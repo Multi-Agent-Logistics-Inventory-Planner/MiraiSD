@@ -1,0 +1,40 @@
+# --- Core data stack ---
+pandas==2.2.2
+numpy<2.0.0
+python-dateutil>=2.8.2
+pytz>=2024.1
+
+# --- Forecasting ---
+prophet==1.1.5
+cmdstanpy>=1.2.0
+
+# --- API / serving ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+orjson==3.10.7
+
+# --- Streaming / event sim ---
+kafka-python==2.0.2
+watchdog==4.0.1
+
+# --- Storage / ORM ---
+SQLAlchemy==2.0.35
+
+# --- Monitoring / metrics ---
+scikit-learn==1.5.2
+
+# --- Visualization / debugging (optional) ---
+matplotlib==3.9.2
+
+# --- Utilities ---
+pydantic==2.9.2
+python-dotenv==1.0.1
+rich==13.9.4
+
+# --- Dev tooling ---
+pytest>=7.4.0
+pytest-cov>=4.1.0
+ruff>=0.1.0
+black>=24.0.0
+mypy>=1.5.0
+pre-commit>=3.5.0
