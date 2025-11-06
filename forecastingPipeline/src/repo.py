@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
+import uuid
 
 from . import config
 
@@ -19,17 +20,30 @@ REQUIRED_INVENTORY_COLUMNS: Iterable[str] = (
     "current_qty",
 )
 
-FORECAST_OUTPUT_COLUMNS: Iterable[str] = (
-    "run_id",
+# Forecast schema (database contract)
+FORECAST_INPUT_COLUMNS: Iterable[str] = (
     "item_id",
     "computed_at",
-    "avg_daily_demand",
+    "horizon_days",
+    "avg_daily_delta",
     "days_to_stockout",
-    "reorder_point",
-    "lead_time_days",
-    "safety_stock",
+    "suggested_reorder_qty",
     "suggested_order_date",
-    "suggested_qty",
+    "confidence",
+    "features",
+)
+
+FORECAST_OUTPUT_COLUMNS: Iterable[str] = (
+    "id",
+    "item_id",
+    "computed_at",
+    "horizon_days",
+    "avg_daily_delta",
+    "days_to_stockout",
+    "suggested_reorder_qty",
+    "suggested_order_date",
+    "confidence",
+    "features",
 )
 
 
@@ -64,13 +78,26 @@ def load_inventories() -> pd.DataFrame:
     return df
 
 
-def write_forecasts(forecasts: pd.DataFrame) -> Path:
-    _ensure_columns(forecasts, FORECAST_OUTPUT_COLUMNS)
+def write_forecasts(forecasts_df: pd.DataFrame) -> Path:
+    """Write forecast predictions (database-aligned schema) to CSV.
+
+    Expects DataFrame with FORECAST_INPUT_COLUMNS. Adds `id` if missing and
+    writes columns ordered as FORECAST_OUTPUT_COLUMNS.
+    """
+    _ensure_columns(forecasts_df, FORECAST_INPUT_COLUMNS)
     out_dir = config.OUTPUT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "forecast_predictions.csv"
-    forecasts.to_csv(out_path, index=False)
+    df = forecasts_df.copy()
+    if "id" not in df.columns:
+        df.insert(0, "id", [str(uuid.uuid4()) for _ in range(len(df))])
+    df = df[[c for c in FORECAST_OUTPUT_COLUMNS]]
+    df.to_csv(out_path, index=False)
     return out_path
+
+
+
+
 
 
 class Repo:
