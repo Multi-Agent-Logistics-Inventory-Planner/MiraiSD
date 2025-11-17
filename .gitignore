@@ -1,0 +1,186 @@
+# ============================================
+# MIRAI INVENTORY - PROJECT-SPECIFIC
+# ============================================
+
+# HTTP Request files (testing scripts)
+# http-requests/
+
+# Reference documentation
+# refs/
+
+# Environment variables (contains sensitive data)
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# JAVA / SPRING BOOT
+# ============================================
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Java compiled files
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# ============================================
+# IDE - IntelliJ IDEA
+# ============================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.idea_modules/
+
+# ============================================
+# IDE - Eclipse
+# ============================================
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# ============================================
+# IDE - VS Code
+# ============================================
+.vscode/
+*.code-workspace
+.history/
+
+# ============================================
+# IDE - NetBeans
+# ============================================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ============================================
+# MACOS
+# ============================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ============================================
+# WINDOWS
+# ============================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# ============================================
+# LINUX
+# ============================================
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# DATABASE
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# DOCKER
+# ============================================
+# Keep docker-compose.yml and Dockerfile, but ignore runtime files
+.dockerignore
+
+# ============================================
+# NODE (for frontend if applicable)
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ============================================
+# TEMPORARY & BACKUP FILES
+# ============================================
+*.tmp
+*.bak
+*.swp
+*.swo
+*~.nib
+*.orig
+
+# ============================================
+# SECURITY & SECRETS
+# ============================================
+*.pem
+*.key
+*.p12
+*.jks
+application-secrets.properties
+application-local.properties
+secrets/
+
