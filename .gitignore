@@ -1,12 +1,8 @@
-# ============================================
-# MIRAI INVENTORY - PROJECT-SPECIFIC
-# ============================================
-
 # HTTP Request files (testing scripts)
-# http-requests/
+http-requests/
 
 # Reference documentation
-# refs/
+refs/
 
 # Environment variables (contains sensitive data)
 .env
@@ -14,48 +10,10 @@
 .env.*.local
 
 # ============================================
-# JAVA / SPRING BOOT
+# IDE - WORKSPACE LEVEL
 # ============================================
 
-# Maven
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-
-# Gradle
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-# Java compiled files
-*.class
-*.jar
-*.war
-*.ear
-*.zip
-*.tar.gz
-*.rar
-
-# Log files
-*.log
-logs/
-*.log.*
-
-# ============================================
-# IDE - IntelliJ IDEA
-# ============================================
+# IntelliJ IDEA
 .idea/
 *.iws
 *.iml
@@ -63,9 +21,7 @@ logs/
 out/
 .idea_modules/
 
-# ============================================
-# IDE - Eclipse
-# ============================================
+# Eclipse
 .apt_generated
 .classpath
 .factorypath
@@ -73,20 +29,13 @@ out/
 .settings
 .springBeans
 .sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
 
-# ============================================
-# IDE - VS Code
-# ============================================
+# VS Code
 .vscode/
 *.code-workspace
 .history/
 
-# ============================================
-# IDE - NetBeans
-# ============================================
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
@@ -150,18 +99,7 @@ $RECYCLE.BIN/
 # ============================================
 # DOCKER
 # ============================================
-# Keep docker-compose.yml and Dockerfile, but ignore runtime files
 .dockerignore
-
-# ============================================
-# NODE (for frontend if applicable)
-# ============================================
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
 
 # ============================================
 # TEMPORARY & BACKUP FILES
@@ -183,4 +121,3 @@ lerna-debug.log*
 application-secrets.properties
 application-local.properties
 secrets/
-
