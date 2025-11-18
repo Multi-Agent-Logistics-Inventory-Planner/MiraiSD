@@ -61,6 +61,25 @@ services:
     networks:
       - mirai
 
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://inventory-service:4000
+      - NEXT_PUBLIC_KAFKA_UI_URL=http://kafka-ui:8000
+    depends_on:
+      - inventory-service
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    networks:
+      - mirai
+
 volumes:
   kafka-data:
 
