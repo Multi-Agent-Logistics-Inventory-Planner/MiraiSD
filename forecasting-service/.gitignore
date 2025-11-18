@@ -27,7 +27,6 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-*.manifest
 *.spec
 
 # Installer logs
@@ -54,9 +53,7 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
-db.sqlite3
 db.sqlite3-journal
 
 # Flask stuff:
@@ -103,7 +100,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -135,25 +131,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Desktop.ini
-
-# Project specific
+# Project specific data files
 *.csv
 *.ndjson
 *.parquet
