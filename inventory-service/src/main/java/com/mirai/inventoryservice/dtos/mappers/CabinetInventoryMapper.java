@@ -12,8 +12,11 @@ import java.util.List;
 public interface CabinetInventoryMapper {
     @Mapping(source = "cabinet.id", target = "cabinetId")
     @Mapping(source = "cabinet.cabinetCode", target = "cabinetCode")
+    @Mapping(source = "item.id", target = "itemId")
+    @Mapping(source = "item.sku", target = "itemSku")
+    @Mapping(source = "item.name", target = "itemName")
+    @Mapping(source = "item.category", target = "itemCategory")
     CabinetInventoryResponseDTO toResponseDTO(CabinetInventory inventory);
     
     List<CabinetInventoryResponseDTO> toResponseDTOList(List<CabinetInventory> inventories);
 }
-

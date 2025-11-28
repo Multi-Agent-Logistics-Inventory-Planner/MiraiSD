@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.models.Item;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -102,8 +103,11 @@ public class StockMovementService {
             metadata.put("notes", request.getNotes());
         }
         
+        // Extract item from inventory
+        Item inventoryItem = getInventoryItem(inventory);
+        
         StockMovement movement = StockMovement.builder()
-                .itemId(inventoryId)
+                .item(inventoryItem)
                 .locationType(locationType)
                 .quantityChange(request.getQuantityChange())
                 .reason(request.getReason())
@@ -158,9 +162,13 @@ public class StockMovementService {
         UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
         UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
         
+        // Extract items from inventory
+        Item sourceItem = getInventoryItem(sourceInventory);
+        Item destinationItem = getInventoryItem(destinationInventory);
+        
         // 7. Create withdrawal movement
         StockMovement withdrawal = StockMovement.builder()
-                .itemId(request.getSourceInventoryId())
+                .item(sourceItem)
                 .locationType(request.getSourceLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
@@ -173,7 +181,7 @@ public class StockMovementService {
         
         // 8. Create deposit movement
         StockMovement deposit = StockMovement.builder()
-                .itemId(request.getDestinationInventoryId())
+                .item(destinationItem)
                 .locationType(request.getDestinationLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
@@ -196,14 +204,26 @@ public class StockMovementService {
      * Get movement history for an inventory item
      */
     public Page<StockMovement> getMovementHistory(UUID itemId, Pageable pageable) {
-        return stockMovementRepository.findByItemIdOrderByAtDesc(itemId, pageable);
+        return stockMovementRepository.findByItem_IdOrderByAtDesc(itemId, pageable);
     }
 
     public List<StockMovement> getMovementHistory(UUID itemId) {
-        return stockMovementRepository.findByItemIdOrderByAtDesc(itemId);
+        return stockMovementRepository.findByItem_IdOrderByAtDesc(itemId);
     }
 
     // ========= Helper Methods =========
+    
+    private Item getInventoryItem(Object inventory) {
+        return switch (inventory) {
+            case BoxBinInventory bbi -> bbi.getItem();
+            case SingleClawMachineInventory scmi -> scmi.getItem();
+            case DoubleClawMachineInventory dcmi -> dcmi.getItem();
+            case KeychainMachineInventory kmi -> kmi.getItem();
+            case CabinetInventory ci -> ci.getItem();
+            case RackInventory ri -> ri.getItem();
+            default -> throw new IllegalArgumentException("Unknown inventory type");
+        };
+    }
 
     @NonNull
     private Object loadInventory(LocationType locationType, UUID inventoryId) {

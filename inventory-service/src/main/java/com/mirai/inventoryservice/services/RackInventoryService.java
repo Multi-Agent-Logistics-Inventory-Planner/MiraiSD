@@ -1,8 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.RackInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Item;
 import com.mirai.inventoryservice.models.inventory.RackInventory;
 import com.mirai.inventoryservice.models.storage.Rack;
 import com.mirai.inventoryservice.repositories.RackInventoryRepository;
@@ -17,31 +16,28 @@ import java.util.UUID;
 public class RackInventoryService {
     private final RackInventoryRepository rackInventoryRepository;
     private final RackService rackService;
+    private final ItemService itemService;
 
     public RackInventoryService(
             RackInventoryRepository rackInventoryRepository,
-            RackService rackService) {
+            RackService rackService,
+            ItemService itemService) {
         this.rackInventoryRepository = rackInventoryRepository;
         this.rackService = rackService;
+        this.itemService = itemService;
     }
 
     public RackInventory addInventory(
             UUID rackId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         Rack rack = rackService.getRackById(rackId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
+        Item item = itemService.getItemById(itemId);
         
         RackInventory inventory = RackInventory.builder()
                 .rack(rack)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(item)
                 .quantity(quantity)
                 .build();
         
@@ -62,29 +58,16 @@ public class RackInventoryService {
 
     public RackInventory updateInventory(
             UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         RackInventory inventory = getInventoryById(inventoryId);
         
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (itemId != null) {
+            Item item = itemService.getItemById(itemId);
+            inventory.setItem(item);
         }
         
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
         if (quantity != null) inventory.setQuantity(quantity);
         
         return rackInventoryRepository.save(inventory);
@@ -95,4 +78,3 @@ public class RackInventoryService {
         rackInventoryRepository.delete(inventory);
     }
 }
-

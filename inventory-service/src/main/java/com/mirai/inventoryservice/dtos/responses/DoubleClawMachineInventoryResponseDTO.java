@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.dtos.responses;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,11 +16,11 @@ public class DoubleClawMachineInventoryResponseDTO {
     private UUID id;
     private UUID doubleClawMachineId;
     private String doubleClawMachineCode;
-    private ProductCategory category;
-    private ProductSubcategory subcategory;
-    private String description;
+    private UUID itemId;
+    private String itemSku;
+    private String itemName;
+    private String itemCategory;
     private Integer quantity;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }
-

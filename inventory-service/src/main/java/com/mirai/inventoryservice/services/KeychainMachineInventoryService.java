@@ -1,8 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.KeychainMachineInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Item;
 import com.mirai.inventoryservice.models.inventory.KeychainMachineInventory;
 import com.mirai.inventoryservice.models.storage.KeychainMachine;
 import com.mirai.inventoryservice.repositories.KeychainMachineInventoryRepository;
@@ -17,31 +16,28 @@ import java.util.UUID;
 public class KeychainMachineInventoryService {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final KeychainMachineService keychainMachineService;
+    private final ItemService itemService;
 
     public KeychainMachineInventoryService(
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
-            KeychainMachineService keychainMachineService) {
+            KeychainMachineService keychainMachineService,
+            ItemService itemService) {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.keychainMachineService = keychainMachineService;
+        this.itemService = itemService;
     }
 
     public KeychainMachineInventory addInventory(
             UUID keychainMachineId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         KeychainMachine machine = keychainMachineService.getKeychainMachineById(keychainMachineId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
+        Item item = itemService.getItemById(itemId);
         
         KeychainMachineInventory inventory = KeychainMachineInventory.builder()
                 .keychainMachine(machine)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(item)
                 .quantity(quantity)
                 .build();
         
@@ -62,29 +58,16 @@ public class KeychainMachineInventoryService {
 
     public KeychainMachineInventory updateInventory(
             UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         KeychainMachineInventory inventory = getInventoryById(inventoryId);
         
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (itemId != null) {
+            Item item = itemService.getItemById(itemId);
+            inventory.setItem(item);
         }
         
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
         if (quantity != null) inventory.setQuantity(quantity);
         
         return keychainMachineInventoryRepository.save(inventory);
@@ -95,4 +78,3 @@ public class KeychainMachineInventoryService {
         keychainMachineInventoryRepository.delete(inventory);
     }
 }
-

@@ -1,8 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.SingleClawMachineInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Item;
 import com.mirai.inventoryservice.models.inventory.SingleClawMachineInventory;
 import com.mirai.inventoryservice.models.storage.SingleClawMachine;
 import com.mirai.inventoryservice.repositories.SingleClawMachineInventoryRepository;
@@ -17,31 +16,28 @@ import java.util.UUID;
 public class SingleClawMachineInventoryService {
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final SingleClawMachineService singleClawMachineService;
+    private final ItemService itemService;
 
     public SingleClawMachineInventoryService(
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
-            SingleClawMachineService singleClawMachineService) {
+            SingleClawMachineService singleClawMachineService,
+            ItemService itemService) {
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.singleClawMachineService = singleClawMachineService;
+        this.itemService = itemService;
     }
 
     public SingleClawMachineInventory addInventory(
             UUID singleClawMachineId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         SingleClawMachine machine = singleClawMachineService.getSingleClawMachineById(singleClawMachineId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
+        Item item = itemService.getItemById(itemId);
         
         SingleClawMachineInventory inventory = SingleClawMachineInventory.builder()
                 .singleClawMachine(machine)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(item)
                 .quantity(quantity)
                 .build();
         
@@ -62,29 +58,16 @@ public class SingleClawMachineInventoryService {
 
     public SingleClawMachineInventory updateInventory(
             UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         SingleClawMachineInventory inventory = getInventoryById(inventoryId);
         
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (itemId != null) {
+            Item item = itemService.getItemById(itemId);
+            inventory.setItem(item);
         }
         
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
         if (quantity != null) inventory.setQuantity(quantity);
         
         return singleClawMachineInventoryRepository.save(inventory);
@@ -95,4 +78,3 @@ public class SingleClawMachineInventoryService {
         singleClawMachineInventoryRepository.delete(inventory);
     }
 }
-

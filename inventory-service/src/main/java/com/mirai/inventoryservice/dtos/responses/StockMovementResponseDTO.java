@@ -19,6 +19,9 @@ public class StockMovementResponseDTO {
     private Long id;
     private LocationType locationType;
     private UUID itemId;
+    private String itemSku;
+    private String itemName;
+    private String itemCategory;
     private UUID fromLocationId;
     private UUID toLocationId;
     private Integer quantityChange;

@@ -12,8 +12,11 @@ import java.util.List;
 public interface RackInventoryMapper {
     @Mapping(source = "rack.id", target = "rackId")
     @Mapping(source = "rack.rackCode", target = "rackCode")
+    @Mapping(source = "item.id", target = "itemId")
+    @Mapping(source = "item.sku", target = "itemSku")
+    @Mapping(source = "item.name", target = "itemName")
+    @Mapping(source = "item.category", target = "itemCategory")
     RackInventoryResponseDTO toResponseDTO(RackInventory inventory);
     
     List<RackInventoryResponseDTO> toResponseDTOList(List<RackInventory> inventories);
 }
-

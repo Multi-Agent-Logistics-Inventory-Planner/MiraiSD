@@ -12,6 +12,10 @@ import java.util.List;
 public interface BoxBinInventoryMapper {
     @Mapping(source = "boxBin.id", target = "boxBinId")
     @Mapping(source = "boxBin.boxBinCode", target = "boxBinCode")
+    @Mapping(source = "item.id", target = "itemId")
+    @Mapping(source = "item.sku", target = "itemSku")
+    @Mapping(source = "item.name", target = "itemName")
+    @Mapping(source = "item.category", target = "itemCategory")
     BoxBinInventoryResponseDTO toResponseDTO(BoxBinInventory inventory);
     
     List<BoxBinInventoryResponseDTO> toResponseDTOList(List<BoxBinInventory> inventories);

@@ -12,8 +12,11 @@ import java.util.List;
 public interface SingleClawMachineInventoryMapper {
     @Mapping(source = "singleClawMachine.id", target = "singleClawMachineId")
     @Mapping(source = "singleClawMachine.singleClawMachineCode", target = "singleClawMachineCode")
+    @Mapping(source = "item.id", target = "itemId")
+    @Mapping(source = "item.sku", target = "itemSku")
+    @Mapping(source = "item.name", target = "itemName")
+    @Mapping(source = "item.category", target = "itemCategory")
     SingleClawMachineInventoryResponseDTO toResponseDTO(SingleClawMachineInventory inventory);
     
     List<SingleClawMachineInventoryResponseDTO> toResponseDTOList(List<SingleClawMachineInventory> inventories);
 }
-

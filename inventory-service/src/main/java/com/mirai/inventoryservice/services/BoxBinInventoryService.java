@@ -1,8 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.BoxBinInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Item;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
@@ -17,31 +16,28 @@ import java.util.UUID;
 public class BoxBinInventoryService {
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final BoxBinService boxBinService;
+    private final ItemService itemService;
 
     public BoxBinInventoryService(
             BoxBinInventoryRepository boxBinInventoryRepository,
-            BoxBinService boxBinService) {
+            BoxBinService boxBinService,
+            ItemService itemService) {
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.boxBinService = boxBinService;
+        this.itemService = itemService;
     }
 
     public BoxBinInventory addInventory(
             UUID boxBinId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         BoxBin boxBin = boxBinService.getBoxBinById(boxBinId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
+        Item item = itemService.getItemById(itemId);
         
         BoxBinInventory inventory = BoxBinInventory.builder()
                 .boxBin(boxBin)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(item)
                 .quantity(quantity)
                 .build();
         
@@ -62,29 +58,16 @@ public class BoxBinInventoryService {
 
     public BoxBinInventory updateInventory(
             UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
+            UUID itemId,
             Integer quantity) {
         
         BoxBinInventory inventory = getInventoryById(inventoryId);
         
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (itemId != null) {
+            Item item = itemService.getItemById(itemId);
+            inventory.setItem(item);
         }
         
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
         if (quantity != null) inventory.setQuantity(quantity);
         
         return boxBinInventoryRepository.save(inventory);
