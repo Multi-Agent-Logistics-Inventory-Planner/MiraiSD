@@ -121,3 +121,10 @@ $RECYCLE.BIN/
 application-secrets.properties
 application-local.properties
 secrets/
+
+# ============================================
+# MARKDOWN FILES
+# ============================================
+# Ignore all markdown files except README.md
+*.md
+!README.md
