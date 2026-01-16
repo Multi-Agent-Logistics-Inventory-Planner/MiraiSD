@@ -36,10 +36,17 @@ cd mirai
 
 2. Edit the `.env` file and fill in your Supabase credentials:
    ```
-   SUPABASE_DB_URL=jdbc:postgresql://db.xxxxxxxxxx.supabase.co:5432/postgres
+   SUPABASE_DB_URL=jdbc:postgresql://db.xxxxxxxxxx.supabase.co:6543/postgres?pgbouncer=true
    SUPABASE_DB_USERNAME=postgres
    SUPABASE_DB_PASSWORD=your-actual-password
    ```
+
+   **Important:** Use the **Session Pooler** connection string (port 6543) instead of direct connection (port 5432) for IPv4 compatibility in Docker.
+   
+   To get the correct connection string:
+   - Go to Supabase Dashboard → Settings → Database → Connection Pooling
+   - Copy the connection string from "Session mode"
+   - It should include `:6543` port and `pgbouncer=true` parameter
 
    **Note:** Ask a teammate for the actual Supabase credentials if you don't have them.
 
@@ -188,6 +195,8 @@ mvn spring-boot:run
 
 **Database connection errors:**
 - Verify your `.env` file has correct Supabase credentials
+- **Use Session Pooler (port 6543)** instead of direct connection (port 5432) for IPv4 compatibility
+- If you see "Connection refused", make sure you're using port 6543 with `pgbouncer=true`
 - Check if your IP is whitelisted in Supabase dashboard
 
 **"Port already in use" errors:**

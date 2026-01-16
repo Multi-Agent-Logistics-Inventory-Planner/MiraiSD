@@ -1,9 +1,3 @@
-# HTTP Request files (testing scripts)
-http-requests/
-
-# Reference documentation
-refs/
-
 # Environment variables (contains sensitive data)
 .env
 .env.local
@@ -122,9 +116,11 @@ application-secrets.properties
 application-local.properties
 secrets/
 
-# ============================================
-# MARKDOWN FILES
-# ============================================
-# Ignore all markdown files except README.md
 *.md
 !README.md
+.context/
+.claude/
+.mcp.json
+
+# Reference documentation
+refs/
