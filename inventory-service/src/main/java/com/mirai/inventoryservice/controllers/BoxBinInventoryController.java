@@ -46,9 +46,7 @@ public class BoxBinInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         BoxBinInventory inventory = boxBinInventoryService.addInventory(
                 boxBinId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(boxBinInventoryMapper.toResponseDTO(inventory));
@@ -61,9 +59,6 @@ public class BoxBinInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         BoxBinInventory inventory = boxBinInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(boxBinInventoryMapper.toResponseDTO(inventory));
     }

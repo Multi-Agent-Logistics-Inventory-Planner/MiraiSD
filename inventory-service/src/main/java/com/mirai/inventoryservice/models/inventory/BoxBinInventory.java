@@ -1,7 +1,6 @@
 package com.mirai.inventoryservice.models.inventory;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
@@ -32,17 +31,10 @@ public class BoxBinInventory {
     @NotNull
     private BoxBin boxBin;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", nullable = false)
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ProductCategory category;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = true)
-    private ProductSubcategory subcategory;
-
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    private Product item;
 
     @NotNull
     @Min(0)

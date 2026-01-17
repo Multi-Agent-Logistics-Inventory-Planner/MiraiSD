@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.audit;
 
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.persistence.*;
@@ -31,9 +32,10 @@ public class StockMovement {
     @Column(name = "location_type", nullable = false)
     private LocationType locationType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_id", nullable = false)
     @NotNull
-    @Column(name = "item_id", nullable = false)
-    private UUID itemId;
+    private Product item;
 
     @Column(name = "from_location_id")
     private UUID fromLocationId;

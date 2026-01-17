@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.KeychainMachineInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.inventory.KeychainMachineInventory;
 import com.mirai.inventoryservice.models.storage.KeychainMachine;
 import com.mirai.inventoryservice.repositories.KeychainMachineInventoryRepository;
@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,34 +18,34 @@ import java.util.UUID;
 public class KeychainMachineInventoryService {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final KeychainMachineService keychainMachineService;
+    private final ProductService productService;
 
     public KeychainMachineInventoryService(
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
-            KeychainMachineService keychainMachineService) {
+            KeychainMachineService keychainMachineService,
+            ProductService productService) {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.keychainMachineService = keychainMachineService;
+        this.productService = productService;
     }
 
-    public KeychainMachineInventory addInventory(
-            UUID keychainMachineId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public KeychainMachineInventory addInventory(UUID keychainMachineId, UUID productId, Integer quantity) {
         KeychainMachine machine = keychainMachineService.getKeychainMachineById(keychainMachineId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
-        
+        Product product = productService.getProductById(productId);
+
+        Optional<KeychainMachineInventory> existing = keychainMachineInventoryRepository
+                .findByKeychainMachine_IdAndItem_Id(keychainMachineId, productId);
+        if (existing.isPresent()) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory for product " + product.getSku() + " already exists in this machine");
+        }
+
         KeychainMachineInventory inventory = KeychainMachineInventory.builder()
                 .keychainMachine(machine)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(product)
                 .quantity(quantity)
                 .build();
-        
+
         return keychainMachineInventoryRepository.save(inventory);
     }
 
@@ -55,38 +56,19 @@ public class KeychainMachineInventoryService {
     }
 
     public List<KeychainMachineInventory> listInventory(UUID keychainMachineId) {
-        // Verify machine exists
         keychainMachineService.getKeychainMachineById(keychainMachineId);
         return keychainMachineInventoryRepository.findByKeychainMachine_Id(keychainMachineId);
     }
 
-    public KeychainMachineInventory updateInventory(
-            UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public List<KeychainMachineInventory> findByProduct(UUID productId) {
+        return keychainMachineInventoryRepository.findByItem_Id(productId);
+    }
+
+    public KeychainMachineInventory updateInventory(UUID inventoryId, Integer quantity) {
         KeychainMachineInventory inventory = getInventoryById(inventoryId);
-        
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (quantity != null) {
+            inventory.setQuantity(quantity);
         }
-        
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
-        if (quantity != null) inventory.setQuantity(quantity);
-        
         return keychainMachineInventoryRepository.save(inventory);
     }
 
@@ -95,4 +77,3 @@ public class KeychainMachineInventoryService {
         keychainMachineInventoryRepository.delete(inventory);
     }
 }
-

@@ -48,9 +48,7 @@ public class KeychainMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         KeychainMachineInventory inventory = keychainMachineInventoryService.addInventory(
                 keychainMachineId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(keychainMachineInventoryMapper.toResponseDTO(inventory));
@@ -63,9 +61,6 @@ public class KeychainMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         KeychainMachineInventory inventory = keychainMachineInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(keychainMachineInventoryMapper.toResponseDTO(inventory));
     }

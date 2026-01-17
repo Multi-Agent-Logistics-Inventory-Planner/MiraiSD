@@ -5,10 +5,10 @@ public enum ProductSubcategory {
     POKEMON,
     POPMART,
     SANRIO_SAN_X,
-    _52_TOYS,
+    FIFTY_TWO_TOYS,
     ROLIFE,
     TOY_CITY,
     MINISO,
-    MISC
+    MISCELLANEOUS
 }
 

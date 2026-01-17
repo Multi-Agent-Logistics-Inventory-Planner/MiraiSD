@@ -8,12 +8,13 @@ import org.mapstruct.MappingConstants;
 
 import java.util.List;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {ProductMapper.class})
 public interface BoxBinInventoryMapper {
     @Mapping(source = "boxBin.id", target = "boxBinId")
     @Mapping(source = "boxBin.boxBinCode", target = "boxBinCode")
+    @Mapping(source = "item", target = "item")
     BoxBinInventoryResponseDTO toResponseDTO(BoxBinInventory inventory);
-    
+
     List<BoxBinInventoryResponseDTO> toResponseDTOList(List<BoxBinInventory> inventories);
 }
 

@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.RackInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.inventory.RackInventory;
 import com.mirai.inventoryservice.models.storage.Rack;
 import com.mirai.inventoryservice.repositories.RackInventoryRepository;
@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,34 +18,34 @@ import java.util.UUID;
 public class RackInventoryService {
     private final RackInventoryRepository rackInventoryRepository;
     private final RackService rackService;
+    private final ProductService productService;
 
     public RackInventoryService(
             RackInventoryRepository rackInventoryRepository,
-            RackService rackService) {
+            RackService rackService,
+            ProductService productService) {
         this.rackInventoryRepository = rackInventoryRepository;
         this.rackService = rackService;
+        this.productService = productService;
     }
 
-    public RackInventory addInventory(
-            UUID rackId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public RackInventory addInventory(UUID rackId, UUID productId, Integer quantity) {
         Rack rack = rackService.getRackById(rackId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
-        
+        Product product = productService.getProductById(productId);
+
+        Optional<RackInventory> existing = rackInventoryRepository
+                .findByRack_IdAndItem_Id(rackId, productId);
+        if (existing.isPresent()) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory for product " + product.getSku() + " already exists in this rack");
+        }
+
         RackInventory inventory = RackInventory.builder()
                 .rack(rack)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(product)
                 .quantity(quantity)
                 .build();
-        
+
         return rackInventoryRepository.save(inventory);
     }
 
@@ -55,38 +56,19 @@ public class RackInventoryService {
     }
 
     public List<RackInventory> listInventory(UUID rackId) {
-        // Verify rack exists
         rackService.getRackById(rackId);
         return rackInventoryRepository.findByRack_Id(rackId);
     }
 
-    public RackInventory updateInventory(
-            UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public List<RackInventory> findByProduct(UUID productId) {
+        return rackInventoryRepository.findByItem_Id(productId);
+    }
+
+    public RackInventory updateInventory(UUID inventoryId, Integer quantity) {
         RackInventory inventory = getInventoryById(inventoryId);
-        
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (quantity != null) {
+            inventory.setQuantity(quantity);
         }
-        
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
-        if (quantity != null) inventory.setQuantity(quantity);
-        
         return rackInventoryRepository.save(inventory);
     }
 

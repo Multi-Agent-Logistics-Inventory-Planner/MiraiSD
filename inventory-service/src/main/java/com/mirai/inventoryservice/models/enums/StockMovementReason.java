@@ -6,6 +6,7 @@ public enum StockMovementReason {
     SALE,
     DAMAGE,
     ADJUSTMENT,
-    EXPIRY
+    RETURN,
+    TRANSFER
 }
 

@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.DoubleClawMachineInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.inventory.DoubleClawMachineInventory;
 import com.mirai.inventoryservice.models.storage.DoubleClawMachine;
 import com.mirai.inventoryservice.repositories.DoubleClawMachineInventoryRepository;
@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,34 +18,34 @@ import java.util.UUID;
 public class DoubleClawMachineInventoryService {
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
     private final DoubleClawMachineService doubleClawMachineService;
+    private final ProductService productService;
 
     public DoubleClawMachineInventoryService(
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
-            DoubleClawMachineService doubleClawMachineService) {
+            DoubleClawMachineService doubleClawMachineService,
+            ProductService productService) {
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
         this.doubleClawMachineService = doubleClawMachineService;
+        this.productService = productService;
     }
 
-    public DoubleClawMachineInventory addInventory(
-            UUID doubleClawMachineId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public DoubleClawMachineInventory addInventory(UUID doubleClawMachineId, UUID productId, Integer quantity) {
         DoubleClawMachine machine = doubleClawMachineService.getDoubleClawMachineById(doubleClawMachineId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
-        
+        Product product = productService.getProductById(productId);
+
+        Optional<DoubleClawMachineInventory> existing = doubleClawMachineInventoryRepository
+                .findByDoubleClawMachine_IdAndItem_Id(doubleClawMachineId, productId);
+        if (existing.isPresent()) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory for product " + product.getSku() + " already exists in this machine");
+        }
+
         DoubleClawMachineInventory inventory = DoubleClawMachineInventory.builder()
                 .doubleClawMachine(machine)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(product)
                 .quantity(quantity)
                 .build();
-        
+
         return doubleClawMachineInventoryRepository.save(inventory);
     }
 
@@ -55,38 +56,19 @@ public class DoubleClawMachineInventoryService {
     }
 
     public List<DoubleClawMachineInventory> listInventory(UUID doubleClawMachineId) {
-        // Verify machine exists
         doubleClawMachineService.getDoubleClawMachineById(doubleClawMachineId);
         return doubleClawMachineInventoryRepository.findByDoubleClawMachine_Id(doubleClawMachineId);
     }
 
-    public DoubleClawMachineInventory updateInventory(
-            UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public List<DoubleClawMachineInventory> findByProduct(UUID productId) {
+        return doubleClawMachineInventoryRepository.findByItem_Id(productId);
+    }
+
+    public DoubleClawMachineInventory updateInventory(UUID inventoryId, Integer quantity) {
         DoubleClawMachineInventory inventory = getInventoryById(inventoryId);
-        
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (quantity != null) {
+            inventory.setQuantity(quantity);
         }
-        
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
-        if (quantity != null) inventory.setQuantity(quantity);
-        
         return doubleClawMachineInventoryRepository.save(inventory);
     }
 
@@ -95,4 +77,3 @@ public class DoubleClawMachineInventoryService {
         doubleClawMachineInventoryRepository.delete(inventory);
     }
 }
-

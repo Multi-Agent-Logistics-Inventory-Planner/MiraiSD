@@ -27,8 +27,8 @@ public class User {
     private UUID id;
 
     @NotBlank
-    @Column(unique = true, nullable = false)
-    private String username;
+    @Column(name = "full_name", nullable = false)
+    private String fullName;
 
     @NotBlank
     @Email
@@ -39,9 +39,6 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role;
-
-    @Column(name = "supabase_uid")
-    private String supabaseUid;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

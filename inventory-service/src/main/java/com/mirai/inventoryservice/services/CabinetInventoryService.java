@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.CabinetInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.inventory.CabinetInventory;
 import com.mirai.inventoryservice.models.storage.Cabinet;
 import com.mirai.inventoryservice.repositories.CabinetInventoryRepository;
@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,34 +18,34 @@ import java.util.UUID;
 public class CabinetInventoryService {
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final CabinetService cabinetService;
+    private final ProductService productService;
 
     public CabinetInventoryService(
             CabinetInventoryRepository cabinetInventoryRepository,
-            CabinetService cabinetService) {
+            CabinetService cabinetService,
+            ProductService productService) {
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.cabinetService = cabinetService;
+        this.productService = productService;
     }
 
-    public CabinetInventory addInventory(
-            UUID cabinetId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public CabinetInventory addInventory(UUID cabinetId, UUID productId, Integer quantity) {
         Cabinet cabinet = cabinetService.getCabinetById(cabinetId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
-        
+        Product product = productService.getProductById(productId);
+
+        Optional<CabinetInventory> existing = cabinetInventoryRepository
+                .findByCabinet_IdAndItem_Id(cabinetId, productId);
+        if (existing.isPresent()) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory for product " + product.getSku() + " already exists in this cabinet");
+        }
+
         CabinetInventory inventory = CabinetInventory.builder()
                 .cabinet(cabinet)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(product)
                 .quantity(quantity)
                 .build();
-        
+
         return cabinetInventoryRepository.save(inventory);
     }
 
@@ -55,38 +56,19 @@ public class CabinetInventoryService {
     }
 
     public List<CabinetInventory> listInventory(UUID cabinetId) {
-        // Verify cabinet exists
         cabinetService.getCabinetById(cabinetId);
         return cabinetInventoryRepository.findByCabinet_Id(cabinetId);
     }
 
-    public CabinetInventory updateInventory(
-            UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public List<CabinetInventory> findByProduct(UUID productId) {
+        return cabinetInventoryRepository.findByItem_Id(productId);
+    }
+
+    public CabinetInventory updateInventory(UUID inventoryId, Integer quantity) {
         CabinetInventory inventory = getInventoryById(inventoryId);
-        
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (quantity != null) {
+            inventory.setQuantity(quantity);
         }
-        
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
-        if (quantity != null) inventory.setQuantity(quantity);
-        
         return cabinetInventoryRepository.save(inventory);
     }
 
@@ -95,4 +77,3 @@ public class CabinetInventoryService {
         cabinetInventoryRepository.delete(inventory);
     }
 }
-

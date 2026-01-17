@@ -46,9 +46,7 @@ public class CabinetInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         CabinetInventory inventory = cabinetInventoryService.addInventory(
                 cabinetId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(cabinetInventoryMapper.toResponseDTO(inventory));
@@ -61,9 +59,6 @@ public class CabinetInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         CabinetInventory inventory = cabinetInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(cabinetInventoryMapper.toResponseDTO(inventory));
     }

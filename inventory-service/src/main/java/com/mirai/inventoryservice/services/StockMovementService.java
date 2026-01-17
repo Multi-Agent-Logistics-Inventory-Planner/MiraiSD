@@ -101,17 +101,18 @@ public class StockMovementService {
         if (request.getNotes() != null) {
             metadata.put("notes", request.getNotes());
         }
-        
+        metadata.put("inventory_id", inventoryId.toString());
+
         StockMovement movement = StockMovement.builder()
-                .itemId(inventoryId)
+                .item(getInventoryProduct(inventory))
                 .locationType(locationType)
                 .quantityChange(request.getQuantityChange())
                 .reason(request.getReason())
                 .actorId(request.getActorId())
                 .at(OffsetDateTime.now())
-                .metadata(metadata.isEmpty() ? null : metadata)
+                .metadata(metadata)
                 .build();
-        
+
         StockMovement savedMovement = stockMovementRepository.save(movement);
         
         // Create outbox event for Kafka
@@ -148,40 +149,45 @@ public class StockMovementService {
         saveInventory(request.getDestinationLocationType(), destinationInventory);
         
         // 5. Create metadata
-        Map<String, Object> metadata = new HashMap<>();
+        Map<String, Object> withdrawalMetadata = new HashMap<>();
+        Map<String, Object> depositMetadata = new HashMap<>();
         if (request.getNotes() != null) {
-            metadata.put("notes", request.getNotes());
+            withdrawalMetadata.put("notes", request.getNotes());
+            depositMetadata.put("notes", request.getNotes());
         }
-        metadata.put("transfer", true);
-        
+        withdrawalMetadata.put("transfer", true);
+        withdrawalMetadata.put("inventory_id", request.getSourceInventoryId().toString());
+        depositMetadata.put("transfer", true);
+        depositMetadata.put("inventory_id", request.getDestinationInventoryId().toString());
+
         // 6. Get location IDs
         UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
         UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
-        
+
         // 7. Create withdrawal movement
         StockMovement withdrawal = StockMovement.builder()
-                .itemId(request.getSourceInventoryId())
+                .item(getInventoryProduct(sourceInventory))
                 .locationType(request.getSourceLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
                 .quantityChange(-request.getQuantity())
-                .reason(StockMovementReason.ADJUSTMENT)
+                .reason(StockMovementReason.TRANSFER)
                 .actorId(request.getActorId())
                 .at(OffsetDateTime.now())
-                .metadata(metadata)
+                .metadata(withdrawalMetadata)
                 .build();
-        
+
         // 8. Create deposit movement
         StockMovement deposit = StockMovement.builder()
-                .itemId(request.getDestinationInventoryId())
+                .item(getInventoryProduct(destinationInventory))
                 .locationType(request.getDestinationLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
                 .quantityChange(request.getQuantity())
-                .reason(StockMovementReason.ADJUSTMENT)
+                .reason(StockMovementReason.TRANSFER)
                 .actorId(request.getActorId())
                 .at(OffsetDateTime.now())
-                .metadata(metadata)
+                .metadata(depositMetadata)
                 .build();
         
         StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
@@ -193,14 +199,14 @@ public class StockMovementService {
     }
 
     /**
-     * Get movement history for an inventory item
+     * Get movement history for a product
      */
-    public Page<StockMovement> getMovementHistory(UUID itemId, Pageable pageable) {
-        return stockMovementRepository.findByItemIdOrderByAtDesc(itemId, pageable);
+    public Page<StockMovement> getMovementHistory(UUID productId, Pageable pageable) {
+        return stockMovementRepository.findByItem_IdOrderByAtDesc(productId, pageable);
     }
 
-    public List<StockMovement> getMovementHistory(UUID itemId) {
-        return stockMovementRepository.findByItemIdOrderByAtDesc(itemId);
+    public List<StockMovement> getMovementHistory(UUID productId) {
+        return stockMovementRepository.findByItem_IdOrderByAtDesc(productId);
     }
 
     // ========= Helper Methods =========
@@ -266,6 +272,18 @@ public class StockMovementService {
             case KEYCHAIN_MACHINE -> ((KeychainMachineInventory) inventory).getKeychainMachine().getId();
             case CABINET -> ((CabinetInventory) inventory).getCabinet().getId();
             case RACK -> ((RackInventory) inventory).getRack().getId();
+        };
+    }
+
+    private com.mirai.inventoryservice.models.Product getInventoryProduct(Object inventory) {
+        return switch (inventory) {
+            case BoxBinInventory bbi -> bbi.getItem();
+            case SingleClawMachineInventory scmi -> scmi.getItem();
+            case DoubleClawMachineInventory dcmi -> dcmi.getItem();
+            case KeychainMachineInventory kmi -> kmi.getItem();
+            case CabinetInventory ci -> ci.getItem();
+            case RackInventory ri -> ri.getItem();
+            default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
 

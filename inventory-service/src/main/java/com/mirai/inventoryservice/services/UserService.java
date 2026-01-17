@@ -19,12 +19,11 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User createUser(String username, String email, UserRole role, String supabaseUid) {
+    public User createUser(String fullName, String email, UserRole role) {
         User user = User.builder()
-                .username(username)
+                .fullName(fullName)
                 .email(email)
                 .role(role)
-                .supabaseUid(supabaseUid)
                 .build();
         return userRepository.save(user);
     }
@@ -39,28 +38,22 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
     }
 
-    public User getUserByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("User not found with username: " + username));
-    }
-
-    public User getUserBySupabaseUid(String supabaseUid) {
-        return userRepository.findBySupabaseUid(supabaseUid)
-                .orElseThrow(() -> new UserNotFoundException("User not found with supabaseUid: " + supabaseUid));
+    public User getUserByFullName(String fullName) {
+        return userRepository.findByFullName(fullName)
+                .orElseThrow(() -> new UserNotFoundException("User not found with fullName: " + fullName));
     }
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
 
-    public User updateUser(UUID id, String username, String email, UserRole role, String supabaseUid) {
+    public User updateUser(UUID id, String fullName, String email, UserRole role) {
         User user = getUserById(id);
-        
-        if (username != null) user.setUsername(username);
+
+        if (fullName != null) user.setFullName(fullName);
         if (email != null) user.setEmail(email);
         if (role != null) user.setRole(role);
-        if (supabaseUid != null) user.setSupabaseUid(supabaseUid);
-        
+
         return userRepository.save(user);
     }
 
@@ -73,8 +66,8 @@ public class UserService {
         return userRepository.existsByEmail(email);
     }
 
-    public boolean existsByUsername(String username) {
-        return userRepository.existsByUsername(username);
+    public boolean existsByFullName(String fullName) {
+        return userRepository.existsByFullName(fullName);
     }
 }
 

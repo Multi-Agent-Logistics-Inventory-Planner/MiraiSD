@@ -42,19 +42,18 @@ public class UserController {
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
-    @GetMapping("/username/{username}")
-    public ResponseEntity<UserResponseDTO> getUserByUsername(@PathVariable String username) {
-        User user = userService.getUserByUsername(username);
+    @GetMapping("/name/{fullName}")
+    public ResponseEntity<UserResponseDTO> getUserByFullName(@PathVariable String fullName) {
+        User user = userService.getUserByFullName(fullName);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @PostMapping
     public ResponseEntity<UserResponseDTO> createUser(@Valid @RequestBody UserRequestDTO requestDTO) {
         User user = userService.createUser(
-                requestDTO.getUsername(),
+                requestDTO.getFullName(),
                 requestDTO.getEmail(),
-                requestDTO.getRole(),
-                requestDTO.getSupabaseUid());
+                requestDTO.getRole());
         return ResponseEntity.status(HttpStatus.CREATED).body(userMapper.toResponseDTO(user));
     }
 
@@ -64,10 +63,9 @@ public class UserController {
             @Valid @RequestBody UserRequestDTO requestDTO) {
         User user = userService.updateUser(
                 id,
-                requestDTO.getUsername(),
+                requestDTO.getFullName(),
                 requestDTO.getEmail(),
-                requestDTO.getRole(),
-                requestDTO.getSupabaseUid());
+                requestDTO.getRole());
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
@@ -77,4 +75,5 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 }
+
 

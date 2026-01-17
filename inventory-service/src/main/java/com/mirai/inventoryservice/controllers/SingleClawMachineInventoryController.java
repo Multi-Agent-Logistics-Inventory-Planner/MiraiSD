@@ -48,9 +48,7 @@ public class SingleClawMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         SingleClawMachineInventory inventory = singleClawMachineInventoryService.addInventory(
                 singleClawMachineId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(singleClawMachineInventoryMapper.toResponseDTO(inventory));
@@ -63,9 +61,6 @@ public class SingleClawMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         SingleClawMachineInventory inventory = singleClawMachineInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(singleClawMachineInventoryMapper.toResponseDTO(inventory));
     }

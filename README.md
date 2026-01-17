@@ -30,11 +30,13 @@ cd mirai
 ## Step 2: Set Up Environment Variables
 
 1. Copy the environment template:
+
    ```bash
    cp env.template .env
    ```
 
 2. Edit the `.env` file and fill in your Supabase credentials:
+
    ```
    SUPABASE_DB_URL=jdbc:postgresql://db.xxxxxxxxxx.supabase.co:6543/postgres?pgbouncer=true
    SUPABASE_DB_USERNAME=postgres
@@ -42,8 +44,9 @@ cd mirai
    ```
 
    **Important:** Use the **Session Pooler** connection string (port 6543) instead of direct connection (port 5432) for IPv4 compatibility in Docker.
-   
+
    To get the correct connection string:
+
    - Go to Supabase Dashboard → Settings → Database → Connection Pooling
    - Copy the connection string from "Session mode"
    - It should include `:6543` port and `pgbouncer=true` parameter
@@ -75,6 +78,7 @@ docker-compose up --build
 ```
 
 This will start:
+
 - **Inventory Service** (Spring Boot API) - http://localhost:4000
 - **Frontend** (Next.js) - http://localhost:3000
 - **Kafka** (Message broker) - localhost:9092
@@ -83,11 +87,13 @@ This will start:
 **First time startup might take 5-10 minutes** while Docker downloads images and builds everything.
 
 To run in the background (detached mode):
+
 ```bash
 docker-compose up -d
 ```
 
 To stop everything:
+
 ```bash
 docker-compose down
 ```
@@ -99,16 +105,19 @@ docker-compose down
 The forecasting service isn't in Docker yet, so run it locally:
 
 1. Navigate to the forecasting service:
+
    ```bash
    cd forecasting-service
    ```
 
 2. Create a Python virtual environment:
+
    ```bash
    python -m venv venv
    ```
 
 3. Activate the virtual environment:
+
    - **Windows:**
      ```bash
      venv\Scripts\activate
@@ -119,6 +128,7 @@ The forecasting service isn't in Docker yet, so run it locally:
      ```
 
 4. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -145,6 +155,7 @@ Once all services are running, check:
 ## Useful Commands
 
 ### Docker Commands
+
 ```bash
 # View logs for all services
 docker-compose logs -f
@@ -171,6 +182,7 @@ docker-compose down -v
 If you want to run services individually for development:
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm install
@@ -179,6 +191,7 @@ npm run dev
 ```
 
 **Inventory Service:**
+
 ```bash
 cd inventory-service
 mvn spring-boot:run
@@ -190,16 +203,19 @@ mvn spring-boot:run
 ## Troubleshooting
 
 **Docker won't start:**
+
 - Make sure Docker Desktop is running
 - Check if ports 3000, 4000, 8080, 9092 are not already in use
 
 **Database connection errors:**
+
 - Verify your `.env` file has correct Supabase credentials
 - **Use Session Pooler (port 6543)** instead of direct connection (port 5432) for IPv4 compatibility
 - If you see "Connection refused", make sure you're using port 6543 with `pgbouncer=true`
 - Check if your IP is whitelisted in Supabase dashboard
 
 **"Port already in use" errors:**
+
 ```bash
 # Find what's using a port (example for port 4000)
 # Windows:
@@ -212,12 +228,14 @@ lsof -i :4000
 ```
 
 **Forecasting service Prophet installation issues:**
+
 - Prophet requires additional system dependencies
 - Windows: May need to install Visual C++ Build Tools
 - Mac: Might need `brew install gcc`
 - Linux: Might need `sudo apt-get install build-essential`
 
 **Maven build fails:**
+
 - Make sure you have Java 17 or higher
 - Try `mvn clean install -U` to force update dependencies
 

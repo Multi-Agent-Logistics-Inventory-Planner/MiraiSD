@@ -8,12 +8,13 @@ import org.mapstruct.MappingConstants;
 
 import java.util.List;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {ProductMapper.class})
 public interface DoubleClawMachineInventoryMapper {
     @Mapping(source = "doubleClawMachine.id", target = "doubleClawMachineId")
     @Mapping(source = "doubleClawMachine.doubleClawMachineCode", target = "doubleClawMachineCode")
+    @Mapping(source = "item", target = "item")
     DoubleClawMachineInventoryResponseDTO toResponseDTO(DoubleClawMachineInventory inventory);
-    
+
     List<DoubleClawMachineInventoryResponseDTO> toResponseDTOList(List<DoubleClawMachineInventory> inventories);
 }
 

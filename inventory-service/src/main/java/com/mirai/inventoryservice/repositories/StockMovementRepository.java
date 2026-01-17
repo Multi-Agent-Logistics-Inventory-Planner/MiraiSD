@@ -13,16 +13,16 @@ import java.util.UUID;
 
 @Repository
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
-    // Find all movements for a specific inventory item, newest first
-    List<StockMovement> findByItemIdOrderByAtDesc(UUID itemId);
-    
+    // Find all movements for a specific product, newest first
+    List<StockMovement> findByItem_IdOrderByAtDesc(UUID productId);
+
     // Paginated version for large histories
-    Page<StockMovement> findByItemIdOrderByAtDesc(UUID itemId, Pageable pageable);
-    
+    Page<StockMovement> findByItem_IdOrderByAtDesc(UUID productId, Pageable pageable);
+
     // Filter by location type
-    List<StockMovement> findByItemIdAndLocationTypeOrderByAtDesc(UUID itemId, LocationType locationType);
-    
+    List<StockMovement> findByItem_IdAndLocationTypeOrderByAtDesc(UUID productId, LocationType locationType);
+
     // Find recent movements (last 30 days, etc)
-    List<StockMovement> findByItemIdAndAtAfterOrderByAtDesc(UUID itemId, OffsetDateTime since);
+    List<StockMovement> findByItem_IdAndAtAfterOrderByAtDesc(UUID productId, OffsetDateTime since);
 }
 

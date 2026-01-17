@@ -46,9 +46,7 @@ public class RackInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         RackInventory inventory = rackInventoryService.addInventory(
                 rackId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(rackInventoryMapper.toResponseDTO(inventory));
@@ -61,9 +59,6 @@ public class RackInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         RackInventory inventory = rackInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(rackInventoryMapper.toResponseDTO(inventory));
     }

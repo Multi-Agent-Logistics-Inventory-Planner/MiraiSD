@@ -27,7 +27,9 @@ public class GlobalExceptionHandler {
             KeychainMachineInventoryNotFoundException.class,
             CabinetInventoryNotFoundException.class,
             RackInventoryNotFoundException.class,
-            UserNotFoundException.class
+            UserNotFoundException.class,
+            ProductNotFoundException.class,
+            ShipmentNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
@@ -41,7 +43,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             InsufficientInventoryException.class,
-            InvalidInventoryOperationException.class
+            InvalidInventoryOperationException.class,
+            InvalidShipmentStatusException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
@@ -51,6 +54,19 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler({
+            DuplicateSkuException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConflictException(RuntimeException ex) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("Conflict")
+                .message(ex.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

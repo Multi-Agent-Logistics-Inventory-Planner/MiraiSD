@@ -48,9 +48,7 @@ public class DoubleClawMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         DoubleClawMachineInventory inventory = doubleClawMachineInventoryService.addInventory(
                 doubleClawMachineId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
+                requestDTO.getItemId(),
                 requestDTO.getQuantity());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(doubleClawMachineInventoryMapper.toResponseDTO(inventory));
@@ -63,9 +61,6 @@ public class DoubleClawMachineInventoryController {
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
         DoubleClawMachineInventory inventory = doubleClawMachineInventoryService.updateInventory(
                 inventoryId,
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
-                requestDTO.getDescription(),
                 requestDTO.getQuantity());
         return ResponseEntity.ok(doubleClawMachineInventoryMapper.toResponseDTO(inventory));
     }

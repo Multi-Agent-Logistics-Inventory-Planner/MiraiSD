@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.dtos.responses;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,9 +16,7 @@ public class RackInventoryResponseDTO {
     private UUID id;
     private UUID rackId;
     private String rackCode;
-    private ProductCategory category;
-    private ProductSubcategory subcategory;
-    private String description;
+    private ProductSummaryDTO item;
     private Integer quantity;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

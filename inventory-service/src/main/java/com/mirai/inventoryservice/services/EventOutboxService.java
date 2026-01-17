@@ -45,7 +45,9 @@ public class EventOutboxService {
     public void createStockMovementEvent(StockMovement movement) {
         // Build payload with resolved location codes for ML analytics
         Map<String, Object> payload = new HashMap<>();
-        payload.put("item_id", movement.getItemId().toString());
+        payload.put("product_id", movement.getItem().getId().toString());
+        payload.put("sku", movement.getItem().getSku());
+        payload.put("item_id", movement.getItem().getId().toString());
         payload.put("quantity_change",  movement.getQuantityChange());
         payload.put("reason", movement.getReason().name().toLowerCase()); // "sale", "restock", etc
         payload.put("at", movement.getAt().toString()); // YYYY-MM-DDTHH:MM:SSZ

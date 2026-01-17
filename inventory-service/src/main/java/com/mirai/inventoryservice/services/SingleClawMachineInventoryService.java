@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.SingleClawMachineInventoryNotFoundException;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.inventory.SingleClawMachineInventory;
 import com.mirai.inventoryservice.models.storage.SingleClawMachine;
 import com.mirai.inventoryservice.repositories.SingleClawMachineInventoryRepository;
@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -17,34 +18,34 @@ import java.util.UUID;
 public class SingleClawMachineInventoryService {
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final SingleClawMachineService singleClawMachineService;
+    private final ProductService productService;
 
     public SingleClawMachineInventoryService(
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
-            SingleClawMachineService singleClawMachineService) {
+            SingleClawMachineService singleClawMachineService,
+            ProductService productService) {
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.singleClawMachineService = singleClawMachineService;
+        this.productService = productService;
     }
 
-    public SingleClawMachineInventory addInventory(
-            UUID singleClawMachineId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public SingleClawMachineInventory addInventory(UUID singleClawMachineId, UUID productId, Integer quantity) {
         SingleClawMachine machine = singleClawMachineService.getSingleClawMachineById(singleClawMachineId);
-        
-        // Subcategory is ONLY used for BLIND_BOX category, set to null for all others
-        ProductSubcategory finalSubcategory = (category == ProductCategory.BLIND_BOX) ? subcategory : null;
-        
+        Product product = productService.getProductById(productId);
+
+        Optional<SingleClawMachineInventory> existing = singleClawMachineInventoryRepository
+                .findBySingleClawMachine_IdAndItem_Id(singleClawMachineId, productId);
+        if (existing.isPresent()) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory for product " + product.getSku() + " already exists in this machine");
+        }
+
         SingleClawMachineInventory inventory = SingleClawMachineInventory.builder()
                 .singleClawMachine(machine)
-                .category(category)
-                .subcategory(finalSubcategory)
-                .description(description)
+                .item(product)
                 .quantity(quantity)
                 .build();
-        
+
         return singleClawMachineInventoryRepository.save(inventory);
     }
 
@@ -55,38 +56,19 @@ public class SingleClawMachineInventoryService {
     }
 
     public List<SingleClawMachineInventory> listInventory(UUID singleClawMachineId) {
-        // Verify machine exists
         singleClawMachineService.getSingleClawMachineById(singleClawMachineId);
         return singleClawMachineInventoryRepository.findBySingleClawMachine_Id(singleClawMachineId);
     }
 
-    public SingleClawMachineInventory updateInventory(
-            UUID inventoryId,
-            ProductCategory category,
-            ProductSubcategory subcategory,
-            String description,
-            Integer quantity) {
-        
+    public List<SingleClawMachineInventory> findByProduct(UUID productId) {
+        return singleClawMachineInventoryRepository.findByItem_Id(productId);
+    }
+
+    public SingleClawMachineInventory updateInventory(UUID inventoryId, Integer quantity) {
         SingleClawMachineInventory inventory = getInventoryById(inventoryId);
-        
-        if (category != null) {
-            inventory.setCategory(category);
-            // If category changed to non-BLIND_BOX, clear subcategory
-            if (category != ProductCategory.BLIND_BOX) {
-                inventory.setSubcategory(null);
-            }
+        if (quantity != null) {
+            inventory.setQuantity(quantity);
         }
-        
-        // Only set subcategory if category is BLIND_BOX
-        if (subcategory != null && (category != null ? category : inventory.getCategory()) == ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(subcategory);
-        } else if ((category != null ? category : inventory.getCategory()) != ProductCategory.BLIND_BOX) {
-            inventory.setSubcategory(null);
-        }
-        
-        if (description != null) inventory.setDescription(description);
-        if (quantity != null) inventory.setQuantity(quantity);
-        
         return singleClawMachineInventoryRepository.save(inventory);
     }
 
@@ -95,4 +77,3 @@ public class SingleClawMachineInventoryService {
         singleClawMachineInventoryRepository.delete(inventory);
     }
 }
-

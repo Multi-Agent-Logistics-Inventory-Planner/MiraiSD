@@ -14,8 +14,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRequestDTO {
-    @NotBlank(message = "Username is required")
-    private String username;
+    @NotBlank(message = "Full name is required")
+    private String fullName;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be valid")
@@ -23,7 +23,5 @@ public class UserRequestDTO {
 
     @NotNull(message = "Role is required")
     private UserRole role;
-
-    private String supabaseUid;
 }
 

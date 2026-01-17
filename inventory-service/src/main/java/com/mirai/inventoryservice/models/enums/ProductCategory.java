@@ -9,6 +9,6 @@ public enum ProductCategory {
     BUILD_KIT,
     GUNDAM,
     KUJI,
-    MISC
+    MISCELLANEOUS
 }
 
