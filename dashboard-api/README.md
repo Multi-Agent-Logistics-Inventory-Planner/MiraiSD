@@ -229,3 +229,8 @@ dashboard-api/
 ### "Rate limit exceeded"
 - Default: 100 requests per minute
 - Wait for the TTL to reset or adjust `RATE_LIMIT_MAX` in environment
+
+
+### TESTING
+dashboard-api/
+npm test -- --run
