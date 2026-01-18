@@ -7,7 +7,35 @@ name = "malp-forecast"
 version = "0.1.0"
 description = "Forecasting pipeline for inventory management"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pandas>=2.2.2",
+    "numpy<2.0.0",
+    "python-dateutil>=2.8.2",
+    "pytz>=2024.1",
+    "prophet==1.1.5",
+    "cmdstanpy>=1.2.0",
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.30.6",
+    "orjson==3.10.7",
+    "kafka-python==2.0.2",
+    "watchdog==4.0.1",
+    "SQLAlchemy==2.0.35",
+    "scikit-learn==1.5.2",
+    "matplotlib==3.9.2",
+    "pydantic==2.9.2",
+    "python-dotenv==1.0.1",
+    "rich==13.9.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+    "black>=24.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.5.0",
+]
 
 [tool.ruff]
 line-length = 100

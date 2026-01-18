@@ -94,14 +94,3 @@ def build_daily_consumption(events_df: pd.DataFrame) -> pd.DataFrame:
         lambda s: s.rolling(14, min_periods=3).mean()
     )
     return daily
-
-
-def compute_policy(
-    onhand_df: pd.DataFrame, daily_df: pd.DataFrame, target_days=21, reorder_threshold=7, now=None
-) -> pd.DataFrame:
-    latest = daily_df.groupby("item_id", as_index=False).agg(avg_daily=("avg_14", "last"))
-    df = latest.merge(onhand_df, on="item_id", how="left").fillna({"quantity": 0})
-    df["days_to_stockout"] = (df["quantity"] / df["avg_daily"]).replace([float("inf")], 9999)
-    df["target_qty"] = (df["avg_daily"] * target_days).round().astype("Int64")
-    df["suggested_reorder_qty"] = (df["target_qty"] - df["quantity"]).clip(lower=0).astype("Int64")
-    return df

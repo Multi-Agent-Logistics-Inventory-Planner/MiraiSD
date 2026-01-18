@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
@@ -25,7 +26,9 @@ def snapshot_onhand(inv_df: pd.DataFrame) -> pd.DataFrame:
 
 def _build_features(events_df: pd.DataFrame) -> pd.DataFrame:
     if events_df.empty:
-        return pd.DataFrame(columns=["date", "item_id", "consumption", "ma7", "ma14", "std14", "dow", "is_weekend"])  # noqa: E501
+        return pd.DataFrame(
+            columns=["date", "item_id", "consumption", "ma7", "ma14", "std14", "dow", "is_weekend"]
+        )
     daily = features.build_daily_usage(events_df)
     feats = features.build_stats(daily)
     return feats
@@ -55,18 +58,26 @@ def run_batch(
     if "service_level" not in items_df.columns:
         items_df["service_level"] = config.SERVICE_LEVEL_DEFAULT
     else:
-        items_df["service_level"] = pd.to_numeric(items_df["service_level"], errors="coerce").fillna(config.SERVICE_LEVEL_DEFAULT)  # noqa: E501
+        items_df["service_level"] = (
+            pd.to_numeric(items_df["service_level"], errors="coerce")
+            .fillna(config.SERVICE_LEVEL_DEFAULT)
+        )
 
     if "lead_time_std_days" not in items_df.columns:
         items_df["lead_time_std_days"] = config.LEAD_TIME_STD_DEFAULT_DAYS
     else:
-        items_df["lead_time_std_days"] = pd.to_numeric(items_df["lead_time_std_days"], errors="coerce").fillna(config.LEAD_TIME_STD_DEFAULT_DAYS)  # noqa: E501
+        items_df["lead_time_std_days"] = (
+            pd.to_numeric(items_df["lead_time_std_days"], errors="coerce")
+            .fillna(config.LEAD_TIME_STD_DEFAULT_DAYS)
+        )
 
     # 2) Load events window
     if from_ts or to_ts:
-        ev_df = events.load_events_window(from_ts or "1970-01-01T00:00:00Z", to_ts or _now_utc_iso())
+        ev_df = events.load_events_window(
+            from_ts or "1970-01-01T00:00:00Z", to_ts or _now_utc_iso()
+        )
     else:
-        ev_df = pd.DataFrame(columns=["event_id", "item_id", "quantity_change", "reason", "at"])  # noqa: E501
+        ev_df = pd.DataFrame(columns=["event_id", "item_id", "quantity_change", "reason", "at"])
 
     # 3) Features
     feats = _build_features(ev_df)
@@ -78,12 +89,16 @@ def run_batch(
         fcst_df = forecast.estimate_mu_sigma(feats, method=method)
 
     # 5) Join items + onhand + forecast; fill floors when missing
-    merged = items_df[["item_id", "lead_time_days", "lead_time_std_days", "service_level"]].merge(
-        onhand_df, on="item_id", how="left"
-    ).merge(fcst_df, on="item_id", how="left")
+    merged = (
+        items_df[["item_id", "lead_time_days", "lead_time_std_days", "service_level"]]
+        .merge(onhand_df, on="item_id", how="left")
+        .merge(fcst_df, on="item_id", how="left")
+    )
     merged["current_qty"] = pd.to_numeric(merged["current_qty"], errors="coerce").fillna(0).astype(float)
     merged["mu_hat"] = pd.to_numeric(merged["mu_hat"], errors="coerce").fillna(config.MU_FLOOR)
-    merged["sigma_d_hat"] = pd.to_numeric(merged["sigma_d_hat"], errors="coerce").fillna(config.SIGMA_FLOOR)
+    merged["sigma_d_hat"] = (
+        pd.to_numeric(merged["sigma_d_hat"], errors="coerce").fillna(config.SIGMA_FLOOR)
+    )
     merged["method"] = merged.get("method", method)
 
     # 6) Policy per item
@@ -94,7 +109,9 @@ def run_batch(
         sigma_d_hat = float(r["sigma_d_hat"])
         L = float(r["lead_time_days"]) if pd.notna(r["lead_time_days"]) else 0.0
         sigma_L = float(r["lead_time_std_days"]) if pd.notna(r["lead_time_std_days"]) else 0.0
-        alpha = float(r["service_level"]) if pd.notna(r["service_level"]) else config.SERVICE_LEVEL_DEFAULT
+        alpha = (
+            float(r["service_level"]) if pd.notna(r["service_level"]) else config.SERVICE_LEVEL_DEFAULT
+        )
         current_qty = float(r["current_qty"]) if pd.notna(r["current_qty"]) else 0.0
 
         z = policy.z_for_service_level(alpha)
@@ -149,7 +166,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run forecasting job")
     parser.add_argument("--from", dest="from_ts", type=str, default=None, help="Start ISO timestamp (inclusive)")
     parser.add_argument("--to", dest="to_ts", type=str, default=None, help="End ISO timestamp (inclusive)")
-    parser.add_argument("--method", dest="method", type=str, default="ma14", choices=["ma7", "ma14", "exp_smooth"], help="Forecast method")  # noqa: E501
+    parser.add_argument(
+        "--method",
+        dest="method",
+        type=str,
+        default="ma14",
+        choices=["ma7", "ma14", "exp_smooth"],
+        help="Forecast method",
+    )
     parser.add_argument("--target-days", dest="target_days", type=int, default=None, help="Target days of cover")
     args = parser.parse_args()
 
@@ -159,3 +183,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

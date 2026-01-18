@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+import uuid
 from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
-import uuid
 
 from . import config
 
@@ -96,15 +98,8 @@ def write_forecasts(forecasts_df: pd.DataFrame) -> Path:
     return out_path
 
 
-
-
-
-
 class Repo:
     """Backwards-compatible class wrapper for existing usage."""
-
-    def __init__(self) -> None:
-        pass
 
     def load_items(self) -> pd.DataFrame:  # type: ignore[override]
         return load_items()
@@ -114,3 +109,4 @@ class Repo:
 
     def write_forecasts(self, df: pd.DataFrame) -> Path:  # type: ignore[override]
         return write_forecasts(df)
+

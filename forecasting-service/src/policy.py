@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import math
+from statistics import NormalDist
 from typing import Optional
-
-from scipy.stats import norm
 
 
 def z_for_service_level(alpha: float) -> float:
@@ -13,7 +12,7 @@ def z_for_service_level(alpha: float) -> float:
     """
     if not (0.0 < alpha < 1.0):
         raise ValueError("alpha must be in (0,1)")
-    return float(norm.ppf(alpha))
+    return float(NormalDist().inv_cdf(alpha))
 
 
 def sigma_lead_time(
@@ -93,5 +92,3 @@ def suggest_order(
     if needed <= 0.0:
         return 0
     return int(math.ceil(needed))
-
-

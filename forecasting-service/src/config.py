@@ -20,3 +20,7 @@ SIGMA_FLOOR = float(os.getenv("SIGMA_FLOOR", "0.01"))
 SERVICE_LEVEL_DEFAULT = float(os.getenv("SERVICE_LEVEL_DEFAULT", "0.95"))
 LEAD_TIME_STD_DEFAULT_DAYS = float(os.getenv("LEAD_TIME_STD_DEFAULT_DAYS", "0.0"))
 EPSILON_MU = float(os.getenv("EPSILON_MU", "0.1"))
+
+# API settings
+API_HOST = os.getenv("API_HOST", "0.0.0.0")
+API_PORT = int(os.getenv("API_PORT", "5000"))
