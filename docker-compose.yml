@@ -19,6 +19,32 @@ services:
       - 1.1.1.1
     networks:
       - mirai
+
+  bff-service:
+    container_name: bff-service
+    build:
+      context: ./bff-service
+      dockerfile: Dockerfile
+    image: bff-service:latest
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://${SUPABASE_DB_USERNAME}:${SUPABASE_DB_PASSWORD}@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - RATE_LIMIT_MAX=100
+      - RATE_LIMIT_WINDOW=60000
+      - PORT=5001
+    depends_on:
+      - inventory-service
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    networks:
+      - mirai
+
   kafka:
     image: apache/kafka:latest
     container_name: kafka
@@ -70,9 +96,11 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://inventory-service:4000
+      - NEXT_PUBLIC_BFF_URL=http://bff-service:5001
       - NEXT_PUBLIC_KAFKA_UI_URL=http://kafka-ui:8000
     depends_on:
       - inventory-service
+      - bff-service
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -86,4 +114,4 @@ volumes:
 networks:
   mirai:
     driver: bridge
-    enable_ipv6: true
+    # enable_ipv6: true
