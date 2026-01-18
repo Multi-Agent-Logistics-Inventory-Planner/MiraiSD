@@ -20,15 +20,16 @@ services:
     networks:
       - mirai
 
-  bff-service:
-    container_name: bff-service
+  dashboard-api:
+    container_name: dashboard-api
     build:
-      context: ./bff-service
+      context: ./dashboard-api
       dockerfile: Dockerfile
-    image: bff-service:latest
+    image: dashboard-api:latest
     ports:
       - "5001:5001"
     environment:
+      - AUTH_DISABLED=true
       - DATABASE_URL=postgresql://${SUPABASE_DB_USERNAME}:${SUPABASE_DB_PASSWORD}@aws-1-us-east-2.pooler.supabase.com:5432/postgres
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
@@ -96,11 +97,11 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://inventory-service:4000
-      - NEXT_PUBLIC_BFF_URL=http://bff-service:5001
+      - NEXT_PUBLIC_DASHBOARD_API_URL=http://dashboard-api:5001
       - NEXT_PUBLIC_KAFKA_UI_URL=http://kafka-ui:8000
     depends_on:
       - inventory-service
-      - bff-service
+      - dashboard-api
     dns:
       - 8.8.8.8
       - 8.8.4.4

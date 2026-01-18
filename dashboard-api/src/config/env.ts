@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { z } from 'zod';
+import { z, type RefinementCtx } from 'zod';
 
-const envSchema = z.object({
+const envSchemaBase = z.object({
   DATABASE_URL: z.string().url(),
 
   /**
@@ -18,7 +18,9 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().int().positive().default(60000),
   PORT: z.coerce.number().int().positive().default(5001),
-}).superRefine((val, ctx) => {
+});
+
+const envSchema = envSchemaBase.superRefine((val: z.infer<typeof envSchemaBase>, ctx: RefinementCtx) => {
   if (val.AUTH_DISABLED) return;
 
   if (!val.SUPABASE_URL) {

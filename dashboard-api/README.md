@@ -1,6 +1,6 @@
-# BFF Service
+# Dashboard API
 
-Backend-for-Frontend service for the Mirai inventory dashboard. Provides REST API endpoints for forecasts, inventory summaries, and item data.
+UI-focused API (BFF) for the Mirai inventory dashboard. Provides REST API endpoints for forecasts, inventory summaries, and item data.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ Backend-for-Frontend service for the Mirai inventory dashboard. Provides REST AP
 ### 1. Install dependencies
 
 ```bash
-cd bff-service
+cd dashboard-api
 npm install
 ```
 
@@ -58,7 +58,7 @@ curl http://localhost:5001/health
 
 Expected response:
 ```json
-{"status":"ok","timestamp":"2025-01-18T...","service":"bff-service"}
+{"status":"ok","timestamp":"2025-01-18T...","service":"dashboard-api"}
 ```
 
 ### Authenticated Endpoints
@@ -119,13 +119,13 @@ curl "http://localhost:5001/items?limit=10"
 ### Build image
 
 ```bash
-docker-compose build bff-service
+docker-compose build dashboard-api
 ```
 
 ### Run with Docker Compose
 
 ```bash
-docker-compose up bff-service
+docker-compose up dashboard-api
 ```
 
 ### Run standalone
@@ -136,7 +136,7 @@ docker run -p 5001:5001 \
   -e SUPABASE_URL="https://xxx.supabase.co" \
   -e SUPABASE_ANON_KEY="eyJ..." \
   -e SUPABASE_JWT_SECRET="..." \
-  bff-service:latest
+  dashboard-api:latest
 ```
 
 ## API Reference
@@ -197,7 +197,7 @@ List items with quantities and optional forecasts.
 ## Project Structure
 
 ```
-bff-service/
+dashboard-api/
 ├── src/
 │   ├── index.ts              # Entry point
 │   ├── app.ts                # Fastify app factory

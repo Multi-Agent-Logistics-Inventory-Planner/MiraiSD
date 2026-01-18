@@ -5,7 +5,7 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'bff-service',
+      service: 'dashboard-api',
     };
   });
 };
