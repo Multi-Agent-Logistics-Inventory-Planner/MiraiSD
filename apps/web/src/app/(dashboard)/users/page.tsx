@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Plus,
   Search,
@@ -10,12 +10,12 @@ import {
   Shield,
   Pencil,
   Trash2,
-} from "lucide-react"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+} from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -23,14 +23,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -39,38 +39,36 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { users, type User } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { useSearchParams } from "next/navigation"
-import { Suspense } from "react"
-import Loading from "./loading"
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { users, type User } from "@/lib/data";
+import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import Loading from "./loading";
 
 function getStatusColor(status: User["status"]) {
   switch (status) {
     case "active":
-      return "bg-green-100 text-green-700"
+      return "bg-green-100 text-green-700";
     case "inactive":
-      return "bg-gray-100 text-gray-700"
+      return "bg-gray-100 text-gray-700";
     case "pending":
-      return "bg-amber-100 text-amber-700"
+      return "bg-amber-100 text-amber-700";
     default:
-      return "bg-gray-100 text-gray-700"
+      return "bg-gray-100 text-gray-700";
   }
 }
 
 function getRoleColor(role: User["role"]) {
   switch (role) {
     case "admin":
-      return "bg-purple-100 text-purple-700"
-    case "manager":
-      return "bg-blue-100 text-blue-700"
+      return "bg-purple-100 text-purple-700";
     case "employee":
-      return "bg-gray-100 text-gray-700"
+      return "bg-gray-100 text-gray-700";
     default:
-      return "bg-gray-100 text-gray-700"
+      return "bg-gray-100 text-gray-700";
   }
 }
 
@@ -92,19 +90,6 @@ const accessPermissions = [
     ],
   },
   {
-    role: "Manager",
-    permissions: [
-      "View Inventory",
-      "Edit Inventory",
-      "View Shipments",
-      "Manage Shipments",
-      "View Analytics",
-      "View Alerts",
-      "View Users",
-      "View Audit Logs",
-    ],
-  },
-  {
     role: "Employee",
     permissions: [
       "View Inventory",
@@ -113,24 +98,24 @@ const accessPermissions = [
       "View Alerts",
     ],
   },
-]
+];
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const searchParams = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const searchParams = useSearchParams();
 
   const filteredUsers = users.filter((user) => {
     return (
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  })
+    );
+  });
 
-  const totalUsers = users.length
-  const activeUsers = users.filter((u) => u.status === "active").length
-  const pendingApprovals = users.filter((u) => u.status === "pending").length
-  const adminCount = users.filter((u) => u.role === "admin").length
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.status === "active").length;
+  const pendingApprovals = users.filter((u) => u.status === "pending").length;
+  const adminCount = users.filter((u) => u.role === "admin").length;
 
   return (
     <Suspense fallback={<Loading />}>
@@ -144,22 +129,32 @@ export default function UsersPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Users
+                </CardTitle>
                 <UsersIcon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalUsers}</div>
-                <p className="text-xs text-muted-foreground">Registered users</p>
+                <p className="text-xs text-muted-foreground">
+                  Registered users
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Active Users
+                </CardTitle>
                 <UserCheck className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{activeUsers}</div>
-                <p className="text-xs text-muted-foreground">Currently on shift</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {activeUsers}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Currently on shift
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -178,12 +173,18 @@ export default function UsersPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Administrators</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Administrators
+                </CardTitle>
                 <Shield className="h-4 w-4 text-purple-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">{adminCount}</div>
-                <p className="text-xs text-muted-foreground">Full access users</p>
+                <div className="text-2xl font-bold text-purple-600">
+                  {adminCount}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Full access users
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -236,7 +237,6 @@ export default function UsersPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
                           <SelectItem value="employee">Employee</SelectItem>
                         </SelectContent>
                       </Select>
@@ -294,20 +294,26 @@ export default function UsersPage() {
                   <TableBody>
                     {filteredUsers.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {user.name}
+                        </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
                             className={cn("text-xs", getRoleColor(user.role))}
                           >
-                            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                            {user.role.charAt(0).toUpperCase() +
+                              user.role.slice(1)}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={cn("text-xs", getStatusColor(user.status))}
+                            className={cn(
+                              "text-xs",
+                              getStatusColor(user.status)
+                            )}
                           >
                             {user.status.charAt(0).toUpperCase() +
                               user.status.slice(1)}
@@ -366,5 +372,5 @@ export default function UsersPage() {
         </main>
       </div>
     </Suspense>
-  )
+  );
 }

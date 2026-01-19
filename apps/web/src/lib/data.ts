@@ -39,7 +39,7 @@ export type User = {
   id: string
   name: string
   email: string
-  role: "admin" | "manager" | "employee"
+  role: "admin" | "employee"
   status: "active" | "inactive" | "pending"
   lastLogin: string
   createdAt: string
@@ -268,15 +268,6 @@ export const users: User[] = [
   },
   {
     id: "2",
-    name: "Sarah Johnson",
-    email: "sarah.j@company.com",
-    role: "manager",
-    status: "active",
-    lastLogin: "2026-01-19 08:45",
-    createdAt: "2025-08-20",
-  },
-  {
-    id: "3",
     name: "Mike Wilson",
     email: "mike.w@company.com",
     role: "employee",
@@ -285,7 +276,7 @@ export const users: User[] = [
     createdAt: "2025-10-01",
   },
   {
-    id: "4",
+    id: "3",
     name: "Emily Davis",
     email: "emily.d@company.com",
     role: "employee",
@@ -294,7 +285,7 @@ export const users: User[] = [
     createdAt: "2025-09-15",
   },
   {
-    id: "5",
+    id: "4",
     name: "David Brown",
     email: "david.b@company.com",
     role: "employee",
