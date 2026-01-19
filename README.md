@@ -60,9 +60,9 @@ cd mirai
 The inventory service needs to be built with Maven before Docker can use it:
 
 ```bash
-cd inventory-service
+cd services/inventory-service
 mvn clean package -DskipTests
-cd ..
+cd ../..
 ```
 
 This will create a JAR file that Docker will use.
@@ -74,7 +74,7 @@ This will create a JAR file that Docker will use.
 From the project root directory:
 
 ```bash
-docker-compose up --build
+docker-compose -f infra/docker-compose.yml up --build
 ```
 
 This will start:
@@ -89,13 +89,13 @@ This will start:
 To run in the background (detached mode):
 
 ```bash
-docker-compose up -d
+docker-compose -f infra/docker-compose.yml up -d
 ```
 
 To stop everything:
 
 ```bash
-docker-compose down
+docker-compose -f infra/docker-compose.yml down
 ```
 
 ---
@@ -107,7 +107,7 @@ The forecasting service isn't in Docker yet, so run it locally:
 1. Navigate to the forecasting service:
 
    ```bash
-   cd forecasting-service
+   cd services/forecasting-service
    ```
 
 2. Create a Python virtual environment:
@@ -158,23 +158,23 @@ Once all services are running, check:
 
 ```bash
 # View logs for all services
-docker-compose logs -f
+docker-compose -f infra/docker-compose.yml logs -f
 
 # View logs for specific service
-docker-compose logs -f inventory-service
-docker-compose logs -f frontend
+docker-compose -f infra/docker-compose.yml logs -f inventory-service
+docker-compose -f infra/docker-compose.yml logs -f frontend
 
 # Restart a specific service
-docker-compose restart inventory-service
+docker-compose -f infra/docker-compose.yml restart inventory-service
 
 # Rebuild after code changes
-docker-compose up --build
+docker-compose -f infra/docker-compose.yml up --build
 
 # Stop and remove all containers
-docker-compose down
+docker-compose -f infra/docker-compose.yml down
 
 # Stop and remove everything including volumes
-docker-compose down -v
+docker-compose -f infra/docker-compose.yml down -v
 ```
 
 ### Development Without Docker
@@ -184,7 +184,7 @@ If you want to run services individually for development:
 **Frontend:**
 
 ```bash
-cd frontend
+cd apps/web
 npm install
 npm run dev
 # Runs on http://localhost:3000
@@ -193,7 +193,7 @@ npm run dev
 **Inventory Service:**
 
 ```bash
-cd inventory-service
+cd services/inventory-service
 mvn spring-boot:run
 # Runs on http://localhost:4000
 ```
@@ -224,7 +224,7 @@ netstat -ano | findstr :4000
 # Mac/Linux:
 lsof -i :4000
 
-# Then stop that process or change the port in docker-compose.yml
+# Then stop that process or change the port in infra/docker-compose.yml
 ```
 
 **Forecasting service Prophet installation issues:**
@@ -244,11 +244,16 @@ lsof -i :4000
 ## Project Structure Quick Reference
 
 ```
-mirai/
-├── inventory-service/     # Spring Boot API (Java)
-├── frontend/              # Next.js web app (TypeScript/React)
-├── forecasting-service/   # Forecasting pipeline (Python)
-├── http-requests/         # API test requests
-├── docker-compose.yml     # Docker orchestration
-└── .env                   # Environment variables (create from env.template)
+MiraiSD/
+├── apps/
+│   └── web/                       # Next.js web app (TypeScript/React)
+├── services/
+│   ├── inventory-service/         # Spring Boot API (Java)
+│   └── forecasting-service/       # Forecasting pipeline (Python)
+├── infra/
+│   └── docker-compose.yml         # Docker orchestration
+├── scripts/
+│   └── get-token.mjs              # Supabase auth token helper
+├── .context/                      # AI/Claude context documentation
+└── .env                           # Environment variables (create from env.template)
 ```
