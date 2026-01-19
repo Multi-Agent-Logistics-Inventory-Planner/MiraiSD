@@ -200,7 +200,8 @@ class SupabaseRepo:
                 FROM ({query}) AS inv
                 WHERE item_id = ANY(:item_ids)
             """
-            params["item_ids"] = item_ids
+            # Convert to UUID objects to match PostgreSQL UUID column type
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
 
         with self._engine.connect() as conn:
             df = pd.read_sql(text(query), conn, params=params)
