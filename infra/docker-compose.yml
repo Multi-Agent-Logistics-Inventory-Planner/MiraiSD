@@ -31,12 +31,17 @@ services:
       - KAFKA_PROCESS_ROLES=broker,controller
       - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
       - CLUSTER_ID=5L6g3nShT-eMCtK--X86sw
       - KAFKA_LOG_DIRS=/var/lib/kafka/data
       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      # Single-broker defaults: internal topics must use RF=1 or consumer groups will break
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -61,6 +66,35 @@ services:
       - 1.1.1.1
     networks:
       - mirai
+
+  forecasting-service:
+    container_name: forecasting-service
+    build:
+      context: ../services/forecasting-service
+      dockerfile: Dockerfile
+    image: forecasting-service:latest
+    environment:
+      # Supabase connection
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
+      - SUPABASE_DB_USERNAME=${SUPABASE_DB_USERNAME}
+      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+      # Kafka settings
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=inventory-changes
+      - KAFKA_CONSUMER_GROUP=forecasting-service
+      # Batching settings
+      - BATCH_WINDOW_SECONDS=30
+      - BATCH_SIZE_TRIGGER=50
+      - ITEM_DEBOUNCE_SECONDS=5.0
+    depends_on:
+      - kafka
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    networks:
+      - mirai
+    restart: unless-stopped
 
   frontend:
     container_name: frontend

@@ -12,7 +12,10 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
+# Expose port for optional API mode
 EXPOSE 5000
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "5000"]
+# Default: run worker for real-time event processing
+# Override with: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "-m", "src.worker"]
 
