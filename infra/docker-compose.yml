@@ -20,32 +20,6 @@ services:
     networks:
       - mirai
 
-  dashboard-api:
-    container_name: dashboard-api
-    build:
-      context: ../services/dashboard-api
-      dockerfile: Dockerfile
-    image: dashboard-api:latest
-    ports:
-      - "5001:5001"
-    environment:
-      - AUTH_DISABLED=true
-      - DATABASE_URL=postgresql://${SUPABASE_DB_USERNAME}:${SUPABASE_DB_PASSWORD}@aws-1-us-east-2.pooler.supabase.com:5432/postgres
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
-      - RATE_LIMIT_MAX=100
-      - RATE_LIMIT_WINDOW=60000
-      - PORT=5001
-    depends_on:
-      - inventory-service
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
-    networks:
-      - mirai
-
   kafka:
     image: apache/kafka:latest
     container_name: kafka
@@ -97,11 +71,9 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://inventory-service:4000
-      - NEXT_PUBLIC_DASHBOARD_API_URL=http://dashboard-api:5001
       - NEXT_PUBLIC_KAFKA_UI_URL=http://kafka-ui:8000
     depends_on:
       - inventory-service
-      - dashboard-api
     dns:
       - 8.8.8.8
       - 8.8.4.4

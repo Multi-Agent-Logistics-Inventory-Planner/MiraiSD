@@ -8,14 +8,12 @@ type FetchResult<T> =
   | { ok: true; data: T; status: number }
   | { ok: false; error: string; status?: number };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_DASHBOARD_API_URL ?? "http://localhost:5001";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-async function fetchJson<T>(path: string, accessToken?: string): Promise<FetchResult<T>> {
+async function fetchJson<T>(path: string): Promise<FetchResult<T>> {
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       cache: "no-store",
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -152,9 +150,12 @@ export default function DashboardPage() {
   const envStatus = getSupabaseEnvStatus();
   const [email, setEmail] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [health, setHealth] = useState<FetchResult<unknown> | null>(null);
-  const [summary, setSummary] = useState<FetchResult<unknown> | null>(null);
-  const [items, setItems] = useState<FetchResult<unknown> | null>(null);
+  const [boxBins, setBoxBins] = useState<FetchResult<unknown> | null>(null);
+  const [cabinets, setCabinets] = useState<FetchResult<unknown> | null>(null);
+  const [racks, setRacks] = useState<FetchResult<unknown> | null>(null);
+  const [keychainMachines, setKeychainMachines] = useState<FetchResult<unknown> | null>(null);
+  const [singleClawMachines, setSingleClawMachines] = useState<FetchResult<unknown> | null>(null);
+  const [doubleClawMachines, setDoubleClawMachines] = useState<FetchResult<unknown> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,16 +169,22 @@ export default function DashboardPage() {
       setAccessToken(token);
       setEmail(userEmail);
 
-      const [h, s, i] = await Promise.all([
-        fetchJson("/health", token ?? undefined),
-        fetchJson("/inventory/summary", token ?? undefined),
-        fetchJson("/items?limit=10&includeForecasts=true", token ?? undefined),
+      const [bb, c, r, km, scm, dcm] = await Promise.all([
+        fetchJson("/api/box-bins"),
+        fetchJson("/api/cabinets"),
+        fetchJson("/api/racks"),
+        fetchJson("/api/keychain-machines"),
+        fetchJson("/api/single-claw-machines"),
+        fetchJson("/api/double-claw-machines"),
       ]);
 
       if (cancelled) return;
-      setHealth(h);
-      setSummary(s);
-      setItems(i);
+      setBoxBins(bb);
+      setCabinets(c);
+      setRacks(r);
+      setKeychainMachines(km);
+      setSingleClawMachines(scm);
+      setDoubleClawMachines(dcm);
     }
 
     void load();
@@ -219,45 +226,47 @@ export default function DashboardPage() {
       </p>
       <p>Token present: {accessToken ? "yes" : "no"}</p>
 
-      <ResultBlock title="/health" result={health} />
       <ResultBlock
-        title="/inventory/summary"
-        result={summary}
-        renderOk={(data) => {
-          const d = data as any;
-          const byLocation = d?.byLocation && typeof d.byLocation === "object" ? d.byLocation : null;
-          return (
-            <>
-              <KeyValueTable value={{ ...d, byLocation: undefined }} />
-              <h3>byLocation</h3>
-              {byLocation ? (
-                <ArrayTable
-                  rows={Object.entries(byLocation).map(([location, v]) => ({
-                    location,
-                    ...(v as Record<string, unknown>),
-                  }))}
-                />
-              ) : (
-                <p>(no byLocation)</p>
-              )}
-            </>
-          );
-        }}
+        title="/api/box-bins"
+        result={boxBins}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
       />
       <ResultBlock
-        title="/items?limit=10&includeForecasts=true"
-        result={items}
-        renderOk={(data) => {
-          const d = data as any;
-          const rows = Array.isArray(d?.data) ? (d.data as Array<Record<string, unknown>>) : [];
-          return (
-            <>
-              <ArrayTable rows={rows} />
-              <h3>pagination</h3>
-              <KeyValueTable value={d?.pagination ?? null} />
-            </>
-          );
-        }}
+        title="/api/cabinets"
+        result={cabinets}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
+      />
+      <ResultBlock
+        title="/api/racks"
+        result={racks}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
+      />
+      <ResultBlock
+        title="/api/keychain-machines"
+        result={keychainMachines}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
+      />
+      <ResultBlock
+        title="/api/single-claw-machines"
+        result={singleClawMachines}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
+      />
+      <ResultBlock
+        title="/api/double-claw-machines"
+        result={doubleClawMachines}
+        renderOk={(data) =>
+          Array.isArray(data) ? <ArrayTable rows={data as Array<Record<string, unknown>>} /> : <KeyValueTable value={data} />
+        }
       />
     </main>
   );

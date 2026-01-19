@@ -76,7 +76,6 @@ docker-compose -f infra/docker-compose.yml up --build
 
 This will start:
 - **Inventory Service** (Spring Boot API) - http://localhost:4000
-- **Dashboard API** (Fastify BFF) - http://localhost:5001
 - **Frontend** (Next.js) - http://localhost:3000
 - **Kafka** (Message broker) - localhost:9092
 - **Kafka UI** (Web interface for Kafka) - http://localhost:8080
@@ -179,14 +178,6 @@ npm run dev
 # Runs on http://localhost:3000
 ```
 
-**Dashboard API:**
-```bash
-cd services/dashboard-api
-npm install
-npm run dev
-# Runs on http://localhost:5001
-```
-
 **Inventory Service:**
 ```bash
 cd services/inventory-service
@@ -239,7 +230,6 @@ MiraiSD/
 ├── apps/
 │   └── web/                       # Next.js web app (TypeScript/React)
 ├── services/
-│   ├── dashboard-api/             # Fastify BFF (TypeScript)
 │   ├── inventory-service/         # Spring Boot API (Java)
 │   └── forecasting-service/       # Forecasting pipeline (Python)
 ├── infra/
