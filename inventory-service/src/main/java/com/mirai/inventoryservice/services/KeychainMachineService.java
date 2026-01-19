@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.exceptions.KeychainMachineNotFoundException;
 import com.mirai.inventoryservice.models.storage.KeychainMachine;
 import com.mirai.inventoryservice.repositories.KeychainMachineRepository;
@@ -19,6 +20,9 @@ public class KeychainMachineService {
     }
 
     public KeychainMachine createKeychainMachine(String keychainMachineCode) {
+        if (keychainMachineRepository.existsByKeychainMachineCode(keychainMachineCode)) {
+            throw new DuplicateLocationCodeException("KeychainMachine with code already exists: " + keychainMachineCode);
+        }
         KeychainMachine machine = KeychainMachine.builder()
                 .keychainMachineCode(keychainMachineCode)
                 .build();
@@ -41,6 +45,9 @@ public class KeychainMachineService {
 
     public KeychainMachine updateKeychainMachine(UUID id, String keychainMachineCode) {
         KeychainMachine machine = getKeychainMachineById(id);
+        if (!keychainMachineCode.equals(machine.getKeychainMachineCode()) && keychainMachineRepository.existsByKeychainMachineCode(keychainMachineCode)) {
+            throw new DuplicateLocationCodeException("KeychainMachine with code already exists: " + keychainMachineCode);
+        }
         machine.setKeychainMachineCode(keychainMachineCode);
         return keychainMachineRepository.save(machine);
     }

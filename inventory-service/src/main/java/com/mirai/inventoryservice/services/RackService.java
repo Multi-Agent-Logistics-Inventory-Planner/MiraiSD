@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.exceptions.RackNotFoundException;
 import com.mirai.inventoryservice.models.storage.Rack;
 import com.mirai.inventoryservice.repositories.RackRepository;
@@ -19,6 +20,9 @@ public class RackService {
     }
 
     public Rack createRack(String rackCode) {
+        if (rackRepository.existsByRackCode(rackCode)) {
+            throw new DuplicateLocationCodeException("Rack with code already exists: " + rackCode);
+        }
         Rack rack = Rack.builder()
                 .rackCode(rackCode)
                 .build();
@@ -41,6 +45,9 @@ public class RackService {
 
     public Rack updateRack(UUID id, String rackCode) {
         Rack rack = getRackById(id);
+        if (!rackCode.equals(rack.getRackCode()) && rackRepository.existsByRackCode(rackCode)) {
+            throw new DuplicateLocationCodeException("Rack with code already exists: " + rackCode);
+        }
         rack.setRackCode(rackCode);
         return rackRepository.save(rack);
     }

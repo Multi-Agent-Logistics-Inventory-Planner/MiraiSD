@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.CabinetNotFoundException;
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.models.storage.Cabinet;
 import com.mirai.inventoryservice.repositories.CabinetRepository;
 import jakarta.transaction.Transactional;
@@ -19,6 +20,9 @@ public class CabinetService {
     }
 
     public Cabinet createCabinet(String cabinetCode) {
+        if (cabinetRepository.existsByCabinetCode(cabinetCode)) {
+            throw new DuplicateLocationCodeException("Cabinet with code already exists: " + cabinetCode);
+        }
         Cabinet cabinet = Cabinet.builder()
                 .cabinetCode(cabinetCode)
                 .build();
@@ -41,6 +45,9 @@ public class CabinetService {
 
     public Cabinet updateCabinet(UUID id, String cabinetCode) {
         Cabinet cabinet = getCabinetById(id);
+        if (!cabinetCode.equals(cabinet.getCabinetCode()) && cabinetRepository.existsByCabinetCode(cabinetCode)) {
+            throw new DuplicateLocationCodeException("Cabinet with code already exists: " + cabinetCode);
+        }
         cabinet.setCabinetCode(cabinetCode);
         return cabinetRepository.save(cabinet);
     }

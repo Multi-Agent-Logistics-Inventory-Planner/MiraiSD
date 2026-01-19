@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.BoxBinNotFoundException;
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
 import jakarta.transaction.Transactional;
@@ -19,6 +20,9 @@ public class BoxBinService {
     }
 
     public BoxBin createBoxBin(String boxBinCode) {
+        if (boxBinRepository.existsByBoxBinCode(boxBinCode)) {
+            throw new DuplicateLocationCodeException("BoxBin with code already exists: " + boxBinCode);
+        }
         BoxBin boxBin = BoxBin.builder()
                 .boxBinCode(boxBinCode)
                 .build();
@@ -41,6 +45,9 @@ public class BoxBinService {
 
     public BoxBin updateBoxBin(UUID id, String boxBinCode) {
         BoxBin boxBin = getBoxBinById(id);
+        if (!boxBinCode.equals(boxBin.getBoxBinCode()) && boxBinRepository.existsByBoxBinCode(boxBinCode)) {
+            throw new DuplicateLocationCodeException("BoxBin with code already exists: " + boxBinCode);
+        }
         boxBin.setBoxBinCode(boxBinCode);
         return boxBinRepository.save(boxBin);
     }

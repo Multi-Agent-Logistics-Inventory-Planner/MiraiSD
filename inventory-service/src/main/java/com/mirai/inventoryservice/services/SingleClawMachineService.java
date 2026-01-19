@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.exceptions.SingleClawMachineNotFoundException;
 import com.mirai.inventoryservice.models.storage.SingleClawMachine;
 import com.mirai.inventoryservice.repositories.SingleClawMachineRepository;
@@ -19,6 +20,9 @@ public class SingleClawMachineService {
     }
 
     public SingleClawMachine createSingleClawMachine(String singleClawMachineCode) {
+        if (singleClawMachineRepository.existsBySingleClawMachineCode(singleClawMachineCode)) {
+            throw new DuplicateLocationCodeException("SingleClawMachine with code already exists: " + singleClawMachineCode);
+        }
         SingleClawMachine machine = SingleClawMachine.builder()
                 .singleClawMachineCode(singleClawMachineCode)
                 .build();
@@ -41,6 +45,9 @@ public class SingleClawMachineService {
 
     public SingleClawMachine updateSingleClawMachine(UUID id, String singleClawMachineCode) {
         SingleClawMachine machine = getSingleClawMachineById(id);
+        if (!singleClawMachineCode.equals(machine.getSingleClawMachineCode()) && singleClawMachineRepository.existsBySingleClawMachineCode(singleClawMachineCode)) {
+            throw new DuplicateLocationCodeException("SingleClawMachine with code already exists: " + singleClawMachineCode);
+        }
         machine.setSingleClawMachineCode(singleClawMachineCode);
         return singleClawMachineRepository.save(machine);
     }

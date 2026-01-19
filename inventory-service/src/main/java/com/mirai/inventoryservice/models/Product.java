@@ -31,11 +31,9 @@ public class Product {
     private String sku;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProductCategory category;
 
-    @Enumerated(EnumType.STRING)
     private ProductSubcategory subcategory;
 
     @NotBlank

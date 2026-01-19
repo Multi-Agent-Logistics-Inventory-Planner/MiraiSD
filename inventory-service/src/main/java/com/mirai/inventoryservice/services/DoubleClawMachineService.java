@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.DoubleClawMachineNotFoundException;
+import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.models.storage.DoubleClawMachine;
 import com.mirai.inventoryservice.repositories.DoubleClawMachineRepository;
 import jakarta.transaction.Transactional;
@@ -19,6 +20,9 @@ public class DoubleClawMachineService {
     }
 
     public DoubleClawMachine createDoubleClawMachine(String doubleClawMachineCode) {
+        if (doubleClawMachineRepository.existsByDoubleClawMachineCode(doubleClawMachineCode)) {
+            throw new DuplicateLocationCodeException("DoubleClawMachine with code already exists: " + doubleClawMachineCode);
+        }
         DoubleClawMachine machine = DoubleClawMachine.builder()
                 .doubleClawMachineCode(doubleClawMachineCode)
                 .build();
@@ -41,6 +45,9 @@ public class DoubleClawMachineService {
 
     public DoubleClawMachine updateDoubleClawMachine(UUID id, String doubleClawMachineCode) {
         DoubleClawMachine machine = getDoubleClawMachineById(id);
+        if (!doubleClawMachineCode.equals(machine.getDoubleClawMachineCode()) && doubleClawMachineRepository.existsByDoubleClawMachineCode(doubleClawMachineCode)) {
+            throw new DuplicateLocationCodeException("DoubleClawMachine with code already exists: " + doubleClawMachineCode);
+        }
         machine.setDoubleClawMachineCode(doubleClawMachineCode);
         return doubleClawMachineRepository.save(machine);
     }

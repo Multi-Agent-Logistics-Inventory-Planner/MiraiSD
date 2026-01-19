@@ -124,3 +124,5 @@ secrets/
 
 # Reference documentation
 refs/
+
+tests/
