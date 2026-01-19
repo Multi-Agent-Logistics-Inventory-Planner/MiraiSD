@@ -1,5 +1,20 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+import { dirname, join, resolve } from 'path'
 import { createClient } from '@supabase/supabase-js'
+
+// Load .env from project root (parent directory)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const projectRoot = resolve(__dirname, '..')
+const envPath = resolve(projectRoot, '.env')
+const result = dotenv.config({ path: envPath })
+
+if (result.error) {
+  console.error(`Failed to load .env from ${envPath}:`, result.error.message)
+  console.error(`Make sure .env file exists. You can copy env.template to .env and fill in your values.`)
+  process.exit(1)
+}
 
 const {
   SUPABASE_URL,

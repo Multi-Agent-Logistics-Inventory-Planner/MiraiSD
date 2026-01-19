@@ -9,10 +9,8 @@ services:
     image: inventory-service:latest
     ports:
       - "4000:4000"
-    environment:
-      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
-      - SUPABASE_DB_USERNAME=${SUPABASE_DB_USERNAME}
-      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+    env_file:
+      - ../.env
     dns:
       - 8.8.8.8
       - 8.8.4.4
