@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -14,20 +14,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { ProductFilters, type ProductFiltersState } from "@/components/inventory/product-filters"
 import { ProductTable } from "@/components/inventory/product-table"
 import { ProductGrid } from "@/components/inventory/product-grid"
 import { ProductDetailSheet } from "@/components/inventory/product-detail-sheet"
 import { ProductForm } from "@/components/inventory/product-form"
+import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog"
+import { MovementFilters, DEFAULT_MOVEMENT_FILTERS, type MovementFiltersState } from "@/components/stock/movement-filters"
+import { MovementHistoryTable } from "@/components/stock/movement-history-table"
+import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog"
 import { useProductInventory, type ProductWithInventory } from "@/hooks/queries/use-product-inventory"
+import { useMovementHistory } from "@/hooks/queries/use-movement-history"
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations"
 import { useToast } from "@/hooks/use-toast"
 import type { ProductCategory } from "@/types/api"
@@ -53,6 +50,15 @@ export default function InventoryPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState<ProductWithInventory | null>(null)
 
+  const [adjustOpen, setAdjustOpen] = useState(false)
+  const [transferOpen, setTransferOpen] = useState(false)
+
+  const [movementFilters, setMovementFilters] = useState<MovementFiltersState>({
+    ...DEFAULT_MOVEMENT_FILTERS,
+  })
+  const [movementPage, setMovementPage] = useState(0)
+  const movementPageSize = 20
+
   const items = list.data ?? []
 
   const categories: ProductCategory[] = Array.from(
@@ -70,6 +76,90 @@ export default function InventoryPage() {
     const matchesStatus = filters.status === "all" || row.status === filters.status
     return matchesSearch && matchesCategory && matchesStatus
   })
+
+  const movementProducts = items.map((row) => ({
+    id: row.product.id,
+    sku: row.product.sku,
+    name: row.product.name,
+  }))
+  const movementProductById = useMemo(() => {
+    const entries = movementProducts.map((product) => [
+      product.id,
+      { name: product.name, sku: product.sku },
+    ])
+    return Object.fromEntries(entries) as Record<string, { name: string; sku: string }>
+  }, [movementProducts])
+  const movementProduct = items.find(
+    (row) => row.product.id === movementFilters.productId
+  )?.product
+
+  useEffect(() => {
+    setMovementPage(0)
+  }, [
+    movementFilters.productId,
+    movementFilters.reason,
+    movementFilters.actorId,
+    movementFilters.locationId,
+    movementFilters.fromDate,
+    movementFilters.toDate,
+  ])
+
+  const movementQuery = useMovementHistory(
+    movementFilters.productId,
+    movementPage,
+    movementPageSize
+  )
+
+  const movementRows = movementQuery.data?.content ?? []
+
+  const filteredMovements = useMemo(() => {
+    if (!movementFilters.productId) return []
+
+    const actorFilter = movementFilters.actorId.trim()
+    const locationFilter = movementFilters.locationId.trim()
+    const reasonFilter = movementFilters.reason
+    const fromDate = movementFilters.fromDate
+      ? new Date(movementFilters.fromDate)
+      : null
+    const toDate = movementFilters.toDate
+      ? new Date(movementFilters.toDate)
+      : null
+
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999)
+    }
+
+    return movementRows.filter((movement) => {
+      if (reasonFilter !== "all" && movement.reason !== reasonFilter) {
+        return false
+      }
+
+      if (
+        actorFilter &&
+        (!movement.actorId || !movement.actorId.includes(actorFilter))
+      ) {
+        return false
+      }
+
+      if (locationFilter) {
+        const matchesLocation =
+          movement.fromLocationId?.includes(locationFilter) ||
+          movement.toLocationId?.includes(locationFilter) ||
+          movement.locationType
+            .toLowerCase()
+            .includes(locationFilter.toLowerCase())
+        if (!matchesLocation) return false
+      }
+
+      if (fromDate || toDate) {
+        const movementDate = new Date(movement.at)
+        if (fromDate && movementDate < fromDate) return false
+        if (toDate && movementDate > toDate) return false
+      }
+
+      return true
+    })
+  }, [movementFilters, movementRows])
 
   return (
     <div className="flex flex-col">
@@ -112,6 +202,10 @@ export default function InventoryPage() {
                     onSelect={(row) => {
                       setSelected(row)
                       setDetailOpen(true)
+                      setMovementFilters((prev) => ({
+                        ...prev,
+                        productId: row.product.id,
+                      }))
                     }}
                     onEdit={(row) => {
                       setEditing(row)
@@ -130,6 +224,10 @@ export default function InventoryPage() {
                   onSelect={(row) => {
                     setSelected(row)
                     setDetailOpen(true)
+                    setMovementFilters((prev) => ({
+                      ...prev,
+                      productId: row.product.id,
+                    }))
                   }}
                   onEdit={(row) => {
                     setEditing(row)
@@ -143,61 +241,45 @@ export default function InventoryPage() {
               )}
             </TabsContent>
             <TabsContent value="audit-log">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Audit Log</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Timestamp</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Details</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>2026-01-19 10:30</TableCell>
-                        <TableCell>John Smith</TableCell>
-                        <TableCell>Stock Adjustment</TableCell>
-                        <TableCell>Wireless Headphones</TableCell>
-                        <TableCell>20 units → 15 units (-5)</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2026-01-19 09:15</TableCell>
-                        <TableCell>Sarah Johnson</TableCell>
-                        <TableCell>Received Shipment</TableCell>
-                        <TableCell>Bluetooth Speaker</TableCell>
-                        <TableCell>+45 units</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2026-01-18 16:45</TableCell>
-                        <TableCell>Mike Wilson</TableCell>
-                        <TableCell>Sale</TableCell>
-                        <TableCell>USB-C Cable</TableCell>
-                        <TableCell>5 units → 0 units (-5)</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2026-01-18 14:20</TableCell>
-                        <TableCell>John Smith</TableCell>
-                        <TableCell>Price Update</TableCell>
-                        <TableCell>Laptop Stand</TableCell>
-                        <TableCell>$29.99 → $34.99</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2026-01-17 11:00</TableCell>
-                        <TableCell>Sarah Johnson</TableCell>
-                        <TableCell>New Item Added</TableCell>
-                        <TableCell>Monitor Arm</TableCell>
-                        <TableCell>Initial stock: 30 units</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+              <div className="space-y-4">
+                <MovementFilters
+                  state={movementFilters}
+                  onChange={setMovementFilters}
+                  products={movementProducts}
+                />
+
+                {!movementFilters.productId ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Stock Movement History</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm text-muted-foreground">
+                      Select a product to view its movement history.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>
+                        {movementProduct
+                          ? `Stock Movements for ${movementProduct.name}`
+                          : "Stock Movement History"}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <MovementHistoryTable
+                        movements={filteredMovements}
+                        isLoading={movementQuery.isLoading}
+                        error={movementQuery.error as Error | null}
+                        page={movementPage}
+                        totalPages={movementQuery.data?.totalPages ?? 1}
+                        onPageChange={setMovementPage}
+                        productById={movementProductById}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
 
@@ -205,12 +287,31 @@ export default function InventoryPage() {
           open={detailOpen}
           onOpenChange={setDetailOpen}
           item={selected}
+          onAdjustClick={() => {
+            if (!selected) return
+            setAdjustOpen(true)
+          }}
+          onTransferClick={() => {
+            if (!selected) return
+            setTransferOpen(true)
+          }}
         />
 
         <ProductForm
           open={formOpen}
           onOpenChange={setFormOpen}
           initialProduct={editing?.product ?? null}
+        />
+
+        <AdjustStockDialog
+          open={adjustOpen}
+          onOpenChange={setAdjustOpen}
+          product={selected?.product ?? null}
+        />
+        <TransferStockDialog
+          open={transferOpen}
+          onOpenChange={setTransferOpen}
+          product={selected?.product ?? null}
         />
 
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

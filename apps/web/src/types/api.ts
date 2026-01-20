@@ -324,7 +324,8 @@ export interface StockMovementMetadata {
 export interface StockMovement {
   id: number;
   locationType: LocationType;
-  item: InventoryItem;
+  item?: InventoryItem;
+  itemId?: string;
   fromLocationId?: string;
   toLocationId?: string;
   quantityChange: number;
