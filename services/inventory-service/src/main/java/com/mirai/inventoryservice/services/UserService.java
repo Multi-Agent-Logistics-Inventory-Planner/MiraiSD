@@ -1,22 +1,28 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
+import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @Transactional
 public class UserService {
     private final UserRepository userRepository;
+    private final StockMovementRepository stockMovementRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, StockMovementRepository stockMovementRepository) {
         this.userRepository = userRepository;
+        this.stockMovementRepository = stockMovementRepository;
     }
 
     public User createUser(String fullName, String email, UserRole role) {
@@ -88,6 +94,11 @@ public class UserService {
                 .role(userRole)
                 .build();
         return userRepository.save(user);
+    }
+
+    public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {
+        return stockMovementRepository.findTopByActorIdOrderByAtDesc(userId)
+                .map(StockMovement::getAt);
     }
 }
 
