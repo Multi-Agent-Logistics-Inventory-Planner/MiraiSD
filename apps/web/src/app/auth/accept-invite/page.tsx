@@ -130,6 +130,9 @@ function AcceptInviteContent() {
         return;
       }
 
+      // Refresh session to get new JWT with updated user_metadata
+      await supabase.auth.refreshSession();
+
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 

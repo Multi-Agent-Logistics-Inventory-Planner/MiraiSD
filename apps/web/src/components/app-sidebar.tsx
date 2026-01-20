@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
@@ -12,7 +12,7 @@ import {
   Settings,
   LogOut,
   MapPin,
-} from "lucide-react"
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -25,13 +25,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
-} from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useAuth } from "@/hooks/use-auth"
-import { UserRole } from "@/types/api"
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
+import { UserRole } from "@/types/api";
+import { Logo } from "@/components/logo";
 
 const mainNavItems = [
   {
@@ -69,36 +69,32 @@ const mainNavItems = [
     href: "/users",
     icon: Users,
   },
-]
+];
 
 function getInitials(name: string | undefined): string {
-  if (!name) return "U"
-  const parts = name.split(" ")
+  if (!name) return "U";
+  const parts = name.split(" ");
   if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
-  return name.slice(0, 2).toUpperCase()
+  return name.slice(0, 2).toUpperCase();
 }
 
 function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
-  return role === UserRole.ADMIN ? "default" : "secondary"
+  return role === UserRole.ADMIN ? "default" : "secondary";
 }
 
 export function AppSidebar() {
-  const pathname = usePathname()
-  const { user, isLoading, signOut } = useAuth()
+  const pathname = usePathname();
+  const { user, isLoading, signOut } = useAuth();
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Package className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold">Mirai</span>
+      <SidebarHeader className="p-2.5">
+        <Link href="/" className="flex items-center">
+          <Logo width={86} height={86} />
         </Link>
       </SidebarHeader>
-      <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
@@ -117,7 +113,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel>Settings</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -146,9 +141,7 @@ export function AppSidebar() {
         ) : user ? (
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9">
-              <AvatarFallback>
-                {getInitials(user.personName)}
-              </AvatarFallback>
+              <AvatarFallback>{getInitials(user.personName)}</AvatarFallback>
             </Avatar>
             <div className="flex flex-1 flex-col">
               <span className="text-sm font-medium">
@@ -183,5 +176,5 @@ export function AppSidebar() {
         )}
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
