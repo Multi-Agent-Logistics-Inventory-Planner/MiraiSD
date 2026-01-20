@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +35,11 @@ public class UserController {
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable UUID id) {
         User user = userService.getUserById(id);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
+    }
+
+    @GetMapping("/{id}/last-audit")
+    public ResponseEntity<OffsetDateTime> getLastAudit(@PathVariable UUID id) {
+        return ResponseEntity.ok(userService.getLastAuditDate(id).orElse(null));
     }
 
     @GetMapping("/email/{email}")
