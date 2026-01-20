@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -16,6 +17,8 @@ interface ProductDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: ProductWithInventory | null;
+  onAdjustClick?: () => void;
+  onTransferClick?: () => void;
 }
 
 function getStatusColor(status: StockStatus) {
@@ -53,6 +56,8 @@ export function ProductDetailSheet({
   open,
   onOpenChange,
   item,
+  onAdjustClick,
+  onTransferClick,
 }: ProductDetailSheetProps) {
   const p = item?.product;
 
@@ -112,10 +117,30 @@ export function ProductDetailSheet({
                 <p className="text-sm text-muted-foreground">{p.notes}</p>
               </div>
             ) : null}
+
+            <div className="space-y-2 pt-2">
+              <div className="text-sm font-medium">Stock Operations</div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => onAdjustClick?.()}
+                  disabled={!item}
+                >
+                  Adjust Stock
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onTransferClick?.()}
+                  disabled={!item}
+                >
+                  Transfer Stock
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </SheetContent>
     </Sheet>
   );
 }
-

@@ -10,7 +10,9 @@ import {
   KeychainMachineInventory,
   InventoryRequest,
   Inventory,
+  InventoryItem,
 } from "@/types/api";
+import { getLocationsByType } from "@/lib/api/locations";
 
 // Helper to build inventory path
 function getInventoryPath(locationType: LocationType, locationId: string): string {
@@ -328,4 +330,111 @@ export async function getInventoryByLocation(
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }
+}
+
+export interface InventoryLocationEntry {
+  inventoryId: string;
+  item: InventoryItem;
+  quantity: number;
+  locationType: LocationType;
+  locationId: string;
+  locationCode: string;
+  locationLabel: string;
+}
+
+const ALL_LOCATION_TYPES: LocationType[] = [
+  LocationType.BOX_BIN,
+  LocationType.RACK,
+  LocationType.CABINET,
+  LocationType.SINGLE_CLAW_MACHINE,
+  LocationType.DOUBLE_CLAW_MACHINE,
+  LocationType.KEYCHAIN_MACHINE,
+];
+
+function formatLocationType(locationType: LocationType): string {
+  return locationType
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getLocationDetails(
+  locationType: LocationType,
+  inventory: Inventory
+): { locationId: string; locationCode: string } {
+  switch (locationType) {
+    case LocationType.BOX_BIN: {
+      const inv = inventory as BoxBinInventory;
+      return { locationId: inv.boxBinId, locationCode: inv.boxBinCode };
+    }
+    case LocationType.RACK: {
+      const inv = inventory as RackInventory;
+      return { locationId: inv.rackId, locationCode: inv.rackCode };
+    }
+    case LocationType.CABINET: {
+      const inv = inventory as CabinetInventory;
+      return { locationId: inv.cabinetId, locationCode: inv.cabinetCode };
+    }
+    case LocationType.SINGLE_CLAW_MACHINE: {
+      const inv = inventory as SingleClawMachineInventory;
+      return {
+        locationId: inv.singleClawMachineId,
+        locationCode: inv.singleClawMachineCode,
+      };
+    }
+    case LocationType.DOUBLE_CLAW_MACHINE: {
+      const inv = inventory as DoubleClawMachineInventory;
+      return {
+        locationId: inv.doubleClawMachineId,
+        locationCode: inv.doubleClawMachineCode,
+      };
+    }
+    case LocationType.KEYCHAIN_MACHINE: {
+      const inv = inventory as KeychainMachineInventory;
+      return {
+        locationId: inv.keychainMachineId,
+        locationCode: inv.keychainMachineCode,
+      };
+    }
+    default:
+      throw new Error(`Unknown location type: ${locationType}`);
+  }
+}
+
+export async function getInventoryEntriesByItemId(
+  itemId: string
+): Promise<InventoryLocationEntry[]> {
+  const entries: InventoryLocationEntry[] = [];
+
+  const locationsByType = await Promise.all(
+    ALL_LOCATION_TYPES.map(async (locationType) => {
+      const locations = await getLocationsByType(locationType);
+      const ids = (locations as Array<{ id: string }>).map((l) => l.id);
+      return { locationType, ids };
+    })
+  );
+
+  await Promise.all(
+    locationsByType.flatMap(({ locationType, ids }) =>
+      ids.map(async (locationId) => {
+        const inventories = await getInventoryByLocation(locationType, locationId);
+        for (const inv of inventories) {
+          if (inv.item.id !== itemId) continue;
+          const { locationId: invLocationId, locationCode } =
+            getLocationDetails(locationType, inv);
+          entries.push({
+            inventoryId: inv.id,
+            item: inv.item,
+            quantity: inv.quantity ?? 0,
+            locationType,
+            locationId: invLocationId ?? locationId,
+            locationCode,
+            locationLabel: `${formatLocationType(locationType)} ${locationCode}`,
+          });
+        }
+      })
+    )
+  );
+
+  return entries.sort((a, b) => a.locationLabel.localeCompare(b.locationLabel));
 }
