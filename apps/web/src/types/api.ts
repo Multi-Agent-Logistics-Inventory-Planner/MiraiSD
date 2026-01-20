@@ -117,6 +117,16 @@ export interface UserRequest {
   role: UserRole;
 }
 
+export interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  invitedByEmail: string;
+  invitedAt: string;
+  acceptedAt: string | null;
+  status: string;
+}
+
 // Base Storage Location type
 
 interface BaseLocation {

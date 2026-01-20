@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import {
   Search,
   Users as UsersIcon,
@@ -45,18 +45,29 @@ import {
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { users, type User } from "@/lib/data";
 import { cn } from "@/lib/utils";
-import { Suspense } from "react";
 import Loading from "./loading";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getUsers, getUserLastAudit, deleteUser } from "@/lib/api/users";
+import { getPendingInvitations, resendInvitation, cancelInvitation } from "@/lib/api/invitations";
+import { EditUserDialog } from "@/components/users/edit-user-dialog";
+import { User, Invitation } from "@/types/api";
 
-function getStatusColor(status: User["status"]) {
+type UserTableRow = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  status: "active" | "pending";
+  lastAudit: string | null;
+  createdAt: string;
+  type: "user" | "invitation";
+};
+
+function getStatusColor(status: "active" | "pending") {
   switch (status) {
     case "active":
       return "bg-green-100 text-green-700";
-    case "inactive":
-      return "bg-gray-100 text-gray-700";
     case "pending":
       return "bg-amber-100 text-amber-700";
     default:
@@ -64,7 +75,7 @@ function getStatusColor(status: User["status"]) {
   }
 }
 
-function getRoleColor(role: User["role"]) {
+function getRoleColor(role: "admin" | "employee") {
   switch (role) {
     case "admin":
       return "bg-purple-100 text-purple-700";
@@ -113,17 +124,75 @@ export default function UsersPage() {
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const supabase = getSupabaseClient();
 
-  const filteredUsers = users.filter((user) => {
+  // New state for real data
+  const [tableData, setTableData] = useState<UserTableRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const session = supabase ? await supabase.auth.getSession() : null;
+      if (!session?.data.session?.access_token) return;
+
+      const [usersData, invitationsData] = await Promise.all([
+        getUsers(),
+        getPendingInvitations().catch(() => [] as Invitation[]),
+      ]);
+
+      // Fetch last audit for each user
+      const usersWithAudit = await Promise.all(
+        usersData.map(async (user) => {
+          const lastAudit = await getUserLastAudit(user.id).catch(() => null);
+          return {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+            status: "active" as const,
+            lastAudit,
+            createdAt: user.createdAt,
+            type: "user" as const,
+          };
+        })
+      );
+
+      // Map invitations to table rows
+      const invitationRows: UserTableRow[] = invitationsData.map((inv) => ({
+        id: inv.id,
+        fullName: "-",
+        email: inv.email,
+        role: inv.role,
+        status: "pending" as const,
+        lastAudit: null,
+        createdAt: inv.invitedAt,
+        type: "invitation" as const,
+      }));
+
+      setTableData([...usersWithAudit, ...invitationRows]);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const filteredData = tableData.filter((row) => {
     return (
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
+      row.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      row.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
-  const totalUsers = users.length;
-  const activeUsers = users.filter((u) => u.status === "active").length;
-  const pendingApprovals = users.filter((u) => u.status === "pending").length;
-  const adminCount = users.filter((u) => u.role === "admin").length;
+  const totalUsers = tableData.filter((r) => r.type === "user").length;
+  const activeUsers = tableData.filter((r) => r.status === "active").length;
+  const pendingInvites = tableData.filter((r) => r.status === "pending").length;
+  const adminCount = tableData.filter((r) => r.role === "ADMIN" || r.role === "admin").length;
 
   const resetInviteForm = () => {
     setInviteEmail("");
@@ -173,6 +242,7 @@ export default function UsersPage() {
       setTimeout(() => {
         setIsAddDialogOpen(false);
         resetInviteForm();
+        fetchData();
       }, 2000);
     } catch (error) {
       setInviteError(error instanceof Error ? error.message : "Failed to send invitation");
@@ -183,22 +253,36 @@ export default function UsersPage() {
 
   const handleResendInvite = async (email: string) => {
     try {
-      const session = supabase ? await supabase.auth.getSession() : null;
-      const accessToken = session?.data.session?.access_token;
-
-      if (!accessToken) {
-        return;
-      }
-
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
-      await fetch(`${backendUrl}/api/admin/invitations/${encodeURIComponent(email)}/resend`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
+      await resendInvitation(email);
     } catch (error) {
       console.error("Failed to resend invitation:", error);
+    }
+  };
+
+  const handleEditUser = async (row: UserTableRow) => {
+    if (row.type !== "user") return;
+    try {
+      const users = await getUsers();
+      const user = users.find((u) => u.id === row.id);
+      if (user) {
+        setEditingUser(user);
+        setIsEditDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user for editing:", error);
+    }
+  };
+
+  const handleDelete = async (row: UserTableRow) => {
+    try {
+      if (row.type === "user") {
+        await deleteUser(row.id);
+      } else {
+        await cancelInvitation(row.email);
+      }
+      fetchData();
+    } catch (error) {
+      console.error("Failed to delete:", error);
     }
   };
 
@@ -251,7 +335,7 @@ export default function UsersPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-amber-600">
-                  {pendingApprovals}
+                  {pendingInvites}
                 </div>
                 <p className="text-xs text-muted-foreground">Awaiting acceptance</p>
               </CardContent>
@@ -385,76 +469,87 @@ export default function UsersPage() {
             </TabsList>
             <TabsContent value="users">
               <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Login</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="w-[120px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">
-                          {user.name}
-                        </TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", getRoleColor(user.role))}
-                          >
-                            {user.role.charAt(0).toUpperCase() +
-                              user.role.slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-xs",
-                              getStatusColor(user.status)
-                            )}
-                          >
-                            {user.status.charAt(0).toUpperCase() +
-                              user.status.slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.lastLogin}</TableCell>
-                        <TableCell>{user.createdAt}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {user.status === "pending" && (
+                {isLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Audit</TableHead>
+                        <TableHead className="w-[120px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredData.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">
+                            {row.fullName}
+                          </TableCell>
+                          <TableCell>{row.email}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-xs", getRoleColor(row.role.toLowerCase() as "admin" | "employee"))}
+                            >
+                              {row.role.charAt(0).toUpperCase() + row.role.slice(1).toLowerCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                getStatusColor(row.status)
+                              )}
+                            >
+                              {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {row.lastAudit ? new Date(row.lastAudit).toLocaleDateString() : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {row.status === "pending" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Resend invitation"
+                                  onClick={() => handleResendInvite(row.email)}
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {row.type === "user" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => handleEditUser(row)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                title="Resend invitation"
-                                onClick={() => handleResendInvite(user.email)}
+                                className="text-destructive"
+                                onClick={() => handleDelete(row)}
                               >
-                                <RefreshCw className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button variant="ghost" size="icon-sm">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </Card>
             </TabsContent>
             <TabsContent value="access-control">
@@ -487,6 +582,13 @@ export default function UsersPage() {
           </Tabs>
         </main>
       </div>
+
+      <EditUserDialog
+        user={editingUser}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSuccess={fetchData}
+      />
     </Suspense>
   );
 }

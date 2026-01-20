@@ -51,3 +51,10 @@ export async function updateUser(id: string, data: UserRequest): Promise<User> {
 export async function deleteUser(id: string): Promise<void> {
   return apiDelete<void>(`${BASE_PATH}/${id}`);
 }
+
+/**
+ * Get the last audit date for a user
+ */
+export async function getUserLastAudit(id: string): Promise<string | null> {
+  return apiGet<string | null>(`${BASE_PATH}/${id}/last-audit`);
+}

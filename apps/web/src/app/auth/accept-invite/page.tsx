@@ -130,15 +130,19 @@ function AcceptInviteContent() {
         return;
       }
 
+      // Refresh session to get new JWT with updated user_metadata
+      await supabase.auth.refreshSession();
+
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
       if (accessToken) {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
         await fetch(`${backendUrl}/api/auth/sync-user`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
         });
@@ -157,7 +161,9 @@ function AcceptInviteContent() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="mt-4 text-sm text-gray-600">Verifying invitation...</p>
+            <p className="mt-4 text-sm text-gray-600">
+              Verifying invitation...
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -190,7 +196,8 @@ function AcceptInviteContent() {
         <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
-            You've been invited to join. Please complete your profile to continue.
+            You've been invited to join. Please complete your profile to
+            continue.
           </CardDescription>
         </CardHeader>
         <CardContent>
