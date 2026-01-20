@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Suspense } from "react"
 import {
   Plus,
   Search,
