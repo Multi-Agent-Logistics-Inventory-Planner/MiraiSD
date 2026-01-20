@@ -310,6 +310,6 @@ export default function ShipmentsPage() {
             </Table>
           </Card>
         </main>
-    </div>
+      </div>
   )
 }
