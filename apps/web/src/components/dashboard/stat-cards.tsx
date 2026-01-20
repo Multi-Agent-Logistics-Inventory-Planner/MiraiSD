@@ -2,6 +2,7 @@
 
 import { DollarSign, AlertTriangle, PackageX, Package } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface StatCardsProps {
   totalStockValue: number
@@ -10,6 +11,7 @@ interface StatCardsProps {
   criticalItems: number
   outOfStockItems: number
   totalSKUs: number
+  isLoading?: boolean
 }
 
 export function StatCards({
@@ -19,7 +21,27 @@ export function StatCards({
   criticalItems,
   outOfStockItems,
   totalSKUs,
+  isLoading,
 }: StatCardsProps) {
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="mt-2 h-3 w-40" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>

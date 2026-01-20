@@ -3,14 +3,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import type { InventoryItem } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { StockLevelItem, StockStatus } from "@/types/dashboard"
 
 interface StockLevelsProps {
-  items: InventoryItem[]
+  items: StockLevelItem[]
+  isLoading?: boolean
 }
 
-function getStatusColor(status: InventoryItem["status"]) {
+function getStatusColor(status: StockStatus) {
   switch (status) {
     case "good":
       return "bg-green-100 text-green-700"
@@ -25,7 +27,7 @@ function getStatusColor(status: InventoryItem["status"]) {
   }
 }
 
-function getProgressColor(status: InventoryItem["status"]) {
+function getProgressColor(status: StockStatus) {
   switch (status) {
     case "good":
       return "[&>[data-slot=progress-indicator]]:bg-green-500"
@@ -40,22 +42,41 @@ function getProgressColor(status: InventoryItem["status"]) {
   }
 }
 
-function formatStatus(status: InventoryItem["status"]) {
+function formatStatus(status: StockStatus) {
   return status
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
 }
 
-export function StockLevels({ items }: StockLevelsProps) {
+export function StockLevels({ items, isLoading }: StockLevelsProps) {
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle>Real-Time Stock Levels</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {items.slice(0, 5).map((item) => (
-          <div key={item.id} className="space-y-2">
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No inventory data yet.</p>
+        ) : (
+          items.slice(0, 5).map((item) => (
+          <div key={item.itemId} className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{item.name}</span>
@@ -75,7 +96,8 @@ export function StockLevels({ items }: StockLevelsProps) {
               Last updated: {item.lastUpdated}
             </p>
           </div>
-        ))}
+          ))
+        )}
       </CardContent>
     </Card>
   )
