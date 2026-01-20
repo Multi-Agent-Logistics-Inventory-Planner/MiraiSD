@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import {
   Plus,
@@ -71,7 +70,6 @@ function formatStatus(status: Shipment["status"]) {
 const Loading = () => null
 
 export default function ShipmentsPage() {
-  const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -94,8 +92,7 @@ export default function ShipmentsPage() {
   const delayed = shipments.filter((s) => s.status === "delayed").length
 
   return (
-    <Suspense fallback={<Loading />}>
-      <div className="flex flex-col">
+    <div className="flex flex-col">
         <DashboardHeader
           title="Shipments"
           description="Manage inbound and outbound shipments"
@@ -318,6 +315,5 @@ export default function ShipmentsPage() {
           </Card>
         </main>
       </div>
-    </Suspense>
   )
 }
