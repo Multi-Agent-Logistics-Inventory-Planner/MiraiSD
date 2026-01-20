@@ -1,6 +1,5 @@
 package com.mirai.inventoryservice.models.audit;
 
-import com.mirai.inventoryservice.converters.UserRoleConverter;
 import com.mirai.inventoryservice.models.enums.UserRole;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -10,26 +9,20 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "invitations")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class Invitation {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
-    @NotBlank
-    @Column(name = "full_name", nullable = false)
-    private String fullName;
 
     @NotBlank
     @Email
@@ -37,16 +30,27 @@ public class User {
     private String email;
 
     @NotNull
-    @Convert(converter = UserRoleConverter.class)
     @Column(nullable = false)
-    private UserRole role;
+    private String role;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invited_by")
+    private User invitedBy;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
+    @Column(name = "invited_at")
+    private OffsetDateTime invitedAt;
+
+    @Column(name = "accepted_at")
+    private OffsetDateTime acceptedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (invitedAt == null) {
+            invitedAt = OffsetDateTime.now();
+        }
+    }
+
+    public boolean isPending() {
+        return acceptedAt == null;
+    }
 }
-

@@ -69,5 +69,25 @@ public class UserService {
     public boolean existsByFullName(String fullName) {
         return userRepository.existsByFullName(fullName);
     }
+
+    public User createFromJwt(String email, String name, String role) {
+        UserRole userRole = UserRole.EMPLOYEE;
+        if (role != null) {
+            try {
+                userRole = UserRole.valueOf(role.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Default to EMPLOYEE if invalid role
+            }
+        }
+
+        String fullName = name != null ? name : email.split("@")[0];
+
+        User user = User.builder()
+                .fullName(fullName)
+                .email(email)
+                .role(userRole)
+                .build();
+        return userRepository.save(user);
+    }
 }
 

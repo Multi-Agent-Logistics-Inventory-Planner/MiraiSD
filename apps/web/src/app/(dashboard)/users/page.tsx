@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Plus,
   Search,
   Users as UsersIcon,
   UserCheck,
@@ -10,6 +9,9 @@ import {
   Shield,
   Pencil,
   Trash2,
+  RefreshCw,
+  Loader2,
+  Mail,
 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
@@ -42,11 +44,12 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { users, type User } from "@/lib/data";
 import { cn } from "@/lib/utils";
-import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "./loading";
+import { getSupabaseClient } from "@/lib/supabase";
 
 function getStatusColor(status: User["status"]) {
   switch (status) {
@@ -103,7 +106,12 @@ const accessPermissions = [
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const searchParams = useSearchParams();
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const supabase = getSupabaseClient();
 
   const filteredUsers = users.filter((user) => {
     return (
@@ -116,6 +124,83 @@ export default function UsersPage() {
   const activeUsers = users.filter((u) => u.status === "active").length;
   const pendingApprovals = users.filter((u) => u.status === "pending").length;
   const adminCount = users.filter((u) => u.role === "admin").length;
+
+  const resetInviteForm = () => {
+    setInviteEmail("");
+    setInviteRole("");
+    setInviteError(null);
+    setInviteSuccess(false);
+  };
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail || !inviteRole) {
+      setInviteError("Email and role are required");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setInviteError(null);
+
+    try {
+      const session = supabase ? await supabase.auth.getSession() : null;
+      const accessToken = session?.data.session?.access_token;
+
+      if (!accessToken) {
+        setInviteError("You must be logged in to invite users");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+      const response = await fetch(`${backendUrl}/api/admin/invitations`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole.toUpperCase(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to send invitation");
+      }
+
+      setInviteSuccess(true);
+      setTimeout(() => {
+        setIsAddDialogOpen(false);
+        resetInviteForm();
+      }, 2000);
+    } catch (error) {
+      setInviteError(error instanceof Error ? error.message : "Failed to send invitation");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendInvite = async (email: string) => {
+    try {
+      const session = supabase ? await supabase.auth.getSession() : null;
+      const accessToken = session?.data.session?.access_token;
+
+      if (!accessToken) {
+        return;
+      }
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+      await fetch(`${backendUrl}/api/admin/invitations/${encodeURIComponent(email)}/resend`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to resend invitation:", error);
+    }
+  };
 
   return (
     <Suspense fallback={<Loading />}>
@@ -160,7 +245,7 @@ export default function UsersPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Pending Approval
+                  Pending Invites
                 </CardTitle>
                 <Clock className="h-4 w-4 text-amber-500" />
               </CardHeader>
@@ -168,7 +253,7 @@ export default function UsersPage() {
                 <div className="text-2xl font-bold text-amber-600">
                   {pendingApprovals}
                 </div>
-                <p className="text-xs text-muted-foreground">Awaiting review</p>
+                <p className="text-xs text-muted-foreground">Awaiting acceptance</p>
               </CardContent>
             </Card>
             <Card>
@@ -200,71 +285,92 @@ export default function UsersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog
+              open={isAddDialogOpen}
+              onOpenChange={(open) => {
+                setIsAddDialogOpen(open);
+                if (!open) resetInviteForm();
+              }}
+            >
               <DialogTrigger asChild>
                 <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add User
+                  <Mail className="mr-2 h-4 w-4" />
+                  Invite User
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add New User</DialogTitle>
+                  <DialogTitle>Invite New User</DialogTitle>
                   <DialogDescription>
-                    Create a new user account. They will receive an email
-                    invitation.
+                    Send an email invitation. The user will set their name and password when they accept.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" placeholder="John Doe" />
-                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="john@company.com"
+                      placeholder="user@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      disabled={isSubmitting}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="role">Role</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="employee">Employee</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select
+                      value={inviteRole}
+                      onValueChange={setInviteRole}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {inviteError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{inviteError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {inviteSuccess && (
+                    <Alert className="bg-green-50 border-green-200 text-green-800">
+                      <AlertDescription>
+                        Invitation sent successfully!
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => setIsAddDialogOpen(false)}
+                    onClick={() => {
+                      setIsAddDialogOpen(false);
+                      resetInviteForm();
+                    }}
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
-                  <Button onClick={() => setIsAddDialogOpen(false)}>
-                    Add User
+                  <Button
+                    onClick={handleInviteUser}
+                    disabled={isSubmitting || inviteSuccess}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Invitation"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -288,7 +394,7 @@ export default function UsersPage() {
                       <TableHead>Status</TableHead>
                       <TableHead>Last Login</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
+                      <TableHead className="w-[120px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -323,6 +429,16 @@ export default function UsersPage() {
                         <TableCell>{user.createdAt}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
+                            {user.status === "pending" && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Resend invitation"
+                                onClick={() => handleResendInvite(user.email)}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon-sm">
                               <Pencil className="h-4 w-4" />
                             </Button>
