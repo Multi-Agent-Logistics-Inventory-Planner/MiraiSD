@@ -11,6 +11,7 @@ import {
   Users,
   Settings,
   LogOut,
+  MapPin,
 } from "lucide-react"
 
 import {
@@ -26,7 +27,11 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth } from "@/hooks/use-auth"
+import { UserRole } from "@/types/api"
 
 const mainNavItems = [
   {
@@ -38,6 +43,11 @@ const mainNavItems = [
     title: "Inventory",
     href: "/inventory",
     icon: Package,
+  },
+  {
+    title: "Locations",
+    href: "/locations",
+    icon: MapPin,
   },
   {
     title: "Shipments",
@@ -61,8 +71,22 @@ const mainNavItems = [
   },
 ]
 
+function getInitials(name: string | undefined): string {
+  if (!name) return "U"
+  const parts = name.split(" ")
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
+
+function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
+  return role === UserRole.ADMIN ? "default" : "secondary"
+}
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const { user, isLoading, signOut } = useAuth()
 
   return (
     <Sidebar>
@@ -71,7 +95,7 @@ export function AppSidebar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Package className="h-5 w-5" />
           </div>
-          <span className="text-lg font-semibold">Inventory Pro</span>
+          <span className="text-lg font-semibold">Mirai</span>
         </Link>
       </SidebarHeader>
       <SidebarSeparator />
@@ -111,19 +135,52 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-            <AvatarFallback>JS</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-1 flex-col">
-            <span className="text-sm font-medium">John Smith</span>
-            <span className="text-xs text-muted-foreground">Admin</span>
+        {isLoading ? (
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-full" />
+            <div className="flex flex-1 flex-col gap-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
           </div>
-          <button className="text-muted-foreground hover:text-foreground">
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
+        ) : user ? (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback>
+                {getInitials(user.personName)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-1 flex-col">
+              <span className="text-sm font-medium">
+                {user.personName || user.email}
+              </span>
+              <Badge
+                variant={getRoleBadgeVariant(user.role)}
+                className="w-fit text-xs"
+              >
+                {user.role}
+              </Badge>
+            </div>
+            <button
+              onClick={signOut}
+              className="text-muted-foreground hover:text-foreground"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback>?</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-1 flex-col">
+              <span className="text-sm font-medium text-muted-foreground">
+                Not signed in
+              </span>
+            </div>
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   )
