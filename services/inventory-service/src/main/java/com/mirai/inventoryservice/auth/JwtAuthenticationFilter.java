@@ -31,7 +31,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String personRole = null;
         String personId = null;
         String personName = null;
-        
+        String personEmail = null;
+
         // Extract JWT token from Authorization header
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
@@ -39,25 +40,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 personRole = jwtService.extractRole(token);
                 personId = jwtService.extractPersonId(token);
                 personName = jwtService.extractName(token);
+                personEmail = jwtService.extractEmail(token);
             } catch (Exception e) {
                 // Invalid token
                 filterChain.doFilter(request, response);
                 return;
             }
         }
-        
-        // Validate token and set authentication
-        if (personId != null && personName != null && personRole != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            Map<String, String> principal = Map.of("personId", personId, "personName", personName);
+
+        // Validate token and set authentication (role can be null for unauthenticated users)
+        if (personId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            Map<String, String> principal = new java.util.HashMap<>();
+            principal.put("personId", personId);
+            principal.put("personName", personName != null ? personName : "Unknown");
+            principal.put("email", personEmail);
+            principal.put("role", personRole);
+
             if (jwtService.validateToken(token)) {
-                // Create authentication object with role
-                UsernamePasswordAuthenticationToken authToken = 
+                // Create authentication object with role (default to USER if no role)
+                String role = personRole != null ? personRole.toUpperCase() : "USER";
+                UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(
-                        principal, 
-                        null, 
-                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + personRole.toUpperCase()))
+                        principal,
+                        null,
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
                     );
-                
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }

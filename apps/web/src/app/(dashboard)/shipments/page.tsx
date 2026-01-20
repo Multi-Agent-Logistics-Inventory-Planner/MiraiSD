@@ -9,7 +9,6 @@ import {
   Upload,
   Truck,
   Package,
-  Clock,
   AlertTriangle,
 } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -66,8 +65,6 @@ function formatStatus(status: Shipment["status"]) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ")
 }
-
-const Loading = () => null
 
 export default function ShipmentsPage() {
   const [searchQuery, setSearchQuery] = useState("")

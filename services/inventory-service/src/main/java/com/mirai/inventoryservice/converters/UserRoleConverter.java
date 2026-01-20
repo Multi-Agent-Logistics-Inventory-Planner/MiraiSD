@@ -19,10 +19,6 @@ public class UserRoleConverter implements AttributeConverter<UserRole, String> {
     @Override
     public UserRole convertToEntityAttribute(String dbValue) {
         if (dbValue == null) return null;
-        return switch (dbValue) {
-            case "admin" -> UserRole.ADMIN;
-            case "employee" -> UserRole.EMPLOYEE;
-            default -> throw new IllegalArgumentException("Unknown UserRole: " + dbValue);
-        };
+        return UserRole.valueOf(dbValue.toUpperCase());
     }
 }

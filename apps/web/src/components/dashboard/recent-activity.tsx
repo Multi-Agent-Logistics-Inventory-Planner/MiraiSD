@@ -2,18 +2,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Activity } from "lucide-react"
-
-interface ActivityItem {
-  id: string
-  action: string
-  time: string
-}
+import { Skeleton } from "@/components/ui/skeleton"
+import type { ActivityItem } from "@/types/dashboard"
 
 interface RecentActivityProps {
   activities: ActivityItem[]
+  isLoading?: boolean
 }
 
-export function RecentActivity({ activities }: RecentActivityProps) {
+export function RecentActivity({ activities, isLoading }: RecentActivityProps) {
   return (
     <Card className="h-full">
       <CardHeader>
@@ -24,7 +21,22 @@ export function RecentActivity({ activities }: RecentActivityProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {activities.map((activity) => (
+          {isLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <Skeleton className="mt-1.5 h-2 w-2 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : activities.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+          ) : (
+            activities.map((activity) => (
             <div key={activity.id} className="flex items-start gap-3">
               <div className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
               <div className="flex-1 space-y-1">
@@ -32,7 +44,8 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                 <p className="text-xs text-muted-foreground">{activity.time}</p>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

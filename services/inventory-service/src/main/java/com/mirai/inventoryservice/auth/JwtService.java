@@ -30,17 +30,19 @@ public class JwtService {
     public String extractName(String token){
         return extractClaim(token, claims -> {
             HashMap<?, ?> userMetadata = claims.get("user_metadata", HashMap.class);
-            if (userMetadata != null) {
+            if (userMetadata != null && userMetadata.get("name") != null) {
                 return userMetadata.get("name").toString();
             }
-            return null;
+            // Fallback to email if name not set
+            String email = claims.get("email", String.class);
+            return email != null ? email.split("@")[0] : "Unknown";
         });
     }
 
     public String extractRole(String token){
         return extractClaim(token, claims -> {
             HashMap<?, ?> userMetadata = claims.get("user_metadata", HashMap.class);
-            if (userMetadata != null) {
+            if (userMetadata != null && userMetadata.get("role") != null) {
                 return userMetadata.get("role").toString();
             }
             return null;
@@ -50,7 +52,11 @@ public class JwtService {
     public String extractPersonId(String token) {
         return extractClaim(token, Claims::getSubject);
     }
-    
+
+    public String extractEmail(String token) {
+        return extractClaim(token, claims -> claims.get("email", String.class));
+    }
+
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }

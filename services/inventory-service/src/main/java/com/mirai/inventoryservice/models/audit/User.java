@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.audit;
 
+import com.mirai.inventoryservice.converters.UserRoleConverter;
 import com.mirai.inventoryservice.models.enums.UserRole;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -36,7 +37,7 @@ public class User {
     private String email;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = UserRoleConverter.class)
     @Column(nullable = false)
     private UserRole role;
 
