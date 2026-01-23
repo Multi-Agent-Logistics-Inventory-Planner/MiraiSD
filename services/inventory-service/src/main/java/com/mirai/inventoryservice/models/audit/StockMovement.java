@@ -43,6 +43,12 @@ public class StockMovement {
     @Column(name = "to_location_id")
     private UUID toLocationId;
 
+    @Column(name = "previous_quantity")
+    private Integer previousQuantity;
+
+    @Column(name = "current_quantity")
+    private Integer currentQuantity;
+
     @NotNull
     @Column(name = "quantity_change", nullable = false)
     private Integer quantityChange;
