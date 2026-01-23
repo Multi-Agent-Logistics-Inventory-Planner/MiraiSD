@@ -345,6 +345,33 @@ export interface StockMovement {
   metadata?: StockMovementMetadata;
 }
 
+export interface AuditLogEntry {
+  id: number;
+  locationType: LocationType;
+  itemId: string;
+  itemSku: string;
+  itemName: string;
+  fromLocationId?: string;
+  fromLocationCode?: string;
+  toLocationId?: string;
+  toLocationCode?: string;
+  previousQuantity?: number;
+  currentQuantity?: number;
+  quantityChange: number;
+  reason: StockMovementReason;
+  actorId?: string;
+  actorName?: string;
+  at: string;
+}
+
+export interface AuditLogFilters {
+  search?: string;
+  actorId?: string;
+  reason?: StockMovementReason;
+  fromDate?: string;
+  toDate?: string;
+}
+
 export interface AdjustStockRequest {
   quantityChange: number;
   reason: StockMovementReason;
