@@ -295,7 +295,7 @@ export default function UsersPage() {
         />
         <main className="flex-1 space-y-6 p-4 md:p-6">
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -356,7 +356,7 @@ export default function UsersPage() {
                 </p>
               </CardContent>
             </Card>
-          </div>
+          </div> */}
 
           {/* Filters and Actions */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
