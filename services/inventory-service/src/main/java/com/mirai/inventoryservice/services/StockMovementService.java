@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -9,6 +10,7 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.*;
 import com.mirai.inventoryservice.models.storage.*;
 import com.mirai.inventoryservice.repositories.*;
+import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -106,6 +108,8 @@ public class StockMovementService {
         StockMovement movement = StockMovement.builder()
                 .item(getInventoryProduct(inventory))
                 .locationType(locationType)
+                .previousQuantity(currentQuantity)
+                .currentQuantity(newQuantity)
                 .quantityChange(request.getQuantityChange())
                 .reason(request.getReason())
                 .actorId(request.getActorId())
@@ -170,6 +174,8 @@ public class StockMovementService {
                 .locationType(request.getSourceLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
+                .previousQuantity(sourceQuantity)
+                .currentQuantity(sourceQuantity - request.getQuantity())
                 .quantityChange(-request.getQuantity())
                 .reason(StockMovementReason.TRANSFER)
                 .actorId(request.getActorId())
@@ -183,6 +189,8 @@ public class StockMovementService {
                 .locationType(request.getDestinationLocationType())
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
+                .previousQuantity(destinationQuantity)
+                .currentQuantity(destinationQuantity + request.getQuantity())
                 .quantityChange(request.getQuantity())
                 .reason(StockMovementReason.TRANSFER)
                 .actorId(request.getActorId())
@@ -207,6 +215,13 @@ public class StockMovementService {
 
     public List<StockMovement> getMovementHistory(UUID productId) {
         return stockMovementRepository.findByItem_IdOrderByAtDesc(productId);
+    }
+
+    /**
+     * Get audit log with optional filters
+     */
+    public Page<StockMovement> getAuditLog(AuditLogFilterDTO filters, Pageable pageable) {
+        return stockMovementRepository.findAll(withFilters(filters), pageable);
     }
 
     // ========= Helper Methods =========

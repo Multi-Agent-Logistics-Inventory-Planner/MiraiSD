@@ -8,6 +8,7 @@ import {
   Truck,
   BarChart3,
   Bell,
+  ClipboardList,
   Users,
   Settings,
   LogOut,
@@ -63,6 +64,11 @@ const mainNavItems = [
     title: "Alerts",
     href: "/alerts",
     icon: Bell,
+  },
+  {
+    title: "Audit Log",
+    href: "/audit-log",
+    icon: ClipboardList,
   },
   {
     title: "Users",
