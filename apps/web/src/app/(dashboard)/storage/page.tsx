@@ -6,7 +6,30 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { LocationType, StorageLocation } from "@/types/api";
+import { Can, Permission } from "@/components/rbac";
+import type {
+  LocationType,
+  StorageLocation,
+  BoxBin,
+  Rack,
+  Cabinet,
+  SingleClawMachine,
+  DoubleClawMachine,
+  KeychainMachine,
+} from "@/types/api";
+
+function getLocationCode(location: StorageLocation): string {
+  if ("boxBinCode" in location) return (location as BoxBin).boxBinCode;
+  if ("rackCode" in location) return (location as Rack).rackCode;
+  if ("cabinetCode" in location) return (location as Cabinet).cabinetCode;
+  if ("singleClawMachineCode" in location)
+    return (location as SingleClawMachine).singleClawMachineCode;
+  if ("doubleClawMachineCode" in location)
+    return (location as DoubleClawMachine).doubleClawMachineCode;
+  if ("keychainMachineCode" in location)
+    return (location as KeychainMachine).keychainMachineCode;
+  return "";
+}
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationList } from "@/components/locations/location-list";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
@@ -40,15 +63,7 @@ export default function LocationsPage() {
     if (!q) return data;
 
     return data.filter((x) => {
-      const loc = x.location as any;
-      const code =
-        loc.boxBinCode ??
-        loc.rackCode ??
-        loc.cabinetCode ??
-        loc.singleClawMachineCode ??
-        loc.doubleClawMachineCode ??
-        loc.keychainMachineCode ??
-        "";
+      const code = getLocationCode(x.location);
       return code.toLowerCase().includes(q);
     });
   }, [list.data, search]);
@@ -72,15 +87,17 @@ export default function LocationsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Location
-            </Button>
+            <Can permission={Permission.STORAGE_CREATE}>
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Location
+              </Button>
+            </Can>
           </div>
         </div>
 

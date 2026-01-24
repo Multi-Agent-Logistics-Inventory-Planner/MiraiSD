@@ -13,6 +13,7 @@ import {
   Users,
   Settings,
   LogOut,
+  MoreVertical,
 } from "lucide-react";
 
 import {
@@ -29,51 +30,77 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
+import type { PermissionKey } from "@/lib/rbac";
 
-const mainNavItems = [
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission: PermissionKey;
+}
+
+const dashboardItem: NavItem = {
+  title: "Dashboard",
+  href: "/",
+  icon: LayoutDashboard,
+  permission: Permission.DASHBOARD_VIEW,
+};
+
+const inventoryItems: NavItem[] = [
   {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
+    title: "Storage",
+    href: "/storage",
+    icon: Warehouse,
+    permission: Permission.STORAGE_VIEW,
   },
   {
     title: "Products",
     href: "/products",
     icon: ShoppingBag,
-  },
-  {
-    title: "Storage",
-    href: "/storage",
-    icon: Warehouse,
+    permission: Permission.PRODUCTS_VIEW,
   },
   {
     title: "Shipments",
     href: "/shipments",
     icon: Package,
+    permission: Permission.SHIPMENTS_VIEW,
   },
+];
+
+const managementItems: NavItem[] = [
   {
     title: "Analytics",
     href: "/analytics",
     icon: BarChart3,
-  },
-  {
-    title: "Alerts",
-    href: "/alerts",
-    icon: Bell,
+    permission: Permission.ANALYTICS_VIEW,
   },
   {
     title: "Audit Log",
     href: "/audit-log",
     icon: ClipboardList,
+    permission: Permission.AUDIT_LOG_VIEW,
+  },
+  {
+    title: "Alerts",
+    href: "/alerts",
+    icon: Bell,
+    permission: Permission.ALERTS_VIEW,
   },
   {
     title: "Team",
     href: "/team",
     icon: Users,
+    permission: Permission.TEAM_VIEW,
   },
 ];
 
@@ -90,9 +117,36 @@ function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
   return role === UserRole.ADMIN ? "default" : "secondary";
 }
 
+function NavItemLink({
+  item,
+  pathname,
+}: {
+  item: NavItem;
+  pathname: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={pathname === item.href}>
+        <Link href={item.href}>
+          <item.icon className="h-4 w-4" />
+          <span>{item.title}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
+  const { can } = usePermissions();
+
+  const visibleInventoryItems = inventoryItems.filter((item) =>
+    can(item.permission)
+  );
+  const visibleManagementItems = managementItems.filter((item) =>
+    can(item.permission)
+  );
 
   return (
     <Sidebar>
@@ -102,38 +156,39 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href}>
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {can(dashboardItem.permission) && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <NavItemLink item={dashboardItem} pathname={pathname} />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleInventoryItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">Inventory</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleInventoryItems.map((item) => (
+                  <NavItemLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleManagementItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">Management</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleManagementItems.map((item) => (
+                  <NavItemLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="p-4">
         {isLoading ? (
@@ -160,13 +215,35 @@ export function AppSidebar() {
                 {user.role}
               </Badge>
             </div>
-            <button
-              onClick={signOut}
-              className="text-muted-foreground hover:text-foreground"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="More options"
+                  aria-label="More options"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" side="top" className="w-48 p-1">
+                <div className="flex flex-col">
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                  <button
+                    onClick={signOut}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : (
           <div className="flex items-center gap-3">
