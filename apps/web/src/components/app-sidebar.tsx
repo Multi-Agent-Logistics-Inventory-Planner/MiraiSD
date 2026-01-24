@@ -4,15 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  ShoppingBag,
+  Warehouse,
   Package,
-  Truck,
   BarChart3,
   Bell,
   ClipboardList,
   Users,
   Settings,
   LogOut,
-  MapPin,
 } from "lucide-react";
 
 import {
@@ -41,19 +41,19 @@ const mainNavItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Inventory",
-    href: "/inventory",
-    icon: Package,
+    title: "Products",
+    href: "/products",
+    icon: ShoppingBag,
   },
   {
-    title: "Locations",
-    href: "/locations",
-    icon: MapPin,
+    title: "Storage",
+    href: "/storage",
+    icon: Warehouse,
   },
   {
     title: "Shipments",
     href: "/shipments",
-    icon: Truck,
+    icon: Package,
   },
   {
     title: "Analytics",
