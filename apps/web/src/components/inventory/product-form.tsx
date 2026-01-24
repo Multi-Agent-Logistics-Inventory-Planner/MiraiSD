@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ImageUpload } from "@/components/ui/image-upload";
 import {
   Select,
   SelectContent,
@@ -25,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useImageUpload } from "@/hooks/use-image-upload";
 import {
   ProductCategory,
   ProductSubcategory,
@@ -63,6 +65,8 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
   const { toast } = useToast();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
+  const imageUpload = useImageUpload(initialProduct?.imageUrl);
+  const { reset: resetImage } = imageUpload;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -100,14 +104,27 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
         notes: initialProduct.notes ?? "",
         isActive: initialProduct.isActive ?? true,
       });
+      resetImage(initialProduct.imageUrl);
     } else {
       form.reset();
+      resetImage();
     }
-  }, [open, initialProduct, form]);
+  }, [open, initialProduct, form, resetImage]);
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isSaving = createMutation.isPending || updateMutation.isPending || imageUpload.isUploading;
 
   async function onSubmit(values: FormValues) {
+    // Upload image first if a new file was selected
+    let imageUrl: string | undefined = values.imageUrl || undefined;
+    if (imageUpload.hasNewFile) {
+      const uploadedUrl = await imageUpload.upload();
+      if (uploadedUrl === null && imageUpload.error) {
+        toast({ title: "Image upload failed", description: imageUpload.error });
+        return;
+      }
+      imageUrl = uploadedUrl ?? undefined;
+    }
+
     const payload: ProductRequest = {
       sku: values.sku.trim(),
       name: values.name.trim(),
@@ -118,7 +135,7 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
       targetStockLevel: values.targetStockLevel,
       leadTimeDays: values.leadTimeDays,
       unitCost: values.unitCost,
-      imageUrl: values.imageUrl ? values.imageUrl : undefined,
+      imageUrl,
       notes: values.notes || undefined,
       isActive: values.isActive,
     };
@@ -151,6 +168,19 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid gap-2">
+            <Label>Product Image</Label>
+            <ImageUpload
+              displayUrl={imageUpload.displayUrl}
+              isUploading={imageUpload.isUploading}
+              error={imageUpload.error}
+              hasNewFile={imageUpload.hasNewFile}
+              onFileSelect={imageUpload.selectFile}
+              onClear={imageUpload.clear}
+              disabled={isSaving}
+            />
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="name">Item Name</Label>
             <Input id="name" placeholder="Enter item name" {...form.register("name")} />
