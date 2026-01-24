@@ -24,14 +24,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User, UserRole } from "@/types/api";
 import { updateUser } from "@/lib/api/users";
 
-interface EditUserDialogProps {
-  user: User | null;
+interface EditMemberDialogProps {
+  member: User | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export function EditUserDialog({ user, open, onOpenChange, onSuccess }: EditUserDialogProps) {
+export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: EditMemberDialogProps) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>(UserRole.EMPLOYEE);
@@ -39,16 +39,16 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: EditUser
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      setFullName(user.fullName);
-      setEmail(user.email);
-      setRole(user.role);
+    if (member) {
+      setFullName(member.fullName);
+      setEmail(member.email);
+      setRole(member.role);
       setError(null);
     }
-  }, [user]);
+  }, [member]);
 
   const handleSubmit = async () => {
-    if (!user || !fullName || !email) {
+    if (!member || !fullName || !email) {
       setError("Name and email are required");
       return;
     }
@@ -57,11 +57,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: EditUser
     setError(null);
 
     try {
-      await updateUser(user.id, { fullName, email, role });
+      await updateUser(member.id, { fullName, email, role });
       onSuccess();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update user");
+      setError(err instanceof Error ? err.message : "Failed to update team member");
     } finally {
       setIsSubmitting(false);
     }
@@ -71,8 +71,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: EditUser
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>Update user information</DialogDescription>
+          <DialogTitle>Edit Team Member</DialogTitle>
+          <DialogDescription>Update member information</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">

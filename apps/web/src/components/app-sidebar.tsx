@@ -71,8 +71,8 @@ const mainNavItems = [
     icon: ClipboardList,
   },
   {
-    title: "Users",
-    href: "/users",
+    title: "Team",
+    href: "/team",
     icon: Users,
   },
 ];
