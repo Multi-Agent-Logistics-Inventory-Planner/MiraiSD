@@ -122,6 +122,51 @@ class MessagingWorker:
 
         product = alert_result.product
 
+        # Determine notification type and severity
+        # OUT_OF_STOCK if quantity is 0, LOW_STOCK otherwise
+        notification_type = "OUT_OF_STOCK" if product.current_quantity == 0 else "LOW_STOCK"
+        # CRITICAL if out of stock, WARNING if low stock
+        severity = "CRITICAL" if product.current_quantity == 0 else "WARNING"
+
+        # Create notification message
+        if product.current_quantity == 0:
+            message = f"{product.name} is now out of stock"
+        else:
+            quantity_diff = product.reorder_point - product.current_quantity
+            message = f"{product.name} stock is low ({product.current_quantity} units, {quantity_diff} below reorder point)"
+
+        # Add SKU to message if available
+        if product.sku:
+            message += f" (SKU: {product.sku})"
+
+        # Create notification in database
+        notification_id = self._repo.create_notification(
+            notification_type=notification_type,
+            severity=severity,
+            message=message,
+            item_id=product.id,
+            recipient_id=None,  # Could be set to specific admin users
+            metadata={
+                "product_name": product.name,
+                "product_sku": product.sku,
+                "current_quantity": product.current_quantity,
+                "reorder_point": product.reorder_point,
+                "quantity_diff": product.reorder_point - product.current_quantity,
+            },
+        )
+
+        if notification_id:
+            logger.info(
+                "Created notification %s for product %s (id=%s, qty=%d, reorder=%d)",
+                notification_id,
+                product.name,
+                product.id,
+                product.current_quantity,
+                product.reorder_point,
+            )
+        else:
+            logger.warning("Failed to create notification for product %s", product.name)
+
         # Send Slack notification
         alert_message = AlertMessage(
             product_name=product.name,
@@ -135,14 +180,14 @@ class MessagingWorker:
 
         if success:
             logger.info(
-                "Sent reorder alert for product %s (id=%s, qty=%d, reorder=%d)",
+                "Sent Slack alert for product %s (id=%s, qty=%d, reorder=%d)",
                 product.name,
                 product.id,
                 product.current_quantity,
                 product.reorder_point,
             )
         else:
-            logger.error("Failed to send alert for product %s", product.name)
+            logger.error("Failed to send Slack alert for product %s", product.name)
 
 
 def main() -> None:

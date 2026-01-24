@@ -55,6 +55,20 @@ export enum UserRole {
   EMPLOYEE = "EMPLOYEE",
 }
 
+export enum NotificationType {
+  LOW_STOCK = "LOW_STOCK",
+  OUT_OF_STOCK = "OUT_OF_STOCK",
+  REORDER_SUGGESTION = "REORDER_SUGGESTION",
+  EXPIRY_WARNING = "EXPIRY_WARNING",
+  SYSTEM_ALERT = "SYSTEM_ALERT",
+}
+
+export enum NotificationSeverity {
+  INFO = "INFO",
+  WARNING = "WARNING",
+  CRITICAL = "CRITICAL",
+}
+
 // Auth types
 
 export interface AuthValidationResponse {
@@ -399,6 +413,22 @@ export interface PaginatedResponse<T> {
   number: number;
   first: boolean;
   last: boolean;
+}
+
+// Notification types
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  severity: NotificationSeverity;
+  message: string;
+  recipientId?: string;
+  itemId?: string;
+  inventoryId?: string;
+  via?: string[];
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  deliveredAt?: string;
 }
 
 // API Error types

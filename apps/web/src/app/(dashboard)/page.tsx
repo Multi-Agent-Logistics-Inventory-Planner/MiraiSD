@@ -19,8 +19,8 @@ export default function DashboardPage() {
   const stats = useDashboardStats()
   const shipments = useShipments()
 
-  // Refresh relative time strings (e.g. "5 minutes ago") even if shipment data doesn't change.
-  // Updates once per minute to avoid excessive re-renders.
+  // Refresh relative time strings
+  // Updates once per minute to avoid rerendering
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60_000)

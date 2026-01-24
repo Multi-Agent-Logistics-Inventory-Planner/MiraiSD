@@ -24,7 +24,6 @@ def _strip_jdbc_prefix(url: str) -> str:
 
 
 def _ensure_sqla_url_with_creds(url: str) -> str:
-    """Ensure URL is a SQLAlchemy-compatible postgresql URL and includes credentials when available."""
     raw = _strip_jdbc_prefix(url)
     parsed = urlparse(raw)
 
@@ -43,7 +42,7 @@ def _ensure_sqla_url_with_creds(url: str) -> str:
             f"Unsupported SUPABASE_DB_URL scheme '{parsed.scheme}' (expected jdbc:postgresql://... or postgresql://...)"
         )
 
-    # If creds already present, keep them.
+    # Keep credentials
     if parsed.username or parsed.password:
         netloc = parsed.netloc
     else:
@@ -53,7 +52,7 @@ def _ensure_sqla_url_with_creds(url: str) -> str:
             raise ValueError(
                 "SUPABASE_DB_PASSWORD not configured (required when SUPABASE_DB_URL has no embedded credentials)"
             )
-        # Quote password for URL safety
+        # Quote Pass
         user_enc = quote(user, safe="")
         pw_enc = quote(pw, safe="")
         host = parsed.hostname or ""
@@ -72,7 +71,6 @@ def _ensure_sqla_url_with_creds(url: str) -> str:
 
 
 def _sanitize_query_params_for_psycopg2(url: str) -> str:
-    """Remove JDBC-only query params that break psycopg2/libpq DSNs."""
     parsed = urlparse(url)
     if not parsed.query:
         return url
@@ -182,5 +180,89 @@ class SupabaseRepo:
                 )
         except Exception as e:
             logger.error("Failed to get product with inventory: %s", e)
+            return None
+
+    def create_notification(
+        self,
+        notification_type: str,
+        severity: str,
+        message: str,
+        item_id: str,
+        recipient_id: str | None = None,
+        inventory_id: str | None = None,
+        metadata: dict | None = None,
+    ) -> str | None:
+        """Create a notification record in the database.
+
+        Args:
+            notification_type: Notification type (LOW_STOCK, OUT_OF_STOCK, etc.)
+            severity: Severity level (INFO, WARNING, CRITICAL)
+            message: Notification message
+            item_id: Product/item UUID
+            recipient_id: Optional recipient user UUID
+            inventory_id: Optional inventory record UUID
+            metadata: Optional JSON metadata
+
+        Returns:
+            Created notification ID, or None if creation failed
+        """
+        import json
+        from datetime import datetime, timezone
+
+        # Generate UUID client-side (matching Hibernate's GenerationType.UUID behavior)
+        notification_id = uuid.uuid4()
+
+        query = text("""
+            INSERT INTO notifications (
+                id,
+                type,
+                severity,
+                message,
+                item_id,
+                recipient_id,
+                inventory_id,
+                via,
+                metadata,
+                created_at
+            ) VALUES (
+                :id,
+                :type,
+                :severity,
+                :message,
+                :item_id,
+                :recipient_id,
+                :inventory_id,
+                CAST(:via AS text[]),
+                CAST(:metadata AS jsonb),
+                :created_at
+            )
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                # Prepare parameters
+                via_array_str = "{" + ",".join(f'"{v}"' for v in ["slack", "app"]) + "}"
+                metadata_json_str = json.dumps(metadata if metadata else {})
+
+                params = {
+                    "id": notification_id,
+                    "type": notification_type,
+                    "severity": severity,
+                    "message": message,
+                    "item_id": uuid.UUID(item_id),
+                    "recipient_id": uuid.UUID(recipient_id) if recipient_id else None,
+                    "inventory_id": uuid.UUID(inventory_id) if inventory_id else None,
+                    "via": via_array_str,
+                    "metadata": metadata_json_str,
+                    "created_at": datetime.now(timezone.utc),
+                }
+
+                conn.execute(query, params)
+                conn.commit()
+
+                logger.info("Created notification: id=%s, type=%s, item=%s", notification_id, notification_type, item_id)
+                return str(notification_id)
+        except Exception as e:
+            logger.error("Failed to create notification: %s", e)
             return None
 
