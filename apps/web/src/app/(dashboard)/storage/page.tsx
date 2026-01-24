@@ -56,7 +56,7 @@ export default function LocationsPage() {
   return (
     <div className="flex flex-col">
       <DashboardHeader
-        title="Locations"
+        title="Storage"
         description="Manage storage locations and their inventory"
       />
 
