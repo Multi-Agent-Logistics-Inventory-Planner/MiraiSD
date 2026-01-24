@@ -163,7 +163,7 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col">
-      <DashboardHeader title="Inventory" description="Manage your inventory items" />
+      <DashboardHeader title="Products" description="Manage your products and inventory" />
 
       <main className="flex-1 space-y-6 p-4 md:p-6">
         <ProductFilters
@@ -190,7 +190,7 @@ export default function InventoryPage() {
           {/* Inventory Content */}
           <Tabs defaultValue="inventory" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
+              <TabsTrigger value="inventory">Products</TabsTrigger>
               <TabsTrigger value="audit-log">Audit Log</TabsTrigger>
             </TabsList>
             <TabsContent value="inventory">

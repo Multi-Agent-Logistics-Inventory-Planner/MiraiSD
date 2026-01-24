@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { formatDistanceStrict } from "date-fns"
+import { usePermissions, Permission } from "@/hooks/use-permissions"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { StatCards } from "@/components/dashboard/stat-cards"
 import { StockLevels } from "@/components/dashboard/stock-levels"
@@ -12,6 +14,8 @@ import { useShipments } from "@/hooks/queries/use-shipments"
 import type { ActivityItem } from "@/types/dashboard"
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const { can, role } = usePermissions()
   const stats = useDashboardStats()
   const shipments = useShipments()
 
@@ -47,6 +51,19 @@ export default function DashboardPage() {
         }
       })
   }, [shipments.data, now])
+
+  // Redirect employees to storage page
+  const canViewDashboard = can(Permission.DASHBOARD_VIEW)
+  useEffect(() => {
+    if (role && !canViewDashboard) {
+      router.replace("/storage")
+    }
+  }, [role, canViewDashboard, router])
+
+  // Show nothing while redirecting
+  if (role && !canViewDashboard) {
+    return null
+  }
 
   return (
     <div className="flex flex-col">

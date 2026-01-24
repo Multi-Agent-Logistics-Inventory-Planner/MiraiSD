@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Can, Permission } from "@/components/rbac";
 import type { ProductCategory } from "@/types/api";
 
 export interface ProductFiltersState {
@@ -49,13 +50,20 @@ export function ProductFilters({
             placeholder="Search by SKU or name..."
             className="pl-8"
             value={state.searchQuery}
-            onChange={(e) => onChange({ ...state, searchQuery: e.target.value })}
+            onChange={(e) =>
+              onChange({ ...state, searchQuery: e.target.value })
+            }
           />
         </div>
 
         <Select
           value={state.category}
-          onValueChange={(v) => onChange({ ...state, category: v as ProductFiltersState["category"] })}
+          onValueChange={(v) =>
+            onChange({
+              ...state,
+              category: v as ProductFiltersState["category"],
+            })
+          }
         >
           <SelectTrigger className="w-[170px]">
             <Filter className="mr-2 h-4 w-4" />
@@ -73,7 +81,9 @@ export function ProductFilters({
 
         <Select
           value={state.status}
-          onValueChange={(v) => onChange({ ...state, status: v as ProductFiltersState["status"] })}
+          onValueChange={(v) =>
+            onChange({ ...state, status: v as ProductFiltersState["status"] })
+          }
         >
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Status" />
@@ -107,9 +117,10 @@ export function ProductFilters({
           </Button>
         </div>
 
-        <Button onClick={onAddClick}>Add Item</Button>
+        <Can permission={Permission.PRODUCTS_CREATE}>
+          <Button onClick={onAddClick}>Add Product</Button>
+        </Can>
       </div>
     </div>
   );
 }
-
