@@ -257,7 +257,7 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
             </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {initialProduct ? "Save" : "Add Item"}
+              {initialProduct ? "Save" : "Add Product"}
             </Button>
           </DialogFooter>
         </form>
