@@ -5,6 +5,9 @@ import com.mirai.inventoryservice.models.shipment.Shipment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +24,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     List<Shipment> findByOrderDateBetweenOrderByOrderDateDesc(LocalDate startDate, LocalDate endDate);
 
     List<Shipment> findByExpectedDeliveryDateBetweenOrderByExpectedDeliveryDateAsc(LocalDate startDate, LocalDate endDate);
+
+    @Query("SELECT DISTINCT s FROM Shipment s JOIN s.items i WHERE i.item.id = :productId ORDER BY s.orderDate DESC")
+    List<Shipment> findByItemsContainingProduct(@Param("productId") UUID productId);
 }
