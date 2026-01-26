@@ -18,7 +18,7 @@ import {
   ProductFiltersState,
   ProductTable,
   ProductPagination,
-  ProductDetailDialog,
+  ProductDetailSheet,
   DEFAULT_PRODUCT_FILTERS,
 } from "@/components/products";
 import { ProductForm } from "@/components/inventory/product-form";
@@ -71,9 +71,11 @@ export default function ProductsPage() {
         row.product.sku.toLowerCase().includes(q);
       const matchesCategory =
         filters.category === "all" || row.product.category === filters.category;
+      const matchesSubcategory =
+        filters.subcategory === "all" || row.product.subcategory === filters.subcategory;
       const matchesStatus =
         filters.status === "all" || row.status === filters.status;
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesCategory && matchesSubcategory && matchesStatus;
     });
   }, [items, filters]);
 
@@ -136,10 +138,18 @@ export default function ProductsPage() {
         onPageChange={setPage}
       />
 
-      <ProductDetailDialog
+      <ProductDetailSheet
         open={detailOpen}
         onOpenChange={setDetailOpen}
         product={selected}
+        onAdjustClick={() => setAdjustOpen(true)}
+        onTransferClick={() => setTransferOpen(true)}
+        onEditClick={() => {
+          if (selected) {
+            setEditing(selected);
+            setFormOpen(true);
+          }
+        }}
       />
 
       <ProductForm

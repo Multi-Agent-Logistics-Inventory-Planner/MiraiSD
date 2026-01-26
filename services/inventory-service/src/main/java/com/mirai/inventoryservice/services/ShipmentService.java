@@ -121,6 +121,10 @@ public class ShipmentService {
         return shipmentRepository.findByStatusOrderByCreatedAtDesc(status);
     }
 
+    public List<Shipment> getShipmentsContainingProduct(UUID productId) {
+        return shipmentRepository.findByItemsContainingProduct(productId);
+    }
+
     public Shipment updateShipment(UUID id, ShipmentRequestDTO requestDTO) {
         Shipment shipment = getShipmentById(id);
 

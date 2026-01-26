@@ -24,6 +24,31 @@ export enum ProductSubcategory {
   MISCELLANEOUS = "MISCELLANEOUS",
 }
 
+// Display labels for enums
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  [ProductCategory.PLUSHIE]: "Plushie",
+  [ProductCategory.KEYCHAIN]: "Keychain",
+  [ProductCategory.FIGURINE]: "Figurine",
+  [ProductCategory.GACHAPON]: "Gachapon",
+  [ProductCategory.BLIND_BOX]: "Blind Box",
+  [ProductCategory.BUILD_KIT]: "Build Kit",
+  [ProductCategory.GUNDAM]: "Gundam",
+  [ProductCategory.KUJI]: "Kuji",
+  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
+};
+
+export const PRODUCT_SUBCATEGORY_LABELS: Record<ProductSubcategory, string> = {
+  [ProductSubcategory.DREAMS]: "Dreams",
+  [ProductSubcategory.POKEMON]: "Pokemon",
+  [ProductSubcategory.POPMART]: "Pop Mart",
+  [ProductSubcategory.SANRIO_SAN_X]: "Sanrio / San-X",
+  [ProductSubcategory.FIFTY_TWO_TOYS]: "52 Toys",
+  [ProductSubcategory.ROLIFE]: "Rolife",
+  [ProductSubcategory.TOY_CITY]: "Toy City",
+  [ProductSubcategory.MINISO]: "Miniso",
+  [ProductSubcategory.MISCELLANEOUS]: "Miscellaneous",
+};
+
 export enum LocationType {
   BOX_BIN = "BOX_BIN",
   SINGLE_CLAW_MACHINE = "SINGLE_CLAW_MACHINE",
