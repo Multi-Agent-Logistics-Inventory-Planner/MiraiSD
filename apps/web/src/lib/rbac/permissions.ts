@@ -27,9 +27,9 @@ export const Permission = {
   // Analytics
   ANALYTICS_VIEW: "analytics:view",
 
-  // Alerts
-  ALERTS_VIEW: "alerts:view",
-  ALERTS_MANAGE: "alerts:manage",
+  // Notifications
+  NOTIFICATIONS_VIEW: "notifications:view",
+  NOTIFICATIONS_MANAGE: "notifications:manage",
 
   // Audit Log
   AUDIT_LOG_VIEW: "audit_log:view",
@@ -55,7 +55,7 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey> = {
   "/storage": Permission.STORAGE_VIEW,
   "/shipments": Permission.SHIPMENTS_VIEW,
   "/analytics": Permission.ANALYTICS_VIEW,
-  "/alerts": Permission.ALERTS_VIEW,
+  "/notifications": Permission.NOTIFICATIONS_VIEW,
   "/audit-log": Permission.AUDIT_LOG_VIEW,
   "/team": Permission.TEAM_VIEW,
   "/settings": Permission.SETTINGS_VIEW,

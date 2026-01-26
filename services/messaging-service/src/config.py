@@ -1,6 +1,14 @@
 # config.py
 """Configuration settings for the messaging service."""
 import os
+from pathlib import Path
+
+# Load environment variables from .env file if it exists
+from dotenv import load_dotenv
+
+# Load .env file from the project root (MiraiSD/)
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 # Kafka settings
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")

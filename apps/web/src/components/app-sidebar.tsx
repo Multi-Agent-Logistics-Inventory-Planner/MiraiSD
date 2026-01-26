@@ -91,10 +91,10 @@ const managementItems: NavItem[] = [
     permission: Permission.AUDIT_LOG_VIEW,
   },
   {
-    title: "Alerts",
-    href: "/alerts",
+    title: "Notifications",
+    href: "/notifications",
     icon: Bell,
-    permission: Permission.ALERTS_VIEW,
+    permission: Permission.NOTIFICATIONS_VIEW,
   },
   {
     title: "Team",

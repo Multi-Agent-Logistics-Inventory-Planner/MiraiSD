@@ -1,41 +1,38 @@
 #!/usr/bin/env python3
-"""Quick test script for Slack notifications.
-
-Usage:
-    # Set webhook URL as environment variable
-    export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-    export SLACK_CHANNEL="#inventory-alerts"
-    
-    # Run the test
-    python test_slack.py
-    
-    # Or test with specific values
-    python test_slack.py --product-name "Test Product" --quantity 5 --reorder-point 10
-"""
 
 import argparse
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Add src to path
+env_path = Path(__file__).parent.parent.parent / ".env"
+env_loaded = load_dotenv(env_path)
+env_path_str = str(env_path.resolve())
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.adapters.slack_notifier import AlertMessage, SlackNotifier
+from src import config
 
 
 def main():
+    # Get webhook URL from env or config (check both)
+    env_webhook = os.getenv("SLACK_WEBHOOK_URL", "")
+    config_webhook = getattr(config, "SLACK_WEBHOOK_URL", "")
+    default_webhook = env_webhook or config_webhook
+    
     parser = argparse.ArgumentParser(description="Test Slack notifications")
     parser.add_argument(
         "--webhook-url",
         type=str,
-        default=os.getenv("SLACK_WEBHOOK_URL", ""),
+        default=default_webhook,
         help="Slack webhook URL (or set SLACK_WEBHOOK_URL env var)",
     )
     parser.add_argument(
         "--channel",
         type=str,
-        default=os.getenv("SLACK_CHANNEL", "#inventory-alerts"),
+        default=os.getenv("SLACK_CHANNEL") or getattr(config, "SLACK_CHANNEL", "#testing-wiggly"),
         help="Slack channel (or set SLACK_CHANNEL env var)",
     )
     parser.add_argument(
@@ -71,16 +68,31 @@ def main():
 
     args = parser.parse_args()
 
-    # Check webhook URL
+    if not args.webhook_url:
+        env_webhook = os.getenv("SLACK_WEBHOOK_URL", "")
+        config_webhook = getattr(config, "SLACK_WEBHOOK_URL", "")
+        args.webhook_url = env_webhook or config_webhook
+
     if not args.webhook_url:
         print("Error: SLACK_WEBHOOK_URL not set!")
-        print("\nSet it as an environment variable:")
-        print("  export SLACK_WEBHOOK_URL='https://hooks.slack.com/services/YOUR/WEBHOOK/URL'")
-        print("\nOr pass it as an argument:")
-        print("  python test_slack.py --webhook-url 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'")
+        print("\nDebug info:")
+        print(f"  Looking for .env file at: {env_path_str}")
+        print(f"  .env file exists: {env_path.exists()}")
+        print(f"  .env file loaded: {env_loaded}")
+        print(f"  Environment variable: {repr(os.getenv('SLACK_WEBHOOK_URL', 'NOT SET'))}")
+        print(f"  Config value: {repr(getattr(config, 'SLACK_WEBHOOK_URL', 'NOT FOUND'))}")
+        print("\nTo fix this:")
+        print("  1. Create a .env file at the project root with:")
+        print("     SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL")
+        print("     SLACK_CHANNEL=#inventory-alerts")
+        print(f"\n     File location: {env_path_str}")
+        print("\n  2. Or set it as an environment variable:")
+        print("     export SLACK_WEBHOOK_URL='https://hooks.slack.com/services/YOUR/WEBHOOK/URL'")
+        print("\n  3. Or pass it as an argument:")
+        print("     python test_slack.py --webhook-url 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'")
         sys.exit(1)
 
-    print("test")
+    print("Test Configuration")
     print("=" * 60)
     print(f"Webhook URL: {args.webhook_url[:50]}...")
     print(f"Channel: {args.channel}")
