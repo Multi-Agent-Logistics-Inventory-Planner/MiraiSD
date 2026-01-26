@@ -71,9 +71,11 @@ export default function ProductsPage() {
         row.product.sku.toLowerCase().includes(q);
       const matchesCategory =
         filters.category === "all" || row.product.category === filters.category;
+      const matchesSubcategory =
+        filters.subcategory === "all" || row.product.subcategory === filters.subcategory;
       const matchesStatus =
         filters.status === "all" || row.status === filters.status;
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesCategory && matchesSubcategory && matchesStatus;
     });
   }, [items, filters]);
 
