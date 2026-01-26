@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import {
   ProductCategory,
   ProductSubcategory,
@@ -135,6 +136,9 @@ export function ProductForm({
   async function onSubmit(values: FormValues) {
     // Upload image first if a new file was selected
     let imageUrl: string | undefined = values.imageUrl || undefined;
+    const oldImageUrl = initialProduct?.imageUrl;
+    const isReplacingImage = imageUpload.hasNewFile && oldImageUrl;
+
     if (imageUpload.hasNewFile) {
       const uploadedUrl = await imageUpload.upload();
       if (uploadedUrl === null && imageUpload.error) {
@@ -165,6 +169,19 @@ export function ProductForm({
       if (initialProduct) {
         await updateMutation.mutateAsync({ id: initialProduct.id, payload });
         toast({ title: "Product updated" });
+
+        // Delete old image from storage after successful update (non-blocking)
+        if (isReplacingImage) {
+          deleteProductImage(oldImageUrl).then((deleteResult) => {
+            if (isUploadError(deleteResult)) {
+              toast({
+                title: "Note",
+                description: "Old image cleanup failed. Storage may need manual cleanup.",
+                variant: "default",
+              });
+            }
+          });
+        }
       } else {
         await createMutation.mutateAsync(payload);
         toast({ title: "Product created" });
