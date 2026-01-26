@@ -18,20 +18,23 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ProductCategory } from "@/types/api";
+import { ProductCategory, ProductSubcategory } from "@/types/api";
 
 export type CategoryFilter = ProductCategory | "all";
+export type SubcategoryFilter = ProductSubcategory | "all";
 export type StatusFilter = "all" | "good" | "low" | "critical" | "out-of-stock";
 
 export interface ProductFiltersState {
   search: string;
   category: CategoryFilter;
+  subcategory: SubcategoryFilter;
   status: StatusFilter;
 }
 
 export const DEFAULT_PRODUCT_FILTERS: ProductFiltersState = {
   search: "",
   category: "all",
+  subcategory: "all",
   status: "all",
 };
 
@@ -61,6 +64,18 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
 };
 
+const SUBCATEGORY_LABELS: Record<ProductSubcategory, string> = {
+  [ProductSubcategory.DREAMS]: "Dreams",
+  [ProductSubcategory.POKEMON]: "Pokemon",
+  [ProductSubcategory.POPMART]: "Pop Mart",
+  [ProductSubcategory.SANRIO_SAN_X]: "Sanrio / San-X",
+  [ProductSubcategory.FIFTY_TWO_TOYS]: "52 Toys",
+  [ProductSubcategory.ROLIFE]: "Rolife",
+  [ProductSubcategory.TOY_CITY]: "Toy City",
+  [ProductSubcategory.MINISO]: "Miniso",
+  [ProductSubcategory.MISCELLANEOUS]: "Miscellaneous",
+};
+
 export function ProductFilters({
   state,
   onChange,
@@ -69,7 +84,9 @@ export function ProductFilters({
   const [filterOpen, setFilterOpen] = useState(false);
 
   const hasActiveFilters =
-    state.category !== "all" || state.status !== "all";
+    state.category !== "all" ||
+    state.subcategory !== "all" ||
+    state.status !== "all";
 
   const updateField = <K extends keyof ProductFiltersState>(
     key: K,
@@ -80,6 +97,7 @@ export function ProductFilters({
 
   const filterCount = [
     state.category !== "all",
+    state.subcategory !== "all",
     state.status !== "all",
   ].filter(Boolean).length;
 
@@ -113,7 +131,13 @@ export function ProductFilters({
               <Label htmlFor="category-select">Category</Label>
               <Select
                 value={state.category}
-                onValueChange={(v) => updateField("category", v as CategoryFilter)}
+                onValueChange={(v) => {
+                  const newCategory = v as CategoryFilter;
+                  updateField("category", newCategory);
+                  if (newCategory !== ProductCategory.BLIND_BOX) {
+                    updateField("subcategory", "all");
+                  }
+                }}
               >
                 <SelectTrigger id="category-select">
                   <SelectValue placeholder="Select category" />
@@ -128,6 +152,28 @@ export function ProductFilters({
                 </SelectContent>
               </Select>
             </div>
+
+            {state.category === ProductCategory.BLIND_BOX && (
+              <div className="space-y-2">
+                <Label htmlFor="subcategory-select">Subcategory</Label>
+                <Select
+                  value={state.subcategory}
+                  onValueChange={(v) => updateField("subcategory", v as SubcategoryFilter)}
+                >
+                  <SelectTrigger id="subcategory-select">
+                    <SelectValue placeholder="Select subcategory" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All subcategories</SelectItem>
+                    {Object.values(ProductSubcategory).map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {SUBCATEGORY_LABELS[sub] ?? sub}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="status-select">Stock Status</Label>

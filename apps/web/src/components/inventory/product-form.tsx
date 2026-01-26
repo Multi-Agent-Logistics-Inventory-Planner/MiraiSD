@@ -51,7 +51,13 @@ const schema = z.object({
   imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
-});
+}).refine(
+  (data) => !data.subcategory || data.category === ProductCategory.BLIND_BOX,
+  {
+    message: "Subcategory is only allowed for Blind Box products",
+    path: ["subcategory"],
+  }
+);
 
 type FormValues = z.infer<typeof schema>;
 
@@ -202,7 +208,12 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
               <Label>Category</Label>
               <Select
                 value={form.watch("category")}
-                onValueChange={(v) => form.setValue("category", v, { shouldValidate: true })}
+                onValueChange={(v) => {
+                  form.setValue("category", v, { shouldValidate: true });
+                  if (v !== ProductCategory.BLIND_BOX) {
+                    form.setValue("subcategory", "");
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select" />
@@ -221,27 +232,29 @@ export function ProductForm({ open, onOpenChange, initialProduct }: ProductFormP
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label>Subcategory (optional)</Label>
-            <Select
-              value={form.watch("subcategory") || ""}
-              onValueChange={(v) =>
-                form.setValue("subcategory", v === "__none__" ? "" : v)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {Object.values(ProductSubcategory).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {form.watch("category") === ProductCategory.BLIND_BOX && (
+            <div className="grid gap-2">
+              <Label>Subcategory (optional)</Label>
+              <Select
+                value={form.watch("subcategory") || ""}
+                onValueChange={(v) =>
+                  form.setValue("subcategory", v === "__none__" ? "" : v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {Object.values(ProductSubcategory).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
