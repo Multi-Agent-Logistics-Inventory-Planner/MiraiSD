@@ -18,7 +18,7 @@ import {
   ProductFiltersState,
   ProductTable,
   ProductPagination,
-  ProductDetailDialog,
+  ProductDetailSheet,
   DEFAULT_PRODUCT_FILTERS,
 } from "@/components/products";
 import { ProductForm } from "@/components/inventory/product-form";
@@ -138,10 +138,18 @@ export default function ProductsPage() {
         onPageChange={setPage}
       />
 
-      <ProductDetailDialog
+      <ProductDetailSheet
         open={detailOpen}
         onOpenChange={setDetailOpen}
         product={selected}
+        onAdjustClick={() => setAdjustOpen(true)}
+        onTransferClick={() => setTransferOpen(true)}
+        onEditClick={() => {
+          if (selected) {
+            setEditing(selected);
+            setFormOpen(true);
+          }
+        }}
       />
 
       <ProductForm
