@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ProductCategory, ProductSubcategory } from "@/types/api";
+import {
+  ProductCategory,
+  ProductSubcategory,
+  PRODUCT_CATEGORY_LABELS,
+  PRODUCT_SUBCATEGORY_LABELS,
+} from "@/types/api";
 
 export type CategoryFilter = ProductCategory | "all";
 export type SubcategoryFilter = ProductSubcategory | "all";
@@ -50,30 +55,6 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
   low: "Low",
   critical: "Critical",
   "out-of-stock": "Out of Stock",
-};
-
-const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  [ProductCategory.PLUSHIE]: "Plushie",
-  [ProductCategory.KEYCHAIN]: "Keychain",
-  [ProductCategory.FIGURINE]: "Figurine",
-  [ProductCategory.GACHAPON]: "Gachapon",
-  [ProductCategory.BLIND_BOX]: "Blind Box",
-  [ProductCategory.BUILD_KIT]: "Build Kit",
-  [ProductCategory.GUNDAM]: "Gundam",
-  [ProductCategory.KUJI]: "Kuji",
-  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
-};
-
-const SUBCATEGORY_LABELS: Record<ProductSubcategory, string> = {
-  [ProductSubcategory.DREAMS]: "Dreams",
-  [ProductSubcategory.POKEMON]: "Pokemon",
-  [ProductSubcategory.POPMART]: "Pop Mart",
-  [ProductSubcategory.SANRIO_SAN_X]: "Sanrio / San-X",
-  [ProductSubcategory.FIFTY_TWO_TOYS]: "52 Toys",
-  [ProductSubcategory.ROLIFE]: "Rolife",
-  [ProductSubcategory.TOY_CITY]: "Toy City",
-  [ProductSubcategory.MINISO]: "Miniso",
-  [ProductSubcategory.MISCELLANEOUS]: "Miscellaneous",
 };
 
 export function ProductFilters({
@@ -146,7 +127,7 @@ export function ProductFilters({
                   <SelectItem value="all">All categories</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat] ?? cat}
+                      {PRODUCT_CATEGORY_LABELS[cat] ?? cat}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -167,7 +148,7 @@ export function ProductFilters({
                     <SelectItem value="all">All subcategories</SelectItem>
                     {Object.values(ProductSubcategory).map((sub) => (
                       <SelectItem key={sub} value={sub}>
-                        {SUBCATEGORY_LABELS[sub] ?? sub}
+                        {PRODUCT_SUBCATEGORY_LABELS[sub] ?? sub}
                       </SelectItem>
                     ))}
                   </SelectContent>
