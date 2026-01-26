@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
+import com.mirai.inventoryservice.exceptions.InvalidSubcategoryException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.enums.ProductCategory;
@@ -26,6 +27,8 @@ public class ProductService {
                                  String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes) {
+        validateSubcategory(category, subcategory);
+
         if (sku != null && productRepository.existsBySku(sku)) {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
         }
@@ -84,12 +87,27 @@ public class ProductService {
                                  BigDecimal unitCost, String imageUrl, String notes) {
         Product product = getProductById(id);
 
+        // Determine effective category and subcategory for validation
+        ProductCategory effectiveCategory = category != null ? category : product.getCategory();
+        ProductSubcategory effectiveSubcategory = subcategory;
+        // If subcategory not provided, keep existing (unless category is changing away from BLIND_BOX)
+        if (subcategory == null && category == null) {
+            effectiveSubcategory = product.getSubcategory();
+        }
+        validateSubcategory(effectiveCategory, effectiveSubcategory);
+
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
         }
 
         if (sku != null) product.setSku(sku);
-        if (category != null) product.setCategory(category);
+        if (category != null) {
+            product.setCategory(category);
+            // Auto-clear subcategory when changing away from BLIND_BOX
+            if (category != ProductCategory.BLIND_BOX) {
+                product.setSubcategory(null);
+            }
+        }
         if (subcategory != null) product.setSubcategory(subcategory);
         if (name != null) product.setName(name);
         if (description != null) product.setDescription(description);
@@ -122,5 +140,13 @@ public class ProductService {
 
     public boolean existsBySku(String sku) {
         return productRepository.existsBySku(sku);
+    }
+
+    private void validateSubcategory(ProductCategory category, ProductSubcategory subcategory) {
+        if (subcategory != null && category != ProductCategory.BLIND_BOX) {
+            throw new InvalidSubcategoryException(
+                "Subcategory is only allowed for BLIND_BOX category"
+            );
+        }
     }
 }
