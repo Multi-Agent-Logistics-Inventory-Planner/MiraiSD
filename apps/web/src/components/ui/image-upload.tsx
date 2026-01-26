@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import { ImagePlus, X, Loader2 } from "lucide-react";
+import { useRef, useCallback, useState } from "react";
+import { Upload, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +27,7 @@ export function ImageUpload({
   className,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleClick = useCallback(() => {
     inputRef.current?.click();
@@ -50,6 +51,31 @@ export function ImageUpload({
     [onClear]
   );
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      if (disabled || isUploading) return;
+
+      const file = e.dataTransfer.files?.[0] ?? null;
+      if (file && file.type.startsWith("image/")) {
+        onFileSelect(file);
+      }
+    },
+    [disabled, isUploading, onFileSelect]
+  );
+
   return (
     <div className={cn("space-y-2", className)}>
       <input
@@ -63,7 +89,7 @@ export function ImageUpload({
 
       {displayUrl ? (
         <div className="relative inline-block">
-          <div className="relative h-24 w-24 overflow-hidden rounded-lg border bg-muted">
+          <div className="relative h-32 w-32 overflow-hidden rounded-lg border bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={displayUrl}
@@ -88,34 +114,39 @@ export function ImageUpload({
               <span className="sr-only">Remove image</span>
             </Button>
           ) : null}
-          {hasNewFile && !isUploading ? (
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-              New
-            </span>
-          ) : null}
         </div>
       ) : (
-        <button
-          type="button"
+        <div
           onClick={handleClick}
-          disabled={disabled || isUploading}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={cn(
-            "flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed",
-            "text-muted-foreground transition-colors",
-            "hover:border-primary hover:text-primary",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:text-muted-foreground"
+            "flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-muted/30 px-6 py-12 transition-colors",
+            isDragging && "border-primary bg-primary/5",
+            !isDragging && "hover:border-muted-foreground/50 hover:bg-muted/50",
+            (disabled || isUploading) && "cursor-not-allowed opacity-50"
           )}
         >
           {isUploading ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           ) : (
             <>
-              <ImagePlus className="h-6 w-6" />
-              <span className="text-xs">Add image</span>
+              <div className="rounded-lg bg-muted p-3">
+                <Upload className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm">
+                  <span className="font-medium text-primary">Click to upload</span>
+                  <span className="text-muted-foreground"> or drag and drop</span>
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  JPG, JPEG, PNG less than 5MB.
+                </p>
+              </div>
             </>
           )}
-        </button>
+        </div>
       )}
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

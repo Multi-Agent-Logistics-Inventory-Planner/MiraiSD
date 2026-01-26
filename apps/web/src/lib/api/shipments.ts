@@ -59,3 +59,10 @@ export async function receiveShipment(
     data
   );
 }
+
+/**
+ * Get all shipments containing a specific product
+ */
+export async function getShipmentsByProduct(productId: string): Promise<Shipment[]> {
+  return apiGet<Shipment[]>(`${BASE_PATH}/by-product/${productId}`);
+}
