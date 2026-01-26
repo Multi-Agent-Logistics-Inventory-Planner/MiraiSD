@@ -10,6 +10,7 @@ import com.mirai.inventoryservice.services.ShipmentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class ShipmentController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ShipmentResponseDTO> createShipment(@Valid @RequestBody ShipmentRequestDTO requestDTO) {
         Shipment shipment = shipmentService.createShipment(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -48,7 +50,14 @@ public class ShipmentController {
         return ResponseEntity.ok(shipmentMapper.toResponseDTO(shipment));
     }
 
+    @GetMapping("/by-product/{productId}")
+    public ResponseEntity<List<ShipmentResponseDTO>> getShipmentsByProduct(@PathVariable UUID productId) {
+        List<Shipment> shipments = shipmentService.getShipmentsContainingProduct(productId);
+        return ResponseEntity.ok(shipmentMapper.toResponseDTOList(shipments));
+    }
+
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ShipmentResponseDTO> updateShipment(
             @PathVariable UUID id,
             @Valid @RequestBody ShipmentRequestDTO requestDTO) {
@@ -57,12 +66,14 @@ public class ShipmentController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteShipment(@PathVariable UUID id) {
         shipmentService.deleteShipment(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/receive")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ShipmentResponseDTO> receiveShipment(
             @PathVariable UUID id,
             @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO) {
