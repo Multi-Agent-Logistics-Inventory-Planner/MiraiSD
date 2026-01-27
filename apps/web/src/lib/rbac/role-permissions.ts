@@ -16,10 +16,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
     // Storage - view only
     Permission.STORAGE_VIEW,
 
-    // Shipments - full access
+    // Shipments - view and receive only
     Permission.SHIPMENTS_VIEW,
-    Permission.SHIPMENTS_CREATE,
-    Permission.SHIPMENTS_UPDATE,
+    Permission.SHIPMENTS_RECEIVE,
   ]),
 };
 

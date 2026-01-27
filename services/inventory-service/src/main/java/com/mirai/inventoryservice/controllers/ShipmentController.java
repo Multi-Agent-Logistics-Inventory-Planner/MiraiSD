@@ -73,7 +73,7 @@ public class ShipmentController {
     }
 
     @PostMapping("/{id}/receive")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<ShipmentResponseDTO> receiveShipment(
             @PathVariable UUID id,
             @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO) {

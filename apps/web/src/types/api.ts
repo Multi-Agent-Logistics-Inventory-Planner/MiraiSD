@@ -346,7 +346,7 @@ export interface ShipmentRequest {
   expectedDeliveryDate?: string;
   totalCost?: number;
   notes?: string;
-  createdBy: string;
+  createdBy?: string;
   items: ShipmentItemRequest[];
 }
 
