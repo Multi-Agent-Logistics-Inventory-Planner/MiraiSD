@@ -6,17 +6,16 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-<<<<<<< HEAD:apps/web/src/app/(dashboard)/storage/page.tsx
 import { Can, Permission } from "@/components/rbac";
-import type {
+import {
   LocationType,
-  StorageLocation,
-  BoxBin,
-  Rack,
-  Cabinet,
-  SingleClawMachine,
-  DoubleClawMachine,
-  KeychainMachine,
+  type StorageLocation,
+  type BoxBin,
+  type Rack,
+  type Cabinet,
+  type SingleClawMachine,
+  type DoubleClawMachine,
+  type KeychainMachine,
 } from "@/types/api";
 
 function getLocationCode(location: StorageLocation): string {
@@ -31,10 +30,6 @@ function getLocationCode(location: StorageLocation): string {
     return (location as KeychainMachine).keychainMachineCode;
   return "";
 }
-=======
-import { LocationType } from "@/types/api";
-import type { StorageLocation } from "@/types/api";
->>>>>>> 33e90095 (WIP: forecasting_ui progress):apps/web/src/app/(dashboard)/locations/page.tsx
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationList } from "@/components/locations/location-list";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
@@ -48,7 +43,9 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType>(LocationType.BOX_BIN);
+  const [locationType, setLocationType] = useState<LocationType>(
+    LocationType.BOX_BIN,
+  );
   const [search, setSearch] = useState("");
 
   const list = useLocationsWithCounts(locationType);
@@ -112,7 +109,9 @@ export default function LocationsPage() {
               <CardTitle>Could not load locations</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              {list.error instanceof Error ? list.error.message : "Unknown error"}
+              {list.error instanceof Error
+                ? list.error.message
+                : "Unknown error"}
             </CardContent>
           </Card>
         ) : null}
@@ -162,4 +161,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-

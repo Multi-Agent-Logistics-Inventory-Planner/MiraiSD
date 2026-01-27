@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.responses.CategoryInventoryDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
+import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
 import com.mirai.inventoryservice.services.AnalyticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,5 +26,10 @@ public class AnalyticsController {
     @GetMapping("/performance-metrics")
     public PerformanceMetricsDTO getPerformanceMetrics() {
         return analyticsService.getPerformanceMetrics();
+    }
+
+    @GetMapping("/sales-summary")
+    public SalesSummaryDTO getSalesSummary() {
+        return analyticsService.getSalesSummary();
     }
 }
