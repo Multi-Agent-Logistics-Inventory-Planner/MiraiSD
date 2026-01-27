@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
-import { ProductForm } from "@/components/inventory/product-form";
+import { ProductForm } from "@/components/products/product-form";
 import { ShipmentStatus, type Product, type ShipmentItemRequest } from "@/types/api";
 
 const itemSchema = z.object({
