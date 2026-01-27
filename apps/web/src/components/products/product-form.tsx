@@ -43,8 +43,10 @@ const schema = z
   .object({
     sku: z.string().min(1, "SKU is required"),
     name: z.string().min(1, "Name is required"),
-    category: z.string().min(1, "Category is required"),
-    subcategory: z.string().optional(),
+    category: z.nativeEnum(ProductCategory, {
+      errorMap: () => ({ message: "Category is required" }),
+    }),
+    subcategory: z.nativeEnum(ProductSubcategory).optional(),
     description: z.string().optional(),
     reorderPoint: z.coerce.number().int().min(0).optional(),
     targetStockLevel: z.coerce.number().int().min(0).optional(),
@@ -90,8 +92,8 @@ export function ProductForm({
     defaultValues: {
       sku: "",
       name: "",
-      category: "",
-      subcategory: "",
+      category: undefined,
+      subcategory: undefined,
       description: "",
       reorderPoint: undefined,
       targetStockLevel: undefined,
@@ -111,7 +113,7 @@ export function ProductForm({
         sku: initialProduct.sku,
         name: initialProduct.name,
         category: initialProduct.category,
-        subcategory: initialProduct.subcategory ?? "",
+        subcategory: initialProduct.subcategory,
         description: initialProduct.description ?? "",
         reorderPoint: initialProduct.reorderPoint ?? undefined,
         targetStockLevel: initialProduct.targetStockLevel ?? undefined,
@@ -151,10 +153,8 @@ export function ProductForm({
     const payload: ProductRequest = {
       sku: values.sku.trim(),
       name: values.name.trim(),
-      category: values.category as ProductCategory,
-      subcategory: values.subcategory
-        ? (values.subcategory as ProductSubcategory)
-        : undefined,
+      category: values.category,
+      subcategory: values.subcategory,
       description: values.description || undefined,
       reorderPoint: values.reorderPoint,
       targetStockLevel: values.targetStockLevel,
@@ -199,7 +199,7 @@ export function ProductForm({
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col gap-0 p-0">
         <DialogHeader className="p-6">
           <DialogTitle>
-            {initialProduct ? "Edit Item" : "Add Item"}
+            {initialProduct ? "Edit Product" : "Add Product"}
           </DialogTitle>
         </DialogHeader>
 
@@ -222,10 +222,10 @@ export function ProductForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="name">Item Name</Label>
+              <Label htmlFor="name">Product Name</Label>
               <Input
                 id="name"
-                placeholder="Enter item name"
+                placeholder="Enter product name"
                 {...form.register("name")}
               />
               {form.formState.errors.name?.message ? (
@@ -248,11 +248,13 @@ export function ProductForm({
               <div className="grid gap-2">
                 <Label>Category</Label>
                 <Select
-                  value={form.watch("category")}
+                  value={form.watch("category") ?? ""}
                   onValueChange={(v) => {
-                    form.setValue("category", v, { shouldValidate: true });
+                    form.setValue("category", v as ProductCategory, {
+                      shouldValidate: true,
+                    });
                     if (v !== ProductCategory.BLIND_BOX) {
-                      form.setValue("subcategory", "");
+                      form.setValue("subcategory", undefined);
                     }
                   }}
                 >
@@ -277,9 +279,12 @@ export function ProductForm({
               <div className="grid gap-2">
                 <Label>Subcategory</Label>
                 <Select
-                  value={form.watch("subcategory") || ""}
+                  value={form.watch("subcategory") ?? ""}
                   onValueChange={(v) =>
-                    form.setValue("subcategory", v === "__none__" ? "" : v)
+                    form.setValue(
+                      "subcategory",
+                      v === "__none__" ? undefined : (v as ProductSubcategory)
+                    )
                   }
                   disabled={
                     form.watch("category") !== ProductCategory.BLIND_BOX

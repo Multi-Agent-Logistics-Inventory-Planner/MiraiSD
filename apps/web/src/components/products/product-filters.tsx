@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Can, Permission } from "@/components/rbac";
 import {
   Select,
   SelectContent,
@@ -47,6 +48,7 @@ interface ProductFiltersProps {
   state: ProductFiltersState;
   onChange: (next: ProductFiltersState) => void;
   categories: ProductCategory[];
+  onAddClick?: () => void;
 }
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
@@ -61,6 +63,7 @@ export function ProductFilters({
   state,
   onChange,
   categories,
+  onAddClick,
 }: ProductFiltersProps) {
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -83,8 +86,8 @@ export function ProductFilters({
   ].filter(Boolean).length;
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative flex-1 max-w-sm">
+    <div className="flex items-center justify-between gap-2 sm:gap-3">
+      <div className="relative flex-1 sm:flex-none sm:w-64">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search by name or SKU"
@@ -94,7 +97,8 @@ export function ProductFilters({
         />
       </div>
 
-      <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+      <div className="flex items-center gap-2">
+        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" className="gap-2">
             <Filter className="h-4 w-4" />
@@ -195,6 +199,16 @@ export function ProductFilters({
           </div>
         </PopoverContent>
       </Popover>
+
+      {onAddClick && (
+        <Can permission={Permission.PRODUCTS_CREATE}>
+          <Button onClick={onAddClick} size="sm" className="shrink-0">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Product</span>
+          </Button>
+        </Can>
+      )}
+      </div>
     </div>
   );
 }

@@ -59,6 +59,15 @@ export enum LocationType {
   NOT_ASSIGNED = "NOT_ASSIGNED",
 }
 
+export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
+  [LocationType.BOX_BIN]: "Box Bin",
+  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
+  [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
+  [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
+  [LocationType.CABINET]: "Cabinet",
+  [LocationType.RACK]: "Rack",
+};
+
 export enum StockMovementReason {
   INITIAL_STOCK = "INITIAL_STOCK",
   RESTOCK = "RESTOCK",
@@ -75,6 +84,23 @@ export enum ShipmentStatus {
   DELIVERED = "DELIVERED",
   CANCELLED = "CANCELLED",
 }
+
+export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
+  [ShipmentStatus.PENDING]: "Pending",
+  [ShipmentStatus.IN_TRANSIT]: "In Transit",
+  [ShipmentStatus.DELIVERED]: "Delivered",
+  [ShipmentStatus.CANCELLED]: "Cancelled",
+};
+
+export const SHIPMENT_STATUS_VARIANTS: Record<
+  ShipmentStatus,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  [ShipmentStatus.PENDING]: "outline",
+  [ShipmentStatus.IN_TRANSIT]: "secondary",
+  [ShipmentStatus.DELIVERED]: "default",
+  [ShipmentStatus.CANCELLED]: "destructive",
+};
 
 export enum UserRole {
   ADMIN = "ADMIN",

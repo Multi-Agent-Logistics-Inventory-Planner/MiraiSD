@@ -35,19 +35,19 @@ function TableSkeleton() {
               <Skeleton className="h-4 w-40" />
             </div>
           </TableCell>
-          <TableCell>
+          <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell>
+          <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell>
+          <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-24" />
           </TableCell>
           <TableCell>
             <Skeleton className="h-4 w-16" />
           </TableCell>
-          <TableCell>
+          <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-20" />
           </TableCell>
           <TableCell>
@@ -68,13 +68,13 @@ export function ProductTable({
     <Table>
       <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="text-left rounded-tl-xl">Product</TableHead>
-          <TableHead>SKU</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead>Subcategory</TableHead>
-          <TableHead className="">Stock</TableHead>
-          <TableHead>Unit Price</TableHead>
-          <TableHead className="rounded-tr-xl w-12"></TableHead>
+          <TableHead className="text-left rounded-tl-xl sm:rounded-none">Product</TableHead>
+          <TableHead className="hidden sm:table-cell">SKU</TableHead>
+          <TableHead className="hidden sm:table-cell">Category</TableHead>
+          <TableHead className="hidden sm:table-cell">Subcategory</TableHead>
+          <TableHead>Stock</TableHead>
+          <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
+          <TableHead className="rounded-tr-xl sm:rounded-none w-12"></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -83,8 +83,14 @@ export function ProductTable({
         ) : items.length === 0 ? (
           <TableRow>
             <TableCell
+              colSpan={3}
+              className="h-24 text-center text-muted-foreground sm:hidden"
+            >
+              No products found.
+            </TableCell>
+            <TableCell
               colSpan={7}
-              className="h-24 text-center text-muted-foreground"
+              className="h-24 text-center text-muted-foreground hidden sm:table-cell"
             >
               No products found.
             </TableCell>
@@ -116,19 +122,19 @@ export function ProductTable({
                   <span className="font-medium">{row.product.name}</span>
                 </div>
               </TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
+              <TableCell className="hidden sm:table-cell font-mono text-xs text-muted-foreground">
                 {row.product.sku}
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell">
                 {PRODUCT_CATEGORY_LABELS[row.product.category]}
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="hidden sm:table-cell text-muted-foreground">
                 {row.product.subcategory
                   ? PRODUCT_SUBCATEGORY_LABELS[row.product.subcategory]
                   : ""}
               </TableCell>
-              <TableCell className="">{row.totalQuantity}</TableCell>
-              <TableCell className="">
+              <TableCell>{row.totalQuantity}</TableCell>
+              <TableCell className="hidden sm:table-cell">
                 {row.product.unitCost != null
                   ? `$${row.product.unitCost.toFixed(2)}`
                   : "-"}
