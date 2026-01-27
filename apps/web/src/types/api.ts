@@ -353,6 +353,8 @@ export interface ShipmentRequest {
 export interface ShipmentItemReceipt {
   shipmentItemId: string;
   receivedQuantity: number;
+  destinationLocationType?: LocationType;
+  destinationLocationId?: string;
 }
 
 export interface ReceiveShipmentRequest {

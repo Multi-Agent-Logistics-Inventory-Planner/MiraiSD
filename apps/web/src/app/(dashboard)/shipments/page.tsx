@@ -39,7 +39,10 @@ import {
   ShipmentReceiveDialog,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
-import { useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
+import {
+  useUpdateShipmentMutation,
+  useDeleteShipmentMutation,
+} from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { ShipmentStatus, type Shipment } from "@/types/api";
 
@@ -47,6 +50,7 @@ export default function ShipmentsPage() {
   const { toast } = useToast();
   const shipmentsQuery = useShipments();
   const updateMutation = useUpdateShipmentMutation();
+  const deleteMutation = useDeleteShipmentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -56,6 +60,7 @@ export default function ShipmentsPage() {
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null
   );
@@ -127,6 +132,26 @@ export default function ShipmentsPage() {
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to cancel shipment";
+      toast({ title: "Error", description: message });
+    }
+  }
+
+  function handleDeleteClick() {
+    setDetailSheetOpen(false);
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (!selectedShipment) return;
+
+    try {
+      await deleteMutation.mutateAsync({ id: selectedShipment.id });
+      toast({ title: "Shipment deleted" });
+      setDeleteDialogOpen(false);
+      setSelectedShipment(null);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete shipment";
       toast({ title: "Error", description: message });
     }
   }
@@ -288,6 +313,7 @@ export default function ShipmentsPage() {
         onEditClick={handleEditClick}
         onCancelClick={handleCancelClick}
         onReceiveClick={handleReceiveClick}
+        onDeleteClick={handleDeleteClick}
       />
 
       <ShipmentReceiveDialog
@@ -312,11 +338,38 @@ export default function ShipmentsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Shipment</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90 hover:text-white active:text-white"
               onClick={handleConfirmCancel}
               disabled={updateMutation.isPending}
             >
               Cancel Shipment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete shipment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete shipment{" "}
+              <span className="font-medium font-mono">
+                {selectedShipment?.shipmentNumber}
+              </span>
+              ? This action cannot be undone. Delivered shipments cannot be
+              deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Shipment</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90 hover:text-white active:text-white"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              Delete Shipment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

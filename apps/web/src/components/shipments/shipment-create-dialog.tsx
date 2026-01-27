@@ -267,23 +267,46 @@ export function ShipmentCreateDialog({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label>Items</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      append({
-                        productId: "",
-                        productName: "",
-                        productSku: "",
-                        orderedQuantity: 1,
-                        unitCost: undefined,
-                      })
-                    }
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newIndex = fields.length;
+                        append({
+                          productId: "",
+                          productName: "",
+                          productSku: "",
+                          orderedQuantity: 1,
+                          unitCost: undefined,
+                        });
+                        pendingProductSelectIndex.current = newIndex;
+                        previousProductCount.current = products.length;
+                        setProductFormOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Product
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        append({
+                          productId: "",
+                          productName: "",
+                          productSku: "",
+                          orderedQuantity: 1,
+                          unitCost: undefined,
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Item
+                    </Button>
+                  </div>
                 </div>
 
                 {form.formState.errors.items?.message && (
@@ -366,21 +389,6 @@ export function ShipmentCreateDialog({
                                           </div>
                                         </CommandItem>
                                       ))}
-                                    </CommandGroup>
-                                    <CommandSeparator alwaysRender />
-                                    <CommandGroup forceMount>
-                                      <CommandItem
-                                        forceMount
-                                        onSelect={() => {
-                                          pendingProductSelectIndex.current = index;
-                                          previousProductCount.current = products.length;
-                                          setComboOpenIndex(null);
-                                          setProductFormOpen(true);
-                                        }}
-                                      >
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Create New Product
-                                      </CommandItem>
                                     </CommandGroup>
                                   </CommandList>
                                 </Command>

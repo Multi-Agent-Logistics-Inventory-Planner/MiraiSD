@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.requests;
 
+import com.mirai.inventoryservice.models.enums.LocationType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -35,5 +36,9 @@ public class ReceiveShipmentRequestDTO {
         @NotNull(message = "Received quantity is required")
         @Min(value = 0, message = "Received quantity must be non-negative")
         private Integer receivedQuantity;
+
+        private LocationType destinationLocationType;
+
+        private UUID destinationLocationId;
     }
 }

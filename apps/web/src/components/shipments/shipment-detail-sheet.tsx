@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Pencil, X, PackageCheck } from "lucide-react";
+import { Package, Pencil, X, PackageCheck, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ interface ShipmentDetailSheetProps {
   onEditClick?: () => void;
   onCancelClick?: () => void;
   onReceiveClick?: () => void;
+  onDeleteClick?: () => void;
 }
 
 const STATUS_VARIANTS: Record<
@@ -66,6 +67,7 @@ export function ShipmentDetailSheet({
   onEditClick,
   onCancelClick,
   onReceiveClick,
+  onDeleteClick,
 }: ShipmentDetailSheetProps) {
   if (!shipment) {
     return null;
@@ -75,6 +77,7 @@ export function ShipmentDetailSheet({
     shipment.status === "PENDING" || shipment.status === "IN_TRANSIT";
   const canModify =
     shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
+  const canDelete = shipment.status !== "DELIVERED";
 
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
@@ -152,6 +155,18 @@ export function ShipmentDetailSheet({
               <Button variant="outline" onClick={onCancelClick}>
                 <X className="h-4 w-4 mr-2" />
                 Cancel
+              </Button>
+            )}
+          </Can>
+          <Can permission={Permission.SHIPMENTS_DELETE}>
+            {canDelete && (
+              <Button
+                variant="destructive"
+                onClick={onDeleteClick}
+                className="ml-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
               </Button>
             )}
           </Can>

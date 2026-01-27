@@ -3,9 +3,15 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentItemRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
+import com.mirai.inventoryservice.exceptions.BoxBinNotFoundException;
+import com.mirai.inventoryservice.exceptions.CabinetNotFoundException;
+import com.mirai.inventoryservice.exceptions.DoubleClawMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
+import com.mirai.inventoryservice.exceptions.KeychainMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
+import com.mirai.inventoryservice.exceptions.RackNotFoundException;
 import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
+import com.mirai.inventoryservice.exceptions.SingleClawMachineNotFoundException;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
@@ -33,6 +39,7 @@ public class ShipmentService {
     private final ShipmentItemRepository shipmentItemRepository;
     private final ProductService productService;
     private final UserService userService;
+    private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
     private final EventOutboxService eventOutboxService;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
@@ -41,12 +48,19 @@ public class ShipmentService {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final RackInventoryRepository rackInventoryRepository;
+    private final BoxBinRepository boxBinRepository;
+    private final RackRepository rackRepository;
+    private final CabinetRepository cabinetRepository;
+    private final SingleClawMachineRepository singleClawMachineRepository;
+    private final DoubleClawMachineRepository doubleClawMachineRepository;
+    private final KeychainMachineRepository keychainMachineRepository;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             ShipmentItemRepository shipmentItemRepository,
             ProductService productService,
             UserService userService,
+            UserRepository userRepository,
             StockMovementRepository stockMovementRepository,
             EventOutboxService eventOutboxService,
             BoxBinInventoryRepository boxBinInventoryRepository,
@@ -54,11 +68,18 @@ public class ShipmentService {
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             CabinetInventoryRepository cabinetInventoryRepository,
-            RackInventoryRepository rackInventoryRepository) {
+            RackInventoryRepository rackInventoryRepository,
+            BoxBinRepository boxBinRepository,
+            RackRepository rackRepository,
+            CabinetRepository cabinetRepository,
+            SingleClawMachineRepository singleClawMachineRepository,
+            DoubleClawMachineRepository doubleClawMachineRepository,
+            KeychainMachineRepository keychainMachineRepository) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productService = productService;
         this.userService = userService;
+        this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.eventOutboxService = eventOutboxService;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -67,6 +88,12 @@ public class ShipmentService {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.rackInventoryRepository = rackInventoryRepository;
+        this.boxBinRepository = boxBinRepository;
+        this.rackRepository = rackRepository;
+        this.cabinetRepository = cabinetRepository;
+        this.singleClawMachineRepository = singleClawMachineRepository;
+        this.doubleClawMachineRepository = doubleClawMachineRepository;
+        this.keychainMachineRepository = keychainMachineRepository;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -191,10 +218,27 @@ public class ShipmentService {
             int receivedQuantity = receipt.getReceivedQuantity();
             shipmentItem.setReceivedQuantity(receivedQuantity);
 
-            if (receivedQuantity > 0 && shipmentItem.getDestinationLocationId() != null) {
+            // Use destination location from request if provided, otherwise use existing one from shipment item
+            LocationType destinationLocationType = receipt.getDestinationLocationType() != null 
+                    ? receipt.getDestinationLocationType() 
+                    : shipmentItem.getDestinationLocationType();
+            UUID destinationLocationId = receipt.getDestinationLocationId() != null 
+                    ? receipt.getDestinationLocationId() 
+                    : shipmentItem.getDestinationLocationId();
+
+            // Update shipment item with destination location if provided in request
+            if (receipt.getDestinationLocationType() != null) {
+                shipmentItem.setDestinationLocationType(receipt.getDestinationLocationType());
+            }
+            if (receipt.getDestinationLocationId() != null) {
+                shipmentItem.setDestinationLocationId(receipt.getDestinationLocationId());
+            }
+
+            // Update inventory if we have a destination location and received quantity > 0
+            if (receivedQuantity > 0 && destinationLocationId != null && destinationLocationType != null) {
                 addToInventory(
-                        shipmentItem.getDestinationLocationType(),
-                        shipmentItem.getDestinationLocationId(),
+                        destinationLocationType,
+                        destinationLocationId,
                         shipmentItem.getItem(),
                         receivedQuantity,
                         requestDTO.getReceivedBy()
@@ -215,13 +259,23 @@ public class ShipmentService {
         metadata.put("inventory_id", inventoryId.toString());
         metadata.put("shipment_receipt", true);
 
+        // Validate actorId exists in users table, set to null if not found
+        UUID validatedActorId = null;
+        if (actorId != null) {
+            // Use repository directly to avoid transaction rollback issues
+            if (userRepository.findById(actorId).isPresent()) {
+                validatedActorId = actorId;
+            }
+            // If user not found, validatedActorId remains null (actorId is nullable)
+        }
+
         StockMovement movement = StockMovement.builder()
                 .item(product)
                 .locationType(locationType)
                 .toLocationId(locationId)
                 .quantityChange(quantity)
                 .reason(StockMovementReason.RESTOCK)
-                .actorId(actorId)
+                .actorId(validatedActorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
                 .build();
@@ -236,9 +290,8 @@ public class ShipmentService {
                     .findByBoxBin_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         BoxBinInventory inv = new BoxBinInventory();
-                        inv.setBoxBin(boxBinInventoryRepository.findById(locationId)
-                                .map(BoxBinInventory::getBoxBin)
-                                .orElseThrow(() -> new IllegalArgumentException("BoxBin not found")));
+                        inv.setBoxBin(boxBinRepository.findById(locationId)
+                                .orElseThrow(() -> new BoxBinNotFoundException("BoxBin not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -247,9 +300,8 @@ public class ShipmentService {
                     .findBySingleClawMachine_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         SingleClawMachineInventory inv = new SingleClawMachineInventory();
-                        inv.setSingleClawMachine(singleClawMachineInventoryRepository.findById(locationId)
-                                .map(SingleClawMachineInventory::getSingleClawMachine)
-                                .orElseThrow(() -> new IllegalArgumentException("SingleClawMachine not found")));
+                        inv.setSingleClawMachine(singleClawMachineRepository.findById(locationId)
+                                .orElseThrow(() -> new SingleClawMachineNotFoundException("SingleClawMachine not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -258,9 +310,8 @@ public class ShipmentService {
                     .findByDoubleClawMachine_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         DoubleClawMachineInventory inv = new DoubleClawMachineInventory();
-                        inv.setDoubleClawMachine(doubleClawMachineInventoryRepository.findById(locationId)
-                                .map(DoubleClawMachineInventory::getDoubleClawMachine)
-                                .orElseThrow(() -> new IllegalArgumentException("DoubleClawMachine not found")));
+                        inv.setDoubleClawMachine(doubleClawMachineRepository.findById(locationId)
+                                .orElseThrow(() -> new DoubleClawMachineNotFoundException("DoubleClawMachine not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -269,9 +320,8 @@ public class ShipmentService {
                     .findByKeychainMachine_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         KeychainMachineInventory inv = new KeychainMachineInventory();
-                        inv.setKeychainMachine(keychainMachineInventoryRepository.findById(locationId)
-                                .map(KeychainMachineInventory::getKeychainMachine)
-                                .orElseThrow(() -> new IllegalArgumentException("KeychainMachine not found")));
+                        inv.setKeychainMachine(keychainMachineRepository.findById(locationId)
+                                .orElseThrow(() -> new KeychainMachineNotFoundException("KeychainMachine not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -280,9 +330,8 @@ public class ShipmentService {
                     .findByCabinet_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         CabinetInventory inv = new CabinetInventory();
-                        inv.setCabinet(cabinetInventoryRepository.findById(locationId)
-                                .map(CabinetInventory::getCabinet)
-                                .orElseThrow(() -> new IllegalArgumentException("Cabinet not found")));
+                        inv.setCabinet(cabinetRepository.findById(locationId)
+                                .orElseThrow(() -> new CabinetNotFoundException("Cabinet not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -291,9 +340,8 @@ public class ShipmentService {
                     .findByRack_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         RackInventory inv = new RackInventory();
-                        inv.setRack(rackInventoryRepository.findById(locationId)
-                                .map(RackInventory::getRack)
-                                .orElseThrow(() -> new IllegalArgumentException("Rack not found")));
+                        inv.setRack(rackRepository.findById(locationId)
+                                .orElseThrow(() -> new RackNotFoundException("Rack not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
