@@ -77,11 +77,11 @@ export function ShipmentReceiveDialog({
   const [deliveryDate, setDeliveryDate] = useState<string>("");
   const [receiveAll, setReceiveAll] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [locationType, setLocationType] = useState<LocationType | "">("");
+  const [locationType, setLocationType] = useState<LocationType>(LocationType.NOT_ASSIGNED);
   const [locationId, setLocationId] = useState<string>("");
 
   const locationsQuery = useLocations(
-    (locationType || LocationType.BOX_BIN) as LocationType
+    locationType === LocationType.NOT_ASSIGNED ? LocationType.BOX_BIN : locationType
   );
 
   // Reset form when dialog opens
@@ -90,7 +90,7 @@ export function ShipmentReceiveDialog({
       const today = new Date().toISOString().split("T")[0];
       setDeliveryDate(today);
       setReceiveAll(false);
-      setLocationType("");
+      setLocationType(LocationType.NOT_ASSIGNED);
       setLocationId("");
 
       // Initialize quantities with remaining amounts
@@ -136,7 +136,8 @@ export function ShipmentReceiveDialog({
   };
 
   const hasAnyToReceive = Object.values(quantities).some((q) => q > 0);
-  const hasLocation = locationType && locationId;
+  const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
+  const hasPhysicalLocation = locationType && locationType !== LocationType.NOT_ASSIGNED && locationId;
 
   const locations = useMemo(() => {
     return (locationsQuery.data ?? []) as StorageLocation[];
@@ -150,8 +151,8 @@ export function ShipmentReceiveDialog({
       .map((item) => ({
         shipmentItemId: item.id,
         receivedQuantity: quantities[item.id] ?? 0,
-        destinationLocationType: locationType ? (locationType as LocationType) : undefined,
-        destinationLocationId: locationId || undefined,
+        destinationLocationType: locationType,
+        destinationLocationId: locationType === LocationType.NOT_ASSIGNED ? undefined : (locationId || undefined),
       }));
 
     if (itemReceipts.length === 0) {
@@ -187,10 +188,12 @@ export function ShipmentReceiveDialog({
         <DialogHeader>
           <DialogTitle>Receive Items</DialogTitle>
           <DialogDescription>
-            Record received quantities for shipment {shipment.shipmentNumber}. 
-            {hasLocation 
-              ? " Stock will be updated at the selected destination location."
-              : " If no location is selected, items will be marked as 'Not Assigned' and inventory will not be updated."}
+            Record received quantities for shipment {shipment.shipmentNumber}.
+            {isNotAssigned
+              ? " Items will be added to 'Not Assigned' inventory until moved to a physical location."
+              : hasPhysicalLocation
+                ? " Stock will be updated at the selected destination location."
+                : " Please select a destination location type."}
           </DialogDescription>
         </DialogHeader>
 
@@ -206,17 +209,18 @@ export function ShipmentReceiveDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="locationType">
-              Destination Location Type <span className="text-muted-foreground text-xs">(Optional)</span>
-            </Label>
+            <Label htmlFor="locationType">Destination Location Type</Label>
             <Select
               value={locationType}
               onValueChange={(value) => setLocationType(value as LocationType)}
             >
               <SelectTrigger id="locationType">
-                <SelectValue placeholder="Select location type (optional)" />
+                <SelectValue placeholder="Select location type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={LocationType.NOT_ASSIGNED}>
+                  Not Assigned (default)
+                </SelectItem>
                 <SelectItem value={LocationType.BOX_BIN}>Box/Bin</SelectItem>
                 <SelectItem value={LocationType.RACK}>Rack</SelectItem>
                 <SelectItem value={LocationType.CABINET}>Cabinet</SelectItem>
@@ -233,18 +237,16 @@ export function ShipmentReceiveDialog({
             </Select>
           </div>
 
-          {locationType && (
+          {locationType && locationType !== LocationType.NOT_ASSIGNED && (
             <div className="grid gap-2">
-              <Label htmlFor="locationId">
-                Destination Location <span className="text-muted-foreground text-xs">(Optional)</span>
-              </Label>
+              <Label htmlFor="locationId">Destination Location</Label>
               <Select
                 value={locationId}
                 onValueChange={setLocationId}
                 disabled={locationsQuery.isLoading}
               >
                 <SelectTrigger id="locationId">
-                  <SelectValue placeholder="Select location (optional)" />
+                  <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => {
