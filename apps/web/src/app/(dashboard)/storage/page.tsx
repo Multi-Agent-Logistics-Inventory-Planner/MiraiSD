@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+<<<<<<< HEAD:apps/web/src/app/(dashboard)/storage/page.tsx
 import { Can, Permission } from "@/components/rbac";
 import type {
   LocationType,
@@ -30,6 +31,10 @@ function getLocationCode(location: StorageLocation): string {
     return (location as KeychainMachine).keychainMachineCode;
   return "";
 }
+=======
+import { LocationType } from "@/types/api";
+import type { StorageLocation } from "@/types/api";
+>>>>>>> 33e90095 (WIP: forecasting_ui progress):apps/web/src/app/(dashboard)/locations/page.tsx
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationList } from "@/components/locations/location-list";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
@@ -43,7 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType>("BOX_BIN");
+  const [locationType, setLocationType] = useState<LocationType>(LocationType.BOX_BIN);
   const [search, setSearch] = useState("");
 
   const list = useLocationsWithCounts(locationType);

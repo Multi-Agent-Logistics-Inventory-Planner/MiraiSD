@@ -454,6 +454,37 @@ export interface TransferStockRequest {
   notes?: string;
 }
 
+// Forecast types
+export interface ForecastPrediction {
+  id: string;
+  itemId: string;
+  itemName: string;
+  itemSku: string;
+  currentStock: number;
+  horizonDays: number;
+  avgDailyDelta: number;
+  daysToStockout: number;
+  suggestedReorderQty: number;
+  suggestedOrderDate: string;
+  unitCost?: number;
+  confidence: number;
+  computedAt: string;
+}
+
+// Analytics types
+export interface CategoryInventory {
+  category: string;
+  totalItems: number;
+  totalStock: number;
+}
+
+export interface PerformanceMetrics {
+  turnoverRate: number;
+  forecastAccuracy: number;
+  stockoutRate: number;
+  fillRate: number;
+}
+
 // Pagination types
 
 export interface PaginatedResponse<T> {
