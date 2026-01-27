@@ -99,7 +99,7 @@ export function ProductModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden !px-4 sm:!px-6">
+      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden !px-4 sm:!px-6">
         <DialogHeader className="text-left">
           <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-row items-center gap-2 sm:gap-3">
             <span className="break-words">{p.name}</span>
@@ -241,7 +241,7 @@ export function ProductModal({
 
         <div className="mt-4 sm:mt-6">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
-            Current Qty{" "}
+            Current Stock{" "}
             <span className="text-foreground">
               ({totalQuantity.toLocaleString()})
             </span>
@@ -278,7 +278,7 @@ export function ProductModal({
                       colSpan={3}
                       className="h-16 text-center text-muted-foreground"
                     >
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-1 py-6">
                         <MapPin className="h-5 w-5 text-muted-foreground/50" />
                         <span>No inventory at any location</span>
                       </div>
@@ -344,7 +344,7 @@ export function ProductModal({
                       colSpan={4}
                       className="h-16 text-center text-muted-foreground"
                     >
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-1 py-6">
                         <Package className="h-5 w-5 text-muted-foreground/50" />
                         <span>No orders found</span>
                       </div>
