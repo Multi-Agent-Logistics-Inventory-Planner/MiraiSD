@@ -56,6 +56,7 @@ export enum LocationType {
   KEYCHAIN_MACHINE = "KEYCHAIN_MACHINE",
   CABINET = "CABINET",
   RACK = "RACK",
+  NOT_ASSIGNED = "NOT_ASSIGNED",
 }
 
 export enum StockMovementReason {

@@ -152,6 +152,7 @@ public class AuditLogMapper {
                     .collect(Collectors.toMap(Cabinet::getId, Cabinet::getCabinetCode));
             case RACK -> rackRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(Rack::getId, Rack::getRackCode));
+            case NOT_ASSIGNED -> new HashMap<>(); // No location codes for NOT_ASSIGNED
         };
     }
 }

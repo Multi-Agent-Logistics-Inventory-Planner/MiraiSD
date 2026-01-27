@@ -6,6 +6,7 @@ public enum LocationType {
     DOUBLE_CLAW_MACHINE,
     KEYCHAIN_MACHINE,
     CABINET,
-    RACK
+    RACK,
+    NOT_ASSIGNED
 }
 

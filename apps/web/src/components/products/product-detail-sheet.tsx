@@ -22,8 +22,9 @@ import { Button } from "@/components/ui/button";
 import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
-import type { LocationType, ShipmentStatus } from "@/types/api";
+import type { ShipmentStatus } from "@/types/api";
 import {
+  LocationType,
   PRODUCT_CATEGORY_LABELS,
   PRODUCT_SUBCATEGORY_LABELS,
 } from "@/types/api";
@@ -44,6 +45,7 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   KEYCHAIN_MACHINE: "Keychain",
   CABINET: "Cabinet",
   RACK: "Rack",
+  NOT_ASSIGNED: "Not Assigned",
 };
 
 const STATUS_VARIANTS: Record<
@@ -83,6 +85,23 @@ export function ProductDetailSheet({
   }
 
   const { product: p, totalQuantity } = product;
+
+  // Calculate "Not Assigned" quantity from shipment items
+  const notAssignedQuantity = shipments
+    ? shipments.reduce((total, shipment) => {
+        return (
+          total +
+          shipment.items
+            .filter(
+              (item) =>
+                item.item.id === p.id &&
+                item.destinationLocationType === "NOT_ASSIGNED" &&
+                item.receivedQuantity > 0
+            )
+            .reduce((sum, item) => sum + item.receivedQuantity, 0)
+        );
+      }, 0)
+    : 0;
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
@@ -188,26 +207,53 @@ export function ProductDetailSheet({
                     ))}
                   </>
                 ) : !locations || locations.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="h-16 text-center text-muted-foreground">
-                      <div className="flex flex-col items-center gap-1">
-                        <MapPin className="h-5 w-5 text-muted-foreground/50" />
-                        <span>No inventory at any location</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    {notAssignedQuantity > 0 ? (
+                      <TableRow>
+                        <TableCell className="font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {LOCATION_TYPE_LABELS[LocationType.NOT_ASSIGNED]}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {notAssignedQuantity.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="h-16 text-center text-muted-foreground">
+                          <div className="flex flex-col items-center gap-1">
+                            <MapPin className="h-5 w-5 text-muted-foreground/50" />
+                            <span>No inventory at any location</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 ) : (
-                  locations.map((entry) => (
-                    <TableRow key={entry.inventoryId}>
-                      <TableCell className="font-mono">{entry.locationCode}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {LOCATION_TYPE_LABELS[entry.locationType]}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {entry.quantity.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  <>
+                    {locations.map((entry) => (
+                      <TableRow key={entry.inventoryId}>
+                        <TableCell className="font-mono">{entry.locationCode}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {LOCATION_TYPE_LABELS[entry.locationType]}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {entry.quantity.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {notAssignedQuantity > 0 && (
+                      <TableRow>
+                        <TableCell className="font-mono text-muted-foreground">-</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {LOCATION_TYPE_LABELS[LocationType.NOT_ASSIGNED]}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {notAssignedQuantity.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
               </TableBody>
             </Table>

@@ -193,6 +193,7 @@ public class ShipmentService {
 
     /**
      * Receive a shipment: update inventory, create stock movements, publish events
+     * Supports partial receipts - shipment remains PENDING until all items are fully received
      */
     public Shipment receiveShipment(UUID shipmentId, ReceiveShipmentRequestDTO requestDTO) {
         Shipment shipment = getShipmentById(shipmentId);
@@ -204,8 +205,10 @@ public class ShipmentService {
             throw new InvalidShipmentStatusException("Cannot receive a cancelled shipment");
         }
 
-        shipment.setStatus(ShipmentStatus.DELIVERED);
-        shipment.setActualDeliveryDate(requestDTO.getActualDeliveryDate());
+        // Set actual delivery date on first receipt, or update if this is a later receipt
+        if (shipment.getActualDeliveryDate() == null) {
+            shipment.setActualDeliveryDate(requestDTO.getActualDeliveryDate());
+        }
 
         for (ReceiveShipmentRequestDTO.ItemReceiptDTO receipt : requestDTO.getItemReceipts()) {
             ShipmentItem shipmentItem = shipmentItemRepository.findById(receipt.getShipmentItemId())
@@ -215,8 +218,21 @@ public class ShipmentService {
                 throw new IllegalArgumentException("Shipment item does not belong to this shipment");
             }
 
-            int receivedQuantity = receipt.getReceivedQuantity();
-            shipmentItem.setReceivedQuantity(receivedQuantity);
+            int quantityToReceive = receipt.getReceivedQuantity();
+            int currentReceivedQuantity = shipmentItem.getReceivedQuantity();
+            int newReceivedQuantity = currentReceivedQuantity + quantityToReceive;
+
+            // Validate that we're not receiving more than ordered
+            if (newReceivedQuantity > shipmentItem.getOrderedQuantity()) {
+                throw new IllegalArgumentException(
+                    String.format("Cannot receive %d items for shipment item %s. " +
+                            "Already received: %d, Ordered: %d, Attempting to receive: %d",
+                            newReceivedQuantity, receipt.getShipmentItemId(),
+                            currentReceivedQuantity, shipmentItem.getOrderedQuantity(), quantityToReceive));
+            }
+
+            // Accumulate received quantity instead of replacing it
+            shipmentItem.setReceivedQuantity(newReceivedQuantity);
 
             // Use destination location from request if provided, otherwise use existing one from shipment item
             LocationType destinationLocationType = receipt.getDestinationLocationType() != null 
@@ -226,24 +242,46 @@ public class ShipmentService {
                     ? receipt.getDestinationLocationId() 
                     : shipmentItem.getDestinationLocationId();
 
-            // Update shipment item with destination location if provided in request
+            // Update shipment item with destination location from request
+            // If no location is provided, set to NOT_ASSIGNED
             if (receipt.getDestinationLocationType() != null) {
                 shipmentItem.setDestinationLocationType(receipt.getDestinationLocationType());
-            }
-            if (receipt.getDestinationLocationId() != null) {
-                shipmentItem.setDestinationLocationId(receipt.getDestinationLocationId());
+                if (receipt.getDestinationLocationId() != null) {
+                    shipmentItem.setDestinationLocationId(receipt.getDestinationLocationId());
+                } else {
+                    shipmentItem.setDestinationLocationId(null);
+                }
+            } else {
+                // If location type is not provided in receipt, set to NOT_ASSIGNED
+                shipmentItem.setDestinationLocationType(LocationType.NOT_ASSIGNED);
+                shipmentItem.setDestinationLocationId(null);
             }
 
             // Update inventory if we have a destination location and received quantity > 0
-            if (receivedQuantity > 0 && destinationLocationId != null && destinationLocationType != null) {
+            // Skip inventory update for NOT_ASSIGNED location type
+            if (quantityToReceive > 0 
+                    && destinationLocationId != null 
+                    && destinationLocationType != null 
+                    && destinationLocationType != LocationType.NOT_ASSIGNED) {
                 addToInventory(
                         destinationLocationType,
                         destinationLocationId,
                         shipmentItem.getItem(),
-                        receivedQuantity,
+                        quantityToReceive,
                         requestDTO.getReceivedBy()
                 );
             }
+        }
+
+        // Check if all items are fully received
+        boolean allItemsFullyReceived = shipment.getItems().stream()
+                .allMatch(item -> item.getReceivedQuantity() >= item.getOrderedQuantity());
+
+        // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
+        if (allItemsFullyReceived) {
+            shipment.setStatus(ShipmentStatus.DELIVERED);
+        } else {
+            shipment.setStatus(ShipmentStatus.PENDING);
         }
 
         return shipmentRepository.save(shipment);
@@ -346,6 +384,7 @@ public class ShipmentService {
                         inv.setQuantity(0);
                         return inv;
                     });
+            case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot create inventory for NOT_ASSIGNED location type");
         };
     }
 
@@ -381,6 +420,7 @@ public class ShipmentService {
             case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory).getId();
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory).getId();
             case RACK -> rackInventoryRepository.save((RackInventory) inventory).getId();
+            case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
         };
     }
 }
