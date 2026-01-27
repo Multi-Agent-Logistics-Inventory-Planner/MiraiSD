@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+<<<<<<< HEAD:apps/web/src/app/(dashboard)/storage/page.tsx
 import { Can, Permission } from "@/components/rbac";
 import {
   LocationType,
@@ -36,6 +37,10 @@ function getLocationCode(location: StorageLocation): string {
     return (location as PusherMachine).pusherMachineCode;
   return "";
 }
+=======
+import { LocationType } from "@/types/api";
+import type { StorageLocation } from "@/types/api";
+>>>>>>> 33e90095 (WIP: forecasting_ui progress):apps/web/src/app/(dashboard)/locations/page.tsx
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationList } from "@/components/locations/location-list";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
