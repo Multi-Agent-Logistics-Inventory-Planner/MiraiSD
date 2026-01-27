@@ -540,6 +540,27 @@ export interface PerformanceMetrics {
   fillRate: number;
 }
 
+// Sales Summary types
+export interface MonthlySales {
+  month: string;
+  totalRevenue: number;
+  totalUnits: number;
+}
+
+export interface DailySales {
+  date: string;
+  totalUnits: number;
+}
+
+export interface SalesSummary {
+  monthlySales: MonthlySales[];
+  dailySales: DailySales[];
+  totalRevenue: number;
+  totalUnits: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
 // Pagination types
 
 export interface PaginatedResponse<T> {

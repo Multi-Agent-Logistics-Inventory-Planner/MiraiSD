@@ -1,5 +1,5 @@
 import { apiGet } from './client'
-import { CategoryInventory, PerformanceMetrics } from '@/types/api'
+import { CategoryInventory, PerformanceMetrics, SalesSummary } from '@/types/api'
 
 const BASE_PATH = '/api/analytics'
 
@@ -9,4 +9,8 @@ export async function getInventoryByCategory(): Promise<CategoryInventory[]> {
 
 export async function getPerformanceMetrics(): Promise<PerformanceMetrics> {
   return apiGet<PerformanceMetrics>(`${BASE_PATH}/performance-metrics`)
+}
+
+export async function getSalesSummary(): Promise<SalesSummary> {
+  return apiGet<SalesSummary>(`${BASE_PATH}/sales-summary`)
 }
