@@ -39,6 +39,7 @@ public class StockMovementService {
     private final KeychainMachineRepository keychainMachineRepository;
     private final CabinetRepository cabinetRepository;
     private final RackRepository rackRepository;
+    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final EventOutboxService eventOutboxService;
 
     public StockMovementService(
@@ -55,6 +56,7 @@ public class StockMovementService {
             KeychainMachineRepository keychainMachineRepository,
             CabinetRepository cabinetRepository,
             RackRepository rackRepository,
+            NotAssignedInventoryRepository notAssignedInventoryRepository,
             EventOutboxService eventOutboxService) {
         this.stockMovementRepository = stockMovementRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -69,6 +71,7 @@ public class StockMovementService {
         this.keychainMachineRepository = keychainMachineRepository;
         this.cabinetRepository = cabinetRepository;
         this.rackRepository = rackRepository;
+        this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.eventOutboxService = eventOutboxService;
     }
 
@@ -232,7 +235,8 @@ public class StockMovementService {
                     .orElseThrow(() -> new CabinetInventoryNotFoundException("Cabinet inventory not found: " + inventoryId));
             case RACK -> rackInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new RackInventoryNotFoundException("Rack inventory not found: " + inventoryId));
-            case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot load inventory for NOT_ASSIGNED location type");
+            case NOT_ASSIGNED -> notAssignedInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new NotAssignedInventoryNotFoundException("NotAssigned inventory not found: " + inventoryId));
         };
     }
 
@@ -244,6 +248,7 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getQuantity();
             case CabinetInventory ci -> ci.getQuantity();
             case RackInventory ri -> ri.getQuantity();
+            case NotAssignedInventory nai -> nai.getQuantity();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -256,6 +261,7 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.setQuantity(quantity);
             case CabinetInventory ci -> ci.setQuantity(quantity);
             case RackInventory ri -> ri.setQuantity(quantity);
+            case NotAssignedInventory nai -> nai.setQuantity(quantity);
             default -> throw new IllegalArgumentException("Unknown inventory type");
         }
     }
@@ -268,7 +274,7 @@ public class StockMovementService {
             case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory);
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory);
             case RACK -> rackInventoryRepository.save((RackInventory) inventory);
-            case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
+            case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
         }
     }
 
@@ -280,7 +286,7 @@ public class StockMovementService {
             case KEYCHAIN_MACHINE -> ((KeychainMachineInventory) inventory).getKeychainMachine().getId();
             case CABINET -> ((CabinetInventory) inventory).getCabinet().getId();
             case RACK -> ((RackInventory) inventory).getRack().getId();
-            case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot get location ID for NOT_ASSIGNED location type");
+            case NOT_ASSIGNED -> null;  // No location for NOT_ASSIGNED
         };
     }
 
@@ -292,6 +298,7 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getItem();
             case CabinetInventory ci -> ci.getItem();
             case RackInventory ri -> ri.getItem();
+            case NotAssignedInventory nai -> nai.getItem();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }

@@ -22,6 +22,7 @@ import com.mirai.inventoryservice.models.inventory.*;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.repositories.*;
+import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +55,7 @@ public class ShipmentService {
     private final SingleClawMachineRepository singleClawMachineRepository;
     private final DoubleClawMachineRepository doubleClawMachineRepository;
     private final KeychainMachineRepository keychainMachineRepository;
+    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
@@ -74,7 +76,8 @@ public class ShipmentService {
             CabinetRepository cabinetRepository,
             SingleClawMachineRepository singleClawMachineRepository,
             DoubleClawMachineRepository doubleClawMachineRepository,
-            KeychainMachineRepository keychainMachineRepository) {
+            KeychainMachineRepository keychainMachineRepository,
+            NotAssignedInventoryRepository notAssignedInventoryRepository) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productService = productService;
@@ -94,6 +97,7 @@ public class ShipmentService {
         this.singleClawMachineRepository = singleClawMachineRepository;
         this.doubleClawMachineRepository = doubleClawMachineRepository;
         this.keychainMachineRepository = keychainMachineRepository;
+        this.notAssignedInventoryRepository = notAssignedInventoryRepository;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -257,19 +261,27 @@ public class ShipmentService {
                 shipmentItem.setDestinationLocationId(null);
             }
 
-            // Update inventory if we have a destination location and received quantity > 0
-            // Skip inventory update for NOT_ASSIGNED location type
-            if (quantityToReceive > 0 
-                    && destinationLocationId != null 
-                    && destinationLocationType != null 
-                    && destinationLocationType != LocationType.NOT_ASSIGNED) {
-                addToInventory(
-                        destinationLocationType,
-                        destinationLocationId,
-                        shipmentItem.getItem(),
-                        quantityToReceive,
-                        requestDTO.getReceivedBy()
-                );
+            // Update inventory if received quantity > 0
+            if (quantityToReceive > 0) {
+                if (destinationLocationType == LocationType.NOT_ASSIGNED
+                        || destinationLocationType == null
+                        || destinationLocationId == null) {
+                    // Add to NotAssignedInventory
+                    addToNotAssignedInventory(
+                            shipmentItem.getItem(),
+                            quantityToReceive,
+                            requestDTO.getReceivedBy()
+                    );
+                } else {
+                    // Add to regular location inventory
+                    addToInventory(
+                            destinationLocationType,
+                            destinationLocationId,
+                            shipmentItem.getItem(),
+                            quantityToReceive,
+                            requestDTO.getReceivedBy()
+                    );
+                }
             }
         }
 
@@ -311,6 +323,46 @@ public class ShipmentService {
                 .item(product)
                 .locationType(locationType)
                 .toLocationId(locationId)
+                .quantityChange(quantity)
+                .reason(StockMovementReason.RESTOCK)
+                .actorId(validatedActorId)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        StockMovement savedMovement = stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(savedMovement);
+    }
+
+    private void addToNotAssignedInventory(Product product, int quantity, UUID actorId) {
+        NotAssignedInventory inventory = notAssignedInventoryRepository
+                .findByItem_Id(product.getId())
+                .orElseGet(() -> {
+                    NotAssignedInventory inv = new NotAssignedInventory();
+                    inv.setItem(product);
+                    inv.setQuantity(0);
+                    return inv;
+                });
+
+        inventory.setQuantity(inventory.getQuantity() + quantity);
+        NotAssignedInventory saved = notAssignedInventoryRepository.save(inventory);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("inventory_id", saved.getId().toString());
+        metadata.put("shipment_receipt", true);
+
+        // Validate actorId exists in users table, set to null if not found
+        UUID validatedActorId = null;
+        if (actorId != null) {
+            if (userRepository.findById(actorId).isPresent()) {
+                validatedActorId = actorId;
+            }
+        }
+
+        StockMovement movement = StockMovement.builder()
+                .item(product)
+                .locationType(LocationType.NOT_ASSIGNED)
+                .toLocationId(null)  // No location for NOT_ASSIGNED
                 .quantityChange(quantity)
                 .reason(StockMovementReason.RESTOCK)
                 .actorId(validatedActorId)

@@ -66,6 +66,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
   [LocationType.CABINET]: "Cabinet",
   [LocationType.RACK]: "Rack",
+  [LocationType.NOT_ASSIGNED]: "Not Assigned",
 };
 
 export enum StockMovementReason {
@@ -310,6 +311,10 @@ export interface KeychainMachineInventory extends BaseInventory {
   keychainMachineCode: string;
 }
 
+export interface NotAssignedInventory extends BaseInventory {
+  // No location fields - NOT_ASSIGNED has no physical location
+}
+
 // Union type for all inventory
 export type Inventory =
   | BoxBinInventory
@@ -317,7 +322,8 @@ export type Inventory =
   | CabinetInventory
   | SingleClawMachineInventory
   | DoubleClawMachineInventory
-  | KeychainMachineInventory;
+  | KeychainMachineInventory
+  | NotAssignedInventory;
 
 // Inventory request
 export interface InventoryRequest {
@@ -503,6 +509,7 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.DOUBLE_CLAW_MACHINE]: /^D\d+$/,
   [LocationType.KEYCHAIN_MACHINE]: /^M\d+$/,
+  [LocationType.NOT_ASSIGNED]: /^N\d+$/,
 };
 
 // Helper type for location endpoints
@@ -513,4 +520,5 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.SINGLE_CLAW_MACHINE]: "single-claw-machines",
   [LocationType.DOUBLE_CLAW_MACHINE]: "double-claw-machines",
   [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
+  [LocationType.NOT_ASSIGNED]: "not-assigned",
 };
