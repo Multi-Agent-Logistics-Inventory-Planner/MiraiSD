@@ -169,28 +169,35 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
         {(can(Permission.INVENTORY_ADJUST) || can(Permission.INVENTORY_TRANSFER)) && (
-          <div className="flex gap-2 px-3.5 pb-2">
-            {can(Permission.INVENTORY_ADJUST) && (
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={() => setAdjustOpen(true)}
-              >
-                <ArrowUpDown className="h-3 w-3" />
-                <span>Adjust</span>
-              </Button>
-            )}
-            {can(Permission.INVENTORY_TRANSFER) && (
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={() => setTransferOpen(true)}
-              >
-                <RefreshCw className="h-3 w-3" />
-                <span>Transfer</span>
-              </Button>
-            )}
-          </div>
+          <SidebarGroup>
+            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
+              Quick Actions
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="flex gap-2 px-2">
+                {can(Permission.INVENTORY_ADJUST) && (
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAdjustOpen(true)}
+                  >
+                    <ArrowUpDown className="h-3 w-3" />
+                    <span>Adjust</span>
+                  </Button>
+                )}
+                {can(Permission.INVENTORY_TRANSFER) && (
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setTransferOpen(true)}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>Transfer</span>
+                  </Button>
+                )}
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
         {visibleInventoryItems.length > 0 && (
           <SidebarGroup>
