@@ -149,7 +149,6 @@ export default function ProductsPage() {
       <TransferStockDialog
         open={transferOpen}
         onOpenChange={setTransferOpen}
-        product={selected?.product ?? null}
       />
     </div>
   );

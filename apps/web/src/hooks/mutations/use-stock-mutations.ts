@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { adjustStock, transferStock } from "@/lib/api/stock-movements";
 import type {
@@ -19,6 +20,30 @@ interface AdjustStockVariables {
 interface TransferStockVariables {
   payload: TransferStockRequest;
   productId?: string;
+}
+
+export interface BatchTransferItem {
+  payload: TransferStockRequest;
+  productId: string;
+  productName: string;
+}
+
+interface BatchTransferVariables {
+  transfers: BatchTransferItem[];
+  sourceLocationId: string;
+  destinationLocationId: string;
+}
+
+export interface BatchTransferProgress {
+  completed: number;
+  total: number;
+  currentItem?: string;
+  errors: Array<{ productName: string; error: string }>;
+}
+
+interface BatchTransferResult {
+  successful: StockMovement[];
+  failed: Array<{ productName: string; error: string }>;
 }
 
 async function invalidateStockQueries(
@@ -51,4 +76,70 @@ export function useTransferStockMutation() {
       await invalidateStockQueries(qc, variables.productId);
     },
   });
+}
+
+export function useBatchTransferMutation() {
+  const qc = useQueryClient();
+  const [progress, setProgress] = useState<BatchTransferProgress>({
+    completed: 0,
+    total: 0,
+    errors: [],
+  });
+
+  const mutation = useMutation<BatchTransferResult, Error, BatchTransferVariables>({
+    mutationFn: async ({ transfers }) => {
+      const successful: StockMovement[] = [];
+      const failed: Array<{ productName: string; error: string }> = [];
+
+      setProgress({
+        completed: 0,
+        total: transfers.length,
+        errors: [],
+      });
+
+      for (let i = 0; i < transfers.length; i++) {
+        const transfer = transfers[i];
+        setProgress((prev) => ({
+          ...prev,
+          currentItem: transfer.productName,
+        }));
+
+        try {
+          const result = await transferStock(transfer.payload);
+          successful.push(result);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Transfer failed";
+          failed.push({ productName: transfer.productName, error: errorMessage });
+        }
+
+        setProgress((prev) => ({
+          ...prev,
+          completed: i + 1,
+          errors: failed,
+        }));
+      }
+
+      return { successful, failed };
+    },
+    onSuccess: async ({ successful }, variables) => {
+      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+      await qc.invalidateQueries({
+        queryKey: ["locationInventory", variables.sourceLocationId],
+      });
+      await qc.invalidateQueries({
+        queryKey: ["locationInventory", variables.destinationLocationId],
+      });
+
+      for (const transfer of variables.transfers) {
+        await qc.invalidateQueries({
+          queryKey: ["inventoryByItem", transfer.productId],
+        });
+      }
+    },
+    onSettled: () => {
+      setProgress({ completed: 0, total: 0, errors: [] });
+    },
+  });
+
+  return { ...mutation, progress };
 }
