@@ -34,8 +34,6 @@ public class SecurityConfig {
                 // Public endpoints (no authentication required)
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/health").permitAll()
-                // Dev seed endpoints (controller only exists in dev profile)
-                .requestMatchers("/api/dev/**").permitAll()
 
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

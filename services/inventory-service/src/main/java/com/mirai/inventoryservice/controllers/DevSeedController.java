@@ -11,11 +11,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -30,6 +34,7 @@ import java.util.Random;
 @RequiredArgsConstructor
 @Slf4j
 @Profile("dev")
+@Validated
 public class DevSeedController {
 
     private final ProductRepository productRepository;
@@ -39,8 +44,8 @@ public class DevSeedController {
 
     @PostMapping("/seed/sales")
     public ResponseEntity<Map<String, Object>> seedSalesData(
-            @RequestParam(defaultValue = "100") int salesPerProduct,
-            @RequestParam(defaultValue = "365") int daysBack) {
+            @RequestParam(defaultValue = "100") @Min(1) @Max(500) int salesPerProduct,
+            @RequestParam(defaultValue = "365") @Min(1) @Max(730) int daysBack) {
 
         List<Product> products = productRepository.findAll();
 
@@ -100,7 +105,7 @@ public class DevSeedController {
 
     @PostMapping("/seed/products")
     public ResponseEntity<Map<String, Object>> seedProducts(
-            @RequestParam(defaultValue = "10") int count) {
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int count) {
 
         List<Product> products = new ArrayList<>();
         ProductCategory[] categories = ProductCategory.values();
