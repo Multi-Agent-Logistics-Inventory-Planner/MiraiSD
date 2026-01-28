@@ -10,6 +10,8 @@ const LOCATION_TABS: Array<{ type: LocationType; label: string }> = [
   { type: "SINGLE_CLAW_MACHINE", label: "Single Claw" },
   { type: "DOUBLE_CLAW_MACHINE", label: "Double Claw" },
   { type: "KEYCHAIN_MACHINE", label: "Keychain" },
+  { type: "FOUR_CORNER_MACHINE", label: "Four Corner" },
+  { type: "PUSHER_MACHINE", label: "Pusher" },
 ];
 
 interface LocationTabsProps {

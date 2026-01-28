@@ -7,6 +7,11 @@ public enum LocationType {
     KEYCHAIN_MACHINE,
     CABINET,
     RACK,
+<<<<<<< HEAD
     NOT_ASSIGNED
+=======
+    FOUR_CORNER_MACHINE,
+    PUSHER_MACHINE
+>>>>>>> origin/main
 }
 

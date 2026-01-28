@@ -19,6 +19,10 @@ function getLocationCode(locationType: LocationType, loc: StorageLocation): stri
       return (loc as any).doubleClawMachineCode;
     case "KEYCHAIN_MACHINE":
       return (loc as any).keychainMachineCode;
+    case "FOUR_CORNER_MACHINE":
+      return (loc as any).fourCornerMachineCode;
+    case "PUSHER_MACHINE":
+      return (loc as any).pusherMachineCode;
     default:
       return loc.id;
   }

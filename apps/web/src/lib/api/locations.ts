@@ -8,12 +8,16 @@ import {
   SingleClawMachine,
   DoubleClawMachine,
   KeychainMachine,
+  FourCornerMachine,
+  PusherMachine,
   BoxBinRequest,
   RackRequest,
   CabinetRequest,
   SingleClawMachineRequest,
   DoubleClawMachineRequest,
   KeychainMachineRequest,
+  FourCornerMachineRequest,
+  PusherMachineRequest,
 } from "@/types/api";
 
 // Generic location API functions
@@ -225,6 +229,80 @@ export async function deleteKeychainMachine(id: string): Promise<void> {
   return apiDelete<void>(`${getBasePath(LocationType.KEYCHAIN_MACHINE)}/${id}`);
 }
 
+// FourCornerMachine API
+
+export async function getFourCornerMachines(): Promise<FourCornerMachine[]> {
+  return apiGet<FourCornerMachine[]>(getBasePath(LocationType.FOUR_CORNER_MACHINE));
+}
+
+export async function getFourCornerMachineById(
+  id: string
+): Promise<FourCornerMachine> {
+  return apiGet<FourCornerMachine>(
+    `${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`
+  );
+}
+
+export async function createFourCornerMachine(
+  data: FourCornerMachineRequest
+): Promise<FourCornerMachine> {
+  return apiPost<FourCornerMachine, FourCornerMachineRequest>(
+    getBasePath(LocationType.FOUR_CORNER_MACHINE),
+    data
+  );
+}
+
+export async function updateFourCornerMachine(
+  id: string,
+  data: FourCornerMachineRequest
+): Promise<FourCornerMachine> {
+  return apiPut<FourCornerMachine, FourCornerMachineRequest>(
+    `${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`,
+    data
+  );
+}
+
+export async function deleteFourCornerMachine(id: string): Promise<void> {
+  return apiDelete<void>(`${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`);
+}
+
+// PusherMachine API
+
+export async function getPusherMachines(): Promise<PusherMachine[]> {
+  return apiGet<PusherMachine[]>(getBasePath(LocationType.PUSHER_MACHINE));
+}
+
+export async function getPusherMachineById(
+  id: string
+): Promise<PusherMachine> {
+  return apiGet<PusherMachine>(
+    `${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`
+  );
+}
+
+export async function createPusherMachine(
+  data: PusherMachineRequest
+): Promise<PusherMachine> {
+  return apiPost<PusherMachine, PusherMachineRequest>(
+    getBasePath(LocationType.PUSHER_MACHINE),
+    data
+  );
+}
+
+export async function updatePusherMachine(
+  id: string,
+  data: PusherMachineRequest
+): Promise<PusherMachine> {
+  return apiPut<PusherMachine, PusherMachineRequest>(
+    `${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`,
+    data
+  );
+}
+
+export async function deletePusherMachine(id: string): Promise<void> {
+  return apiDelete<void>(`${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`);
+}
+
 // Helper to get all locations of a specific type
 export async function getLocationsByType(
   locationType: LocationType
@@ -235,6 +313,8 @@ export async function getLocationsByType(
   | SingleClawMachine[]
   | DoubleClawMachine[]
   | KeychainMachine[]
+  | FourCornerMachine[]
+  | PusherMachine[]
 > {
   switch (locationType) {
     case LocationType.BOX_BIN:
@@ -249,6 +329,10 @@ export async function getLocationsByType(
       return getDoubleClawMachines();
     case LocationType.KEYCHAIN_MACHINE:
       return getKeychainMachines();
+    case LocationType.FOUR_CORNER_MACHINE:
+      return getFourCornerMachines();
+    case LocationType.PUSHER_MACHINE:
+      return getPusherMachines();
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }

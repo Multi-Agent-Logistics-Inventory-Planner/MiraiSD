@@ -11,9 +11,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class KeychainMachineRequestDTO {
-    @NotBlank(message = "KeychainMachine code is required")
-    @Pattern(regexp = "^K\\d+$", message = "KeychainMachine code must follow format K1, K2, etc.")
-    private String keychainMachineCode;
+public class FourCornerMachineRequestDTO {
+    @NotBlank(message = "FourCornerMachine code is required")
+    @Pattern(regexp = "^M\\d+$", message = "FourCornerMachine code must follow format M1, M2, etc.")
+    private String fourCornerMachineCode;
 }
-

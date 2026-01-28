@@ -23,6 +23,8 @@ public class AuditLogMapper {
     private final KeychainMachineRepository keychainMachineRepository;
     private final CabinetRepository cabinetRepository;
     private final RackRepository rackRepository;
+    private final FourCornerMachineRepository fourCornerMachineRepository;
+    private final PusherMachineRepository pusherMachineRepository;
 
     public AuditLogMapper(
             UserRepository userRepository,
@@ -31,7 +33,9 @@ public class AuditLogMapper {
             DoubleClawMachineRepository doubleClawMachineRepository,
             KeychainMachineRepository keychainMachineRepository,
             CabinetRepository cabinetRepository,
-            RackRepository rackRepository) {
+            RackRepository rackRepository,
+            FourCornerMachineRepository fourCornerMachineRepository,
+            PusherMachineRepository pusherMachineRepository) {
         this.userRepository = userRepository;
         this.boxBinRepository = boxBinRepository;
         this.singleClawMachineRepository = singleClawMachineRepository;
@@ -39,6 +43,8 @@ public class AuditLogMapper {
         this.keychainMachineRepository = keychainMachineRepository;
         this.cabinetRepository = cabinetRepository;
         this.rackRepository = rackRepository;
+        this.fourCornerMachineRepository = fourCornerMachineRepository;
+        this.pusherMachineRepository = pusherMachineRepository;
     }
 
     /**
@@ -152,7 +158,14 @@ public class AuditLogMapper {
                     .collect(Collectors.toMap(Cabinet::getId, Cabinet::getCabinetCode));
             case RACK -> rackRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(Rack::getId, Rack::getRackCode));
+<<<<<<< HEAD
             case NOT_ASSIGNED -> new HashMap<>(); // No location codes for NOT_ASSIGNED
+=======
+            case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(FourCornerMachine::getId, FourCornerMachine::getFourCornerMachineCode));
+            case PUSHER_MACHINE -> pusherMachineRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(PusherMachine::getId, PusherMachine::getPusherMachineCode));
+>>>>>>> origin/main
         };
     }
 }

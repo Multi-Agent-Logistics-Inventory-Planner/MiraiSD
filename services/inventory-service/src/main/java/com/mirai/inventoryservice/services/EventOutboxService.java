@@ -57,7 +57,7 @@ public class EventOutboxService {
                     movement.getFromLocationId(),
                     movement.getLocationType()
             );
-            payload.put("from_box_id", fromCode); // "B1", "S2", "D1", "M1", "C1", "R3", etc
+            payload.put("from_box_id", fromCode); // "B1", "S2", "D1", "K1", "C1", "R3", etc
         } else {
             payload.put("from_box_id", null);
         }

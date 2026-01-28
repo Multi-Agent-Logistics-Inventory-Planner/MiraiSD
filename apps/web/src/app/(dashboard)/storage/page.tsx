@@ -16,6 +16,8 @@ import type {
   SingleClawMachine,
   DoubleClawMachine,
   KeychainMachine,
+  FourCornerMachine,
+  PusherMachine,
 } from "@/types/api";
 
 function getLocationCode(location: StorageLocation): string {
@@ -28,6 +30,10 @@ function getLocationCode(location: StorageLocation): string {
     return (location as DoubleClawMachine).doubleClawMachineCode;
   if ("keychainMachineCode" in location)
     return (location as KeychainMachine).keychainMachineCode;
+  if ("fourCornerMachineCode" in location)
+    return (location as FourCornerMachine).fourCornerMachineCode;
+  if ("pusherMachineCode" in location)
+    return (location as PusherMachine).pusherMachineCode;
   return "";
 }
 import { LocationTabs } from "@/components/locations/location-tabs";

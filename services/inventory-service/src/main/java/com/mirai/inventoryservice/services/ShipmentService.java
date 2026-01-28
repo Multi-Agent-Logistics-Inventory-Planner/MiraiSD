@@ -56,6 +56,8 @@ public class ShipmentService {
     private final DoubleClawMachineRepository doubleClawMachineRepository;
     private final KeychainMachineRepository keychainMachineRepository;
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
+    private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
+    private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
@@ -71,13 +73,8 @@ public class ShipmentService {
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             CabinetInventoryRepository cabinetInventoryRepository,
             RackInventoryRepository rackInventoryRepository,
-            BoxBinRepository boxBinRepository,
-            RackRepository rackRepository,
-            CabinetRepository cabinetRepository,
-            SingleClawMachineRepository singleClawMachineRepository,
-            DoubleClawMachineRepository doubleClawMachineRepository,
-            KeychainMachineRepository keychainMachineRepository,
-            NotAssignedInventoryRepository notAssignedInventoryRepository) {
+            FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
+            PusherMachineInventoryRepository pusherMachineInventoryRepository) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productService = productService;
@@ -98,6 +95,8 @@ public class ShipmentService {
         this.doubleClawMachineRepository = doubleClawMachineRepository;
         this.keychainMachineRepository = keychainMachineRepository;
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
+        this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
+        this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -459,6 +458,28 @@ public class ShipmentService {
                         return inv;
                     });
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot create inventory for NOT_ASSIGNED location type");
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository
+                    .findByFourCornerMachine_IdAndItem_Id(locationId, product.getId())
+                    .orElseGet(() -> {
+                        FourCornerMachineInventory inv = new FourCornerMachineInventory();
+                        inv.setFourCornerMachine(fourCornerMachineInventoryRepository.findById(locationId)
+                                .map(FourCornerMachineInventory::getFourCornerMachine)
+                                .orElseThrow(() -> new IllegalArgumentException("FourCornerMachine not found")));
+                        inv.setItem(product);
+                        inv.setQuantity(0);
+                        return inv;
+                    });
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository
+                    .findByPusherMachine_IdAndItem_Id(locationId, product.getId())
+                    .orElseGet(() -> {
+                        PusherMachineInventory inv = new PusherMachineInventory();
+                        inv.setPusherMachine(pusherMachineInventoryRepository.findById(locationId)
+                                .map(PusherMachineInventory::getPusherMachine)
+                                .orElseThrow(() -> new IllegalArgumentException("PusherMachine not found")));
+                        inv.setItem(product);
+                        inv.setQuantity(0);
+                        return inv;
+                    });
         };
     }
 
@@ -470,6 +491,8 @@ public class ShipmentService {
             case KeychainMachineInventory kmi -> kmi.getQuantity();
             case CabinetInventory ci -> ci.getQuantity();
             case RackInventory ri -> ri.getQuantity();
+            case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
+            case PusherMachineInventory pmi -> pmi.getQuantity();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -482,6 +505,8 @@ public class ShipmentService {
             case KeychainMachineInventory kmi -> kmi.setQuantity(quantity);
             case CabinetInventory ci -> ci.setQuantity(quantity);
             case RackInventory ri -> ri.setQuantity(quantity);
+            case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
+            case PusherMachineInventory pmi -> pmi.setQuantity(quantity);
             default -> throw new IllegalArgumentException("Unknown inventory type");
         }
     }
@@ -495,6 +520,8 @@ public class ShipmentService {
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory).getId();
             case RACK -> rackInventoryRepository.save((RackInventory) inventory).getId();
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory).getId();
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory).getId();
         };
     }
 }

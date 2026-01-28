@@ -8,7 +8,12 @@ import {
   SingleClawMachineInventory,
   DoubleClawMachineInventory,
   KeychainMachineInventory,
+<<<<<<< HEAD
   NotAssignedInventory,
+=======
+  FourCornerMachineInventory,
+  PusherMachineInventory,
+>>>>>>> origin/main
   InventoryRequest,
   Inventory,
   InventoryItem,
@@ -310,6 +315,7 @@ export async function deleteKeychainMachineInventory(
   );
 }
 
+<<<<<<< HEAD
 // NotAssigned Inventory
 
 export async function getNotAssignedInventory(): Promise<NotAssignedInventory[]> {
@@ -329,24 +335,120 @@ export async function createNotAssignedInventory(
 ): Promise<NotAssignedInventory> {
   return apiPost<NotAssignedInventory, InventoryRequest>(
     "/api/not-assigned/inventory",
+=======
+// FourCornerMachine Inventory
+
+export async function getFourCornerMachineInventory(
+  machineId: string
+): Promise<FourCornerMachineInventory[]> {
+  return apiGet<FourCornerMachineInventory[]>(
+    getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId)
+  );
+}
+
+export async function getFourCornerMachineInventoryItem(
+  machineId: string,
+  inventoryId: string
+): Promise<FourCornerMachineInventory> {
+  return apiGet<FourCornerMachineInventory>(
+    `${getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId)}/${inventoryId}`
+  );
+}
+
+export async function createFourCornerMachineInventory(
+  machineId: string,
+  data: InventoryRequest
+): Promise<FourCornerMachineInventory> {
+  return apiPost<FourCornerMachineInventory, InventoryRequest>(
+    getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId),
+>>>>>>> origin/main
     data
   );
 }
 
+<<<<<<< HEAD
 export async function updateNotAssignedInventory(
   inventoryId: string,
   data: InventoryRequest
 ): Promise<NotAssignedInventory> {
   return apiPut<NotAssignedInventory, InventoryRequest>(
     `/api/not-assigned/inventory/${inventoryId}`,
+=======
+export async function updateFourCornerMachineInventory(
+  machineId: string,
+  inventoryId: string,
+  data: InventoryRequest
+): Promise<FourCornerMachineInventory> {
+  return apiPut<FourCornerMachineInventory, InventoryRequest>(
+    `${getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId)}/${inventoryId}`,
+>>>>>>> origin/main
     data
   );
 }
 
+<<<<<<< HEAD
 export async function deleteNotAssignedInventory(
   inventoryId: string
 ): Promise<void> {
   return apiDelete<void>(`/api/not-assigned/inventory/${inventoryId}`);
+=======
+export async function deleteFourCornerMachineInventory(
+  machineId: string,
+  inventoryId: string
+): Promise<void> {
+  return apiDelete<void>(
+    `${getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId)}/${inventoryId}`
+  );
+}
+
+// PusherMachine Inventory
+
+export async function getPusherMachineInventory(
+  machineId: string
+): Promise<PusherMachineInventory[]> {
+  return apiGet<PusherMachineInventory[]>(
+    getInventoryPath(LocationType.PUSHER_MACHINE, machineId)
+  );
+}
+
+export async function getPusherMachineInventoryItem(
+  machineId: string,
+  inventoryId: string
+): Promise<PusherMachineInventory> {
+  return apiGet<PusherMachineInventory>(
+    `${getInventoryPath(LocationType.PUSHER_MACHINE, machineId)}/${inventoryId}`
+  );
+}
+
+export async function createPusherMachineInventory(
+  machineId: string,
+  data: InventoryRequest
+): Promise<PusherMachineInventory> {
+  return apiPost<PusherMachineInventory, InventoryRequest>(
+    getInventoryPath(LocationType.PUSHER_MACHINE, machineId),
+    data
+  );
+}
+
+export async function updatePusherMachineInventory(
+  machineId: string,
+  inventoryId: string,
+  data: InventoryRequest
+): Promise<PusherMachineInventory> {
+  return apiPut<PusherMachineInventory, InventoryRequest>(
+    `${getInventoryPath(LocationType.PUSHER_MACHINE, machineId)}/${inventoryId}`,
+    data
+  );
+}
+
+export async function deletePusherMachineInventory(
+  machineId: string,
+  inventoryId: string
+): Promise<void> {
+  return apiDelete<void>(
+    `${getInventoryPath(LocationType.PUSHER_MACHINE, machineId)}/${inventoryId}`
+  );
+>>>>>>> origin/main
 }
 
 // Generic inventory getter by location type
@@ -367,6 +469,10 @@ export async function getInventoryByLocation(
       return getDoubleClawMachineInventory(locationId);
     case LocationType.KEYCHAIN_MACHINE:
       return getKeychainMachineInventory(locationId);
+    case LocationType.FOUR_CORNER_MACHINE:
+      return getFourCornerMachineInventory(locationId);
+    case LocationType.PUSHER_MACHINE:
+      return getPusherMachineInventory(locationId);
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }
@@ -389,6 +495,8 @@ const ALL_LOCATION_TYPES: LocationType[] = [
   LocationType.SINGLE_CLAW_MACHINE,
   LocationType.DOUBLE_CLAW_MACHINE,
   LocationType.KEYCHAIN_MACHINE,
+  LocationType.FOUR_CORNER_MACHINE,
+  LocationType.PUSHER_MACHINE,
 ];
 
 function formatLocationType(locationType: LocationType): string {
@@ -434,6 +542,20 @@ function getLocationDetails(
       return {
         locationId: inv.keychainMachineId,
         locationCode: inv.keychainMachineCode,
+      };
+    }
+    case LocationType.FOUR_CORNER_MACHINE: {
+      const inv = inventory as FourCornerMachineInventory;
+      return {
+        locationId: inv.fourCornerMachineId,
+        locationCode: inv.fourCornerMachineCode,
+      };
+    }
+    case LocationType.PUSHER_MACHINE: {
+      const inv = inventory as PusherMachineInventory;
+      return {
+        locationId: inv.pusherMachineId,
+        locationCode: inv.pusherMachineCode,
       };
     }
     default:

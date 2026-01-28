@@ -14,20 +14,20 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "keychain_machines")
+@Table(name = "four_corner_machines")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class KeychainMachine {
+public class FourCornerMachine {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @NotBlank
-    @Pattern(regexp = "^K\\d+$", message = "KeychainMachine code must follow format K1, K2, etc.")
-    @Column(name = "keychain_machine_code", unique = true, nullable = false)
-    private String keychainMachineCode;
+    @Pattern(regexp = "^M\\d+$", message = "FourCornerMachine code must follow format M1, M2, etc.")
+    @Column(name = "four_corner_machine_code", unique = true, nullable = false)
+    private String fourCornerMachineCode;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -37,4 +37,3 @@ public class KeychainMachine {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 }
-
