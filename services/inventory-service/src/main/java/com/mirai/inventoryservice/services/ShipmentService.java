@@ -73,6 +73,13 @@ public class ShipmentService {
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             CabinetInventoryRepository cabinetInventoryRepository,
             RackInventoryRepository rackInventoryRepository,
+            BoxBinRepository boxBinRepository,
+            RackRepository rackRepository,
+            CabinetRepository cabinetRepository,
+            SingleClawMachineRepository singleClawMachineRepository,
+            DoubleClawMachineRepository doubleClawMachineRepository,
+            KeychainMachineRepository keychainMachineRepository,
+            NotAssignedInventoryRepository notAssignedInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository) {
         this.shipmentRepository = shipmentRepository;

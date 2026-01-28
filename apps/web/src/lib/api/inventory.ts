@@ -8,12 +8,9 @@ import {
   SingleClawMachineInventory,
   DoubleClawMachineInventory,
   KeychainMachineInventory,
-<<<<<<< HEAD
-  NotAssignedInventory,
-=======
   FourCornerMachineInventory,
   PusherMachineInventory,
->>>>>>> origin/main
+  NotAssignedInventory,
   InventoryRequest,
   Inventory,
   InventoryItem,
@@ -315,27 +312,6 @@ export async function deleteKeychainMachineInventory(
   );
 }
 
-<<<<<<< HEAD
-// NotAssigned Inventory
-
-export async function getNotAssignedInventory(): Promise<NotAssignedInventory[]> {
-  return apiGet<NotAssignedInventory[]>("/api/not-assigned/inventory");
-}
-
-export async function getNotAssignedInventoryByProduct(
-  productId: string
-): Promise<NotAssignedInventory[]> {
-  return apiGet<NotAssignedInventory[]>(
-    `/api/not-assigned/inventory/by-product/${productId}`
-  );
-}
-
-export async function createNotAssignedInventory(
-  data: InventoryRequest
-): Promise<NotAssignedInventory> {
-  return apiPost<NotAssignedInventory, InventoryRequest>(
-    "/api/not-assigned/inventory",
-=======
 // FourCornerMachine Inventory
 
 export async function getFourCornerMachineInventory(
@@ -361,19 +337,10 @@ export async function createFourCornerMachineInventory(
 ): Promise<FourCornerMachineInventory> {
   return apiPost<FourCornerMachineInventory, InventoryRequest>(
     getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId),
->>>>>>> origin/main
     data
   );
 }
 
-<<<<<<< HEAD
-export async function updateNotAssignedInventory(
-  inventoryId: string,
-  data: InventoryRequest
-): Promise<NotAssignedInventory> {
-  return apiPut<NotAssignedInventory, InventoryRequest>(
-    `/api/not-assigned/inventory/${inventoryId}`,
-=======
 export async function updateFourCornerMachineInventory(
   machineId: string,
   inventoryId: string,
@@ -381,17 +348,10 @@ export async function updateFourCornerMachineInventory(
 ): Promise<FourCornerMachineInventory> {
   return apiPut<FourCornerMachineInventory, InventoryRequest>(
     `${getInventoryPath(LocationType.FOUR_CORNER_MACHINE, machineId)}/${inventoryId}`,
->>>>>>> origin/main
     data
   );
 }
 
-<<<<<<< HEAD
-export async function deleteNotAssignedInventory(
-  inventoryId: string
-): Promise<void> {
-  return apiDelete<void>(`/api/not-assigned/inventory/${inventoryId}`);
-=======
 export async function deleteFourCornerMachineInventory(
   machineId: string,
   inventoryId: string
@@ -448,7 +408,45 @@ export async function deletePusherMachineInventory(
   return apiDelete<void>(
     `${getInventoryPath(LocationType.PUSHER_MACHINE, machineId)}/${inventoryId}`
   );
->>>>>>> origin/main
+}
+
+// NotAssigned Inventory
+
+export async function getNotAssignedInventory(): Promise<NotAssignedInventory[]> {
+  return apiGet<NotAssignedInventory[]>("/api/not-assigned/inventory");
+}
+
+export async function getNotAssignedInventoryByProduct(
+  productId: string
+): Promise<NotAssignedInventory[]> {
+  return apiGet<NotAssignedInventory[]>(
+    `/api/not-assigned/inventory/by-product/${productId}`
+  );
+}
+
+export async function createNotAssignedInventory(
+  data: InventoryRequest
+): Promise<NotAssignedInventory> {
+  return apiPost<NotAssignedInventory, InventoryRequest>(
+    "/api/not-assigned/inventory",
+    data
+  );
+}
+
+export async function updateNotAssignedInventory(
+  inventoryId: string,
+  data: InventoryRequest
+): Promise<NotAssignedInventory> {
+  return apiPut<NotAssignedInventory, InventoryRequest>(
+    `/api/not-assigned/inventory/${inventoryId}`,
+    data
+  );
+}
+
+export async function deleteNotAssignedInventory(
+  inventoryId: string
+): Promise<void> {
+  return apiDelete<void>(`/api/not-assigned/inventory/${inventoryId}`);
 }
 
 // Generic inventory getter by location type

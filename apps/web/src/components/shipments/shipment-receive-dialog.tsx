@@ -59,6 +59,8 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
   [LocationType.KEYCHAIN_MACHINE]: "Keychain",
+  [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
+  [LocationType.PUSHER_MACHINE]: "Pusher",
 };
 
 interface ItemAllocation {

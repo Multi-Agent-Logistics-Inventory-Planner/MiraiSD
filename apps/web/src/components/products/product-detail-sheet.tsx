@@ -45,6 +45,8 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   KEYCHAIN_MACHINE: "Keychain",
   CABINET: "Cabinet",
   RACK: "Rack",
+  FOUR_CORNER_MACHINE: "Four Corner",
+  PUSHER_MACHINE: "Pusher",
   NOT_ASSIGNED: "Not Assigned",
 };
 

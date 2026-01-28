@@ -1,17 +1,17 @@
 "use client";
 
-import type { LocationType } from "@/types/api";
+import { LocationType } from "@/types/api";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const LOCATION_TABS: Array<{ type: LocationType; label: string }> = [
-  { type: "BOX_BIN", label: "Box Bins" },
-  { type: "RACK", label: "Racks" },
-  { type: "CABINET", label: "Cabinets" },
-  { type: "SINGLE_CLAW_MACHINE", label: "Single Claw" },
-  { type: "DOUBLE_CLAW_MACHINE", label: "Double Claw" },
-  { type: "KEYCHAIN_MACHINE", label: "Keychain" },
-  { type: "FOUR_CORNER_MACHINE", label: "Four Corner" },
-  { type: "PUSHER_MACHINE", label: "Pusher" },
+  { type: LocationType.BOX_BIN, label: "Box Bins" },
+  { type: LocationType.RACK, label: "Racks" },
+  { type: LocationType.CABINET, label: "Cabinets" },
+  { type: LocationType.SINGLE_CLAW_MACHINE, label: "Single Claw" },
+  { type: LocationType.DOUBLE_CLAW_MACHINE, label: "Double Claw" },
+  { type: LocationType.KEYCHAIN_MACHINE, label: "Keychain" },
+  { type: LocationType.FOUR_CORNER_MACHINE, label: "Four Corner" },
+  { type: LocationType.PUSHER_MACHINE, label: "Pusher" },
 ];
 
 interface LocationTabsProps {
