@@ -13,6 +13,8 @@ export const LOCATION_TYPE_CODES: Record<LocationType, string> = {
   KEYCHAIN_MACHINE: "K",
   CABINET: "C",
   RACK: "R",
+  FOUR_CORNER_MACHINE: "M",
+  PUSHER_MACHINE: "P",
 };
 
 export const CODE_TO_LOCATION_TYPE: Record<string, LocationType> = {
@@ -22,6 +24,8 @@ export const CODE_TO_LOCATION_TYPE: Record<string, LocationType> = {
   K: "KEYCHAIN_MACHINE" as LocationType,
   C: "CABINET" as LocationType,
   R: "RACK" as LocationType,
+  M: "FOUR_CORNER_MACHINE" as LocationType,
+  P: "PUSHER_MACHINE" as LocationType,
 };
 
 export const LOCATION_TYPE_OPTIONS = [
@@ -31,4 +35,6 @@ export const LOCATION_TYPE_OPTIONS = [
   { code: "K", label: "Keychain Machine" },
   { code: "C", label: "Cabinet" },
   { code: "R", label: "Rack" },
+  { code: "M", label: "Four Corner" },
+  { code: "P", label: "Pusher" },
 ] as const;
