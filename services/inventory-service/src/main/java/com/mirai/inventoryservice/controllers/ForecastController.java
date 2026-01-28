@@ -2,11 +2,14 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
 import com.mirai.inventoryservice.services.ForecastService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,6 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/forecasts")
 @RequiredArgsConstructor
+@Validated
 public class ForecastController {
 
     private final ForecastService forecastService;
@@ -36,7 +40,7 @@ public class ForecastController {
 
     @GetMapping("/at-risk")
     public ResponseEntity<List<ForecastPredictionResponseDTO>> getAtRiskItems(
-            @RequestParam(defaultValue = "7") int daysThreshold) {
+            @RequestParam(defaultValue = "7") @Min(1) @Max(365) int daysThreshold) {
         return ResponseEntity.ok(forecastService.getAtRiskForecasts(daysThreshold));
     }
 }
