@@ -6,6 +6,8 @@ public enum LocationType {
     DOUBLE_CLAW_MACHINE,
     KEYCHAIN_MACHINE,
     CABINET,
-    RACK
+    RACK,
+    FOUR_CORNER_MACHINE,
+    PUSHER_MACHINE
 }
 
