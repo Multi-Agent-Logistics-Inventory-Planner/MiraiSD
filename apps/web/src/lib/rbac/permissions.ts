@@ -18,6 +18,10 @@ export const Permission = {
   STORAGE_UPDATE: "storage:update",
   STORAGE_DELETE: "storage:delete",
 
+  // Inventory Operations
+  INVENTORY_ADJUST: "inventory:adjust",
+  INVENTORY_TRANSFER: "inventory:transfer",
+
   // Shipments
   SHIPMENTS_VIEW: "shipments:view",
   SHIPMENTS_CREATE: "shipments:create",
