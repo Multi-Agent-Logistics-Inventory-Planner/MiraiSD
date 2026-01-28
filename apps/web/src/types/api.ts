@@ -56,6 +56,8 @@ export enum LocationType {
   KEYCHAIN_MACHINE = "KEYCHAIN_MACHINE",
   CABINET = "CABINET",
   RACK = "RACK",
+  FOUR_CORNER_MACHINE = "FOUR_CORNER_MACHINE",
+  PUSHER_MACHINE = "PUSHER_MACHINE",
 }
 
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
@@ -65,6 +67,8 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
   [LocationType.CABINET]: "Cabinet",
   [LocationType.RACK]: "Rack",
+  [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
+  [LocationType.PUSHER_MACHINE]: "Pusher",
 };
 
 export enum StockMovementReason {
@@ -226,6 +230,14 @@ export interface KeychainMachine extends BaseLocation {
   keychainMachineCode: string;
 }
 
+export interface FourCornerMachine extends BaseLocation {
+  fourCornerMachineCode: string;
+}
+
+export interface PusherMachine extends BaseLocation {
+  pusherMachineCode: string;
+}
+
 // Union type for all locations
 export type StorageLocation =
   | BoxBin
@@ -233,7 +245,9 @@ export type StorageLocation =
   | Cabinet
   | SingleClawMachine
   | DoubleClawMachine
-  | KeychainMachine;
+  | KeychainMachine
+  | FourCornerMachine
+  | PusherMachine;
 
 // Location request types
 export interface BoxBinRequest {
@@ -258,6 +272,14 @@ export interface DoubleClawMachineRequest {
 
 export interface KeychainMachineRequest {
   keychainMachineCode: string;
+}
+
+export interface FourCornerMachineRequest {
+  fourCornerMachineCode: string;
+}
+
+export interface PusherMachineRequest {
+  pusherMachineCode: string;
 }
 
 // Inventory item embedded in response (simplified product)
@@ -310,6 +332,16 @@ export interface KeychainMachineInventory extends BaseInventory {
   keychainMachineCode: string;
 }
 
+export interface FourCornerMachineInventory extends BaseInventory {
+  fourCornerMachineId: string;
+  fourCornerMachineCode: string;
+}
+
+export interface PusherMachineInventory extends BaseInventory {
+  pusherMachineId: string;
+  pusherMachineCode: string;
+}
+
 // Union type for all inventory
 export type Inventory =
   | BoxBinInventory
@@ -317,7 +349,9 @@ export type Inventory =
   | CabinetInventory
   | SingleClawMachineInventory
   | DoubleClawMachineInventory
-  | KeychainMachineInventory;
+  | KeychainMachineInventory
+  | FourCornerMachineInventory
+  | PusherMachineInventory;
 
 // Inventory request
 export interface InventoryRequest {
@@ -501,7 +535,9 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.CABINET]: /^C\d+$/,
   [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.DOUBLE_CLAW_MACHINE]: /^D\d+$/,
-  [LocationType.KEYCHAIN_MACHINE]: /^M\d+$/,
+  [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
+  [LocationType.FOUR_CORNER_MACHINE]: /^M\d+$/,
+  [LocationType.PUSHER_MACHINE]: /^P\d+$/,
 };
 
 // Helper type for location endpoints
@@ -512,4 +548,6 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.SINGLE_CLAW_MACHINE]: "single-claw-machines",
   [LocationType.DOUBLE_CLAW_MACHINE]: "double-claw-machines",
   [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
+  [LocationType.FOUR_CORNER_MACHINE]: "four-corner-machines",
+  [LocationType.PUSHER_MACHINE]: "pusher-machines",
 };

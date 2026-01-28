@@ -26,6 +26,12 @@ import {
   createKeychainMachine,
   updateKeychainMachine,
   deleteKeychainMachine,
+  createFourCornerMachine,
+  updateFourCornerMachine,
+  deleteFourCornerMachine,
+  createPusherMachine,
+  updatePusherMachine,
+  deletePusherMachine,
 } from "@/lib/api/locations";
 import {
   createBoxBinInventory,
@@ -46,6 +52,12 @@ import {
   createKeychainMachineInventory,
   updateKeychainMachineInventory,
   deleteKeychainMachineInventory,
+  createFourCornerMachineInventory,
+  updateFourCornerMachineInventory,
+  deleteFourCornerMachineInventory,
+  createPusherMachineInventory,
+  updatePusherMachineInventory,
+  deletePusherMachineInventory,
 } from "@/lib/api/inventory";
 
 type LocationPayload = Record<string, string>;
@@ -88,6 +100,10 @@ export function useCreateLocationMutation(locationType: LocationType) {
           return createDoubleClawMachine(payload as any);
         case "KEYCHAIN_MACHINE":
           return createKeychainMachine(payload as any);
+        case "FOUR_CORNER_MACHINE":
+          return createFourCornerMachine(payload as any);
+        case "PUSHER_MACHINE":
+          return createPusherMachine(payload as any);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -116,6 +132,10 @@ export function useUpdateLocationMutation(locationType: LocationType) {
           return updateDoubleClawMachine(id, payload as any);
         case "KEYCHAIN_MACHINE":
           return updateKeychainMachine(id, payload as any);
+        case "FOUR_CORNER_MACHINE":
+          return updateFourCornerMachine(id, payload as any);
+        case "PUSHER_MACHINE":
+          return updatePusherMachine(id, payload as any);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -144,6 +164,10 @@ export function useDeleteLocationMutation(locationType: LocationType) {
           return deleteDoubleClawMachine(id);
         case "KEYCHAIN_MACHINE":
           return deleteKeychainMachine(id);
+        case "FOUR_CORNER_MACHINE":
+          return deleteFourCornerMachine(id);
+        case "PUSHER_MACHINE":
+          return deletePusherMachine(id);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -172,6 +196,10 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
           return (await createDoubleClawMachineInventory(locationId, payload)) as any;
         case "KEYCHAIN_MACHINE":
           return (await createKeychainMachineInventory(locationId, payload)) as any;
+        case "FOUR_CORNER_MACHINE":
+          return (await createFourCornerMachineInventory(locationId, payload)) as any;
+        case "PUSHER_MACHINE":
+          return (await createPusherMachineInventory(locationId, payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -203,6 +231,10 @@ export function useUpdateInventoryMutation(
           return (await updateDoubleClawMachineInventory(locationId, inventoryId, payload)) as any;
         case "KEYCHAIN_MACHINE":
           return (await updateKeychainMachineInventory(locationId, inventoryId, payload)) as any;
+        case "FOUR_CORNER_MACHINE":
+          return (await updateFourCornerMachineInventory(locationId, inventoryId, payload)) as any;
+        case "PUSHER_MACHINE":
+          return (await updatePusherMachineInventory(locationId, inventoryId, payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -234,6 +266,10 @@ export function useDeleteInventoryMutation(
           return deleteDoubleClawMachineInventory(locationId, inventoryId);
         case "KEYCHAIN_MACHINE":
           return deleteKeychainMachineInventory(locationId, inventoryId);
+        case "FOUR_CORNER_MACHINE":
+          return deleteFourCornerMachineInventory(locationId, inventoryId);
+        case "PUSHER_MACHINE":
+          return deletePusherMachineInventory(locationId, inventoryId);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }

@@ -33,12 +33,16 @@ public class StockMovementService {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final RackInventoryRepository rackInventoryRepository;
+    private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
+    private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
     private final BoxBinRepository boxBinRepository;
     private final SingleClawMachineRepository singleClawMachineRepository;
     private final DoubleClawMachineRepository doubleClawMachineRepository;
     private final KeychainMachineRepository keychainMachineRepository;
     private final CabinetRepository cabinetRepository;
     private final RackRepository rackRepository;
+    private final FourCornerMachineRepository fourCornerMachineRepository;
+    private final PusherMachineRepository pusherMachineRepository;
     private final EventOutboxService eventOutboxService;
 
     public StockMovementService(
@@ -49,12 +53,16 @@ public class StockMovementService {
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             CabinetInventoryRepository cabinetInventoryRepository,
             RackInventoryRepository rackInventoryRepository,
+            FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
+            PusherMachineInventoryRepository pusherMachineInventoryRepository,
             BoxBinRepository boxBinRepository,
             SingleClawMachineRepository singleClawMachineRepository,
             DoubleClawMachineRepository doubleClawMachineRepository,
             KeychainMachineRepository keychainMachineRepository,
             CabinetRepository cabinetRepository,
             RackRepository rackRepository,
+            FourCornerMachineRepository fourCornerMachineRepository,
+            PusherMachineRepository pusherMachineRepository,
             EventOutboxService eventOutboxService) {
         this.stockMovementRepository = stockMovementRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -63,12 +71,16 @@ public class StockMovementService {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.rackInventoryRepository = rackInventoryRepository;
+        this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
+        this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
         this.boxBinRepository = boxBinRepository;
         this.singleClawMachineRepository = singleClawMachineRepository;
         this.doubleClawMachineRepository = doubleClawMachineRepository;
         this.keychainMachineRepository = keychainMachineRepository;
         this.cabinetRepository = cabinetRepository;
         this.rackRepository = rackRepository;
+        this.fourCornerMachineRepository = fourCornerMachineRepository;
+        this.pusherMachineRepository = pusherMachineRepository;
         this.eventOutboxService = eventOutboxService;
     }
 
@@ -262,6 +274,10 @@ public class StockMovementService {
                     .orElseThrow(() -> new CabinetInventoryNotFoundException("Cabinet inventory not found: " + inventoryId));
             case RACK -> rackInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new RackInventoryNotFoundException("Rack inventory not found: " + inventoryId));
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("FourCornerMachine inventory not found: " + inventoryId));
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new PusherMachineInventoryNotFoundException("PusherMachine inventory not found: " + inventoryId));
         };
     }
 
@@ -273,6 +289,8 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getQuantity();
             case CabinetInventory ci -> ci.getQuantity();
             case RackInventory ri -> ri.getQuantity();
+            case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
+            case PusherMachineInventory pmi -> pmi.getQuantity();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -285,6 +303,8 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.setQuantity(quantity);
             case CabinetInventory ci -> ci.setQuantity(quantity);
             case RackInventory ri -> ri.setQuantity(quantity);
+            case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
+            case PusherMachineInventory pmi -> pmi.setQuantity(quantity);
             default -> throw new IllegalArgumentException("Unknown inventory type");
         }
     }
@@ -297,6 +317,8 @@ public class StockMovementService {
             case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory);
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory);
             case RACK -> rackInventoryRepository.save((RackInventory) inventory);
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
         }
     }
 
@@ -308,6 +330,8 @@ public class StockMovementService {
             case KEYCHAIN_MACHINE -> ((KeychainMachineInventory) inventory).getKeychainMachine().getId();
             case CABINET -> ((CabinetInventory) inventory).getCabinet().getId();
             case RACK -> ((RackInventory) inventory).getRack().getId();
+            case FOUR_CORNER_MACHINE -> ((FourCornerMachineInventory) inventory).getFourCornerMachine().getId();
+            case PUSHER_MACHINE -> ((PusherMachineInventory) inventory).getPusherMachine().getId();
         };
     }
 
@@ -319,6 +343,8 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getItem();
             case CabinetInventory ci -> ci.getItem();
             case RackInventory ri -> ri.getItem();
+            case FourCornerMachineInventory fcmi -> fcmi.getItem();
+            case PusherMachineInventory pmi -> pmi.getItem();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -383,6 +409,24 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield rackInventoryRepository.save(inv);
             }
+            case FOUR_CORNER_MACHINE -> {
+                FourCornerMachine machine = fourCornerMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new FourCornerMachineNotFoundException("FourCornerMachine not found: " + locationId));
+                FourCornerMachineInventory inv = new FourCornerMachineInventory();
+                inv.setFourCornerMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield fourCornerMachineInventoryRepository.save(inv);
+            }
+            case PUSHER_MACHINE -> {
+                PusherMachine machine = pusherMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new PusherMachineNotFoundException("PusherMachine not found: " + locationId));
+                PusherMachineInventory inv = new PusherMachineInventory();
+                inv.setPusherMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield pusherMachineInventoryRepository.save(inv);
+            }
         };
     }
 
@@ -397,6 +441,8 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getId();
             case CabinetInventory ci -> ci.getId();
             case RackInventory ri -> ri.getId();
+            case FourCornerMachineInventory fcmi -> fcmi.getId();
+            case PusherMachineInventory pmi -> pmi.getId();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -420,6 +466,10 @@ public class StockMovementService {
                     .map(Cabinet::getCabinetCode).orElse(null);
             case RACK -> rackRepository.findById(locationId)
                     .map(Rack::getRackCode).orElse(null);
+            case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findById(locationId)
+                    .map(FourCornerMachine::getFourCornerMachineCode).orElse(null);
+            case PUSHER_MACHINE -> pusherMachineRepository.findById(locationId)
+                    .map(PusherMachine::getPusherMachineCode).orElse(null);
         };
     }
 }

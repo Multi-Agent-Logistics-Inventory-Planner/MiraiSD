@@ -25,6 +25,10 @@ function getCodeField(locationType: LocationType): string {
       return "doubleClawMachineCode";
     case "KEYCHAIN_MACHINE":
       return "keychainMachineCode";
+    case "FOUR_CORNER_MACHINE":
+      return "fourCornerMachineCode";
+    case "PUSHER_MACHINE":
+      return "pusherMachineCode";
     default:
       return "code";
   }
