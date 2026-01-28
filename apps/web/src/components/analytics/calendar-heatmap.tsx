@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import {
   Tooltip,
   TooltipContent,
@@ -11,17 +11,31 @@ import type { DailySales } from "@/types/api"
 
 interface CalendarHeatmapProps {
   data: DailySales[]
+  year: number
   isLoading?: boolean
 }
 
-const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]
 
-function getIntensityLevel(units: number): number {
+function getIntensityLevel(units: number, max: number): number {
   if (units === 0) return 0
-  if (units <= 3) return 1
-  if (units <= 7) return 2
-  if (units <= 15) return 3
+  const ratio = units / max
+  if (ratio <= 0.25) return 1
+  if (ratio <= 0.5) return 2
+  if (ratio <= 0.75) return 3
   return 4
 }
 
@@ -36,152 +50,229 @@ function getIntensityClass(level: number): string {
   return classes[level] ?? classes[0]
 }
 
-interface DayData {
-  date: Date
-  dateString: string
-  units: number
-  level: number
-}
-
 interface WeekData {
-  days: DayData[]
-  weekIndex: number
+  weekStart: Date
+  days: { date: Date; units: number; level: number }[]
 }
 
-export function CalendarHeatmap({ data, isLoading }: CalendarHeatmapProps) {
+const GAP_SIZE = 2
+const MIN_CELL_SIZE = 8
+const MAX_CELL_SIZE = 14
+
+function getYearPeriodLabel(year: number): string {
+  const currentYear = new Date().getFullYear()
+  if (year === currentYear) {
+    return `${year} (Year to Date)`
+  }
+  return String(year)
+}
+
+export function CalendarHeatmap({
+  data,
+  year,
+  isLoading,
+}: CalendarHeatmapProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [cellSize, setCellSize] = useState(10)
+
   const { weeks, monthLabels } = useMemo(() => {
+    // Filter data for the selected year
+    const yearData = data.filter((d) => new Date(d.date).getFullYear() === year)
+
+    // Build sales map from filtered data
     const salesMap = new Map<string, number>()
-    for (const item of data) {
+    let max = 1
+    for (const item of yearData) {
       salesMap.set(item.date, item.totalUnits)
+      if (item.totalUnits > max) max = item.totalUnits
     }
 
     const today = new Date()
-    const startDate = new Date(today)
-    startDate.setFullYear(startDate.getFullYear() - 1)
+    const isCurrentYear = year === today.getFullYear()
+
+    // Start from Jan 1 of selected year, aligned to Sunday
+    const startDate = new Date(year, 0, 1)
     startDate.setDate(startDate.getDate() - startDate.getDay())
 
+    // End at Dec 31 of year, or today if current year
+    const endDate = isCurrentYear ? today : new Date(year, 11, 31)
+
     const weeksData: WeekData[] = []
-    const monthPositions: { month: number; weekIndex: number }[] = []
+    const months: { month: string; weekIndex: number }[] = []
 
     let currentDate = new Date(startDate)
     let weekIndex = 0
     let lastMonth = -1
 
-    while (currentDate <= today) {
-      const week: DayData[] = []
+    while (currentDate <= endDate) {
+      const weekDays: { date: Date; units: number; level: number }[] = []
+      const weekStart = new Date(currentDate)
 
-      for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-        if (currentDate > today) {
-          break
+      for (let day = 0; day < 7; day++) {
+        const dateStr = currentDate.toISOString().split("T")[0]
+        const units = salesMap.get(dateStr) ?? 0
+
+        // Only track months within the selected year
+        if (
+          currentDate.getMonth() !== lastMonth &&
+          currentDate <= endDate &&
+          currentDate.getFullYear() === year
+        ) {
+          months.push({ month: MONTHS[currentDate.getMonth()], weekIndex })
+          lastMonth = currentDate.getMonth()
         }
 
-        const month = currentDate.getMonth()
-        if (month !== lastMonth) {
-          monthPositions.push({ month, weekIndex })
-          lastMonth = month
-        }
-
-        const dateString = currentDate.toISOString().split("T")[0]
-        const units = salesMap.get(dateString) ?? 0
-
-        week.push({
+        weekDays.push({
           date: new Date(currentDate),
-          dateString,
           units,
-          level: getIntensityLevel(units),
+          level: getIntensityLevel(units, max),
         })
 
         currentDate.setDate(currentDate.getDate() + 1)
       }
 
-      if (week.length > 0) {
-        weeksData.push({ days: week, weekIndex })
-        weekIndex++
-      }
+      weeksData.push({ weekStart, days: weekDays })
+      weekIndex++
     }
 
-    return { weeks: weeksData, monthLabels: monthPositions }
-  }, [data])
+    return { weeks: weeksData, monthLabels: months }
+  }, [data, year])
+
+  useEffect(() => {
+    const calculateCellSize = () => {
+      if (!containerRef.current || weeks.length === 0) return
+
+      const containerWidth = containerRef.current.offsetWidth
+      const numWeeks = weeks.length
+      const calculatedSize =
+        (containerWidth - (numWeeks - 1) * GAP_SIZE) / numWeeks
+      const clampedSize = Math.max(
+        MIN_CELL_SIZE,
+        Math.min(MAX_CELL_SIZE, Math.floor(calculatedSize))
+      )
+      setCellSize(clampedSize)
+    }
+
+    calculateCellSize()
+
+    const resizeObserver = new ResizeObserver(calculateCellSize)
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
+
+    return () => resizeObserver.disconnect()
+  }, [weeks.length])
 
   if (isLoading) {
     return (
-      <div className="flex h-[140px] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--sales-secondary)] border-t-transparent" />
+      <div className="flex h-[180px] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-sales-secondary border-t-transparent" />
       </div>
     )
   }
 
+  const cellStyle = {
+    width: cellSize,
+    height: cellSize,
+  }
+
+  const gapStyle = { gap: GAP_SIZE }
+
+  const gridWidth = weeks.length * cellSize + (weeks.length - 1) * GAP_SIZE
+
   return (
-    <TooltipProvider delayDuration={100}>
-      <div className="overflow-x-auto">
-        <div className="min-w-[700px]">
-          <div className="mb-1 flex pl-8">
-            {monthLabels.map((item, idx) => {
-              const nextItem = monthLabels[idx + 1]
-              const width = nextItem
-                ? (nextItem.weekIndex - item.weekIndex) * 14
-                : (weeks.length - item.weekIndex) * 14
-
-              return (
-                <div
-                  key={`${item.month}-${item.weekIndex}`}
-                  className="text-xs text-muted-foreground"
-                  style={{ width: `${width}px`, minWidth: `${width}px` }}
-                >
-                  {MONTHS[item.month]}
-                </div>
-              )
-            })}
+    <TooltipProvider delayDuration={50}>
+      <div className="w-full" ref={containerRef}>
+        {/* Legend */}
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {getYearPeriodLabel(year)}
+          </span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Less</span>
+            {[0, 1, 2, 3, 4].map((level) => (
+              <div
+                key={level}
+                className={`h-3 w-3 rounded-[2px] ${getIntensityClass(level)}`}
+              />
+            ))}
+            <span>More</span>
           </div>
+        </div>
 
-          <div className="flex">
-            <div className="flex flex-col justify-between pr-2 text-xs text-muted-foreground">
-              {DAYS_OF_WEEK.filter((_, i) => i % 2 === 1).map((day) => (
-                <span key={day} className="h-3 leading-3">
-                  {day}
-                </span>
-              ))}
-            </div>
+        {/* Heatmap Grid - Centered */}
+        <div className="flex justify-center">
+          <div
+            className="flex flex-col"
+            style={{ ...gapStyle, width: gridWidth }}
+          >
+            {/* Grid - 7 rows (days) x N columns (weeks) */}
+            {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
+              <div key={dayOfWeek} className="flex" style={gapStyle}>
+                {weeks.map((week, weekIdx) => {
+                  const day = week.days[dayOfWeek]
+                  const today = new Date()
+                  const isOutsideYear = day?.date.getFullYear() !== year
+                  const isFutureDate = day?.date > today
 
-            <div className="flex gap-[2px]">
-              {weeks.map((week) => (
-                <div key={week.weekIndex} className="flex flex-col gap-[2px]">
-                  {week.days.map((day) => (
-                    <Tooltip key={day.dateString}>
+                  if (!day || isOutsideYear || isFutureDate) {
+                    return (
+                      <div
+                        key={weekIdx}
+                        className="rounded-[2px] bg-transparent"
+                        style={cellStyle}
+                      />
+                    )
+                  }
+
+                  return (
+                    <Tooltip key={weekIdx}>
                       <TooltipTrigger asChild>
                         <div
-                          className={`h-3 w-3 rounded-sm transition-colors ${getIntensityClass(day.level)}`}
+                          className={`cursor-pointer rounded-[2px] transition-all hover:ring-1 hover:ring-sales-accent hover:ring-offset-1 ${getIntensityClass(day.level)}`}
+                          style={cellStyle}
                         />
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">
-                          {day.units} {day.units === 1 ? "sale" : "sales"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
+                      <TooltipContent
+                        className="border-none bg-zinc-900 px-3 py-2 text-sm text-white"
+                        sideOffset={8}
+                      >
+                        <p className="font-semibold">
+                          {day.units} {day.units === 1 ? "Sale" : "Sales"} on{" "}
                           {day.date.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
                             day: "numeric",
+                            month: "short",
                             year: "numeric",
                           })}
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-2 flex items-center justify-end gap-1 text-xs text-muted-foreground">
-            <span>Less</span>
-            {[0, 1, 2, 3, 4].map((level) => (
-              <div
-                key={level}
-                className={`h-3 w-3 rounded-sm ${getIntensityClass(level)}`}
-              />
+                  )
+                })}
+              </div>
             ))}
-            <span>More</span>
+
+            {/* Month Labels Below */}
+            <div className="mt-1 flex" style={gapStyle}>
+              {weeks.map((_, weekIdx) => {
+                const monthLabel = monthLabels.find(
+                  (m) => m.weekIndex === weekIdx
+                )
+                return (
+                  <div
+                    key={weekIdx}
+                    className="text-center"
+                    style={{ width: cellSize }}
+                  >
+                    {monthLabel && (
+                      <span className="text-[9px] text-muted-foreground">
+                        {monthLabel.month}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>

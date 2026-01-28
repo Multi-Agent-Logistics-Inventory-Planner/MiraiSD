@@ -115,6 +115,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public SalesSummaryDTO getSalesSummary() {
         LocalDate today = LocalDate.now();
+        // Rolling 12 months for consistent chart display
         LocalDate periodStart = today.minusMonths(12);
         OffsetDateTime startDateTime = periodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
 

@@ -1,24 +1,65 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
+  CartesianGrid,
 } from "recharts"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown, BarChart3 } from "lucide-react"
 import { CalendarHeatmap } from "./calendar-heatmap"
-import type { SalesSummary } from "@/types/api"
+import { cn } from "@/lib/utils"
+import type { SalesSummary, MonthlySales } from "@/types/api"
 
 interface SalesMetricsCardProps {
   data: SalesSummary | undefined
   isLoading?: boolean
+}
+
+type BarTimeFilter = "3M" | "6M" | "1Y" | "YTD"
+type ViewMode = "bar" | "line"
+
+const BAR_FILTER_OPTIONS = ["3M", "6M", "1Y", "YTD"] as const
+
+interface TimeFilterTabsProps<T extends string> {
+  value: T
+  onChange: (value: T) => void
+  options: readonly T[]
+}
+
+function TimeFilterTabs<T extends string>({
+  value,
+  onChange,
+  options,
+}: TimeFilterTabsProps<T>) {
+  return (
+    <div className="flex gap-1 rounded-md bg-muted p-1">
+      {options.map((option) => (
+        <button
+          key={option}
+          onClick={() => onChange(option)}
+          className={cn(
+            "px-2 py-0.5 text-xs font-medium rounded transition-colors",
+            value === option
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function formatCurrency(value: number): string {
@@ -31,188 +72,504 @@ function formatCurrency(value: number): string {
 
 function formatCompactCurrency(value: number): string {
   if (value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}k`
+    return `$${(value / 1000).toFixed(0)}k`
   }
-  return formatCurrency(value)
+  return `$${value.toFixed(0)}`
 }
 
 interface ChartDataItem {
   month: string
-  shortMonth: string
+  label: string
   revenue: number
   units: number
   isCurrent: boolean
 }
 
+interface ViewToggleProps {
+  value: ViewMode
+  onChange: (value: ViewMode) => void
+}
+
+function ViewToggle({ value, onChange }: ViewToggleProps) {
+  return (
+    <div className="flex gap-1 rounded-md bg-muted p-1">
+      <button
+        onClick={() => onChange("bar")}
+        className={cn(
+          "p-1 rounded transition-colors",
+          value === "bar"
+            ? "bg-background shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+        aria-label="Bar chart view"
+      >
+        <BarChart3 className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => onChange("line")}
+        className={cn(
+          "p-1 rounded transition-colors",
+          value === "line"
+            ? "bg-background shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+        aria-label="Trend line view"
+      >
+        <TrendingUp className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ value: number; payload: ChartDataItem }>
+}) {
+  if (!active || !payload || !payload.length) return null
+
+  const data = payload[0].payload
+  const monthDate = new Date(data.month + "-01")
+  const monthName = monthDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+
+  return (
+    <div className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white shadow-lg">
+      <p className="font-semibold">
+        {formatCurrency(data.revenue)} on {monthName}
+      </p>
+    </div>
+  )
+}
+
+interface LineChartDataItem extends ChartDataItem {
+  previousRevenue?: number
+}
+
+function LineChartTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ dataKey: string; value: number; payload: LineChartDataItem }>
+}) {
+  if (!active || !payload || !payload.length) return null
+
+  const data = payload[0].payload
+  const monthDate = new Date(data.month + "-01")
+  const monthName = monthDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+
+  const currentValue = payload.find((p) => p.dataKey === "revenue")
+  const previousValue = payload.find((p) => p.dataKey === "previousRevenue")
+
+  return (
+    <div className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white shadow-lg">
+      <p className="font-semibold">{monthName}</p>
+      {currentValue && (
+        <p className="text-purple-300">
+          Current: {formatCurrency(currentValue.value)}
+        </p>
+      )}
+      {previousValue && previousValue.value > 0 && (
+        <p className="text-gray-400">
+          Previous: {formatCurrency(previousValue.value)}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function filterMonthlyData(
+  monthlySales: MonthlySales[],
+  filter: BarTimeFilter
+): MonthlySales[] {
+  const now = new Date()
+
+  if (filter === "YTD") {
+    return monthlySales.filter((item) => {
+      const [year] = item.month.split("-")
+      return parseInt(year, 10) === now.getFullYear()
+    })
+  }
+
+  const monthsMap: Record<Exclude<BarTimeFilter, "YTD">, number> = {
+    "3M": 3,
+    "6M": 6,
+    "1Y": 12,
+  }
+
+  return monthlySales.slice(-monthsMap[filter])
+}
+
 export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
-  const { chartData, yearOverYearChange } = useMemo(() => {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [barFilter, setBarFilter] = useState<BarTimeFilter>("1Y")
+  const [viewMode, setViewMode] = useState<ViewMode>("bar")
+  const [heatmapYear, setHeatmapYear] = useState<number | null>(null)
+
+  // Get unique years from dailySales data for heatmap filter
+  const availableYears = useMemo(() => {
+    if (!data?.dailySales) return []
+
+    const years = new Set<number>()
+    for (const day of data.dailySales) {
+      const year = new Date(day.date).getFullYear()
+      years.add(year)
+    }
+
+    return Array.from(years).sort((a, b) => b - a) // Descending (newest first)
+  }, [data])
+
+  // Default to most recent year with data
+  const selectedYear = heatmapYear ?? availableYears[0] ?? new Date().getFullYear()
+
+  const {
+    chartData,
+    lineChartData,
+    filteredRevenue,
+    yearOverYearChange,
+    periodLabel,
+    hasPreviousPeriodData,
+  } = useMemo(() => {
     if (!data?.monthlySales) {
-      return { chartData: [], yearOverYearChange: 0 }
+      return {
+        chartData: [],
+        lineChartData: [],
+        filteredRevenue: 0,
+        yearOverYearChange: 0,
+        periodLabel: "",
+        hasPreviousPeriodData: false,
+      }
     }
 
     const now = new Date()
     const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-    const formattedData: ChartDataItem[] = data.monthlySales.map((item) => {
-      const [year, month] = item.month.split("-")
-      const date = new Date(parseInt(year), parseInt(month) - 1)
-      const shortMonth = date.toLocaleDateString("en-US", { month: "short" })
+    const filtered = filterMonthlyData(data.monthlySales, barFilter)
 
+    const formattedData: ChartDataItem[] = filtered.map((item) => {
+      const monthDate = new Date(item.month + "-01")
+      const monthLabel = monthDate.toLocaleDateString("en-US", {
+        month: "short",
+      })
       return {
         month: item.month,
-        shortMonth,
+        label: monthLabel,
         revenue: item.totalRevenue,
         units: item.totalUnits,
         isCurrent: item.month === currentKey,
       }
     })
 
-    const currentMonthData = formattedData.find((d) => d.isCurrent)
-    const lastYearMonth = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, "0")}`
-    const lastYearData = formattedData.find((d) => d.month === lastYearMonth)
+    const revenue = filtered.reduce((sum, m) => sum + m.totalRevenue, 0)
 
+    // Build previous period data for line chart comparison
+    let previousPeriodData: MonthlySales[] = []
     let change = 0
-    if (lastYearData && lastYearData.revenue > 0 && currentMonthData) {
-      change = ((currentMonthData.revenue - lastYearData.revenue) / lastYearData.revenue) * 100
+    let hasPrevData = false
+
+    if (barFilter === "YTD") {
+      const lastYearYTD = data.monthlySales.filter((item) => {
+        const [year, month] = item.month.split("-")
+        return (
+          parseInt(year, 10) === now.getFullYear() - 1 &&
+          parseInt(month, 10) <= now.getMonth() + 1
+        )
+      })
+      previousPeriodData = lastYearYTD
+      const lastYearRevenue = lastYearYTD.reduce(
+        (sum, m) => sum + m.totalRevenue,
+        0
+      )
+      hasPrevData = lastYearYTD.length > 0 && lastYearRevenue > 0
+      if (lastYearRevenue > 0) {
+        change = ((revenue - lastYearRevenue) / lastYearRevenue) * 100
+      }
+    } else {
+      const monthsCount = { "3M": 3, "6M": 6, "1Y": 12 }[barFilter] ?? 12
+      const startIdx = data.monthlySales.length - monthsCount * 2
+      const endIdx = data.monthlySales.length - monthsCount
+      if (startIdx >= 0) {
+        previousPeriodData = data.monthlySales.slice(startIdx, endIdx)
+        const previousRevenue = previousPeriodData.reduce(
+          (sum, m) => sum + m.totalRevenue,
+          0
+        )
+        hasPrevData =
+          previousPeriodData.length > 0 &&
+          previousPeriodData.some((m) => m.totalRevenue > 0)
+        if (previousRevenue > 0) {
+          change = ((revenue - previousRevenue) / previousRevenue) * 100
+        }
+      }
+    }
+
+    // Build line chart data with previous period values
+    const lineData: LineChartDataItem[] = formattedData.map((item, index) => {
+      const prevItem = previousPeriodData[index]
+      return {
+        ...item,
+        previousRevenue: prevItem?.totalRevenue ?? 0,
+      }
+    })
+
+    const periodLabels: Record<BarTimeFilter, string> = {
+      "3M": "vs previous 3 months",
+      "6M": "vs previous 6 months",
+      "1Y": "vs last year",
+      YTD: "vs same period last year",
     }
 
     return {
       chartData: formattedData,
+      lineChartData: lineData,
+      filteredRevenue: revenue,
       yearOverYearChange: change,
+      periodLabel: periodLabels[barFilter],
+      hasPreviousPeriodData: hasPrevData,
     }
-  }, [data])
+  }, [data, barFilter])
+
+  const { heatmapTotalUnits, heatmapPeriodLabel } = useMemo(() => {
+    if (!data?.dailySales) {
+      return { heatmapTotalUnits: 0, heatmapPeriodLabel: "" }
+    }
+
+    const yearData = data.dailySales.filter(
+      (day) => new Date(day.date).getFullYear() === selectedYear
+    )
+
+    const totalUnits = yearData.reduce((sum, d) => sum + d.totalUnits, 0)
+
+    const isCurrentYear = selectedYear === new Date().getFullYear()
+    const periodLabel = isCurrentYear
+      ? `Total in ${selectedYear} (YTD)`
+      : `Total in ${selectedYear}`
+
+    return {
+      heatmapTotalUnits: totalUnits,
+      heatmapPeriodLabel: periodLabel,
+    }
+  }, [data, selectedYear])
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div>
-              <Skeleton className="mb-4 h-6 w-32" />
-              <Skeleton className="mb-2 h-10 w-48" />
-              <Skeleton className="mb-4 h-4 w-24" />
-              <Skeleton className="h-[200px] w-full" />
-            </div>
-            <div>
-              <Skeleton className="mb-4 h-6 w-32" />
-              <Skeleton className="mb-4 h-8 w-36" />
-              <Skeleton className="h-[140px] w-full" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border">
+          <CardContent className="p-6">
+            <Skeleton className="mb-6 h-5 w-24" />
+            <Skeleton className="mb-2 h-10 w-40" />
+            <Skeleton className="mb-6 h-4 w-32" />
+            <Skeleton className="h-[200px] w-full" />
+          </CardContent>
+        </Card>
+        <Card className="border">
+          <CardContent className="p-6">
+            <Skeleton className="mb-6 h-5 w-24" />
+            <Skeleton className="mb-2 h-10 w-32" />
+            <Skeleton className="mb-6 h-4 w-40" />
+            <Skeleton className="h-[180px] w-full" />
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   if (!data) {
     return (
-      <Card>
-        <CardContent className="flex h-[300px] items-center justify-center p-6">
-          <p className="text-muted-foreground">No sales data available</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border">
+          <CardContent className="flex h-[320px] items-center justify-center p-6">
+            <p className="text-muted-foreground">No sales data available</p>
+          </CardContent>
+        </Card>
+        <Card className="border">
+          <CardContent className="flex h-[320px] items-center justify-center p-6">
+            <p className="text-muted-foreground">No trend data available</p>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   const isPositiveChange = yearOverYearChange >= 0
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div>
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-lg font-semibold">Total Sales</CardTitle>
-            </CardHeader>
-
-            <div className="mb-4">
-              <p
-                className="text-3xl font-bold"
-                style={{ color: "var(--sales-primary)" }}
-              >
-                {formatCurrency(data.totalRevenue)}
-              </p>
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Total Sales - Bar/Line Chart */}
+      <Card className="border">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base font-medium">Total Sales</CardTitle>
+          <div className="flex items-center gap-2">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+            <TimeFilterTabs
+              value={barFilter}
+              onChange={setBarFilter}
+              options={BAR_FILTER_OPTIONS}
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6">
+            <p className="text-4xl font-bold tracking-tight">
+              {formatCurrency(filteredRevenue)}
+            </p>
+            {hasPreviousPeriodData && (
               <div className="mt-1 flex items-center gap-1">
                 {isPositiveChange ? (
-                  <TrendingUp className="h-4 w-4 text-green-600" />
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
                 ) : (
-                  <TrendingDown className="h-4 w-4 text-red-600" />
+                  <TrendingDown className="h-4 w-4 text-red-500" />
                 )}
                 <span
-                  className={`text-sm font-medium ${
-                    isPositiveChange ? "text-green-600" : "text-red-600"
-                  }`}
+                  className={cn(
+                    "text-sm font-medium",
+                    isPositiveChange ? "text-emerald-500" : "text-red-500"
+                  )}
                 >
                   {isPositiveChange ? "+" : ""}
-                  {yearOverYearChange.toFixed(1)}% vs last year
+                  {yearOverYearChange.toFixed(0)}%
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {periodLabel}
                 </span>
               </div>
-            </div>
+            )}
+          </div>
 
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              {viewMode === "bar" ? (
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                  onMouseLeave={() => setActiveIndex(null)}
+                >
                   <XAxis
-                    dataKey="shortMonth"
+                    dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                    interval="preserveStartEnd"
+                    tick={{ fontSize: 12, fill: "#9ca3af" }}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: 12, fill: "#9ca3af" }}
                     tickFormatter={formatCompactCurrency}
-                    width={50}
+                    width={45}
                   />
+                  {activeIndex !== null && chartData[activeIndex] && (
+                    <ReferenceLine
+                      y={chartData[activeIndex].revenue}
+                      stroke="var(--sales-accent)"
+                      strokeDasharray="4 4"
+                    />
+                  )}
                   <Tooltip
-                    formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                    labelFormatter={(label) => `Month: ${label}`}
-                    contentStyle={{
-                      backgroundColor: "var(--card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius)",
-                    }}
+                    content={<CustomTooltip />}
+                    cursor={{ fill: "transparent" }}
                   />
-                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry) => (
+                  <Bar
+                    dataKey="revenue"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={40}
+                    onMouseEnter={(_, index) => setActiveIndex(index)}
+                  >
+                    {chartData.map((entry, index) => (
                       <Cell
                         key={entry.month}
                         fill={
-                          entry.isCurrent
+                          index === activeIndex
                             ? "var(--sales-accent)"
                             : "var(--sales-secondary)"
                         }
+                        style={{ cursor: "pointer" }}
                       />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+              ) : (
+                <LineChart
+                  data={lineChartData}
+                  margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#e5e7eb"
+                  />
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#9ca3af" }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#9ca3af" }}
+                    tickFormatter={formatCompactCurrency}
+                    width={45}
+                  />
+                  {hasPreviousPeriodData && (
+                    <Line
+                      dataKey="previousRevenue"
+                      stroke="#d1d5db"
+                      strokeWidth={2}
+                      dot={false}
+                      type="linear"
+                    />
+                  )}
+                  <Line
+                    dataKey="revenue"
+                    stroke="var(--sales-secondary)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--sales-secondary)", r: 4 }}
+                    type="linear"
+                  />
+                  <Tooltip content={<LineChartTooltip />} />
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sales Trend - Heatmap */}
+      <Card className="border">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base font-medium">Sales Trend</CardTitle>
+          {availableYears.length > 0 && (
+            <TimeFilterTabs
+              value={String(selectedYear)}
+              onChange={(val) => setHeatmapYear(parseInt(val, 10))}
+              options={availableYears.map(String)}
+            />
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6">
+            <p className="text-4xl font-bold tracking-tight">
+              {heatmapTotalUnits.toLocaleString()}{" "}
+              <span className="text-xl font-normal text-muted-foreground">
+                Sales
+              </span>
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {heatmapPeriodLabel}
+            </p>
           </div>
 
-          <div>
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-lg font-semibold">Sales Trend</CardTitle>
-            </CardHeader>
-
-            <div className="mb-4">
-              <p
-                className="text-2xl font-bold"
-                style={{ color: "var(--sales-primary)" }}
-              >
-                {data.totalUnits.toLocaleString()} Sales
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Last 12 months
-              </p>
-            </div>
-
-            <CalendarHeatmap data={data.dailySales} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          <CalendarHeatmap data={data.dailySales} year={selectedYear} />
+        </CardContent>
+      </Card>
+    </div>
   )
 }
