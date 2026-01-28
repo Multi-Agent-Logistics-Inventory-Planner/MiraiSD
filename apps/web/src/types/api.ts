@@ -267,6 +267,7 @@ export interface InventoryItem {
   name: string;
   category: ProductCategory;
   subcategory?: ProductSubcategory;
+  imageUrl?: string;
 }
 
 // Base Inventory type
@@ -448,7 +449,8 @@ export interface TransferStockRequest {
   sourceLocationType: LocationType;
   sourceInventoryId: string;
   destinationLocationType: LocationType;
-  destinationInventoryId: string;
+  destinationInventoryId?: string;
+  destinationLocationId?: string;
   quantity: number;
   actorId: string;
   notes?: string;

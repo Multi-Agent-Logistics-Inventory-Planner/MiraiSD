@@ -1,17 +1,21 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { LocationType, Inventory } from "@/types/api";
+import { LocationType, type Inventory } from "@/types/api";
 import { getInventoryByLocation } from "@/lib/api/inventory";
 
 export function useLocationInventory(
-  locationType: LocationType,
+  locationType: LocationType | undefined,
   locationId: string | undefined
 ) {
   return useQuery({
     queryKey: ["locationInventory", locationType, locationId],
-    queryFn: () => getInventoryByLocation(locationType, locationId as string) as Promise<Inventory[]>,
-    enabled: Boolean(locationId),
+    queryFn: () =>
+      getInventoryByLocation(
+        locationType as LocationType,
+        locationId as string
+      ) as Promise<Inventory[]>,
+    enabled: Boolean(locationType) && Boolean(locationId),
   });
 }
 

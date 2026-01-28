@@ -1,305 +1,321 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
-import { useTransferStockMutation } from "@/hooks/mutations/use-stock-mutations";
-import type { Product } from "@/types/api";
-
-const schema = z
-  .object({
-    sourceInventoryId: z.string().min(1, "Select a source location"),
-    destinationInventoryId: z.string().min(1, "Select a destination location"),
-    quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
-    notes: z.string().optional(),
-  })
-  .refine((values) => values.sourceInventoryId !== values.destinationInventoryId, {
-    message: "Source and destination must differ",
-    path: ["destinationInventoryId"],
-  });
-
-type FormValues = z.infer<typeof schema>;
+import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
+import {
+  useBatchTransferMutation,
+  type BatchTransferItem,
+} from "@/hooks/mutations/use-stock-mutations";
+import { LocationSelector } from "./location-selector";
+import { ProductTransferCard } from "./product-transfer-card";
+import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
 
 interface TransferStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product?: Product | null;
 }
+
+const EMPTY_LOCATION: LocationSelection = {
+  locationType: null,
+  locationId: null,
+  locationCode: "",
+};
 
 export function TransferStockDialog({
   open,
   onOpenChange,
-  product,
 }: TransferStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const inventoryQuery = useInventoryByItemId(product?.id);
-  const transferMutation = useTransferStockMutation();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      sourceInventoryId: "",
-      destinationInventoryId: "",
-      quantity: 1,
-      notes: "",
-    },
-  });
+  const [sourceLocation, setSourceLocation] =
+    useState<LocationSelection>(EMPTY_LOCATION);
+  const [destinationLocation, setDestinationLocation] =
+    useState<LocationSelection>(EMPTY_LOCATION);
+  const [transferQuantities, setTransferQuantities] = useState<
+    Record<string, number>
+  >({});
+
+  const batchTransferMutation = useBatchTransferMutation();
+
+  const sourceInventoryQuery = useLocationInventory(
+    sourceLocation.locationType ?? undefined,
+    sourceLocation.locationId ?? undefined,
+  );
+
+  const destinationInventoryQuery = useLocationInventory(
+    destinationLocation.locationType ?? undefined,
+    destinationLocation.locationId ?? undefined,
+  );
 
   useEffect(() => {
     if (!open) {
-      form.reset();
+      setSourceLocation(EMPTY_LOCATION);
+      setDestinationLocation(EMPTY_LOCATION);
+      setTransferQuantities({});
     }
-  }, [open, form]);
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return;
-    if (!inventoryQuery.data || inventoryQuery.data.length === 0) return;
-
-    const [first, second] = inventoryQuery.data;
-    if (!form.getValues("sourceInventoryId") && first) {
-      form.setValue("sourceInventoryId", first.inventoryId);
+    if (sourceLocation.locationId) {
+      setTransferQuantities({});
     }
-    if (!form.getValues("destinationInventoryId") && second) {
-      form.setValue("destinationInventoryId", second.inventoryId);
-    }
-  }, [open, inventoryQuery.data, form]);
+  }, [sourceLocation.locationId]);
 
-  const sourceId = form.watch("sourceInventoryId");
-  const destinationId = form.watch("destinationInventoryId");
-  const quantity = form.watch("quantity") ?? 0;
+  const sourceInventory = sourceInventoryQuery.data ?? [];
+  const destinationInventory = destinationInventoryQuery.data ?? [];
 
-  const sourceEntry = useMemo(() => {
-    return inventoryQuery.data?.find((entry) => entry.inventoryId === sourceId);
-  }, [inventoryQuery.data, sourceId]);
+  const transferItems = useMemo(() => {
+    return sourceInventory.filter((inv) => {
+      const qty = transferQuantities[inv.id] ?? 0;
+      return qty > 0;
+    });
+  }, [sourceInventory, transferQuantities]);
 
-  const destinationEntry = useMemo(() => {
-    return inventoryQuery.data?.find(
-      (entry) => entry.inventoryId === destinationId
-    );
-  }, [inventoryQuery.data, destinationId]);
+  const totalItemsToTransfer = transferItems.length;
+  const totalQuantityToTransfer = useMemo(() => {
+    return transferItems.reduce((sum, inv) => {
+      return sum + (transferQuantities[inv.id] ?? 0);
+    }, 0);
+  }, [transferItems, transferQuantities]);
 
-  const destinationOptions = useMemo(() => {
-    return (inventoryQuery.data ?? []).filter(
-      (entry) => entry.inventoryId !== sourceId
-    );
-  }, [inventoryQuery.data, sourceId]);
+  const hasValidSource = Boolean(sourceLocation.locationId);
+  const hasValidDestination = Boolean(destinationLocation.locationId);
+  const isSameLocation =
+    hasValidSource &&
+    hasValidDestination &&
+    sourceLocation.locationType === destinationLocation.locationType &&
+    sourceLocation.locationId === destinationLocation.locationId;
+  const hasItemsToTransfer = totalItemsToTransfer > 0;
 
-  useEffect(() => {
-    if (!sourceId || !destinationId) return;
-    if (sourceId !== destinationId) return;
-    const fallback = destinationOptions[0];
-    if (fallback) {
-      form.setValue("destinationInventoryId", fallback.inventoryId);
-    }
-  }, [sourceId, destinationId, destinationOptions, form]);
+  const canSubmit =
+    hasValidSource &&
+    hasValidDestination &&
+    !isSameLocation &&
+    hasItemsToTransfer &&
+    !batchTransferMutation.isPending;
 
-  const isSaving = transferMutation.isPending;
-  const isInventoryLoading = inventoryQuery.isLoading;
-  const hasInventory = !isInventoryLoading && (inventoryQuery.data?.length ?? 0) > 1;
+  function handleQuantityChange(inventoryId: string, quantity: number) {
+    setTransferQuantities((prev) => ({
+      ...prev,
+      [inventoryId]: quantity,
+    }));
+  }
 
-  const sourceQty = sourceEntry?.quantity ?? 0;
-  const destinationQty = destinationEntry?.quantity ?? 0;
-  const previewSourceQty = sourceQty - quantity;
-  const previewDestinationQty = destinationQty + quantity;
-
-  async function onSubmit(values: FormValues) {
+  async function handleSubmit() {
     const actorId = user?.personId || user?.id;
     if (!actorId) {
       toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
 
-    if (!sourceEntry || !destinationEntry) {
+    if (!sourceLocation.locationType || !sourceLocation.locationId) {
       toast({
-        title: "Missing locations",
-        description: "Select both source and destination locations.",
+        title: "Missing source",
+        description: "Select a valid source location.",
       });
       return;
     }
 
-    if (values.quantity > sourceEntry.quantity) {
+    if (!destinationLocation.locationType || !destinationLocation.locationId) {
       toast({
-        title: "Quantity too high",
-        description: "Transfer quantity exceeds source stock.",
+        title: "Missing destination",
+        description: "Select a valid destination location.",
       });
       return;
     }
+
+    const transfers: BatchTransferItem[] = transferItems.map((inv) => {
+      const existingDestInventory = destinationInventory.find(
+        (destInv) => destInv.item.id === inv.item.id,
+      );
+
+      return {
+        payload: {
+          sourceLocationType: sourceLocation.locationType!,
+          sourceInventoryId: inv.id,
+          destinationLocationType: destinationLocation.locationType!,
+          ...(existingDestInventory
+            ? { destinationInventoryId: existingDestInventory.id }
+            : { destinationLocationId: destinationLocation.locationId! }),
+          quantity: transferQuantities[inv.id] ?? 0,
+          actorId,
+        },
+        productId: inv.item.id,
+        productName: inv.item.name,
+      };
+    });
 
     try {
-      await transferMutation.mutateAsync({
-        payload: {
-          sourceLocationType: sourceEntry.locationType,
-          sourceInventoryId: sourceEntry.inventoryId,
-          destinationLocationType: destinationEntry.locationType,
-          destinationInventoryId: destinationEntry.inventoryId,
-          quantity: values.quantity,
-          actorId,
-          notes: values.notes?.trim() || undefined,
-        },
-        productId: product?.id,
+      const result = await batchTransferMutation.mutateAsync({
+        transfers,
+        sourceLocationId: sourceLocation.locationId!,
+        destinationLocationId: destinationLocation.locationId!,
       });
-      toast({ title: "Stock transferred" });
-      onOpenChange(false);
-    } catch (err: unknown) {
+
+      if (result.failed.length === 0) {
+        toast({
+          title: "Transfer complete",
+          description: `Successfully transferred ${result.successful.length} item(s).`,
+        });
+        onOpenChange(false);
+      } else if (result.successful.length > 0) {
+        toast({
+          title: "Partial transfer",
+          description: `${result.successful.length} succeeded, ${result.failed.length} failed.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Transfer failed",
+          description: "All transfers failed. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
       const message = err instanceof Error ? err.message : "Transfer failed";
       toast({ title: "Transfer failed", description: message });
     }
   }
 
+  const progress = batchTransferMutation.progress;
+  const isTransferring = batchTransferMutation.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Transfer Stock</DialogTitle>
-          <DialogDescription>
-            {product
-              ? `Move inventory for ${product.name} between locations.`
-              : "Select a product to transfer stock."}
-          </DialogDescription>
         </DialogHeader>
 
-        {!product ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            Select a product before transferring stock.
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-16 bg-gray-200 p-4 rounded-xl">
+            <LocationSelector
+              label="From"
+              value={sourceLocation}
+              onChange={setSourceLocation}
+              disabled={isTransferring}
+            />
+            <LocationSelector
+              label="To"
+              value={destinationLocation}
+              onChange={setDestinationLocation}
+              disabled={isTransferring}
+              excludeLocation={
+                sourceLocation.locationType && sourceLocation.locationId
+                  ? {
+                      locationType: sourceLocation.locationType,
+                      locationId: sourceLocation.locationId,
+                    }
+                  : undefined
+              }
+            />
           </div>
-        ) : (
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid gap-2">
-              <Label>Source Location</Label>
-              <Select
-                value={sourceId}
-                onValueChange={(v) => form.setValue("sourceInventoryId", v)}
-                disabled={!hasInventory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(inventoryQuery.data ?? []).map((entry) => (
-                    <SelectItem key={entry.inventoryId} value={entry.inventoryId}>
-                      {entry.locationLabel} (qty {entry.quantity})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.sourceInventoryId?.message ? (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.sourceInventoryId.message}
-                </p>
-              ) : null}
-              {isInventoryLoading ? (
-                <p className="text-xs text-muted-foreground">Loading inventory...</p>
-              ) : null}
-            </div>
 
-            <div className="grid gap-2">
-              <Label>Destination Location</Label>
-              <Select
-                value={destinationId}
-                onValueChange={(v) =>
-                  form.setValue("destinationInventoryId", v)
-                }
-                disabled={!hasInventory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select destination" />
-                </SelectTrigger>
-                <SelectContent>
-                  {destinationOptions.map((entry) => (
-                    <SelectItem key={entry.inventoryId} value={entry.inventoryId}>
-                      {entry.locationLabel} (qty {entry.quantity})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.destinationInventoryId?.message ? (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.destinationInventoryId.message}
-                </p>
-              ) : null}
-            </div>
+          {isSameLocation ? (
+            <p className="text-sm text-destructive">
+              Source and destination cannot be the same
+            </p>
+          ) : null}
 
-            <div className="grid gap-2">
-              <Label htmlFor="quantity">Quantity to Transfer</Label>
-              <Input
-                id="quantity"
-                type="number"
-                step="1"
-                min={1}
-                max={sourceEntry?.quantity ?? undefined}
-                {...form.register("quantity")}
+          {hasValidSource ? (
+            <div className="space-y-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground">
+                Products at {sourceLocation.locationType ? LOCATION_TYPE_CODES[sourceLocation.locationType] : ""}{sourceLocation.locationCode} ({sourceInventory.length})
+              </Label>
+              {sourceInventoryQuery.isLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : sourceInventory.length === 0 ? (
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                  No inventory at this location
+                </div>
+              ) : (
+                <ScrollArea className="max-h-72 sm:max-h-80">
+                  <div className="pr-4">
+                    {sourceInventory.map((inv) => (
+                      <ProductTransferCard
+                        key={inv.id}
+                        inventory={inv}
+                        transferQuantity={transferQuantities[inv.id] ?? 0}
+                        onQuantityChange={(qty) =>
+                          handleQuantityChange(inv.id, qty)
+                        }
+                        maxQuantity={inv.quantity}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+              Select a source location to see available products
+            </div>
+          )}
+
+          {hasItemsToTransfer ? (
+            <div className="rounded-md border p-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Items to transfer</span>
+                <span className="font-medium">{totalItemsToTransfer}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total quantity</span>
+                <span className="font-medium">{totalQuantityToTransfer}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {isTransferring && progress.total > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Transferring: {progress.currentItem}
+                </span>
+                <span>
+                  {progress.completed}/{progress.total}
+                </span>
+              </div>
+              <Progress
+                value={(progress.completed / progress.total) * 100}
+                className="h-2"
               />
-              {form.formState.errors.quantity?.message ? (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.quantity.message}
-                </p>
-              ) : null}
             </div>
+          ) : null}
+        </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Textarea id="notes" rows={3} {...form.register("notes")} />
-            </div>
-
-            <div className="rounded-md border p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Source after transfer</span>
-                <span className="font-medium">{previewSourceQty}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Destination after transfer</span>
-                <span className="font-medium">{previewDestinationQty}</span>
-              </div>
-            </div>
-
-            {!hasInventory && !isInventoryLoading ? (
-              <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                Add inventory at another location before transferring.
-              </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isTransferring}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSubmit} disabled={!canSubmit}>
+            {isTransferring ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!hasInventory || isSaving}>
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Transfer Stock
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
+            Transfer {hasItemsToTransfer ? `(${totalItemsToTransfer})` : ""}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
