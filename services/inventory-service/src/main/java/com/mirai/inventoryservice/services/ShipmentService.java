@@ -312,6 +312,12 @@ public class ShipmentService {
             shipment.setStatus(ShipmentStatus.PENDING);
         }
 
+        // Set receivedBy if provided
+        if (requestDTO.getReceivedBy() != null) {
+            userRepository.findById(requestDTO.getReceivedBy())
+                    .ifPresent(shipment::setReceivedBy);
+        }
+
         return shipmentRepository.save(shipment);
     }
 

@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { ProductForm } from "@/components/products/product-form";
 import { ShipmentStatus, type Product, type ShipmentItemRequest } from "@/types/api";
 
@@ -66,6 +67,7 @@ export function ShipmentCreateDialog({
   onOpenChange,
 }: ShipmentCreateDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const createMutation = useCreateShipmentMutation();
   const productsQuery = useProducts();
   const products = productsQuery.data ?? [];
@@ -184,6 +186,7 @@ export function ShipmentCreateDialog({
         orderDate: values.orderDate,
         expectedDeliveryDate: values.expectedDeliveryDate || undefined,
         notes: values.notes || undefined,
+        createdBy: user?.personId,
         items,
       });
       toast({ title: "Shipment created successfully" });

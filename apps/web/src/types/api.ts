@@ -358,6 +358,7 @@ export interface Shipment {
   totalCost?: number;
   notes?: string;
   createdBy?: User;
+  receivedBy?: User;
   items: ShipmentItem[];
   createdAt: string;
   updatedAt: string;

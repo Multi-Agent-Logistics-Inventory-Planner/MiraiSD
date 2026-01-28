@@ -130,6 +130,10 @@ export function ShipmentDetailSheet({
             <span className="text-muted-foreground">Total Cost:</span>
             <p className="font-medium">{formatCurrency(shipment.totalCost)}</p>
           </div>
+          <div>
+            <span className="text-muted-foreground">Received By:</span>
+            <p className="font-medium">{shipment.receivedBy?.fullName || "-"}</p>
+          </div>
         </div>
 
         {/* Action Buttons */}

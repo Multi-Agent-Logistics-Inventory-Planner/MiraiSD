@@ -26,7 +26,8 @@ public class ShipmentResponseDTO {
     private LocalDate actualDeliveryDate;
     private BigDecimal totalCost;
     private String notes;
-    private UUID createdBy;
+    private UserResponseDTO createdBy;
+    private UserResponseDTO receivedBy;
     private List<ShipmentItemResponseDTO> items;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
