@@ -11,28 +11,20 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Shipment, ShipmentStatus } from "@/types/api";
+import type { Shipment } from "@/types/api";
 import { cn } from "@/lib/utils";
+import {
+  getShipmentDisplayStatus,
+  SHIPMENT_DISPLAY_STATUS_LABELS,
+  SHIPMENT_DISPLAY_STATUS_COLORS,
+  type ShipmentDisplayStatus,
+} from "@/lib/shipment-utils";
 
 interface ShipmentsTableProps {
   shipments: Shipment[];
   isLoading: boolean;
   onRowClick: (shipment: Shipment) => void;
 }
-
-const STATUS_COLORS: Record<ShipmentStatus, string> = {
-  PENDING: "bg-amber-100 text-amber-700",
-  IN_TRANSIT: "bg-blue-100 text-blue-700",
-  DELIVERED: "bg-green-100 text-green-700",
-  CANCELLED: "bg-gray-100 text-gray-700",
-};
-
-const STATUS_LABELS: Record<ShipmentStatus, string> = {
-  PENDING: "Pending",
-  IN_TRANSIT: "In Transit",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-};
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
@@ -117,6 +109,8 @@ export function ShipmentsTable({
       <TableBody>
         {shipments.map((shipment) => {
           const progress = getReceiveProgress(shipment);
+          const displayStatus = getShipmentDisplayStatus(shipment);
+
           return (
             <TableRow
               key={shipment.id}
@@ -128,12 +122,14 @@ export function ShipmentsTable({
               </TableCell>
               <TableCell>{shipment.supplierName || "-"}</TableCell>
               <TableCell>
-                <Badge
-                  variant="outline"
-                  className={cn("text-xs", STATUS_COLORS[shipment.status])}
-                >
-                  {STATUS_LABELS[shipment.status]}
-                </Badge>
+                {displayStatus && (
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs", SHIPMENT_DISPLAY_STATUS_COLORS[displayStatus])}
+                  >
+                    {SHIPMENT_DISPLAY_STATUS_LABELS[displayStatus]}
+                  </Badge>
+                )}
               </TableCell>
               <TableCell>{shipment.items.length}</TableCell>
               <TableCell>

@@ -1,26 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Plus,
-  Search,
-  Filter,
-  Truck,
-  Package,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react";
-import { DashboardHeader } from "@/components/dashboard-header";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +13,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Can, Permission } from "@/components/rbac";
 import {
   ShipmentsTable,
   ShipmentDetailSheet,
   ShipmentCreateDialog,
   ShipmentReceiveDialog,
+  ShipmentHeader,
+  ShipmentFilters,
+  ShipmentPagination,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
 import {
@@ -45,6 +29,13 @@ import {
 } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { ShipmentStatus, type Shipment } from "@/types/api";
+import {
+  filterShipmentsByDisplayStatus,
+  getShipmentDisplayStatusCounts,
+  type ShipmentDisplayStatus,
+} from "@/lib/shipment-utils";
+
+const PAGE_SIZE = 20;
 
 export default function ShipmentsPage() {
   const { toast } = useToast();
@@ -53,7 +44,8 @@ export default function ShipmentsPage() {
   const deleteMutation = useDeleteShipmentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
+  const [page, setPage] = useState(0);
 
   // Dialog/sheet states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -67,31 +59,43 @@ export default function ShipmentsPage() {
 
   const shipments = shipmentsQuery.data ?? [];
 
-  // Filter shipments
-  const filteredShipments = useMemo(() => {
-    return shipments.filter((shipment) => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        q.length === 0 ||
-        shipment.shipmentNumber.toLowerCase().includes(q) ||
-        shipment.supplierName?.toLowerCase().includes(q);
-      const matchesStatus =
-        statusFilter === "all" || shipment.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [shipments, searchQuery, statusFilter]);
+  // Get counts for each status tab
+  const statusCounts = useMemo(() => {
+    return getShipmentDisplayStatusCounts(shipments);
+  }, [shipments]);
 
-  // Stats
-  const totalShipments = shipments.length;
-  const pending = shipments.filter(
-    (s) => s.status === ShipmentStatus.PENDING
-  ).length;
-  const inTransit = shipments.filter(
-    (s) => s.status === ShipmentStatus.IN_TRANSIT
-  ).length;
-  const delivered = shipments.filter(
-    (s) => s.status === ShipmentStatus.DELIVERED
-  ).length;
+  // Filter shipments by tab and search
+  const filteredShipments = useMemo(() => {
+    const byStatus = filterShipmentsByDisplayStatus(shipments, activeTab);
+
+    if (searchQuery.trim().length === 0) {
+      return byStatus;
+    }
+
+    const q = searchQuery.trim().toLowerCase();
+    return byStatus.filter(
+      (shipment) =>
+        shipment.shipmentNumber.toLowerCase().includes(q) ||
+        shipment.supplierName?.toLowerCase().includes(q)
+    );
+  }, [shipments, activeTab, searchQuery]);
+
+  // Paginate filtered shipments
+  const paginatedShipments = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredShipments.slice(start, start + PAGE_SIZE);
+  }, [filteredShipments, page]);
+
+  // Reset page when tab or search changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as ShipmentDisplayStatus);
+    setPage(0);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(0);
+  };
 
   function handleRowClick(shipment: Shipment) {
     setSelectedShipment(shipment);
@@ -179,126 +183,61 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader
-        title="Shipments"
-      />
-      <main className="flex-1 space-y-6 p-4 md:p-6">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Shipments
-              </CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalShipments}</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{pending}</div>
-              <p className="text-xs text-muted-foreground">Awaiting shipment</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">In Transit</CardTitle>
-              <Truck className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{inTransit}</div>
-              <p className="text-xs text-muted-foreground">Currently shipping</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {delivered}
-              </div>
-              <p className="text-xs text-muted-foreground">Completed</p>
-            </CardContent>
-          </Card>
-        </div>
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <ShipmentHeader />
 
-        {/* Filters and Actions */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 items-center gap-2">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search shipments..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value={ShipmentStatus.PENDING}>Pending</SelectItem>
-                <SelectItem value={ShipmentStatus.IN_TRANSIT}>
-                  In Transit
-                </SelectItem>
-                <SelectItem value={ShipmentStatus.DELIVERED}>
-                  Delivered
-                </SelectItem>
-                <SelectItem value={ShipmentStatus.CANCELLED}>
-                  Cancelled
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Can permission={Permission.SHIPMENTS_CREATE}>
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                New Shipment
-              </Button>
-            </Can>
-          </div>
-        </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="ACTIVE">
+              Active ({statusCounts.ACTIVE})
+            </TabsTrigger>
+            <TabsTrigger value="PARTIAL">
+              Partial ({statusCounts.PARTIAL})
+            </TabsTrigger>
+            <TabsTrigger value="COMPLETED">
+              Completed ({statusCounts.COMPLETED})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Shipments Table */}
+          <ShipmentFilters
+            search={searchQuery}
+            onSearchChange={handleSearchChange}
+            onAddClick={() => setCreateDialogOpen(true)}
+          />
+        </div>
+      </Tabs>
+
+      {shipmentsQuery.error ? (
         <Card>
+          <CardHeader>
+            <CardTitle>Could not load shipments</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {shipmentsQuery.error instanceof Error
+              ? shipmentsQuery.error.message
+              : "Unknown error"}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="py-0">
           <CardContent className="p-0">
             <ShipmentsTable
-              shipments={filteredShipments}
+              shipments={paginatedShipments}
               isLoading={shipmentsQuery.isLoading}
               onRowClick={handleRowClick}
             />
           </CardContent>
         </Card>
+      )}
 
-        {/* Error State */}
-        {shipmentsQuery.error && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Could not load shipments</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {shipmentsQuery.error instanceof Error
-                ? shipmentsQuery.error.message
-                : "Unknown error"}
-            </CardContent>
-          </Card>
-        )}
-      </main>
+      <ShipmentPagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalItems={filteredShipments.length}
+        isLoading={shipmentsQuery.isLoading}
+        onPageChange={setPage}
+      />
 
       {/* Dialogs and Sheets */}
       <ShipmentCreateDialog
