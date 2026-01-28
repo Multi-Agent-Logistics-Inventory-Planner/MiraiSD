@@ -24,6 +24,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
     Permission.SHIPMENTS_VIEW,
     Permission.SHIPMENTS_CREATE,
     Permission.SHIPMENTS_UPDATE,
+
+    // Audit Log - view only
+    Permission.AUDIT_LOG_VIEW,
   ]),
 };
 
