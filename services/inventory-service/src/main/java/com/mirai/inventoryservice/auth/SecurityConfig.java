@@ -29,15 +29,15 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        http.authorizeHttpRequests(auth -> 
+        http.authorizeHttpRequests(auth ->
             auth
                 // Public endpoints (no authentication required)
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/health").permitAll()
-                
+
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                
+
                 // All other requests require authentication
                 .anyRequest().authenticated()
         );

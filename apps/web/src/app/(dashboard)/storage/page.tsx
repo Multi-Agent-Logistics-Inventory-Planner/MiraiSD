@@ -49,7 +49,9 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType>(LocationType.BOX_BIN);
+  const [locationType, setLocationType] = useState<LocationType>(
+    LocationType.BOX_BIN,
+  );
   const [search, setSearch] = useState("");
 
   const list = useLocationsWithCounts(locationType);
@@ -113,7 +115,9 @@ export default function LocationsPage() {
               <CardTitle>Could not load locations</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              {list.error instanceof Error ? list.error.message : "Unknown error"}
+              {list.error instanceof Error
+                ? list.error.message
+                : "Unknown error"}
             </CardContent>
           </Card>
         ) : null}
@@ -163,4 +167,3 @@ export default function LocationsPage() {
     </div>
   );
 }
-

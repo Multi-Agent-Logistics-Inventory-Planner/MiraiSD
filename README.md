@@ -46,7 +46,6 @@ cd mirai
    **Important:** Use the **Session Pooler** connection string (port 6543) instead of direct connection (port 5432) for IPv4 compatibility in Docker.
 
    To get the correct connection string:
-
    - Go to Supabase Dashboard → Settings → Database → Connection Pooling
    - Copy the connection string from "Session mode"
    - It should include `:6543` port and `pgbouncer=true` parameter
@@ -117,7 +116,6 @@ The forecasting service isn't in Docker yet, so run it locally:
    ```
 
 3. Activate the virtual environment:
-
    - **Windows:**
      ```bash
      venv\Scripts\activate
@@ -224,6 +222,8 @@ netstat -ano | findstr :4000
 # Mac/Linux:
 lsof -i :4000
 
+# On macOS, port 4000 may show as "terabase" in the NODE NAME column.
+# Stop the process: kill <PID>  (or kill -9 <PID> if it does not exit)
 # Then stop that process or change the port in infra/docker-compose.yml
 ```
 

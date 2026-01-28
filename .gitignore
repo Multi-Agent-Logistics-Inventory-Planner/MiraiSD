@@ -175,3 +175,5 @@ secrets/
 refs/
 tests/
 codemaps/
+# IDE - Cursor
+.cursor/
