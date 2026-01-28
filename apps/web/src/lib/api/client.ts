@@ -77,8 +77,15 @@ export async function apiClient<T>(
     });
   }
 
-  // Handle empty response (204 No Content, etc.)
-  if (response.status === 204 || response.headers.get("content-length") === "0") {
+  // Handle empty response (204 No Content, 201 Created with no body, etc.)
+  const contentLength = response.headers.get("content-length");
+  const contentType = response.headers.get("content-type");
+  const isEmptyResponse =
+    response.status === 204 ||
+    contentLength === "0" ||
+    (response.status === 201 && !contentType?.includes("application/json"));
+
+  if (isEmptyResponse) {
     return undefined as T;
   }
 
