@@ -22,7 +22,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
 
     // Shipments - full access
     Permission.SHIPMENTS_VIEW,
-    Permission.SHIPMENTS_RECEIVE,
+    Permission.SHIPMENTS_CREATE,
+    Permission.SHIPMENTS_UPDATE,
+
+    // Audit Log - view only
+    Permission.AUDIT_LOG_VIEW,
   ]),
 };
 
