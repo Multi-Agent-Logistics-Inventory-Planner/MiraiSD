@@ -222,6 +222,8 @@ netstat -ano | findstr :4000
 # Mac/Linux:
 lsof -i :4000
 
+# On macOS, port 4000 may show as "terabase" in the NODE NAME column.
+# Stop the process: kill <PID>  (or kill -9 <PID> if it does not exit)
 # Then stop that process or change the port in infra/docker-compose.yml
 ```
 
