@@ -45,6 +45,10 @@ class AuditLogMapperTest {
     private CabinetRepository cabinetRepository;
     @Mock
     private RackRepository rackRepository;
+    @Mock
+    private FourCornerMachineRepository fourCornerMachineRepository;
+    @Mock
+    private PusherMachineRepository pusherMachineRepository;
 
     private AuditLogMapper auditLogMapper;
 
@@ -57,7 +61,9 @@ class AuditLogMapperTest {
                 doubleClawMachineRepository,
                 keychainMachineRepository,
                 cabinetRepository,
-                rackRepository
+                rackRepository,
+                fourCornerMachineRepository,
+                pusherMachineRepository
         );
     }
 
@@ -391,6 +397,8 @@ class AuditLogMapperTest {
             verify(singleClawMachineRepository, never()).findAllById(anyCollection());
             verify(doubleClawMachineRepository, never()).findAllById(anyCollection());
             verify(keychainMachineRepository, never()).findAllById(anyCollection());
+            verify(fourCornerMachineRepository, never()).findAllById(anyCollection());
+            verify(pusherMachineRepository, never()).findAllById(anyCollection());
         }
 
         @Test
