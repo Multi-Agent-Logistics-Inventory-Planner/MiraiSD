@@ -37,6 +37,8 @@ import {
   ShipmentDetailSheet,
   ShipmentCreateDialog,
   ShipmentReceiveDialog,
+  TrackingLookupCard,
+  TrackingLookupResultsTable,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
 import {
@@ -45,6 +47,7 @@ import {
 } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { ShipmentStatus, type Shipment } from "@/types/api";
+import { type TrackingLookupResponse } from "@/lib/api/tracking";
 
 export default function ShipmentsPage() {
   const { toast } = useToast();
@@ -54,6 +57,7 @@ export default function ShipmentsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [trackings, setTrackings] = useState<TrackingLookupResponse[]>([]);
 
   // Dialog/sheet states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -154,6 +158,10 @@ export default function ShipmentsPage() {
         err instanceof Error ? err.message : "Failed to delete shipment";
       toast({ title: "Error", description: message });
     }
+  }
+
+  function handleTrackingAdded(tracking: TrackingLookupResponse) {
+    setTrackings((prev) => [tracking, ...prev]);
   }
 
   // Helper to build ShipmentRequest from existing Shipment
@@ -273,6 +281,15 @@ export default function ShipmentsPage() {
             </Can>
           </div>
         </div>
+
+        {/* Tracking Lookup Section */}
+        <TrackingLookupCard onTrackingAdded={handleTrackingAdded} />
+
+        <Card>
+          <CardContent className="p-6">
+            <TrackingLookupResultsTable trackings={trackings} />
+          </CardContent>
+        </Card>
 
         {/* Shipments Table */}
         <Card>

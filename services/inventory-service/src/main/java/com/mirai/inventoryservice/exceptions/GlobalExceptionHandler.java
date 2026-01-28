@@ -51,7 +51,8 @@ public class GlobalExceptionHandler {
             InsufficientInventoryException.class,
             InvalidInventoryOperationException.class,
             InvalidShipmentStatusException.class,
-            InvalidSubcategoryException.class
+            InvalidSubcategoryException.class,
+            TrackingException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
