@@ -19,7 +19,7 @@ import {
 import { TrendingUp, TrendingDown, BarChart3 } from "lucide-react"
 import { CalendarHeatmap } from "./calendar-heatmap"
 import { cn } from "@/lib/utils"
-import type { SalesSummary, MonthlySales } from "@/types/api"
+import type { SalesSummary, MonthlySales, DailySales } from "@/types/api"
 
 interface SalesMetricsCardProps {
   data: SalesSummary | undefined
@@ -150,36 +150,48 @@ interface LineChartDataItem extends ChartDataItem {
   previousRevenue?: number
 }
 
+interface WeeklyChartDataItem {
+  weekStart: string
+  label: string
+  revenue: number
+  previousRevenue: number
+}
+
 function LineChartTooltip({
   active,
   payload,
 }: {
   active?: boolean
-  payload?: Array<{ dataKey: string; value: number; payload: LineChartDataItem }>
+  payload?: Array<{ dataKey: string; value: number; payload: WeeklyChartDataItem }>
 }) {
   if (!active || !payload || !payload.length) return null
 
   const data = payload[0].payload
-  const monthDate = new Date(data.month + "-01")
-  const monthName = monthDate.toLocaleDateString("en-US", {
+  if (!data?.weekStart) return null
+
+  const weekDate = new Date(data.weekStart)
+  const weekLabel = weekDate.toLocaleDateString("en-US", {
     month: "long",
+    day: "numeric",
     year: "numeric",
   })
 
   const currentValue = payload.find((p) => p.dataKey === "revenue")
   const previousValue = payload.find((p) => p.dataKey === "previousRevenue")
+  const currentRevenue = currentValue?.value ?? 0
+  const previousRevenue = previousValue?.value ?? 0
 
   return (
     <div className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white shadow-lg">
-      <p className="font-semibold">{monthName}</p>
-      {currentValue && (
+      <p className="font-semibold">Week of {weekLabel}</p>
+      {currentValue && !isNaN(currentRevenue) && (
         <p className="text-purple-300">
-          Current: {formatCurrency(currentValue.value)}
+          Current: {formatCurrency(currentRevenue)}
         </p>
       )}
-      {previousValue && previousValue.value > 0 && (
+      {previousValue && previousRevenue > 0 && !isNaN(previousRevenue) && (
         <p className="text-gray-400">
-          Previous: {formatCurrency(previousValue.value)}
+          Previous: {formatCurrency(previousRevenue)}
         </p>
       )}
     </div>
@@ -206,6 +218,114 @@ function filterMonthlyData(
   }
 
   return monthlySales.slice(-monthsMap[filter])
+}
+
+interface WeeklySales {
+  weekStart: string
+  weekLabel: string
+  totalUnits: number
+  totalRevenue: number
+}
+
+function aggregateByWeek(
+  dailySales: DailySales[],
+  filter: BarTimeFilter
+): WeeklySales[] {
+  const now = new Date()
+  let startDate: Date
+
+  if (filter === "YTD") {
+    startDate = new Date(now.getFullYear(), 0, 1)
+  } else {
+    const monthsMap = { "3M": 3, "6M": 6, "1Y": 12 }
+    startDate = new Date(now)
+    startDate.setMonth(startDate.getMonth() - monthsMap[filter])
+  }
+
+  const filtered = dailySales.filter((d) => {
+    const date = new Date(d.date)
+    return date >= startDate && date <= now
+  })
+
+  const weekMap = new Map<string, { units: number; revenue: number }>()
+
+  for (const day of filtered) {
+    const date = new Date(day.date)
+    const sunday = new Date(date)
+    sunday.setDate(date.getDate() - date.getDay())
+    const weekKey = sunday.toISOString().split("T")[0]
+
+    const existing = weekMap.get(weekKey) ?? { units: 0, revenue: 0 }
+    weekMap.set(weekKey, {
+      units: existing.units + (day.totalUnits ?? 0),
+      revenue: existing.revenue + (day.totalRevenue ?? 0),
+    })
+  }
+
+  return Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([weekStart, data]) => ({
+      weekStart,
+      weekLabel: new Date(weekStart).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      totalUnits: data.units,
+      totalRevenue: data.revenue,
+    }))
+}
+
+function getPreviousPeriodWeekly(
+  dailySales: DailySales[],
+  filter: BarTimeFilter
+): WeeklySales[] {
+  const now = new Date()
+  let startDate: Date
+  let endDate: Date
+
+  if (filter === "YTD") {
+    startDate = new Date(now.getFullYear() - 1, 0, 1)
+    endDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+  } else {
+    const monthsMap = { "3M": 3, "6M": 6, "1Y": 12 }
+    const months = monthsMap[filter]
+    endDate = new Date(now)
+    endDate.setMonth(endDate.getMonth() - months)
+    startDate = new Date(endDate)
+    startDate.setMonth(startDate.getMonth() - months)
+  }
+
+  const filtered = dailySales.filter((d) => {
+    const date = new Date(d.date)
+    return date >= startDate && date <= endDate
+  })
+
+  const weekMap = new Map<string, { units: number; revenue: number }>()
+
+  for (const day of filtered) {
+    const date = new Date(day.date)
+    const sunday = new Date(date)
+    sunday.setDate(date.getDate() - date.getDay())
+    const weekKey = sunday.toISOString().split("T")[0]
+
+    const existing = weekMap.get(weekKey) ?? { units: 0, revenue: 0 }
+    weekMap.set(weekKey, {
+      units: existing.units + (day.totalUnits ?? 0),
+      revenue: existing.revenue + (day.totalRevenue ?? 0),
+    })
+  }
+
+  return Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([weekStart, data]) => ({
+      weekStart,
+      weekLabel: new Date(weekStart).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      totalUnits: data.units,
+      totalRevenue: data.revenue,
+    }))
 }
 
 export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
@@ -321,10 +441,10 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
     })
 
     const periodLabels: Record<BarTimeFilter, string> = {
-      "3M": "vs previous 3 months",
-      "6M": "vs previous 6 months",
-      "1Y": "vs last year",
-      YTD: "vs same period last year",
+      "3M": "previous 3 months",
+      "6M": "previous 6 months",
+      "1Y": "previous year",
+      YTD: "same period last year",
     }
 
     return {
@@ -358,6 +478,26 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
       heatmapPeriodLabel: periodLabel,
     }
   }, [data, selectedYear])
+
+  const { weeklyChartData, hasPreviousWeeklyData } = useMemo(() => {
+    if (!data?.dailySales) {
+      return { weeklyChartData: [], hasPreviousWeeklyData: false }
+    }
+
+    const currentWeeks = aggregateByWeek(data.dailySales, barFilter)
+    const previousWeeks = getPreviousPeriodWeekly(data.dailySales, barFilter)
+
+    const chartData: WeeklyChartDataItem[] = currentWeeks.map((week, idx) => ({
+      weekStart: week.weekStart,
+      label: week.weekLabel,
+      revenue: week.totalRevenue,
+      previousRevenue: previousWeeks[idx]?.totalRevenue ?? 0,
+    }))
+
+    const hasPrevData = previousWeeks.some((w) => w.totalRevenue > 0)
+
+    return { weeklyChartData: chartData, hasPreviousWeeklyData: hasPrevData }
+  }, [data, barFilter])
 
   if (isLoading) {
     return (
@@ -497,7 +637,7 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                 </BarChart>
               ) : (
                 <LineChart
-                  data={lineChartData}
+                  data={weeklyChartData}
                   margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
                 >
                   <CartesianGrid
@@ -509,7 +649,8 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 12, fill: "#9ca3af" }}
+                    tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    interval="preserveStartEnd"
                   />
                   <YAxis
                     axisLine={false}
@@ -518,7 +659,7 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                     tickFormatter={formatCompactCurrency}
                     width={45}
                   />
-                  {hasPreviousPeriodData && (
+                  {hasPreviousWeeklyData && (
                     <Line
                       dataKey="previousRevenue"
                       stroke="#d1d5db"
@@ -531,7 +672,7 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                     dataKey="revenue"
                     stroke="var(--sales-secondary)"
                     strokeWidth={2}
-                    dot={{ fill: "var(--sales-secondary)", r: 4 }}
+                    dot={{ fill: "var(--sales-secondary)", r: 3 }}
                     type="linear"
                   />
                   <Tooltip content={<LineChartTooltip />} />
