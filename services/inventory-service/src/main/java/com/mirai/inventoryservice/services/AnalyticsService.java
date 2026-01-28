@@ -133,6 +133,7 @@ public class AnalyticsService {
         Map<String, BigDecimal> monthlyRevenue = new TreeMap<>();
         Map<String, Integer> monthlyUnits = new TreeMap<>();
         Map<String, Integer> dailyUnits = new TreeMap<>();
+        Map<String, BigDecimal> dailyRevenue = new TreeMap<>();
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
         int totalUnits = 0;
@@ -150,6 +151,7 @@ public class AnalyticsService {
             monthlyRevenue.merge(monthKey, revenue, BigDecimal::add);
             monthlyUnits.merge(monthKey, units, Integer::sum);
             dailyUnits.merge(dateKey, units, Integer::sum);
+            dailyRevenue.merge(dateKey, revenue, BigDecimal::add);
 
             totalRevenue = totalRevenue.add(revenue);
             totalUnits += units;
@@ -164,7 +166,12 @@ public class AnalyticsService {
             .toList();
 
         List<DailySalesDTO> dailySales = dailyUnits.entrySet().stream()
-            .map(entry -> new DailySalesDTO(entry.getKey(), entry.getValue()))
+            .map(entry -> new DailySalesDTO(
+                entry.getKey(),
+                entry.getValue(),
+                dailyRevenue.getOrDefault(entry.getKey(), BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP)
+            ))
             .toList();
 
         return new SalesSummaryDTO(

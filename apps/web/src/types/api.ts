@@ -495,6 +495,7 @@ export interface MonthlySales {
 export interface DailySales {
   date: string;
   totalUnits: number;
+  totalRevenue: number;
 }
 
 export interface SalesSummary {
