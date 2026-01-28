@@ -384,9 +384,18 @@ export interface ShipmentRequest {
   items: ShipmentItemRequest[];
 }
 
+export interface DestinationAllocation {
+  locationType: LocationType;
+  locationId?: string;
+  quantity: number;
+}
+
 export interface ShipmentItemReceipt {
   shipmentItemId: string;
-  receivedQuantity: number;
+  // New: multi-destination allocations
+  allocations?: DestinationAllocation[];
+  // Legacy fields for backward compatibility
+  receivedQuantity?: number;
   destinationLocationType?: LocationType;
   destinationLocationId?: string;
 }

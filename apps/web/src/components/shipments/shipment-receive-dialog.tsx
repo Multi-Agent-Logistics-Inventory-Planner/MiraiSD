@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -21,14 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { useReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +27,7 @@ import { useLocations } from "@/hooks/queries/use-locations";
 import type {
   Shipment,
   ShipmentItemReceipt,
+  DestinationAllocation,
   StorageLocation,
   BoxBin,
   Rack,
@@ -59,10 +51,123 @@ function getLocationCode(location: StorageLocation): string {
   return "";
 }
 
+const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
+  [LocationType.NOT_ASSIGNED]: "Not Assigned",
+  [LocationType.BOX_BIN]: "Box/Bin",
+  [LocationType.RACK]: "Rack",
+  [LocationType.CABINET]: "Cabinet",
+  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
+  [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
+  [LocationType.KEYCHAIN_MACHINE]: "Keychain",
+};
+
+interface ItemAllocation {
+  id: string;
+  locationType: LocationType;
+  locationId: string;
+  quantity: number;
+}
+
+interface ItemAllocations {
+  [itemId: string]: ItemAllocation[];
+}
+
 interface ShipmentReceiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipment: Shipment | null;
+}
+
+function AllocationRow({
+  allocation,
+  maxQuantity,
+  onUpdate,
+  onRemove,
+  canRemove,
+}: {
+  allocation: ItemAllocation;
+  maxQuantity: number;
+  onUpdate: (updates: Partial<ItemAllocation>) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const locationsQuery = useLocations(
+    allocation.locationType === LocationType.NOT_ASSIGNED
+      ? LocationType.BOX_BIN
+      : allocation.locationType
+  );
+
+  const locations = useMemo(() => {
+    return (locationsQuery.data ?? []) as StorageLocation[];
+  }, [locationsQuery.data]);
+
+  const showLocationSelect =
+    allocation.locationType !== LocationType.NOT_ASSIGNED;
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <Select
+        value={allocation.locationType}
+        onValueChange={(value) =>
+          onUpdate({ locationType: value as LocationType, locationId: "" })
+        }
+      >
+        <SelectTrigger className="w-32 h-8 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(LOCATION_TYPE_LABELS).map(([value, label]) => (
+            <SelectItem key={value} value={value} className="text-xs">
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {showLocationSelect && (
+        <Select
+          value={allocation.locationId}
+          onValueChange={(value) => onUpdate({ locationId: value })}
+          disabled={locationsQuery.isLoading}
+        >
+          <SelectTrigger className="w-28 h-8 text-xs">
+            <SelectValue placeholder="Location" />
+          </SelectTrigger>
+          <SelectContent>
+            {locations.map((loc) => (
+              <SelectItem key={loc.id} value={loc.id} className="text-xs">
+                {getLocationCode(loc)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      <Input
+        type="number"
+        min={0}
+        max={maxQuantity}
+        value={allocation.quantity}
+        onChange={(e) => {
+          const num = parseInt(e.target.value, 10);
+          onUpdate({ quantity: Number.isNaN(num) ? 0 : Math.max(0, num) });
+        }}
+        className="w-20 h-8 text-xs text-right"
+      />
+
+      {canRemove && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          onClick={onRemove}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function ShipmentReceiveDialog({
@@ -75,85 +180,109 @@ export function ShipmentReceiveDialog({
   const receiveMutation = useReceiveShipmentMutation();
 
   const [deliveryDate, setDeliveryDate] = useState<string>("");
-  const [receiveAll, setReceiveAll] = useState(false);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [locationType, setLocationType] = useState<LocationType>(LocationType.NOT_ASSIGNED);
-  const [locationId, setLocationId] = useState<string>("");
-
-  const locationsQuery = useLocations(
-    locationType === LocationType.NOT_ASSIGNED ? LocationType.BOX_BIN : locationType
-  );
+  const [itemAllocations, setItemAllocations] = useState<ItemAllocations>({});
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open && shipment) {
       const today = new Date().toISOString().split("T")[0];
       setDeliveryDate(today);
-      setReceiveAll(false);
-      setLocationType(LocationType.NOT_ASSIGNED);
-      setLocationId("");
 
-      // Initialize quantities with remaining amounts
-      const initialQuantities: Record<string, number> = {};
+      // Initialize each item with one default allocation
+      const initialAllocations: ItemAllocations = {};
       shipment.items.forEach((item) => {
         const remaining = item.orderedQuantity - item.receivedQuantity;
-        initialQuantities[item.id] = remaining > 0 ? remaining : 0;
+        initialAllocations[item.id] = [
+          {
+            id: crypto.randomUUID(),
+            locationType: LocationType.NOT_ASSIGNED,
+            locationId: "",
+            quantity: remaining > 0 ? remaining : 0,
+          },
+        ];
       });
-      setQuantities(initialQuantities);
+      setItemAllocations(initialAllocations);
     }
   }, [open, shipment]);
 
-  // Reset location ID when location type changes
-  useEffect(() => {
-    setLocationId("");
-  }, [locationType]);
-
-  // Handle receive all toggle
-  useEffect(() => {
-    if (!shipment) return;
-    if (receiveAll) {
-      const maxQuantities: Record<string, number> = {};
-      shipment.items.forEach((item) => {
-        const remaining = item.orderedQuantity - item.receivedQuantity;
-        maxQuantities[item.id] = remaining > 0 ? remaining : 0;
-      });
-      setQuantities(maxQuantities);
-    }
-  }, [receiveAll, shipment]);
-
   if (!shipment) return null;
 
-  const handleQuantityChange = (itemId: string, value: string) => {
-    const num = parseInt(value, 10);
-    const item = shipment.items.find((i) => i.id === itemId);
-    if (!item) return;
-
-    const maxAllowed = item.orderedQuantity - item.receivedQuantity;
-    const clamped = Number.isNaN(num) ? 0 : Math.max(0, Math.min(num, maxAllowed));
-
-    setQuantities((prev) => ({ ...prev, [itemId]: clamped }));
-    setReceiveAll(false);
+  const addAllocation = (itemId: string) => {
+    setItemAllocations((prev) => ({
+      ...prev,
+      [itemId]: [
+        ...(prev[itemId] || []),
+        {
+          id: crypto.randomUUID(),
+          locationType: LocationType.NOT_ASSIGNED,
+          locationId: "",
+          quantity: 0,
+        },
+      ],
+    }));
   };
 
-  const hasAnyToReceive = Object.values(quantities).some((q) => q > 0);
-  const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
-  const hasPhysicalLocation = locationType && locationType !== LocationType.NOT_ASSIGNED && locationId;
+  const updateAllocation = (
+    itemId: string,
+    allocationId: string,
+    updates: Partial<ItemAllocation>
+  ) => {
+    setItemAllocations((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] || []).map((a) =>
+        a.id === allocationId ? { ...a, ...updates } : a
+      ),
+    }));
+  };
 
-  const locations = useMemo(() => {
-    return (locationsQuery.data ?? []) as StorageLocation[];
-  }, [locationsQuery.data]);
+  const removeAllocation = (itemId: string, allocationId: string) => {
+    setItemAllocations((prev) => ({
+      ...prev,
+      [itemId]: (prev[itemId] || []).filter((a) => a.id !== allocationId),
+    }));
+  };
+
+  const getTotalAllocated = (itemId: string) => {
+    return (itemAllocations[itemId] || []).reduce(
+      (sum, a) => sum + a.quantity,
+      0
+    );
+  };
+
+  const hasAnyToReceive = shipment.items.some(
+    (item) => getTotalAllocated(item.id) > 0
+  );
+
+  const hasValidationErrors = shipment.items.some((item) => {
+    const remaining = item.orderedQuantity - item.receivedQuantity;
+    const allocated = getTotalAllocated(item.id);
+    return allocated > remaining;
+  });
 
   async function handleSubmit() {
     if (!user?.personId || !shipment) return;
 
     const itemReceipts: ShipmentItemReceipt[] = shipment.items
-      .filter((item) => (quantities[item.id] ?? 0) > 0)
-      .map((item) => ({
-        shipmentItemId: item.id,
-        receivedQuantity: quantities[item.id] ?? 0,
-        destinationLocationType: locationType,
-        destinationLocationId: locationType === LocationType.NOT_ASSIGNED ? undefined : (locationId || undefined),
-      }));
+      .filter((item) => getTotalAllocated(item.id) > 0)
+      .map((item) => {
+        const allocations: DestinationAllocation[] = (
+          itemAllocations[item.id] || []
+        )
+          .filter((a) => a.quantity > 0)
+          .map((a) => ({
+            locationType: a.locationType,
+            locationId:
+              a.locationType === LocationType.NOT_ASSIGNED
+                ? undefined
+                : a.locationId || undefined,
+            quantity: a.quantity,
+          }));
+
+        return {
+          shipmentItemId: item.id,
+          allocations,
+        };
+      });
 
     if (itemReceipts.length === 0) {
       toast({
@@ -175,7 +304,8 @@ export function ShipmentReceiveDialog({
       toast({ title: "Items received successfully" });
       onOpenChange(false);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to receive items";
+      const message =
+        err instanceof Error ? err.message : "Failed to receive items";
       toast({ title: "Error", description: message });
     }
   }
@@ -184,16 +314,12 @@ export function ShipmentReceiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receive Items</DialogTitle>
           <DialogDescription>
             Record received quantities for shipment {shipment.shipmentNumber}.
-            {isNotAssigned
-              ? " Items will be added to 'Not Assigned' inventory until moved to a physical location."
-              : hasPhysicalLocation
-                ? " Stock will be updated at the selected destination location."
-                : " Please select a destination location type."}
+            You can split items across multiple destinations.
           </DialogDescription>
         </DialogHeader>
 
@@ -205,129 +331,94 @@ export function ShipmentReceiveDialog({
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
+              className="w-48"
             />
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="locationType">Destination Location Type</Label>
-            <Select
-              value={locationType}
-              onValueChange={(value) => setLocationType(value as LocationType)}
-            >
-              <SelectTrigger id="locationType">
-                <SelectValue placeholder="Select location type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={LocationType.NOT_ASSIGNED}>
-                  Not Assigned (default)
-                </SelectItem>
-                <SelectItem value={LocationType.BOX_BIN}>Box/Bin</SelectItem>
-                <SelectItem value={LocationType.RACK}>Rack</SelectItem>
-                <SelectItem value={LocationType.CABINET}>Cabinet</SelectItem>
-                <SelectItem value={LocationType.SINGLE_CLAW_MACHINE}>
-                  Single Claw Machine
-                </SelectItem>
-                <SelectItem value={LocationType.DOUBLE_CLAW_MACHINE}>
-                  Double Claw Machine
-                </SelectItem>
-                <SelectItem value={LocationType.KEYCHAIN_MACHINE}>
-                  Keychain Machine
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="space-y-4">
+            {shipment.items.map((item) => {
+              const remaining = item.orderedQuantity - item.receivedQuantity;
+              const isComplete = remaining <= 0;
+              const allocated = getTotalAllocated(item.id);
+              const isOverAllocated = allocated > remaining;
+              const allocations = itemAllocations[item.id] || [];
 
-          {locationType && locationType !== LocationType.NOT_ASSIGNED && (
-            <div className="grid gap-2">
-              <Label htmlFor="locationId">Destination Location</Label>
-              <Select
-                value={locationId}
-                onValueChange={setLocationId}
-                disabled={locationsQuery.isLoading}
-              >
-                <SelectTrigger id="locationId">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => {
-                    const code = getLocationCode(loc);
-                    return (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        {code}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              {locationsQuery.isLoading && (
-                <p className="text-xs text-muted-foreground">Loading locations...</p>
-              )}
-            </div>
-          )}
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-lg border p-4 ${
+                    isComplete ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="font-medium">{item.item.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        {item.item.sku}
+                      </div>
+                    </div>
+                    <div className="text-right text-sm">
+                      <div>
+                        Ordered: <span className="font-medium">{item.orderedQuantity}</span>
+                      </div>
+                      <div>
+                        Received: <span className="font-medium">{item.receivedQuantity}</span>
+                      </div>
+                      <div>
+                        Remaining:{" "}
+                        <span className="font-medium text-primary">
+                          {remaining}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="receiveAll"
-              checked={receiveAll}
-              onCheckedChange={(checked) => setReceiveAll(checked === true)}
-            />
-            <Label htmlFor="receiveAll" className="text-sm font-normal">
-              Receive all remaining items
-            </Label>
-          </div>
-
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted">
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Already Received</TableHead>
-                  <TableHead className="text-right">Receiving Now</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shipment.items.map((item) => {
-                  const remaining = item.orderedQuantity - item.receivedQuantity;
-                  const isComplete = remaining <= 0;
-
-                  return (
-                    <TableRow
-                      key={item.id}
-                      className={isComplete ? "opacity-50" : ""}
-                    >
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.item.name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {item.item.sku}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.orderedQuantity}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.receivedQuantity}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={remaining}
-                          value={quantities[item.id] ?? 0}
-                          onChange={(e) =>
-                            handleQuantityChange(item.id, e.target.value)
+                  {!isComplete && (
+                    <>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Allocations{" "}
+                        <span
+                          className={
+                            isOverAllocated ? "text-destructive font-medium" : ""
                           }
-                          disabled={isComplete}
-                          className="w-20 ml-auto text-right"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        >
+                          (Total: {allocated}
+                          {isOverAllocated && ` — exceeds remaining by ${allocated - remaining}`})
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 pl-2 border-l-2 border-muted">
+                        {allocations.map((allocation) => (
+                          <AllocationRow
+                            key={allocation.id}
+                            allocation={allocation}
+                            maxQuantity={remaining}
+                            onUpdate={(updates) =>
+                              updateAllocation(item.id, allocation.id, updates)
+                            }
+                            onRemove={() =>
+                              removeAllocation(item.id, allocation.id)
+                            }
+                            canRemove={allocations.length > 1}
+                          />
+                        ))}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-7 text-xs"
+                        onClick={() => addAllocation(item.id)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add destination
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -342,7 +433,7 @@ export function ShipmentReceiveDialog({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={isSaving || !hasAnyToReceive}
+            disabled={isSaving || !hasAnyToReceive || hasValidationErrors}
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Receive Items

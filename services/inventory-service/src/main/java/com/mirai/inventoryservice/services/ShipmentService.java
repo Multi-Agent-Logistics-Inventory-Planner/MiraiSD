@@ -222,7 +222,39 @@ public class ShipmentService {
                 throw new IllegalArgumentException("Shipment item does not belong to this shipment");
             }
 
-            int quantityToReceive = receipt.getReceivedQuantity();
+            // Build allocations list - support both new multi-destination and legacy single-destination formats
+            List<ReceiveShipmentRequestDTO.DestinationAllocationDTO> allocations;
+
+            if (receipt.getAllocations() != null && !receipt.getAllocations().isEmpty()) {
+                // New format: use allocations directly
+                allocations = receipt.getAllocations();
+            } else {
+                // Legacy format: create single allocation from old fields
+                LocationType legacyLocationType = receipt.getDestinationLocationType() != null
+                        ? receipt.getDestinationLocationType()
+                        : shipmentItem.getDestinationLocationType();
+                UUID legacyLocationId = receipt.getDestinationLocationId() != null
+                        ? receipt.getDestinationLocationId()
+                        : shipmentItem.getDestinationLocationId();
+
+                // Default to NOT_ASSIGNED if no location specified
+                if (legacyLocationType == null) {
+                    legacyLocationType = LocationType.NOT_ASSIGNED;
+                    legacyLocationId = null;
+                }
+
+                allocations = List.of(ReceiveShipmentRequestDTO.DestinationAllocationDTO.builder()
+                        .locationType(legacyLocationType)
+                        .locationId(legacyLocationId)
+                        .quantity(receipt.getReceivedQuantity())
+                        .build());
+            }
+
+            // Calculate total quantity from allocations
+            int quantityToReceive = allocations.stream()
+                    .mapToInt(ReceiveShipmentRequestDTO.DestinationAllocationDTO::getQuantity)
+                    .sum();
+
             int currentReceivedQuantity = shipmentItem.getReceivedQuantity();
             int newReceivedQuantity = currentReceivedQuantity + quantityToReceive;
 
@@ -235,50 +267,34 @@ public class ShipmentService {
                             currentReceivedQuantity, shipmentItem.getOrderedQuantity(), quantityToReceive));
             }
 
-            // Accumulate received quantity instead of replacing it
+            // Accumulate received quantity
             shipmentItem.setReceivedQuantity(newReceivedQuantity);
 
-            // Use destination location from request if provided, otherwise use existing one from shipment item
-            LocationType destinationLocationType = receipt.getDestinationLocationType() != null 
-                    ? receipt.getDestinationLocationType() 
-                    : shipmentItem.getDestinationLocationType();
-            UUID destinationLocationId = receipt.getDestinationLocationId() != null 
-                    ? receipt.getDestinationLocationId() 
-                    : shipmentItem.getDestinationLocationId();
-
-            // Update shipment item with destination location from request
-            // If no location is provided, set to NOT_ASSIGNED
-            if (receipt.getDestinationLocationType() != null) {
-                shipmentItem.setDestinationLocationType(receipt.getDestinationLocationType());
-                if (receipt.getDestinationLocationId() != null) {
-                    shipmentItem.setDestinationLocationId(receipt.getDestinationLocationId());
-                } else {
-                    shipmentItem.setDestinationLocationId(null);
+            // Process each allocation
+            for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
+                if (allocation.getQuantity() <= 0) {
+                    continue;
                 }
-            } else {
-                // If location type is not provided in receipt, set to NOT_ASSIGNED
-                shipmentItem.setDestinationLocationType(LocationType.NOT_ASSIGNED);
-                shipmentItem.setDestinationLocationId(null);
-            }
 
-            // Update inventory if received quantity > 0
-            if (quantityToReceive > 0) {
-                if (destinationLocationType == LocationType.NOT_ASSIGNED
-                        || destinationLocationType == null
-                        || destinationLocationId == null) {
+                LocationType locationType = allocation.getLocationType();
+                UUID locationId = allocation.getLocationId();
+
+                if (locationType == LocationType.NOT_ASSIGNED
+                        || locationType == null
+                        || locationId == null) {
                     // Add to NotAssignedInventory
                     addToNotAssignedInventory(
                             shipmentItem.getItem(),
-                            quantityToReceive,
+                            allocation.getQuantity(),
                             requestDTO.getReceivedBy()
                     );
                 } else {
                     // Add to regular location inventory
                     addToInventory(
-                            destinationLocationType,
-                            destinationLocationId,
+                            locationType,
+                            locationId,
                             shipmentItem.getItem(),
-                            quantityToReceive,
+                            allocation.getQuantity(),
                             requestDTO.getReceivedBy()
                     );
                 }

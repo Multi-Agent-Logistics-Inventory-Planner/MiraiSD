@@ -29,11 +29,29 @@ public class ReceiveShipmentRequestDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class DestinationAllocationDTO {
+        @NotNull(message = "Location type is required")
+        private LocationType locationType;
+
+        private UUID locationId;  // null for NOT_ASSIGNED
+
+        @NotNull(message = "Quantity is required")
+        @Min(value = 1, message = "Quantity must be at least 1")
+        private Integer quantity;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ItemReceiptDTO {
         @NotNull(message = "Shipment item ID is required")
         private UUID shipmentItemId;
 
-        @NotNull(message = "Received quantity is required")
+        // Multi-destination allocations (preferred)
+        private List<DestinationAllocationDTO> allocations;
+
+        // Legacy fields for backward compatibility
         @Min(value = 0, message = "Received quantity must be non-negative")
         private Integer receivedQuantity;
 
