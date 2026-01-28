@@ -501,7 +501,7 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.CABINET]: /^C\d+$/,
   [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.DOUBLE_CLAW_MACHINE]: /^D\d+$/,
-  [LocationType.KEYCHAIN_MACHINE]: /^M\d+$/,
+  [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
 };
 
 // Helper type for location endpoints

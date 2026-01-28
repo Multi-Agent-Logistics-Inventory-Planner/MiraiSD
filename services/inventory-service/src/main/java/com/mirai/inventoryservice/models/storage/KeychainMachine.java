@@ -25,7 +25,7 @@ public class KeychainMachine {
     private UUID id;
 
     @NotBlank
-    @Pattern(regexp = "^M\\d+$", message = "KeychainMachine code must follow format M1, M2, etc.")
+    @Pattern(regexp = "^K\\d+$", message = "KeychainMachine code must follow format K1, K2, etc.")
     @Column(name = "keychain_machine_code", unique = true, nullable = false)
     private String keychainMachineCode;
 
