@@ -10,6 +10,7 @@ import {
   KeychainMachineInventory,
   FourCornerMachineInventory,
   PusherMachineInventory,
+  NotAssignedInventory,
   InventoryRequest,
   Inventory,
   InventoryItem,
@@ -409,6 +410,45 @@ export async function deletePusherMachineInventory(
   );
 }
 
+// NotAssigned Inventory
+
+export async function getNotAssignedInventory(): Promise<NotAssignedInventory[]> {
+  return apiGet<NotAssignedInventory[]>("/api/not-assigned/inventory");
+}
+
+export async function getNotAssignedInventoryByProduct(
+  productId: string
+): Promise<NotAssignedInventory[]> {
+  return apiGet<NotAssignedInventory[]>(
+    `/api/not-assigned/inventory/by-product/${productId}`
+  );
+}
+
+export async function createNotAssignedInventory(
+  data: InventoryRequest
+): Promise<NotAssignedInventory> {
+  return apiPost<NotAssignedInventory, InventoryRequest>(
+    "/api/not-assigned/inventory",
+    data
+  );
+}
+
+export async function updateNotAssignedInventory(
+  inventoryId: string,
+  data: InventoryRequest
+): Promise<NotAssignedInventory> {
+  return apiPut<NotAssignedInventory, InventoryRequest>(
+    `/api/not-assigned/inventory/${inventoryId}`,
+    data
+  );
+}
+
+export async function deleteNotAssignedInventory(
+  inventoryId: string
+): Promise<void> {
+  return apiDelete<void>(`/api/not-assigned/inventory/${inventoryId}`);
+}
+
 // Generic inventory getter by location type
 export async function getInventoryByLocation(
   locationType: LocationType,
@@ -526,6 +566,21 @@ export async function getInventoryEntriesByItemId(
 ): Promise<InventoryLocationEntry[]> {
   const entries: InventoryLocationEntry[] = [];
 
+  // Fetch NOT_ASSIGNED inventory first (different API pattern - no location)
+  const notAssignedInventories = await getNotAssignedInventoryByProduct(itemId);
+  for (const inv of notAssignedInventories) {
+    entries.push({
+      inventoryId: inv.id,
+      item: inv.item,
+      quantity: inv.quantity ?? 0,
+      locationType: LocationType.NOT_ASSIGNED,
+      locationId: "",
+      locationCode: "-",
+      locationLabel: "Not Assigned",
+    });
+  }
+
+  // Fetch location-based inventory
   const locationsByType = await Promise.all(
     ALL_LOCATION_TYPES.map(async (locationType) => {
       const locations = await getLocationsByType(locationType);

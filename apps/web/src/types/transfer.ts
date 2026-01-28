@@ -15,6 +15,7 @@ export const LOCATION_TYPE_CODES: Record<LocationType, string> = {
   RACK: "R",
   FOUR_CORNER_MACHINE: "M",
   PUSHER_MACHINE: "P",
+  NOT_ASSIGNED: "",
 };
 
 export const CODE_TO_LOCATION_TYPE: Record<string, LocationType> = {

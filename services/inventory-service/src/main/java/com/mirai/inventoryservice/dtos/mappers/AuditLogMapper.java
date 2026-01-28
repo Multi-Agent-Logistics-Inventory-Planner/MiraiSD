@@ -162,6 +162,7 @@ public class AuditLogMapper {
                     .collect(Collectors.toMap(FourCornerMachine::getId, FourCornerMachine::getFourCornerMachineCode));
             case PUSHER_MACHINE -> pusherMachineRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(PusherMachine::getId, PusherMachine::getPusherMachineCode));
+            case NOT_ASSIGNED -> new HashMap<>(); // No location codes for NOT_ASSIGNED
         };
     }
 }

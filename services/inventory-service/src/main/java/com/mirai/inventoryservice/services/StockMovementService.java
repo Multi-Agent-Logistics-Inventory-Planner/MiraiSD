@@ -35,6 +35,7 @@ public class StockMovementService {
     private final RackInventoryRepository rackInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final BoxBinRepository boxBinRepository;
     private final SingleClawMachineRepository singleClawMachineRepository;
     private final DoubleClawMachineRepository doubleClawMachineRepository;
@@ -55,6 +56,7 @@ public class StockMovementService {
             RackInventoryRepository rackInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
+            NotAssignedInventoryRepository notAssignedInventoryRepository,
             BoxBinRepository boxBinRepository,
             SingleClawMachineRepository singleClawMachineRepository,
             DoubleClawMachineRepository doubleClawMachineRepository,
@@ -73,6 +75,7 @@ public class StockMovementService {
         this.rackInventoryRepository = rackInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
+        this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.boxBinRepository = boxBinRepository;
         this.singleClawMachineRepository = singleClawMachineRepository;
         this.doubleClawMachineRepository = doubleClawMachineRepository;
@@ -89,28 +92,25 @@ public class StockMovementService {
      * Creates a single stock movement record
      */
     public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
-        // 1. Load the appropriate inventory record
+        // Load inventory records
         Object inventory = loadInventory(locationType, inventoryId);
-        
-        // 2. Get current quantity
+
         int currentQuantity = getInventoryQuantity(inventory);
-        
-        // 3. Calculate new quantity
+
         int newQuantity = currentQuantity + request.getQuantityChange();
-        
-        // 4. Validate: can't go below 0
+
+        // Validate
         if (newQuantity < 0) {
             throw new InsufficientInventoryException(
                     String.format("Cannot reduce quantity by %d. Current quantity: %d",
                             Math.abs(request.getQuantityChange()), currentQuantity)
             );
         }
-        
-        // 5. Update inventory quantity
+
         setInventoryQuantity(inventory, newQuantity);
         saveInventory(locationType, inventory);
-        
-        // 6. Create stock movement record
+
+        // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         if (request.getNotes() != null) {
             metadata.put("notes", request.getNotes());
@@ -130,10 +130,10 @@ public class StockMovementService {
                 .build();
 
         StockMovement savedMovement = stockMovementRepository.save(movement);
-        
+
         // Create outbox event for Kafka
         eventOutboxService.createStockMovementEvent(savedMovement);
-        
+
         return savedMovement;
     }
 
@@ -143,7 +143,7 @@ public class StockMovementService {
      * If destination inventory doesn't exist, creates it automatically
      */
     public void transferInventory(TransferInventoryRequestDTO request) {
-        // 1. Load source inventory
+        // Load source inventory
         Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
         int sourceQuantity = getInventoryQuantity(sourceInventory);
 
@@ -178,14 +178,12 @@ public class StockMovementService {
             destinationQuantity = 0;
             destinationInventoryId = getInventoryId(destinationInventory);
         }
-        
-        // 4. Update quantities
+
         setInventoryQuantity(sourceInventory, sourceQuantity - request.getQuantity());
         setInventoryQuantity(destinationInventory, destinationQuantity + request.getQuantity());
         saveInventory(request.getSourceLocationType(), sourceInventory);
         saveInventory(request.getDestinationLocationType(), destinationInventory);
-        
-        // 5. Create metadata
+
         Map<String, Object> withdrawalMetadata = new HashMap<>();
         Map<String, Object> depositMetadata = new HashMap<>();
         if (request.getNotes() != null) {
@@ -197,11 +195,9 @@ public class StockMovementService {
         depositMetadata.put("transfer", true);
         depositMetadata.put("inventory_id", destinationInventoryId.toString());
 
-        // 6. Get location IDs
         UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
         UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
 
-        // 7. Create withdrawal movement
         StockMovement withdrawal = StockMovement.builder()
                 .item(getInventoryProduct(sourceInventory))
                 .locationType(request.getSourceLocationType())
@@ -216,7 +212,6 @@ public class StockMovementService {
                 .metadata(withdrawalMetadata)
                 .build();
 
-        // 8. Create deposit movement
         StockMovement deposit = StockMovement.builder()
                 .item(getInventoryProduct(destinationInventory))
                 .locationType(request.getDestinationLocationType())
@@ -230,10 +225,10 @@ public class StockMovementService {
                 .at(OffsetDateTime.now())
                 .metadata(depositMetadata)
                 .build();
-        
+
         StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
         StockMovement savedDeposit = stockMovementRepository.save(deposit);
-        
+
         // Create outbox events for Kafka
         eventOutboxService.createStockMovementEvent(savedWithdrawal);
         eventOutboxService.createStockMovementEvent(savedDeposit);
@@ -278,6 +273,8 @@ public class StockMovementService {
                     .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("FourCornerMachine inventory not found: " + inventoryId));
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new PusherMachineInventoryNotFoundException("PusherMachine inventory not found: " + inventoryId));
+            case NOT_ASSIGNED -> notAssignedInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new NotAssignedInventoryNotFoundException("NotAssigned inventory not found: " + inventoryId));
         };
     }
 
@@ -291,6 +288,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getQuantity();
             case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
             case PusherMachineInventory pmi -> pmi.getQuantity();
+            case NotAssignedInventory nai -> nai.getQuantity();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -305,6 +303,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.setQuantity(quantity);
             case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
             case PusherMachineInventory pmi -> pmi.setQuantity(quantity);
+            case NotAssignedInventory nai -> nai.setQuantity(quantity);
             default -> throw new IllegalArgumentException("Unknown inventory type");
         }
     }
@@ -319,6 +318,7 @@ public class StockMovementService {
             case RACK -> rackInventoryRepository.save((RackInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
+            case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
         }
     }
 
@@ -332,6 +332,7 @@ public class StockMovementService {
             case RACK -> ((RackInventory) inventory).getRack().getId();
             case FOUR_CORNER_MACHINE -> ((FourCornerMachineInventory) inventory).getFourCornerMachine().getId();
             case PUSHER_MACHINE -> ((PusherMachineInventory) inventory).getPusherMachine().getId();
+            case NOT_ASSIGNED -> null;  // No location for NOT_ASSIGNED
         };
     }
 
@@ -345,6 +346,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getItem();
             case FourCornerMachineInventory fcmi -> fcmi.getItem();
             case PusherMachineInventory pmi -> pmi.getItem();
+            case NotAssignedInventory nai -> nai.getItem();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -427,6 +429,12 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield pusherMachineInventoryRepository.save(inv);
             }
+            case NOT_ASSIGNED -> {
+                NotAssignedInventory inv = new NotAssignedInventory();
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield notAssignedInventoryRepository.save(inv);
+            }
         };
     }
 
@@ -443,6 +451,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getId();
             case FourCornerMachineInventory fcmi -> fcmi.getId();
             case PusherMachineInventory pmi -> pmi.getId();
+            case NotAssignedInventory nai -> nai.getId();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
@@ -470,7 +479,7 @@ public class StockMovementService {
                     .map(FourCornerMachine::getFourCornerMachineCode).orElse(null);
             case PUSHER_MACHINE -> pusherMachineRepository.findById(locationId)
                     .map(PusherMachine::getPusherMachineCode).orElse(null);
+            case NOT_ASSIGNED -> "Not Assigned";
         };
     }
 }
-

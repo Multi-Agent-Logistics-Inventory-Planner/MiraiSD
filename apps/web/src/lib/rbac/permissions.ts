@@ -27,6 +27,7 @@ export const Permission = {
   SHIPMENTS_CREATE: "shipments:create",
   SHIPMENTS_UPDATE: "shipments:update",
   SHIPMENTS_DELETE: "shipments:delete",
+  SHIPMENTS_RECEIVE: "shipments:receive",
 
   // Analytics
   ANALYTICS_VIEW: "analytics:view",

@@ -7,17 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Can, Permission } from "@/components/rbac";
-import type {
+import {
   LocationType,
-  StorageLocation,
-  BoxBin,
-  Rack,
-  Cabinet,
-  SingleClawMachine,
-  DoubleClawMachine,
-  KeychainMachine,
-  FourCornerMachine,
-  PusherMachine,
+  type StorageLocation,
+  type BoxBin,
+  type Rack,
+  type Cabinet,
+  type SingleClawMachine,
+  type DoubleClawMachine,
+  type KeychainMachine,
+  type FourCornerMachine,
+  type PusherMachine,
 } from "@/types/api";
 
 function getLocationCode(location: StorageLocation): string {
@@ -49,7 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType>("BOX_BIN");
+  const [locationType, setLocationType] = useState<LocationType>(LocationType.BOX_BIN);
   const [search, setSearch] = useState("");
 
   const list = useLocationsWithCounts(locationType);

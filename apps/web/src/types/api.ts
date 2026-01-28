@@ -58,6 +58,7 @@ export enum LocationType {
   RACK = "RACK",
   FOUR_CORNER_MACHINE = "FOUR_CORNER_MACHINE",
   PUSHER_MACHINE = "PUSHER_MACHINE",
+  NOT_ASSIGNED = "NOT_ASSIGNED",
 }
 
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
@@ -69,6 +70,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.RACK]: "Rack",
   [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
   [LocationType.PUSHER_MACHINE]: "Pusher",
+  [LocationType.NOT_ASSIGNED]: "Not Assigned",
 };
 
 export enum StockMovementReason {
@@ -342,6 +344,10 @@ export interface PusherMachineInventory extends BaseInventory {
   pusherMachineCode: string;
 }
 
+export interface NotAssignedInventory extends BaseInventory {
+  // No location fields - NOT_ASSIGNED has no physical location
+}
+
 // Union type for all inventory
 export type Inventory =
   | BoxBinInventory
@@ -351,7 +357,8 @@ export type Inventory =
   | DoubleClawMachineInventory
   | KeychainMachineInventory
   | FourCornerMachineInventory
-  | PusherMachineInventory;
+  | PusherMachineInventory
+  | NotAssignedInventory;
 
 // Inventory request
 export interface InventoryRequest {
@@ -385,6 +392,7 @@ export interface Shipment {
   totalCost?: number;
   notes?: string;
   createdBy?: User;
+  receivedBy?: User;
   items: ShipmentItem[];
   createdAt: string;
   updatedAt: string;
@@ -407,13 +415,24 @@ export interface ShipmentRequest {
   expectedDeliveryDate?: string;
   totalCost?: number;
   notes?: string;
-  createdBy: string;
+  createdBy?: string;
   items: ShipmentItemRequest[];
+}
+
+export interface DestinationAllocation {
+  locationType: LocationType;
+  locationId?: string;
+  quantity: number;
 }
 
 export interface ShipmentItemReceipt {
   shipmentItemId: string;
-  receivedQuantity: number;
+  // New: multi-destination allocations
+  allocations?: DestinationAllocation[];
+  // Legacy fields for backward compatibility
+  receivedQuantity?: number;
+  destinationLocationType?: LocationType;
+  destinationLocationId?: string;
 }
 
 export interface ReceiveShipmentRequest {
@@ -538,6 +557,7 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
   [LocationType.FOUR_CORNER_MACHINE]: /^M\d+$/,
   [LocationType.PUSHER_MACHINE]: /^P\d+$/,
+  [LocationType.NOT_ASSIGNED]: /^$/,  // No pattern for NOT_ASSIGNED
 };
 
 // Helper type for location endpoints
@@ -550,4 +570,5 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
   [LocationType.FOUR_CORNER_MACHINE]: "four-corner-machines",
   [LocationType.PUSHER_MACHINE]: "pusher-machines",
+  [LocationType.NOT_ASSIGNED]: "not-assigned",
 };

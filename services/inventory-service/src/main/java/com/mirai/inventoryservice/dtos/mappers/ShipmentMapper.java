@@ -10,9 +10,8 @@ import org.mapstruct.MappingConstants;
 
 import java.util.List;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {ProductMapper.class})
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = {ProductMapper.class, UserMapper.class})
 public interface ShipmentMapper {
-    @Mapping(source = "createdBy.id", target = "createdBy")
     ShipmentResponseDTO toResponseDTO(Shipment shipment);
 
     List<ShipmentResponseDTO> toResponseDTOList(List<Shipment> shipments);

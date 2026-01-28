@@ -8,6 +8,6 @@ public enum LocationType {
     CABINET,
     RACK,
     FOUR_CORNER_MACHINE,
-    PUSHER_MACHINE
+    PUSHER_MACHINE,
+    NOT_ASSIGNED
 }
-
