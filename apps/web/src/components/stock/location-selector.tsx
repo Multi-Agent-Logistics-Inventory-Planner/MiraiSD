@@ -49,6 +49,14 @@ function getLocationCode(
       return "keychainMachineCode" in location
         ? location.keychainMachineCode
         : "";
+    case "FOUR_CORNER_MACHINE":
+      return "fourCornerMachineCode" in location
+        ? location.fourCornerMachineCode
+        : "";
+    case "PUSHER_MACHINE":
+      return "pusherMachineCode" in location
+        ? location.pusherMachineCode
+        : "";
     default:
       return "";
   }
