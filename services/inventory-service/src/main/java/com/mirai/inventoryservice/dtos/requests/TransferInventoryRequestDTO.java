@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.dtos.requests;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.validation.ValidTransferDestination;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ValidTransferDestination
 public class TransferInventoryRequestDTO {
     @NotNull(message = "Source location type is required")
     private LocationType sourceLocationType;
@@ -24,15 +26,18 @@ public class TransferInventoryRequestDTO {
     @NotNull(message = "Destination location type is required")
     private LocationType destinationLocationType;
 
-    @NotNull(message = "Destination inventory ID is required")
+    // Destination inventory ID - required if inventory already exists at destination
     private UUID destinationInventoryId;
+
+    // Destination location ID - required if creating new inventory at destination
+    private UUID destinationLocationId;
 
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
 
     private UUID actorId;
-    
+
     private String notes;
 }
 

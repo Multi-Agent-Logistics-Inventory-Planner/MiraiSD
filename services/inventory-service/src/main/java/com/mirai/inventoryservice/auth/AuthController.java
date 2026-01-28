@@ -40,8 +40,15 @@ public class AuthController {
 
             if (jwtService.validateToken(token)) {
                 String role = jwtService.extractRole(token);
-                String personId = jwtService.extractPersonId(token);
                 String personName = jwtService.extractName(token);
+                String email = jwtService.extractEmail(token);
+
+                // Look up the application user ID by email
+                String personId = null;
+                if (email != null && userService.existsByEmail(email)) {
+                    User user = userService.getUserByEmail(email);
+                    personId = user.getId().toString();
+                }
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("valid", true);

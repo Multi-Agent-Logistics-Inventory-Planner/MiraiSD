@@ -128,22 +128,55 @@ public class StockMovementService {
     /**
      * Transfer inventory between two locations
      * Creates TWO stock movement records (withdrawal + deposit)
+     * If destination inventory doesn't exist, creates it automatically
      */
     public void transferInventory(TransferInventoryRequestDTO request) {
         // Load source inventory
         Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
         int sourceQuantity = getInventoryQuantity(sourceInventory);
+<<<<<<< HEAD
         
         // Validate sufficient quantity
+=======
+
+        // 2. Validate sufficient quantity
+>>>>>>> origin/main
         if (sourceQuantity < request.getQuantity()) {
             throw new InsufficientInventoryException(
                     String.format("Cannot transfer %d items. Source only has %d available.",
                             request.getQuantity(), sourceQuantity)
             );
         }
+<<<<<<< HEAD
         
         Object destinationInventory = loadInventory(request.getDestinationLocationType(), request.getDestinationInventoryId());
         int destinationQuantity = getInventoryQuantity(destinationInventory);
+=======
+
+        // 3. Load or create destination inventory
+        Object destinationInventory;
+        int destinationQuantity;
+        UUID destinationInventoryId = request.getDestinationInventoryId();
+
+        if (destinationInventoryId != null) {
+            // Load existing destination inventory
+            destinationInventory = loadInventory(request.getDestinationLocationType(), destinationInventoryId);
+            destinationQuantity = getInventoryQuantity(destinationInventory);
+        } else {
+            // Create new inventory at destination
+            if (request.getDestinationLocationId() == null) {
+                throw new IllegalArgumentException("Either destinationInventoryId or destinationLocationId must be provided");
+            }
+            destinationInventory = createInventoryAtLocation(
+                    request.getDestinationLocationType(),
+                    request.getDestinationLocationId(),
+                    getInventoryProduct(sourceInventory),
+                    0
+            );
+            destinationQuantity = 0;
+            destinationInventoryId = getInventoryId(destinationInventory);
+        }
+>>>>>>> origin/main
         
         setInventoryQuantity(sourceInventory, sourceQuantity - request.getQuantity());
         setInventoryQuantity(destinationInventory, destinationQuantity + request.getQuantity());
@@ -159,7 +192,7 @@ public class StockMovementService {
         withdrawalMetadata.put("transfer", true);
         withdrawalMetadata.put("inventory_id", request.getSourceInventoryId().toString());
         depositMetadata.put("transfer", true);
-        depositMetadata.put("inventory_id", request.getDestinationInventoryId().toString());
+        depositMetadata.put("inventory_id", destinationInventoryId.toString());
 
         UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
         UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
@@ -304,11 +337,89 @@ public class StockMovementService {
     }
 
     /**
+     * Create a new inventory record at the specified location
+     */
+    private Object createInventoryAtLocation(LocationType locationType, UUID locationId,
+            com.mirai.inventoryservice.models.Product product, int quantity) {
+        return switch (locationType) {
+            case BOX_BIN -> {
+                BoxBin boxBin = boxBinRepository.findById(locationId)
+                        .orElseThrow(() -> new BoxBinNotFoundException("BoxBin not found: " + locationId));
+                BoxBinInventory inv = new BoxBinInventory();
+                inv.setBoxBin(boxBin);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield boxBinInventoryRepository.save(inv);
+            }
+            case SINGLE_CLAW_MACHINE -> {
+                SingleClawMachine machine = singleClawMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new SingleClawMachineNotFoundException("SingleClawMachine not found: " + locationId));
+                SingleClawMachineInventory inv = new SingleClawMachineInventory();
+                inv.setSingleClawMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield singleClawMachineInventoryRepository.save(inv);
+            }
+            case DOUBLE_CLAW_MACHINE -> {
+                DoubleClawMachine machine = doubleClawMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new DoubleClawMachineNotFoundException("DoubleClawMachine not found: " + locationId));
+                DoubleClawMachineInventory inv = new DoubleClawMachineInventory();
+                inv.setDoubleClawMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield doubleClawMachineInventoryRepository.save(inv);
+            }
+            case KEYCHAIN_MACHINE -> {
+                KeychainMachine machine = keychainMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new KeychainMachineNotFoundException("KeychainMachine not found: " + locationId));
+                KeychainMachineInventory inv = new KeychainMachineInventory();
+                inv.setKeychainMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield keychainMachineInventoryRepository.save(inv);
+            }
+            case CABINET -> {
+                Cabinet cabinet = cabinetRepository.findById(locationId)
+                        .orElseThrow(() -> new CabinetNotFoundException("Cabinet not found: " + locationId));
+                CabinetInventory inv = new CabinetInventory();
+                inv.setCabinet(cabinet);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield cabinetInventoryRepository.save(inv);
+            }
+            case RACK -> {
+                Rack rack = rackRepository.findById(locationId)
+                        .orElseThrow(() -> new RackNotFoundException("Rack not found: " + locationId));
+                RackInventory inv = new RackInventory();
+                inv.setRack(rack);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield rackInventoryRepository.save(inv);
+            }
+        };
+    }
+
+    /**
+     * Get the ID from an inventory object
+     */
+    private UUID getInventoryId(Object inventory) {
+        return switch (inventory) {
+            case BoxBinInventory bbi -> bbi.getId();
+            case SingleClawMachineInventory scmi -> scmi.getId();
+            case DoubleClawMachineInventory dcmi -> dcmi.getId();
+            case KeychainMachineInventory kmi -> kmi.getId();
+            case CabinetInventory ci -> ci.getId();
+            case RackInventory ri -> ri.getId();
+            default -> throw new IllegalArgumentException("Unknown inventory type");
+        };
+    }
+
+    /**
      * Resolve location UUID → code (for Kafka/UI use)
      */
     public String resolveLocationCode(UUID locationId, LocationType locationType) {
         if (locationId == null) return null;
-        
+
         return switch (locationType) {
             case BOX_BIN -> boxBinRepository.findById(locationId)
                     .map(BoxBin::getBoxBinCode).orElse(null);

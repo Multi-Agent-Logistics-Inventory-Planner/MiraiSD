@@ -19,4 +19,5 @@ public class ProductSummaryDTO {
     private String name;
     private ProductCategory category;
     private ProductSubcategory subcategory;
+    private String imageUrl;
 }

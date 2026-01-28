@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,7 +15,12 @@ import {
   Settings,
   LogOut,
   MoreVertical,
+  ArrowUpDown,
+  RefreshCw,
 } from "lucide-react";
+
+import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
+import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 
 import {
   Sidebar,
@@ -30,6 +36,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -117,13 +124,7 @@ function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
   return role === UserRole.ADMIN ? "default" : "secondary";
 }
 
-function NavItemLink({
-  item,
-  pathname,
-}: {
-  item: NavItem;
-  pathname: string;
-}) {
+function NavItemLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={pathname === item.href}>
@@ -140,12 +141,14 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
   const { can } = usePermissions();
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const visibleInventoryItems = inventoryItems.filter((item) =>
-    can(item.permission)
+    can(item.permission),
   );
   const visibleManagementItems = managementItems.filter((item) =>
-    can(item.permission)
+    can(item.permission),
   );
 
   return (
@@ -165,13 +168,43 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        {(can(Permission.INVENTORY_ADJUST) || can(Permission.INVENTORY_TRANSFER)) && (
+          <div className="flex gap-2 px-3.5 pb-2">
+            {can(Permission.INVENTORY_ADJUST) && (
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => setAdjustOpen(true)}
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                <span>Adjust</span>
+              </Button>
+            )}
+            {can(Permission.INVENTORY_TRANSFER) && (
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => setTransferOpen(true)}
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span>Transfer</span>
+              </Button>
+            )}
+          </div>
+        )}
         {visibleInventoryItems.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">Inventory</SidebarGroupLabel>
+            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
+              Inventory
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleInventoryItems.map((item) => (
-                  <NavItemLink key={item.href} item={item} pathname={pathname} />
+                  <NavItemLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                  />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -179,11 +212,17 @@ export function AppSidebar() {
         )}
         {visibleManagementItems.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">Management</SidebarGroupLabel>
+            <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
+              Management
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleManagementItems.map((item) => (
-                  <NavItemLink key={item.href} item={item} pathname={pathname} />
+                  <NavItemLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                  />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -210,7 +249,7 @@ export function AppSidebar() {
               </span>
               <Badge
                 variant={getRoleBadgeVariant(user.role)}
-                className="w-fit text-xs"
+                className="w-fit text-[10px]"
               >
                 {user.role}
               </Badge>
@@ -258,6 +297,9 @@ export function AppSidebar() {
           </div>
         )}
       </SidebarFooter>
+
+      <AdjustStockDialog open={adjustOpen} onOpenChange={setAdjustOpen} />
+      <TransferStockDialog open={transferOpen} onOpenChange={setTransferOpen} />
     </Sidebar>
   );
 }
