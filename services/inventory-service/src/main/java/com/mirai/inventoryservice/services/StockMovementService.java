@@ -134,24 +134,14 @@ public class StockMovementService {
         // Load source inventory
         Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
         int sourceQuantity = getInventoryQuantity(sourceInventory);
-<<<<<<< HEAD
-        
-        // Validate sufficient quantity
-=======
 
         // 2. Validate sufficient quantity
->>>>>>> origin/main
         if (sourceQuantity < request.getQuantity()) {
             throw new InsufficientInventoryException(
                     String.format("Cannot transfer %d items. Source only has %d available.",
                             request.getQuantity(), sourceQuantity)
             );
         }
-<<<<<<< HEAD
-        
-        Object destinationInventory = loadInventory(request.getDestinationLocationType(), request.getDestinationInventoryId());
-        int destinationQuantity = getInventoryQuantity(destinationInventory);
-=======
 
         // 3. Load or create destination inventory
         Object destinationInventory;
@@ -176,7 +166,6 @@ public class StockMovementService {
             destinationQuantity = 0;
             destinationInventoryId = getInventoryId(destinationInventory);
         }
->>>>>>> origin/main
         
         setInventoryQuantity(sourceInventory, sourceQuantity - request.getQuantity());
         setInventoryQuantity(destinationInventory, destinationQuantity + request.getQuantity());
@@ -396,6 +385,12 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield rackInventoryRepository.save(inv);
             }
+            case NOT_ASSIGNED -> {
+                NotAssignedInventory inv = new NotAssignedInventory();
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield notAssignedInventoryRepository.save(inv);
+            }
         };
     }
 
@@ -410,6 +405,7 @@ public class StockMovementService {
             case KeychainMachineInventory kmi -> kmi.getId();
             case CabinetInventory ci -> ci.getId();
             case RackInventory ri -> ri.getId();
+            case NotAssignedInventory nai -> nai.getId();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
     }
