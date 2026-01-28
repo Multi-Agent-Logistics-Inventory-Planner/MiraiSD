@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Pencil, X, PackageCheck, Trash2 } from "lucide-react";
+import { Package, Pencil, X, PackageCheck, Trash2, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Can, Permission } from "@/components/rbac";
-import type { Shipment, ShipmentStatus } from "@/types/api";
+import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
+import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
 
 interface ShipmentDetailSheetProps {
   open: boolean;
@@ -60,6 +61,85 @@ function formatCurrency(value?: number) {
   return value != null ? `$${value.toFixed(2)}` : "-";
 }
 
+function getLocationLabel(locationType?: LocationType): string {
+  if (!locationType) return "-";
+  return LOCATION_TYPE_LABELS[locationType] ?? locationType;
+}
+
+function AllocationDisplay({ allocation }: { allocation: ShipmentItemAllocation }) {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <Badge variant="outline" className="text-xs font-normal">
+        {getLocationLabel(allocation.locationType)}
+      </Badge>
+      <span className="text-xs text-muted-foreground">
+        x{allocation.quantity}
+      </span>
+      {allocation.locationId && (
+        <span className="font-mono text-xs text-muted-foreground">
+          (ID: {allocation.locationId.slice(0, 8)}...)
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ItemAllocationRow({ item }: { item: ShipmentItem }) {
+  const allocations = item.allocations ?? [];
+  const hasAllocations = allocations.length > 0;
+  const isComplete = item.receivedQuantity >= item.orderedQuantity;
+  const isPartial = item.receivedQuantity > 0 && !isComplete;
+
+  // Show allocations if they exist
+  const showAllocations = hasAllocations;
+
+  return (
+    <>
+      <TableRow className={showAllocations ? "border-b-0" : ""}>
+        <TableCell className="font-medium">{item.item.name}</TableCell>
+        <TableCell className="font-mono text-sm text-muted-foreground">
+          {item.item.sku}
+        </TableCell>
+        <TableCell className="text-right">{item.orderedQuantity}</TableCell>
+        <TableCell className="text-right">{item.receivedQuantity}</TableCell>
+        <TableCell className="text-right">
+          {formatCurrency(item.unitCost)}
+        </TableCell>
+        <TableCell>
+          {isComplete ? (
+            <Badge variant="default" className="text-xs">
+              Complete
+            </Badge>
+          ) : isPartial ? (
+            <Badge variant="secondary" className="text-xs">
+              Partial
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Pending
+            </Badge>
+          )}
+        </TableCell>
+      </TableRow>
+      {showAllocations && (
+        <TableRow className="bg-muted/30">
+          <TableCell colSpan={6} className="py-2 pl-8">
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 mt-1.5 shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium mb-1">Assigned to:</span>
+                {allocations.map((allocation) => (
+                  <AllocationDisplay key={allocation.id} allocation={allocation} />
+                ))}
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
 export function ShipmentDetailSheet({
   open,
   onOpenChange,
@@ -87,6 +167,9 @@ export function ShipmentDetailSheet({
     (sum, item) => sum + item.receivedQuantity,
     0
   );
+
+  const isCompleted = shipment.status === "DELIVERED";
+  const hasPartialReceipts = totalReceived > 0 && totalReceived < totalOrdered;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,50 +293,21 @@ export function ShipmentDetailSheet({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  shipment.items.map((item) => {
-                    const isComplete =
-                      item.receivedQuantity >= item.orderedQuantity;
-                    const isPartial =
-                      item.receivedQuantity > 0 && !isComplete;
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">
-                          {item.item.name}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {item.item.sku}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {item.orderedQuantity}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {item.receivedQuantity}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.unitCost)}
-                        </TableCell>
-                        <TableCell>
-                          {isComplete ? (
-                            <Badge variant="default" className="text-xs">
-                              Complete
-                            </Badge>
-                          ) : isPartial ? (
-                            <Badge variant="secondary" className="text-xs">
-                              Partial
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  shipment.items.map((item) => (
+                    <ItemAllocationRow key={item.id} item={item} />
+                  ))
                 )}
               </TableBody>
             </Table>
           </div>
+
+          {/* Legend for completed/partial shipments */}
+          {(isCompleted || hasPartialReceipts) && (
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              Items with allocations show their assigned storage locations
+            </p>
+          )}
         </div>
 
         {/* Notes */}

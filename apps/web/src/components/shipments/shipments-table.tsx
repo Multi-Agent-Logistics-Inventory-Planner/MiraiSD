@@ -17,7 +17,6 @@ import {
   getShipmentDisplayStatus,
   SHIPMENT_DISPLAY_STATUS_LABELS,
   SHIPMENT_DISPLAY_STATUS_COLORS,
-  type ShipmentDisplayStatus,
 } from "@/lib/shipment-utils";
 
 interface ShipmentsTableProps {

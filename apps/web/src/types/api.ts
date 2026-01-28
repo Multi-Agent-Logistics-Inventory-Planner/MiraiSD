@@ -368,6 +368,14 @@ export interface InventoryRequest {
 
 // Shipment types
 
+export interface ShipmentItemAllocation {
+  id: string;
+  locationType: LocationType;
+  locationId?: string;
+  quantity: number;
+  receivedAt: string;
+}
+
 export interface ShipmentItem {
   id: string;
   item: InventoryItem;
@@ -376,6 +384,7 @@ export interface ShipmentItem {
   unitCost?: number;
   destinationLocationType?: LocationType;
   destinationLocationId?: string;
+  allocations?: ShipmentItemAllocation[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
