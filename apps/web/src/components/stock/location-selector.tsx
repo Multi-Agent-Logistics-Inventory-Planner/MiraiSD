@@ -11,12 +11,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocations } from "@/hooks/queries/use-locations";
-import type { LocationType, StorageLocation } from "@/types/api";
+import { LocationType, type StorageLocation } from "@/types/api";
 import {
   CODE_TO_LOCATION_TYPE,
   LOCATION_TYPE_OPTIONS,
   type LocationSelection,
 } from "@/types/transfer";
+
+const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
 
 interface LocationSelectorProps {
   label: string;
@@ -82,7 +84,7 @@ export function LocationSelector({
       : "";
 
   const locationsQuery = useLocations(
-    value.locationType ?? ("BOX_BIN" as LocationType)
+    value.locationType ?? DEFAULT_LOCATION_TYPE
   );
 
   const matchedLocation = useMemo(() => {
@@ -185,10 +187,29 @@ export function LocationSelector({
           disabled={disabled}
         >
           <SelectTrigger
-            className="flex-1 min-w-0 bg-background"
+            className="flex-1 min-w-0 bg-background px-2 sm:px-3"
             aria-label={`${label || "Location"} type`}
           >
-            <SelectValue placeholder="Location" />
+            <SelectValue>
+              {selectedTypeCode ? (
+                <>
+                  {/* Mobile: show only code */}
+                  <span className="sm:hidden">{selectedTypeCode}</span>
+                  {/* Desktop: show code and label */}
+                  <span className="hidden sm:inline">
+                    {selectedTypeCode} -{" "}
+                    {LOCATION_TYPE_OPTIONS.find((opt) => opt.code === selectedTypeCode)?.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {/* Mobile: no placeholder text */}
+                  <span className="sm:hidden text-muted-foreground">-</span>
+                  {/* Desktop: show Location placeholder */}
+                  <span className="hidden sm:inline text-muted-foreground">Location</span>
+                </>
+              )}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {LOCATION_TYPE_OPTIONS.map((opt) => (
