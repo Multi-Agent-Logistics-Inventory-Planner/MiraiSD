@@ -1,4 +1,10 @@
-import type { Inventory, InventoryItem, ProductCategory } from "@/types/api";
+import type { Inventory, InventoryItem } from "@/types/api";
+import {
+  PRODUCT_CATEGORY_LABELS,
+  PRODUCT_SUBCATEGORY_LABELS,
+  type ProductCategory,
+  type ProductSubcategory,
+} from "@/types/api";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 
 export type AdjustAction = "add" | "subtract";
@@ -61,7 +67,8 @@ export interface ProductListProps {
   disabled: boolean;
   emptyMessage: string;
   searchQuery: string;
-  categoryFilter: ProductCategory | null;
+  categoryFilters: ProductCategory[];
+  subcategoryFilters: ProductSubcategory[];
 }
 
 export interface QuantityControlsProps {
@@ -80,4 +87,39 @@ export interface AdjustSummaryProps {
   quantity: number;
   newQty: number;
   locationLabel: string;
+}
+
+/**
+ * Generate a user-friendly message when no products match the current filters
+ */
+export function getNoResultsMessage(
+  searchQuery: string,
+  categoryFilters: ProductCategory[],
+  subcategoryFilters: ProductSubcategory[]
+): string {
+  const parts: string[] = [];
+
+  if (searchQuery) {
+    parts.push(`matching "${searchQuery}"`);
+  }
+
+  if (categoryFilters.length > 0) {
+    const categoryNames = categoryFilters
+      .map((c) => PRODUCT_CATEGORY_LABELS[c])
+      .join(", ");
+    parts.push(`in ${categoryNames}`);
+  }
+
+  if (subcategoryFilters.length > 0) {
+    const subcategoryNames = subcategoryFilters
+      .map((s) => PRODUCT_SUBCATEGORY_LABELS[s])
+      .join(", ");
+    parts.push(`(${subcategoryNames})`);
+  }
+
+  if (parts.length === 0) {
+    return "No products found";
+  }
+
+  return `No products ${parts.join(" ")}`;
 }

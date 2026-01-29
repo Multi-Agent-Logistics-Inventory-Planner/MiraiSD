@@ -41,10 +41,10 @@ export function ProductSelectCard({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-2 sm:gap-4 py-3 sm:py-4 px-3 border-b last:border-b-0",
+        "w-full flex items-center gap-2 sm:gap-4 py-3 sm:py-4 sm:px-3 border-b last:border-b-0 cursor-pointer",
         "transition-colors text-left",
         selected
-          ? "bg-primary/5 border-l-2 border-l-primary"
+          ? "bg-primary/5 border-l-2 border-l-primary pl-2"
           : "hover:bg-muted/50",
         disabled && "opacity-50 cursor-not-allowed"
       )}
@@ -85,7 +85,7 @@ export function ProductSelectCard({
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-1 shrink-0">
+      <div className="flex flex-col items-center gap-1 shrink-0">
         <span className="text-sm font-semibold tabular-nums">
           {inventory.quantity}
         </span>
