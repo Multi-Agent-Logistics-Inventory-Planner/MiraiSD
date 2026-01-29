@@ -1,18 +1,18 @@
-"use client"
+"use client";
 
-import { useMemo, useRef, useState, useEffect } from "react"
+import { useMemo, useRef, useState, useEffect } from "react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import type { DailySales } from "@/types/api"
+} from "@/components/ui/tooltip";
+import type { DailySales } from "@/types/api";
 
 interface CalendarHeatmapProps {
-  data: DailySales[]
-  year: number
-  isLoading?: boolean
+  data: DailySales[];
+  year: number;
+  isLoading?: boolean;
 }
 
 const MONTHS = [
@@ -28,15 +28,15 @@ const MONTHS = [
   "Oct",
   "Nov",
   "Dec",
-]
+];
 
 function getIntensityLevel(units: number, max: number): number {
-  if (units === 0) return 0
-  const ratio = units / max
-  if (ratio <= 0.25) return 1
-  if (ratio <= 0.5) return 2
-  if (ratio <= 0.75) return 3
-  return 4
+  if (units === 0) return 0;
+  const ratio = units / max;
+  if (ratio <= 0.25) return 1;
+  if (ratio <= 0.5) return 2;
+  if (ratio <= 0.75) return 3;
+  return 4;
 }
 
 function getIntensityClass(level: number): string {
@@ -46,25 +46,25 @@ function getIntensityClass(level: number): string {
     2: "bg-[var(--sales-heatmap-2)]",
     3: "bg-[var(--sales-heatmap-3)]",
     4: "bg-[var(--sales-heatmap-4)]",
-  }
-  return classes[level] ?? classes[0]
+  };
+  return classes[level] ?? classes[0];
 }
 
 interface WeekData {
-  weekStart: Date
-  days: { date: Date; units: number; level: number }[]
+  weekStart: Date;
+  days: { date: Date; units: number; level: number }[];
 }
 
-const GAP_SIZE = 2
-const MIN_CELL_SIZE = 8
-const MAX_CELL_SIZE = 14
+const GAP_SIZE = 2;
+const MIN_CELL_SIZE = 8;
+const MAX_CELL_SIZE = 14;
 
 function getYearPeriodLabel(year: number): string {
-  const currentYear = new Date().getFullYear()
+  const currentYear = new Date().getFullYear();
   if (year === currentYear) {
-    return `${year} (Year to Date)`
+    return `${year} (Year to Date)`;
   }
-  return String(year)
+  return String(year);
 }
 
 export function CalendarHeatmap({
@@ -72,45 +72,47 @@ export function CalendarHeatmap({
   year,
   isLoading,
 }: CalendarHeatmapProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [cellSize, setCellSize] = useState(10)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(10);
 
   const { weeks, monthLabels } = useMemo(() => {
     // Filter data for the selected year
-    const yearData = data.filter((d) => new Date(d.date).getFullYear() === year)
+    const yearData = data.filter(
+      (d) => new Date(d.date).getFullYear() === year,
+    );
 
     // Build sales map from filtered data
-    const salesMap = new Map<string, number>()
-    let max = 1
+    const salesMap = new Map<string, number>();
+    let max = 1;
     for (const item of yearData) {
-      salesMap.set(item.date, item.totalUnits)
-      if (item.totalUnits > max) max = item.totalUnits
+      salesMap.set(item.date, item.totalUnits);
+      if (item.totalUnits > max) max = item.totalUnits;
     }
 
-    const today = new Date()
-    const isCurrentYear = year === today.getFullYear()
+    const today = new Date();
+    const isCurrentYear = year === today.getFullYear();
 
     // Start from Jan 1 of selected year, aligned to Sunday
-    const startDate = new Date(year, 0, 1)
-    startDate.setDate(startDate.getDate() - startDate.getDay())
+    const startDate = new Date(year, 0, 1);
+    startDate.setDate(startDate.getDate() - startDate.getDay());
 
     // End at Dec 31 of year, or today if current year
-    const endDate = isCurrentYear ? today : new Date(year, 11, 31)
+    const endDate = isCurrentYear ? today : new Date(year, 11, 31);
 
-    const weeksData: WeekData[] = []
-    const months: { month: string; weekIndex: number }[] = []
+    const weeksData: WeekData[] = [];
+    const months: { month: string; weekIndex: number }[] = [];
 
-    let currentDate = new Date(startDate)
-    let weekIndex = 0
-    let lastMonth = -1
+    let currentDate = new Date(startDate);
+    let weekIndex = 0;
+    let lastMonth = -1;
 
     while (currentDate <= endDate) {
-      const weekDays: { date: Date; units: number; level: number }[] = []
-      const weekStart = new Date(currentDate)
+      const weekDays: { date: Date; units: number; level: number }[] = [];
+      const weekStart = new Date(currentDate);
 
       for (let day = 0; day < 7; day++) {
-        const dateStr = currentDate.toISOString().split("T")[0]
-        const units = salesMap.get(dateStr) ?? 0
+        const dateStr = currentDate.toISOString().split("T")[0];
+        const units = salesMap.get(dateStr) ?? 0;
 
         // Only track months within the selected year
         if (
@@ -118,67 +120,67 @@ export function CalendarHeatmap({
           currentDate <= endDate &&
           currentDate.getFullYear() === year
         ) {
-          months.push({ month: MONTHS[currentDate.getMonth()], weekIndex })
-          lastMonth = currentDate.getMonth()
+          months.push({ month: MONTHS[currentDate.getMonth()], weekIndex });
+          lastMonth = currentDate.getMonth();
         }
 
         weekDays.push({
           date: new Date(currentDate),
           units,
           level: getIntensityLevel(units, max),
-        })
+        });
 
-        currentDate.setDate(currentDate.getDate() + 1)
+        currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      weeksData.push({ weekStart, days: weekDays })
-      weekIndex++
+      weeksData.push({ weekStart, days: weekDays });
+      weekIndex++;
     }
 
-    return { weeks: weeksData, monthLabels: months }
-  }, [data, year])
+    return { weeks: weeksData, monthLabels: months };
+  }, [data, year]);
 
   useEffect(() => {
     const calculateCellSize = () => {
-      if (!containerRef.current || weeks.length === 0) return
+      if (!containerRef.current || weeks.length === 0) return;
 
-      const containerWidth = containerRef.current.offsetWidth
-      const numWeeks = weeks.length
+      const containerWidth = containerRef.current.offsetWidth;
+      const numWeeks = weeks.length;
       const calculatedSize =
-        (containerWidth - (numWeeks - 1) * GAP_SIZE) / numWeeks
+        (containerWidth - (numWeeks - 1) * GAP_SIZE) / numWeeks;
       const clampedSize = Math.max(
         MIN_CELL_SIZE,
-        Math.min(MAX_CELL_SIZE, Math.floor(calculatedSize))
-      )
-      setCellSize(clampedSize)
-    }
+        Math.min(MAX_CELL_SIZE, Math.floor(calculatedSize)),
+      );
+      setCellSize(clampedSize);
+    };
 
-    calculateCellSize()
+    calculateCellSize();
 
-    const resizeObserver = new ResizeObserver(calculateCellSize)
+    const resizeObserver = new ResizeObserver(calculateCellSize);
     if (containerRef.current) {
-      resizeObserver.observe(containerRef.current)
+      resizeObserver.observe(containerRef.current);
     }
 
-    return () => resizeObserver.disconnect()
-  }, [weeks.length])
+    return () => resizeObserver.disconnect();
+  }, [weeks.length]);
 
   if (isLoading) {
     return (
       <div className="flex h-[180px] items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-sales-secondary border-t-transparent" />
       </div>
-    )
+    );
   }
 
   const cellStyle = {
     width: cellSize,
     height: cellSize,
-  }
+  };
 
-  const gapStyle = { gap: GAP_SIZE }
+  const gapStyle = { gap: GAP_SIZE };
 
-  const gridWidth = weeks.length * cellSize + (weeks.length - 1) * GAP_SIZE
+  const gridWidth = weeks.length * cellSize + (weeks.length - 1) * GAP_SIZE;
 
   return (
     <TooltipProvider delayDuration={50}>
@@ -201,7 +203,7 @@ export function CalendarHeatmap({
         </div>
 
         {/* Heatmap Grid - Centered */}
-        <div className="flex justify-center">
+        <div className="flex overflow-x-auto pb-2 lg:justify-center">
           <div
             className="flex flex-col"
             style={{ ...gapStyle, width: gridWidth }}
@@ -210,10 +212,10 @@ export function CalendarHeatmap({
             {[0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
               <div key={dayOfWeek} className="flex" style={gapStyle}>
                 {weeks.map((week, weekIdx) => {
-                  const day = week.days[dayOfWeek]
-                  const today = new Date()
-                  const isOutsideYear = day?.date.getFullYear() !== year
-                  const isFutureDate = day?.date > today
+                  const day = week.days[dayOfWeek];
+                  const today = new Date();
+                  const isOutsideYear = day?.date.getFullYear() !== year;
+                  const isFutureDate = day?.date > today;
 
                   if (!day || isOutsideYear || isFutureDate) {
                     return (
@@ -222,7 +224,7 @@ export function CalendarHeatmap({
                         className="rounded-[2px] bg-transparent"
                         style={cellStyle}
                       />
-                    )
+                    );
                   }
 
                   return (
@@ -247,7 +249,7 @@ export function CalendarHeatmap({
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                  )
+                  );
                 })}
               </div>
             ))}
@@ -256,8 +258,8 @@ export function CalendarHeatmap({
             <div className="mt-1 flex" style={gapStyle}>
               {weeks.map((_, weekIdx) => {
                 const monthLabel = monthLabels.find(
-                  (m) => m.weekIndex === weekIdx
-                )
+                  (m) => m.weekIndex === weekIdx,
+                );
                 return (
                   <div
                     key={weekIdx}
@@ -270,12 +272,12 @@ export function CalendarHeatmap({
                       </span>
                     )}
                   </div>
-                )
+                );
               })}
             </div>
           </div>
         </div>
       </div>
     </TooltipProvider>
-  )
+  );
 }
