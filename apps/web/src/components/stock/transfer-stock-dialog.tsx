@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Filter, Loader2, Search, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,17 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import {
-  ProductCategory,
-  PRODUCT_CATEGORY_LABELS,
-} from "@/types/api";
+import { ProductCategory, ProductSubcategory } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
@@ -34,6 +24,7 @@ import {
 import { LocationSelector } from "./location-selector";
 import { ProductTransferCard } from "./product-transfer-card";
 import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
+import { ProductFilterHeader, getNoResultsMessage } from "./adjust";
 import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
 import { cn } from "@/lib/utils";
 
@@ -63,19 +54,21 @@ export function TransferStockDialog({
     Record<string, number>
   >({});
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | null>(null);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [categoryFilters, setCategoryFilters] = useState<ProductCategory[]>([]);
+  const [subcategoryFilters, setSubcategoryFilters] = useState<
+    ProductSubcategory[]
+  >([]);
 
   const batchTransferMutation = useBatchTransferMutation();
 
   const sourceInventoryQuery = useLocationInventory(
     sourceLocation.locationType ?? undefined,
-    sourceLocation.locationId ?? undefined,
+    sourceLocation.locationId ?? undefined
   );
 
   const destinationInventoryQuery = useLocationInventory(
     destinationLocation.locationType ?? undefined,
-    destinationLocation.locationId ?? undefined,
+    destinationLocation.locationId ?? undefined
   );
 
   useEffect(() => {
@@ -84,8 +77,8 @@ export function TransferStockDialog({
       setDestinationLocation(EMPTY_LOCATION);
       setTransferQuantities({});
       setSearchQuery("");
-      setCategoryFilter(null);
-      setIsFilterOpen(false);
+      setCategoryFilters([]);
+      setSubcategoryFilters([]);
     }
   }, [open]);
 
@@ -101,19 +94,29 @@ export function TransferStockDialog({
   const filteredInventory = useMemo(() => {
     let result = sourceInventory;
 
-    if (categoryFilter) {
-      result = result.filter((inv) => inv.item.category === categoryFilter);
+    if (categoryFilters.length > 0) {
+      result = result.filter((inv) =>
+        categoryFilters.includes(inv.item.category)
+      );
+    }
+
+    if (subcategoryFilters.length > 0) {
+      result = result.filter(
+        (inv) =>
+          inv.item.subcategory &&
+          subcategoryFilters.includes(inv.item.subcategory)
+      );
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter((inv) =>
-        inv.item.name.toLowerCase().includes(query),
+        inv.item.name.toLowerCase().includes(query)
       );
     }
 
     return result;
-  }, [sourceInventory, searchQuery, categoryFilter]);
+  }, [sourceInventory, searchQuery, categoryFilters, subcategoryFilters]);
 
   const availableCategories = useMemo(() => {
     const categories = new Set<ProductCategory>();
@@ -125,7 +128,18 @@ export function TransferStockDialog({
     return Array.from(categories).sort();
   }, [sourceInventory]);
 
-  const hasActiveFilters = categoryFilter !== null;
+  const availableSubcategories = useMemo(() => {
+    const subcategories = new Set<ProductSubcategory>();
+    sourceInventory.forEach((inv) => {
+      if (inv.item.subcategory) {
+        subcategories.add(inv.item.subcategory);
+      }
+    });
+    return Array.from(subcategories).sort();
+  }, [sourceInventory]);
+
+  const hasActiveFilters =
+    categoryFilters.length > 0 || subcategoryFilters.length > 0;
 
   const transferItems = useMemo(() => {
     return sourceInventory.filter((inv) => {
@@ -164,6 +178,20 @@ export function TransferStockDialog({
     }));
   }
 
+  function handleCategoryChange(categories: ProductCategory[]) {
+    setCategoryFilters(categories);
+    // Clear subcategory filters if Blind Box is deselected
+    if (!categories.includes(ProductCategory.BLIND_BOX)) {
+      setSubcategoryFilters([]);
+    }
+  }
+
+  function handleClearFilters() {
+    setCategoryFilters([]);
+    setSubcategoryFilters([]);
+    setSearchQuery("");
+  }
+
   async function handleSubmit() {
     const actorId = user?.personId || user?.id;
     if (!actorId) {
@@ -187,19 +215,25 @@ export function TransferStockDialog({
       return;
     }
 
+    // Extract validated values for type safety
+    const srcLocationType = sourceLocation.locationType;
+    const srcLocationId = sourceLocation.locationId;
+    const destLocationType = destinationLocation.locationType;
+    const destLocationId = destinationLocation.locationId;
+
     const transfers: BatchTransferItem[] = transferItems.map((inv) => {
       const existingDestInventory = destinationInventory.find(
-        (destInv) => destInv.item.id === inv.item.id,
+        (destInv) => destInv.item.id === inv.item.id
       );
 
       return {
         payload: {
-          sourceLocationType: sourceLocation.locationType!,
+          sourceLocationType: srcLocationType,
           sourceInventoryId: inv.id,
-          destinationLocationType: destinationLocation.locationType!,
+          destinationLocationType: destLocationType,
           ...(existingDestInventory
             ? { destinationInventoryId: existingDestInventory.id }
-            : { destinationLocationId: destinationLocation.locationId! }),
+            : { destinationLocationId: destLocationId }),
           quantity: transferQuantities[inv.id] ?? 0,
           actorId,
         },
@@ -211,8 +245,8 @@ export function TransferStockDialog({
     try {
       const result = await batchTransferMutation.mutateAsync({
         transfers,
-        sourceLocationId: sourceLocation.locationId!,
-        destinationLocationId: destinationLocation.locationId!,
+        sourceLocationId: srcLocationId,
+        destinationLocationId: destLocationId,
       });
 
       if (result.failed.length === 0) {
@@ -243,6 +277,10 @@ export function TransferStockDialog({
   const progress = batchTransferMutation.progress;
   const isTransferring = batchTransferMutation.isPending;
 
+  const locationLabel = sourceLocation.locationType
+    ? `${LOCATION_TYPE_CODES[sourceLocation.locationType]}${sourceLocation.locationCode}`
+    : "";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl h-[95dvh] max-h-[95dvh] flex flex-col overflow-hidden p-0">
@@ -251,8 +289,8 @@ export function TransferStockDialog({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
-          {/* Location selectors - fixed height, never shrinks */}
-          <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-16 bg-muted py-4 px-5 rounded-xl mt-4">
+          {/* Location selectors */}
+          <div className="shrink-0 grid grid-cols-2 gap-4 sm:gap-16 bg-muted py-4 px-4 rounded-xl mt-4">
             <LocationSelector
               label="From"
               value={sourceLocation}
@@ -291,114 +329,24 @@ export function TransferStockDialog({
             </p>
           ) : null}
 
-          {/* Products section - this is the only section that grows/shrinks */}
+          {/* Products section */}
           {hasValidSource ? (
             <div className="flex-1 min-h-0 flex flex-col mt-4">
-              {/* Header with search and filter */}
-              <div className="shrink-0 flex flex-col gap-2 mb-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs sm:text-sm text-muted-foreground">
-                    Products at{" "}
-                    {sourceLocation.locationType
-                      ? LOCATION_TYPE_CODES[sourceLocation.locationType]
-                      : ""}
-                    {sourceLocation.locationCode} ({sourceInventory.length})
-                  </Label>
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCategoryFilter(null);
-                        setSearchQuery("");
-                      }}
-                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                      disabled={isTransferring}
-                    >
-                      <X className="h-3 w-3" />
-                      Clear filters
-                    </button>
-                  )}
-                </div>
-
-                {sourceInventory.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Search products..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-9 pl-8 text-sm"
-                        disabled={isTransferring}
-                      />
-                    </div>
-                    <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className={cn(
-                            "h-9 w-9 shrink-0",
-                            hasActiveFilters && "border-primary text-primary"
-                          )}
-                          disabled={isTransferring}
-                        >
-                          <Filter className="h-4 w-4" />
-                          {hasActiveFilters && (
-                            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
-                              1
-                            </span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-56 p-3">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Filter by category</span>
-                            {categoryFilter && (
-                              <button
-                                type="button"
-                                onClick={() => setCategoryFilter(null)}
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                Clear
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {availableCategories.map((category) => (
-                              <Badge
-                                key={category}
-                                variant={categoryFilter === category ? "default" : "outline"}
-                                className={cn(
-                                  "cursor-pointer text-xs",
-                                  categoryFilter === category
-                                    ? "bg-primary hover:bg-primary/90"
-                                    : "hover:bg-muted"
-                                )}
-                                onClick={() => {
-                                  setCategoryFilter(
-                                    categoryFilter === category ? null : category
-                                  );
-                                }}
-                              >
-                                {PRODUCT_CATEGORY_LABELS[category]}
-                              </Badge>
-                            ))}
-                            {availableCategories.length === 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                No categories available
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-              </div>
+              <ProductFilterHeader
+                title={`Products at ${locationLabel}`}
+                itemCount={sourceInventory.length}
+                searchQuery={searchQuery}
+                categoryFilters={categoryFilters}
+                subcategoryFilters={subcategoryFilters}
+                availableCategories={availableCategories}
+                availableSubcategories={availableSubcategories}
+                disabled={isTransferring}
+                showFilters={sourceInventory.length > 0}
+                onSearchChange={setSearchQuery}
+                onCategoryChange={handleCategoryChange}
+                onSubcategoryChange={setSubcategoryFilters}
+                onClearFilters={handleClearFilters}
+              />
 
               {sourceInventoryQuery.isLoading ? (
                 <div className="flex-1 flex items-center justify-center py-4">
@@ -410,18 +358,12 @@ export function TransferStockDialog({
                 </div>
               ) : filteredInventory.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
-                  {searchQuery && categoryFilter
-                    ? `No products match "${searchQuery}" in ${PRODUCT_CATEGORY_LABELS[categoryFilter]}`
-                    : searchQuery
-                      ? `No products match "${searchQuery}"`
-                      : categoryFilter
-                        ? `No ${PRODUCT_CATEGORY_LABELS[categoryFilter]} products`
-                        : "No products found"}
+                  {getNoResultsMessage(searchQuery, categoryFilters, subcategoryFilters)}
                 </div>
               ) : (
                 <div className="flex-1 min-h-0">
                   <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-                    <div className="pr-4 pb-2">
+                    <div className="pb-2">
                       {filteredInventory.map((inv) => (
                         <ProductTransferCard
                           key={inv.id}
@@ -446,13 +388,13 @@ export function TransferStockDialog({
           )}
         </div>
 
-        {/* Fixed bottom section - summary, progress, and footer */}
+        {/* Fixed bottom section */}
         <div className="shrink-0 border-t bg-background">
           {/* Transfer summary */}
           <div
             className={cn(
               "overflow-hidden transition-all duration-200 ease-in-out",
-              hasItemsToTransfer ? "max-h-32 opacity-100" : "max-h-0 opacity-0",
+              hasItemsToTransfer ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
             )}
             aria-live="polite"
             aria-atomic="true"

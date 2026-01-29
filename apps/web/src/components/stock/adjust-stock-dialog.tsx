@@ -12,7 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ProductCategory, StockMovementReason } from "@/types/api";
+import {
+  ProductCategory,
+  ProductSubcategory,
+  StockMovementReason,
+} from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,12 +58,19 @@ export function AdjustStockDialog({
   const queryClient = useQueryClient();
 
   const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
-  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
+    null
+  );
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    null
+  );
   const [action, setAction] = useState<AdjustAction>("subtract");
   const [quantity, setQuantity] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | null>(null);
+  const [categoryFilters, setCategoryFilters] = useState<ProductCategory[]>([]);
+  const [subcategoryFilters, setSubcategoryFilters] = useState<
+    ProductSubcategory[]
+  >([]);
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
 
   const adjustMutation = useAdjustStockMutation();
@@ -71,7 +82,6 @@ export function AdjustStockDialog({
 
   const productInventoryQuery = useProductInventory();
 
-  // Reset all state when dialog closes
   useEffect(() => {
     if (!open) {
       setLocation(EMPTY_LOCATION);
@@ -80,12 +90,12 @@ export function AdjustStockDialog({
       setAction("subtract");
       setQuantity(1);
       setSearchQuery("");
-      setCategoryFilter(null);
+      setCategoryFilters([]);
+      setSubcategoryFilters([]);
       setQuantityWarning(null);
     }
   }, [open]);
 
-  // Clear selected product when location changes
   useEffect(() => {
     if (location.locationId) {
       setSelectedInventoryId(null);
@@ -95,25 +105,23 @@ export function AdjustStockDialog({
     }
   }, [location.locationId]);
 
-  // Clear selected product and reset filters when action changes
   useEffect(() => {
     setSelectedInventoryId(null);
     setSelectedProductId(null);
     setQuantity(1);
     setQuantityWarning(null);
     setSearchQuery("");
-    setCategoryFilter(null);
+    setCategoryFilters([]);
+    setSubcategoryFilters([]);
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
   const allProductsWithInventory = productInventoryQuery.data ?? [];
 
-  // Filter products for add action: only those with stock somewhere
   const productsWithStock = useMemo(() => {
     return allProductsWithInventory.filter((p) => p.totalQuantity > 0);
   }, [allProductsWithInventory]);
 
-  // Normalize items for the product list
   const normalizedInventory: NormalizedInventory[] = useMemo(() => {
     return inventory.map(normalizeInventory);
   }, [inventory]);
@@ -122,12 +130,12 @@ export function AdjustStockDialog({
     return productsWithStock.map(createNormalizedInventory);
   }, [productsWithStock]);
 
-  // Categories for filtering
   const availableCategories = useMemo(() => {
     const categories = new Set<ProductCategory>();
     const items = action === "subtract" ? inventory : productsWithStock;
     items.forEach((item) => {
-      const category = "item" in item ? item.item.category : item.product.category;
+      const category =
+        "item" in item ? item.item.category : item.product.category;
       if (category) {
         categories.add(category);
       }
@@ -135,17 +143,29 @@ export function AdjustStockDialog({
     return Array.from(categories).sort();
   }, [action, inventory, productsWithStock]);
 
-  // Selected inventory (for subtract action)
+  const availableSubcategories = useMemo(() => {
+    const subcategories = new Set<ProductSubcategory>();
+    const items = action === "subtract" ? inventory : productsWithStock;
+    items.forEach((item) => {
+      const subcategory =
+        "item" in item ? item.item.subcategory : item.product.subcategory;
+      if (subcategory) {
+        subcategories.add(subcategory);
+      }
+    });
+    return Array.from(subcategories).sort();
+  }, [action, inventory, productsWithStock]);
+
   const selectedInventory = useMemo(() => {
     return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
   }, [inventory, selectedInventoryId]);
 
-  // Selected product (for add action)
   const selectedProduct = useMemo(() => {
-    return productsWithStock.find((p) => p.product.id === selectedProductId) ?? null;
+    return (
+      productsWithStock.find((p) => p.product.id === selectedProductId) ?? null
+    );
   }, [productsWithStock, selectedProductId]);
 
-  // Check if selected product already exists at location (for add action)
   const existingInventoryForProduct = useMemo(() => {
     if (!selectedProductId || action !== "add") return null;
     return inventory.find((inv) => inv.item.id === selectedProductId) ?? null;
@@ -154,23 +174,25 @@ export function AdjustStockDialog({
   const hasValidLocation = Boolean(location.locationId);
   const isAdjusting = adjustMutation.isPending;
 
-  // Determine if we have a selected product based on action
-  const hasSelectedProduct = action === "subtract"
-    ? Boolean(selectedInventory)
-    : Boolean(selectedProduct);
+  const hasSelectedProduct =
+    action === "subtract"
+      ? Boolean(selectedInventory)
+      : Boolean(selectedProduct);
 
-  // Get current quantity at location and product name based on action
-  const currentQtyAtLocation = action === "subtract"
-    ? (selectedInventory?.quantity ?? 0)
-    : (existingInventoryForProduct?.quantity ?? 0);
+  const currentQtyAtLocation =
+    action === "subtract"
+      ? selectedInventory?.quantity ?? 0
+      : existingInventoryForProduct?.quantity ?? 0;
 
-  const selectedProductName = action === "subtract"
-    ? selectedInventory?.item.name
-    : selectedProduct?.product.name;
+  const selectedProductName =
+    action === "subtract"
+      ? selectedInventory?.item.name
+      : selectedProduct?.product.name;
 
-  const newQty = action === "subtract"
-    ? currentQtyAtLocation - quantity
-    : currentQtyAtLocation + quantity;
+  const newQty =
+    action === "subtract"
+      ? currentQtyAtLocation - quantity
+      : currentQtyAtLocation + quantity;
 
   const canSubmit =
     hasValidLocation &&
@@ -179,10 +201,9 @@ export function AdjustStockDialog({
     newQty >= 0 &&
     !isAdjusting;
 
-  // Source list count based on action
-  const sourceListCount = action === "subtract" ? inventory.length : productsWithStock.length;
+  const sourceListCount =
+    action === "subtract" ? inventory.length : productsWithStock.length;
 
-  // Get the normalized selected item for SelectedProductCard
   const selectedNormalizedItem: NormalizedInventory | null = useMemo(() => {
     if (action === "subtract" && selectedInventory) {
       return normalizeInventory(selectedInventory);
@@ -243,10 +264,23 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
   }
 
+  function handleCategoryChange(categories: ProductCategory[]) {
+    setCategoryFilters(categories);
+    // Clear subcategory filters if Blind Box is deselected
+    if (!categories.includes(ProductCategory.BLIND_BOX)) {
+      setSubcategoryFilters([]);
+    }
+  }
+
+  function handleClearFilters() {
+    setCategoryFilters([]);
+    setSubcategoryFilters([]);
+    setSearchQuery("");
+  }
+
   function handleProductSelect(id: string, itemQuantity: number) {
     if (action === "subtract") {
       setSelectedInventoryId(id);
-      // Reset quantity if it exceeds selection's stock
       if (quantity > itemQuantity) {
         setQuantity(Math.max(1, itemQuantity));
       }
@@ -272,9 +306,10 @@ export function AdjustStockDialog({
       return;
     }
 
-    const reason = action === "subtract"
-      ? StockMovementReason.SALE
-      : StockMovementReason.ADJUSTMENT;
+    const reason =
+      action === "subtract"
+        ? StockMovementReason.SALE
+        : StockMovementReason.ADJUSTMENT;
 
     try {
       if (action === "subtract") {
@@ -340,7 +375,11 @@ export function AdjustStockDialog({
       }
 
       await queryClient.invalidateQueries({
-        queryKey: ["locationInventory", location.locationType, location.locationId],
+        queryKey: [
+          "locationInventory",
+          location.locationType,
+          location.locationId,
+        ],
       });
 
       toast({ title: "Stock adjusted" });
@@ -355,9 +394,10 @@ export function AdjustStockDialog({
     ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
     : "";
 
-  const listTitle = action === "subtract"
-    ? `Products at ${locationLabel}`
-    : `Select product to add to ${locationLabel}`;
+  const listTitle =
+    action === "subtract"
+      ? `Products at ${locationLabel}`
+      : `Select product to add to ${locationLabel}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -373,14 +413,16 @@ export function AdjustStockDialog({
             <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-1.5">
                 <Label>Location</Label>
-                {action === "add" && hasValidLocation && location.locationType && (
-                  <InventoryPreviewTooltip
-                    locationType={location.locationType}
-                    locationCode={location.locationCode}
-                    inventory={inventory}
-                    isLoading={inventoryQuery.isLoading}
-                  />
-                )}
+                {action === "add" &&
+                  hasValidLocation &&
+                  location.locationType && (
+                    <InventoryPreviewTooltip
+                      locationType={location.locationType}
+                      locationCode={location.locationCode}
+                      inventory={inventory}
+                      isLoading={inventoryQuery.isLoading}
+                    />
+                  )}
               </div>
               <LocationSelector
                 label=""
@@ -427,23 +469,31 @@ export function AdjustStockDialog({
                 title={listTitle}
                 itemCount={sourceListCount}
                 searchQuery={searchQuery}
-                categoryFilter={categoryFilter}
+                categoryFilters={categoryFilters}
+                subcategoryFilters={subcategoryFilters}
                 availableCategories={availableCategories}
+                availableSubcategories={availableSubcategories}
                 disabled={isAdjusting}
                 showFilters={sourceListCount > 0}
                 onSearchChange={setSearchQuery}
-                onCategoryChange={setCategoryFilter}
-                onClearFilters={() => {
-                  setCategoryFilter(null);
-                  setSearchQuery("");
-                }}
+                onCategoryChange={handleCategoryChange}
+                onSubcategoryChange={setSubcategoryFilters}
+                onClearFilters={handleClearFilters}
               />
 
               <ProductList
-                items={action === "subtract" ? normalizedInventory : normalizedProducts}
-                selectedId={action === "subtract" ? selectedInventoryId : selectedProductId}
+                items={
+                  action === "subtract" ? normalizedInventory : normalizedProducts
+                }
+                selectedId={
+                  action === "subtract" ? selectedInventoryId : selectedProductId
+                }
                 onSelect={handleProductSelect}
-                isLoading={action === "subtract" ? inventoryQuery.isLoading : productInventoryQuery.isLoading}
+                isLoading={
+                  action === "subtract"
+                    ? inventoryQuery.isLoading
+                    : productInventoryQuery.isLoading
+                }
                 disabled={isAdjusting}
                 emptyMessage={
                   action === "subtract"
@@ -452,10 +502,13 @@ export function AdjustStockDialog({
                 }
                 noResultsMessage="No products found"
                 searchQuery={searchQuery}
-                categoryFilter={categoryFilter}
+                categoryFilters={categoryFilters}
+                subcategoryFilters={subcategoryFilters}
               />
             </div>
-          ) : hasValidLocation && hasSelectedProduct && selectedNormalizedItem ? (
+          ) : hasValidLocation &&
+            hasSelectedProduct &&
+            selectedNormalizedItem ? (
             <SelectedProductCard
               inventory={selectedNormalizedItem}
               existingQuantityAtLocation={currentQtyAtLocation}
