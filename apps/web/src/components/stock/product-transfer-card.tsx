@@ -11,12 +11,14 @@ import {
   PRODUCT_SUBCATEGORY_LABELS,
   type Inventory,
 } from "@/types/api";
+import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface ProductTransferCardProps {
   inventory: Inventory;
   transferQuantity: number;
   onQuantityChange: (qty: number) => void;
   maxQuantity: number;
+  disabled?: boolean;
 }
 
 export function ProductTransferCard({
@@ -24,9 +26,11 @@ export function ProductTransferCard({
   transferQuantity,
   onQuantityChange,
   maxQuantity,
+  disabled = false,
 }: ProductTransferCardProps) {
   const [imageError, setImageError] = useState(false);
   const item = inventory.item;
+  const safeImageUrl = getSafeImageUrl(item.imageUrl);
 
   function handleDecrement() {
     if (transferQuantity > 0) {
@@ -51,7 +55,7 @@ export function ProductTransferCard({
     onQuantityChange(clamped);
   }
 
-  const hasImage = item.imageUrl && !imageError;
+  const hasImage = safeImageUrl && !imageError;
   const categoryLabel = PRODUCT_CATEGORY_LABELS[item.category];
   const subcategoryLabel = item.subcategory
     ? PRODUCT_SUBCATEGORY_LABELS[item.subcategory]
@@ -62,7 +66,7 @@ export function ProductTransferCard({
       <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
         {hasImage ? (
           <Image
-            src={item.imageUrl!}
+            src={safeImageUrl}
             alt={item.name}
             fill
             sizes="(max-width: 640px) 48px, 80px"
@@ -94,17 +98,17 @@ export function ProductTransferCard({
       </div>
 
       <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-6 w-6 sm:h-7 sm:w-7"
+            className="h-9 w-9 sm:h-8 sm:w-8 touch-manipulation"
             onClick={handleDecrement}
-            disabled={transferQuantity <= 0}
+            disabled={disabled || transferQuantity <= 0}
             aria-label={`Decrease quantity for ${item.name}`}
           >
-            <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            <Minus className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
           </Button>
           <Input
             type="text"
@@ -112,19 +116,20 @@ export function ProductTransferCard({
             pattern="[0-9]*"
             value={transferQuantity}
             onChange={(e) => handleInputChange(e.target.value)}
-            className="h-6 w-10 sm:h-7 sm:w-14 text-center text-xs sm:text-sm"
+            disabled={disabled}
+            className="h-9 w-12 sm:h-8 sm:w-14 text-center text-sm touch-manipulation"
             aria-label={`Transfer quantity for ${item.name}`}
           />
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-6 w-6 sm:h-7 sm:w-7"
+            className="h-9 w-9 sm:h-8 sm:w-8 touch-manipulation"
             onClick={handleIncrement}
-            disabled={transferQuantity >= maxQuantity}
+            disabled={disabled || transferQuantity >= maxQuantity}
             aria-label={`Increase quantity for ${item.name}`}
           >
-            <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            <Plus className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
           </Button>
         </div>
         <span className="text-xs text-muted-foreground hidden sm:block">

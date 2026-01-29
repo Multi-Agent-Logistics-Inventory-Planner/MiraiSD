@@ -143,7 +143,6 @@ export default function ProductsPage() {
       <AdjustStockDialog
         open={adjustOpen}
         onOpenChange={setAdjustOpen}
-        product={selected?.product ?? null}
       />
 
       <TransferStockDialog

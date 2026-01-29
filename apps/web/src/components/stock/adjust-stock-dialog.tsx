@@ -1,260 +1,506 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Minus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ProductCategory, StockMovementReason } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
+import { useProductInventory } from "@/hooks/queries/use-product-inventory";
 import { useAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
-import { StockMovementReason, type Product } from "@/types/api";
-
-const ADJUST_REASONS = [
-  StockMovementReason.SALE,
-  StockMovementReason.DAMAGE,
-  StockMovementReason.ADJUSTMENT,
-  StockMovementReason.RETURN,
-  StockMovementReason.RESTOCK,
-] as const;
-
-const schema = z.object({
-  inventoryId: z.string().min(1, "Select a location"),
-  quantityChange: z.coerce.number().int().refine((v) => v !== 0, {
-    message: "Adjustment must be non-zero",
-  }),
-  reason: z.enum(ADJUST_REASONS),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { createInventory } from "@/lib/api/inventory";
+import { parseQuantityInput, clampQuantity } from "@/lib/utils/validation";
+import { LocationSelector } from "./location-selector";
+import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
+import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
+import {
+  ProductList,
+  SelectedProductCard,
+  ProductFilterHeader,
+  type AdjustAction,
+  type NormalizedInventory,
+  createNormalizedInventory,
+  normalizeInventory,
+} from "./adjust";
 
 interface AdjustStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product?: Product | null;
 }
+
+const EMPTY_LOCATION: LocationSelection = {
+  locationType: null,
+  locationId: null,
+  locationCode: "",
+};
 
 export function AdjustStockDialog({
   open,
   onOpenChange,
-  product,
 }: AdjustStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const inventoryQuery = useInventoryByItemId(product?.id);
+  const queryClient = useQueryClient();
+
+  const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [action, setAction] = useState<AdjustAction>("subtract");
+  const [quantity, setQuantity] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<ProductCategory | null>(null);
+  const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
+
   const adjustMutation = useAdjustStockMutation();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      inventoryId: "",
-      quantityChange: 0,
-      reason: StockMovementReason.ADJUSTMENT,
-      notes: "",
-    },
-  });
+  const inventoryQuery = useLocationInventory(
+    location.locationType ?? undefined,
+    location.locationId ?? undefined
+  );
 
+  const productInventoryQuery = useProductInventory();
+
+  // Reset all state when dialog closes
   useEffect(() => {
     if (!open) {
-      form.reset();
+      setLocation(EMPTY_LOCATION);
+      setSelectedInventoryId(null);
+      setSelectedProductId(null);
+      setAction("subtract");
+      setQuantity(1);
+      setSearchQuery("");
+      setCategoryFilter(null);
+      setQuantityWarning(null);
     }
-  }, [open, form]);
+  }, [open]);
 
+  // Clear selected product when location changes
   useEffect(() => {
-    if (!open) return;
-    if (!inventoryQuery.data || inventoryQuery.data.length === 0) return;
-    if (form.getValues("inventoryId")) return;
-    form.setValue("inventoryId", inventoryQuery.data[0].inventoryId);
-  }, [open, inventoryQuery.data, form]);
+    if (location.locationId) {
+      setSelectedInventoryId(null);
+      setSelectedProductId(null);
+      setQuantity(1);
+      setQuantityWarning(null);
+    }
+  }, [location.locationId]);
 
-  const selectedInventoryId = form.watch("inventoryId");
-  const quantityChange = form.watch("quantityChange") ?? 0;
+  // Clear selected product and reset filters when action changes
+  useEffect(() => {
+    setSelectedInventoryId(null);
+    setSelectedProductId(null);
+    setQuantity(1);
+    setQuantityWarning(null);
+    setSearchQuery("");
+    setCategoryFilter(null);
+  }, [action]);
 
+  const inventory = inventoryQuery.data ?? [];
+  const allProductsWithInventory = productInventoryQuery.data ?? [];
+
+  // Filter products for add action: only those with stock somewhere
+  const productsWithStock = useMemo(() => {
+    return allProductsWithInventory.filter((p) => p.totalQuantity > 0);
+  }, [allProductsWithInventory]);
+
+  // Normalize items for the product list
+  const normalizedInventory: NormalizedInventory[] = useMemo(() => {
+    return inventory.map(normalizeInventory);
+  }, [inventory]);
+
+  const normalizedProducts: NormalizedInventory[] = useMemo(() => {
+    return productsWithStock.map(createNormalizedInventory);
+  }, [productsWithStock]);
+
+  // Categories for filtering
+  const availableCategories = useMemo(() => {
+    const categories = new Set<ProductCategory>();
+    const items = action === "subtract" ? inventory : productsWithStock;
+    items.forEach((item) => {
+      const category = "item" in item ? item.item.category : item.product.category;
+      if (category) {
+        categories.add(category);
+      }
+    });
+    return Array.from(categories).sort();
+  }, [action, inventory, productsWithStock]);
+
+  // Selected inventory (for subtract action)
   const selectedInventory = useMemo(() => {
-    return inventoryQuery.data?.find(
-      (entry) => entry.inventoryId === selectedInventoryId
-    );
-  }, [inventoryQuery.data, selectedInventoryId]);
+    return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
+  }, [inventory, selectedInventoryId]);
 
-  const currentQty = selectedInventory?.quantity ?? 0;
-  const previewQty = currentQty + quantityChange;
+  // Selected product (for add action)
+  const selectedProduct = useMemo(() => {
+    return productsWithStock.find((p) => p.product.id === selectedProductId) ?? null;
+  }, [productsWithStock, selectedProductId]);
 
-  const isSaving = adjustMutation.isPending;
-  const isInventoryLoading = inventoryQuery.isLoading;
-  const hasInventory =
-    !isInventoryLoading && (inventoryQuery.data?.length ?? 0) > 0 && Boolean(product?.id);
+  // Check if selected product already exists at location (for add action)
+  const existingInventoryForProduct = useMemo(() => {
+    if (!selectedProductId || action !== "add") return null;
+    return inventory.find((inv) => inv.item.id === selectedProductId) ?? null;
+  }, [inventory, selectedProductId, action]);
 
-  async function onSubmit(values: FormValues) {
+  const hasValidLocation = Boolean(location.locationId);
+  const isAdjusting = adjustMutation.isPending;
+
+  // Determine if we have a selected product based on action
+  const hasSelectedProduct = action === "subtract"
+    ? Boolean(selectedInventory)
+    : Boolean(selectedProduct);
+
+  // Get current quantity at location and product name based on action
+  const currentQtyAtLocation = action === "subtract"
+    ? (selectedInventory?.quantity ?? 0)
+    : (existingInventoryForProduct?.quantity ?? 0);
+
+  const selectedProductName = action === "subtract"
+    ? selectedInventory?.item.name
+    : selectedProduct?.product.name;
+
+  const newQty = action === "subtract"
+    ? currentQtyAtLocation - quantity
+    : currentQtyAtLocation + quantity;
+
+  const canSubmit =
+    hasValidLocation &&
+    hasSelectedProduct &&
+    quantity >= 1 &&
+    newQty >= 0 &&
+    !isAdjusting;
+
+  // Source list count based on action
+  const sourceListCount = action === "subtract" ? inventory.length : productsWithStock.length;
+
+  // Get the normalized selected item for SelectedProductCard
+  const selectedNormalizedItem: NormalizedInventory | null = useMemo(() => {
+    if (action === "subtract" && selectedInventory) {
+      return normalizeInventory(selectedInventory);
+    }
+    if (action === "add" && selectedProduct) {
+      return createNormalizedInventory(selectedProduct);
+    }
+    return null;
+  }, [action, selectedInventory, selectedProduct]);
+
+  function handleQuantityChange(value: string) {
+    const parsed = parseQuantityInput(value);
+
+    if (parsed === null) {
+      setQuantity(0);
+      setQuantityWarning(null);
+      return;
+    }
+
+    if (action === "subtract" && parsed > currentQtyAtLocation) {
+      setQuantity(currentQtyAtLocation);
+      setQuantityWarning(`Clamped to available stock (${currentQtyAtLocation})`);
+    } else {
+      setQuantity(Math.max(1, parsed));
+      setQuantityWarning(null);
+    }
+  }
+
+  function handleIncrement() {
+    if (action === "subtract") {
+      if (quantity < currentQtyAtLocation) {
+        setQuantity(quantity + 1);
+        setQuantityWarning(null);
+      }
+    } else {
+      setQuantity(quantity + 1);
+      setQuantityWarning(null);
+    }
+  }
+
+  function handleDecrement() {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+      setQuantityWarning(null);
+    }
+  }
+
+  function handleActionChange(value: string) {
+    if (value === "add" || value === "subtract") {
+      setAction(value);
+    }
+  }
+
+  function handleClearSelection() {
+    setSelectedInventoryId(null);
+    setSelectedProductId(null);
+    setQuantity(1);
+    setQuantityWarning(null);
+  }
+
+  function handleProductSelect(id: string, itemQuantity: number) {
+    if (action === "subtract") {
+      setSelectedInventoryId(id);
+      // Reset quantity if it exceeds selection's stock
+      if (quantity > itemQuantity) {
+        setQuantity(Math.max(1, itemQuantity));
+      }
+    } else {
+      setSelectedProductId(id);
+      setQuantity(1);
+    }
+    setQuantityWarning(null);
+  }
+
+  async function handleSubmit() {
     const actorId = user?.personId || user?.id;
     if (!actorId) {
       toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
 
-    if (!selectedInventory) {
+    if (!location.locationType || !location.locationId) {
       toast({
-        title: "Missing location",
-        description: "Select a location before adjusting stock.",
+        title: "Missing selection",
+        description: "Select a location and product.",
       });
       return;
     }
 
+    const reason = action === "subtract"
+      ? StockMovementReason.SALE
+      : StockMovementReason.ADJUSTMENT;
+
     try {
-      await adjustMutation.mutateAsync({
-        locationType: selectedInventory.locationType,
-        inventoryId: selectedInventory.inventoryId,
-        payload: {
-          quantityChange: values.quantityChange,
-          reason: values.reason,
-          actorId,
-          notes: values.notes?.trim() || undefined,
-        },
-        productId: product?.id,
+      if (action === "subtract") {
+        if (!selectedInventory) {
+          toast({
+            title: "Missing selection",
+            description: "Select a product.",
+          });
+          return;
+        }
+
+        if (quantity > currentQtyAtLocation) {
+          toast({
+            title: "Invalid quantity",
+            description: "Cannot subtract more than available stock.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        await adjustMutation.mutateAsync({
+          locationType: location.locationType,
+          inventoryId: selectedInventory.id,
+          payload: {
+            quantityChange: -quantity,
+            reason,
+            actorId,
+          },
+          productId: selectedInventory.item.id,
+        });
+      } else {
+        if (!selectedProduct) {
+          toast({
+            title: "Missing selection",
+            description: "Select a product.",
+          });
+          return;
+        }
+
+        let inventoryId: string;
+
+        if (existingInventoryForProduct) {
+          inventoryId = existingInventoryForProduct.id;
+        } else {
+          const newInventory = await createInventory(
+            location.locationType,
+            location.locationId,
+            { itemId: selectedProduct.product.id, quantity: 0 }
+          );
+          inventoryId = newInventory.id;
+        }
+
+        await adjustMutation.mutateAsync({
+          locationType: location.locationType,
+          inventoryId,
+          payload: {
+            quantityChange: quantity,
+            reason,
+            actorId,
+          },
+          productId: selectedProduct.product.id,
+        });
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: ["locationInventory", location.locationType, location.locationId],
       });
+
       toast({ title: "Stock adjusted" });
       onOpenChange(false);
-    } catch (err: unknown) {
+    } catch (err) {
       const message = err instanceof Error ? err.message : "Adjustment failed";
       toast({ title: "Adjustment failed", description: message });
     }
   }
 
+  const locationLabel = location.locationType
+    ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
+    : "";
+
+  const listTitle = action === "subtract"
+    ? `Products at ${locationLabel}`
+    : `Select product to add to ${locationLabel}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-3xl h-[95dvh] max-h-[95dvh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 p-6 pb-0">
           <DialogTitle>Adjust Stock</DialogTitle>
-          <DialogDescription>
-            {product
-              ? `Update inventory for ${product.name}.`
-              : "Select a product to adjust stock."}
-          </DialogDescription>
         </DialogHeader>
 
-        {!product ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            Select a product before adjusting stock.
-          </div>
-        ) : (
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid gap-2">
-              <Label>Location</Label>
-              <Select
-                value={selectedInventoryId}
-                onValueChange={(v) => form.setValue("inventoryId", v)}
-                disabled={!hasInventory}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(inventoryQuery.data ?? []).map((entry) => (
-                    <SelectItem key={entry.inventoryId} value={entry.inventoryId}>
-                      {entry.locationLabel} (qty {entry.quantity})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.inventoryId?.message ? (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.inventoryId.message}
-                </p>
-              ) : null}
-              {isInventoryLoading ? (
-                <p className="text-xs text-muted-foreground">Loading inventory...</p>
-              ) : null}
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="quantityChange">Adjustment (+ / -)</Label>
-              <Input
-                id="quantityChange"
-                type="number"
-                step="1"
-                {...form.register("quantityChange")}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
+          {/* Location selector and action toggle */}
+          <div className="shrink-0 bg-muted py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
+            {/* Location section */}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Location</Label>
+                {action === "add" && hasValidLocation && location.locationType && (
+                  <InventoryPreviewTooltip
+                    locationType={location.locationType}
+                    locationCode={location.locationCode}
+                    inventory={inventory}
+                    isLoading={inventoryQuery.isLoading}
+                  />
+                )}
+              </div>
+              <LocationSelector
+                label=""
+                value={location}
+                onChange={setLocation}
+                disabled={isAdjusting}
               />
-              {form.formState.errors.quantityChange?.message ? (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.quantityChange.message}
-                </p>
-              ) : null}
             </div>
-
-            <div className="grid gap-2">
-              <Label>Reason</Label>
-              <Select
-                value={form.watch("reason")}
-                onValueChange={(v) =>
-                  form.setValue("reason", v as FormValues["reason"])
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ADJUST_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Textarea id="notes" rows={3} {...form.register("notes")} />
-            </div>
-
-            <div className="rounded-md border p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Current quantity</span>
-                <span className="font-medium">{currentQty}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">New quantity</span>
-                <span className="font-semibold">{previewQty}</span>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
+            {/* Action section */}
+            <div className="shrink-0 space-y-2">
+              <Label>Action</Label>
+              <ToggleGroup
+                type="single"
+                value={action}
+                onValueChange={handleActionChange}
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                disabled={isAdjusting}
+                className="border border-input rounded-md"
               >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!hasInventory || isSaving}>
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Adjust Stock
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
+                <ToggleGroupItem
+                  value="subtract"
+                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  aria-label="Subtract stock"
+                >
+                  <Minus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Subtract</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="add"
+                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  aria-label="Add stock"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
+
+          {/* Products section */}
+          {hasValidLocation && !hasSelectedProduct ? (
+            <div className="flex-1 min-h-0 flex flex-col mt-4">
+              <ProductFilterHeader
+                title={listTitle}
+                itemCount={sourceListCount}
+                searchQuery={searchQuery}
+                categoryFilter={categoryFilter}
+                availableCategories={availableCategories}
+                disabled={isAdjusting}
+                showFilters={sourceListCount > 0}
+                onSearchChange={setSearchQuery}
+                onCategoryChange={setCategoryFilter}
+                onClearFilters={() => {
+                  setCategoryFilter(null);
+                  setSearchQuery("");
+                }}
+              />
+
+              <ProductList
+                items={action === "subtract" ? normalizedInventory : normalizedProducts}
+                selectedId={action === "subtract" ? selectedInventoryId : selectedProductId}
+                onSelect={handleProductSelect}
+                isLoading={action === "subtract" ? inventoryQuery.isLoading : productInventoryQuery.isLoading}
+                disabled={isAdjusting}
+                emptyMessage={
+                  action === "subtract"
+                    ? "No inventory at this location"
+                    : "No products with stock available"
+                }
+                noResultsMessage="No products found"
+                searchQuery={searchQuery}
+                categoryFilter={categoryFilter}
+              />
+            </div>
+          ) : hasValidLocation && hasSelectedProduct && selectedNormalizedItem ? (
+            <SelectedProductCard
+              inventory={selectedNormalizedItem}
+              existingQuantityAtLocation={currentQtyAtLocation}
+              action={action}
+              quantity={quantity}
+              quantityWarning={quantityWarning}
+              locationLabel={locationLabel}
+              disabled={isAdjusting}
+              onClearSelection={handleClearSelection}
+              onQuantityChange={handleQuantityChange}
+              onIncrement={handleIncrement}
+              onDecrement={handleDecrement}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
+              Select a location to see available products
+            </div>
+          )}
+        </div>
+
+        {/* Footer buttons */}
+        <div className="shrink-0 border-t bg-background">
+          <DialogFooter className="px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isAdjusting}
+              className="min-h-11 sm:min-h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="min-h-11 sm:min-h-9"
+            >
+              {isAdjusting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Adjust Stock
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

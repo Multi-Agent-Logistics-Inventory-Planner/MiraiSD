@@ -476,6 +476,34 @@ export async function getInventoryByLocation(
   }
 }
 
+// Generic inventory creator by location type
+export async function createInventory(
+  locationType: LocationType,
+  locationId: string,
+  data: InventoryRequest
+): Promise<Inventory> {
+  switch (locationType) {
+    case LocationType.BOX_BIN:
+      return createBoxBinInventory(locationId, data);
+    case LocationType.RACK:
+      return createRackInventory(locationId, data);
+    case LocationType.CABINET:
+      return createCabinetInventory(locationId, data);
+    case LocationType.SINGLE_CLAW_MACHINE:
+      return createSingleClawMachineInventory(locationId, data);
+    case LocationType.DOUBLE_CLAW_MACHINE:
+      return createDoubleClawMachineInventory(locationId, data);
+    case LocationType.KEYCHAIN_MACHINE:
+      return createKeychainMachineInventory(locationId, data);
+    case LocationType.FOUR_CORNER_MACHINE:
+      return createFourCornerMachineInventory(locationId, data);
+    case LocationType.PUSHER_MACHINE:
+      return createPusherMachineInventory(locationId, data);
+    default:
+      throw new Error(`Unknown location type: ${locationType}`);
+  }
+}
+
 export interface InventoryLocationEntry {
   inventoryId: string;
   item: InventoryItem;

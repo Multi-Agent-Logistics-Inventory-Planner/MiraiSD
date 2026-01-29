@@ -120,6 +120,7 @@ public class StockMovementService {
         StockMovement movement = StockMovement.builder()
                 .item(getInventoryProduct(inventory))
                 .locationType(locationType)
+                .toLocationId(getLocationId(inventory, locationType))
                 .previousQuantity(currentQuantity)
                 .currentQuantity(newQuantity)
                 .quantityChange(request.getQuantityChange())
