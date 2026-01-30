@@ -58,6 +58,9 @@ public class Shipment {
     @Column(columnDefinition = "text")
     private String notes;
 
+    @Column(name = "tracking_id")
+    private String trackingId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

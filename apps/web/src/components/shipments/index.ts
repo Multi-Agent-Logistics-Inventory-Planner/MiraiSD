@@ -5,3 +5,5 @@ export { ShipmentReceiveDialog } from "./shipment-receive-dialog";
 export { ShipmentHeader } from "./shipment-header";
 export { ShipmentFilters } from "./shipment-filters";
 export { ShipmentPagination } from "./shipment-pagination";
+export { TrackingLookupCard } from "./tracking-lookup-card";
+export { TrackingLookupResultsTable } from "./tracking-lookup-results-table";

@@ -400,6 +400,7 @@ export interface Shipment {
   actualDeliveryDate?: string;
   totalCost?: number;
   notes?: string;
+  trackingId?: string;
   createdBy?: User;
   receivedBy?: User;
   items: ShipmentItem[];
@@ -424,6 +425,7 @@ export interface ShipmentRequest {
   expectedDeliveryDate?: string;
   totalCost?: number;
   notes?: string;
+  trackingId?: string;
   createdBy?: string;
   items: ShipmentItemRequest[];
 }

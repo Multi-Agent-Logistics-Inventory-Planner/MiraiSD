@@ -117,6 +117,7 @@ public class ShipmentService {
                 .actualDeliveryDate(requestDTO.getActualDeliveryDate())
                 .totalCost(requestDTO.getTotalCost())
                 .notes(requestDTO.getNotes())
+                .trackingId(requestDTO.getTrackingId())
                 .build();
 
         if (requestDTO.getCreatedBy() != null) {
@@ -189,6 +190,9 @@ public class ShipmentService {
         }
         if (requestDTO.getNotes() != null) {
             shipment.setNotes(requestDTO.getNotes());
+        }
+        if (requestDTO.getTrackingId() != null) {
+            shipment.setTrackingId(requestDTO.getTrackingId());
         }
 
         return shipmentRepository.save(shipment);

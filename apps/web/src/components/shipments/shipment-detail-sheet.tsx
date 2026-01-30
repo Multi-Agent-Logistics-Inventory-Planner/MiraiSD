@@ -1,6 +1,8 @@
 "use client";
 
-import { Package, Pencil, X, PackageCheck, Trash2, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { Package, Pencil, X, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,9 +19,15 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
+import { getTracking, type TrackingLookupResponse } from "@/lib/api/tracking";
 
 interface ShipmentDetailSheetProps {
   open: boolean;
@@ -149,6 +157,37 @@ export function ShipmentDetailSheet({
   onReceiveClick,
   onDeleteClick,
 }: ShipmentDetailSheetProps) {
+  const [tracking, setTracking] = useState<TrackingLookupResponse | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [trackingExpanded, setTrackingExpanded] = useState(false);
+
+  // Fetch tracking info when shipment has a trackingId
+  useEffect(() => {
+    if (!shipment?.trackingId) {
+      setTracking(null);
+      setTrackingError(null);
+      return;
+    }
+
+    async function fetchTracking() {
+      setTrackingLoading(true);
+      setTrackingError(null);
+      try {
+        const result = await getTracking(shipment!.trackingId!);
+        setTracking(result);
+      } catch (err) {
+        setTrackingError(
+          err instanceof Error ? err.message : "Failed to load tracking"
+        );
+      } finally {
+        setTrackingLoading(false);
+      }
+    }
+
+    fetchTracking();
+  }, [shipment?.trackingId]);
+
   if (!shipment) {
     return null;
   }
@@ -217,7 +256,112 @@ export function ShipmentDetailSheet({
             <span className="text-muted-foreground">Received By:</span>
             <p className="font-medium">{shipment.receivedBy?.fullName || "-"}</p>
           </div>
+          {shipment.trackingId && (
+            <div>
+              <span className="text-muted-foreground">Tracking #:</span>
+              <p className="font-mono font-medium">{shipment.trackingId}</p>
+            </div>
+          )}
         </div>
+
+        {/* Tracking Information */}
+        {shipment.trackingId && (
+          <div className="mt-4 border rounded-lg">
+            <Collapsible open={trackingExpanded} onOpenChange={setTrackingExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between px-4 py-3 h-auto"
+                >
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    <span className="font-medium">Tracking Information</span>
+                    {tracking && (
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {tracking.carrier}
+                      </Badge>
+                    )}
+                  </div>
+                  {trackingLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {trackingExpanded ? "Hide" : "Show"} details
+                    </span>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-4 pb-4 space-y-3">
+                  {trackingLoading && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {trackingError && (
+                    <p className="text-sm text-destructive">{trackingError}</p>
+                  )}
+                  {tracking && !trackingLoading && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Tracking #:</span>
+                          <p className="font-mono font-medium">{tracking.trackingNumber}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Status:</span>
+                          <p className="font-medium">{tracking.status}</p>
+                        </div>
+                        {tracking.expectedDelivery && (
+                          <div>
+                            <span className="text-muted-foreground">Est. Delivery:</span>
+                            <p className="font-medium">
+                              {format(new Date(tracking.expectedDelivery), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        )}
+                        {tracking.actualDelivery && (
+                          <div>
+                            <span className="text-muted-foreground">Delivered:</span>
+                            <p className="font-medium">
+                              {format(new Date(tracking.actualDelivery), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {tracking.statusDetail && (
+                        <p className="text-sm text-muted-foreground">
+                          {tracking.statusDetail}
+                        </p>
+                      )}
+                      {tracking.events.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            Recent Events
+                          </p>
+                          <div className="space-y-2">
+                            {tracking.events.slice(0, 5).map((event, idx) => (
+                              <div
+                                key={idx}
+                                className="text-xs border-l-2 border-muted pl-3 py-1"
+                              >
+                                <p className="font-medium">{event.message}</p>
+                                <p className="text-muted-foreground">
+                                  {event.location} -{" "}
+                                  {format(new Date(event.occurredAt), "MMM d, h:mm a")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 mt-4">
