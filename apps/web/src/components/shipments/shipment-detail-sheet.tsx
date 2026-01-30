@@ -318,7 +318,7 @@ export function ShipmentDetailSheet({
                       <p className="font-medium">{formatDate(shipment.actualDeliveryDate)}</p>
                     </div>
                   )}
-                  {shipment.totalCost && (
+                  {shipment.totalCost != null && shipment.totalCost > 0 && (
                     <div>
                       <p className="text-muted-foreground text-xs mb-1">Total Cost</p>
                       <p className="font-medium">{formatCurrency(shipment.totalCost)}</p>
