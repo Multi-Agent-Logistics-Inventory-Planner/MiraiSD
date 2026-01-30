@@ -26,6 +26,7 @@ public class ShipmentResponseDTO {
     private LocalDate actualDeliveryDate;
     private BigDecimal totalCost;
     private String notes;
+    private String trackingId;
     private UserResponseDTO createdBy;
     private UserResponseDTO receivedBy;
     private List<ShipmentItemResponseDTO> items;

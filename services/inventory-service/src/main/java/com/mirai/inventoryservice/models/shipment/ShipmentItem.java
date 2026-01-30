@@ -14,6 +14,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -60,6 +62,10 @@ public class ShipmentItem {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    @OneToMany(mappedBy = "shipmentItem", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    private List<ShipmentItemAllocation> allocations = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

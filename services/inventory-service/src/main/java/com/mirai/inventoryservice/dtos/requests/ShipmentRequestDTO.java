@@ -37,6 +37,8 @@ public class ShipmentRequestDTO {
 
     private String notes;
 
+    private String trackingId;
+
     private UUID createdBy;
 
     @NotEmpty(message = "At least one item is required")

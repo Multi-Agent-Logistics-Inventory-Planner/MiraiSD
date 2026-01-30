@@ -51,6 +51,7 @@ const schema = z.object({
   supplierName: z.string().optional(),
   orderDate: z.string().min(1, "Order date is required"),
   expectedDeliveryDate: z.string().optional(),
+  trackingId: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(itemSchema).min(1, "At least one item is required"),
 });
@@ -85,6 +86,7 @@ export function ShipmentCreateDialog({
       supplierName: "",
       orderDate: new Date().toISOString().split("T")[0],
       expectedDeliveryDate: "",
+      trackingId: "",
       notes: "",
       items: [
         {
@@ -111,6 +113,7 @@ export function ShipmentCreateDialog({
         supplierName: "",
         orderDate: new Date().toISOString().split("T")[0],
         expectedDeliveryDate: "",
+        trackingId: "",
         notes: "",
         items: [
           {
@@ -185,6 +188,7 @@ export function ShipmentCreateDialog({
         status: ShipmentStatus.PENDING,
         orderDate: values.orderDate,
         expectedDeliveryDate: values.expectedDeliveryDate || undefined,
+        trackingId: values.trackingId || undefined,
         notes: values.notes || undefined,
         createdBy: user?.personId,
         items,
@@ -264,6 +268,15 @@ export function ShipmentCreateDialog({
                     {...form.register("expectedDeliveryDate")}
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="trackingId">Tracking Number (optional)</Label>
+                <Input
+                  id="trackingId"
+                  placeholder="Enter carrier tracking number..."
+                  {...form.register("trackingId")}
+                />
               </div>
 
               {/* Items */}

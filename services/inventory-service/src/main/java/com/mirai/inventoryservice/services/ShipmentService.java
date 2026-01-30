@@ -21,6 +21,7 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.*;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
+import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;
 import com.mirai.inventoryservice.repositories.*;
 import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
 import jakarta.transaction.Transactional;
@@ -116,6 +117,7 @@ public class ShipmentService {
                 .actualDeliveryDate(requestDTO.getActualDeliveryDate())
                 .totalCost(requestDTO.getTotalCost())
                 .notes(requestDTO.getNotes())
+                .trackingId(requestDTO.getTrackingId())
                 .build();
 
         if (requestDTO.getCreatedBy() != null) {
@@ -188,6 +190,9 @@ public class ShipmentService {
         }
         if (requestDTO.getNotes() != null) {
             shipment.setNotes(requestDTO.getNotes());
+        }
+        if (requestDTO.getTrackingId() != null) {
+            shipment.setTrackingId(requestDTO.getTrackingId());
         }
 
         return shipmentRepository.save(shipment);
@@ -284,6 +289,15 @@ public class ShipmentService {
 
                 LocationType locationType = allocation.getLocationType();
                 UUID locationId = allocation.getLocationId();
+
+                // Create allocation record for tracking
+                ShipmentItemAllocation allocationRecord = ShipmentItemAllocation.builder()
+                        .shipmentItem(shipmentItem)
+                        .locationType(locationType != null ? locationType : LocationType.NOT_ASSIGNED)
+                        .locationId(locationId)
+                        .quantity(allocation.getQuantity())
+                        .build();
+                shipmentItem.getAllocations().add(allocationRecord);
 
                 if (locationType == LocationType.NOT_ASSIGNED
                         || locationType == null
