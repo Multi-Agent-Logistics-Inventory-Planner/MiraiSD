@@ -2,21 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Package, Pencil, X, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
+import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,8 +25,6 @@ interface ShipmentDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipment: Shipment | null;
-  onEditClick?: () => void;
-  onCancelClick?: () => void;
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
 }
@@ -59,8 +49,8 @@ const STATUS_LABELS: Record<ShipmentStatus, string> = {
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
   return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
+    month: "short",
+    day: "numeric",
     year: "numeric",
   });
 }
@@ -76,75 +66,59 @@ function getLocationLabel(locationType?: LocationType): string {
 
 function AllocationDisplay({ allocation }: { allocation: ShipmentItemAllocation }) {
   return (
-    <div className="flex items-center gap-2 py-1">
+    <div className="flex items-center gap-2 py-0.5">
       <Badge variant="outline" className="text-xs font-normal">
         {getLocationLabel(allocation.locationType)}
       </Badge>
       <span className="text-xs text-muted-foreground">
         x{allocation.quantity}
       </span>
-      {allocation.locationId && (
-        <span className="font-mono text-xs text-muted-foreground">
-          (ID: {allocation.locationId.slice(0, 8)}...)
-        </span>
-      )}
     </div>
   );
 }
 
-function ItemAllocationRow({ item }: { item: ShipmentItem }) {
+function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
   const allocations = item.allocations ?? [];
   const hasAllocations = allocations.length > 0;
-  const isComplete = item.receivedQuantity >= item.orderedQuantity;
-  const isPartial = item.receivedQuantity > 0 && !isComplete;
-
-  // Show allocations if they exist
-  const showAllocations = hasAllocations;
+  const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
 
   return (
-    <>
-      <TableRow className={showAllocations ? "border-b-0" : ""}>
-        <TableCell className="font-medium">{item.item.name}</TableCell>
-        <TableCell className="font-mono text-sm text-muted-foreground">
-          {item.item.sku}
-        </TableCell>
-        <TableCell className="text-right">{item.orderedQuantity}</TableCell>
-        <TableCell className="text-right">{item.receivedQuantity}</TableCell>
-        <TableCell className="text-right">
-          {formatCurrency(item.unitCost)}
-        </TableCell>
-        <TableCell>
-          {isComplete ? (
-            <Badge variant="default" className="text-xs">
-              Complete
-            </Badge>
-          ) : isPartial ? (
-            <Badge variant="secondary" className="text-xs">
-              Partial
-            </Badge>
+    <div className="py-3 border-b last:border-b-0">
+      <div className="flex items-start gap-4">
+        <span className="text-sm text-muted-foreground w-6">{index + 1}</span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm">{item.item.name}</p>
+          <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>
+        </div>
+        <div className="text-right text-sm">
+          <p>{item.orderedQuantity} ordered</p>
+          <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
+        </div>
+        <div className="text-right text-sm w-20">
+          {item.unitCost ? (
+            <>
+              <p>{formatCurrency(item.unitCost)}</p>
+              <p className="text-xs text-muted-foreground">each</p>
+            </>
           ) : (
-            <Badge variant="outline" className="text-xs">
-              Pending
-            </Badge>
+            <span className="text-muted-foreground">-</span>
           )}
-        </TableCell>
-      </TableRow>
-      {showAllocations && (
-        <TableRow className="bg-muted/30">
-          <TableCell colSpan={6} className="py-2 pl-8">
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 mt-1.5 shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-xs font-medium mb-1">Assigned to:</span>
-                {allocations.map((allocation) => (
-                  <AllocationDisplay key={allocation.id} allocation={allocation} />
-                ))}
-              </div>
-            </div>
-          </TableCell>
-        </TableRow>
+        </div>
+        <div className="text-right text-sm font-medium w-24">
+          {lineTotal ? formatCurrency(lineTotal) : "-"}
+        </div>
+      </div>
+      {hasAllocations && (
+        <div className="mt-2 ml-10 flex items-start gap-2">
+          <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {allocations.map((allocation) => (
+              <AllocationDisplay key={allocation.id} allocation={allocation} />
+            ))}
+          </div>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -152,8 +126,6 @@ export function ShipmentDetailSheet({
   open,
   onOpenChange,
   shipment,
-  onEditClick,
-  onCancelClick,
   onReceiveClick,
   onDeleteClick,
 }: ShipmentDetailSheetProps) {
@@ -161,8 +133,8 @@ export function ShipmentDetailSheet({
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [trackingExpanded, setTrackingExpanded] = useState(false);
+  const [infoExpanded, setInfoExpanded] = useState(false);
 
-  // Fetch tracking info when shipment has a trackingId
   useEffect(() => {
     if (!shipment?.trackingId) {
       setTracking(null);
@@ -194,8 +166,6 @@ export function ShipmentDetailSheet({
 
   const canReceive =
     shipment.status === "PENDING" || shipment.status === "IN_TRANSIT";
-  const canModify =
-    shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
   const canDelete = shipment.status !== "DELIVERED";
 
   const totalOrdered = shipment.items.reduce(
@@ -207,260 +177,278 @@ export function ShipmentDetailSheet({
     0
   );
 
-  const isCompleted = shipment.status === "DELIVERED";
-  const hasPartialReceipts = totalReceived > 0 && totalReceived < totalOrdered;
+  // Calculate items total from unit costs
+  const itemsTotal = shipment.items.reduce((sum, item) => {
+    if (item.unitCost) {
+      return sum + item.orderedQuantity * item.unitCost;
+    }
+    return sum;
+  }, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold flex items-center gap-3">
-            <span className="font-mono">{shipment.shipmentNumber}</span>
-            <Badge variant={STATUS_VARIANTS[shipment.status]} className="text-xs">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="flex items-center gap-3">
+            <span className="text-xl font-semibold">Shipment:</span>
+            <span className="text-xl font-mono">{shipment.shipmentNumber}</span>
+            <Badge variant={STATUS_VARIANTS[shipment.status]} className="text-xs ml-2">
               {STATUS_LABELS[shipment.status]}
             </Badge>
           </DialogTitle>
         </DialogHeader>
 
-        {/* Shipment Info Grid */}
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Supplier:</span>
-            <p className="font-medium">{shipment.supplierName || "-"}</p>
+        <div className="px-6 pb-6 space-y-6">
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Can permission={Permission.SHIPMENTS_RECEIVE}>
+              {canReceive && (
+                <Button onClick={onReceiveClick} size="sm">
+                  <PackageCheck className="h-4 w-4 mr-2" />
+                  Receive Items
+                </Button>
+              )}
+            </Can>
+            <Can permission={Permission.SHIPMENTS_DELETE}>
+              {canDelete && (
+                <Button variant="destructive" size="sm" onClick={onDeleteClick}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
+            </Can>
           </div>
-          <div>
-            <span className="text-muted-foreground">Created By:</span>
-            <p className="font-medium">{shipment.createdBy?.fullName || "-"}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Order Date:</span>
-            <p className="font-medium">{formatDate(shipment.orderDate)}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Expected Delivery:</span>
-            <p className="font-medium">
-              {formatDate(shipment.expectedDeliveryDate)}
-            </p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Actual Delivery:</span>
-            <p className="font-medium">
-              {formatDate(shipment.actualDeliveryDate)}
-            </p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Total Cost:</span>
-            <p className="font-medium">{formatCurrency(shipment.totalCost)}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Received By:</span>
-            <p className="font-medium">{shipment.receivedBy?.fullName || "-"}</p>
-          </div>
-          {shipment.trackingId && (
-            <div>
-              <span className="text-muted-foreground">Tracking #:</span>
-              <p className="font-mono font-medium">{shipment.trackingId}</p>
-            </div>
-          )}
-        </div>
 
-        {/* Tracking Information */}
-        {shipment.trackingId && (
-          <div className="mt-4 border rounded-lg">
-            <Collapsible open={trackingExpanded} onOpenChange={setTrackingExpanded}>
+          {/* Items Section */}
+          <div className="border rounded-lg">
+            <div className="px-4 py-3 border-b bg-muted/30">
+              <h3 className="font-medium">Item Details</h3>
+            </div>
+
+            {/* Items Header */}
+            <div className="px-4 py-2 border-b bg-muted/20">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
+                <span className="w-6">#</span>
+                <span className="flex-1">Name</span>
+                <span className="text-right w-24">Qty</span>
+                <span className="text-right w-20">Price</span>
+                <span className="text-right w-24">Total</span>
+              </div>
+            </div>
+
+            {/* Items List */}
+            <div className="px-4">
+              {shipment.items.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No items in this shipment</p>
+                </div>
+              ) : (
+                shipment.items.map((item, index) => (
+                  <ItemRow key={item.id} item={item} index={index} />
+                ))
+              )}
+            </div>
+
+            {/* Totals */}
+            {shipment.items.length > 0 && (
+              <div className="px-4 py-3 border-t bg-muted/20">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">
+                    {totalReceived} / {totalOrdered} items received
+                  </span>
+                  {itemsTotal > 0 && (
+                    <div className="text-right">
+                      <span className="text-muted-foreground mr-4">Items Total:</span>
+                      <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
+                    </div>
+                  )}
+                </div>
+                {shipment.totalCost != null && shipment.totalCost > 0 && shipment.totalCost !== itemsTotal && (
+                  <div className="flex justify-end items-center text-sm mt-1">
+                    <span className="text-muted-foreground mr-4">Shipment Total:</span>
+                    <span className="font-semibold">{formatCurrency(shipment.totalCost)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Shipment Info */}
+          <div className="border rounded-lg overflow-hidden">
+            <Collapsible open={infoExpanded} onOpenChange={setInfoExpanded}>
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full justify-between px-4 py-3 h-auto"
+                  className="w-full justify-between px-4 py-3 h-auto rounded-none bg-muted/30 hover:bg-muted/50"
                 >
                   <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    <span className="font-medium">Tracking Information</span>
-                    {tracking && (
-                      <Badge variant="secondary" className="text-xs capitalize">
-                        {tracking.carrier}
-                      </Badge>
-                    )}
+                    <Package className="h-4 w-4" />
+                    <span className="font-medium">Shipment Information</span>
                   </div>
-                  {trackingLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {trackingExpanded ? "Hide" : "Show"} details
-                    </span>
-                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {infoExpanded ? "Hide" : "Show"} details
+                  </span>
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="px-4 pb-4 space-y-3">
-                  {trackingLoading && (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+                  {shipment.supplierName && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Supplier</p>
+                      <p className="font-medium">{shipment.supplierName}</p>
                     </div>
                   )}
-                  {trackingError && (
-                    <p className="text-sm text-destructive">{trackingError}</p>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Created By</p>
+                    <p className="font-medium">{shipment.createdBy?.fullName || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Order Date</p>
+                    <p className="font-medium">{formatDate(shipment.orderDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Expected Delivery</p>
+                    <p className="font-medium">{formatDate(shipment.expectedDeliveryDate)}</p>
+                  </div>
+                  {shipment.actualDeliveryDate && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Actual Delivery</p>
+                      <p className="font-medium">{formatDate(shipment.actualDeliveryDate)}</p>
+                    </div>
                   )}
-                  {tracking && !trackingLoading && (
-                    <>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Tracking #:</span>
-                          <p className="font-mono font-medium">{tracking.trackingNumber}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Status:</span>
-                          <p className="font-medium">{tracking.status}</p>
-                        </div>
-                        {tracking.expectedDelivery && (
-                          <div>
-                            <span className="text-muted-foreground">Est. Delivery:</span>
-                            <p className="font-medium">
-                              {format(new Date(tracking.expectedDelivery), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                        )}
-                        {tracking.actualDelivery && (
-                          <div>
-                            <span className="text-muted-foreground">Delivered:</span>
-                            <p className="font-medium">
-                              {format(new Date(tracking.actualDelivery), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      {tracking.statusDetail && (
-                        <p className="text-sm text-muted-foreground">
-                          {tracking.statusDetail}
-                        </p>
-                      )}
-                      {tracking.events.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">
-                            Recent Events
-                          </p>
-                          <div className="space-y-2">
-                            {tracking.events.slice(0, 5).map((event, idx) => (
-                              <div
-                                key={idx}
-                                className="text-xs border-l-2 border-muted pl-3 py-1"
-                              >
-                                <p className="font-medium">{event.message}</p>
-                                <p className="text-muted-foreground">
-                                  {event.location} -{" "}
-                                  {format(new Date(event.occurredAt), "MMM d, h:mm a")}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
+                  {shipment.totalCost && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Total Cost</p>
+                      <p className="font-medium">{formatCurrency(shipment.totalCost)}</p>
+                    </div>
+                  )}
+                  {shipment.receivedBy && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Received By</p>
+                      <p className="font-medium">{shipment.receivedBy.fullName}</p>
+                    </div>
+                  )}
+                  {shipment.trackingId && (
+                    <div>
+                      <p className="text-muted-foreground text-xs mb-1">Tracking Number</p>
+                      <p className="font-mono font-medium">{shipment.trackingId}</p>
+                    </div>
                   )}
                 </div>
               </CollapsibleContent>
             </Collapsible>
           </div>
-        )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 mt-4">
-          <Can permission={Permission.SHIPMENTS_RECEIVE}>
-            {canReceive && (
-              <Button onClick={onReceiveClick}>
-                <PackageCheck className="h-4 w-4 mr-2" />
-                Receive Items
-              </Button>
-            )}
-          </Can>
-          <Can permission={Permission.SHIPMENTS_UPDATE}>
-            {canModify && (
-              <Button variant="outline" onClick={onEditClick}>
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            )}
-          </Can>
-          <Can permission={Permission.SHIPMENTS_UPDATE}>
-            {canModify && (
-              <Button variant="outline" onClick={onCancelClick}>
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-            )}
-          </Can>
-          <Can permission={Permission.SHIPMENTS_DELETE}>
-            {canDelete && (
-              <Button
-                variant="destructive"
-                onClick={onDeleteClick}
-                className="ml-auto"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </Can>
-        </div>
-
-        {/* Items Table */}
-        <div className="mt-6">
-          <h3 className="text-base font-medium text-primary mb-3">
-            Items ({shipment.items.length})
-            <span className="text-muted-foreground font-normal ml-2">
-              {totalReceived} / {totalOrdered} received
-            </span>
-          </h3>
-          <div className="rounded-lg border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted">
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Received</TableHead>
-                  <TableHead className="text-right">Unit Cost</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shipment.items.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="h-16 text-center text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <Package className="h-5 w-5 text-muted-foreground/50" />
-                        <span>No items in this shipment</span>
+          {/* Tracking Information */}
+          {shipment.trackingId && (
+            <div className="border rounded-lg overflow-hidden">
+              <Collapsible open={trackingExpanded} onOpenChange={setTrackingExpanded}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between px-4 py-3 h-auto rounded-none bg-muted/30 hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      <span className="font-medium">Tracking Information</span>
+                      {tracking && (
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {tracking.carrier}
+                        </Badge>
+                      )}
+                    </div>
+                    {trackingLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {trackingExpanded ? "Hide" : "Show"} details
+                      </span>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 py-4 space-y-4">
+                    {trackingLoading && (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  shipment.items.map((item) => (
-                    <ItemAllocationRow key={item.id} item={item} />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    )}
+                    {trackingError && (
+                      <p className="text-sm text-destructive">{trackingError}</p>
+                    )}
+                    {tracking && !trackingLoading && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-1">Status</p>
+                            <p className="font-medium">{tracking.status}</p>
+                          </div>
+                          {tracking.actualDelivery && (
+                            <div>
+                              <p className="text-muted-foreground text-xs mb-1">Delivered</p>
+                              <p className="font-medium">
+                                {format(new Date(tracking.actualDelivery), "MMM d, yyyy")}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {tracking.statusDetail && (
+                          <p className="text-sm text-muted-foreground bg-muted/30 p-2 rounded">
+                            {tracking.statusDetail}
+                          </p>
+                        )}
+                        {tracking.events.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-3">
+                              Delivery Status
+                            </p>
+                            <div className="space-y-3">
+                              {tracking.events.slice(0, 6).map((event, idx) => (
+                                <div key={idx} className="flex items-start gap-3">
+                                  <div className="relative">
+                                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 ${
+                                      idx === 0 ? "bg-primary" : "bg-muted-foreground/30"
+                                    }`} />
+                                    {idx < tracking.events.slice(0, 6).length - 1 && (
+                                      <div className="absolute top-4 left-1 w-0.5 h-6 bg-muted-foreground/20" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium">{event.message}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {event.location}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {format(new Date(event.occurredAt), "MMM d, h:mm a")}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
 
-          {/* Legend for completed/partial shipments */}
-          {(isCompleted || hasPartialReceipts) && (
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              Items with allocations show their assigned storage locations
-            </p>
+          {/* Notes */}
+          {shipment.notes && (
+            <div className="border rounded-lg">
+              <div className="px-4 py-3 border-b bg-muted/30">
+                <h3 className="font-medium">Notes</h3>
+              </div>
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground">{shipment.notes}</p>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Notes */}
-        {shipment.notes && (
-          <div className="mt-6">
-            <h3 className="text-base font-medium text-primary mb-2">Notes</h3>
-            <p className="text-sm text-muted-foreground">{shipment.notes}</p>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

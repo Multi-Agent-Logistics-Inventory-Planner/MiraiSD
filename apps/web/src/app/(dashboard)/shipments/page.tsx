@@ -23,12 +23,9 @@ import {
   ShipmentPagination,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
-import {
-  useUpdateShipmentMutation,
-  useDeleteShipmentMutation,
-} from "@/hooks/mutations/use-shipment-mutations";
+import { useDeleteShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
-import { ShipmentStatus, type Shipment } from "@/types/api";
+import type { Shipment } from "@/types/api";
 import {
   filterShipmentsByDisplayStatus,
   getShipmentDisplayStatusCounts,
@@ -40,7 +37,6 @@ const PAGE_SIZE = 20;
 export default function ShipmentsPage() {
   const { toast } = useToast();
   const shipmentsQuery = useShipments();
-  const updateMutation = useUpdateShipmentMutation();
   const deleteMutation = useDeleteShipmentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,7 +47,6 @@ export default function ShipmentsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null
@@ -107,39 +102,6 @@ export default function ShipmentsPage() {
     setReceiveDialogOpen(true);
   }
 
-  function handleEditClick() {
-    toast({
-      title: "Edit not implemented",
-      description: "Edit shipment functionality will be added later.",
-    });
-  }
-
-  function handleCancelClick() {
-    setDetailSheetOpen(false);
-    setCancelDialogOpen(true);
-  }
-
-  async function handleConfirmCancel() {
-    if (!selectedShipment) return;
-
-    try {
-      await updateMutation.mutateAsync({
-        id: selectedShipment.id,
-        payload: {
-          ...buildShipmentRequest(selectedShipment),
-          status: ShipmentStatus.CANCELLED,
-        },
-      });
-      toast({ title: "Shipment cancelled" });
-      setCancelDialogOpen(false);
-      setSelectedShipment(null);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to cancel shipment";
-      toast({ title: "Error", description: message });
-    }
-  }
-
   function handleDeleteClick() {
     setDetailSheetOpen(false);
     setDeleteDialogOpen(true);
@@ -158,28 +120,6 @@ export default function ShipmentsPage() {
         err instanceof Error ? err.message : "Failed to delete shipment";
       toast({ title: "Error", description: message });
     }
-  }
-
-  // Helper to build ShipmentRequest from existing Shipment
-  function buildShipmentRequest(shipment: Shipment) {
-    return {
-      shipmentNumber: shipment.shipmentNumber,
-      supplierName: shipment.supplierName,
-      status: shipment.status,
-      orderDate: shipment.orderDate,
-      expectedDeliveryDate: shipment.expectedDeliveryDate,
-      totalCost: shipment.totalCost,
-      notes: shipment.notes,
-      createdBy: shipment.createdBy?.id ?? "",
-      items: shipment.items.map((item) => ({
-        itemId: item.item.id,
-        orderedQuantity: item.orderedQuantity,
-        unitCost: item.unitCost,
-        destinationLocationType: item.destinationLocationType,
-        destinationLocationId: item.destinationLocationId,
-        notes: item.notes,
-      })),
-    };
   }
 
   return (
@@ -226,6 +166,7 @@ export default function ShipmentsPage() {
               shipments={paginatedShipments}
               isLoading={shipmentsQuery.isLoading}
               onRowClick={handleRowClick}
+              showActualDeliveryDate={activeTab === "COMPLETED"}
             />
           </CardContent>
         </Card>
@@ -249,8 +190,6 @@ export default function ShipmentsPage() {
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
         shipment={selectedShipment}
-        onEditClick={handleEditClick}
-        onCancelClick={handleCancelClick}
         onReceiveClick={handleReceiveClick}
         onDeleteClick={handleDeleteClick}
       />
@@ -260,32 +199,6 @@ export default function ShipmentsPage() {
         onOpenChange={setReceiveDialogOpen}
         shipment={selectedShipment}
       />
-
-      {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel shipment?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel shipment{" "}
-              <span className="font-medium font-mono">
-                {selectedShipment?.shipmentNumber}
-              </span>
-              ? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Shipment</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90 hover:text-white active:text-white"
-              onClick={handleConfirmCancel}
-              disabled={updateMutation.isPending}
-            >
-              Cancel Shipment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
