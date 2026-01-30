@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Package, X, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
+import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,6 @@ interface ShipmentDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipment: Shipment | null;
-  onCancelClick?: () => void;
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
 }
@@ -127,7 +126,6 @@ export function ShipmentDetailSheet({
   open,
   onOpenChange,
   shipment,
-  onCancelClick,
   onReceiveClick,
   onDeleteClick,
 }: ShipmentDetailSheetProps) {
@@ -168,8 +166,6 @@ export function ShipmentDetailSheet({
 
   const canReceive =
     shipment.status === "PENDING" || shipment.status === "IN_TRANSIT";
-  const canModify =
-    shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
   const canDelete = shipment.status !== "DELIVERED";
 
   const totalOrdered = shipment.items.reduce(
@@ -211,14 +207,6 @@ export function ShipmentDetailSheet({
                 <Button onClick={onReceiveClick} size="sm">
                   <PackageCheck className="h-4 w-4 mr-2" />
                   Receive Items
-                </Button>
-              )}
-            </Can>
-            <Can permission={Permission.SHIPMENTS_UPDATE}>
-              {canModify && (
-                <Button variant="outline" size="sm" onClick={onCancelClick}>
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
                 </Button>
               )}
             </Can>
