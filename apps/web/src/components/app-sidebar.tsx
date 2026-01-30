@@ -152,7 +152,7 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar>
+    <Sidebar className="z-50 bg-background border-r">
       <SidebarHeader className="p-2.5">
         <Link href="/" className="flex items-center">
           <Logo width={86} height={86} />
@@ -168,7 +168,8 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
-        {(can(Permission.INVENTORY_ADJUST) || can(Permission.INVENTORY_TRANSFER)) && (
+        {(can(Permission.INVENTORY_ADJUST) ||
+          can(Permission.INVENTORY_TRANSFER)) && (
           <SidebarGroup>
             <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
               Quick Actions

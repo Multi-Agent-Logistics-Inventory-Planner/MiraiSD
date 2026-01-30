@@ -78,10 +78,10 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=inventory-changes
       - KAFKA_CONSUMER_GROUP=forecasting-service
-      # Batching settings
-      - BATCH_WINDOW_SECONDS=30
-      - BATCH_SIZE_TRIGGER=50
-      - ITEM_DEBOUNCE_SECONDS=5.0
+      # Batching settings: tuned for low-volume single-location business (<100 changes/day)
+      - BATCH_WINDOW_SECONDS=30        # Max time to wait before processing a batch
+      - BATCH_SIZE_TRIGGER=50          # Process immediately if batch reaches this size
+      - ITEM_DEBOUNCE_SECONDS=5.0      # Dedupe rapid updates to same item within this window
     depends_on:
       - kafka
     dns:

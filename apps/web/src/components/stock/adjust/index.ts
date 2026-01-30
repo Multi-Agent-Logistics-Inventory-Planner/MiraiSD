@@ -11,4 +11,5 @@ export {
   type AdjustSummaryProps,
   createNormalizedInventory,
   normalizeInventory,
+  getNoResultsMessage,
 } from "./types";
