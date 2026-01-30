@@ -17,12 +17,14 @@ import {
   getShipmentDisplayStatus,
   SHIPMENT_DISPLAY_STATUS_LABELS,
   SHIPMENT_DISPLAY_STATUS_COLORS,
+  type ShipmentDisplayStatus,
 } from "@/lib/shipment-utils";
 
 interface ShipmentsTableProps {
   shipments: Shipment[];
   isLoading: boolean;
   onRowClick: (shipment: Shipment) => void;
+  showActualDeliveryDate?: boolean;
 }
 
 function formatDate(dateStr?: string) {
@@ -51,6 +53,7 @@ export function ShipmentsTable({
   shipments,
   isLoading,
   onRowClick,
+  showActualDeliveryDate = false,
 }: ShipmentsTableProps) {
   if (isLoading) {
     return (
@@ -63,7 +66,7 @@ export function ShipmentsTable({
             <TableHead>Items</TableHead>
             <TableHead>Progress</TableHead>
             <TableHead>Order Date</TableHead>
-            <TableHead>Est. Delivery</TableHead>
+            <TableHead>{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -102,7 +105,7 @@ export function ShipmentsTable({
           <TableHead>Items</TableHead>
           <TableHead>Progress</TableHead>
           <TableHead>Order Date</TableHead>
-          <TableHead>Est. Delivery</TableHead>
+          <TableHead>{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -145,7 +148,9 @@ export function ShipmentsTable({
                 </div>
               </TableCell>
               <TableCell>{formatDate(shipment.orderDate)}</TableCell>
-              <TableCell>{formatDate(shipment.expectedDeliveryDate)}</TableCell>
+              <TableCell>
+                {formatDate(showActualDeliveryDate ? shipment.actualDeliveryDate : shipment.expectedDeliveryDate)}
+              </TableCell>
             </TableRow>
           );
         })}

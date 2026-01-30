@@ -52,6 +52,7 @@ const schema = z.object({
   orderDate: z.string().min(1, "Order date is required"),
   expectedDeliveryDate: z.string().optional(),
   trackingId: z.string().optional(),
+  totalCost: z.coerce.number().min(0).optional(),
   notes: z.string().optional(),
   items: z.array(itemSchema).min(1, "At least one item is required"),
 });
@@ -87,6 +88,7 @@ export function ShipmentCreateDialog({
       orderDate: new Date().toISOString().split("T")[0],
       expectedDeliveryDate: "",
       trackingId: "",
+      totalCost: undefined,
       notes: "",
       items: [
         {
@@ -114,6 +116,7 @@ export function ShipmentCreateDialog({
         orderDate: new Date().toISOString().split("T")[0],
         expectedDeliveryDate: "",
         trackingId: "",
+        totalCost: undefined,
         notes: "",
         items: [
           {
@@ -189,6 +192,7 @@ export function ShipmentCreateDialog({
         orderDate: values.orderDate,
         expectedDeliveryDate: values.expectedDeliveryDate || undefined,
         trackingId: values.trackingId || undefined,
+        totalCost: values.totalCost,
         notes: values.notes || undefined,
         createdBy: user?.personId,
         items,
@@ -270,13 +274,26 @@ export function ShipmentCreateDialog({
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="trackingId">Tracking Number (optional)</Label>
-                <Input
-                  id="trackingId"
-                  placeholder="Enter carrier tracking number..."
-                  {...form.register("trackingId")}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="trackingId">Tracking Number (optional)</Label>
+                  <Input
+                    id="trackingId"
+                    placeholder="Enter carrier tracking number..."
+                    {...form.register("trackingId")}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="totalCost">Total Cost ($)</Label>
+                  <Input
+                    id="totalCost"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    placeholder="Optional"
+                    {...form.register("totalCost")}
+                  />
+                </div>
               </div>
 
               {/* Items */}

@@ -107,13 +107,6 @@ export default function ShipmentsPage() {
     setReceiveDialogOpen(true);
   }
 
-  function handleEditClick() {
-    toast({
-      title: "Edit not implemented",
-      description: "Edit shipment functionality will be added later.",
-    });
-  }
-
   function handleCancelClick() {
     setDetailSheetOpen(false);
     setCancelDialogOpen(true);
@@ -226,6 +219,7 @@ export default function ShipmentsPage() {
               shipments={paginatedShipments}
               isLoading={shipmentsQuery.isLoading}
               onRowClick={handleRowClick}
+              showActualDeliveryDate={activeTab === "COMPLETED"}
             />
           </CardContent>
         </Card>
@@ -249,7 +243,6 @@ export default function ShipmentsPage() {
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
         shipment={selectedShipment}
-        onEditClick={handleEditClick}
         onCancelClick={handleCancelClick}
         onReceiveClick={handleReceiveClick}
         onDeleteClick={handleDeleteClick}
