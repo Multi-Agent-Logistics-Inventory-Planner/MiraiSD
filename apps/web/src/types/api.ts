@@ -118,6 +118,7 @@ export enum NotificationType {
   REORDER_SUGGESTION = "REORDER_SUGGESTION",
   EXPIRY_WARNING = "EXPIRY_WARNING",
   SYSTEM_ALERT = "SYSTEM_ALERT",
+  UNASSIGNED_ITEM = "UNASSIGNED_ITEM",
 }
 
 export enum NotificationSeverity {

@@ -84,5 +84,9 @@ public class NotificationService {
     public long countResolved() {
         return notificationRepository.countByResolvedAtIsNotNull();
     }
+
+    public Notification createNotification(Notification notification) {
+        return notificationRepository.save(notification);
+    }
 }
 

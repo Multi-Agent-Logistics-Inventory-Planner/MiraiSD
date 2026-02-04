@@ -27,6 +27,10 @@ import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import com.mirai.inventoryservice.models.audit.Notification;
+import com.mirai.inventoryservice.models.enums.NotificationSeverity;
+import com.mirai.inventoryservice.models.enums.NotificationType;
+
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,6 +63,7 @@ public class ShipmentService {
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final NotificationService notificationService;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
@@ -82,7 +87,8 @@ public class ShipmentService {
             KeychainMachineRepository keychainMachineRepository,
             NotAssignedInventoryRepository notAssignedInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
-            PusherMachineInventoryRepository pusherMachineInventoryRepository) {
+            PusherMachineInventoryRepository pusherMachineInventoryRepository,
+            NotificationService notificationService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productService = productService;
@@ -105,6 +111,7 @@ public class ShipmentService {
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
+        this.notificationService = notificationService;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -306,7 +313,9 @@ public class ShipmentService {
                     addToNotAssignedInventory(
                             shipmentItem.getItem(),
                             allocation.getQuantity(),
-                            requestDTO.getReceivedBy()
+                            requestDTO.getReceivedBy(),
+                            shipment.getShipmentNumber(),
+                            shipment.getId()
                     );
                 } else {
                     // Add to regular location inventory
@@ -376,7 +385,7 @@ public class ShipmentService {
         eventOutboxService.createStockMovementEvent(savedMovement);
     }
 
-    private void addToNotAssignedInventory(Product product, int quantity, UUID actorId) {
+    private void addToNotAssignedInventory(Product product, int quantity, UUID actorId, String shipmentNumber, UUID shipmentId) {
         NotAssignedInventory inventory = notAssignedInventoryRepository
                 .findByItem_Id(product.getId())
                 .orElseGet(() -> {
@@ -414,6 +423,22 @@ public class ShipmentService {
 
         StockMovement savedMovement = stockMovementRepository.save(movement);
         eventOutboxService.createStockMovementEvent(savedMovement);
+
+        // Create notification for unassigned items
+        Map<String, Object> notifMetadata = new HashMap<>();
+        notifMetadata.put("shipment_number", shipmentNumber);
+        notifMetadata.put("shipment_id", shipmentId.toString());
+        notifMetadata.put("product_sku", product.getSku());
+        notifMetadata.put("quantity", quantity);
+
+        Notification notification = Notification.builder()
+                .type(NotificationType.UNASSIGNED_ITEM)
+                .severity(NotificationSeverity.WARNING)
+                .message(quantity + " units of " + product.getName() + " received from shipment " + shipmentNumber + " need location assignment")
+                .itemId(product.getId())
+                .metadata(notifMetadata)
+                .build();
+        notificationService.createNotification(notification);
     }
 
     private Object findOrCreateInventory(LocationType locationType, UUID locationId, Product product) {

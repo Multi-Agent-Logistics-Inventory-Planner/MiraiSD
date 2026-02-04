@@ -5,6 +5,7 @@ public enum NotificationType {
     OUT_OF_STOCK,
     REORDER_SUGGESTION,
     EXPIRY_WARNING,
-    SYSTEM_ALERT
+    SYSTEM_ALERT,
+    UNASSIGNED_ITEM
 }
 

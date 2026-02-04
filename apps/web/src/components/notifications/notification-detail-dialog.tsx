@@ -71,6 +71,8 @@ function getTypeLabel(type: NotificationTypeEnum) {
       return "Expiry Warning";
     case NotificationTypeEnum.SYSTEM_ALERT:
       return "System Alert";
+    case NotificationTypeEnum.UNASSIGNED_ITEM:
+      return "Unassigned Item";
     default:
       return type;
   }

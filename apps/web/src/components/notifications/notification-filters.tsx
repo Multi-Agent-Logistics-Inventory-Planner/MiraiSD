@@ -29,6 +29,7 @@ const TYPE_OPTIONS = [
   { value: NotificationType.REORDER_SUGGESTION, label: "Reorder Suggestion" },
   { value: NotificationType.EXPIRY_WARNING, label: "Expiry Warning" },
   { value: NotificationType.SYSTEM_ALERT, label: "System Alert" },
+  { value: NotificationType.UNASSIGNED_ITEM, label: "Unassigned Item" },
 ];
 
 interface NotificationFiltersProps {
