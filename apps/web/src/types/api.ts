@@ -599,6 +599,22 @@ export interface Notification {
   metadata?: Record<string, unknown>;
   createdAt: string;
   deliveredAt?: string;
+  resolvedAt?: string;
+}
+
+export interface NotificationCounts {
+  active: number;
+  resolved: number;
+}
+
+export interface NotificationSearchParams {
+  search?: string;
+  type?: NotificationType;
+  resolved?: boolean;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  size?: number;
 }
 
 // API Error types

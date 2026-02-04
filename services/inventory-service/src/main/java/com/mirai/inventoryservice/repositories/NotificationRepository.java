@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+public interface NotificationRepository extends JpaRepository<Notification, UUID>, JpaSpecificationExecutor<Notification> {
     // Find undelivered notifications
     List<Notification> findByDeliveredAtIsNullOrderByCreatedAtDesc();
 
@@ -35,5 +36,11 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     // Find by severity
     List<Notification> findBySeverityOrderByCreatedAtDesc(NotificationSeverity severity);
+
+    // Count active (unresolved) notifications
+    long countByResolvedAtIsNull();
+
+    // Count resolved notifications
+    long countByResolvedAtIsNotNull();
 }
 
