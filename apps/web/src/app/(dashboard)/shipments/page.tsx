@@ -23,7 +23,7 @@ import {
   ShipmentPagination,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
-import { useDeleteShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
+import { useDeleteShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
 import {
@@ -38,6 +38,7 @@ export default function ShipmentsPage() {
   const { toast } = useToast();
   const shipmentsQuery = useShipments();
   const deleteMutation = useDeleteShipmentMutation();
+  const updateMutation = useUpdateShipmentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
@@ -105,6 +106,32 @@ export default function ShipmentsPage() {
   function handleDeleteClick() {
     setDetailSheetOpen(false);
     setDeleteDialogOpen(true);
+  }
+
+  async function handleTrackingUpdate(trackingId: string) {
+    if (!selectedShipment) return;
+    try {
+      const updated = await updateMutation.mutateAsync({
+        id: selectedShipment.id,
+        payload: {
+          shipmentNumber: selectedShipment.shipmentNumber,
+          orderDate: selectedShipment.orderDate,
+          trackingId,
+          items: selectedShipment.items.map((item) => ({
+            itemId: item.item.id,
+            orderedQuantity: item.orderedQuantity,
+            unitCost: item.unitCost,
+          })),
+        },
+      });
+      setSelectedShipment(updated);
+      toast({ title: "Tracking number updated" });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update tracking number";
+      toast({ title: "Error", description: message });
+      throw err;
+    }
   }
 
   async function handleConfirmDelete() {
@@ -192,6 +219,7 @@ export default function ShipmentsPage() {
         shipment={selectedShipment}
         onReceiveClick={handleReceiveClick}
         onDeleteClick={handleDeleteClick}
+        onTrackingUpdate={handleTrackingUpdate}
       />
 
       <ShipmentReceiveDialog
