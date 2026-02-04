@@ -28,5 +28,6 @@ public class NotificationResponseDTO {
     private Map<String, Object> metadata;
     private OffsetDateTime createdAt;
     private OffsetDateTime deliveredAt;
+    private OffsetDateTime resolvedAt;
 }
 
