@@ -136,29 +136,24 @@ class SupabaseRepo:
             Product with current inventory quantity, or None if not found
         """
         query = """
-            SELECT 
+            SELECT
                 p.id,
                 p.name,
                 p.sku,
                 COALESCE(p.reorder_point, 0) AS reorder_point,
-                COALESCE(SUM(
-                    CASE 
-                        WHEN ri.quantity IS NOT NULL THEN ri.quantity
-                        WHEN bi.quantity IS NOT NULL THEN bi.quantity
-                        WHEN ci.quantity IS NOT NULL THEN ci.quantity
-                        WHEN kmi.quantity IS NOT NULL THEN kmi.quantity
-                        WHEN scmi.quantity IS NOT NULL THEN scmi.quantity
-                        ELSE 0
-                    END
-                ), 0) AS current_quantity
+                COALESCE(
+                    (SELECT COALESCE(SUM(quantity), 0) FROM rack_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM box_bin_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM cabinet_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM keychain_machine_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM single_claw_machine_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM double_claw_machine_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM four_corner_machine_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM pusher_machine_inventory WHERE item_id = p.id) +
+                    (SELECT COALESCE(SUM(quantity), 0) FROM not_assigned_inventory WHERE item_id = p.id)
+                , 0) AS current_quantity
             FROM products p
-            LEFT JOIN rack_inventories ri ON ri.item_id = p.id
-            LEFT JOIN box_bin_inventories bi ON bi.item_id = p.id
-            LEFT JOIN cabinet_inventories ci ON ci.item_id = p.id
-            LEFT JOIN keychain_machine_inventories kmi ON kmi.item_id = p.id
-            LEFT JOIN single_claw_machine_inventories scmi ON scmi.item_id = p.id
             WHERE p.id = :product_id
-            GROUP BY p.id, p.name, p.sku, p.reorder_point
         """
 
         try:
