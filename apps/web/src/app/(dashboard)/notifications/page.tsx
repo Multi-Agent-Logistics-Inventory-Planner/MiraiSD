@@ -8,6 +8,7 @@ import {
   NotificationsTable,
   NotificationFilters,
   NotificationPagination,
+  NotificationDetailDialog,
 } from "@/components/notifications";
 import {
   useNotificationSearch,
@@ -17,7 +18,7 @@ import {
   useDeleteNotification,
 } from "@/hooks/queries/use-notifications";
 import { DashboardHeader } from "@/components/dashboard-header";
-import type { NotificationType } from "@/types/api";
+import type { NotificationType, Notification } from "@/types/api";
 
 const PAGE_SIZE = 20;
 
@@ -29,6 +30,8 @@ export default function NotificationsPage() {
   const [typeFilter, setTypeFilter] = useState<NotificationType | undefined>();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [page, setPage] = useState(0);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const countsQuery = useNotificationCounts();
   const notificationsQuery = useNotificationSearch({
@@ -68,6 +71,11 @@ export default function NotificationsPage() {
     setDateRange(range);
     setPage(0);
   }, []);
+
+  const handleRowClick = (notification: Notification) => {
+    setSelectedNotification(notification);
+    setDetailDialogOpen(true);
+  };
 
   return (
     <div className="flex flex-col">
@@ -124,6 +132,7 @@ export default function NotificationsPage() {
                 notifications={notifications}
                 isLoading={notificationsQuery.isLoading}
                 isResolved={activeTab === "resolved"}
+                onRowClick={handleRowClick}
                 onResolve={(id) => resolveMutation.mutate(id)}
                 onUnresolve={(id) => unresolveMutation.mutate(id)}
                 onDelete={(id) => deleteMutation.mutate(id)}
@@ -141,6 +150,16 @@ export default function NotificationsPage() {
           onPageChange={setPage}
         />
       </main>
+
+      <NotificationDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        notification={selectedNotification}
+        isResolved={activeTab === "resolved"}
+        onResolve={(id) => resolveMutation.mutate(id)}
+        onUnresolve={(id) => unresolveMutation.mutate(id)}
+        onDelete={(id) => deleteMutation.mutate(id)}
+      />
     </div>
   );
 }

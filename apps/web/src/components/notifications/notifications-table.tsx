@@ -30,6 +30,7 @@ interface NotificationsTableProps {
   notifications: NotificationType[];
   isLoading: boolean;
   isResolved: boolean;
+  onRowClick: (notification: NotificationType) => void;
   onResolve: (id: string) => void;
   onUnresolve: (id: string) => void;
   onDelete: (id: string) => void;
@@ -101,6 +102,7 @@ export function NotificationsTable({
   notifications,
   isLoading,
   isResolved,
+  onRowClick,
   onResolve,
   onUnresolve,
   onDelete,
@@ -164,7 +166,11 @@ export function NotificationsTable({
       </TableHeader>
       <TableBody>
         {notifications.map((notification) => (
-          <TableRow key={notification.id}>
+          <TableRow
+            key={notification.id}
+            className="cursor-pointer hover:bg-muted/50"
+            onClick={() => onRowClick(notification)}
+          >
             <TableCell>{getSeverityIcon(notification.severity)}</TableCell>
             <TableCell>
               <Badge
@@ -186,7 +192,7 @@ export function NotificationsTable({
               {formatTimestamp(notification.createdAt)}
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 {isResolved ? (
                   <Button
                     variant="ghost"
