@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2 } from "lucide-react";
+import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2, Pencil, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
@@ -27,6 +28,7 @@ interface ShipmentDetailSheetProps {
   shipment: Shipment | null;
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
+  onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
 const STATUS_VARIANTS: Record<
@@ -128,12 +130,34 @@ export function ShipmentDetailSheet({
   shipment,
   onReceiveClick,
   onDeleteClick,
+  onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
   const [tracking, setTracking] = useState<TrackingLookupResponse | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [trackingExpanded, setTrackingExpanded] = useState(false);
   const [infoExpanded, setInfoExpanded] = useState(false);
+  const [isEditingTracking, setIsEditingTracking] = useState(false);
+  const [trackingInput, setTrackingInput] = useState("");
+  const [trackingSaving, setTrackingSaving] = useState(false);
+
+  async function handleTrackingSave() {
+    const value = trackingInput.trim();
+    if (!value || !onTrackingUpdate) return;
+    setTrackingSaving(true);
+    try {
+      await onTrackingUpdate(value);
+      setIsEditingTracking(false);
+    } finally {
+      setTrackingSaving(false);
+    }
+  }
+
+  // Reset editing state when shipment changes or sheet closes
+  useEffect(() => {
+    setIsEditingTracking(false);
+    setTrackingInput("");
+  }, [shipment?.id, open]);
 
   useEffect(() => {
     if (!shipment?.trackingId) {
@@ -330,12 +354,82 @@ export function ShipmentDetailSheet({
                       <p className="font-medium">{shipment.receivedBy.fullName}</p>
                     </div>
                   )}
-                  {shipment.trackingId && (
-                    <div>
-                      <p className="text-muted-foreground text-xs mb-1">Tracking Number</p>
-                      <p className="font-mono font-medium">{shipment.trackingId}</p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Tracking Number</p>
+                    {isEditingTracking ? (
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          value={trackingInput}
+                          onChange={(e) => setTrackingInput(e.target.value)}
+                          placeholder="Enter tracking number"
+                          className="h-8 text-sm font-mono"
+                          autoFocus
+                          disabled={trackingSaving}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleTrackingSave();
+                            } else if (e.key === "Escape") {
+                              setIsEditingTracking(false);
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={handleTrackingSave}
+                          disabled={trackingSaving || !trackingInput.trim()}
+                        >
+                          {trackingSaving ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => setIsEditingTracking(false)}
+                          disabled={trackingSaving}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : shipment.trackingId ? (
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-mono font-medium">{shipment.trackingId}</p>
+                        <Can permission={Permission.SHIPMENTS_UPDATE}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => {
+                              setTrackingInput(shipment.trackingId ?? "");
+                              setIsEditingTracking(true);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </Can>
+                      </div>
+                    ) : (
+                      <Can
+                        permission={Permission.SHIPMENTS_UPDATE}
+                        fallback={<p className="text-muted-foreground">-</p>}
+                      >
+                        <button
+                          className="text-sm text-primary hover:underline"
+                          onClick={() => {
+                            setTrackingInput("");
+                            setIsEditingTracking(true);
+                          }}
+                        >
+                          + Add Tracking Number
+                        </button>
+                      </Can>
+                    )}
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
