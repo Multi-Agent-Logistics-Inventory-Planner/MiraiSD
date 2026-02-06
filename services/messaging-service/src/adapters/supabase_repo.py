@@ -186,6 +186,8 @@ class SupabaseRepo:
         recipient_id: str | None = None,
         inventory_id: str | None = None,
         metadata: dict | None = None,
+        source_event_id: str | None = None,
+        dedupe_key: str | None = None,
     ) -> str | None:
         """Create a notification record in the database.
 
@@ -197,9 +199,11 @@ class SupabaseRepo:
             recipient_id: Optional recipient user UUID
             inventory_id: Optional inventory record UUID
             metadata: Optional JSON metadata
+            source_event_id: Optional source Kafka event ID for idempotency
+            dedupe_key: Optional deduplication key (e.g., "LOW_LOC:{item_id}:{location}")
 
         Returns:
-            Created notification ID, or None if creation failed
+            Created notification ID, or None if creation failed or duplicate
         """
         import json
         from datetime import datetime, timezone
@@ -207,31 +211,72 @@ class SupabaseRepo:
         # Generate UUID client-side (matching Hibernate's GenerationType.UUID behavior)
         notification_id = uuid.uuid4()
 
-        query = text("""
-            INSERT INTO notifications (
-                id,
-                type,
-                severity,
-                message,
-                item_id,
-                recipient_id,
-                inventory_id,
-                via,
-                metadata,
-                created_at
-            ) VALUES (
-                :id,
-                :type,
-                :severity,
-                :message,
-                :item_id,
-                :recipient_id,
-                :inventory_id,
-                CAST(:via AS text[]),
-                CAST(:metadata AS jsonb),
-                :created_at
-            )
-        """)
+        # Use INSERT with ON CONFLICT for idempotency when source_event_id is provided
+        if source_event_id and dedupe_key:
+            query = text("""
+                INSERT INTO notifications (
+                    id,
+                    type,
+                    severity,
+                    message,
+                    item_id,
+                    recipient_id,
+                    inventory_id,
+                    via,
+                    metadata,
+                    created_at,
+                    source_event_id,
+                    dedupe_key
+                ) VALUES (
+                    :id,
+                    :type,
+                    :severity,
+                    :message,
+                    :item_id,
+                    :recipient_id,
+                    :inventory_id,
+                    CAST(:via AS text[]),
+                    CAST(:metadata AS jsonb),
+                    :created_at,
+                    :source_event_id,
+                    :dedupe_key
+                )
+                ON CONFLICT (source_event_id, dedupe_key)
+                WHERE source_event_id IS NOT NULL
+                DO NOTHING
+                RETURNING id
+            """)
+        else:
+            query = text("""
+                INSERT INTO notifications (
+                    id,
+                    type,
+                    severity,
+                    message,
+                    item_id,
+                    recipient_id,
+                    inventory_id,
+                    via,
+                    metadata,
+                    created_at,
+                    source_event_id,
+                    dedupe_key
+                ) VALUES (
+                    :id,
+                    :type,
+                    :severity,
+                    :message,
+                    :item_id,
+                    :recipient_id,
+                    :inventory_id,
+                    CAST(:via AS text[]),
+                    CAST(:metadata AS jsonb),
+                    :created_at,
+                    :source_event_id,
+                    :dedupe_key
+                )
+                RETURNING id
+            """)
 
         try:
             with self._engine.connect() as conn:
@@ -250,14 +295,139 @@ class SupabaseRepo:
                     "via": via_array_str,
                     "metadata": metadata_json_str,
                     "created_at": datetime.now(timezone.utc),
+                    "source_event_id": uuid.UUID(source_event_id) if source_event_id else None,
+                    "dedupe_key": dedupe_key,
                 }
 
-                conn.execute(query, params)
+                result = conn.execute(query, params)
+                row = result.fetchone()
                 conn.commit()
 
-                logger.info("Created notification: id=%s, type=%s, item=%s", notification_id, notification_type, item_id)
+                if row is None:
+                    # ON CONFLICT DO NOTHING - duplicate detected
+                    logger.debug(
+                        "Duplicate notification skipped: event=%s, dedupe_key=%s",
+                        source_event_id,
+                        dedupe_key,
+                    )
+                    return None
+
+                logger.info(
+                    "Created notification: id=%s, type=%s, item=%s, dedupe_key=%s",
+                    notification_id,
+                    notification_type,
+                    item_id,
+                    dedupe_key,
+                )
                 return str(notification_id)
         except Exception as e:
             logger.error("Failed to create notification: %s", e)
             return None
+
+    def claim_undelivered_notifications(self, limit: int = 10) -> list[dict]:
+        """Atomically claim notifications pending Slack delivery.
+
+        Uses FOR UPDATE SKIP LOCKED to prevent double-sends when
+        multiple worker instances are running.
+
+        Args:
+            limit: Maximum number of notifications to claim
+
+        Returns:
+            List of notification dicts with all fields needed for delivery
+        """
+        query = text("""
+            UPDATE notifications
+            SET delivery_status = 'sending',
+                delivery_claimed_at = NOW()
+            WHERE id IN (
+                SELECT id FROM notifications
+                WHERE delivered_at IS NULL
+                  AND (delivery_status IS NULL OR delivery_status = 'pending')
+                  AND 'slack' = ANY(via)
+                ORDER BY created_at
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id, type, severity, message, item_id, metadata
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {"limit": limit})
+                rows = result.fetchall()
+                conn.commit()
+
+                notifications = []
+                for row in rows:
+                    notifications.append({
+                        "id": str(row.id),
+                        "type": row.type,
+                        "severity": row.severity,
+                        "message": row.message,
+                        "item_id": str(row.item_id) if row.item_id else None,
+                        "metadata": row.metadata,
+                    })
+
+                if notifications:
+                    logger.info("Claimed %d notifications for Slack delivery", len(notifications))
+
+                return notifications
+        except Exception as e:
+            logger.error("Failed to claim notifications: %s", e)
+            return []
+
+    def mark_as_delivered(self, notification_id: str) -> bool:
+        """Mark a notification as successfully delivered.
+
+        Args:
+            notification_id: UUID of the notification
+
+        Returns:
+            True if updated, False on error
+        """
+        query = text("""
+            UPDATE notifications
+            SET delivered_at = NOW(),
+                delivery_status = 'delivered'
+            WHERE id = :id
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(query, {"id": uuid.UUID(notification_id)})
+                conn.commit()
+                logger.debug("Marked notification %s as delivered", notification_id)
+                return True
+        except Exception as e:
+            logger.error("Failed to mark notification as delivered: %s", e)
+            return False
+
+    def release_claim(self, notification_id: str) -> bool:
+        """Release a claimed notification back to pending status.
+
+        Called when delivery fails, allowing retry.
+
+        Args:
+            notification_id: UUID of the notification
+
+        Returns:
+            True if updated, False on error
+        """
+        query = text("""
+            UPDATE notifications
+            SET delivery_status = 'pending',
+                delivery_attempts = COALESCE(delivery_attempts, 0) + 1
+            WHERE id = :id
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(query, {"id": uuid.UUID(notification_id)})
+                conn.commit()
+                logger.debug("Released claim on notification %s", notification_id)
+                return True
+        except Exception as e:
+            logger.error("Failed to release notification claim: %s", e)
+            return False
 

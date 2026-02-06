@@ -161,22 +161,41 @@ class KafkaEventConsumer:
         try:
             # Parse using existing Pydantic model
             envelope = EventEnvelope.model_validate(value)
+            payload = envelope.payload
 
-            # Convert to normalized event
+            # Convert to normalized event with all quantity fields for crossing logic
             normalized = NormalizedEvent(
                 event_id=envelope.event_id,
-                item_id=envelope.payload.item_id,
-                quantity_change=envelope.payload.quantity_change,
-                reason=envelope.payload.reason,
-                at=envelope.payload.at,
+                item_id=payload.item_id,
+                quantity_change=payload.quantity_change,
+                reason=payload.reason,
+                at=payload.at,
+                # Location codes
+                to_location_code=payload.to_location_code,
+                from_location_code=payload.from_location_code,
+                # Location-level quantities
+                previous_location_qty=payload.previous_location_qty,
+                current_location_qty=payload.current_location_qty,
+                # Total-level quantities
+                previous_total_qty=payload.previous_total_qty,
+                current_total_qty=payload.current_total_qty,
+                # Product config
+                reorder_point=payload.reorder_point,
+                sku=payload.sku,
+                # Actor and reference
+                actor_id=payload.actor_id,
+                stock_movement_id=payload.stock_movement_id,
             )
 
             logger.debug(
-                "Parsed event: id=%s, item=%s, qty=%d, reason=%s",
+                "Parsed event: id=%s, item=%s, qty=%d, reason=%s, to_loc=%s, prev_loc_qty=%s, curr_loc_qty=%s",
                 normalized.event_id,
                 normalized.item_id,
                 normalized.quantity_change,
                 normalized.reason,
+                normalized.to_location_code,
+                normalized.previous_location_qty,
+                normalized.current_location_qty,
             )
             return normalized
 

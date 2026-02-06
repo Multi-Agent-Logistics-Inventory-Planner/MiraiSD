@@ -34,6 +34,13 @@ SLACK_ENABLED = os.getenv("SLACK_ENABLED", "true").lower() == "true"
 # Alert settings
 ALERT_DEBOUNCE_SECONDS = float(os.getenv("ALERT_DEBOUNCE_SECONDS", "300.0"))  # 5 minutes default
 
+# Location-level stock thresholds (for individual storage locations like box bins, machines)
+LOCATION_LOW_STOCK_THRESHOLD = int(os.getenv("LOCATION_LOW_STOCK_THRESHOLD", "5"))
+LOCATION_LOW_STOCK_RECOVERY = int(os.getenv("LOCATION_LOW_STOCK_RECOVERY", "7"))  # threshold + 2 for hysteresis
+
+# Notification polling interval for Slack delivery (seconds)
+NOTIFICATION_POLL_INTERVAL = float(os.getenv("NOTIFICATION_POLL_INTERVAL", "5.0"))
+
 # API settings (optional health endpoint)
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "5001"))

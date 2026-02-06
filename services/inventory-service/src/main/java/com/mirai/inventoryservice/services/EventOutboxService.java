@@ -52,14 +52,15 @@ public class EventOutboxService {
         payload.put("reason", movement.getReason().name().toLowerCase()); // "sale", "restock", etc
         payload.put("at", movement.getAt().toString()); // YYYY-MM-DDTHH:MM:SSZ
 
+        // Location codes (renamed for consistency)
         if (movement.getFromLocationId() != null) {
             String fromCode = stockMovementService.resolveLocationCode(
                     movement.getFromLocationId(),
                     movement.getLocationType()
             );
-            payload.put("from_box_id", fromCode); // "B1", "S2", "D1", "K1", "C1", "R3", etc
+            payload.put("from_location_code", fromCode); // "B1", "S2", "D1", "K1", "C1", "R3", etc
         } else {
-            payload.put("from_box_id", null);
+            payload.put("from_location_code", null);
         }
 
         if (movement.getToLocationId() != null) {
@@ -67,10 +68,24 @@ public class EventOutboxService {
                     movement.getToLocationId(),
                     movement.getLocationType()
             );
-            payload.put("to_box_id", toCode);
+            payload.put("to_location_code", toCode);
         } else {
-            payload.put("to_box_id", null);
+            payload.put("to_location_code", null);
         }
+
+        // Location-level quantities for crossing logic (from StockMovement)
+        payload.put("previous_location_qty", movement.getPreviousQuantity());
+        payload.put("current_location_qty", movement.getCurrentQuantity());
+
+        // Total-level quantities for crossing logic (computed in same transaction)
+        UUID productId = movement.getItem().getId();
+        int currentTotal = stockMovementService.calculateTotalInventory(productId);
+        int previousTotal = currentTotal - movement.getQuantityChange();
+        payload.put("previous_total_qty", previousTotal);
+        payload.put("current_total_qty", currentTotal);
+
+        // Product config for threshold comparison
+        payload.put("reorder_point", movement.getItem().getReorderPoint());
 
         if (movement.getActorId() != null) {
             payload.put("actor_id", movement.getActorId().toString());

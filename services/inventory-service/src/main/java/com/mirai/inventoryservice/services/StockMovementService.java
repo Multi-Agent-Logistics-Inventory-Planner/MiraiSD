@@ -11,6 +11,7 @@ import com.mirai.inventoryservice.models.inventory.*;
 import com.mirai.inventoryservice.models.storage.*;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +46,7 @@ public class StockMovementService {
     private final FourCornerMachineRepository fourCornerMachineRepository;
     private final PusherMachineRepository pusherMachineRepository;
     private final EventOutboxService eventOutboxService;
+    private final EntityManager entityManager;
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
@@ -65,7 +67,8 @@ public class StockMovementService {
             RackRepository rackRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
-            EventOutboxService eventOutboxService) {
+            EventOutboxService eventOutboxService,
+            EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
@@ -85,6 +88,7 @@ public class StockMovementService {
         this.fourCornerMachineRepository = fourCornerMachineRepository;
         this.pusherMachineRepository = pusherMachineRepository;
         this.eventOutboxService = eventOutboxService;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -482,5 +486,31 @@ public class StockMovementService {
                     .map(PusherMachine::getPusherMachineCode).orElse(null);
             case NOT_ASSIGNED -> "Not Assigned";
         };
+    }
+
+    /**
+     * Calculate total inventory for a product across all storage locations.
+     * Uses a single native query instead of 9 repository calls to minimize DB connections.
+     */
+    public int calculateTotalInventory(UUID productId) {
+        String sql = """
+            SELECT COALESCE(
+                (SELECT COALESCE(SUM(quantity), 0) FROM box_bin_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM single_claw_machine_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM double_claw_machine_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM keychain_machine_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM cabinet_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM rack_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM four_corner_machine_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM pusher_machine_inventory WHERE item_id = :productId) +
+                (SELECT COALESCE(SUM(quantity), 0) FROM not_assigned_inventory WHERE item_id = :productId)
+            , 0) AS total
+            """;
+
+        Object result = entityManager.createNativeQuery(sql)
+                .setParameter("productId", productId)
+                .getSingleResult();
+
+        return ((Number) result).intValue();
     }
 }
