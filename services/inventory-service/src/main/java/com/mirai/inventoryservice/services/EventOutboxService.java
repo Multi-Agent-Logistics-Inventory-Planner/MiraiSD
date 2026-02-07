@@ -111,17 +111,20 @@ public class EventOutboxService {
     /**
      * Scheduled job to publish unpublished events to Kafka
      * Runs every 10 seconds
+     *
+     * NOTE: This method is NOT transactional to avoid holding DB connections during Kafka sends.
+     * Each event fetch and update uses its own short transaction via helper methods.
      */
     @Scheduled(fixedDelay = 10000)
-    @Transactional
     public void publishPendingEvents() {
-        List<EventOutbox> pendingEvents = eventOutboxRepository.findTop100ByPublishedAtIsNullOrderByCreatedAtAsc();
+        // Fetch pending events in a short transaction, then release connection
+        List<EventOutbox> pendingEvents = fetchPendingEvents();
 
         if (pendingEvents.isEmpty()) {
             return;
         }
 
-        log.info("Publishing {} pending events to Kafka",  pendingEvents.size());
+        log.info("Publishing {} pending events to Kafka", pendingEvents.size());
 
         for (EventOutbox event : pendingEvents) {
             try {
@@ -132,27 +135,57 @@ public class EventOutboxService {
                 message.put("event_type", event.getEventType());
                 message.put("entity_type", event.getEntityType());
                 message.put("entity_id", event.getEntityId().toString());
-                message.put("payload", event.getPayload()); // Already structured correctly
+                message.put("payload", event.getPayload());
                 message.put("created_at", event.getCreatedAt().toString());
 
-                // Key for Kafka partitioning: item_id + location_type
+                // Key for Kafka partitioning: item_id
                 String key = event.getPayload().get("item_id").toString();
 
-                // Send to Kafka
+                // Send to Kafka (outside of transaction - no DB connection held)
                 kafkaProducer.sendEvent(event.getTopic(), key, message);
 
-                // Mark as published
-                event.setPublishedAt(OffsetDateTime.now());
-                eventOutboxRepository.save(event);
+                // Mark as published in a short transaction
+                markEventAsPublished(event.getId());
 
                 log.info("Published event {} to topic {}", event.getId(), event.getTopic());
             } catch (Exception e) {
                 log.error("Failed to publish event {}: {}", event.getId(), e.getMessage());
-                event.setPublishAttempts(event.getPublishAttempts() + 1);
-                event.setLastError(e.getMessage());
-                eventOutboxRepository.save(event);
+                // Record failure in a short transaction
+                recordEventFailure(event.getId(), e.getMessage());
             }
         }
+    }
+
+    /**
+     * Fetch pending events in its own short transaction.
+     * Connection is released immediately after query completes.
+     */
+    @Transactional(readOnly = true)
+    public List<EventOutbox> fetchPendingEvents() {
+        return eventOutboxRepository.findTop100ByPublishedAtIsNullOrderByCreatedAtAsc();
+    }
+
+    /**
+     * Mark an event as published in its own short transaction.
+     */
+    @Transactional
+    public void markEventAsPublished(UUID eventId) {
+        eventOutboxRepository.findById(eventId).ifPresent(event -> {
+            event.setPublishedAt(OffsetDateTime.now());
+            eventOutboxRepository.save(event);
+        });
+    }
+
+    /**
+     * Record event publish failure in its own short transaction.
+     */
+    @Transactional
+    public void recordEventFailure(UUID eventId, String errorMessage) {
+        eventOutboxRepository.findById(eventId).ifPresent(event -> {
+            event.setPublishAttempts(event.getPublishAttempts() + 1);
+            event.setLastError(errorMessage);
+            eventOutboxRepository.save(event);
+        });
     }
 }
 

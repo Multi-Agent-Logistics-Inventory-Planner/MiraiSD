@@ -10,13 +10,14 @@ services:
     image: postgres:16-alpine
     container_name: postgres-dev
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Use 5433 externally to avoid conflict with local PostgreSQL
     environment:
       POSTGRES_DB: mirai_inventory
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d  # Run init scripts on first startup
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -72,6 +73,37 @@ services:
         condition: service_healthy
     networks:
       - mirai-dev
+
+  messaging-service:
+    container_name: messaging-service-dev
+    build:
+      context: ../services/messaging-service
+      dockerfile: Dockerfile
+    image: messaging-service:latest
+    env_file:
+      - ../.env
+    environment:
+      # Local PostgreSQL (overrides Supabase)
+      - SUPABASE_DB_URL=postgresql://postgres-dev:5432/mirai_inventory
+      - SUPABASE_DB_USERNAME=postgres
+      - SUPABASE_DB_PASSWORD=postgres
+      # Kafka settings
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=inventory-changes
+      - KAFKA_CONSUMER_GROUP=messaging-service
+      # Slack settings (from .env)
+      - SLACK_TOKEN=${SLACK_TOKEN:-}
+      - SLACK_ENABLED=${SLACK_ENABLED:-true}
+      # Alert settings
+      - ALERT_DEBOUNCE_SECONDS=${ALERT_DEBOUNCE_SECONDS:-300}
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - mirai-dev
+    restart: unless-stopped
 
   frontend:
     container_name: frontend-dev

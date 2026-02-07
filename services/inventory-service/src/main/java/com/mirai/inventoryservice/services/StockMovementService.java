@@ -12,11 +12,11 @@ import com.mirai.inventoryservice.models.storage.*;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
-@Transactional
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
@@ -95,6 +94,7 @@ public class StockMovementService {
      * Adjust inventory quantity (restock, sale, damage, etc.)
      * Creates a single stock movement record
      */
+    @Transactional
     public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
         // Load inventory records
         Object inventory = loadInventory(locationType, inventoryId);
@@ -147,6 +147,7 @@ public class StockMovementService {
      * Creates TWO stock movement records (withdrawal + deposit)
      * If destination inventory doesn't exist, creates it automatically
      */
+    @Transactional
     public void transferInventory(TransferInventoryRequestDTO request) {
         // Load source inventory
         Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
