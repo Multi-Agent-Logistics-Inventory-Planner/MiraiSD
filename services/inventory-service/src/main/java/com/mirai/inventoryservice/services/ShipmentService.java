@@ -63,6 +63,8 @@ public class ShipmentService {
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final FourCornerMachineRepository fourCornerMachineRepository;
+    private final PusherMachineRepository pusherMachineRepository;
     private final NotificationService notificationService;
 
     public ShipmentService(
@@ -88,6 +90,8 @@ public class ShipmentService {
             NotAssignedInventoryRepository notAssignedInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
+            FourCornerMachineRepository fourCornerMachineRepository,
+            PusherMachineRepository pusherMachineRepository,
             NotificationService notificationService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
@@ -111,6 +115,8 @@ public class ShipmentService {
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
+        this.fourCornerMachineRepository = fourCornerMachineRepository;
+        this.pusherMachineRepository = pusherMachineRepository;
         this.notificationService = notificationService;
     }
 
@@ -508,9 +514,8 @@ public class ShipmentService {
                     .findByFourCornerMachine_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         FourCornerMachineInventory inv = new FourCornerMachineInventory();
-                        inv.setFourCornerMachine(fourCornerMachineInventoryRepository.findById(locationId)
-                                .map(FourCornerMachineInventory::getFourCornerMachine)
-                                .orElseThrow(() -> new IllegalArgumentException("FourCornerMachine not found")));
+                        inv.setFourCornerMachine(fourCornerMachineRepository.findById(locationId)
+                                .orElseThrow(() -> new IllegalArgumentException("FourCornerMachine not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
@@ -519,9 +524,8 @@ public class ShipmentService {
                     .findByPusherMachine_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
                         PusherMachineInventory inv = new PusherMachineInventory();
-                        inv.setPusherMachine(pusherMachineInventoryRepository.findById(locationId)
-                                .map(PusherMachineInventory::getPusherMachine)
-                                .orElseThrow(() -> new IllegalArgumentException("PusherMachine not found")));
+                        inv.setPusherMachine(pusherMachineRepository.findById(locationId)
+                                .orElseThrow(() -> new IllegalArgumentException("PusherMachine not found with id: " + locationId)));
                         inv.setItem(product);
                         inv.setQuantity(0);
                         return inv;
