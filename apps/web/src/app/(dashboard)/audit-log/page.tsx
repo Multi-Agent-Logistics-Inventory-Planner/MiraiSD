@@ -15,6 +15,7 @@ import {
   AuditLogFilters as AuditLogFiltersType,
   StockMovementReason,
 } from "@/types/api";
+import { DashboardHeader } from "@/components/dashboard-header";
 
 function buildApiFilters(state: AuditLogFiltersState): AuditLogFiltersType {
   const filters: AuditLogFiltersType = {};
@@ -57,9 +58,9 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="flex flex-col p-4 md:p-8 space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
-
+    <div className="flex flex-col">
+      <DashboardHeader title="Audit Log" />
+      <main className="flex-1 p-4 md:p-8 space-y-4">
       <AuditLogFilters
         state={filters}
         onChange={handleFiltersChange}
@@ -83,6 +84,7 @@ export default function AuditLogPage() {
         page={page}
         onPageChange={setPage}
       />
+      </main>
     </div>
   );
 }
