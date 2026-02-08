@@ -122,8 +122,8 @@ class SupabaseRepo:
             self._engine = create_engine(
                 _build_connection_url(),
                 pool_pre_ping=True,
-                pool_size=5,
-                max_overflow=10,
+                pool_size=1,
+                max_overflow=2,
             )
 
     def get_product_with_inventory(self, product_id: str) -> Product | None:
