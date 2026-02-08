@@ -262,7 +262,16 @@ export function ShipmentReceiveDialog({
   });
 
   async function handleSubmit() {
-    if (!user?.personId || !shipment) return;
+    if (!shipment) return;
+
+    if (!user?.personId) {
+      toast({
+        title: "Error",
+        description: "Your user account is not linked to a person record. Please contact an administrator.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const itemReceipts: ShipmentItemReceipt[] = shipment.items
       .filter((item) => getTotalAllocated(item.id) > 0)

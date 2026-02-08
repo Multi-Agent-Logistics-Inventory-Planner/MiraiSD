@@ -16,6 +16,27 @@ class EventPayload(BaseModel):
     reason: str = Field(..., description="Reason for change (sale, restock, etc.)")
     at: datetime = Field(..., description="Timestamp of the event")
 
+    # Location codes (e.g., "B1", "S2", "D1", "K1", "C1", "R3", etc.)
+    to_location_code: str | None = Field(None, description="Target location code")
+    from_location_code: str | None = Field(None, description="Source location code")
+
+    # Location-level quantities for crossing logic
+    previous_location_qty: int | None = Field(None, description="Quantity at location before change")
+    current_location_qty: int | None = Field(None, description="Quantity at location after change")
+
+    # Total-level quantities for crossing logic
+    previous_total_qty: int | None = Field(None, description="Total inventory before change")
+    current_total_qty: int | None = Field(None, description="Total inventory after change")
+
+    # Product config
+    reorder_point: int | None = Field(None, description="Product reorder threshold")
+    sku: str | None = Field(None, description="Product SKU")
+    product_id: str | None = Field(None, description="Product UUID (alias for item_id)")
+
+    # Actor and reference
+    actor_id: str | None = Field(None, description="User who triggered the change")
+    stock_movement_id: str | None = Field(None, description="Stock movement record ID")
+
 
 class EventEnvelope(BaseModel):
     """Kafka event envelope model."""
@@ -38,4 +59,24 @@ class NormalizedEvent:
     quantity_change: int
     reason: str
     at: datetime
+
+    # Location codes
+    to_location_code: str | None = None
+    from_location_code: str | None = None
+
+    # Location-level quantities for crossing logic
+    previous_location_qty: int | None = None
+    current_location_qty: int | None = None
+
+    # Total-level quantities for crossing logic
+    previous_total_qty: int | None = None
+    current_total_qty: int | None = None
+
+    # Product config
+    reorder_point: int | None = None
+    sku: str | None = None
+
+    # Actor and reference
+    actor_id: str | None = None
+    stock_movement_id: str | None = None
 
