@@ -111,38 +111,55 @@ export function NotificationsTable({
 }: NotificationsTableProps) {
   if (isLoading) {
     return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[50px]" />
-            <TableHead>Type</TableHead>
-            <TableHead className="w-full">Content</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead className="w-[100px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <>
+        {/* Mobile loading skeleton */}
+        <div className="sm:hidden divide-y">
           {Array.from({ length: 5 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
+            <div key={i} className="p-4 space-y-2">
+              <div className="flex items-center gap-2">
                 <Skeleton className="h-4 w-4" />
-              </TableCell>
-              <TableCell>
                 <Skeleton className="h-5 w-16" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-full max-w-md" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-20" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-8 w-16" />
-              </TableCell>
-            </TableRow>
+                <Skeleton className="h-4 w-12" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+            </div>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+
+        {/* Desktop loading skeleton */}
+        <Table className="hidden sm:table">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]" />
+              <TableHead>Type</TableHead>
+              <TableHead className="w-full">Content</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="w-[100px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell>
+                  <Skeleton className="h-4 w-4" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-16" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-full max-w-md" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-20" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-8 w-16" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </>
     );
   }
 
@@ -156,44 +173,31 @@ export function NotificationsTable({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[50px]" />
-          <TableHead>Type</TableHead>
-          <TableHead className="w-full">Content</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead className="w-[100px]" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Mobile card layout */}
+      <div className="sm:hidden divide-y">
         {notifications.map((notification) => (
-          <TableRow
+          <div
             key={notification.id}
-            className="cursor-pointer hover:bg-muted/50"
+            className="p-4 cursor-pointer hover:bg-muted/50 active:bg-muted"
             onClick={() => onRowClick(notification)}
           >
-            <TableCell>{getSeverityIcon(notification.severity)}</TableCell>
-            <TableCell>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-xs whitespace-nowrap",
-                  getSeverityColor(notification.severity)
-                )}
-              >
-                {getTypeLabel(notification.type)}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <p className="text-sm truncate max-w-md" title={notification.message}>
-                {notification.message}
-              </p>
-            </TableCell>
-            <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-              {formatTimestamp(notification.createdAt)}
-            </TableCell>
-            <TableCell>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {getSeverityIcon(notification.severity)}
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs whitespace-nowrap",
+                    getSeverityColor(notification.severity)
+                  )}
+                >
+                  {getTypeLabel(notification.type)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {formatTimestamp(notification.createdAt)}
+                </span>
+              </div>
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 {isResolved ? (
                   <Button
@@ -224,10 +228,88 @@ export function NotificationsTable({
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            </TableCell>
-          </TableRow>
+            </div>
+            <p className="text-sm mt-2 text-foreground">
+              {notification.message}
+            </p>
+          </div>
         ))}
-      </TableBody>
-    </Table>
+      </div>
+
+      {/* Desktop table layout */}
+      <Table className="hidden sm:table">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[50px]" />
+            <TableHead>Type</TableHead>
+            <TableHead className="w-full">Content</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="w-[100px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {notifications.map((notification) => (
+            <TableRow
+              key={notification.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => onRowClick(notification)}
+            >
+              <TableCell>{getSeverityIcon(notification.severity)}</TableCell>
+              <TableCell>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs whitespace-nowrap",
+                    getSeverityColor(notification.severity)
+                  )}
+                >
+                  {getTypeLabel(notification.type)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <p className="text-sm truncate max-w-md" title={notification.message}>
+                  {notification.message}
+                </p>
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                {formatTimestamp(notification.createdAt)}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {isResolved ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => onUnresolve(notification.id)}
+                      title="Reopen notification"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => onResolve(notification.id)}
+                      title="Resolve notification"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive"
+                    onClick={() => onDelete(notification.id)}
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
