@@ -105,8 +105,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=inventory-changes
       - KAFKA_CONSUMER_GROUP=messaging-service
-      # Slack settings
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      # Slack settings (SLACK_WEBHOOK_URL comes from env_file)
       - SLACK_CHANNEL=${SLACK_CHANNEL:-#inventory-alerts}
       - SLACK_ENABLED=${SLACK_ENABLED:-true}
       # Alert settings
