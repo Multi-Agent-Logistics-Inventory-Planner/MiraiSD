@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.function.Function;
 import javax.crypto.SecretKey;
 
+@Slf4j
 @Service
 @NoArgsConstructor
 public class JwtService {
@@ -23,7 +25,7 @@ public class JwtService {
 
     @jakarta.annotation.PostConstruct
     public void init() {
-        System.out.println("JwtService initialized with secret: " + (jwtSecret != null ? "LOADED" : "NULL"));
+        log.info("JwtService initialized with secret: {}", (jwtSecret != null ? "LOADED" : "NULL"));
     }
     
     
@@ -84,7 +86,8 @@ public class JwtService {
             boolean result = !isTokenExpired(token);
             return result;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Token validation failed: {}", e.getMessage());
+            log.debug("Token validation error details", e);
             return false;
         }
     }
