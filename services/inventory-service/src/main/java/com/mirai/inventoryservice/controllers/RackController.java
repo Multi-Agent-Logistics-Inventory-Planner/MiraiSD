@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.RackService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,12 +38,14 @@ public class RackController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RackResponseDTO> createRack(@Valid @RequestBody RackRequestDTO requestDTO) {
         Rack rack = rackService.createRack(requestDTO.getRackCode());
         return ResponseEntity.status(HttpStatus.CREATED).body(rackMapper.toResponseDTO(rack));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RackResponseDTO> updateRack(
             @PathVariable UUID id,
             @Valid @RequestBody RackRequestDTO requestDTO) {
@@ -51,6 +54,7 @@ public class RackController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteRack(@PathVariable UUID id) {
         rackService.deleteRack(id);
         return ResponseEntity.noContent().build();

@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.RackInventoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class RackInventoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<RackInventoryResponseDTO> addInventory(
             @PathVariable UUID rackId,
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
@@ -53,6 +55,7 @@ public class RackInventoryController {
     }
 
     @PutMapping("/{inventoryId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<RackInventoryResponseDTO> updateInventory(
             @PathVariable UUID rackId,
             @PathVariable UUID inventoryId,
@@ -64,6 +67,7 @@ public class RackInventoryController {
     }
 
     @DeleteMapping("/{inventoryId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteInventory(
             @PathVariable UUID rackId,
             @PathVariable UUID inventoryId) {

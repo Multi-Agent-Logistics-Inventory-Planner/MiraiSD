@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.CabinetService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,12 +38,14 @@ public class CabinetController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CabinetResponseDTO> createCabinet(@Valid @RequestBody CabinetRequestDTO requestDTO) {
         Cabinet cabinet = cabinetService.createCabinet(requestDTO.getCabinetCode());
         return ResponseEntity.status(HttpStatus.CREATED).body(cabinetMapper.toResponseDTO(cabinet));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CabinetResponseDTO> updateCabinet(
             @PathVariable UUID id,
             @Valid @RequestBody CabinetRequestDTO requestDTO) {
@@ -51,6 +54,7 @@ public class CabinetController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCabinet(@PathVariable UUID id) {
         cabinetService.deleteCabinet(id);
         return ResponseEntity.noContent().build();

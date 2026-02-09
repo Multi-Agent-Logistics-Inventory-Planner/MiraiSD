@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.BoxBinService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,12 +38,14 @@ public class BoxBinController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BoxBinResponseDTO> createBoxBin(@Valid @RequestBody BoxBinRequestDTO requestDTO) {
         BoxBin boxBin = boxBinService.createBoxBin(requestDTO.getBoxBinCode());
         return ResponseEntity.status(HttpStatus.CREATED).body(boxBinMapper.toResponseDTO(boxBin));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BoxBinResponseDTO> updateBoxBin(
             @PathVariable UUID id,
             @Valid @RequestBody BoxBinRequestDTO requestDTO) {
@@ -51,6 +54,7 @@ public class BoxBinController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteBoxBin(@PathVariable UUID id) {
         boxBinService.deleteBoxBin(id);
         return ResponseEntity.noContent().build();

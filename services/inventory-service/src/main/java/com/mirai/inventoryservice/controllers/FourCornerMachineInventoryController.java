@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.FourCornerMachineInventoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,6 +44,7 @@ public class FourCornerMachineInventoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<FourCornerMachineInventoryResponseDTO> addInventory(
             @PathVariable UUID fourCornerMachineId,
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
@@ -55,6 +57,7 @@ public class FourCornerMachineInventoryController {
     }
 
     @PutMapping("/{inventoryId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<FourCornerMachineInventoryResponseDTO> updateInventory(
             @PathVariable UUID fourCornerMachineId,
             @PathVariable UUID inventoryId,
@@ -66,6 +69,7 @@ public class FourCornerMachineInventoryController {
     }
 
     @DeleteMapping("/{inventoryId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteInventory(
             @PathVariable UUID fourCornerMachineId,
             @PathVariable UUID inventoryId) {

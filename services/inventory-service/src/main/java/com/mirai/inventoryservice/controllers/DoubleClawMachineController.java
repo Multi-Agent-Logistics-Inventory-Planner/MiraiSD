@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.DoubleClawMachineService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class DoubleClawMachineController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DoubleClawMachineResponseDTO> createDoubleClawMachine(
             @Valid @RequestBody DoubleClawMachineRequestDTO requestDTO) {
         DoubleClawMachine machine = doubleClawMachineService.createDoubleClawMachine(
@@ -48,6 +50,7 @@ public class DoubleClawMachineController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DoubleClawMachineResponseDTO> updateDoubleClawMachine(
             @PathVariable UUID id,
             @Valid @RequestBody DoubleClawMachineRequestDTO requestDTO) {
@@ -57,6 +60,7 @@ public class DoubleClawMachineController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteDoubleClawMachine(@PathVariable UUID id) {
         doubleClawMachineService.deleteDoubleClawMachine(id);
         return ResponseEntity.noContent().build();
