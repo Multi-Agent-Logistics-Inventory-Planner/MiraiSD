@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.FourCornerMachineService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class FourCornerMachineController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FourCornerMachineResponseDTO> createFourCornerMachine(
             @Valid @RequestBody FourCornerMachineRequestDTO requestDTO) {
         FourCornerMachine machine = fourCornerMachineService.createFourCornerMachine(
@@ -48,6 +50,7 @@ public class FourCornerMachineController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FourCornerMachineResponseDTO> updateFourCornerMachine(
             @PathVariable UUID id,
             @Valid @RequestBody FourCornerMachineRequestDTO requestDTO) {
@@ -57,6 +60,7 @@ public class FourCornerMachineController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteFourCornerMachine(@PathVariable UUID id) {
         fourCornerMachineService.deleteFourCornerMachine(id);
         return ResponseEntity.noContent().build();

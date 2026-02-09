@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.DoubleClawMachineInventoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,6 +44,7 @@ public class DoubleClawMachineInventoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<DoubleClawMachineInventoryResponseDTO> addInventory(
             @PathVariable UUID doubleClawMachineId,
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
@@ -55,6 +57,7 @@ public class DoubleClawMachineInventoryController {
     }
 
     @PutMapping("/{inventoryId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
     public ResponseEntity<DoubleClawMachineInventoryResponseDTO> updateInventory(
             @PathVariable UUID doubleClawMachineId,
             @PathVariable UUID inventoryId,
@@ -66,6 +69,7 @@ public class DoubleClawMachineInventoryController {
     }
 
     @DeleteMapping("/{inventoryId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteInventory(
             @PathVariable UUID doubleClawMachineId,
             @PathVariable UUID inventoryId) {

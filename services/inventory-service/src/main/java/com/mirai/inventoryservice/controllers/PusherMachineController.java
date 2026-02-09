@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.PusherMachineService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class PusherMachineController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PusherMachineResponseDTO> createPusherMachine(
             @Valid @RequestBody PusherMachineRequestDTO requestDTO) {
         PusherMachine machine = pusherMachineService.createPusherMachine(
@@ -48,6 +50,7 @@ public class PusherMachineController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PusherMachineResponseDTO> updatePusherMachine(
             @PathVariable UUID id,
             @Valid @RequestBody PusherMachineRequestDTO requestDTO) {
@@ -57,6 +60,7 @@ public class PusherMachineController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletePusherMachine(@PathVariable UUID id) {
         pusherMachineService.deletePusherMachine(id);
         return ResponseEntity.noContent().build();

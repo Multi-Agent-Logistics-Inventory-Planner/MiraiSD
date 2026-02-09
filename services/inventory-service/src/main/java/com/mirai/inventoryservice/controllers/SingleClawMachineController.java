@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.services.SingleClawMachineService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class SingleClawMachineController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SingleClawMachineResponseDTO> createSingleClawMachine(
             @Valid @RequestBody SingleClawMachineRequestDTO requestDTO) {
         SingleClawMachine machine = singleClawMachineService.createSingleClawMachine(
@@ -48,6 +50,7 @@ public class SingleClawMachineController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SingleClawMachineResponseDTO> updateSingleClawMachine(
             @PathVariable UUID id,
             @Valid @RequestBody SingleClawMachineRequestDTO requestDTO) {
@@ -57,6 +60,7 @@ public class SingleClawMachineController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteSingleClawMachine(@PathVariable UUID id) {
         singleClawMachineService.deleteSingleClawMachine(id);
         return ResponseEntity.noContent().build();
