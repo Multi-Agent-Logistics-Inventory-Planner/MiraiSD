@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -31,6 +32,32 @@ class SlackNotifier:
         self._webhook_url = webhook_url or config.SLACK_WEBHOOK_URL
         self._channel = channel or config.SLACK_CHANNEL
         self._enabled = config.SLACK_ENABLED
+
+        # Validate webhook URL if provided and not empty
+        if self._webhook_url:
+            self._validate_webhook_url(self._webhook_url)
+
+    def _validate_webhook_url(self, url: str) -> None:
+        """Validate that webhook URL is a legitimate Slack webhook.
+
+        Args:
+            url: The webhook URL to validate
+
+        Raises:
+            ValueError: If the URL is not a valid Slack webhook URL
+        """
+        # Check if URL starts with Slack webhook prefix
+        if not url.startswith('https://hooks.slack.com/services/'):
+            raise ValueError(
+                "Invalid Slack webhook URL. Must start with "
+                "'https://hooks.slack.com/services/'"
+            )
+
+        # Validate URL format: https://hooks.slack.com/services/{T-ID}/{B-ID}/{TOKEN}
+        # T-ID and B-ID are 9+ chars, TOKEN is 24+ chars
+        pattern = r'^https://hooks\.slack\.com/services/[A-Z0-9]{9,}/[A-Z0-9]{9,}/[A-Za-z0-9]{24,}$'
+        if not re.match(pattern, url):
+            raise ValueError("Malformed Slack webhook URL")
 
     def send_alert(self, alert: AlertMessage) -> bool:
         """Send an alert to Slack.

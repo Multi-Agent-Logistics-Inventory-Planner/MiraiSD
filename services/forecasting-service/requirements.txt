@@ -14,7 +14,7 @@ uvicorn[standard]==0.30.6
 orjson==3.10.7
 
 # --- Streaming / event sim ---
-kafka-python==2.0.2
+confluent-kafka>=2.3.0
 watchdog==4.0.1
 
 # --- Storage / ORM ---

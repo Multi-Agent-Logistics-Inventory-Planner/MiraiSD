@@ -1,5 +1,5 @@
 # --- Kafka / Streaming ---
-kafka-python==2.0.2
+confluent-kafka>=2.3.0
 
 # --- Database / ORM ---
 SQLAlchemy==2.0.35
@@ -11,7 +11,7 @@ uvicorn[standard]==0.30.6
 orjson==3.10.7
 
 # --- HTTP client ---
-requests==2.31.0
+requests>=2.32.3
 
 # --- Utilities ---
 pydantic==2.9.2
