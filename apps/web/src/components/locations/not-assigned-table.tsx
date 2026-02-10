@@ -23,12 +23,12 @@ export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTa
   if (isLoading) {
     return (
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead>SKU</TableHead>
+            <TableHead className="rounded-tl-lg">SKU</TableHead>
             <TableHead>Product</TableHead>
             <TableHead>Category</TableHead>
-            <TableHead>Quantity</TableHead>
+            <TableHead className="rounded-tr-lg">Quantity</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -56,12 +56,12 @@ export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTa
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead>SKU</TableHead>
+          <TableHead className="rounded-tl-lg">SKU</TableHead>
           <TableHead>Product</TableHead>
           <TableHead>Category</TableHead>
-          <TableHead>Quantity</TableHead>
+          <TableHead className="rounded-tr-lg">Quantity</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

@@ -128,13 +128,13 @@ export function NotificationsTable({
 
         {/* Desktop loading skeleton */}
         <Table className="hidden sm:table">
-          <TableHeader>
+          <TableHeader className="bg-muted">
             <TableRow>
-              <TableHead className="w-[50px]" />
+              <TableHead className="w-[50px] rounded-tl-lg" />
               <TableHead>Type</TableHead>
               <TableHead className="w-full">Content</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-[100px] rounded-tr-lg" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -238,13 +238,13 @@ export function NotificationsTable({
 
       {/* Desktop table layout */}
       <Table className="hidden sm:table">
-        <TableHeader>
+        <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead className="w-[50px]" />
+            <TableHead className="w-[50px] rounded-tl-lg" />
             <TableHead>Type</TableHead>
             <TableHead className="w-full">Content</TableHead>
             <TableHead>Date</TableHead>
-            <TableHead className="w-[100px]" />
+            <TableHead className="w-[100px] rounded-tr-lg" />
           </TableRow>
         </TableHeader>
         <TableBody>

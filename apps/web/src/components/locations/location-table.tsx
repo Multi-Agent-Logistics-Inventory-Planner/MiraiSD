@@ -70,12 +70,12 @@ export function LocationTable({ items, isLoading, onRowClick }: LocationTablePro
   if (isLoading) {
     return (
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead>Location Code</TableHead>
+            <TableHead className="rounded-tl-lg">Location Code</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Items</TableHead>
-            <TableHead>Total Units</TableHead>
+            <TableHead className="rounded-tr-lg">Total Units</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -103,12 +103,12 @@ export function LocationTable({ items, isLoading, onRowClick }: LocationTablePro
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead>Location Code</TableHead>
+          <TableHead className="rounded-tl-lg">Location Code</TableHead>
           <TableHead>Type</TableHead>
           <TableHead>Items</TableHead>
-          <TableHead>Total Units</TableHead>
+          <TableHead className="rounded-tr-lg">Total Units</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
