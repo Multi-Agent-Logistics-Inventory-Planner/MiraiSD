@@ -25,10 +25,12 @@ const nextConfig = {
     ],
   },
   async headers() {
-    const isDevelopment = process.env.NODE_ENV === 'development';
+    // Detect local development by checking if backend URL contains localhost
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
+    const isLocalDevelopment = backendUrl.includes('localhost');
 
     // Environment-specific CSP: allow localhost only in development
-    const connectSrc = isDevelopment
+    const connectSrc = isLocalDevelopment
       ? "'self' http://localhost:3000 http://localhost:4000 https://*.supabase.co https://api.mirai.com"
       : "'self' https://*.supabase.co https://api.mirai.com";
 

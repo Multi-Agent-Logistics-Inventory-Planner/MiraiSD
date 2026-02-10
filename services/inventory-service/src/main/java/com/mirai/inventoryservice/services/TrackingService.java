@@ -87,7 +87,6 @@ public class TrackingService {
 
     private EasyPostTrackerResponse createTracker(String trackingCode, String carrier) {
         log.info("=== Creating EasyPost Tracker ===");
-        log.info("API Key prefix: {}", (apiKey != null ? apiKey.substring(0, Math.min(6, apiKey.length())) : "null"));
         log.info("Tracking Code: {}", trackingCode);
         log.info("Carrier: {}", carrier);
 

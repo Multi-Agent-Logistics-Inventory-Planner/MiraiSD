@@ -14,6 +14,9 @@ services:
     environment:
       POSTGRES_DB: mirai_inventory
       POSTGRES_USER: postgres
+      # SECURITY NOTE: Hardcoded password is acceptable for local development only.
+      # This database is NOT exposed to the internet and is only used for testing.
+      # Production uses managed Supabase PostgreSQL with environment variable credentials.
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data

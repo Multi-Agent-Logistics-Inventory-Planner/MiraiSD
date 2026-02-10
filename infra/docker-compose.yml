@@ -47,6 +47,10 @@ services:
     networks:
       - mirai
 
+  # SECURITY NOTE: Kafka UI is for local development and testing only.
+  # This service should NOT be deployed to production.
+  # It has no authentication and exposes Kafka admin capabilities.
+  # For production monitoring, use DigitalOcean monitoring or remove this service entirely.
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
