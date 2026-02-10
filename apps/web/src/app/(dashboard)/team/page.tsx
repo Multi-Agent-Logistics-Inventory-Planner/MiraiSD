@@ -18,7 +18,7 @@ import {
   cancelInvitation,
 } from "@/lib/api/invitations";
 import { User, Invitation } from "@/types/api";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function TeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -136,9 +136,11 @@ export default function TeamPage() {
   };
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader title="Team" />
-      <main className="flex-1 p-4 md:p-8 space-y-4">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
+      </div>
 
       <TeamFilters
         searchQuery={searchQuery}
@@ -170,7 +172,6 @@ export default function TeamPage() {
         onOpenChange={setIsEditDialogOpen}
         onSuccess={fetchData}
       />
-      </main>
     </div>
   );
 }

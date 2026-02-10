@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DashboardHeader } from "@/components/dashboard-header";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -49,9 +49,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader title="Settings" />
-      <main className="flex-1 p-4 md:p-8 space-y-4">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      </div>
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
@@ -74,7 +76,6 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
-      </main>
     </div>
   );
 }

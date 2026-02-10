@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,13 +77,11 @@ export default function LocationsPage() {
   }, [list.data, search]);
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader
-        title="Storage"
-        description="Manage storage locations and their inventory"
-      />
-
-      <main className="flex-1 space-y-6 p-4 md:p-6">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Storage</h1>
+      </div>
         <div className="space-y-3">
           <LocationTabs value={locationType} onValueChange={setLocationType} />
 
@@ -163,7 +161,6 @@ export default function LocationsPage() {
             }
           }}
         />
-      </main>
     </div>
   );
 }

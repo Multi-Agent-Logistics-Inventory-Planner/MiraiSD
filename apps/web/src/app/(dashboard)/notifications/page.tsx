@@ -1,7 +1,8 @@
 "use client";
 
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useState, useCallback } from "react";
-import { Bell, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -17,7 +18,6 @@ import {
   useUnresolveNotification,
   useDeleteNotification,
 } from "@/hooks/queries/use-notifications";
-import { DashboardHeader } from "@/components/dashboard-header";
 import type { NotificationType, Notification } from "@/types/api";
 
 const PAGE_SIZE = 20;
@@ -78,9 +78,11 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader title="Notifications" />
-      <main className="flex-1 space-y-4 p-4 md:p-6">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
+      </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {counts.active + counts.resolved} Notification{counts.active + counts.resolved !== 1 ? "s" : ""}
@@ -149,7 +151,6 @@ export default function NotificationsPage() {
           isLoading={notificationsQuery.isLoading}
           onPageChange={setPage}
         />
-      </main>
 
       <NotificationDetailDialog
         open={detailDialogOpen}
