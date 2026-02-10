@@ -12,6 +12,7 @@ const LOCATION_TABS: Array<{ type: LocationType; label: string }> = [
   { type: LocationType.KEYCHAIN_MACHINE, label: "Keychain" },
   { type: LocationType.FOUR_CORNER_MACHINE, label: "Four Corner" },
   { type: LocationType.PUSHER_MACHINE, label: "Pusher" },
+  { type: LocationType.NOT_ASSIGNED, label: "Not Assigned" },
 ];
 
 interface LocationTabsProps {
