@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   AuditLogFilters,
@@ -15,7 +16,6 @@ import {
   AuditLogFilters as AuditLogFiltersType,
   StockMovementReason,
 } from "@/types/api";
-import { DashboardHeader } from "@/components/dashboard-header";
 
 function buildApiFilters(state: AuditLogFiltersState): AuditLogFiltersType {
   const filters: AuditLogFiltersType = {};
@@ -58,9 +58,12 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader title="Audit Log" />
-      <main className="flex-1 p-4 md:p-8 space-y-4">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
+      </div>
+
       <AuditLogFilters
         state={filters}
         onChange={handleFiltersChange}
@@ -84,7 +87,6 @@ export default function AuditLogPage() {
         page={page}
         onPageChange={setPage}
       />
-      </main>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 "use client"
 
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { formatDistanceStrict } from "date-fns"
 import { usePermissions, Permission } from "@/hooks/use-permissions"
-import { DashboardHeader } from "@/components/dashboard-header"
 import { StatCards } from "@/components/dashboard/stat-cards"
 import { StockLevels } from "@/components/dashboard/stock-levels"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
@@ -66,12 +66,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col">
-      <DashboardHeader
-        title="Dashboard"
-        description="Overview of your inventory status"
-      />
-      <main className="flex-1 space-y-6 p-4 md:p-6">
+    <div className="flex flex-col p-4 md:p-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      </div>
+      <div className="flex-1 space-y-6">
         <StatCards
           isLoading={stats.isLoading}
           totalStockValue={stats.data?.totalStockValue ?? 0}
@@ -101,7 +101,7 @@ export default function DashboardPage() {
             isLoading={stats.isLoading}
           />
         </div>
-      </main>
+      </div>
     </div>
   )
 }

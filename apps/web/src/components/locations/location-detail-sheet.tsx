@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +31,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { LocationType, StorageLocation, Inventory, InventoryRequest } from "@/types/api";
+import type {
+  LocationType,
+  StorageLocation,
+  Inventory,
+  InventoryRequest,
+  BoxBin,
+  Rack,
+  Cabinet,
+  SingleClawMachine,
+  DoubleClawMachine,
+  KeychainMachine,
+  FourCornerMachine,
+  PusherMachine,
+} from "@/types/api";
 import { cn } from "@/lib/utils";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import {
@@ -43,17 +56,21 @@ import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog"
 function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
   switch (locationType) {
     case "BOX_BIN":
-      return (loc as any).boxBinCode;
+      return (loc as BoxBin).boxBinCode;
     case "RACK":
-      return (loc as any).rackCode;
+      return (loc as Rack).rackCode;
     case "CABINET":
-      return (loc as any).cabinetCode;
+      return (loc as Cabinet).cabinetCode;
     case "SINGLE_CLAW_MACHINE":
-      return (loc as any).singleClawMachineCode;
+      return (loc as SingleClawMachine).singleClawMachineCode;
     case "DOUBLE_CLAW_MACHINE":
-      return (loc as any).doubleClawMachineCode;
+      return (loc as DoubleClawMachine).doubleClawMachineCode;
     case "KEYCHAIN_MACHINE":
-      return (loc as any).keychainMachineCode;
+      return (loc as KeychainMachine).keychainMachineCode;
+    case "FOUR_CORNER_MACHINE":
+      return (loc as FourCornerMachine).fourCornerMachineCode;
+    case "PUSHER_MACHINE":
+      return (loc as PusherMachine).pusherMachineCode;
     default:
       return loc.id;
   }
@@ -95,47 +112,48 @@ export function LocationDetailSheet({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle className="flex items-center justify-between gap-3">
-              <span>{code || "Location"}</span>
-              {location ? (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAddOpen(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Inventory
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEdit(location)}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-              ) : null}
-            </SheetTitle>
-            <SheetDescription>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="flex items-center gap-3">
+              <span className="text-xl font-semibold">{code || "Location"}</span>
+            </DialogTitle>
+            <DialogDescription>
               {locationType} • {totalQty} total units
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="mt-4 space-y-4">
+          <div className="px-6 pb-6 space-y-4">
+            {location && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Inventory
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(location)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            )}
+
             {inventoryQuery.isError ? (
               <Card className="p-4 text-sm text-muted-foreground">
                 Failed to load inventory.
@@ -202,8 +220,8 @@ export function LocationDetailSheet({
               </Table>
             </Card>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {locationId ? (
         <AddInventoryDialog

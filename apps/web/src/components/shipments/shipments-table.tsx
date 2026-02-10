@@ -58,15 +58,15 @@ export function ShipmentsTable({
   if (isLoading) {
     return (
       <Table>
-        <TableHeader>
+        <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead>Shipment #</TableHead>
+            <TableHead className="rounded-tl-lg">Shipment #</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Progress</TableHead>
             <TableHead>Order Date</TableHead>
-            <TableHead>{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
+            <TableHead className="rounded-tr-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -97,15 +97,15 @@ export function ShipmentsTable({
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead>Shipment #</TableHead>
+          <TableHead className="rounded-tl-lg">Shipment #</TableHead>
           <TableHead>Supplier</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Items</TableHead>
           <TableHead>Progress</TableHead>
           <TableHead>Order Date</TableHead>
-          <TableHead>{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
+          <TableHead className="rounded-tr-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
