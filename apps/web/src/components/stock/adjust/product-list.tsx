@@ -77,7 +77,7 @@ export function ProductList({
   return (
     <div className="flex-1 min-h-0">
       <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-        <div className="pb-2">
+        <div className="pb-2 pr-3">
           {filteredItems.map((inv) => (
             <ProductSelectCard
               key={inv.id}
