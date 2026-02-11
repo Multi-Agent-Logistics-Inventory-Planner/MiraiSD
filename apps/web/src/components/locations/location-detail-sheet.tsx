@@ -49,9 +49,11 @@ import { cn } from "@/lib/utils";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import {
   useCreateInventoryMutation,
+  useUpdateInventoryMutation,
   useDeleteLocationMutation,
 } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
+import { InventoryItemDetailDialog } from "@/components/locations/inventory-item-detail-dialog";
 
 function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
   switch (locationType) {
@@ -94,10 +96,13 @@ export function LocationDetailSheet({
   const locationId = location?.id;
   const inventoryQuery = useLocationInventory(locationType, locationId);
   const createInventory = useCreateInventoryMutation(locationType, locationId ?? "");
+  const updateInventory = useUpdateInventoryMutation(locationType, locationId ?? "");
   const deleteLocation = useDeleteLocationMutation(locationType);
 
   const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null);
+  const [inventoryDetailOpen, setInventoryDetailOpen] = useState(false);
 
   const code = location ? getLocationCode(locationType, location) : "";
 
@@ -106,8 +111,12 @@ export function LocationDetailSheet({
     return inv.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
   }, [inventoryQuery.data]);
 
-  async function handleAddInventory(payload: InventoryRequest) {
-    await createInventory.mutateAsync(payload);
+  async function handleAddInventory(payload: InventoryRequest, isUpdate: boolean, inventoryId?: string) {
+    if (isUpdate && inventoryId) {
+      await updateInventory.mutateAsync({ inventoryId, payload });
+    } else {
+      await createInventory.mutateAsync(payload);
+    }
   }
 
   return (
@@ -190,7 +199,14 @@ export function LocationDetailSheet({
                     ))
                   ) : (inventoryQuery.data as Inventory[] | undefined)?.length ? (
                     (inventoryQuery.data as Inventory[]).map((inv) => (
-                      <TableRow key={inv.id}>
+                      <TableRow
+                        key={inv.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedInventory(inv);
+                          setInventoryDetailOpen(true);
+                        }}
+                      >
                         <TableCell className="font-mono text-sm">
                           {inv.item.sku}
                         </TableCell>
@@ -229,7 +245,8 @@ export function LocationDetailSheet({
           onOpenChange={setAddOpen}
           locationType={locationType}
           locationId={locationId}
-          isSaving={createInventory.isPending}
+          existingInventory={(inventoryQuery.data as Inventory[]) ?? []}
+          isSaving={createInventory.isPending || updateInventory.isPending}
           onSubmit={handleAddInventory}
         />
       ) : null}
@@ -257,6 +274,17 @@ export function LocationDetailSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {locationId && (
+        <InventoryItemDetailDialog
+          open={inventoryDetailOpen}
+          onOpenChange={setInventoryDetailOpen}
+          inventory={selectedInventory}
+          locationType={locationType}
+          locationId={locationId}
+          locationCode={code}
+        />
+      )}
     </>
   );
 }

@@ -471,6 +471,9 @@ export async function getInventoryByLocation(
       return getFourCornerMachineInventory(locationId);
     case LocationType.PUSHER_MACHINE:
       return getPusherMachineInventory(locationId);
+    case LocationType.NOT_ASSIGNED:
+      // NOT_ASSIGNED doesn't have a locationId
+      return getNotAssignedInventory() as unknown as Inventory[];
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }
@@ -499,6 +502,9 @@ export async function createInventory(
       return createFourCornerMachineInventory(locationId, data);
     case LocationType.PUSHER_MACHINE:
       return createPusherMachineInventory(locationId, data);
+    case LocationType.NOT_ASSIGNED:
+      // NOT_ASSIGNED doesn't have a locationId, so we ignore it
+      return createNotAssignedInventory(data) as unknown as Inventory;
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }
