@@ -27,6 +27,7 @@ export const CODE_TO_LOCATION_TYPE: Record<string, LocationType> = {
   R: "RACK" as LocationType,
   M: "FOUR_CORNER_MACHINE" as LocationType,
   P: "PUSHER_MACHINE" as LocationType,
+  NA: "NOT_ASSIGNED" as LocationType,
 };
 
 export const LOCATION_TYPE_OPTIONS = [
@@ -38,4 +39,5 @@ export const LOCATION_TYPE_OPTIONS = [
   { code: "R", label: "Rack" },
   { code: "M", label: "Four Corner" },
   { code: "P", label: "Pusher" },
+  { code: "NA", label: "Not Assigned" },
 ] as const;

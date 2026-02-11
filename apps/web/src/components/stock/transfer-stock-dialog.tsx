@@ -247,6 +247,8 @@ export function TransferStockDialog({
         transfers,
         sourceLocationId: srcLocationId,
         destinationLocationId: destLocationId,
+        sourceLocationType: srcLocationType,
+        destinationLocationType: destLocationType,
       });
 
       if (result.failed.length === 0) {

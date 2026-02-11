@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { adjustStock, transferStock } from "@/lib/api/stock-movements";
-import type {
-  AdjustStockRequest,
+import {
   LocationType,
-  StockMovement,
-  TransferStockRequest,
+  type AdjustStockRequest,
+  type StockMovement,
+  type TransferStockRequest,
 } from "@/types/api";
 
 interface AdjustStockVariables {
@@ -32,6 +32,8 @@ interface BatchTransferVariables {
   transfers: BatchTransferItem[];
   sourceLocationId: string;
   destinationLocationId: string;
+  sourceLocationType?: LocationType;
+  destinationLocationType?: LocationType;
 }
 
 export interface BatchTransferProgress {
@@ -48,9 +50,16 @@ interface BatchTransferResult {
 
 async function invalidateStockQueries(
   qc: QueryClient,
-  productId?: string
+  productId?: string,
+  locationType?: LocationType
 ) {
   await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+
+  // Invalidate not-assigned inventory if dealing with NOT_ASSIGNED location
+  if (locationType === LocationType.NOT_ASSIGNED) {
+    await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
+  }
+
   if (productId) {
     await qc.invalidateQueries({ queryKey: ["inventoryByItem", productId] });
     await qc.invalidateQueries({ queryKey: ["movementHistory", productId] });
@@ -63,7 +72,7 @@ export function useAdjustStockMutation() {
     mutationFn: ({ locationType, inventoryId, payload }) =>
       adjustStock(locationType, inventoryId, payload),
     onSuccess: async (_data, variables) => {
-      await invalidateStockQueries(qc, variables.productId);
+      await invalidateStockQueries(qc, variables.productId, variables.locationType);
     },
   });
 }
@@ -123,6 +132,15 @@ export function useBatchTransferMutation() {
     },
     onSuccess: async ({ successful }, variables) => {
       await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+
+      // Invalidate not-assigned inventory if source or destination is NOT_ASSIGNED
+      if (
+        variables.sourceLocationType === LocationType.NOT_ASSIGNED ||
+        variables.destinationLocationType === LocationType.NOT_ASSIGNED
+      ) {
+        await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
+      }
+
       await qc.invalidateQueries({
         queryKey: ["locationInventory", variables.sourceLocationId],
       });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,6 +19,9 @@ import {
 
 const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
 
+/** Virtual ID used for "Not Assigned" selection */
+const NOT_ASSIGNED_ID = "__not_assigned__";
+
 interface LocationSelectorProps {
   label: string;
   labelSuffix?: React.ReactNode;
@@ -27,7 +29,7 @@ interface LocationSelectorProps {
   onChange: (value: LocationSelection) => void;
   disabled?: boolean;
   excludeLocation?: { locationType: LocationType; locationId: string };
-  /** Content to render after the code input (e.g., action toggle) */
+  /** Content to render after the code input*/
   endContent?: React.ReactNode;
 }
 
@@ -76,6 +78,8 @@ export function LocationSelector({
   excludeLocation,
   endContent,
 }: LocationSelectorProps) {
+  const isNotAssigned = value.locationType === LocationType.NOT_ASSIGNED;
+
   const selectedTypeCode =
     value.locationType
       ? LOCATION_TYPE_OPTIONS.find(
@@ -83,91 +87,69 @@ export function LocationSelector({
         )?.code ?? ""
       : "";
 
+  // Only fetch locations if a non-NOT_ASSIGNED type is selected
   const locationsQuery = useLocations(
-    value.locationType ?? DEFAULT_LOCATION_TYPE
+    isNotAssigned ? DEFAULT_LOCATION_TYPE : (value.locationType ?? DEFAULT_LOCATION_TYPE)
   );
 
-  const matchedLocation = useMemo(() => {
-    if (!value.locationType || !value.locationCode) return null;
-    if (!locationsQuery.data) return null;
+  // Build list of available locations for the dropdown
+  const availableLocations = useMemo(() => {
+    if (isNotAssigned || !value.locationType || !locationsQuery.data) return [];
 
-    const typePrefix = selectedTypeCode;
-    const fullCode = typePrefix + value.locationCode;
-
-    const match = (locationsQuery.data as StorageLocation[]).find((loc) => {
-      const locCode = getLocationCode(value.locationType!, loc);
-      return locCode === fullCode;
-    });
-
-    if (
-      match &&
-      excludeLocation &&
-      excludeLocation.locationType === value.locationType &&
-      excludeLocation.locationId === match.id
-    ) {
-      return null;
-    }
-
-    return match;
-  }, [
-    locationsQuery.data,
-    value.locationType,
-    value.locationCode,
-    selectedTypeCode,
-    excludeLocation,
-  ]);
-
-  const isValidLocation = Boolean(matchedLocation);
-  const locationLabel = matchedLocation
-    ? LOCATION_TYPE_OPTIONS.find((opt) => opt.code === selectedTypeCode)?.label +
-      " " +
-      selectedTypeCode +
-      value.locationCode
-    : null;
+    return (locationsQuery.data as StorageLocation[])
+      .map((loc) => {
+        const code = getLocationCode(value.locationType!, loc);
+        return {
+          id: loc.id,
+          code,
+          // Extract numeric part from the code
+          numericCode: code.replace(/^[A-Z]+/, ""),
+        };
+      })
+      .filter((loc) => {
+        // Exclude the specified location if any
+        if (
+          excludeLocation &&
+          excludeLocation.locationType === value.locationType &&
+          excludeLocation.locationId === loc.id
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [locationsQuery.data, value.locationType, excludeLocation, isNotAssigned]);
 
   function handleTypeChange(typeCode: string) {
     const locationType = CODE_TO_LOCATION_TYPE[typeCode];
-    onChange({
-      locationType: locationType ?? null,
-      locationId: null,
-      locationCode: "",
-    });
+
+    // If NOT_ASSIGNED is selected, immediately set the locationId
+    if (locationType === LocationType.NOT_ASSIGNED) {
+      onChange({
+        locationType,
+        locationId: NOT_ASSIGNED_ID,
+        locationCode: "",
+      });
+    } else {
+      onChange({
+        locationType: locationType ?? null,
+        locationId: null,
+        locationCode: "",
+      });
+    }
   }
 
-  function handleCodeChange(numericCode: string) {
-    const sanitized = numericCode.replace(/\D/g, "");
-    const locationType = value.locationType;
+  function handleLocationChange(locationId: string) {
+    if (!value.locationType) return;
 
-    if (!locationType || !sanitized) {
+    const selected = availableLocations.find((loc) => loc.id === locationId);
+    if (selected) {
       onChange({
-        ...value,
-        locationCode: sanitized,
-        locationId: null,
+        locationType: value.locationType,
+        locationId: selected.id,
+        locationCode: selected.numericCode,
       });
-      return;
     }
-
-    const typePrefix =
-      LOCATION_TYPE_OPTIONS.find(
-        (opt) => CODE_TO_LOCATION_TYPE[opt.code] === locationType
-      )?.code ?? "";
-    const fullCode = typePrefix + sanitized;
-
-    const match = (locationsQuery.data as StorageLocation[] | undefined)?.find(
-      (loc) => getLocationCode(locationType, loc) === fullCode
-    );
-
-    const shouldExclude =
-      match &&
-      excludeLocation &&
-      excludeLocation.locationType === locationType &&
-      excludeLocation.locationId === match.id;
-
-    onChange({
-      locationType,
-      locationCode: sanitized,
-      locationId: match && !shouldExclude ? match.id : null,
-    });
   }
 
   const hasLabel = Boolean(label || labelSuffix);
@@ -219,17 +201,34 @@ export function LocationSelector({
             ))}
           </SelectContent>
         </Select>
-        <Input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          placeholder="Code"
-          value={value.locationCode}
-          onChange={(e) => handleCodeChange(e.target.value)}
-          disabled={disabled || !value.locationType}
-          className="w-16 shrink-0 bg-background"
-          aria-label={`${label || "Location"} code number`}
-        />
+        {/* Show location dropdown for regular types, hide for NOT_ASSIGNED */}
+        {!isNotAssigned && (
+          <Select
+            value={value.locationId ?? ""}
+            onValueChange={handleLocationChange}
+            disabled={disabled || !value.locationType || locationsQuery.isLoading}
+          >
+            <SelectTrigger
+              className="w-24 shrink-0 bg-background"
+              aria-label={`${label || "Location"} code`}
+            >
+              <SelectValue placeholder={locationsQuery.isLoading ? "..." : "Code"} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableLocations.length === 0 ? (
+                <SelectItem value="__none__" disabled>
+                  No locations
+                </SelectItem>
+              ) : (
+                availableLocations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.code}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        )}
         {endContent}
       </div>
     </div>
