@@ -491,24 +491,10 @@ public class StockMovementService {
 
     /**
      * Calculate total inventory for a product across all storage locations.
-     * Uses a single native query instead of 9 repository calls to minimize DB connections.
+     * Calls the database function calculate_total_inventory() for consistency.
      */
     public int calculateTotalInventory(UUID productId) {
-        String sql = """
-            SELECT COALESCE(
-                (SELECT COALESCE(SUM(quantity), 0) FROM box_bin_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM single_claw_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM double_claw_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM keychain_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM cabinet_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM rack_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM four_corner_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM pusher_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM not_assigned_inventory WHERE item_id = :productId)
-            , 0) AS total
-            """;
-
-        Object result = entityManager.createNativeQuery(sql)
+        Object result = entityManager.createNativeQuery("SELECT calculate_total_inventory(:productId)")
                 .setParameter("productId", productId)
                 .getSingleResult();
 
