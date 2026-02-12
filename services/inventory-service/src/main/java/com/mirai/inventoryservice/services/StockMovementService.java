@@ -44,7 +44,6 @@ public class StockMovementService {
     private final RackRepository rackRepository;
     private final FourCornerMachineRepository fourCornerMachineRepository;
     private final PusherMachineRepository pusherMachineRepository;
-    private final EventOutboxService eventOutboxService;
     private final EntityManager entityManager;
 
     public StockMovementService(
@@ -66,7 +65,6 @@ public class StockMovementService {
             RackRepository rackRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
-            EventOutboxService eventOutboxService,
             EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -86,7 +84,6 @@ public class StockMovementService {
         this.rackRepository = rackRepository;
         this.fourCornerMachineRepository = fourCornerMachineRepository;
         this.pusherMachineRepository = pusherMachineRepository;
-        this.eventOutboxService = eventOutboxService;
         this.entityManager = entityManager;
     }
 
@@ -134,12 +131,8 @@ public class StockMovementService {
                 .metadata(metadata)
                 .build();
 
-        StockMovement savedMovement = stockMovementRepository.save(movement);
-
-        // Create outbox event for Kafka
-        eventOutboxService.createStockMovementEvent(savedMovement);
-
-        return savedMovement;
+        // Trigger auto-creates event_outbox entry
+        return stockMovementRepository.save(movement);
     }
 
     /**
@@ -232,12 +225,9 @@ public class StockMovementService {
                 .metadata(depositMetadata)
                 .build();
 
-        StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
-        StockMovement savedDeposit = stockMovementRepository.save(deposit);
-
-        // Create outbox events for Kafka
-        eventOutboxService.createStockMovementEvent(savedWithdrawal);
-        eventOutboxService.createStockMovementEvent(savedDeposit);
+        // Trigger auto-creates event_outbox entries for both movements
+        stockMovementRepository.save(withdrawal);
+        stockMovementRepository.save(deposit);
     }
 
     /**
