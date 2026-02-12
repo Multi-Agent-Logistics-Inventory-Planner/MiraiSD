@@ -464,29 +464,17 @@ public class StockMovementService {
 
     /**
      * Resolve location UUID → code (for Kafka/UI use)
+     * Calls the database function resolve_location_code() for consistency.
      */
     public String resolveLocationCode(UUID locationId, LocationType locationType) {
         if (locationId == null) return null;
 
-        return switch (locationType) {
-            case BOX_BIN -> boxBinRepository.findById(locationId)
-                    .map(BoxBin::getBoxBinCode).orElse(null);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineRepository.findById(locationId)
-                    .map(SingleClawMachine::getSingleClawMachineCode).orElse(null);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineRepository.findById(locationId)
-                    .map(DoubleClawMachine::getDoubleClawMachineCode).orElse(null);
-            case KEYCHAIN_MACHINE -> keychainMachineRepository.findById(locationId)
-                    .map(KeychainMachine::getKeychainMachineCode).orElse(null);
-            case CABINET -> cabinetRepository.findById(locationId)
-                    .map(Cabinet::getCabinetCode).orElse(null);
-            case RACK -> rackRepository.findById(locationId)
-                    .map(Rack::getRackCode).orElse(null);
-            case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findById(locationId)
-                    .map(FourCornerMachine::getFourCornerMachineCode).orElse(null);
-            case PUSHER_MACHINE -> pusherMachineRepository.findById(locationId)
-                    .map(PusherMachine::getPusherMachineCode).orElse(null);
-            case NOT_ASSIGNED -> "Not Assigned";
-        };
+        Object result = entityManager.createNativeQuery("SELECT resolve_location_code(:locationId, :locationType)")
+                .setParameter("locationId", locationId)
+                .setParameter("locationType", locationType.name())
+                .getSingleResult();
+
+        return result != null ? result.toString() : null;
     }
 
     /**
