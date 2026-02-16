@@ -47,7 +47,6 @@ public class ShipmentService {
     private final UserService userService;
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
-    private final EventOutboxService eventOutboxService;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
@@ -74,7 +73,6 @@ public class ShipmentService {
             UserService userService,
             UserRepository userRepository,
             StockMovementRepository stockMovementRepository,
-            EventOutboxService eventOutboxService,
             BoxBinInventoryRepository boxBinInventoryRepository,
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
@@ -99,7 +97,6 @@ public class ShipmentService {
         this.userService = userService;
         this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
-        this.eventOutboxService = eventOutboxService;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
@@ -387,8 +384,8 @@ public class ShipmentService {
                 .metadata(metadata)
                 .build();
 
-        StockMovement savedMovement = stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(savedMovement);
+        // Trigger auto-creates event_outbox entry
+        stockMovementRepository.save(movement);
     }
 
     private void addToNotAssignedInventory(Product product, int quantity, UUID actorId, String shipmentNumber, UUID shipmentId) {
@@ -427,8 +424,8 @@ public class ShipmentService {
                 .metadata(metadata)
                 .build();
 
-        StockMovement savedMovement = stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(savedMovement);
+        // Trigger auto-creates event_outbox entry
+        stockMovementRepository.save(movement);
 
         // Create notification for unassigned items
         Map<String, Object> notifMetadata = new HashMap<>();

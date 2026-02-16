@@ -44,7 +44,6 @@ public class StockMovementService {
     private final RackRepository rackRepository;
     private final FourCornerMachineRepository fourCornerMachineRepository;
     private final PusherMachineRepository pusherMachineRepository;
-    private final EventOutboxService eventOutboxService;
     private final EntityManager entityManager;
 
     public StockMovementService(
@@ -66,7 +65,6 @@ public class StockMovementService {
             RackRepository rackRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
-            EventOutboxService eventOutboxService,
             EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -86,7 +84,6 @@ public class StockMovementService {
         this.rackRepository = rackRepository;
         this.fourCornerMachineRepository = fourCornerMachineRepository;
         this.pusherMachineRepository = pusherMachineRepository;
-        this.eventOutboxService = eventOutboxService;
         this.entityManager = entityManager;
     }
 
@@ -134,12 +131,8 @@ public class StockMovementService {
                 .metadata(metadata)
                 .build();
 
-        StockMovement savedMovement = stockMovementRepository.save(movement);
-
-        // Create outbox event for Kafka
-        eventOutboxService.createStockMovementEvent(savedMovement);
-
-        return savedMovement;
+        // Trigger auto-creates event_outbox entry
+        return stockMovementRepository.save(movement);
     }
 
     /**
@@ -232,12 +225,9 @@ public class StockMovementService {
                 .metadata(depositMetadata)
                 .build();
 
-        StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
-        StockMovement savedDeposit = stockMovementRepository.save(deposit);
-
-        // Create outbox events for Kafka
-        eventOutboxService.createStockMovementEvent(savedWithdrawal);
-        eventOutboxService.createStockMovementEvent(savedDeposit);
+        // Trigger auto-creates event_outbox entries for both movements
+        stockMovementRepository.save(withdrawal);
+        stockMovementRepository.save(deposit);
     }
 
     /**
@@ -464,51 +454,25 @@ public class StockMovementService {
 
     /**
      * Resolve location UUID → code (for Kafka/UI use)
+     * Calls the database function resolve_location_code() for consistency.
      */
     public String resolveLocationCode(UUID locationId, LocationType locationType) {
         if (locationId == null) return null;
 
-        return switch (locationType) {
-            case BOX_BIN -> boxBinRepository.findById(locationId)
-                    .map(BoxBin::getBoxBinCode).orElse(null);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineRepository.findById(locationId)
-                    .map(SingleClawMachine::getSingleClawMachineCode).orElse(null);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineRepository.findById(locationId)
-                    .map(DoubleClawMachine::getDoubleClawMachineCode).orElse(null);
-            case KEYCHAIN_MACHINE -> keychainMachineRepository.findById(locationId)
-                    .map(KeychainMachine::getKeychainMachineCode).orElse(null);
-            case CABINET -> cabinetRepository.findById(locationId)
-                    .map(Cabinet::getCabinetCode).orElse(null);
-            case RACK -> rackRepository.findById(locationId)
-                    .map(Rack::getRackCode).orElse(null);
-            case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findById(locationId)
-                    .map(FourCornerMachine::getFourCornerMachineCode).orElse(null);
-            case PUSHER_MACHINE -> pusherMachineRepository.findById(locationId)
-                    .map(PusherMachine::getPusherMachineCode).orElse(null);
-            case NOT_ASSIGNED -> "Not Assigned";
-        };
+        Object result = entityManager.createNativeQuery("SELECT resolve_location_code(:locationId, :locationType)")
+                .setParameter("locationId", locationId)
+                .setParameter("locationType", locationType.name())
+                .getSingleResult();
+
+        return result != null ? result.toString() : null;
     }
 
     /**
      * Calculate total inventory for a product across all storage locations.
-     * Uses a single native query instead of 9 repository calls to minimize DB connections.
+     * Calls the database function calculate_total_inventory() for consistency.
      */
     public int calculateTotalInventory(UUID productId) {
-        String sql = """
-            SELECT COALESCE(
-                (SELECT COALESCE(SUM(quantity), 0) FROM box_bin_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM single_claw_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM double_claw_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM keychain_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM cabinet_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM rack_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM four_corner_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM pusher_machine_inventory WHERE item_id = :productId) +
-                (SELECT COALESCE(SUM(quantity), 0) FROM not_assigned_inventory WHERE item_id = :productId)
-            , 0) AS total
-            """;
-
-        Object result = entityManager.createNativeQuery(sql)
+        Object result = entityManager.createNativeQuery("SELECT calculate_total_inventory(:productId)")
                 .setParameter("productId", productId)
                 .getSingleResult();
 
