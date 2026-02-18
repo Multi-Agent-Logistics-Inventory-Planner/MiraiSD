@@ -431,3 +431,224 @@ class SupabaseRepo:
             logger.error("Failed to release notification claim: %s", e)
             return False
 
+    # -------------------------------------------------------------------------
+    # Review tracking methods
+    # -------------------------------------------------------------------------
+
+    def get_review_employees(self) -> list[dict]:
+        """Get all review employees with their name variants.
+
+        Returns:
+            List of dicts with id, canonical_name, name_variants, is_active.
+        """
+        query = text("""
+            SELECT id, canonical_name, name_variants, is_active
+            FROM review_employees
+            WHERE is_active = true
+            ORDER BY canonical_name
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query)
+                rows = result.fetchall()
+
+                employees = []
+                for row in rows:
+                    employees.append({
+                        "id": str(row.id),
+                        "canonical_name": row.canonical_name,
+                        "name_variants": list(row.name_variants) if row.name_variants else [],
+                        "is_active": row.is_active,
+                    })
+                return employees
+        except Exception as e:
+            logger.error("Failed to get review employees: %s", e)
+            return []
+
+    def get_employee_id_by_name(self, canonical_name: str) -> str | None:
+        """Get employee ID by canonical name.
+
+        Args:
+            canonical_name: Employee's canonical name.
+
+        Returns:
+            Employee UUID or None if not found.
+        """
+        query = text("""
+            SELECT id FROM review_employees
+            WHERE canonical_name = :name AND is_active = true
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {"name": canonical_name})
+                row = result.fetchone()
+                return str(row.id) if row else None
+        except Exception as e:
+            logger.error("Failed to get employee by name: %s", e)
+            return None
+
+    def create_review(
+        self,
+        employee_name: str,
+        external_id: str,
+        review_date,  # date
+        review_text: str,
+        rating: int,
+        reviewer_name: str,
+    ) -> str | None:
+        """Create an individual review record.
+
+        Uses ON CONFLICT to handle duplicates (same external_id).
+
+        Args:
+            employee_name: Canonical employee name.
+            external_id: External review ID (from Apify).
+            review_date: Date of the review.
+            review_text: Review text content.
+            rating: Star rating (1-5).
+            reviewer_name: Name of the reviewer.
+
+        Returns:
+            Review UUID if created, None if duplicate.
+        """
+        # First get the employee ID
+        employee_id = self.get_employee_id_by_name(employee_name)
+        if not employee_id:
+            logger.warning("Employee not found: %s", employee_name)
+            return None
+
+        review_id = uuid.uuid4()
+        query = text("""
+            INSERT INTO reviews (
+                id, external_id, employee_id, review_date,
+                review_text, rating, reviewer_name
+            ) VALUES (
+                :id, :external_id, :employee_id, :review_date,
+                :review_text, :rating, :reviewer_name
+            )
+            ON CONFLICT (external_id) DO NOTHING
+            RETURNING id
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {
+                    "id": review_id,
+                    "external_id": external_id,
+                    "employee_id": uuid.UUID(employee_id),
+                    "review_date": review_date,
+                    "review_text": review_text,
+                    "rating": rating,
+                    "reviewer_name": reviewer_name,
+                })
+                row = result.fetchone()
+                conn.commit()
+
+                if row is None:
+                    logger.debug("Duplicate review skipped: %s", external_id)
+                    return None
+
+                return str(review_id)
+        except Exception as e:
+            logger.error("Failed to create review: %s", e)
+            return None
+
+    def increment_daily_count(self, employee_name: str, review_date) -> bool:
+        """Increment daily review count for an employee.
+
+        Uses UPSERT to create or increment the count.
+
+        Args:
+            employee_name: Canonical employee name.
+            review_date: Date of the review.
+
+        Returns:
+            True if successful, False on error.
+        """
+        employee_id = self.get_employee_id_by_name(employee_name)
+        if not employee_id:
+            logger.warning("Employee not found for count update: %s", employee_name)
+            return False
+
+        query = text("""
+            INSERT INTO review_daily_counts (id, employee_id, date, review_count)
+            VALUES (gen_random_uuid(), :employee_id, :date, 1)
+            ON CONFLICT (employee_id, date)
+            DO UPDATE SET review_count = review_daily_counts.review_count + 1
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(query, {
+                    "employee_id": uuid.UUID(employee_id),
+                    "date": review_date,
+                })
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error("Failed to increment daily count: %s", e)
+            return False
+
+    def get_daily_counts(self, target_date) -> list[tuple[str, int]]:
+        """Get review counts for a specific date.
+
+        Args:
+            target_date: Date to query.
+
+        Returns:
+            List of (employee_name, count) tuples, ordered by count descending.
+        """
+        query = text("""
+            SELECT e.canonical_name, c.review_count
+            FROM review_daily_counts c
+            JOIN review_employees e ON c.employee_id = e.id
+            WHERE c.date = :date
+            ORDER BY c.review_count DESC
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {"date": target_date})
+                return [(row.canonical_name, row.review_count) for row in result.fetchall()]
+        except Exception as e:
+            logger.error("Failed to get daily counts: %s", e)
+            return []
+
+    def get_monthly_review_totals(self, year: int, month: int) -> list[tuple[str, int]]:
+        """Get total review counts for a month.
+
+        Args:
+            year: Year (e.g., 2026).
+            month: Month (1-12).
+
+        Returns:
+            List of (employee_name, total_count) tuples, ordered by count descending.
+        """
+        from datetime import date as date_type
+        import calendar
+
+        first_day = date_type(year, month, 1)
+        last_day = date_type(year, month, calendar.monthrange(year, month)[1])
+
+        query = text("""
+            SELECT e.canonical_name, SUM(c.review_count) AS total_count
+            FROM review_daily_counts c
+            JOIN review_employees e ON c.employee_id = e.id
+            WHERE c.date >= :first_day AND c.date <= :last_day
+            GROUP BY e.canonical_name
+            ORDER BY total_count DESC
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {
+                    "first_day": first_day,
+                    "last_day": last_day,
+                })
+                return [(row.canonical_name, int(row.total_count)) for row in result.fetchall()]
+        except Exception as e:
+            logger.error("Failed to get monthly review totals: %s", e)
+            return []
+

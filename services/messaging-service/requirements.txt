@@ -1,5 +1,8 @@
 # --- Kafka / Streaming ---
-confluent-kafka>=2.3.0
+kafka-python>=2.0.2
+
+# --- Scheduling ---
+APScheduler>=3.10.0
 
 # --- Database / ORM ---
 SQLAlchemy==2.0.35

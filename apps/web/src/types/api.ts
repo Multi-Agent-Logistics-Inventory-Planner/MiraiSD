@@ -653,3 +653,40 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.PUSHER_MACHINE]: "pusher-machines",
   [LocationType.NOT_ASSIGNED]: "not-assigned",
 };
+
+// Review types
+
+export interface ReviewEmployee {
+  id: string;
+  canonicalName: string;
+  nameVariants: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewEmployeeRequest {
+  canonicalName: string;
+  nameVariants: string[];
+  isActive?: boolean;
+}
+
+export interface ReviewSummary {
+  employeeId: string;
+  employeeName: string;
+  totalReviews: number;
+  averageReviewsPerDay: number;
+  lastReviewDate: string | null;
+}
+
+export interface Review {
+  id: string;
+  externalId: string;
+  employeeId: string;
+  employeeName: string;
+  reviewDate: string;
+  reviewText: string;
+  rating: number;
+  reviewerName: string;
+  createdAt: string;
+}

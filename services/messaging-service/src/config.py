@@ -45,3 +45,12 @@ NOTIFICATION_POLL_INTERVAL = float(os.getenv("NOTIFICATION_POLL_INTERVAL", "5.0"
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "5001"))
 
+# Review tracking settings
+KAFKA_REVIEWS_TOPIC = os.getenv("KAFKA_REVIEWS_TOPIC", "employee-reviews")
+APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "")
+APIFY_ACTOR_ID = os.getenv("APIFY_ACTOR_ID", "compass/google-maps-reviews-scraper")
+GOOGLE_PLACE_URL = os.getenv("GOOGLE_PLACE_URL", "")
+REVIEW_SLACK_CHANNEL = os.getenv("REVIEW_SLACK_CHANNEL", "#piggly-review")
+REVIEW_FETCH_HOUR = int(os.getenv("REVIEW_FETCH_HOUR", "6"))
+REVIEW_MAX_REVIEWS = int(os.getenv("REVIEW_MAX_REVIEWS", "100"))
+
