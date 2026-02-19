@@ -320,7 +320,7 @@ class SlackNotifier:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Total employee mentions today:* {total}",
+                    "text": f"*Total Reviews:* {total}",
                 },
             },
             {"type": "divider"},

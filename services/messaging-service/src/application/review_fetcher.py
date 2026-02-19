@@ -29,11 +29,18 @@ class ReviewFetcher:
         self._producer = kafka_producer or ReviewKafkaProducer()
         self._slack = slack_notifier or SlackNotifier()
 
-    def fetch_and_publish_daily(self, target_date: date | None = None) -> int:
+    def fetch_and_publish_daily(
+        self,
+        target_date: date | None = None,
+        prefetched_reviews: list | None = None,
+    ) -> int:
         """Fetch today's reviews from Apify and publish to Kafka.
 
         Args:
             target_date: Date to filter reviews for. Defaults to today.
+            prefetched_reviews: Optional pre-fetched reviews to filter instead of
+                calling Apify. Use this when processing multiple dates to avoid
+                redundant API calls.
 
         Returns:
             Number of reviews published.
@@ -44,10 +51,14 @@ class ReviewFetcher:
         logger.info("Starting daily review fetch for %s", target_str)
 
         try:
-            # Fetch reviews from Apify
-            all_reviews = self._apify.fetch_reviews(
-                max_reviews=config.REVIEW_MAX_REVIEWS,
-            )
+            # Use prefetched reviews or fetch from Apify
+            if prefetched_reviews is not None:
+                all_reviews = prefetched_reviews
+                logger.info("Using %d prefetched reviews", len(all_reviews))
+            else:
+                all_reviews = self._apify.fetch_reviews(
+                    max_reviews=config.REVIEW_MAX_REVIEWS,
+                )
 
             # Filter to target date and 5-star reviews (matching old behavior)
             filtered = [
@@ -95,7 +106,8 @@ class ReviewFetcher:
     def fetch_and_publish_backfill(self, days: int = 7) -> int:
         """Backfill reviews for the past N days.
 
-        Useful if daily fetches were missed.
+        Useful if daily fetches were missed. Fetches reviews once from Apify
+        and filters by date for each day to avoid redundant API calls.
 
         Args:
             days: Number of days to backfill.
@@ -108,10 +120,26 @@ class ReviewFetcher:
         total = 0
         today = date.today()
 
+        # Fetch all reviews once from Apify
+        logger.info("Fetching reviews from Apify for %d-day backfill", days)
+        try:
+            all_reviews = self._apify.fetch_reviews(
+                max_reviews=config.REVIEW_MAX_REVIEWS,
+            )
+            logger.info("Fetched %d reviews from Apify", len(all_reviews))
+        except Exception as e:
+            logger.error("Failed to fetch reviews from Apify: %s", e)
+            self._send_failure_alert(str(e))
+            raise
+
+        # Process each day using the prefetched reviews
         for i in range(days):
             target = today - timedelta(days=i)
             try:
-                count = self.fetch_and_publish_daily(target)
+                count = self.fetch_and_publish_daily(
+                    target_date=target,
+                    prefetched_reviews=all_reviews,
+                )
                 total += count
             except Exception as e:
                 logger.error("Failed to backfill %s: %s", target, e)

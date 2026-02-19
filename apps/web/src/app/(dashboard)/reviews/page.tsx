@@ -136,7 +136,7 @@ function LeaderboardTable({
             </TableCell>
             <TableCell className="text-right text-muted-foreground">
               {summary.lastReviewDate
-                ? new Date(summary.lastReviewDate).toLocaleDateString()
+                ? new Date(summary.lastReviewDate + "T00:00:00").toLocaleDateString()
                 : "-"}
             </TableCell>
           </TableRow>
@@ -192,7 +192,7 @@ export default function ReviewsPage() {
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         <h1 className="text-2xl font-semibold tracking-tight">
-          Review Tracker
+          Reviews
         </h1>
       </div>
 

@@ -110,8 +110,8 @@ class ApifyClient:
         """Execute the Apify actor and retrieve results."""
         headers = {"Authorization": f"Bearer {self._token}"}
 
-        # Start actor run
-        run_url = f"{self.BASE_URL}/acts/{self._actor_id}/runs"
+        # Use synchronous endpoint - waits for actor to complete and returns results
+        run_url = f"{self.BASE_URL}/acts/{self._actor_id}/run-sync-get-dataset-items"
         payload = {
             "startUrls": [{"url": place_url}],
             "maxReviews": max_reviews,
@@ -128,22 +128,11 @@ class ApifyClient:
             timeout=300,
         )
         response.raise_for_status()
-        run_data = response.json()
-
-        # Wait for run completion (Apify handles this with synchronous call)
-        dataset_id = run_data.get("data", {}).get("defaultDatasetId")
-        if not dataset_id:
-            logger.warning("No dataset ID returned from Apify")
-            return []
-
-        # Fetch results from dataset
-        items_url = f"{self.BASE_URL}/datasets/{dataset_id}/items"
-        items_response = requests.get(items_url, headers=headers, timeout=60)
-        items_response.raise_for_status()
+        items = response.json()
 
         # Parse reviews
         reviews: list[Review] = []
-        for item in items_response.json():
+        for item in items:
             review = Review(
                 external_id=item.get("reviewId", ""),
                 text=item.get("text") or "",
