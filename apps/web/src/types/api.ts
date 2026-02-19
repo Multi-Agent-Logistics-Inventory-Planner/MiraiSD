@@ -666,8 +666,8 @@ export interface ReviewEmployee {
 }
 
 export interface ReviewEmployeeRequest {
-  canonicalName: string;
-  nameVariants: string[];
+  canonicalName?: string;
+  nameVariants?: string[];
   isActive?: boolean;
 }
 
