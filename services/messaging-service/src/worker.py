@@ -3,6 +3,8 @@
 Continuously:
 1. Consumes Kafka events and creates notifications for threshold crossings
 2. Polls undelivered notifications and sends them to Slack
+3. Runs scheduled review fetch and summary jobs
+4. Processes review events from employee-reviews topic
 """
 
 from __future__ import annotations
@@ -14,10 +16,12 @@ import threading
 import time
 
 from . import config
+from . import scheduler as review_scheduler
 from .adapters.kafka_consumer import KafkaEventConsumer
 from .adapters.slack_notifier import SlackNotifier
 from .adapters.supabase_repo import SupabaseRepo
 from .application.alert_checker import AlertChecker, AlertResult, AlertType
+from .application.review_processor import ReviewProcessor
 from .events import NormalizedEvent
 
 # Configure logging
@@ -37,8 +41,11 @@ class MessagingWorker:
         self._repo = SupabaseRepo()
         self._alert_checker = AlertChecker(self._repo)
         self._slack_notifier = SlackNotifier()
+        self._review_processor = ReviewProcessor(self._repo)
         self._running = False
         self._notification_thread: threading.Thread | None = None
+        self._review_consumer_thread: threading.Thread | None = None
+        self._scheduler_started = False
 
     def start(self) -> None:
         """Start the worker."""
@@ -50,6 +57,7 @@ class MessagingWorker:
             config.KAFKA_CONSUMER_GROUP,
         )
         logger.info("Slack enabled: %s", config.SLACK_ENABLED)
+        logger.info("Review topic: %s", config.KAFKA_REVIEWS_TOPIC)
 
         self._running = True
         self._consumer.start()
@@ -66,6 +74,17 @@ class MessagingWorker:
         )
         self._notification_thread.start()
 
+        # Start review consumer thread (for employee-reviews topic)
+        self._review_consumer_thread = threading.Thread(
+            target=self._review_consumer_loop,
+            name="review-consumer",
+            daemon=True,
+        )
+        self._review_consumer_thread.start()
+
+        # Start the review scheduler (for daily fetch and monthly summary)
+        self._start_review_scheduler()
+
         # Run main Kafka event loop
         self._run_loop()
 
@@ -74,6 +93,11 @@ class MessagingWorker:
         logger.info("Stopping messaging worker")
         self._running = False
         self._consumer.stop()
+
+        # Stop the review scheduler
+        if self._scheduler_started:
+            review_scheduler.stop_scheduler()
+            self._scheduler_started = False
 
     def _handle_signal(self, signum: int, frame) -> None:
         """Handle shutdown signals."""
@@ -135,6 +159,84 @@ class MessagingWorker:
             time.sleep(poll_interval)
 
         logger.info("Notification polling thread stopped")
+
+    def _start_review_scheduler(self) -> None:
+        """Start the review fetch/summary scheduler."""
+        if config.APIFY_API_TOKEN:
+            logger.info("Starting review scheduler")
+            review_scheduler.start_scheduler()
+            self._scheduler_started = True
+        else:
+            logger.warning(
+                "APIFY_API_TOKEN not configured, review scheduler disabled"
+            )
+
+    def _review_consumer_loop(self) -> None:
+        """Background thread: consume and process review events from Kafka.
+
+        Runs a separate consumer for the employee-reviews topic.
+        """
+        from kafka import KafkaConsumer
+        import json
+
+        logger.info("Starting review consumer thread for topic: %s", config.KAFKA_REVIEWS_TOPIC)
+
+        try:
+            consumer = KafkaConsumer(
+                config.KAFKA_REVIEWS_TOPIC,
+                bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
+                group_id=f"{config.KAFKA_CONSUMER_GROUP}-reviews",
+                enable_auto_commit=False,
+                auto_offset_reset="earliest",
+                value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+                key_deserializer=lambda k: k.decode("utf-8") if k else None,
+                consumer_timeout_ms=1000,
+            )
+        except Exception as e:
+            logger.error("Failed to create review consumer: %s", e)
+            return
+
+        while self._running:
+            try:
+                # Poll for messages
+                records = consumer.poll(timeout_ms=1000)
+
+                for topic_partition, messages in records.items():
+                    for record in messages:
+                        try:
+                            self._process_review_event(record.value)
+                        except Exception as e:
+                            logger.error(
+                                "Error processing review event at offset %d: %s",
+                                record.offset,
+                                e,
+                            )
+
+                # Commit after processing batch
+                if records:
+                    consumer.commit()
+
+            except Exception as e:
+                logger.exception("Error in review consumer loop: %s", e)
+                time.sleep(1)
+
+        logger.info("Review consumer thread stopped")
+        consumer.close()
+
+    def _process_review_event(self, value: dict) -> None:
+        """Process a single review event from Kafka.
+
+        Args:
+            value: Deserialized Kafka message value.
+        """
+        from .application.review_processor import ReviewEvent
+
+        event = self._review_processor.parse_kafka_message(value)
+        if event is None:
+            logger.warning("Failed to parse review event")
+            return
+
+        self._review_processor.process_review(event)
 
     def _poll_undelivered_notifications(self) -> None:
         """Poll for and deliver pending notifications to Slack."""
@@ -289,10 +391,12 @@ def main() -> None:
     logger.info("=" * 60)
     logger.info("Kafka: %s", config.KAFKA_BOOTSTRAP_SERVERS)
     logger.info("Topic: %s", config.KAFKA_TOPIC)
+    logger.info("Review Topic: %s", config.KAFKA_REVIEWS_TOPIC)
     logger.info("Consumer Group: %s", config.KAFKA_CONSUMER_GROUP)
     logger.info("Slack Enabled: %s", config.SLACK_ENABLED)
     logger.info("Notification Poll Interval: %.1fs", config.NOTIFICATION_POLL_INTERVAL)
     logger.info("Location Low Stock Threshold: %d", config.LOCATION_LOW_STOCK_THRESHOLD)
+    logger.info("Review Scheduler: %s", "enabled" if config.APIFY_API_TOKEN else "disabled")
     logger.info("=" * 60)
 
     worker = MessagingWorker()

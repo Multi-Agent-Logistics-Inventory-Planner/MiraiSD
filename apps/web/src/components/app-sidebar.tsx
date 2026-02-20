@@ -17,6 +17,7 @@ import {
   MoreVertical,
   ArrowUpDown,
   RefreshCw,
+  Star,
 } from "lucide-react";
 
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -90,6 +91,12 @@ const managementItems: NavItem[] = [
     href: "/analytics",
     icon: BarChart3,
     permission: Permission.ANALYTICS_VIEW,
+  },
+  {
+    title: "Reviews",
+    href: "/reviews",
+    icon: Star,
+    permission: Permission.REVIEWS_VIEW,
   },
   {
     title: "Audit Log",
