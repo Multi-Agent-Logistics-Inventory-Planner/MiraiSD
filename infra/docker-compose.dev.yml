@@ -1,16 +1,15 @@
 # Local Development Stack - Self-contained, no Supabase needed
-# Usage: docker-compose -f docker-compose.dev.yml up -d
-
-# seed data:
-# curl -X POST "http://localhost:4000/api/dev/seed/products?count=15"
-# curl -X POST "http://localhost:4000/api/dev/seed/sales?salesPerProduct=100"
+# Usage: docker compose -f docker-compose.dev.yml up -d
+#
+# This creates an ephemeral database with seed data for testing.
+# Data is reset on each restart.
 
 services:
   postgres-dev:
     image: postgres:16-alpine
     container_name: postgres-dev
     ports:
-      - "5433:5432"  # Use 5433 externally to avoid conflict with local PostgreSQL
+      - "5433:5432" # Use 5433 externally to avoid conflict with local PostgreSQL
     environment:
       POSTGRES_DB: mirai_inventory
       POSTGRES_USER: postgres
@@ -20,9 +19,9 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d  # Run init scripts on first startup
+      - ./init-db:/docker-entrypoint-initdb.d # Run init scripts on first startup
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mirai_inventory"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -129,9 +128,51 @@ services:
     networks:
       - mirai-dev
 
-volumes:
-  postgres-dev-data:
+  forecasting-service:
+    container_name: forecasting-service-dev
+    build:
+      context: ../services/forecasting-service
+      dockerfile: Dockerfile
+    image: forecasting-service:latest
+    environment:
+      # Local PostgreSQL connection
+      - SUPABASE_DB_URL=postgresql://postgres-dev:5432/mirai_inventory
+      - SUPABASE_DB_USERNAME=postgres
+      - SUPABASE_DB_PASSWORD=postgres
+      # Kafka settings
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=inventory-changes
+      - KAFKA_CONSUMER_GROUP=forecasting-service
+      # Batching settings
+      - BATCH_WINDOW_SECONDS=30
+      - BATCH_SIZE_TRIGGER=50
+      - ITEM_DEBOUNCE_SECONDS=5.0
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - mirai-dev
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=mirai-kafka-dev
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - DYNAMIC_CONFIG_ENABLED=true
+    depends_on:
+      - kafka
+    networks:
+      - mirai-dev
 
 networks:
   mirai-dev:
     driver: bridge
+
+volumes:
+  postgres-dev-data:

@@ -200,8 +200,8 @@ class SupabaseRepo:
                 FROM ({query}) AS inv
                 WHERE item_id = ANY(:item_ids)
             """
-            # Convert to UUID objects to match PostgreSQL UUID column type
-            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+            # Keep as strings to match the ::text cast in the inner query
+            params["item_ids"] = list(item_ids)
 
         with self._engine.connect() as conn:
             df = pd.read_sql(text(query), conn, params=params)
@@ -240,8 +240,9 @@ class SupabaseRepo:
         params: dict = {"start_ts": start_ts, "end_ts": end_ts}
 
         if item_ids:
-            query += " AND item_id = ANY(:item_ids)"
-            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+            query += " AND item_id::text = ANY(:item_ids)"
+            # Keep as strings to match the ::text cast
+            params["item_ids"] = list(item_ids)
 
         query += " ORDER BY at ASC"
 

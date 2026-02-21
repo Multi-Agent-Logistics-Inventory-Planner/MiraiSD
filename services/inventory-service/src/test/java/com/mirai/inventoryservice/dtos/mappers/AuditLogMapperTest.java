@@ -241,7 +241,7 @@ class AuditLogMapperTest {
 
             OffsetDateTime timestamp = OffsetDateTime.now();
             StockMovement movement = StockMovement.builder()
-                    .id(1L)
+                    .id(UUID.randomUUID())
                     .locationType(LocationType.BOX_BIN)
                     .item(product)
                     .fromLocationId(fromLocationId)
@@ -486,7 +486,7 @@ class AuditLogMapperTest {
                 .build();
 
         return StockMovement.builder()
-                .id((long) (Math.random() * 10000))
+                .id(UUID.randomUUID())
                 .locationType(locationType)
                 .item(product)
                 .fromLocationId(fromLocationId)

@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StockMovementResponseDTO {
-    private Long id;
+    private UUID id;
     private LocationType locationType;
     private UUID itemId;
     private UUID fromLocationId;

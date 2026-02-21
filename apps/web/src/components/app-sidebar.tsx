@@ -48,6 +48,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -269,6 +270,7 @@ export function AppSidebar() {
                 {user.role}
               </Badge>
             </div>
+            <ThemeToggle />
             <Popover>
               <PopoverTrigger asChild>
                 <button
