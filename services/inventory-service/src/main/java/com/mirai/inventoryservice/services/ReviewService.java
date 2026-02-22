@@ -16,10 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -105,48 +102,23 @@ public class ReviewService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        // Get all active employees
-        List<ReviewEmployee> allEmployees = employeeRepository.findByIsActiveTrueOrderByCanonicalNameAsc();
-
-        // Get summaries for employees with reviews in this period
         List<Object[]> results = dailyCountRepository.getMonthlySummaries(startDate, endDate);
 
-        // Create a map of employeeId -> summary data
-        Map<UUID, Object[]> summaryMap = results.stream()
-                .collect(Collectors.toMap(
-                        row -> (UUID) row[0],
-                        row -> row
-                ));
+        return results.stream()
+                .map(row -> {
+                    UUID employeeId = (UUID) row[0];
+                    String employeeName = (String) row[1];
+                    Long totalReviews = (Long) row[2];
+                    Double avgPerDay = (Double) row[3];
 
-        // Build complete list including employees with 0 reviews
-        return allEmployees.stream()
-                .map(employee -> {
-                    Object[] summary = summaryMap.get(employee.getId());
-                    if (summary != null) {
-                        // Employee has reviews this month
-                        Long totalReviews = (Long) summary[2];
-                        Double avgPerDay = (Double) summary[3];
-
-                        return ReviewSummaryResponseDTO.builder()
-                                .employeeId(employee.getId())
-                                .employeeName(employee.getCanonicalName())
-                                .totalReviews(totalReviews.intValue())
-                                .averageReviewsPerDay(avgPerDay)
-                                .lastReviewDate(null)
-                                .build();
-                    } else {
-                        // Employee has no reviews this month
-                        return ReviewSummaryResponseDTO.builder()
-                                .employeeId(employee.getId())
-                                .employeeName(employee.getCanonicalName())
-                                .totalReviews(0)
-                                .averageReviewsPerDay(0.0)
-                                .lastReviewDate(null)
-                                .build();
-                    }
+                    return ReviewSummaryResponseDTO.builder()
+                            .employeeId(employeeId)
+                            .employeeName(employeeName)
+                            .totalReviews(totalReviews.intValue())
+                            .averageReviewsPerDay(avgPerDay)
+                            .lastReviewDate(null)
+                            .build();
                 })
-                .sorted(Comparator.comparing(ReviewSummaryResponseDTO::getTotalReviews).reversed()
-                        .thenComparing(ReviewSummaryResponseDTO::getEmployeeName))
                 .collect(Collectors.toList());
     }
 
