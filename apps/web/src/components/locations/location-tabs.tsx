@@ -1,7 +1,7 @@
 "use client";
 
 import { LocationType } from "@/types/api";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 const LOCATION_TABS: Array<{ type: LocationType; label: string }> = [
   { type: LocationType.BOX_BIN, label: "Box Bins" },
@@ -22,15 +22,17 @@ interface LocationTabsProps {
 
 export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
   return (
-    <Tabs value={value} onValueChange={(v) => onValueChange(v as LocationType)}>
-      <TabsList className="flex flex-wrap">
-        {LOCATION_TABS.map((t) => (
-          <TabsTrigger key={t.type} value={t.type}>
-            {t.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+    <div className="flex flex-wrap gap-2">
+      {LOCATION_TABS.map((t) => (
+        <Button
+          key={t.type}
+          variant={value === t.type ? "default" : "outline"}
+          size="sm"
+          onClick={() => onValueChange(t.type)}
+        >
+          {t.label}
+        </Button>
+      ))}
+    </div>
   );
 }
-
