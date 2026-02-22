@@ -21,25 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  getReviewSummaries,
-  getReviewEmployeeById,
-  updateReviewEmployee,
-} from "@/lib/api/reviews";
-import { ReviewSummary, ReviewEmployee } from "@/types/api";
+import { getReviewSummaries } from "@/lib/api/reviews";
+import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
-import { AddEmployeeDialog, EditEmployeeDialog } from "@/components/reviews";
-import { UserPlus, Pencil, Trash2, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { ManageEmployeesDialog } from "@/components/reviews";
+import { Settings, Star, ChevronLeft, ChevronRight } from "lucide-react";
 
 const MONTHS = [
   "January",
@@ -58,7 +44,7 @@ const MONTHS = [
 
 const ITEMS_PER_PAGE = 10;
 
-function TableSkeleton({ isAdmin }: { isAdmin: boolean }) {
+function TableSkeleton() {
   return (
     <>
       {Array.from({ length: 10 }).map((_, i) => (
@@ -72,11 +58,6 @@ function TableSkeleton({ isAdmin }: { isAdmin: boolean }) {
           <TableCell className="text-right">
             <Skeleton className="h-4 w-8 ml-auto" />
           </TableCell>
-          {isAdmin && (
-            <TableCell>
-              <Skeleton className="h-8 w-16" />
-            </TableCell>
-          )}
         </TableRow>
       ))}
     </>
@@ -86,16 +67,10 @@ function TableSkeleton({ isAdmin }: { isAdmin: boolean }) {
 function LeaderboardTable({
   summaries,
   isLoading,
-  isAdmin,
-  onEdit,
-  onRemove,
   startIndex,
 }: {
   summaries: ReviewSummary[];
   isLoading: boolean;
-  isAdmin: boolean;
-  onEdit: (summary: ReviewSummary) => void;
-  onRemove: (summary: ReviewSummary) => void;
   startIndex: number;
 }) {
   if (!isLoading && summaries.length === 0) {
@@ -113,15 +88,12 @@ function LeaderboardTable({
         <TableRow>
           <TableHead className="w-16 rounded-tl-xl">Rank</TableHead>
           <TableHead>Employee</TableHead>
-          <TableHead className={isAdmin ? "text-right" : "text-right rounded-tr-xl"}>
-            Reviews
-          </TableHead>
-          {isAdmin && <TableHead className="w-[100px] rounded-tr-xl">Actions</TableHead>}
+          <TableHead className="text-right rounded-tr-xl">Reviews</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {isLoading ? (
-          <TableSkeleton isAdmin={isAdmin} />
+          <TableSkeleton />
         ) : (
           summaries.map((summary, index) => {
             const globalIndex = startIndex + index;
@@ -153,28 +125,6 @@ function LeaderboardTable({
                 <TableCell className="text-right">
                   <span className="font-semibold">{summary.totalReviews}</span>
                 </TableCell>
-                {isAdmin && (
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onEdit(summary)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-destructive"
-                        onClick={() => onRemove(summary)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                )}
               </TableRow>
             );
           })
@@ -252,14 +202,7 @@ export default function ReviewsPage() {
   const [summaries, setSummaries] = useState<ReviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Dialog states
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<ReviewEmployee | null>(
-    null
-  );
-  const [deleteTarget, setDeleteTarget] = useState<ReviewSummary | null>(null);
+  const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -285,38 +228,6 @@ export default function ReviewsPage() {
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedSummaries = summaries.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  const handleEdit = async (summary: ReviewSummary) => {
-    try {
-      const employee = await getReviewEmployeeById(summary.employeeId);
-      setEditingEmployee(employee);
-      setIsEditDialogOpen(true);
-    } catch (error) {
-      // Error handled silently
-    }
-  };
-
-  const handleRemove = async () => {
-    if (!deleteTarget) return;
-    try {
-      await updateReviewEmployee(deleteTarget.employeeId, { isActive: false });
-      setDeleteTarget(null);
-      fetchData();
-    } catch (error) {
-      // Error handled silently
-    }
-  };
-
-  const handleAddSuccess = () => {
-    setIsAddDialogOpen(false);
-    fetchData();
-  };
-
-  const handleEditSuccess = () => {
-    setIsEditDialogOpen(false);
-    setEditingEmployee(null);
-    fetchData();
-  };
 
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
@@ -362,9 +273,14 @@ export default function ReviewsPage() {
         </div>
 
         {isAdmin && (
-          <Button onClick={() => setIsAddDialogOpen(true)} size="sm" className="sm:size-default">
-            <UserPlus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Employee</span>
+          <Button
+            variant="outline"
+            onClick={() => setIsManageDialogOpen(true)}
+            size="sm"
+            className="sm:size-default"
+          >
+            <Settings className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Manage Employees</span>
           </Button>
         )}
       </div>
@@ -375,9 +291,6 @@ export default function ReviewsPage() {
           <LeaderboardTable
             summaries={paginatedSummaries}
             isLoading={isLoading}
-            isAdmin={isAdmin}
-            onEdit={handleEdit}
-            onRemove={setDeleteTarget}
             startIndex={startIndex}
           />
         </CardContent>
@@ -392,45 +305,12 @@ export default function ReviewsPage() {
         onPageChange={setCurrentPage}
       />
 
-      {/* Add Employee Dialog */}
-      <AddEmployeeDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        onSuccess={handleAddSuccess}
+      {/* Manage Employees Dialog */}
+      <ManageEmployeesDialog
+        open={isManageDialogOpen}
+        onOpenChange={setIsManageDialogOpen}
+        onSuccess={fetchData}
       />
-
-      {/* Edit Employee Dialog */}
-      <EditEmployeeDialog
-        employee={editingEmployee}
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSuccess={handleEditSuccess}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Employee from Tracker</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {deleteTarget?.employeeName} from
-              the review tracker? They will no longer appear on the leaderboard.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRemove}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
