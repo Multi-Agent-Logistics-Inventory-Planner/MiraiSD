@@ -102,7 +102,7 @@ function LeaderboardTable({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Star className="h-12 w-12 mb-4" />
-        <p>No employees in the review tracker</p>
+        <p>No Reviews Found</p>
       </div>
     );
   }
