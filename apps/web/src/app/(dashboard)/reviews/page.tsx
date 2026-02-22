@@ -10,22 +10,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { getReviewSummaries } from "@/lib/api/reviews";
 import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
 import { ManageEmployeesDialog } from "@/components/reviews";
-import { Settings, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Settings, Star, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const MONTHS = [
   "January",
@@ -40,6 +39,21 @@ const MONTHS = [
   "October",
   "November",
   "December",
+];
+
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -203,6 +217,8 @@ export default function ReviewsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -221,10 +237,21 @@ export default function ReviewsPage() {
     fetchData();
   }, [fetchData]);
 
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return [currentYear, currentYear - 1, currentYear - 2];
-  }, []);
+  const formattedMonthYear = useMemo(() => {
+    return `${MONTHS[selectedMonth - 1]} ${selectedYear}`;
+  }, [selectedMonth, selectedYear]);
+
+  const handleSelectMonth = useCallback((month: number) => {
+    setSelectedMonth(month);
+    setSelectedYear(pickerYear);
+    setIsCalendarOpen(false);
+  }, [pickerYear]);
+
+  const isFutureMonth = useCallback((month: number) => {
+    if (pickerYear > currentDate.getFullYear()) return true;
+    if (pickerYear === currentDate.getFullYear() && month > currentDate.getMonth() + 1) return true;
+    return false;
+  }, [pickerYear, currentDate]);
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedSummaries = summaries.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -236,41 +263,65 @@ export default function ReviewsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Reviews</h1>
       </div>
 
-      {/* Filters */}
+      {/* Month/Year Picker */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-2 sm:gap-4">
-          <Select
-            value={String(selectedMonth)}
-            onValueChange={(v) => setSelectedMonth(Number(v))}
-          >
-            <SelectTrigger className="w-32 sm:w-40">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((month, index) => (
-                <SelectItem key={index} value={String(index + 1)}>
-                  {month}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={String(selectedYear)}
-            onValueChange={(v) => setSelectedYear(Number(v))}
-          >
-            <SelectTrigger className="w-24 sm:w-28">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Popover open={isCalendarOpen} onOpenChange={(open) => {
+          setIsCalendarOpen(open);
+          if (open) setPickerYear(selectedYear);
+        }}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              <span>{formattedMonthYear}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3" align="start">
+            {/* Year Navigation */}
+            <div className="flex items-center justify-between mb-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPickerYear((prev) => prev - 1)}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium">{pickerYear}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPickerYear((prev) => prev + 1)}
+                disabled={pickerYear >= currentDate.getFullYear()}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            {/* Month Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {MONTHS_SHORT.map((month, index) => {
+                const monthNum = index + 1;
+                const isSelected = selectedMonth === monthNum && selectedYear === pickerYear;
+                const isDisabled = isFutureMonth(monthNum);
+                return (
+                  <Button
+                    key={month}
+                    variant={isSelected ? "default" : "ghost"}
+                    size="sm"
+                    disabled={isDisabled}
+                    onClick={() => handleSelectMonth(monthNum)}
+                    className={cn(
+                      "h-9",
+                      isSelected && "bg-primary text-primary-foreground"
+                    )}
+                  >
+                    {month}
+                  </Button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {isAdmin && (
           <Button
