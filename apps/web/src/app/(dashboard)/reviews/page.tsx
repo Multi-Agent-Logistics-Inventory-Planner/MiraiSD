@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -58,38 +58,47 @@ const MONTHS = [
 
 const ITEMS_PER_PAGE = 10;
 
+function TableSkeleton({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell>
+            <Skeleton className="h-6 w-10" />
+          </TableCell>
+          <TableCell>
+            <Skeleton className="h-4 w-32" />
+          </TableCell>
+          <TableCell className="text-right">
+            <Skeleton className="h-4 w-8 ml-auto" />
+          </TableCell>
+          {isAdmin && (
+            <TableCell>
+              <Skeleton className="h-8 w-16" />
+            </TableCell>
+          )}
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
 function LeaderboardTable({
   summaries,
   isLoading,
   isAdmin,
   onEdit,
   onRemove,
-  currentPage,
-  onPageChange,
+  startIndex,
 }: {
   summaries: ReviewSummary[];
   isLoading: boolean;
   isAdmin: boolean;
   onEdit: (summary: ReviewSummary) => void;
   onRemove: (summary: ReviewSummary) => void;
-  currentPage: number;
-  onPageChange: (page: number) => void;
+  startIndex: number;
 }) {
-  const totalPages = Math.ceil(summaries.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedSummaries = summaries.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2 p-4">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  if (summaries.length === 0) {
+  if (!isLoading && summaries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Star className="h-12 w-12 mb-4" />
@@ -99,18 +108,22 @@ function LeaderboardTable({
   }
 
   return (
-    <div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-16">Rank</TableHead>
-            <TableHead>Employee</TableHead>
-            <TableHead className="text-right">Reviews</TableHead>
-            {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {paginatedSummaries.map((summary, index) => {
+    <Table>
+      <TableHeader className="bg-muted">
+        <TableRow>
+          <TableHead className="w-16 rounded-tl-xl">Rank</TableHead>
+          <TableHead>Employee</TableHead>
+          <TableHead className={isAdmin ? "text-right" : "text-right rounded-tr-xl"}>
+            Reviews
+          </TableHead>
+          {isAdmin && <TableHead className="w-[100px] rounded-tr-xl">Actions</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {isLoading ? (
+          <TableSkeleton isAdmin={isAdmin} />
+        ) : (
+          summaries.map((summary, index) => {
             const globalIndex = startIndex + index;
             return (
               <TableRow key={summary.employeeId}>
@@ -164,41 +177,67 @@ function LeaderboardTable({
                 )}
               </TableRow>
             );
-          })}
-        </TableBody>
-      </Table>
+          })
+        )}
+      </TableBody>
+    </Table>
+  );
+}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, summaries.length)} of {summaries.length}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+function LeaderboardPagination({
+  page,
+  pageSize,
+  totalItems,
+  isLoading,
+  onPageChange,
+}: {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  isLoading: boolean;
+  onPageChange: (page: number) => void;
+}) {
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const isFirst = page === 1;
+  const isLast = page >= totalPages;
+
+  const startItem = (page - 1) * pageSize + 1;
+  const endItem = Math.min(startItem + pageSize - 1, totalItems);
+
+  if (isLoading || totalItems === 0 || totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center justify-between px-2 pb-4 gap-2">
+      <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+        Showing {startItem}-{endItem} of {totalItems}
+      </p>
+      <div className="flex items-center gap-1 sm:gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onPageChange(page - 1)}
+          disabled={isFirst}
+          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline sm:ml-1">Previous</span>
+        </Button>
+        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap px-1 sm:px-2">
+          Page {page} of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onPageChange(page + 1)}
+          disabled={isLast}
+          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3"
+        >
+          <span className="hidden sm:inline sm:mr-1">Next</span>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -227,7 +266,7 @@ export default function ReviewsPage() {
     try {
       const data = await getReviewSummaries(selectedYear, selectedMonth);
       setSummaries(data);
-      setCurrentPage(1); // Reset to first page when data changes
+      setCurrentPage(1);
     } catch (error) {
       // Error handled silently
     } finally {
@@ -239,11 +278,13 @@ export default function ReviewsPage() {
     fetchData();
   }, [fetchData]);
 
-  // Generate year options (current year and 2 previous years)
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return [currentYear, currentYear - 1, currentYear - 2];
   }, []);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedSummaries = summaries.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleEdit = async (summary: ReviewSummary) => {
     try {
@@ -286,12 +327,12 @@ export default function ReviewsPage() {
 
       {/* Filters */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-4">
+        <div className="flex gap-2 sm:gap-4">
           <Select
             value={String(selectedMonth)}
             onValueChange={(v) => setSelectedMonth(Number(v))}
           >
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-32 sm:w-40">
               <SelectValue placeholder="Month" />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +348,7 @@ export default function ReviewsPage() {
             value={String(selectedYear)}
             onValueChange={(v) => setSelectedYear(Number(v))}
           >
-            <SelectTrigger className="w-28">
+            <SelectTrigger className="w-24 sm:w-28">
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
@@ -321,32 +362,35 @@ export default function ReviewsPage() {
         </div>
 
         {isAdmin && (
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Employee
+          <Button onClick={() => setIsAddDialogOpen(true)} size="sm" className="sm:size-default">
+            <UserPlus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Employee</span>
           </Button>
         )}
       </div>
 
       {/* Leaderboard */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">
-            {MONTHS[selectedMonth - 1]} {selectedYear} Leaderboard
-          </CardTitle>
-        </CardHeader>
+      <Card className="py-0">
         <CardContent className="p-0">
           <LeaderboardTable
-            summaries={summaries}
+            summaries={paginatedSummaries}
             isLoading={isLoading}
             isAdmin={isAdmin}
             onEdit={handleEdit}
             onRemove={setDeleteTarget}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
+            startIndex={startIndex}
           />
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      <LeaderboardPagination
+        page={currentPage}
+        pageSize={ITEMS_PER_PAGE}
+        totalItems={summaries.length}
+        isLoading={isLoading}
+        onPageChange={setCurrentPage}
+      />
 
       {/* Add Employee Dialog */}
       <AddEmployeeDialog
