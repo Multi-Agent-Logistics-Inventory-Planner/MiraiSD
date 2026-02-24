@@ -310,7 +310,7 @@ export function ManageEmployeesDialog({
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-medium">{user.fullName}</span>
-                              <span className="text-xs text-muted-foreground">{user.email}</span>
+                              <span className="text-xs text-muted-foreground">{user.canonicalName}</span>
                             </div>
                           </TableCell>
                           <TableCell>
