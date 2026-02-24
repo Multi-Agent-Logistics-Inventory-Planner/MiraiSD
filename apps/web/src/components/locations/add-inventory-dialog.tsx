@@ -40,6 +40,7 @@ export function AddInventoryDialog({
 
   const [productId, setProductId] = useState<string>("");
   const [qty, setQty] = useState<string>("1");
+  const [qtyError, setQtyError] = useState<string | null>(null);
   const [comboOpen, setComboOpen] = useState(false);
 
   const selected: Product | undefined = useMemo(
@@ -67,12 +68,17 @@ export function AddInventoryDialog({
     if (!open) {
       setProductId("");
       setQty("1");
+      setQtyError(null);
     }
   }, [open]);
 
   async function handleSubmit() {
     const quantity = Number(qty);
-    if (!productId || !Number.isFinite(quantity) || quantity <= 0) return;
+    if (!productId) return;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setQtyError("Quantity must be greater than 0.");
+      return;
+    }
 
     const isUpdate = Boolean(existingItem);
     await onSubmit({ itemId: productId, quantity }, isUpdate, existingItem?.id);
@@ -177,8 +183,15 @@ export function AddInventoryDialog({
               type="number"
               min={1}
               value={qty}
-              onChange={(e) => setQty(e.target.value)}
+              onChange={(e) => {
+                setQty(e.target.value);
+                setQtyError(null);
+              }}
+              aria-invalid={!!qtyError}
             />
+            {qtyError && (
+              <p className="text-xs text-destructive">{qtyError}</p>
+            )}
           </div>
         </div>
 
