@@ -7,11 +7,14 @@ and triggers the forecasting pipeline when batch conditions are met.
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
 import time
+from pathlib import Path
 
 from . import config
+from .adapters.dlq_producer import DLQProducer
 from .adapters.kafka_consumer import KafkaEventConsumer
 from .adapters.supabase_repo import SupabaseRepo
 from .application.event_aggregator import EventAggregator
@@ -25,12 +28,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Healthcheck heartbeat file - Docker healthcheck verifies this file is recent
+HEARTBEAT_FILE = Path(os.environ.get("HEARTBEAT_FILE", "/tmp/forecasting-worker-heartbeat"))
+
 
 class ForecastingWorker:
     """Worker that processes Kafka events and triggers forecasting pipeline."""
 
     def __init__(self):
-        self._consumer = KafkaEventConsumer()
+        self._dlq_producer = DLQProducer()
+        self._consumer = KafkaEventConsumer(dlq_producer=self._dlq_producer)
         self._aggregator = EventAggregator()
         self._repo = SupabaseRepo()
         self._pipeline = ForecastingPipeline(repo=self._repo)
@@ -45,9 +52,12 @@ class ForecastingWorker:
             config.BATCH_SIZE_TRIGGER,
             config.ITEM_DEBOUNCE_SECONDS,
         )
+        logger.info("DLQ topic: %s", config.KAFKA_DLQ_TOPIC)
 
         self._running = True
+        self._dlq_producer.start()
         self._consumer.start()
+        self._write_heartbeat()  # Initial heartbeat for Docker healthcheck
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._handle_signal)
@@ -60,6 +70,14 @@ class ForecastingWorker:
         logger.info("Stopping forecasting worker")
         self._running = False
         self._consumer.stop()
+        self._dlq_producer.stop()
+
+    def _write_heartbeat(self) -> None:
+        """Write heartbeat file for Docker healthcheck."""
+        try:
+            HEARTBEAT_FILE.touch()
+        except OSError as e:
+            logger.warning("Failed to write heartbeat file: %s", e)
 
     def _handle_signal(self, signum: int, frame) -> None:
         """Handle shutdown signals."""
@@ -74,10 +92,11 @@ class ForecastingWorker:
 
         while self._running:
             poll_count += 1
-            # Log heartbeat every 30 polls (30 seconds)
+            # Log heartbeat every 30 polls (30 seconds) and update heartbeat file
             if poll_count % 30 == 0:
-                logger.info("Worker heartbeat: %d polls, aggregator has %d items", 
+                logger.info("Worker heartbeat: %d polls, aggregator has %d items",
                            poll_count, len(self._aggregator.get_affected_items()))
+                self._write_heartbeat()
             try:
                 # Poll for new events
                 events = self._consumer.poll(timeout_ms=poll_timeout_ms)
