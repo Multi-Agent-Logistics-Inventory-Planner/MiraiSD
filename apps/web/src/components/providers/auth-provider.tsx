@@ -10,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase";
-import { validateToken } from "@/lib/api/auth";
+import { validateToken, getCurrentUser } from "@/lib/api/auth";
 import { UserRole } from "@/types/api";
 
 export interface AuthUser {
@@ -47,13 +47,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const validation = await validateToken(accessToken);
 
         if (validation.valid && validation.role) {
-          setUser({
-            id: supabaseUser.id,
-            email: supabaseUser.email || "",
-            role: validation.role,
-            personId: validation.personId,
-            personName: validation.personName,
-          });
+          // Fetch fresh user data from database
+          try {
+            const dbUser = await getCurrentUser();
+            setUser({
+              id: supabaseUser.id,
+              email: supabaseUser.email || "",
+              role: dbUser.role,
+              personId: dbUser.id,
+              personName: dbUser.fullName,
+            });
+          } catch {
+            // Fallback to JWT data if /me endpoint fails
+            setUser({
+              id: supabaseUser.id,
+              email: supabaseUser.email || "",
+              role: validation.role,
+              personId: validation.personId,
+              personName: validation.personName,
+            });
+          }
         } else {
           // Backend validation failed - clear auth state
           const supabase = getSupabaseClient();

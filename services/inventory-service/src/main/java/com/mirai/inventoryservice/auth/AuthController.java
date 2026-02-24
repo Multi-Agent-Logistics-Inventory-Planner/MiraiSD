@@ -43,15 +43,11 @@ public class AuthController {
                 String personName = jwtService.extractName(token);
                 String email = jwtService.extractEmail(token);
 
-                // Look up the application user by email - use database values when available
+                // Look up the application user ID by email
                 String personId = null;
                 if (email != null && userService.existsByEmail(email)) {
                     User user = userService.getUserByEmail(email);
                     personId = user.getId().toString();
-                    // Use database fullName instead of JWT name
-                    personName = user.getFullName();
-                    // Use database role instead of JWT role
-                    role = user.getRole().name();
                 }
 
                 Map<String, Object> response = new HashMap<>();
@@ -69,6 +65,24 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Token validation failed"));
         }
+    }
+
+    /**
+     * Get current user profile from database.
+     * Returns fresh user data (name, role, etc.) from the database.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
+        @SuppressWarnings("unchecked")
+        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
+        String email = principal.get("email");
+
+        if (email == null || !userService.existsByEmail(email)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userService.getUserByEmail(email);
+        return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     /**
