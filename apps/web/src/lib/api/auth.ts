@@ -1,5 +1,5 @@
-import { apiPost } from "./client";
-import { AuthValidationResponse } from "@/types/api";
+import { apiGet, apiPost } from "./client";
+import { AuthValidationResponse, User } from "@/types/api";
 
 /**
  * Validate Supabase JWT token with backend
@@ -14,4 +14,12 @@ export async function validateToken(
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+/**
+ * Get current user profile from database
+ * Returns fresh user data (name, role, etc.)
+ */
+export async function getCurrentUser(): Promise<User> {
+  return apiGet<User>("/api/auth/me");
 }
