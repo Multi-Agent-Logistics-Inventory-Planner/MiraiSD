@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,8 @@ from typing import Optional
 import pandas as pd
 
 from . import config, events, features, forecast, policy, repo
+
+logger = logging.getLogger(__name__)
 
 
 def _now_utc_iso() -> str:
@@ -178,7 +181,7 @@ def main() -> None:
     args = parser.parse_args()
 
     out_path = run_batch(from_ts=args.from_ts, to_ts=args.to_ts, method=args.method, target_days=args.target_days)
-    print(str(out_path))
+    logger.info("Forecast output path: %s", out_path)
 
 
 if __name__ == "__main__":

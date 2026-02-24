@@ -52,6 +52,22 @@ services:
     networks:
       - mirai-dev
 
+  # Kafka UI for development monitoring
+  # WARNING: No authentication - local development only
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=mirai-kafka-dev
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - DYNAMIC_CONFIG_ENABLED=true
+    depends_on:
+      - kafka
+    networks:
+      - mirai-dev
+
   inventory-service:
     container_name: inventory-service-dev
     build:

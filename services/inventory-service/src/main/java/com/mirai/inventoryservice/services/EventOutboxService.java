@@ -1,8 +1,10 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.kafka.KafkaProducer;
+import com.mirai.inventoryservice.models.audit.EventDeadLetter;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,9 +22,13 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class EventOutboxService {
+
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+
     private final EventOutboxRepository eventOutboxRepository;
     private final KafkaProducer kafkaProducer;
     private final StockMovementService stockMovementService;
+    private final EventDeadLetterRepository eventDeadLetterRepository;
 
     @Value("${kafka.topic.inventory-changes:inventory-changes}")
     private String inventoryChangesTopic;
@@ -30,11 +36,13 @@ public class EventOutboxService {
     public EventOutboxService(
             EventOutboxRepository eventOutboxRepository,
             KafkaProducer kafkaProducer,
-            @Lazy StockMovementService stockMovementService)
+            @Lazy StockMovementService stockMovementService,
+            EventDeadLetterRepository eventDeadLetterRepository)
     {
         this.eventOutboxRepository = eventOutboxRepository;
         this.kafkaProducer = kafkaProducer;
         this.stockMovementService = stockMovementService;
+        this.eventDeadLetterRepository = eventDeadLetterRepository;
     }
 
     /**
@@ -158,11 +166,12 @@ public class EventOutboxService {
 
     /**
      * Fetch pending events in its own short transaction.
+     * Only fetches events that haven't exceeded max retry attempts.
      * Connection is released immediately after query completes.
      */
     @Transactional(readOnly = true)
     public List<EventOutbox> fetchPendingEvents() {
-        return eventOutboxRepository.findTop100ByPublishedAtIsNullOrderByCreatedAtAsc();
+        return eventOutboxRepository.findByPublishedAtIsNullAndPublishAttemptsLessThanOrderByCreatedAtAsc(MAX_RETRY_ATTEMPTS);
     }
 
     /**
@@ -178,13 +187,23 @@ public class EventOutboxService {
 
     /**
      * Record event publish failure in its own short transaction.
+     * Moves event to dead letter table after MAX_RETRY_ATTEMPTS failures.
      */
     @Transactional
     public void recordEventFailure(UUID eventId, String errorMessage) {
         eventOutboxRepository.findById(eventId).ifPresent(event -> {
             event.setPublishAttempts(event.getPublishAttempts() + 1);
             event.setLastError(errorMessage);
-            eventOutboxRepository.save(event);
+
+            if (event.getPublishAttempts() >= MAX_RETRY_ATTEMPTS) {
+                EventDeadLetter deadLetter = EventDeadLetter.fromOutboxEvent(event);
+                eventDeadLetterRepository.save(deadLetter);
+                eventOutboxRepository.delete(event);
+                log.error("Event {} moved to dead letter after {} attempts: {}",
+                        eventId, event.getPublishAttempts(), errorMessage);
+            } else {
+                eventOutboxRepository.save(event);
+            }
         });
     }
 }

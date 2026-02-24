@@ -77,22 +77,67 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     /**
      * Extract the client IP address from the request.
-     * Handles X-Forwarded-For header for reverse proxy deployments.
+     * Only trusts X-Forwarded-For header when request comes from trusted proxies
+     * (private IP ranges or localhost) to prevent IP spoofing attacks.
      *
      * @param request The HTTP request
      * @return The client IP address
      */
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        String remoteAddr = request.getRemoteAddr();
 
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2
-            // The first IP is the original client
-            String firstIp = xForwardedFor.split(",")[0].trim();
-            return firstIp;
+        // Only trust X-Forwarded-For if connection is from trusted proxy
+        if (isFromTrustedProxy(remoteAddr)) {
+            String xForwardedFor = request.getHeader("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+                // X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2
+                // The first IP is the original client
+                String clientIp = xForwardedFor.split(",")[0].trim();
+                log.debug("Trusted proxy {} forwarded client IP {}", remoteAddr, clientIp);
+                return clientIp;
+            }
+        } else if (request.getHeader("X-Forwarded-For") != null) {
+            log.debug("Ignoring X-Forwarded-For from untrusted source: {}", remoteAddr);
         }
 
-        return request.getRemoteAddr();
+        return remoteAddr;
+    }
+
+    /**
+     * Check if the remote address is from a trusted proxy (private IP range or localhost).
+     * Trusted ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8
+     *
+     * @param ip The remote IP address
+     * @return true if the IP is from a trusted proxy
+     */
+    private boolean isFromTrustedProxy(String ip) {
+        if (ip == null) {
+            return false;
+        }
+        // 10.0.0.0/8 - Class A private
+        if (ip.startsWith("10.")) {
+            return true;
+        }
+        // 172.16.0.0/12 - Class B private (172.16.x.x - 172.31.x.x)
+        if (ip.startsWith("172.")) {
+            try {
+                int secondOctet = Integer.parseInt(ip.split("\\.")[1]);
+                if (secondOctet >= 16 && secondOctet <= 31) {
+                    return true;
+                }
+            } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+                return false;
+            }
+        }
+        // 192.168.0.0/16 - Class C private
+        if (ip.startsWith("192.168.")) {
+            return true;
+        }
+        // 127.0.0.0/8 - Localhost
+        if (ip.startsWith("127.")) {
+            return true;
+        }
+        return false;
     }
 
     /**

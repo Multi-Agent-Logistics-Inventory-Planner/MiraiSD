@@ -10,13 +10,16 @@ Continuously:
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
 import threading
 import time
+from pathlib import Path
 
 from . import config
 from . import scheduler as review_scheduler
+from .adapters.dlq_producer import DLQProducer
 from .adapters.kafka_consumer import KafkaEventConsumer
 from .adapters.slack_notifier import SlackNotifier
 from .adapters.supabase_repo import SupabaseRepo
@@ -32,12 +35,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Healthcheck heartbeat file - Docker healthcheck verifies this file is recent
+HEARTBEAT_FILE = Path(os.environ.get("HEARTBEAT_FILE", "/tmp/messaging-worker-heartbeat"))
+
 
 class MessagingWorker:
     """Worker that processes Kafka events and delivers Slack notifications."""
 
     def __init__(self):
-        self._consumer = KafkaEventConsumer()
+        self._dlq_producer = DLQProducer()
+        self._consumer = KafkaEventConsumer(dlq_producer=self._dlq_producer)
         self._repo = SupabaseRepo()
         self._alert_checker = AlertChecker(self._repo)
         self._slack_notifier = SlackNotifier()
@@ -56,11 +63,14 @@ class MessagingWorker:
             config.KAFKA_TOPIC,
             config.KAFKA_CONSUMER_GROUP,
         )
+        logger.info("DLQ topic: %s", config.KAFKA_DLQ_TOPIC)
         logger.info("Slack enabled: %s", config.SLACK_ENABLED)
         logger.info("Review topic: %s", config.KAFKA_REVIEWS_TOPIC)
 
         self._running = True
+        self._dlq_producer.start()
         self._consumer.start()
+        self._write_heartbeat()  # Initial heartbeat for Docker healthcheck
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._handle_signal)
@@ -93,11 +103,19 @@ class MessagingWorker:
         logger.info("Stopping messaging worker")
         self._running = False
         self._consumer.stop()
+        self._dlq_producer.stop()
 
         # Stop the review scheduler
         if self._scheduler_started:
             review_scheduler.stop_scheduler()
             self._scheduler_started = False
+
+    def _write_heartbeat(self) -> None:
+        """Write heartbeat file for Docker healthcheck."""
+        try:
+            HEARTBEAT_FILE.touch()
+        except OSError as e:
+            logger.warning("Failed to write heartbeat file: %s", e)
 
     def _handle_signal(self, signum: int, frame) -> None:
         """Handle shutdown signals."""
@@ -109,8 +127,14 @@ class MessagingWorker:
         """Main worker loop: poll Kafka → check alerts → create notifications."""
         poll_timeout_ms = 1000  # 1 second poll timeout
         processed_count = 0
+        poll_count = 0
 
         while self._running:
+            poll_count += 1
+            # Update heartbeat every 30 polls (30 seconds)
+            if poll_count % 30 == 0:
+                self._write_heartbeat()
+
             try:
                 # Poll for new events
                 events = self._consumer.poll(timeout_ms=poll_timeout_ms)

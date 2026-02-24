@@ -1,21 +1,16 @@
-services:
-  inventory-service:
-    container_name: inventory-service
-    build:
-      context: ../services/inventory-service
-      dockerfile: Dockerfile
-    image: inventory-service:latest
-    ports:
-      - "4000:4000"
-    env_file:
-      - ../.env
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
-    networks:
-      - mirai
+# Production Docker Compose Configuration
+#
+# SECURITY NOTE (H5): Kafka uses plaintext protocol within Docker network.
+# This is acceptable because:
+# 1. All services communicate over isolated Docker bridge network (mirai)
+# 2. Kafka is not exposed to public internet (only localhost:29092 for local dev)
+# 3. For production deployments requiring encryption, configure SASL_SSL listeners
+#    and update KAFKA_LISTENER_SECURITY_PROTOCOL_MAP accordingly.
+#
+# Network isolation is enforced by the 'mirai' bridge network - only containers
+# attached to this network can communicate with Kafka.
 
+services:
   kafka:
     image: apache/kafka:latest
     container_name: kafka
@@ -47,28 +42,41 @@ services:
       - 1.1.1.1
     networks:
       - mirai
+    # H1: Healthcheck to detect broker readiness
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
-  # SECURITY NOTE: Kafka UI is for local development and testing only.
-  # This service should NOT be deployed to production.
-  # It has no authentication and exposes Kafka admin capabilities.
-  # For production monitoring, use DigitalOcean monitoring or remove this service entirely.
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
+  inventory-service:
+    container_name: inventory-service
+    build:
+      context: ../services/inventory-service
+      dockerfile: Dockerfile
+    image: inventory-service:latest
     ports:
-      - "8080:8080"
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=mirai-kafka
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - DYNAMIC_CONFIG_ENABLED=true
-    depends_on:
-      - kafka
+      - "4000:4000"
+    env_file:
+      - ../.env
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 1.1.1.1
     networks:
       - mirai
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
 
   forecasting-service:
     container_name: forecasting-service
@@ -83,18 +91,28 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=inventory-changes
       - KAFKA_CONSUMER_GROUP=forecasting-service
+      # DLQ settings
+      - KAFKA_DLQ_TOPIC=inventory-changes.DLQ
       # Batching settings: tuned for low-volume single-location business (<100 changes/day)
       - BATCH_WINDOW_SECONDS=30        # Max time to wait before processing a batch
       - BATCH_SIZE_TRIGGER=50          # Process immediately if batch reaches this size
       - ITEM_DEBOUNCE_SECONDS=5.0      # Dedupe rapid updates to same item within this window
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 1.1.1.1
     networks:
       - mirai
+    healthcheck:
+      # Verify heartbeat file was modified within last 60 seconds
+      test: ["CMD-SHELL", "find /tmp/forecasting-worker-heartbeat -mmin -1 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     restart: unless-stopped
 
   messaging-service:
@@ -110,19 +128,29 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_TOPIC=inventory-changes
       - KAFKA_CONSUMER_GROUP=messaging-service
+      # DLQ settings
+      - KAFKA_DLQ_TOPIC=inventory-changes.DLQ
       # Slack settings (SLACK_WEBHOOK_URL comes from env_file)
       - SLACK_CHANNEL=${SLACK_CHANNEL:-#inventory-alerts}
       - SLACK_ENABLED=${SLACK_ENABLED:-true}
       # Alert settings
       - ALERT_DEBOUNCE_SECONDS=${ALERT_DEBOUNCE_SECONDS:-300}
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 1.1.1.1
     networks:
       - mirai
+    healthcheck:
+      # Verify heartbeat file was modified within last 60 seconds
+      test: ["CMD-SHELL", "find /tmp/messaging-worker-heartbeat -mmin -1 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
     restart: unless-stopped
 
   frontend:
@@ -140,18 +168,19 @@ services:
       - ../.env
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
-      - NEXT_PUBLIC_KAFKA_UI_URL=http://localhost:8080
       - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL:-}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
     depends_on:
-      - inventory-service
+      inventory-service:
+        condition: service_healthy
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 1.1.1.1
     networks:
       - mirai
+    restart: unless-stopped
 
 volumes:
   kafka-data:

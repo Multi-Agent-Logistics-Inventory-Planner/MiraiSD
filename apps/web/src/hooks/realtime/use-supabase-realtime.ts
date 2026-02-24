@@ -63,56 +63,70 @@ export function useSupabaseRealtime<T>({
       return;
     }
 
+    // Check if we're in a secure context (HTTPS or localhost)
+    // WebSocket connections require a secure context in modern browsers
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      // Silently disable realtime in insecure context
+      return;
+    }
+
     // Create a unique channel name
     const channelName = `realtime:${schema}:${table}:${event}${filter ? `:${filter}` : ""}`;
 
-    // Create the channel and subscribe
-    const channel = supabase.channel(channelName);
+    let channel: RealtimeChannel | null = null;
 
-    // Use type assertion to work around strict typing
-    const subscribeConfig = {
-      event,
-      schema,
-      table,
-      ...(filter && { filter }),
-    };
+    try {
+      // Create the channel and subscribe
+      channel = supabase.channel(channelName);
 
-    channel
-      .on(
-        "postgres_changes" as "system",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        subscribeConfig as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (payload: any) => {
-          // Invalidate all specified query keys
-          queryKeys.forEach((queryKey) => {
-            queryClient.invalidateQueries({ queryKey });
-          });
+      // Use type assertion to work around strict typing
+      const subscribeConfig = {
+        event,
+        schema,
+        table,
+        ...(filter && { filter }),
+      };
 
-          // Call optional callback with typed payload
-          stableOnReceive({
-            eventType: payload.eventType,
-            new: payload.new as T,
-            old: payload.old as Partial<T>,
-            schema: payload.schema,
-            table: payload.table,
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log(`[Realtime] Subscribed to ${table}`);
-        } else if (status === "CHANNEL_ERROR") {
-          console.error(`[Realtime] Error subscribing to ${table}`);
-        }
-      });
+      channel
+        .on(
+          "postgres_changes" as "system",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          subscribeConfig as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (payload: any) => {
+            // Invalidate all specified query keys
+            queryKeys.forEach((queryKey) => {
+              queryClient.invalidateQueries({ queryKey });
+            });
 
-    channelRef.current = channel;
+            // Call optional callback with typed payload
+            stableOnReceive({
+              eventType: payload.eventType,
+              new: payload.new as T,
+              old: payload.old as Partial<T>,
+              schema: payload.schema,
+              table: payload.table,
+            });
+          }
+        )
+        .subscribe(() => {
+          // Subscription status handled silently
+        });
+
+      channelRef.current = channel;
+    } catch {
+      // Realtime subscription failed - continue without realtime
+      channelRef.current = null;
+    }
 
     // Cleanup on unmount
     return () => {
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch {
+          // Ignore cleanup errors
+        }
         channelRef.current = null;
       }
     };

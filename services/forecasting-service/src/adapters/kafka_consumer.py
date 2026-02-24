@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from kafka import KafkaConsumer
@@ -12,6 +13,7 @@ from kafka.errors import KafkaError
 
 from .. import config
 from ..events import EventEnvelope, NormalizedEvent
+from .dlq_producer import DLQMessage, DLQProducer
 
 if TYPE_CHECKING:
     from kafka.consumer.fetcher import ConsumerRecord
@@ -27,12 +29,14 @@ class KafkaEventConsumer:
         bootstrap_servers: str | None = None,
         topic: str | None = None,
         group_id: str | None = None,
+        dlq_producer: DLQProducer | None = None,
     ):
         self._bootstrap_servers = bootstrap_servers or config.KAFKA_BOOTSTRAP_SERVERS
         self._topic = topic or config.KAFKA_TOPIC
         self._group_id = group_id or config.KAFKA_CONSUMER_GROUP
         self._consumer: KafkaConsumer | None = None
         self._running = False
+        self._dlq_producer = dlq_producer
 
     def _create_consumer(self) -> KafkaConsumer:
         """Create and configure Kafka consumer."""
@@ -123,6 +127,7 @@ class KafkaEventConsumer:
                         record.offset,
                         e,
                     )
+                    self._send_to_dlq(record, str(e))
 
         return events
 
@@ -140,6 +145,39 @@ class KafkaEventConsumer:
             events = self.poll(timeout_ms=poll_timeout_ms)
             for event in events:
                 yield event
+
+    def _send_to_dlq(self, record: ConsumerRecord, error_message: str) -> None:
+        """Send a failed record to the Dead Letter Queue.
+
+        Args:
+            record: The failed Kafka record.
+            error_message: Description of the failure.
+        """
+        if self._dlq_producer is None:
+            return
+
+        try:
+            # Get raw bytes from record
+            raw_value = record.value
+            if isinstance(raw_value, dict):
+                raw_value = json.dumps(raw_value).encode("utf-8")
+            elif isinstance(raw_value, str):
+                raw_value = raw_value.encode("utf-8")
+            elif not isinstance(raw_value, bytes):
+                raw_value = str(raw_value).encode("utf-8")
+
+            dlq_message = DLQMessage(
+                original_topic=record.topic,
+                original_offset=record.offset,
+                original_partition=record.partition,
+                error_message=error_message,
+                raw_value=raw_value,
+                failed_at=datetime.now(timezone.utc),
+            )
+            self._dlq_producer.send(dlq_message)
+        except Exception as e:
+            logger.error("Failed to send to DLQ: %s", e)
+            # Don't raise - DLQ failures shouldn't stop processing
 
     def _parse_record(self, record: ConsumerRecord) -> NormalizedEvent | None:
         """Parse a Kafka record into a NormalizedEvent.
@@ -165,7 +203,9 @@ class KafkaEventConsumer:
         """
         value = record.value
         if not isinstance(value, dict):
-            logger.warning("Unexpected message format: %s", type(value))
+            error_msg = f"Unexpected message format: {type(value)}"
+            logger.warning(error_msg)
+            self._send_to_dlq(record, error_msg)
             return None
 
         try:
@@ -191,7 +231,9 @@ class KafkaEventConsumer:
             return normalized
 
         except Exception as e:
-            logger.warning("Failed to validate event envelope: %s", e)
+            error_msg = f"Failed to validate event envelope: {e}"
+            logger.warning(error_msg)
+            self._send_to_dlq(record, error_msg)
             return None
 
     @property

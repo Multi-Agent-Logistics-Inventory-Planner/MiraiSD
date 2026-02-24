@@ -34,6 +34,7 @@ SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "inventory-changes")
 KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", "forecasting-service")
+KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "inventory-changes.DLQ")
 
 # Real-time batching
 BATCH_WINDOW_SECONDS = int(os.getenv("BATCH_WINDOW_SECONDS", "30"))
