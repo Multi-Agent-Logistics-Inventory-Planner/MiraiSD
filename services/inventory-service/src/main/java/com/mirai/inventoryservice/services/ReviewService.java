@@ -3,11 +3,14 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.dtos.responses.ReviewEmployeeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewEmployee;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewEmployeeRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,14 +29,17 @@ public class ReviewService {
     private final ReviewEmployeeRepository employeeRepository;
     private final ReviewDailyCountRepository dailyCountRepository;
     private final ReviewRepository reviewRepository;
+    private final UserRepository userRepository;
 
     public ReviewService(
             ReviewEmployeeRepository employeeRepository,
             ReviewDailyCountRepository dailyCountRepository,
-            ReviewRepository reviewRepository) {
+            ReviewRepository reviewRepository,
+            UserRepository userRepository) {
         this.employeeRepository = employeeRepository;
         this.dailyCountRepository = dailyCountRepository;
         this.reviewRepository = reviewRepository;
+        this.userRepository = userRepository;
     }
 
     // -------------------------------------------------------------------------
@@ -94,6 +100,47 @@ public class ReviewService {
     }
 
     // -------------------------------------------------------------------------
+    // User-based review tracking methods (new)
+    // -------------------------------------------------------------------------
+
+    public List<UserResponseDTO> getReviewTrackedUsers() {
+        return userRepository.findByIsReviewTrackedTrueOrderByFullNameAsc()
+                .stream()
+                .map(this::toUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<UserResponseDTO> getAllUsersForReviewManagement() {
+        return userRepository.findAllByOrderByFullNameAsc()
+                .stream()
+                .map(this::toUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    public UserResponseDTO getUserForReviewTracking(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+        return toUserDTO(user);
+    }
+
+    @Transactional
+    public UserResponseDTO updateUserReviewTracking(UUID userId, List<String> nameVariants, Boolean isReviewTracked) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        if (nameVariants != null) {
+            user.setNameVariants(nameVariants);
+        }
+
+        if (isReviewTracked != null) {
+            user.setIsReviewTracked(isReviewTracked);
+        }
+
+        user = userRepository.save(user);
+        return toUserDTO(user);
+    }
+
+    // -------------------------------------------------------------------------
     // Summary methods
     // -------------------------------------------------------------------------
 
@@ -114,6 +161,31 @@ public class ReviewService {
                     return ReviewSummaryResponseDTO.builder()
                             .employeeId(employeeId)
                             .employeeName(employeeName)
+                            .totalReviews(totalReviews.intValue())
+                            .averageReviewsPerDay(avgPerDay)
+                            .lastReviewDate(null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<ReviewSummaryResponseDTO> getMonthlySummariesByUser(int year, int month) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        List<Object[]> results = dailyCountRepository.getMonthlySummariesByUser(startDate, endDate);
+
+        return results.stream()
+                .map(row -> {
+                    UUID userId = (UUID) row[0];
+                    String userName = (String) row[1];
+                    Long totalReviews = (Long) row[2];
+                    Double avgPerDay = (Double) row[3];
+
+                    return ReviewSummaryResponseDTO.builder()
+                            .userId(userId)
+                            .userName(userName)
                             .totalReviews(totalReviews.intValue())
                             .averageReviewsPerDay(avgPerDay)
                             .lastReviewDate(null)
@@ -152,6 +224,21 @@ public class ReviewService {
                 .isActive(employee.getIsActive())
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
+                .build();
+    }
+
+    private UserResponseDTO toUserDTO(User user) {
+        return UserResponseDTO.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .nameVariants(user.getNameVariants() != null
+                        ? user.getNameVariants()
+                        : List.of())
+                .isReviewTracked(user.getIsReviewTracked())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 

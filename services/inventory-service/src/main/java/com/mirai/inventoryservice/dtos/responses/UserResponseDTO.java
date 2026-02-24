@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,6 +19,8 @@ public class UserResponseDTO {
     private String fullName;
     private String email;
     private UserRole role;
+    private List<String> nameVariants;
+    private Boolean isReviewTracked;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

@@ -19,7 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getReviewSummaries } from "@/lib/api/reviews";
+import { getReviewSummariesByUser } from "@/lib/api/reviews";
 import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
 import { ManageEmployeesDialog } from "@/components/reviews";
@@ -111,8 +111,11 @@ function LeaderboardTable({
         ) : (
           summaries.map((summary, index) => {
             const globalIndex = startIndex + index;
+            // Support both user-based (new) and employee-based (legacy) data
+            const id = summary.userId || summary.employeeId;
+            const name = summary.userName || summary.employeeName;
             return (
-              <TableRow key={summary.employeeId}>
+              <TableRow key={id}>
                 <TableCell>
                   {globalIndex === 0 && (
                     <Badge variant="default" className="bg-yellow-500">
@@ -134,7 +137,7 @@ function LeaderboardTable({
                   )}
                 </TableCell>
                 <TableCell className="font-medium">
-                  {summary.employeeName}
+                  {name}
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-semibold">{summary.totalReviews}</span>
@@ -223,7 +226,7 @@ export default function ReviewsPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getReviewSummaries(selectedYear, selectedMonth);
+      const data = await getReviewSummariesByUser(selectedYear, selectedMonth);
       setSummaries(data);
       setCurrentPage(1);
     } catch (error) {

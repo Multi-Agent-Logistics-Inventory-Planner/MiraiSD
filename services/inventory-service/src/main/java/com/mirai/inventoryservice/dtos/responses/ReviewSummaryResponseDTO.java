@@ -13,8 +13,14 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReviewSummaryResponseDTO {
+    // Legacy fields for backward compatibility
     private UUID employeeId;
     private String employeeName;
+
+    // New user-based fields
+    private UUID userId;
+    private String userName;
+
     private Integer totalReviews;
     private Double averageReviewsPerDay;
     private LocalDate lastReviewDate;

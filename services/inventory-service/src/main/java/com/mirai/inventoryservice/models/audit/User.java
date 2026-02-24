@@ -11,9 +11,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -40,6 +43,15 @@ public class User {
     @Convert(converter = UserRoleConverter.class)
     @Column(nullable = false)
     private UserRole role;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "name_variants", columnDefinition = "text[]")
+    @Builder.Default
+    private List<String> nameVariants = List.of();
+
+    @Column(name = "is_review_tracked")
+    @Builder.Default
+    private Boolean isReviewTracked = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -1,27 +1,18 @@
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from "react";
-import { Loader2, Plus, Pencil, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Pencil, X, ChevronLeft, ChevronRight, Check, UserCheck, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -31,11 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  getReviewEmployees,
-  createReviewEmployee,
-  updateReviewEmployee,
+  getAllUsersForReviewManagement,
+  updateUserReviewTracking,
 } from "@/lib/api/reviews";
-import { ReviewEmployee } from "@/types/api";
+import { User } from "@/types/api";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -110,37 +100,34 @@ function TagInput({ tags, onChange, disabled, placeholder }: TagInputProps) {
   );
 }
 
-interface EditEmployeeModalProps {
-  employee: ReviewEmployee | null;
+interface EditUserModalProps {
+  user: User | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-function EditEmployeeModal({
-  employee,
+function EditUserModal({
+  user,
   open,
   onOpenChange,
   onSuccess,
-}: EditEmployeeModalProps) {
-  const [name, setName] = useState("");
+}: EditUserModalProps) {
   const [aliases, setAliases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (employee) {
-      setName(employee.canonicalName);
-      setAliases(employee.nameVariants || []);
+    if (user) {
+      setAliases(user.nameVariants || []);
     }
-  }, [employee]);
+  }, [user]);
 
   const handleSave = async () => {
-    if (!employee || !name.trim()) return;
+    if (!user) return;
 
     setIsSaving(true);
     try {
-      await updateReviewEmployee(employee.id, {
-        canonicalName: name.trim(),
+      await updateUserReviewTracking(user.id, {
         nameVariants: aliases,
       });
       onSuccess();
@@ -156,20 +143,18 @@ function EditEmployeeModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit Employee</DialogTitle>
+          <DialogTitle>Edit Review Aliases</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="edit-name">Name</Label>
-            <Input
-              id="edit-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isSaving}
-            />
+          <div className="space-y-1">
+            <Label className="text-muted-foreground text-sm">User</Label>
+            <p className="font-medium">{user?.fullName}</p>
           </div>
           <div className="space-y-2">
-            <Label>Aliases</Label>
+            <Label>Name Aliases</Label>
+            <p className="text-xs text-muted-foreground">
+              Add alternative names or spellings used in reviews
+            </p>
             <TagInput
               tags={aliases}
               onChange={setAliases}
@@ -185,97 +170,9 @@ function EditEmployeeModal({
             >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
+            <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface AddEmployeeModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-}
-
-function AddEmployeeModal({
-  open,
-  onOpenChange,
-  onSuccess,
-}: AddEmployeeModalProps) {
-  const [name, setName] = useState("");
-  const [aliases, setAliases] = useState<string[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const resetForm = () => {
-    setName("");
-    setAliases([]);
-  };
-
-  const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) resetForm();
-    onOpenChange(isOpen);
-  };
-
-  const handleSave = async () => {
-    if (!name.trim()) return;
-
-    setIsSaving(true);
-    try {
-      await createReviewEmployee({
-        canonicalName: name.trim(),
-        nameVariants: aliases,
-      });
-      onSuccess();
-      handleOpenChange(false);
-    } catch (error) {
-      // Error handled silently
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Add Employee</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="add-name">Name</Label>
-            <Input
-              id="add-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Employee name"
-              disabled={isSaving}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Aliases</Label>
-            <TagInput
-              tags={aliases}
-              onChange={setAliases}
-              disabled={isSaving}
-              placeholder="Add an alias..."
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => handleOpenChange(false)}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
-              {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Add
             </Button>
           </div>
         </div>
@@ -295,22 +192,28 @@ export function ManageEmployeesDialog({
   onOpenChange,
   onSuccess,
 }: ManageEmployeesDialogProps) {
-  const [employees, setEmployees] = useState<ReviewEmployee[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState<ReviewEmployee | null>(null);
-  const [editTarget, setEditTarget] = useState<ReviewEmployee | null>(null);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<User | null>(null);
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
 
-  const totalPages = Math.ceil(employees.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedEmployees = employees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedUsers = users.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const fetchEmployees = async () => {
+  const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const data = await getReviewEmployees();
-      setEmployees(data);
+      const data = await getAllUsersForReviewManagement();
+      // Sort by tracked status (tracked first) then by name
+      const sorted = data.sort((a, b) => {
+        if (a.isReviewTracked === b.isReviewTracked) {
+          return a.fullName.localeCompare(b.fullName);
+        }
+        return a.isReviewTracked ? -1 : 1;
+      });
+      setUsers(sorted);
     } catch (error) {
       // Error handled silently
     } finally {
@@ -320,60 +223,57 @@ export function ManageEmployeesDialog({
 
   useEffect(() => {
     if (open) {
-      fetchEmployees();
+      fetchUsers();
       setCurrentPage(1);
     }
   }, [open]);
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  const handleToggleTracking = async (user: User) => {
+    setTogglingUserId(user.id);
     try {
-      await updateReviewEmployee(deleteTarget.id, { isActive: false });
-      setDeleteTarget(null);
-      fetchEmployees();
+      await updateUserReviewTracking(user.id, {
+        isReviewTracked: !user.isReviewTracked,
+      });
+      fetchUsers();
       onSuccess();
     } catch (error) {
       // Error handled silently
+    } finally {
+      setTogglingUserId(null);
     }
   };
 
   const handleEditSuccess = () => {
     setEditTarget(null);
-    fetchEmployees();
+    fetchUsers();
     onSuccess();
   };
 
-  const handleAddSuccess = () => {
-    setIsAddOpen(false);
-    fetchEmployees();
-    onSuccess();
-  };
+  const trackedCount = users.filter((u) => u.isReviewTracked).length;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Manage Employees</DialogTitle>
+            <DialogTitle>Manage Review Tracking</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Header with Add button */}
-            <div className="flex items-center justify-end">
-              <Button size="sm" onClick={() => setIsAddOpen(true)}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Employee
-              </Button>
+            {/* Summary */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <UserCheck className="h-4 w-4" />
+              <span>{trackedCount} of {users.length} users tracked for reviews</span>
             </div>
 
-            {/* Employee Table */}
+            {/* User Table */}
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : employees.length === 0 ? (
+            ) : users.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <p>No employees added yet</p>
+                <p>No users found</p>
               </div>
             ) : (
               <>
@@ -381,21 +281,25 @@ export function ManageEmployeesDialog({
                   <Table>
                     <TableHeader className="bg-muted">
                       <TableRow>
-                        <TableHead className="rounded-tl-lg">Name</TableHead>
+                        <TableHead className="rounded-tl-lg">User</TableHead>
                         <TableHead>Aliases</TableHead>
-                        <TableHead className="w-[100px] rounded-tr-lg">Actions</TableHead>
+                        <TableHead className="w-[100px] text-center">Tracked</TableHead>
+                        <TableHead className="w-[60px] rounded-tr-lg">Edit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedEmployees.map((employee) => (
-                        <TableRow key={employee.id}>
-                          <TableCell className="font-medium">
-                            {employee.canonicalName}
+                      {paginatedUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{user.fullName}</span>
+                              <span className="text-xs text-muted-foreground">{user.email}</span>
+                            </div>
                           </TableCell>
                           <TableCell>
-                            {employee.nameVariants && employee.nameVariants.length > 0 ? (
+                            {user.nameVariants && user.nameVariants.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {employee.nameVariants.slice(0, 2).map((variant) => (
+                                {user.nameVariants.slice(0, 2).map((variant) => (
                                   <Badge
                                     key={variant}
                                     variant="outline"
@@ -404,12 +308,12 @@ export function ManageEmployeesDialog({
                                     {variant}
                                   </Badge>
                                 ))}
-                                {employee.nameVariants.length > 2 && (
+                                {user.nameVariants.length > 2 && (
                                   <Badge
                                     variant="outline"
                                     className="text-xs font-normal"
                                   >
-                                    +{employee.nameVariants.length - 2}
+                                    +{user.nameVariants.length - 2}
                                   </Badge>
                                 )}
                               </div>
@@ -417,25 +321,27 @@ export function ManageEmployeesDialog({
                               <span className="text-muted-foreground text-sm">—</span>
                             )}
                           </TableCell>
+                          <TableCell className="text-center">
+                            {togglingUserId === user.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                            ) : (
+                              <Switch
+                                checked={user.isReviewTracked || false}
+                                onCheckedChange={() => handleToggleTracking(user)}
+                              />
+                            )}
+                          </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setEditTarget(employee)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 hover:text-destructive"
-                                onClick={() => setDeleteTarget(employee)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setEditTarget(user)}
+                              disabled={!user.isReviewTracked}
+                              title={user.isReviewTracked ? "Edit aliases" : "Enable tracking first"}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -447,7 +353,7 @@ export function ManageEmployeesDialog({
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between pt-2">
                     <p className="text-xs text-muted-foreground">
-                      Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, employees.length)} of {employees.length}
+                      Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, users.length)} of {users.length}
                     </p>
                     <div className="flex items-center gap-1">
                       <Button
@@ -480,45 +386,13 @@ export function ManageEmployeesDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Add Employee Modal */}
-      <AddEmployeeModal
-        open={isAddOpen}
-        onOpenChange={setIsAddOpen}
-        onSuccess={handleAddSuccess}
-      />
-
-      {/* Edit Employee Modal */}
-      <EditEmployeeModal
-        employee={editTarget}
+      {/* Edit User Modal */}
+      <EditUserModal
+        user={editTarget}
         open={!!editTarget}
         onOpenChange={(open) => !open && setEditTarget(null)}
         onSuccess={handleEditSuccess}
       />
-
-      {/* Delete Confirmation */}
-      <AlertDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Employee</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {deleteTarget?.canonicalName} from
-              the review tracker?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

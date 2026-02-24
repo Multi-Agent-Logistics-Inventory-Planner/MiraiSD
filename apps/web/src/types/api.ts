@@ -179,6 +179,8 @@ export interface User {
   fullName: string;
   email: string;
   role: UserRole;
+  nameVariants?: string[];
+  isReviewTracked?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,6 +189,11 @@ export interface UserRequest {
   fullName: string;
   email: string;
   role: UserRole;
+}
+
+export interface UserReviewTrackingRequest {
+  nameVariants?: string[];
+  isReviewTracked?: boolean;
 }
 
 export interface Invitation {
@@ -672,8 +679,12 @@ export interface ReviewEmployeeRequest {
 }
 
 export interface ReviewSummary {
-  employeeId: string;
-  employeeName: string;
+  // Legacy fields for backward compatibility
+  employeeId?: string;
+  employeeName?: string;
+  // New user-based fields
+  userId?: string;
+  userName?: string;
   totalReviews: number;
   averageReviewsPerDay: number;
   lastReviewDate: string | null;
