@@ -108,8 +108,12 @@ public class StockMovementService {
             );
         }
 
-        setInventoryQuantity(inventory, newQuantity);
-        saveInventory(locationType, inventory);
+        if (newQuantity == 0) {
+            deleteInventory(locationType, inventory);
+        } else {
+            setInventoryQuantity(inventory, newQuantity);
+            saveInventory(locationType, inventory);
+        }
 
         // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
@@ -178,9 +182,14 @@ public class StockMovementService {
             destinationInventoryId = getInventoryId(destinationInventory);
         }
 
-        setInventoryQuantity(sourceInventory, sourceQuantity - request.getQuantity());
+        int newSourceQuantity = sourceQuantity - request.getQuantity();
         setInventoryQuantity(destinationInventory, destinationQuantity + request.getQuantity());
-        saveInventory(request.getSourceLocationType(), sourceInventory);
+        if (newSourceQuantity == 0) {
+            deleteInventory(request.getSourceLocationType(), sourceInventory);
+        } else {
+            setInventoryQuantity(sourceInventory, newSourceQuantity);
+            saveInventory(request.getSourceLocationType(), sourceInventory);
+        }
         saveInventory(request.getDestinationLocationType(), destinationInventory);
 
         Map<String, Object> withdrawalMetadata = new HashMap<>();
@@ -315,6 +324,20 @@ public class StockMovementService {
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
             case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
+        }
+    }
+
+    private void deleteInventory(LocationType locationType, Object inventory) {
+        switch (locationType) {
+            case BOX_BIN -> boxBinInventoryRepository.delete((BoxBinInventory) inventory);
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.delete((KeychainMachineInventory) inventory);
+            case CABINET -> cabinetInventoryRepository.delete((CabinetInventory) inventory);
+            case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
+            case NOT_ASSIGNED -> notAssignedInventoryRepository.delete((NotAssignedInventory) inventory);
         }
     }
 

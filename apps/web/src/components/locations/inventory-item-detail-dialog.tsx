@@ -77,12 +77,19 @@ export function InventoryItemDetailDialog({
     }
 
     try {
-      await updateMutation.mutateAsync({
-        inventoryId: inventory!.id,
-        payload: { itemId: inventory!.item.id, quantity },
-      });
-      toast({ title: "Quantity updated" });
-      setIsEditing(false);
+      if (quantity === 0) {
+        await deleteMutation.mutateAsync({ inventoryId: inventory!.id });
+        toast({ title: "Item removed from location" });
+        setIsEditing(false);
+        onOpenChange(false);
+      } else {
+        await updateMutation.mutateAsync({
+          inventoryId: inventory!.id,
+          payload: { itemId: inventory!.item.id, quantity },
+        });
+        toast({ title: "Quantity updated" });
+        setIsEditing(false);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Update failed";
       toast({ title: "Update failed", description: msg });

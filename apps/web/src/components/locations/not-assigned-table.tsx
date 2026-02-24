@@ -1,6 +1,7 @@
 "use client";
 
-import { Package } from "lucide-react";
+import Image from "next/image";
+import { ImageOff, Package } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -71,8 +72,25 @@ export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTa
             className="cursor-pointer hover:bg-muted/50"
             onClick={() => onRowClick(item)}
           >
-            <TableCell className="font-mono text-sm">
-              {item.item.sku}
+            <TableCell className="py-2">
+              <div className="flex items-center gap-3">
+                {item.item.imageUrl ? (
+                  <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-muted">
+                    <Image
+                      src={item.item.imageUrl}
+                      alt={item.item.name}
+                      fill
+                      sizes="32px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                )}
+                <span className="font-mono text-sm">{item.item.sku}</span>
+              </div>
             </TableCell>
             <TableCell>{item.item.name}</TableCell>
             <TableCell>
