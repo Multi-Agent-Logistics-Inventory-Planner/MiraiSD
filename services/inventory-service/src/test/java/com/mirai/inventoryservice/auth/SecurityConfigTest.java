@@ -35,6 +35,9 @@ class SecurityConfigTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private RateLimitingFilter rateLimitingFilter;
+
     @MockBean
     private JwtService jwtService;
 
@@ -44,6 +47,7 @@ class SecurityConfigTest {
     @BeforeEach
     void setUp() {
         signingKey = Keys.hmacShaKeyFor(testSecret.getBytes(StandardCharsets.UTF_8));
+        rateLimitingFilter.clearBuckets();
     }
 
     @Test
