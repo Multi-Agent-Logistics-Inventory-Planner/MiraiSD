@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.review;
 
+import com.mirai.inventoryservice.models.audit.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -13,8 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "review_daily_counts",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"employee_id", "date"}))
+@Table(name = "review_daily_counts")
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,10 +24,15 @@ public class ReviewDailyCount {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @NotNull
+    // Legacy relationship - kept for backward compatibility during migration
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "employee_id", nullable = false)
+    @JoinColumn(name = "employee_id")
     private ReviewEmployee employee;
+
+    // New relationship - daily counts linked to users
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @NotNull
     @Column(name = "date", nullable = false)

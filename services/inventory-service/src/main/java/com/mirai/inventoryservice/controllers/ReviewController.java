@@ -1,9 +1,11 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.ReviewEmployeeRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.UserReviewTrackingRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewEmployeeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
 import com.mirai.inventoryservice.services.ReviewService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -67,6 +69,39 @@ public class ReviewController {
     }
 
     // -------------------------------------------------------------------------
+    // User-based review tracking endpoints (new)
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/users/tracked")
+    public ResponseEntity<List<UserResponseDTO>> getReviewTrackedUsers() {
+        return ResponseEntity.ok(reviewService.getReviewTrackedUsers());
+    }
+
+    @GetMapping("/users/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponseDTO>> getAllUsersForReviewManagement() {
+        return ResponseEntity.ok(reviewService.getAllUsersForReviewManagement());
+    }
+
+    @GetMapping("/users/{id}")
+    public ResponseEntity<UserResponseDTO> getUserForReviewTracking(@PathVariable UUID id) {
+        return ResponseEntity.ok(reviewService.getUserForReviewTracking(id));
+    }
+
+    @PutMapping("/users/{id}/tracking")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDTO> updateUserReviewTracking(
+            @PathVariable UUID id,
+            @RequestBody UserReviewTrackingRequestDTO request) {
+        UserResponseDTO user = reviewService.updateUserReviewTracking(
+                id,
+                request.getCanonicalName(),
+                request.getNameVariants(),
+                request.getIsReviewTracked());
+        return ResponseEntity.ok(user);
+    }
+
+    // -------------------------------------------------------------------------
     // Summary endpoints
     // -------------------------------------------------------------------------
 
@@ -75,6 +110,13 @@ public class ReviewController {
             @RequestParam int year,
             @RequestParam int month) {
         return ResponseEntity.ok(reviewService.getMonthlySummaries(year, month));
+    }
+
+    @GetMapping("/summaries/by-user")
+    public ResponseEntity<List<ReviewSummaryResponseDTO>> getMonthlySummariesByUser(
+            @RequestParam int year,
+            @RequestParam int month) {
+        return ResponseEntity.ok(reviewService.getMonthlySummariesByUser(year, month));
     }
 
     // -------------------------------------------------------------------------

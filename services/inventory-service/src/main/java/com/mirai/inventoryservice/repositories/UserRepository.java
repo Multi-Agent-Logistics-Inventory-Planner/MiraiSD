@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.models.audit.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,5 +14,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByFullName(String fullName);
     boolean existsByEmail(String email);
     boolean existsByFullName(String fullName);
+
+    // Review tracking methods
+    List<User> findByIsReviewTrackedTrueOrderByFullNameAsc();
+    List<User> findAllByOrderByFullNameAsc();
 }
 

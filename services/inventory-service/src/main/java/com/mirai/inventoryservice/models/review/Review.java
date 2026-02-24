@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.review;
 
+import com.mirai.inventoryservice.models.audit.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -28,9 +29,15 @@ public class Review {
     @Column(name = "external_id", unique = true)
     private String externalId;
 
+    // Legacy relationship - kept for backward compatibility during migration
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private ReviewEmployee employee;
+
+    // New relationship - reviews linked to users
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @NotNull
     @Column(name = "review_date", nullable = false)
