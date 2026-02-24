@@ -12,6 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserReviewTrackingRequestDTO {
+    private String canonicalName;
     private List<String> nameVariants;
     private Boolean isReviewTracked;
 }

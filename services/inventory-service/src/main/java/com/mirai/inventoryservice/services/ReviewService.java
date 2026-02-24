@@ -124,9 +124,13 @@ public class ReviewService {
     }
 
     @Transactional
-    public UserResponseDTO updateUserReviewTracking(UUID userId, List<String> nameVariants, Boolean isReviewTracked) {
+    public UserResponseDTO updateUserReviewTracking(UUID userId, String canonicalName, List<String> nameVariants, Boolean isReviewTracked) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        if (canonicalName != null) {
+            user.setCanonicalName(canonicalName);
+        }
 
         if (nameVariants != null) {
             user.setNameVariants(nameVariants);
@@ -233,6 +237,7 @@ public class ReviewService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .role(user.getRole())
+                .canonicalName(user.getCanonicalName())
                 .nameVariants(user.getNameVariants() != null
                         ? user.getNameVariants()
                         : List.of())

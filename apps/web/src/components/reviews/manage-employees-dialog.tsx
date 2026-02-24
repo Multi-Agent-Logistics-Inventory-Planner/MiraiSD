@@ -113,21 +113,25 @@ function EditUserModal({
   onOpenChange,
   onSuccess,
 }: EditUserModalProps) {
+  const [canonicalName, setCanonicalName] = useState("");
   const [aliases, setAliases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
+      // Default canonical name to first name if not set
+      setCanonicalName(user.canonicalName || user.fullName.split(" ")[0]);
       setAliases(user.nameVariants || []);
     }
   }, [user]);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !canonicalName.trim()) return;
 
     setIsSaving(true);
     try {
       await updateUserReviewTracking(user.id, {
+        canonicalName: canonicalName.trim(),
         nameVariants: aliases,
       });
       onSuccess();
@@ -143,7 +147,7 @@ function EditUserModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit Review Aliases</DialogTitle>
+          <DialogTitle>Edit Review Settings</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-1">
@@ -151,9 +155,22 @@ function EditUserModal({
             <p className="font-medium">{user?.fullName}</p>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="canonical-name">Review Name</Label>
+            <p className="text-xs text-muted-foreground">
+              Primary name to search for in reviews
+            </p>
+            <Input
+              id="canonical-name"
+              value={canonicalName}
+              onChange={(e) => setCanonicalName(e.target.value)}
+              disabled={isSaving}
+              placeholder="e.g., Quincy"
+            />
+          </div>
+          <div className="space-y-2">
             <Label>Name Aliases</Label>
             <p className="text-xs text-muted-foreground">
-              Add alternative names or spellings used in reviews
+              Additional names or spellings used in reviews
             </p>
             <TagInput
               tags={aliases}
@@ -337,8 +354,6 @@ export function ManageEmployeesDialog({
                               size="icon"
                               className="h-8 w-8"
                               onClick={() => setEditTarget(user)}
-                              disabled={!user.isReviewTracked}
-                              title={user.isReviewTracked ? "Edit aliases" : "Enable tracking first"}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>

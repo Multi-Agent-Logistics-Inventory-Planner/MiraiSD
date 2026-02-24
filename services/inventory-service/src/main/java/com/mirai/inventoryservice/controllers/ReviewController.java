@@ -95,6 +95,7 @@ public class ReviewController {
             @RequestBody UserReviewTrackingRequestDTO request) {
         UserResponseDTO user = reviewService.updateUserReviewTracking(
                 id,
+                request.getCanonicalName(),
                 request.getNameVariants(),
                 request.getIsReviewTracked());
         return ResponseEntity.ok(user);

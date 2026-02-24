@@ -19,6 +19,7 @@ public class UserResponseDTO {
     private String fullName;
     private String email;
     private UserRole role;
+    private String canonicalName;
     private List<String> nameVariants;
     private Boolean isReviewTracked;
     private OffsetDateTime createdAt;

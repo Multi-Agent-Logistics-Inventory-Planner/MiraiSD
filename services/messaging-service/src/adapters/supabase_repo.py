@@ -432,20 +432,20 @@ class SupabaseRepo:
             return False
 
     # -------------------------------------------------------------------------
-    # Review tracking methods
+    # Review tracking methods (using users table)
     # -------------------------------------------------------------------------
 
     def get_review_employees(self) -> list[dict]:
-        """Get all review employees with their name variants.
+        """Get all users tracked for reviews with their name variants.
 
         Returns:
             List of dicts with id, canonical_name, name_variants, is_active.
         """
         query = text("""
-            SELECT id, canonical_name, name_variants, is_active
-            FROM review_employees
-            WHERE is_active = true
-            ORDER BY canonical_name
+            SELECT id, full_name, canonical_name, name_variants, is_review_tracked
+            FROM users
+            WHERE is_review_tracked = true
+            ORDER BY full_name
         """)
 
         try:
@@ -457,9 +457,9 @@ class SupabaseRepo:
                 for row in rows:
                     employees.append({
                         "id": str(row.id),
-                        "canonical_name": row.canonical_name,
+                        "canonical_name": row.canonical_name or row.full_name.split()[0],
                         "name_variants": list(row.name_variants) if row.name_variants else [],
-                        "is_active": row.is_active,
+                        "is_active": row.is_review_tracked,
                     })
                 return employees
         except Exception as e:
@@ -467,17 +467,17 @@ class SupabaseRepo:
             return []
 
     def get_employee_id_by_name(self, canonical_name: str) -> str | None:
-        """Get employee ID by canonical name.
+        """Get user ID by canonical name.
 
         Args:
-            canonical_name: Employee's canonical name.
+            canonical_name: User's canonical name for reviews.
 
         Returns:
-            Employee UUID or None if not found.
+            User UUID or None if not found.
         """
         query = text("""
-            SELECT id FROM review_employees
-            WHERE canonical_name = :name AND is_active = true
+            SELECT id FROM users
+            WHERE canonical_name = :name AND is_review_tracked = true
         """)
 
         try:
@@ -503,7 +503,7 @@ class SupabaseRepo:
         Uses ON CONFLICT to handle duplicates (same external_id).
 
         Args:
-            employee_name: Canonical employee name.
+            employee_name: User's full name.
             external_id: External review ID (from Apify).
             review_date: Date of the review.
             review_text: Review text content.
@@ -513,19 +513,19 @@ class SupabaseRepo:
         Returns:
             Review UUID if created, None if duplicate.
         """
-        # First get the employee ID
-        employee_id = self.get_employee_id_by_name(employee_name)
-        if not employee_id:
-            logger.warning("Employee not found: %s", employee_name)
+        # First get the user ID
+        user_id = self.get_employee_id_by_name(employee_name)
+        if not user_id:
+            logger.warning("User not found: %s", employee_name)
             return None
 
         review_id = uuid.uuid4()
         query = text("""
             INSERT INTO reviews (
-                id, external_id, employee_id, review_date,
+                id, external_id, user_id, review_date,
                 review_text, rating, reviewer_name
             ) VALUES (
-                :id, :external_id, :employee_id, :review_date,
+                :id, :external_id, :user_id, :review_date,
                 :review_text, :rating, :reviewer_name
             )
             ON CONFLICT (external_id) DO NOTHING
@@ -537,7 +537,7 @@ class SupabaseRepo:
                 result = conn.execute(query, {
                     "id": review_id,
                     "external_id": external_id,
-                    "employee_id": uuid.UUID(employee_id),
+                    "user_id": uuid.UUID(user_id),
                     "review_date": review_date,
                     "review_text": review_text,
                     "rating": rating,
@@ -556,33 +556,33 @@ class SupabaseRepo:
             return None
 
     def increment_daily_count(self, employee_name: str, review_date) -> bool:
-        """Increment daily review count for an employee.
+        """Increment daily review count for a user.
 
         Uses UPSERT to create or increment the count.
 
         Args:
-            employee_name: Canonical employee name.
+            employee_name: User's full name.
             review_date: Date of the review.
 
         Returns:
             True if successful, False on error.
         """
-        employee_id = self.get_employee_id_by_name(employee_name)
-        if not employee_id:
-            logger.warning("Employee not found for count update: %s", employee_name)
+        user_id = self.get_employee_id_by_name(employee_name)
+        if not user_id:
+            logger.warning("User not found for count update: %s", employee_name)
             return False
 
         query = text("""
-            INSERT INTO review_daily_counts (id, employee_id, date, review_count)
-            VALUES (gen_random_uuid(), :employee_id, :date, 1)
-            ON CONFLICT (employee_id, date)
+            INSERT INTO review_daily_counts (id, user_id, date, review_count)
+            VALUES (gen_random_uuid(), :user_id, :date, 1)
+            ON CONFLICT (user_id, date)
             DO UPDATE SET review_count = review_daily_counts.review_count + 1
         """)
 
         try:
             with self._engine.connect() as conn:
                 conn.execute(query, {
-                    "employee_id": uuid.UUID(employee_id),
+                    "user_id": uuid.UUID(user_id),
                     "date": review_date,
                 })
                 conn.commit()
@@ -598,12 +598,12 @@ class SupabaseRepo:
             target_date: Date to query.
 
         Returns:
-            List of (employee_name, count) tuples, ordered by count descending.
+            List of (user_name, count) tuples, ordered by count descending.
         """
         query = text("""
-            SELECT e.canonical_name, c.review_count
+            SELECT COALESCE(u.canonical_name, u.full_name) AS name, c.review_count
             FROM review_daily_counts c
-            JOIN review_employees e ON c.employee_id = e.id
+            JOIN users u ON c.user_id = u.id
             WHERE c.date = :date
             ORDER BY c.review_count DESC
         """)
@@ -611,7 +611,7 @@ class SupabaseRepo:
         try:
             with self._engine.connect() as conn:
                 result = conn.execute(query, {"date": target_date})
-                return [(row.canonical_name, row.review_count) for row in result.fetchall()]
+                return [(row.name, row.review_count) for row in result.fetchall()]
         except Exception as e:
             logger.error("Failed to get daily counts: %s", e)
             return []
@@ -624,7 +624,7 @@ class SupabaseRepo:
             month: Month (1-12).
 
         Returns:
-            List of (employee_name, total_count) tuples, ordered by count descending.
+            List of (user_name, total_count) tuples, ordered by count descending.
         """
         from datetime import date as date_type
         import calendar
@@ -633,11 +633,11 @@ class SupabaseRepo:
         last_day = date_type(year, month, calendar.monthrange(year, month)[1])
 
         query = text("""
-            SELECT e.canonical_name, SUM(c.review_count) AS total_count
+            SELECT COALESCE(u.canonical_name, u.full_name) AS name, SUM(c.review_count) AS total_count
             FROM review_daily_counts c
-            JOIN review_employees e ON c.employee_id = e.id
+            JOIN users u ON c.user_id = u.id
             WHERE c.date >= :first_day AND c.date <= :last_day
-            GROUP BY e.canonical_name
+            GROUP BY COALESCE(u.canonical_name, u.full_name)
             ORDER BY total_count DESC
         """)
 
@@ -647,7 +647,7 @@ class SupabaseRepo:
                     "first_day": first_day,
                     "last_day": last_day,
                 })
-                return [(row.canonical_name, int(row.total_count)) for row in result.fetchall()]
+                return [(row.name, int(row.total_count)) for row in result.fetchall()]
         except Exception as e:
             logger.error("Failed to get monthly review totals: %s", e)
             return []

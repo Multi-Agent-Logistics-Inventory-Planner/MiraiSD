@@ -113,8 +113,8 @@ def test_apify_only():
     print(f"\nFetched {len(reviews)} reviews from Apify")
 
     if reviews:
-        print("\nSample reviews:")
-        for r in reviews[:3]:
+        print("\nAll reviews:")
+        for r in reviews:
             print(f"  [{r.rating} star] {r.reviewer_name} ({r.published_at[:10]})")
             text_preview = r.text[:80].replace('\n', ' ') if r.text else "(no text)"
             print(f"    {text_preview}...")

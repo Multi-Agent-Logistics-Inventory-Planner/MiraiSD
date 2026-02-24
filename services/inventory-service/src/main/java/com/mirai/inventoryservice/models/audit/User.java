@@ -44,6 +44,9 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
+    @Column(name = "canonical_name")
+    private String canonicalName;
+
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "name_variants", columnDefinition = "text[]")
     @Builder.Default

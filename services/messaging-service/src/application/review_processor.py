@@ -47,7 +47,11 @@ class ReviewProcessor:
 
         for emp in employees:
             canonical = emp["canonical_name"]
-            for variant in emp["name_variants"]:
+
+            # Include the full name itself as a searchable name
+            all_names = [canonical] + emp["name_variants"]
+
+            for variant in all_names:
                 variant_lower = variant.lower()
                 self._name_map[variant_lower] = canonical
                 # Word boundary pattern for matching

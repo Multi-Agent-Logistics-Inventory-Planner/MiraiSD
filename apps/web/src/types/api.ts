@@ -179,6 +179,7 @@ export interface User {
   fullName: string;
   email: string;
   role: UserRole;
+  canonicalName?: string;
   nameVariants?: string[];
   isReviewTracked?: boolean;
   createdAt: string;
@@ -192,6 +193,7 @@ export interface UserRequest {
 }
 
 export interface UserReviewTrackingRequest {
+  canonicalName?: string;
   nameVariants?: string[];
   isReviewTracked?: boolean;
 }
