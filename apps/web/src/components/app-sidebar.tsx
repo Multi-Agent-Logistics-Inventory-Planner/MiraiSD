@@ -42,6 +42,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
+import { ModeToggle } from "@/components/mode-toggle";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -280,6 +281,7 @@ export function AppSidebar() {
                 {user.role}
               </Badge>
             </div>
+            <ModeToggle />
             <button
               onClick={signOut}
               className="text-muted-foreground hover:text-destructive cursor-pointer"
