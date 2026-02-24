@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.JwtService;
+import com.mirai.inventoryservice.auth.RateLimitingFilter;
 import com.mirai.inventoryservice.dtos.requests.ShipmentItemRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
@@ -53,12 +54,16 @@ class ShipmentControllerSecurityTest {
     @MockBean
     private JwtService jwtService;
 
+    @Autowired
+    private RateLimitingFilter rateLimitingFilter;
+
     private final String testSecret = "test-secret-key-for-jwt-validation-that-is-long-enough-for-hmac-sha";
     private SecretKey signingKey;
 
     @BeforeEach
     void setUp() {
         signingKey = Keys.hmacShaKeyFor(testSecret.getBytes(StandardCharsets.UTF_8));
+        rateLimitingFilter.clearBuckets();
     }
 
     @Nested
