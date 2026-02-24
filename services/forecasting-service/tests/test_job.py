@@ -1,10 +1,12 @@
 from pathlib import Path
 import json
+import logging
+from unittest.mock import patch, MagicMock
 
 import pandas as pd
 
 from src import config
-from src.forecast_job import run_batch
+from src.forecast_job import run_batch, main
 
 
 def _write_csv(p: Path, rows: list[dict]) -> None:
@@ -571,4 +573,106 @@ def test_high_demand_scenario(tmp_path: Path, monkeypatch):
     assert pd.notna(row["suggested_order_date"]) and str(row["suggested_order_date"]).strip() != "", "Should trigger order date"
     print("\n✓ High demand scenario correctly triggers urgent reorder")
     print("="*80 + "\n")
+
+
+def test_main_uses_logging_not_print(tmp_path: Path, monkeypatch):
+    """Test that main() uses logging instead of print for output path."""
+    data_dir = tmp_path / "data"
+    events_dir = tmp_path / "events"
+    out_dir = tmp_path / "out"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    events_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(config, "DATA_DIR", data_dir)
+    monkeypatch.setattr(config, "EVENTS_DIR", events_dir)
+    monkeypatch.setattr(config, "OUTPUT_DIR", out_dir)
+
+    # Seed minimal data
+    _write_csv(
+        data_dir / "items.csv",
+        [
+            {
+                "item_id": "MAIN-TEST",
+                "name": "Main Test Item",
+                "category": "Test",
+                "lead_time_days": 7,
+                "safety_stock_days": 0,
+                "service_level": 0.95,
+                "lead_time_std_days": 0.0,
+            }
+        ],
+    )
+    _write_csv(
+        data_dir / "inventories.csv",
+        [{"item_id": "MAIN-TEST", "as_of_ts": "2025-11-05T09:00:00Z", "current_qty": 50}],
+    )
+    _write_events_ndjson(events_dir / "inventory-changes.ndjson", [])
+
+    # Mock command line arguments
+    monkeypatch.setattr(
+        "sys.argv",
+        ["forecast_job.py", "--from", "2025-11-05T00:00:00Z", "--to", "2025-11-05T23:59:59Z"],
+    )
+
+    # Patch the logger for forecast_job module and capture logging calls
+    with patch("src.forecast_job.logger") as mock_logger:
+        main()
+
+        # Verify logger.info was called with the output path
+        mock_logger.info.assert_called()
+        call_args = mock_logger.info.call_args_list
+        # Find the call that logs the output path
+        path_logged = any(
+            "Forecast output path" in str(call) or "out" in str(call).lower()
+            for call in call_args
+        )
+        assert path_logged, f"Expected logger.info to be called with output path. Calls: {call_args}"
+
+
+def test_main_no_print_statement(tmp_path: Path, monkeypatch, capsys):
+    """Test that main() does not use print() for output."""
+    data_dir = tmp_path / "data"
+    events_dir = tmp_path / "events"
+    out_dir = tmp_path / "out"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    events_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(config, "DATA_DIR", data_dir)
+    monkeypatch.setattr(config, "EVENTS_DIR", events_dir)
+    monkeypatch.setattr(config, "OUTPUT_DIR", out_dir)
+
+    # Seed minimal data
+    _write_csv(
+        data_dir / "items.csv",
+        [
+            {
+                "item_id": "NO-PRINT-TEST",
+                "name": "No Print Test Item",
+                "category": "Test",
+                "lead_time_days": 7,
+                "safety_stock_days": 0,
+                "service_level": 0.95,
+                "lead_time_std_days": 0.0,
+            }
+        ],
+    )
+    _write_csv(
+        data_dir / "inventories.csv",
+        [{"item_id": "NO-PRINT-TEST", "as_of_ts": "2025-11-05T09:00:00Z", "current_qty": 50}],
+    )
+    _write_events_ndjson(events_dir / "inventory-changes.ndjson", [])
+
+    # Mock command line arguments
+    monkeypatch.setattr(
+        "sys.argv",
+        ["forecast_job.py", "--from", "2025-11-05T00:00:00Z", "--to", "2025-11-05T23:59:59Z"],
+    )
+
+    main()
+
+    # Capture stdout - should be empty (no print statements)
+    captured = capsys.readouterr()
+    assert captured.out == "", f"main() should not print to stdout. Got: {captured.out}"
 
