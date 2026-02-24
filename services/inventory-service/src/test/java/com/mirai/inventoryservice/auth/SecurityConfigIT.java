@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.auth;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -19,6 +20,14 @@ class SecurityConfigIT {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private RateLimitingFilter rateLimitingFilter;
+
+    @BeforeEach
+    void setUp() {
+        rateLimitingFilter.clearBuckets();
+    }
 
     @Test
     void corsAllowsLocalhostOrigin() throws Exception {
