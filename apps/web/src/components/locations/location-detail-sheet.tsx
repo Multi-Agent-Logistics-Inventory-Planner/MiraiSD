@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -207,8 +208,25 @@ export function LocationDetailSheet({
                           setInventoryDetailOpen(true);
                         }}
                       >
-                        <TableCell className="font-mono text-sm">
-                          {inv.item.sku}
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-3">
+                            {inv.item.imageUrl ? (
+                              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-muted">
+                                <Image
+                                  src={inv.item.imageUrl}
+                                  alt={inv.item.name}
+                                  fill
+                                  sizes="32px"
+                                  className="object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                                <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="font-mono text-sm">{inv.item.sku}</span>
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">{inv.item.name}</TableCell>
                         <TableCell>

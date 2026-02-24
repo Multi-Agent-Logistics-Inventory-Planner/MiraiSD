@@ -14,7 +14,6 @@ import {
   Users,
   Settings,
   LogOut,
-  MoreVertical,
   ArrowUpDown,
   RefreshCw,
   Star,
@@ -38,11 +37,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
@@ -243,6 +237,23 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        <SidebarGroup>
+          <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
+            Profile
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/settings"}>
+                  <Link href="/settings">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
         {isLoading ? (
@@ -269,35 +280,14 @@ export function AppSidebar() {
                 {user.role}
               </Badge>
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground cursor-pointer"
-                  title="More options"
-                  aria-label="More options"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" side="top" className="w-48 p-1">
-                <div className="flex flex-col">
-                  <Link
-                    href="/settings"
-                    className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                  <button
-                    onClick={signOut}
-                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-accent"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Log out</span>
-                  </button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <button
+              onClick={signOut}
+              className="text-muted-foreground hover:text-destructive cursor-pointer"
+              title="Log out"
+              aria-label="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-3">
