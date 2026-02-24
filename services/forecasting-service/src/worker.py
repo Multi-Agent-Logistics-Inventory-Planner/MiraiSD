@@ -10,6 +10,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -43,9 +44,26 @@ class ForecastingWorker:
         self._pipeline = ForecastingPipeline(repo=self._repo)
         self._running = False
 
+    @staticmethod
+    def _start_api_server() -> None:
+        """Start FastAPI server in a daemon thread for HTTP trigger access."""
+        import uvicorn
+
+        from .api.main import app
+
+        logger.info("Starting FastAPI server on 0.0.0.0:5000")
+        thread = threading.Thread(
+            target=uvicorn.run,
+            args=(app,),
+            kwargs={"host": "0.0.0.0", "port": 5000, "log_level": "info"},
+            daemon=True,
+        )
+        thread.start()
+
     def start(self) -> None:
         """Start the worker."""
         logger.info("Starting forecasting worker")
+        self._start_api_server()
         logger.info(
             "Config: batch_window=%ds, batch_size=%d, debounce=%.1fs",
             config.BATCH_WINDOW_SECONDS,

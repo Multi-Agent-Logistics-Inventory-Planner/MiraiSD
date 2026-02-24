@@ -10,7 +10,10 @@ import com.mirai.inventoryservice.repositories.CabinetInventoryRepository;
 import com.mirai.inventoryservice.repositories.RackInventoryRepository;
 import com.mirai.inventoryservice.repositories.DoubleClawMachineInventoryRepository;
 import com.mirai.inventoryservice.repositories.SingleClawMachineInventoryRepository;
+import com.mirai.inventoryservice.repositories.FourCornerMachineInventoryRepository;
 import com.mirai.inventoryservice.repositories.KeychainMachineInventoryRepository;
+import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
+import com.mirai.inventoryservice.repositories.PusherMachineInventoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,7 +21,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,19 +43,21 @@ public class ForecastService {
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
+    private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
+    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
 
     @Transactional(readOnly = true)
     public Page<ForecastPredictionResponseDTO> getAllForecasts(Pageable pageable) {
-        Page<ForecastPrediction> predictions = forecastPredictionRepository.findAll(pageable);
-        
+        Page<ForecastPrediction> predictions = forecastPredictionRepository.findLatestPerItem(pageable);
+
         return mapToDTOs(predictions);
     }
 
     @Transactional(readOnly = true)
     public List<ForecastPredictionResponseDTO> getAtRiskForecasts(int daysThreshold) {
-        BigDecimal threshold = BigDecimal.valueOf(daysThreshold);
-        List<ForecastPrediction> predictions = forecastPredictionRepository.findByDaysToStockoutLessThanOrderByDaysToStockoutAsc(threshold);
-        
+        List<ForecastPrediction> predictions = forecastPredictionRepository.findLatestAtRisk(daysThreshold);
+
         return mapToDTOList(predictions);
     }
 
@@ -98,7 +102,10 @@ public class ForecastService {
         total += getSafeSum(doubleClawMachineInventoryRepository.sumQuantityByProductId(itemId));
         total += getSafeSum(singleClawMachineInventoryRepository.sumQuantityByProductId(itemId));
         total += getSafeSum(keychainMachineInventoryRepository.sumQuantityByProductId(itemId));
-        
+        total += getSafeSum(pusherMachineInventoryRepository.sumQuantityByProductId(itemId));
+        total += getSafeSum(fourCornerMachineInventoryRepository.sumQuantityByProductId(itemId));
+        total += getSafeSum(notAssignedInventoryRepository.sumQuantityByProductId(itemId));
+
         return total;
     }
     

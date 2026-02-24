@@ -16,7 +16,6 @@ import {
 } from "@/components/analytics"
 import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
-import type { ForecastPrediction } from "@/types/api"
 
 export default function AnalyticsPage() {
   const [page, setPage] = useState(1)
@@ -67,10 +66,6 @@ export default function AnalyticsPage() {
     tableRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const handleOrder = (_item: ForecastPrediction) => {
-    // Future: implement order creation flow
-  }
-
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       <div className="flex items-center gap-2">
@@ -105,7 +100,6 @@ export default function AnalyticsPage() {
             pageSize={pageSize}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
-            onOrder={handleOrder}
           />
         </div>
 

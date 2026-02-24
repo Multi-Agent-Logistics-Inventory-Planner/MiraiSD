@@ -1,12 +1,45 @@
 from __future__ import annotations
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+
+from ...adapters.supabase_repo import SupabaseRepo
+from ...application.pipeline import ForecastingPipeline
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.post("/trigger")
+def trigger_forecast(
+    item_ids: list[str] | None = Query(default=None),
+) -> dict:
+    """Trigger the forecasting pipeline on demand.
+
+    Args:
+        item_ids: Optional list of item UUIDs. If omitted, runs for all items.
+
+    Returns:
+        dict: Contains "saved" count of forecast predictions written.
+    """
+    try:
+        pipeline = ForecastingPipeline(repo=SupabaseRepo())
+
+        if item_ids:
+            saved = pipeline.run_for_items(set(item_ids))
+        else:
+            saved = pipeline.run_all()
+
+        return {"saved": saved}
+
+    except Exception as e:
+        logger.exception("Trigger forecast failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Forecast trigger failed", "code": "INTERNAL_ERROR"},
+        )
 
 
 @router.post("/run")
