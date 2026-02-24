@@ -100,10 +100,11 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    @DisplayName("Should use X-Forwarded-For header when present")
+    @DisplayName("Should use X-Forwarded-For header when from trusted proxy")
     void shouldUseXForwardedForHeader() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/products");
-        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.1");
+        when(request.getRemoteAddr()).thenReturn("10.0.0.1"); // Trusted proxy
 
         // Make requests using forwarded header
         for (int i = 0; i < 5; i++) {
@@ -121,7 +122,8 @@ class RateLimitingFilterTest {
     void shouldExtractFirstIpFromXForwardedFor() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/products");
         // Multiple IPs in header (client, proxy1, proxy2)
-        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2, 10.0.0.3");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.1, 10.0.0.2, 10.0.0.3");
+        when(request.getRemoteAddr()).thenReturn("192.168.1.1"); // Trusted proxy
 
         // Exhaust limit
         for (int i = 0; i < 5; i++) {
@@ -153,15 +155,16 @@ class RateLimitingFilterTest {
     @DisplayName("Should track multiple IPs independently")
     void shouldTrackMultipleIpsIndependently() throws Exception {
         when(request.getRequestURI()).thenReturn("/api/products");
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1"); // Trusted proxy (localhost)
 
         // Exhaust limit for IP1
-        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.1");
         for (int i = 0; i < 5; i++) {
             filter.doFilterInternal(request, response, filterChain);
         }
 
         // IP2 should still have full quota
-        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.2");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.2");
         for (int i = 0; i < 5; i++) {
             filter.doFilterInternal(request, response, filterChain);
         }
@@ -215,5 +218,77 @@ class RateLimitingFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(response).setContentType("application/json");
+    }
+
+    @Test
+    @DisplayName("Should ignore X-Forwarded-For from untrusted source (public IP)")
+    void shouldIgnoreXForwardedForFromUntrustedSource() throws Exception {
+        when(request.getRequestURI()).thenReturn("/api/products");
+        // Simulate direct client (public IP) spoofing X-Forwarded-For
+        lenient().when(request.getHeader("X-Forwarded-For")).thenReturn("1.2.3.4");
+        when(request.getRemoteAddr()).thenReturn("203.0.113.50"); // Public IP (untrusted)
+
+        // Exhaust rate limit using the real remoteAddr
+        for (int i = 0; i < 5; i++) {
+            filter.doFilterInternal(request, response, filterChain);
+        }
+
+        // Change spoofed IP - should NOT reset limit if we're using remoteAddr
+        lenient().when(request.getHeader("X-Forwarded-For")).thenReturn("5.6.7.8");
+        filter.doFilterInternal(request, response, filterChain);
+
+        // Should be blocked (using remoteAddr 203.0.113.50, not spoofed X-Forwarded-For)
+        verify(response, atLeastOnce()).setStatus(429);
+    }
+
+    @Test
+    @DisplayName("Should trust X-Forwarded-For from trusted proxy (10.x.x.x)")
+    void shouldTrustXForwardedForFromTrustedProxy10() throws Exception {
+        when(request.getRequestURI()).thenReturn("/api/products");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.100");
+        lenient().when(request.getRemoteAddr()).thenReturn("10.0.0.1"); // Private IP (trusted proxy)
+
+        // Exhaust rate limit using forwarded IP
+        for (int i = 0; i < 5; i++) {
+            filter.doFilterInternal(request, response, filterChain);
+        }
+
+        // Should be rate limited based on forwarded IP
+        filter.doFilterInternal(request, response, filterChain);
+        verify(response, atLeastOnce()).setStatus(429);
+
+        // Clear and test different forwarded IP should work
+        filter.clearBuckets();
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.200");
+        filter.doFilterInternal(request, response, filterChain);
+
+        // This should succeed (new forwarded IP)
+        verify(filterChain, atLeast(6)).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Should trust X-Forwarded-For from trusted proxy (192.168.x.x)")
+    void shouldTrustXForwardedForFromTrustedProxy192() throws Exception {
+        when(request.getRequestURI()).thenReturn("/api/products");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("8.8.8.8");
+        lenient().when(request.getRemoteAddr()).thenReturn("192.168.1.1"); // Private IP (trusted proxy)
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        // Should use the X-Forwarded-For IP, not the proxy IP
+        verify(filterChain).doFilter(request, response);
+        assertThat(filter.getTrackedIpCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should trust X-Forwarded-For from localhost (127.0.0.1)")
+    void shouldTrustXForwardedForFromLocalhost() throws Exception {
+        when(request.getRequestURI()).thenReturn("/api/products");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("100.100.100.100");
+        lenient().when(request.getRemoteAddr()).thenReturn("127.0.0.1"); // Localhost (trusted)
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
     }
 }
