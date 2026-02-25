@@ -84,6 +84,8 @@ services:
       context: ../services/forecasting-service
       dockerfile: Dockerfile
     image: forecasting-service:latest
+    ports:
+      - "5010:5000"
     env_file:
       - ../.env
     environment:

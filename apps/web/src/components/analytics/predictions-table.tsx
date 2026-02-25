@@ -6,7 +6,6 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
-  ShoppingCart,
   Search,
   Filter,
   Loader2,
@@ -16,7 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import {
   Table,
   TableBody,
@@ -42,7 +40,7 @@ import {
 } from "@/components/ui/select"
 import type { ForecastPrediction, PaginatedResponse } from "@/types/api"
 
-type SortField = "itemSku" | "itemName" | "currentStock" | "avgDailyDelta" | "daysToStockout" | "suggestedReorderQty" | "suggestedOrderDate" | "confidence"
+type SortField = "itemSku" | "itemName" | "currentStock" | "avgDailyDelta" | "daysToStockout" | "suggestedReorderQty" | "suggestedOrderDate"
 type SortDirection = "asc" | "desc"
 type RiskFilter = "all" | "critical" | "warning" | "safe"
 
@@ -54,7 +52,6 @@ interface PredictionsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
-  onOrder?: (item: ForecastPrediction) => void
 }
 
 function getDaysToStockoutBadgeClass(days: number): string {
@@ -163,10 +160,6 @@ function filterAndSortData(
         aVal = a.suggestedOrderDate || ""
         bVal = b.suggestedOrderDate || ""
         break
-      case "confidence":
-        aVal = a.confidence
-        bVal = b.confidence
-        break
       default:
         return 0
     }
@@ -193,7 +186,6 @@ export function PredictionsTable({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onOrder,
 }: PredictionsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all")
@@ -228,7 +220,6 @@ export function PredictionsTable({
       "Days to Stockout",
       "Reorder Qty",
       "Order By",
-      "Confidence",
     ]
 
     const rows = filteredAndSortedData.map((item) => [
@@ -241,7 +232,6 @@ export function PredictionsTable({
       item.suggestedOrderDate
         ? format(new Date(item.suggestedOrderDate), "yyyy-MM-dd")
         : "",
-      `${(item.confidence * 100).toFixed(0)}%`,
     ])
 
     const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
@@ -261,7 +251,7 @@ export function PredictionsTable({
   return (
     <Card>
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle>AI Stock Predictions</CardTitle>
+        <CardTitle>Stock Predictions</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -347,19 +337,12 @@ export function PredictionsTable({
                         <SortIcon field="suggestedOrderDate" currentSortField={sortField} sortDirection={sortDirection} />
                       </Button>
                     </TableHead>
-                    <TableHead aria-sort={getAriaSort("confidence", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("confidence")}>
-                        Confidence
-                        <SortIcon field="confidence" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
                         {searchTerm || riskFilter !== "all"
                           ? "No items match your filters"
                           : "No predictions available"}
@@ -391,26 +374,6 @@ export function PredictionsTable({
                           {prediction.suggestedOrderDate
                             ? format(new Date(prediction.suggestedOrderDate), "MMM d, yyyy")
                             : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              value={prediction.confidence * 100}
-                              className="h-2 w-16"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {(prediction.confidence * 100).toFixed(0)}%
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => onOrder?.(prediction)}
-                          >
-                            <ShoppingCart className="mr-2 h-3 w-3" />
-                            Order
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))

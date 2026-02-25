@@ -139,7 +139,7 @@ class SupabaseRepo:
                 name,
                 category,
                 lead_time_days,
-                COALESCE(reorder_point / NULLIF(target_stock_level / lead_time_days, 0), 7)::int AS safety_stock_days
+                COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
             FROM products
             WHERE is_active = true
         """
@@ -175,6 +175,9 @@ class SupabaseRepo:
             ("single_claw_machine_inventory", "single_claw_machine_id"),
             ("double_claw_machine_inventory", "double_claw_machine_id"),
             ("keychain_machine_inventory", "keychain_machine_id"),
+            ("pusher_machine_inventory", "pusher_machine_id"),
+            ("four_corner_machine_inventory", "four_corner_machine_id"),
+            ("not_assigned_inventory", "item_id"),
         ]
 
         union_parts = []
@@ -200,8 +203,7 @@ class SupabaseRepo:
                 FROM ({query}) AS inv
                 WHERE item_id = ANY(:item_ids)
             """
-            # Convert to UUID objects to match PostgreSQL UUID column type
-            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+            params["item_ids"] = [str(iid) for iid in item_ids]
 
         with self._engine.connect() as conn:
             df = pd.read_sql(text(query), conn, params=params)

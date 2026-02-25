@@ -28,7 +28,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -73,43 +75,86 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public PerformanceMetricsDTO getPerformanceMetrics() {
-        // 1. Forecast Accuracy: Average confidence of latest predictions
-        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAll(); // simplified, ideally distinct by item
-        // In reality we should query: select distinct on (item_id) * from forecast_predictions order by item_id, computed_at desc
-        // But for now let's just take average of all recent predictions (or we can use a custom query)
-        
+        // 1. Forecast Accuracy: Average confidence of latest prediction per item only
+        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
+
         BigDecimal avgConfidence = BigDecimal.ZERO;
         if (!latestPredictions.isEmpty()) {
             double average = latestPredictions.stream()
                     .map(ForecastPrediction::getConfidence)
+                    .filter(Objects::nonNull)
                     .mapToDouble(BigDecimal::doubleValue)
                     .average()
                     .orElse(0.0);
             avgConfidence = BigDecimal.valueOf(average * 100).setScale(1, RoundingMode.HALF_UP);
         }
 
-        // 2. Stockout Rate: % of items with 0 stock
+        // 2. Stockout Rate: % of items with 0 stock (now includes all 9 inventory tables)
         List<Product> allProducts = productRepository.findAll();
-        long outOfStockCount = 0;
-        for (Product p : allProducts) {
-            if (forecastService.getCurrentStockPublic(p.getId()) == 0) {
-                outOfStockCount++;
-            }
-        }
-        
+
+        // Cache stock per product to avoid duplicate DB calls in stockout + turnover
+        Map<UUID, Integer> stockByProduct = allProducts.stream()
+                .collect(Collectors.toMap(
+                        Product::getId,
+                        p -> forecastService.getCurrentStockPublic(p.getId())
+                ));
+
+        long outOfStockCount = stockByProduct.values().stream()
+                .filter(stock -> stock == 0)
+                .count();
+
         BigDecimal stockoutRate = BigDecimal.ZERO;
         if (!allProducts.isEmpty()) {
             double rate = (double) outOfStockCount / allProducts.size();
             stockoutRate = BigDecimal.valueOf(rate * 100).setScale(1, RoundingMode.HALF_UP);
         }
 
-        // 3. Fill Rate: (Total Items - Out of Stock) / Total Items (Inverse of stockout for now)
+        // 3. Fill Rate: inverse of stockout rate
         BigDecimal fillRate = BigDecimal.valueOf(100).subtract(stockoutRate);
 
-        // 4. Turnover Rate: Placeholder (requires sales history which we don't have yet)
-        BigDecimal turnoverRate = new BigDecimal("4.2");
+        // 4. Turnover Rate: COGS (last 12 months) / Average Inventory Value
+        BigDecimal turnoverRate = computeTurnoverRate(allProducts, stockByProduct);
 
         return new PerformanceMetricsDTO(turnoverRate, avgConfidence, stockoutRate, fillRate);
+    }
+
+    private BigDecimal computeTurnoverRate(List<Product> allProducts, Map<UUID, Integer> stockByProduct) {
+        LocalDate today = LocalDate.now();
+        OffsetDateTime startDateTime = today.minusMonths(12).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        // COGS: sum of abs(quantityChange) * unitCost for SALE movements in last 12 months
+        Specification<StockMovement> salesSpec = (root, query, cb) ->
+            cb.and(
+                cb.equal(root.get("reason"), StockMovementReason.SALE),
+                cb.greaterThanOrEqualTo(root.get("at"), startDateTime)
+            );
+
+        List<StockMovement> salesMovements = stockMovementRepository.findAll(salesSpec);
+
+        BigDecimal cogs = BigDecimal.ZERO;
+        for (StockMovement movement : salesMovements) {
+            int units = Math.abs(movement.getQuantityChange());
+            BigDecimal unitCost = movement.getItem().getUnitCost();
+            if (unitCost != null) {
+                cogs = cogs.add(unitCost.multiply(BigDecimal.valueOf(units)));
+            }
+        }
+
+        // Average Inventory Value: current snapshot of stock * unitCost across all active products
+        BigDecimal inventoryValue = BigDecimal.ZERO;
+        for (Product product : allProducts) {
+            int currentStock = stockByProduct.getOrDefault(product.getId(), 0);
+            BigDecimal unitCost = product.getUnitCost();
+            if (unitCost != null && currentStock > 0) {
+                inventoryValue = inventoryValue.add(unitCost.multiply(BigDecimal.valueOf(currentStock)));
+            }
+        }
+
+        if (inventoryValue.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        }
+
+        return cogs.divide(inventoryValue, 1, RoundingMode.HALF_UP);
     }
 
     @Transactional(readOnly = true)
