@@ -90,7 +90,7 @@ export function KPICards({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Forecast Accuracy</CardTitle>
+          <CardTitle className="text-sm font-medium">Prediction Confidence</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -98,7 +98,7 @@ export function KPICards({
             {forecastAccuracy.toFixed(1)}%
           </div>
           <p className="text-xs text-muted-foreground">
-            Target: 85%+
+            Avg demand consistency across items
           </p>
         </CardContent>
       </Card>
