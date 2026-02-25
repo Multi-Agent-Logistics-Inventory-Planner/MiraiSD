@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { Loader2, Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -20,11 +20,29 @@ const themeOptions = [
   { value: "system", label: "System", icon: Monitor },
 ] as const;
 
+const navItems = [
+  { id: "general", label: "General" },
+  { id: "security", label: "Security" },
+  { id: "appearance", label: "Appearance" },
+] as const;
+
+type SectionId = (typeof navItems)[number]["id"];
+
+function getInitials(name: string | undefined): string {
+  if (!name) return "U";
+  const parts = name.split(" ");
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 export default function SettingsPage() {
   const { user, refreshAuth } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionId>("general");
   const [isResetting, setIsResetting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -114,97 +132,174 @@ export default function SettingsPage() {
     fullName !== (user?.personName || "") || email !== (user?.email || "");
 
   return (
-    <div className="flex flex-col p-4 md:p-8 space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <div className="flex items-center gap-2 p-4 md:p-6 lg:p-8 pb-0">
         <SidebarTrigger className="md:hidden" />
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="settings-name">Full Name</Label>
-              <Input
-                id="settings-name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={isSaving}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="settings-email">Email</Label>
-              <Input
-                id="settings-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isSaving}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">Role: {user?.role}</p>
-            <Button
-              onClick={handleSaveProfile}
-              disabled={isSaving || !hasChanges}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Security</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleResetPassword} disabled={isResetting}>
-              {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Reset Password
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Main content */}
+      <div className="flex flex-1 flex-col md:flex-row p-4 md:p-6 lg:p-8 gap-8">
+        {/* Sidebar navigation */}
+        <nav className="md:w-48 shrink-0">
+          <ul className="flex md:flex-col gap-1">
+            {navItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  onClick={() => setActiveSection(item.id)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                    activeSection === item.id
+                      ? "bg-accent font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  )}
+                >
+                  {item.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Appearance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label>Theme</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {themeOptions.map((option) => {
-                  const Icon = option.icon;
-                  const isActive = mounted && theme === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => setTheme(option.value)}
-                      className={cn(
-                        "flex flex-col items-center gap-2 rounded-md border p-3 transition-colors cursor-pointer",
-                        isActive
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50 hover:bg-accent"
-                      )}
+        {/* Content area */}
+        <div className="flex-1 max-w-2xl">
+          {activeSection === "general" && (
+            <div className="space-y-8">
+              {/* Profile Section */}
+              <section>
+                <h2 className="text-lg font-medium mb-6">Profile</h2>
+
+                <div className="space-y-6">
+                  {/* Avatar and Name row */}
+                  <div className="flex items-start gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">Full name</Label>
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarFallback>{getInitials(fullName)}</AvatarFallback>
+                        </Avatar>
+                        <Input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          disabled={isSaving}
+                          className="max-w-xs bg-accent/50 border-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Email</Label>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isSaving}
+                      className="max-w-md bg-accent/50 border-0"
+                    />
+                  </div>
+
+                  {/* Role */}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Role</Label>
+                    <p className="text-sm">{user?.role}</p>
+                  </div>
+
+                  {/* Save button */}
+                  {hasChanges && (
+                    <Button
+                      onClick={handleSaveProfile}
+                      disabled={isSaving}
+                      size="sm"
                     >
-                      <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                      <span className={cn("text-sm", isActive && "font-medium text-primary")}>
-                        {option.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save changes"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </section>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {activeSection === "security" && (
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-lg font-medium mb-6">Security</h2>
+
+                <div className="space-y-6">
+                  {/* Password */}
+                  <div className="flex items-center justify-between py-3 border-b">
+                    <div>
+                      <p className="font-medium">Password</p>
+                      <p className="text-sm text-muted-foreground">
+                        Send a password reset link to your email
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetPassword}
+                      disabled={isResetting}
+                    >
+                      {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Reset password
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeSection === "appearance" && (
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-lg font-medium mb-6">Appearance</h2>
+
+                <div className="space-y-6">
+                  {/* Theme */}
+                  <div>
+                    <Label className="text-muted-foreground">Theme</Label>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select how the application looks on your device
+                    </p>
+                    <div className="flex gap-3">
+                      {themeOptions.map((option) => {
+                        const Icon = option.icon;
+                        const isActive = mounted && theme === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            onClick={() => setTheme(option.value)}
+                            className={cn(
+                              "flex flex-col items-center gap-2 rounded-lg p-4 transition-all cursor-pointer min-w-[80px]",
+                              isActive
+                                ? "bg-accent ring-2 ring-primary"
+                                : "bg-accent/50 hover:bg-accent"
+                            )}
+                          >
+                            <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                            <span className={cn("text-sm", isActive && "font-medium")}>
+                              {option.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
