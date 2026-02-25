@@ -32,8 +32,16 @@ public class SupabaseAdminService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public void inviteUserByEmail(String email, String role) {
-        String url = supabaseUrl + "/auth/v1/invite";
+    /**
+     * Generates an invite link for a user without sending an email.
+     * Uses Supabase Admin API to create the invite token.
+     *
+     * @param email the email address to invite
+     * @param role the role to assign to the user
+     * @return the invitation link
+     */
+    public String generateInviteLink(String email, String role) {
+        String url = supabaseUrl + "/auth/v1/admin/generate_link";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -41,13 +49,13 @@ public class SupabaseAdminService {
         headers.setBearerAuth(serviceRoleKey);
 
         ObjectNode body = objectMapper.createObjectNode();
+        body.put("type", "invite");
         body.put("email", email);
+        body.put("redirect_to", invitationRedirectUrl);
 
         ObjectNode userData = objectMapper.createObjectNode();
         userData.put("role", role.toUpperCase());
         body.set("data", userData);
-
-        body.put("redirect_to", invitationRedirectUrl);
 
         HttpEntity<String> request;
         try {
@@ -60,22 +68,41 @@ public class SupabaseAdminService {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("Failed to invite user: {}", response.getBody());
-                throw new RuntimeException("Failed to invite user: " + response.getStatusCode());
+                log.error("Failed to generate invite link: {}", response.getBody());
+                throw new RuntimeException("Failed to generate invite link: " + response.getStatusCode());
             }
 
-            log.info("Successfully sent invitation to {}", email);
+            JsonNode responseJson = objectMapper.readTree(response.getBody());
+            String actionLink = responseJson.get("action_link").asText();
+
+            log.info("Generated invite link for {}", email);
+            return actionLink;
         } catch (HttpClientErrorException e) {
-            log.error("Supabase invite error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Supabase generate_link error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
 
             if (e.getStatusCode() == HttpStatus.UNPROCESSABLE_ENTITY) {
                 throw new RuntimeException("User already exists or email is invalid");
             }
-            throw new RuntimeException("Failed to invite user: " + e.getMessage());
+            throw new RuntimeException("Failed to generate invite link: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Error parsing Supabase response: {}", e.getMessage());
+            throw new RuntimeException("Failed to parse invite response: " + e.getMessage());
         }
     }
 
+    /**
+     * @deprecated Use {@link #generateInviteLink(String, String)} with EmailService instead
+     */
+    @Deprecated
+    public void inviteUserByEmail(String email, String role) {
+        generateInviteLink(email, role);
+    }
+
+    /**
+     * @deprecated Use {@link #generateInviteLink(String, String)} with EmailService instead
+     */
+    @Deprecated
     public void resendInvitation(String email, String role) {
-        inviteUserByEmail(email, role);
+        generateInviteLink(email, role);
     }
 }
