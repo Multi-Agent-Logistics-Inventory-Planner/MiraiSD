@@ -30,13 +30,14 @@ async function getAuthToken(): Promise<string | null> {
 
 interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
+  skipAuthRedirect?: boolean;
 }
 
 export async function apiClient<T>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { skipAuth = false, ...fetchOptions } = options;
+  const { skipAuth = false, skipAuthRedirect = false, ...fetchOptions } = options;
 
   const headers = new Headers(fetchOptions.headers);
 
@@ -64,9 +65,9 @@ export async function apiClient<T>(
     headers,
   });
 
-  // Handle 401 Unauthorized - redirect to login
+  // Handle 401 Unauthorized - redirect to login (unless skipAuthRedirect is set)
   if (response.status === 401) {
-    if (typeof window !== "undefined") {
+    if (!skipAuthRedirect && typeof window !== "undefined") {
       window.location.href = "/login";
     }
     throw new ApiClientError({
