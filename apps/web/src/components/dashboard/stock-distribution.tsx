@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, TooltipProps } from "recharts"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface CategoryData {
@@ -13,6 +13,17 @@ interface CategoryData {
 interface StockDistributionProps {
   data: CategoryData[]
   isLoading?: boolean
+}
+
+function DarkAwareTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload || payload.length === 0) return null
+  const entry = payload[0]
+  return (
+    <div className="rounded-md border bg-background px-3 py-1.5 text-xs shadow-md">
+      <p className="font-medium">{entry.name}</p>
+      <p className="text-muted-foreground">{entry.value} units</p>
+    </div>
+  )
 }
 
 export function StockDistribution({ data, isLoading }: StockDistributionProps) {
@@ -52,9 +63,7 @@ export function StockDistribution({ data, isLoading }: StockDistributionProps) {
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip
-                  formatter={(value: number) => [`${value} units`, "Quantity"]}
-                />
+                <Tooltip content={<DarkAwareTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>

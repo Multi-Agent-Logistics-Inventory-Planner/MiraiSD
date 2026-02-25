@@ -1,9 +1,9 @@
 # Local Development Stack - Self-contained, no Supabase needed
 # Usage: docker-compose -f docker-compose.dev.yml up -d
 
-# seed data:
-# curl -X POST "http://localhost:4000/api/dev/seed/products?count=15"
-# curl -X POST "http://localhost:4000/api/dev/seed/sales?salesPerProduct=100"
+# seed data (one call seeds everything):
+# curl -X POST "http://localhost:4000/api/dev/seed/all"
+# trigger forecasting: curl -X POST "http://localhost:5010/forecasts/trigger"
 
 services:
   postgres-dev:
@@ -92,6 +92,30 @@ services:
         condition: service_healthy
     networks:
       - mirai-dev
+
+  forecasting-service:
+    container_name: forecasting-service-dev
+    build:
+      context: ../services/forecasting-service
+      dockerfile: Dockerfile
+    image: forecasting-service:latest
+    ports:
+      - "5010:5000"
+    environment:
+      - SUPABASE_DB_URL=postgresql://postgres-dev:5432/mirai_inventory
+      - SUPABASE_DB_USERNAME=postgres
+      - SUPABASE_DB_PASSWORD=postgres
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=inventory-changes
+      - KAFKA_CONSUMER_GROUP=forecasting-service
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - mirai-dev
+    restart: unless-stopped
 
   messaging-service:
     container_name: messaging-service-dev

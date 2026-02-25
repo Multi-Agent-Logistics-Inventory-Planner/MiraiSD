@@ -16,7 +16,13 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
-@Table(name = "forecast_predictions")
+@Table(
+    name = "forecast_predictions",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_forecast_item_computed",
+        columnNames = {"item_id", "computed_at"}
+    )
+)
 @Data
 @Builder
 @NoArgsConstructor

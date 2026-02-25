@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useMemo, useRef } from "react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { useForecasts, useAtRiskForecasts } from "@/hooks/queries/use-forecasts"
+import { useAllForecasts, useAtRiskForecasts } from "@/hooks/queries/use-forecasts"
 import {
   usePerformanceMetrics,
   useSalesSummary,
@@ -18,18 +18,16 @@ import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
 
 export default function AnalyticsPage() {
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
   const tableRef = useRef<HTMLDivElement>(null)
 
   const { user } = useAuth()
   const isAdmin = user?.role === UserRole.ADMIN
 
   const {
-    data: forecastData,
+    data: allForecastsData,
     isLoading: isLoadingForecasts,
     isError: isForecastError,
-  } = useForecasts(page, pageSize)
+  } = useAllForecasts()
 
   const { data: atRiskData, isLoading: isLoadingAtRisk } = useAtRiskForecasts(7)
 
@@ -50,17 +48,6 @@ export default function AnalyticsPage() {
       (sum, p) => sum + p.suggestedReorderQty * (p.unitCost ?? 0),
       0
     ) ?? 0
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= (forecastData?.totalPages ?? 1)) {
-      setPage(newPage)
-    }
-  }
-
-  const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize)
-    setPage(1)
-  }
 
   const handleViewCritical = () => {
     tableRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -93,13 +80,9 @@ export default function AnalyticsPage() {
 
         <div ref={tableRef}>
           <PredictionsTable
-            data={forecastData}
+            data={allForecastsData ?? []}
             isLoading={isLoadingForecasts}
             isError={isForecastError}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
           />
         </div>
 
