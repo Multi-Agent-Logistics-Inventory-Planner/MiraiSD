@@ -40,21 +40,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   const validateAndSetUser = useCallback(
     async (supabaseUser: SupabaseUser, accessToken: string) => {
       try {
-        console.log("[Auth] Validating token...");
         const validation = await validateToken(accessToken);
-        console.log("[Auth] Validation result:", validation);
 
         if (validation.valid && validation.role) {
           // Fetch fresh user data from database
           try {
-            console.log("[Auth] Fetching user from database...");
             const dbUser = await getCurrentUser(accessToken);
-            console.log("[Auth] Database user:", dbUser);
             setUser({
               id: supabaseUser.id,
               email: supabaseUser.email || "",
@@ -62,9 +57,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
               personId: dbUser.id,
               personName: dbUser.fullName,
             });
-          } catch (dbError) {
+          } catch {
             // Fallback to JWT data if /me endpoint fails
-            console.log("[Auth] Database fetch failed, using JWT data:", dbError);
             setUser({
               id: supabaseUser.id,
               email: supabaseUser.email || "",
@@ -75,7 +69,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } else {
           // Backend validation failed - clear auth state
-          console.log("[Auth] Validation failed - no valid role:", validation);
           const supabase = getSupabaseClient();
           if (supabase) {
             await supabase.auth.signOut();
@@ -83,9 +76,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
           setSession(null);
         }
-      } catch (error) {
+      } catch {
         // Validation failed - user might not have backend access
-        console.error("[Auth] Token validation error:", error);
         setUser(null);
         setSession(null);
       }
@@ -103,11 +95,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session
     const initializeAuth = async () => {
       try {
-        console.log("[Auth] Getting initial session...");
         const {
           data: { session: initialSession },
         } = await supabase.auth.getSession();
-        console.log("[Auth] Initial session:", initialSession ? "exists" : "null");
 
         if (initialSession?.user && initialSession.access_token) {
           setSession(initialSession);
@@ -115,14 +105,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             initialSession.user,
             initialSession.access_token
           );
-        } else {
-          console.log("[Auth] No initial session found");
         }
-      } catch (error) {
-        console.error("[Auth] Failed to get session:", error);
+      } catch {
+        // Failed to get session
       } finally {
         setIsLoading(false);
-        setIsInitialized(true);
       }
     };
 
@@ -132,13 +119,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log("[Auth] onAuthStateChange:", event, newSession ? "has session" : "no session");
       setSession(newSession);
 
       // Only handle SIGNED_OUT explicitly - don't redirect just because newSession is null
       // during initialization (INITIAL_SESSION event can have null session briefly)
       if (event === "SIGNED_OUT") {
-        console.log("[Auth] SIGNED_OUT event - redirecting to login");
         setUser(null);
         router.push("/login");
       } else if (
