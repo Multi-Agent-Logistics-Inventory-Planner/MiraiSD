@@ -43,11 +43,13 @@ public class AuthController {
                 String personName = jwtService.extractName(token);
                 String email = jwtService.extractEmail(token);
 
-                // Look up the application user ID by email
+                // Look up the application user by email - use database role for validation
                 String personId = null;
                 if (email != null && userService.existsByEmail(email)) {
                     User user = userService.getUserByEmail(email);
                     personId = user.getId().toString();
+                    // Use database role to ensure validation succeeds
+                    role = user.getRole().name();
                 }
 
                 Map<String, Object> response = new HashMap<>();
