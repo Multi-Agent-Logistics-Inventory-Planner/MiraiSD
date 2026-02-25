@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,14 +12,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseClient } from "@/lib/supabase";
 import { updateUser } from "@/lib/api/users";
+import { cn } from "@/lib/utils";
+
+const themeOptions = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+] as const;
 
 export default function SettingsPage() {
   const { user, refreshAuth } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -155,6 +169,40 @@ export default function SettingsPage() {
               {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reset Password
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Theme</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {themeOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = mounted && theme === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => setTheme(option.value)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-md border p-3 transition-colors cursor-pointer",
+                        isActive
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50 hover:bg-accent"
+                      )}
+                    >
+                      <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                      <span className={cn("text-sm", isActive && "font-medium text-primary")}>
+                        {option.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </CardContent>
         </Card>
     </div>
