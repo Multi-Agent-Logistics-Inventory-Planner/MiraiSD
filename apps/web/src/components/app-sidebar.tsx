@@ -17,6 +17,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   Star,
+  ChevronsUpDown,
 } from "lucide-react";
 
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -38,11 +39,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
-import { ModeToggle } from "@/components/mode-toggle";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -238,63 +245,60 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
-        <SidebarGroup>
-          <SidebarGroupLabel className="font-mono uppercase text-[10px] tracking-wide">
-            Profile
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/settings"}>
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="border-t p-0">
         {isLoading ? (
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Skeleton className="h-8 w-8 rounded-full" />
             <div className="flex flex-1 flex-col gap-1">
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3.5 w-24" />
               <Skeleton className="h-3 w-16" />
             </div>
           </div>
         ) : user ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
-              <AvatarFallback>{getInitials(user.personName)}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-1 flex-col">
-              <span className="text-sm font-medium">
-                {user.personName || user.email}
-              </span>
-              <Badge
-                variant={getRoleBadgeVariant(user.role)}
-                className="w-fit text-[10px]"
-              >
-                {user.role}
-              </Badge>
-            </div>
-            <ModeToggle />
-            <button
-              onClick={signOut}
-              className="text-muted-foreground hover:text-destructive cursor-pointer"
-              title="Log out"
-              aria-label="Log out"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">{getInitials(user.personName)}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-1 flex-col text-left min-w-0">
+                  <span className="text-sm font-medium truncate">
+                    {user.personName || user.email}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {user.role}
+                  </span>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="top"
+              align="center"
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
             >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="cursor-pointer">
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={signOut}
+                variant="destructive"
+                className="cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
-              <AvatarFallback>?</AvatarFallback>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs">?</AvatarFallback>
             </Avatar>
             <div className="flex flex-1 flex-col">
               <span className="text-sm font-medium text-muted-foreground">
