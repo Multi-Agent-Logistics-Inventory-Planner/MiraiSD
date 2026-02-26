@@ -163,7 +163,7 @@ export function AppSidebar() {
   return (
     <Sidebar className="z-50 bg-background border-r">
       <SidebarHeader className="p-2.5">
-        <Link href="/" className="flex items-center">
+        <Link href={user?.role === UserRole.EMPLOYEE ? "/storage" : "/"} className="flex items-center">
           <Logo width={86} height={86} />
         </Link>
       </SidebarHeader>

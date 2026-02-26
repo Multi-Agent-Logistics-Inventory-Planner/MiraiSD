@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { LocationType, StorageLocation, Inventory } from "@/types/api";
+import { LocationType, type StorageLocation, type Inventory } from "@/types/api";
 import { getLocationsByType } from "@/lib/api/locations";
 import { getInventoryByLocation } from "@/lib/api/inventory";
 
@@ -16,6 +16,7 @@ export function useLocations(locationType: LocationType) {
   return useQuery({
     queryKey: ["locations", locationType],
     queryFn: () => getLocationsByType(locationType),
+    enabled: locationType !== LocationType.NOT_ASSIGNED,
   });
 }
 
@@ -46,6 +47,7 @@ export function useLocationsWithCounts(locationType: LocationType) {
         };
       });
     },
+    enabled: locationType !== LocationType.NOT_ASSIGNED,
   });
 }
 
