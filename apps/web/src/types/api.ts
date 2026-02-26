@@ -695,11 +695,23 @@ export interface ReviewSummary {
 export interface Review {
   id: string;
   externalId: string;
-  employeeId: string;
-  employeeName: string;
+  employeeId?: string;
+  employeeName?: string;
+  userId?: string;
+  userName?: string;
   reviewDate: string;
   reviewText: string;
   rating: number;
   reviewerName: string;
   createdAt: string;
+}
+
+export interface UserReviewStats {
+  userId: string;
+  userName: string;
+  allTimeReviewCount: number;
+  firstReviewDate: string | null;
+  lastReviewDate: string | null;
+  selectedMonthReviewCount: number;
+  allTimeRank: number;
 }

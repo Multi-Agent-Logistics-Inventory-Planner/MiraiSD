@@ -7,6 +7,7 @@ import {
   PaginatedResponse,
   User,
   UserReviewTrackingRequest,
+  UserReviewStats,
 } from "@/types/api";
 
 const BASE_PATH = "/api/reviews";
@@ -108,5 +109,37 @@ export async function getReviewSummariesByUser(
 ): Promise<ReviewSummary[]> {
   return apiGet<ReviewSummary[]>(
     `${BASE_PATH}/summaries/by-user?year=${year}&month=${month}`
+  );
+}
+
+// User stats and reviews endpoints
+
+export async function getUserReviewStats(
+  userId: string,
+  year?: number,
+  month?: number
+): Promise<UserReviewStats> {
+  const params = new URLSearchParams();
+  if (year !== undefined) params.set("year", String(year));
+  if (month !== undefined) params.set("month", String(month));
+  const queryString = params.toString();
+  return apiGet<UserReviewStats>(
+    `${BASE_PATH}/users/${userId}/stats${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getUserReviews(
+  userId: string,
+  params: ReviewSearchParams = {}
+): Promise<PaginatedResponse<Review>> {
+  const searchParams = new URLSearchParams();
+  if (params.fromDate) searchParams.set("fromDate", params.fromDate);
+  if (params.toDate) searchParams.set("toDate", params.toDate);
+  if (params.page !== undefined) searchParams.set("page", String(params.page));
+  if (params.size !== undefined) searchParams.set("size", String(params.size));
+
+  const queryString = searchParams.toString();
+  return apiGet<PaginatedResponse<Review>>(
+    `${BASE_PATH}/users/${userId}/reviews${queryString ? `?${queryString}` : ""}`
   );
 }

@@ -16,8 +16,12 @@ import java.util.UUID;
 public class ReviewResponseDTO {
     private UUID id;
     private String externalId;
+    // Legacy employee-based fields
     private UUID employeeId;
     private String employeeName;
+    // New user-based fields
+    private UUID userId;
+    private String userName;
     private LocalDate reviewDate;
     private String reviewText;
     private Integer rating;

@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.dtos.responses.ReviewEmployeeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.UserReviewStatsResponseDTO;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewEmployee;
@@ -214,6 +215,76 @@ public class ReviewService {
         return reviews.map(this::toReviewDTO);
     }
 
+    public Page<ReviewResponseDTO> getUserReviews(UUID userId, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+        Page<Review> reviews;
+
+        if (fromDate != null && toDate != null) {
+            reviews = reviewRepository.findByUserIdAndDateRange(userId, fromDate, toDate, pageable);
+        } else {
+            reviews = reviewRepository.findByUserId(userId, pageable);
+        }
+
+        return reviews.map(this::toReviewDTO);
+    }
+
+    // -------------------------------------------------------------------------
+    // User stats methods
+    // -------------------------------------------------------------------------
+
+    public UserReviewStatsResponseDTO getUserReviewStats(UUID userId, Integer year, Integer month) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        // Get all-time stats
+        List<Object[]> allTimeResults = dailyCountRepository.getAllTimeStatsByUser(userId);
+        Integer allTimeReviewCount = 0;
+        LocalDate firstReviewDate = null;
+        LocalDate lastReviewDate = null;
+
+        if (!allTimeResults.isEmpty() && allTimeResults.get(0)[0] != null) {
+            Object[] row = allTimeResults.get(0);
+            allTimeReviewCount = ((Number) row[0]).intValue();
+            firstReviewDate = (LocalDate) row[1];
+            lastReviewDate = (LocalDate) row[2];
+        }
+
+        // Get selected month stats
+        Integer selectedMonthReviewCount = 0;
+        if (year != null && month != null) {
+            YearMonth yearMonth = YearMonth.of(year, month);
+            LocalDate startDate = yearMonth.atDay(1);
+            LocalDate endDate = yearMonth.atEndOfMonth();
+
+            List<Object[]> monthResults = dailyCountRepository.getMonthlySummariesByUser(startDate, endDate);
+            for (Object[] row : monthResults) {
+                if (userId.equals(row[0])) {
+                    selectedMonthReviewCount = ((Number) row[2]).intValue();
+                    break;
+                }
+            }
+        }
+
+        // Calculate all-time rank
+        List<Object[]> rankings = dailyCountRepository.getAllTimeTotalsByUser();
+        int allTimeRank = 0;
+        for (int i = 0; i < rankings.size(); i++) {
+            if (userId.equals(rankings.get(i)[0])) {
+                allTimeRank = i + 1;
+                break;
+            }
+        }
+
+        return UserReviewStatsResponseDTO.builder()
+                .userId(userId)
+                .userName(user.getFullName())
+                .allTimeReviewCount(allTimeReviewCount)
+                .firstReviewDate(firstReviewDate)
+                .lastReviewDate(lastReviewDate)
+                .selectedMonthReviewCount(selectedMonthReviewCount)
+                .allTimeRank(allTimeRank)
+                .build();
+    }
+
     // -------------------------------------------------------------------------
     // Helper methods
     // -------------------------------------------------------------------------
@@ -253,6 +324,8 @@ public class ReviewService {
                 .externalId(review.getExternalId())
                 .employeeId(review.getEmployee() != null ? review.getEmployee().getId() : null)
                 .employeeName(review.getEmployee() != null ? review.getEmployee().getCanonicalName() : null)
+                .userId(review.getUser() != null ? review.getUser().getId() : null)
+                .userName(review.getUser() != null ? review.getUser().getFullName() : null)
                 .reviewDate(review.getReviewDate())
                 .reviewText(review.getReviewText())
                 .rating(review.getRating())

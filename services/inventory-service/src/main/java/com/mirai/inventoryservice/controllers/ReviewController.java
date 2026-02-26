@@ -6,6 +6,7 @@ import com.mirai.inventoryservice.dtos.responses.ReviewEmployeeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.UserReviewStatsResponseDTO;
 import com.mirai.inventoryservice.services.ReviewService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -132,5 +133,28 @@ public class ReviewController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(reviewService.getEmployeeReviews(employeeId, fromDate, toDate, pageable));
+    }
+
+    @GetMapping("/users/{userId}/reviews")
+    public ResponseEntity<Page<ReviewResponseDTO>> getUserReviews(
+            @PathVariable UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(reviewService.getUserReviews(userId, fromDate, toDate, pageable));
+    }
+
+    // -------------------------------------------------------------------------
+    // User stats endpoints
+    // -------------------------------------------------------------------------
+
+    @GetMapping("/users/{userId}/stats")
+    public ResponseEntity<UserReviewStatsResponseDTO> getUserReviewStats(
+            @PathVariable UUID userId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        return ResponseEntity.ok(reviewService.getUserReviewStats(userId, year, month));
     }
 }
