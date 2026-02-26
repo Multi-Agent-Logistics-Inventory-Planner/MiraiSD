@@ -33,6 +33,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
 
     // Settings - view only
     Permission.SETTINGS_VIEW,
+
+    // Notifications - view only
+    Permission.NOTIFICATIONS_VIEW,
   ]),
 };
 

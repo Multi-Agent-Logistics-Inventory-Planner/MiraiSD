@@ -29,6 +29,7 @@ describe("ROLE_PERMISSIONS", () => {
     expect(employeePermissions.has(Permission.SHIPMENTS_UPDATE)).toBe(true);
     expect(employeePermissions.has(Permission.SHIPMENTS_RECEIVE)).toBe(true);
     expect(employeePermissions.has(Permission.SETTINGS_VIEW)).toBe(true);
+    expect(employeePermissions.has(Permission.NOTIFICATIONS_VIEW)).toBe(true);
 
     // Should NOT have these permissions
     expect(employeePermissions.has(Permission.DASHBOARD_VIEW)).toBe(false);
