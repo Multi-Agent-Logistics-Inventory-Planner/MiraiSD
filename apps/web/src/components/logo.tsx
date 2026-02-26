@@ -1,4 +1,5 @@
 import Image from "next/image"
+import { cn } from "@/lib/utils"
 
 interface LogoProps {
   className?: string
@@ -13,7 +14,7 @@ export function Logo({ className, width = 32, height = 32 }: LogoProps) {
       alt="Mirai Logo"
       width={width}
       height={height}
-      className={className}
+      className={cn("dark:invert", className)}
       priority
     />
   )
