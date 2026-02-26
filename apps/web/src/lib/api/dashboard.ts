@@ -21,6 +21,8 @@ const ALL_LOCATION_TYPES: LocationType[] = [
   LocationType.SINGLE_CLAW_MACHINE,
   LocationType.DOUBLE_CLAW_MACHINE,
   LocationType.KEYCHAIN_MACHINE,
+  LocationType.FOUR_CORNER_MACHINE,
+  LocationType.PUSHER_MACHINE,
 ];
 
 function maxIso(a: string, b: string): string {
@@ -30,8 +32,7 @@ function maxIso(a: string, b: string): string {
 
 /**
  * Fetch inventory across ALL location types + locations, then aggregate quantities by itemId.
- * Note: this is intentionally simple (many small requests). It’s acceptable for Phase 3 / small data.
- */
+*/
 export async function getInventoryTotalsByItemId(): Promise<InventoryTotals> {
   const byItemId: InventoryTotals["byItemId"] = {};
 
