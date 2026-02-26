@@ -282,7 +282,7 @@ export function PredictionsTable({
               <SelectItem value="safe">Safe (&gt;7 days)</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data?.content?.length}>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data?.length}>
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
