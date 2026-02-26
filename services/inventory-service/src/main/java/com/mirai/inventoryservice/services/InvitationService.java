@@ -15,13 +15,16 @@ import java.util.List;
 public class InvitationService {
     private final InvitationRepository invitationRepository;
     private final SupabaseAdminService supabaseAdminService;
+    private final EmailService emailService;
     private final UserService userService;
 
     public InvitationService(InvitationRepository invitationRepository,
                              SupabaseAdminService supabaseAdminService,
+                             EmailService emailService,
                              UserService userService) {
         this.invitationRepository = invitationRepository;
         this.supabaseAdminService = supabaseAdminService;
+        this.emailService = emailService;
         this.userService = userService;
     }
 
@@ -43,7 +46,11 @@ public class InvitationService {
             invitedBy = userService.createFromJwt(inviterEmail, inviterName, "ADMIN");
         }
 
-        supabaseAdminService.inviteUserByEmail(email, role.name());
+        // Generate invite link via Supabase (creates user in pending state)
+        String inviteLink = supabaseAdminService.generateInviteLink(email, role.name());
+
+        // Send custom email via Resend
+        emailService.sendInvitationEmail(email, inviteLink, role.name(), inviterName);
 
         Invitation invitation = Invitation.builder()
                 .email(email)
@@ -66,7 +73,15 @@ public class InvitationService {
             throw new RuntimeException("Invitation has already been accepted");
         }
 
-        supabaseAdminService.resendInvitation(email, invitation.getRole());
+        // Get the inviter's name for the email
+        String inviterName = invitation.getInvitedBy() != null
+                ? invitation.getInvitedBy().getFullName()
+                : "Your team";
+
+        // Generate new invite link and send email
+        String inviteLink = supabaseAdminService.generateInviteLink(email, invitation.getRole());
+        emailService.sendInvitationEmail(email, inviteLink, invitation.getRole(), inviterName);
+
         return invitation;
     }
 

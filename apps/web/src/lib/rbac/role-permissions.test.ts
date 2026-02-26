@@ -26,15 +26,19 @@ describe("ROLE_PERMISSIONS", () => {
     expect(employeePermissions.has(Permission.PRODUCTS_VIEW)).toBe(true);
     expect(employeePermissions.has(Permission.STORAGE_VIEW)).toBe(true);
     expect(employeePermissions.has(Permission.SHIPMENTS_VIEW)).toBe(true);
-    expect(employeePermissions.has(Permission.SHIPMENTS_CREATE)).toBe(true);
     expect(employeePermissions.has(Permission.SHIPMENTS_UPDATE)).toBe(true);
+    expect(employeePermissions.has(Permission.SHIPMENTS_RECEIVE)).toBe(true);
+    expect(employeePermissions.has(Permission.SETTINGS_VIEW)).toBe(true);
+    expect(employeePermissions.has(Permission.NOTIFICATIONS_VIEW)).toBe(true);
 
     // Should NOT have these permissions
     expect(employeePermissions.has(Permission.DASHBOARD_VIEW)).toBe(false);
     expect(employeePermissions.has(Permission.PRODUCTS_CREATE)).toBe(false);
     expect(employeePermissions.has(Permission.ANALYTICS_VIEW)).toBe(false);
     expect(employeePermissions.has(Permission.TEAM_VIEW)).toBe(false);
-    expect(employeePermissions.has(Permission.SETTINGS_VIEW)).toBe(false);
+    expect(employeePermissions.has(Permission.SHIPMENTS_CREATE)).toBe(false);
+    expect(employeePermissions.has(Permission.STORAGE_UPDATE)).toBe(false);
+    expect(employeePermissions.has(Permission.STORAGE_DELETE)).toBe(false);
   });
 });
 

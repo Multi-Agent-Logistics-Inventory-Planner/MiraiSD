@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getSupabaseClient } from "@/lib/supabase";
 import { validateToken } from "@/lib/api/auth";
+import { UserRole } from "@/types/api";
 
 const passwordSchema = z.string().min(1, "Password is required");
 
@@ -82,8 +83,9 @@ export function LoginForm() {
         throw new Error(validation.message || "Backend validation failed");
       }
 
-      // Successful login - redirect to dashboard
-      router.push("/");
+      // Successful login - redirect based on role
+      const redirectPath = validation.role === UserRole.EMPLOYEE ? "/storage" : "/";
+      router.push(redirectPath);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

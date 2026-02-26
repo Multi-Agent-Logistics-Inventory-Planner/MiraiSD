@@ -55,6 +55,8 @@ import {
 } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
 import { InventoryItemDetailDialog } from "@/components/locations/inventory-item-detail-dialog";
+import { Can } from "@/components/rbac/can";
+import { Permission } from "@/lib/rbac/permissions";
 
 function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
   switch (locationType) {
@@ -144,23 +146,27 @@ export function LocationDetailSheet({
                   <Plus className="mr-2 h-4 w-4" />
                   Add Inventory
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(location)}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
+                <Can permission={Permission.STORAGE_UPDATE}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(location)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                </Can>
+                <Can permission={Permission.STORAGE_DELETE}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </Can>
               </div>
             )}
 
