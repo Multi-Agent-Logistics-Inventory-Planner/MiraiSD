@@ -113,7 +113,7 @@ export function ProductForm({
         sku: initialProduct.sku,
         name: initialProduct.name,
         category: initialProduct.category,
-        subcategory: initialProduct.subcategory,
+        subcategory: initialProduct.subcategory ?? undefined,
         description: initialProduct.description ?? "",
         reorderPoint: initialProduct.reorderPoint ?? undefined,
         targetStockLevel: initialProduct.targetStockLevel ?? undefined,
