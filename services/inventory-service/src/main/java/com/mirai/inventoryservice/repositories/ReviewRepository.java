@@ -45,4 +45,17 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     @Query("SELECT MAX(r.reviewDate) FROM Review r WHERE r.employee.id = :employeeId")
     Optional<LocalDate> findLastReviewDateByEmployeeId(@Param("employeeId") UUID employeeId);
+
+    // User-based queries
+    @Query("SELECT r FROM Review r WHERE r.user.id = :userId ORDER BY r.reviewDate DESC")
+    Page<Review> findByUserId(@Param("userId") UUID userId, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE r.user.id = :userId " +
+            "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate " +
+            "ORDER BY r.reviewDate DESC")
+    Page<Review> findByUserIdAndDateRange(
+            @Param("userId") UUID userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
 }

@@ -22,8 +22,8 @@ import {
 import { getReviewSummariesByUser } from "@/lib/api/reviews";
 import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ManageEmployeesDialog } from "@/components/reviews";
-import { Settings, Star, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { ManageEmployeesDialog, UserStatsDialog } from "@/components/reviews";
+import { Settings, Star, ChevronLeft, ChevronRight, CalendarIcon, Trophy, Medal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
@@ -82,10 +82,12 @@ function LeaderboardTable({
   summaries,
   isLoading,
   startIndex,
+  onUserClick,
 }: {
   summaries: ReviewSummary[];
   isLoading: boolean;
   startIndex: number;
+  onUserClick: (userId: string, userName: string) => void;
 }) {
   if (!isLoading && summaries.length === 0) {
     return (
@@ -96,11 +98,18 @@ function LeaderboardTable({
     );
   }
 
+  const getRowStyles = (globalIndex: number) => {
+    if (globalIndex === 0) return "bg-yellow-50/50 dark:bg-yellow-950/20 hover:bg-yellow-100/50 dark:hover:bg-yellow-950/30";
+    if (globalIndex === 1) return "bg-gray-50/50 dark:bg-gray-900/20 hover:bg-gray-100/50 dark:hover:bg-gray-900/30";
+    if (globalIndex === 2) return "bg-amber-50/50 dark:bg-amber-950/20 hover:bg-amber-100/50 dark:hover:bg-amber-950/30";
+    return "hover:bg-muted/50";
+  };
+
   return (
     <Table>
       <TableHeader className="bg-muted">
         <TableRow>
-          <TableHead className="w-16 rounded-tl-xl">Rank</TableHead>
+          <TableHead className="w-20 rounded-tl-xl">Rank</TableHead>
           <TableHead>Employee</TableHead>
           <TableHead className="text-right rounded-tr-xl">Reviews</TableHead>
         </TableRow>
@@ -115,26 +124,44 @@ function LeaderboardTable({
             const id = summary.userId || summary.employeeId;
             const name = summary.userName || summary.employeeName;
             return (
-              <TableRow key={id}>
+              <TableRow
+                key={id}
+                className={cn(
+                  "cursor-pointer transition-colors",
+                  getRowStyles(globalIndex)
+                )}
+                onClick={() => id && name && onUserClick(id, name)}
+              >
                 <TableCell>
-                  {globalIndex === 0 && (
-                    <Badge variant="default" className="bg-yellow-500">
-                      1st
-                    </Badge>
-                  )}
-                  {globalIndex === 1 && (
-                    <Badge variant="secondary" className="bg-gray-400 text-white">
-                      2nd
-                    </Badge>
-                  )}
-                  {globalIndex === 2 && (
-                    <Badge variant="secondary" className="bg-amber-700 text-white">
-                      3rd
-                    </Badge>
-                  )}
-                  {globalIndex > 2 && (
-                    <span className="text-muted-foreground">{globalIndex + 1}</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {globalIndex === 0 && (
+                      <>
+                        <Trophy className="h-4 w-4 text-yellow-500" />
+                        <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600">
+                          1st
+                        </Badge>
+                      </>
+                    )}
+                    {globalIndex === 1 && (
+                      <>
+                        <Medal className="h-4 w-4 text-gray-400" />
+                        <Badge variant="secondary" className="bg-gray-400 text-white hover:bg-gray-500">
+                          2nd
+                        </Badge>
+                      </>
+                    )}
+                    {globalIndex === 2 && (
+                      <>
+                        <Medal className="h-4 w-4 text-amber-700" />
+                        <Badge variant="secondary" className="bg-amber-700 text-white hover:bg-amber-800">
+                          3rd
+                        </Badge>
+                      </>
+                    )}
+                    {globalIndex > 2 && (
+                      <span className="text-muted-foreground pl-6">{globalIndex + 1}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="font-medium">
                   {name}
@@ -222,6 +249,17 @@ export default function ReviewsPage() {
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
+
+  // User stats dialog state
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
+  const [isStatsDialogOpen, setIsStatsDialogOpen] = useState(false);
+
+  const handleUserClick = useCallback((userId: string, userName: string) => {
+    setSelectedUserId(userId);
+    setSelectedUserName(userName);
+    setIsStatsDialogOpen(true);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -346,6 +384,7 @@ export default function ReviewsPage() {
             summaries={paginatedSummaries}
             isLoading={isLoading}
             startIndex={startIndex}
+            onUserClick={handleUserClick}
           />
         </CardContent>
       </Card>
@@ -364,6 +403,16 @@ export default function ReviewsPage() {
         open={isManageDialogOpen}
         onOpenChange={setIsManageDialogOpen}
         onSuccess={fetchData}
+      />
+
+      {/* User Stats Dialog */}
+      <UserStatsDialog
+        open={isStatsDialogOpen}
+        onOpenChange={setIsStatsDialogOpen}
+        userId={selectedUserId}
+        userName={selectedUserName}
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
       />
     </div>
   );
