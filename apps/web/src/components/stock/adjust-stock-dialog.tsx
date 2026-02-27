@@ -59,10 +59,10 @@ export function AdjustStockDialog({
 
   const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
-    null
+    null,
   );
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null
+    null,
   );
   const [action, setAction] = useState<AdjustAction>("subtract");
   const [quantity, setQuantity] = useState(1);
@@ -77,7 +77,7 @@ export function AdjustStockDialog({
 
   const inventoryQuery = useLocationInventory(
     location.locationType ?? undefined,
-    location.locationId ?? undefined
+    location.locationId ?? undefined,
   );
 
   const productInventoryQuery = useProductInventory();
@@ -181,8 +181,8 @@ export function AdjustStockDialog({
 
   const currentQtyAtLocation =
     action === "subtract"
-      ? selectedInventory?.quantity ?? 0
-      : existingInventoryForProduct?.quantity ?? 0;
+      ? (selectedInventory?.quantity ?? 0)
+      : (existingInventoryForProduct?.quantity ?? 0);
 
   const selectedProductName =
     action === "subtract"
@@ -225,7 +225,9 @@ export function AdjustStockDialog({
 
     if (action === "subtract" && parsed > currentQtyAtLocation) {
       setQuantity(currentQtyAtLocation);
-      setQuantityWarning(`Clamped to available stock (${currentQtyAtLocation})`);
+      setQuantityWarning(
+        `Clamped to available stock (${currentQtyAtLocation})`,
+      );
     } else {
       setQuantity(Math.max(1, parsed));
       setQuantityWarning(null);
@@ -357,7 +359,7 @@ export function AdjustStockDialog({
           const newInventory = await createInventory(
             location.locationType,
             location.locationId,
-            { itemId: selectedProduct.product.id, quantity: 0 }
+            { itemId: selectedProduct.product.id, quantity: 0 },
           );
           inventoryId = newInventory.id;
         }
@@ -444,7 +446,7 @@ export function AdjustStockDialog({
               >
                 <ToggleGroupItem
                   value="subtract"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Subtract stock"
                 >
                   <Minus className="h-4 w-4" />
@@ -452,7 +454,7 @@ export function AdjustStockDialog({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="add"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Add stock"
                 >
                   <Plus className="h-4 w-4" />
@@ -483,10 +485,14 @@ export function AdjustStockDialog({
 
               <ProductList
                 items={
-                  action === "subtract" ? normalizedInventory : normalizedProducts
+                  action === "subtract"
+                    ? normalizedInventory
+                    : normalizedProducts
                 }
                 selectedId={
-                  action === "subtract" ? selectedInventoryId : selectedProductId
+                  action === "subtract"
+                    ? selectedInventoryId
+                    : selectedProductId
                 }
                 onSelect={handleProductSelect}
                 isLoading={
@@ -545,7 +551,11 @@ export function AdjustStockDialog({
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="min-h-11 sm:min-h-9"
+              className={`min-h-11 sm:min-h-9 border ${
+                action === "subtract"
+                  ? "dark:bg-amber-700 dark:text-white"
+                  : "dark:bg-emerald-700 dark:text-white"
+              }`}
             >
               {isAdjusting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
