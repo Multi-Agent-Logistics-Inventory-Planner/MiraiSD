@@ -149,10 +149,10 @@ export default function SettingsPage() {
                 <button
                   onClick={() => setActiveSection(item.id)}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors cursor-pointer",
                     activeSection === item.id
-                      ? "bg-accent font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      ? "bg-accent font-medium dark:bg-[#141413]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50 dark:text-foreground dark:hover:bg-[#141413]/35",
                   )}
                 >
                   {item.label}
@@ -177,7 +177,9 @@ export default function SettingsPage() {
                       <Label className="text-muted-foreground">Full name</Label>
                       <div className="flex items-center gap-4">
                         <Avatar className="h-12 w-12">
-                          <AvatarFallback>{getInitials(fullName)}</AvatarFallback>
+                          <AvatarFallback className="dark:bg-[#363633]">
+                            {getInitials(fullName)}
+                          </AvatarFallback>
                         </Avatar>
                         <Input
                           value={fullName}
@@ -249,7 +251,9 @@ export default function SettingsPage() {
                       onClick={handleResetPassword}
                       disabled={isResetting}
                     >
-                      {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isResetting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Reset password
                     </Button>
                   </div>
@@ -279,14 +283,24 @@ export default function SettingsPage() {
                             key={option.value}
                             onClick={() => setTheme(option.value)}
                             className={cn(
-                              "flex flex-col items-center gap-2 rounded-lg p-4 transition-all cursor-pointer min-w-[80px]",
+                              "flex flex-col items-center gap-2 rounded-lg p-4 transition-all cursor-pointer min-w-20",
                               isActive
-                                ? "bg-accent ring-2 ring-primary"
-                                : "bg-accent/50 hover:bg-accent"
+                                ? "bg-accent ring-1 dark:ring-[#3e3d3a]"
+                                : "bg-accent/50 hover:bg-accent",
                             )}
                           >
-                            <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                            <span className={cn("text-sm", isActive && "font-medium")}>
+                            <Icon
+                              className={cn(
+                                "h-5 w-5",
+                                isActive && "text-primary",
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "text-sm",
+                                isActive && "font-medium",
+                              )}
+                            >
                               {option.label}
                             </span>
                           </button>

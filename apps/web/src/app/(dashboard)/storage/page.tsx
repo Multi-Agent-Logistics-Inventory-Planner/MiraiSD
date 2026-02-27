@@ -70,7 +70,8 @@ export default function LocationsPage() {
   const [selected, setSelected] = useState<StorageLocation | null>(null);
 
   const [notAssignedDetailOpen, setNotAssignedDetailOpen] = useState(false);
-  const [selectedNotAssigned, setSelectedNotAssigned] = useState<NotAssignedInventory | null>(null);
+  const [selectedNotAssigned, setSelectedNotAssigned] =
+    useState<NotAssignedInventory | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StorageLocation | null>(null);
@@ -110,133 +111,134 @@ export default function LocationsPage() {
         <SidebarTrigger className="md:hidden" />
         <h1 className="text-2xl font-semibold tracking-tight">Storage</h1>
       </div>
-        <div className="space-y-3">
-          <LocationTabs value={locationType} onValueChange={setLocationType} />
+      <div className="space-y-3">
+        <LocationTabs value={locationType} onValueChange={setLocationType} />
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-sm flex-1">
-              <Input
-                placeholder={
-                  isNotAssigned
-                    ? "Search by SKU or product name..."
-                    : "Search by location code..."
-                }
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            {!isNotAssigned && (
-              <Can permission={Permission.STORAGE_CREATE}>
-                <Button
-                  onClick={() => {
-                    setEditing(null);
-                    setFormOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Location
-                </Button>
-              </Can>
-            )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-sm flex-1">
+            <Input
+              placeholder={
+                isNotAssigned
+                  ? "Search by SKU or product name..."
+                  : "Search by location code..."
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
+          {!isNotAssigned && (
+            <Can permission={Permission.STORAGE_CREATE}>
+              <Button
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+                className="dark:bg-[#7c3aed] dark:text-foreground"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Location
+              </Button>
+            </Can>
+          )}
         </div>
+      </div>
 
-        {isNotAssigned ? (
-          <>
-            {notAssignedQuery.isError ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Could not load unassigned inventory</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  {notAssignedQuery.error instanceof Error
-                    ? notAssignedQuery.error.message
-                    : "Unknown error"}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="py-0">
-                <CardContent className="p-0">
-                  <NotAssignedTable
-                    items={notAssignedItems}
-                    isLoading={notAssignedQuery.isLoading}
-                    onRowClick={(item) => {
-                      setSelectedNotAssigned(item);
-                      setNotAssignedDetailOpen(true);
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )}
+      {isNotAssigned ? (
+        <>
+          {notAssignedQuery.isError ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Could not load unassigned inventory</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {notAssignedQuery.error instanceof Error
+                  ? notAssignedQuery.error.message
+                  : "Unknown error"}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="py-0">
+              <CardContent className="p-0">
+                <NotAssignedTable
+                  items={notAssignedItems}
+                  isLoading={notAssignedQuery.isLoading}
+                  onRowClick={(item) => {
+                    setSelectedNotAssigned(item);
+                    setNotAssignedDetailOpen(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-            <NotAssignedDetailDialog
-              open={notAssignedDetailOpen}
-              onOpenChange={setNotAssignedDetailOpen}
-              inventory={selectedNotAssigned}
-            />
-          </>
-        ) : (
-          <>
-            {list.isError ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Could not load locations</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  {list.error instanceof Error
-                    ? list.error.message
-                    : "Unknown error"}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="py-0">
-                <CardContent className="p-0">
-                  <LocationTable
-                    items={locationItems}
-                    isLoading={list.isLoading}
-                    onRowClick={(row) => {
-                      setSelected(row.location);
-                      setDetailOpen(true);
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )}
+          <NotAssignedDetailDialog
+            open={notAssignedDetailOpen}
+            onOpenChange={setNotAssignedDetailOpen}
+            inventory={selectedNotAssigned}
+          />
+        </>
+      ) : (
+        <>
+          {list.isError ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Could not load locations</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {list.error instanceof Error
+                  ? list.error.message
+                  : "Unknown error"}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="py-0">
+              <CardContent className="p-0">
+                <LocationTable
+                  items={locationItems}
+                  isLoading={list.isLoading}
+                  onRowClick={(row) => {
+                    setSelected(row.location);
+                    setDetailOpen(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-            <LocationDetailSheet
-              open={detailOpen}
-              onOpenChange={setDetailOpen}
-              locationType={locationType}
-              location={selected}
-              onEdit={(loc) => {
-                setEditing(loc);
-                setFormOpen(true);
-              }}
-            />
+          <LocationDetailSheet
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+            locationType={locationType}
+            location={selected}
+            onEdit={(loc) => {
+              setEditing(loc);
+              setFormOpen(true);
+            }}
+          />
 
-            <LocationForm
-              open={formOpen}
-              onOpenChange={setFormOpen}
-              locationType={locationType}
-              initialLocation={editing}
-              isSaving={createMutation.isPending || updateMutation.isPending}
-              onSubmit={async (payload) => {
-                try {
-                  if (editing) {
-                    await updateMutation.mutateAsync({ id: editing.id, payload });
-                    toast({ title: "Location updated" });
-                  } else {
-                    await createMutation.mutateAsync(payload);
-                    toast({ title: "Location created" });
-                  }
-                } catch (err: unknown) {
-                  const msg = err instanceof Error ? err.message : "Save failed";
-                  toast({ title: "Save failed", description: msg });
+          <LocationForm
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            locationType={locationType}
+            initialLocation={editing}
+            isSaving={createMutation.isPending || updateMutation.isPending}
+            onSubmit={async (payload) => {
+              try {
+                if (editing) {
+                  await updateMutation.mutateAsync({ id: editing.id, payload });
+                  toast({ title: "Location updated" });
+                } else {
+                  await createMutation.mutateAsync(payload);
+                  toast({ title: "Location created" });
                 }
-              }}
-            />
-          </>
-        )}
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : "Save failed";
+                toast({ title: "Save failed", description: msg });
+              }
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
