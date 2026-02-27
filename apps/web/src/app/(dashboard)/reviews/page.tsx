@@ -98,12 +98,6 @@ function LeaderboardTable({
     );
   }
 
-  const getRowStyles = (globalIndex: number) => {
-    if (globalIndex === 0) return "bg-yellow-50/50 dark:bg-yellow-950/20 hover:bg-yellow-100/50 dark:hover:bg-yellow-950/30";
-    if (globalIndex === 1) return "bg-gray-50/50 dark:bg-gray-900/20 hover:bg-gray-100/50 dark:hover:bg-gray-900/30";
-    if (globalIndex === 2) return "bg-amber-50/50 dark:bg-amber-950/20 hover:bg-amber-100/50 dark:hover:bg-amber-950/30";
-    return "hover:bg-muted/50";
-  };
 
   return (
     <Table>
@@ -123,10 +117,7 @@ function LeaderboardTable({
             return (
               <TableRow
                 key={summary.userId}
-                className={cn(
-                  "cursor-pointer transition-colors",
-                  getRowStyles(globalIndex)
-                )}
+                className="cursor-pointer transition-colors hover:bg-muted/50"
                 onClick={() => onUserClick(summary.userId, summary.userName)}
               >
                 <TableCell>
