@@ -21,6 +21,8 @@ class EventPayload(BaseModel):
     from_box_id: str | None = None
     to_box_id: str | None = None
     actor_id: str | None = None
+    current_total_qty: int | None = None
+    previous_total_qty: int | None = None
 
     @field_validator("at")
     @classmethod
@@ -54,6 +56,8 @@ class NormalizedEvent(BaseModel):
     quantity_change: int
     reason: str | None = None
     at: datetime
+    current_total_qty: int | None = None
+    previous_total_qty: int | None = None
 
 
 def _default_events_path(path: Path | str | None) -> Path:
@@ -78,6 +82,8 @@ def _parse_line(line: str, strict: bool) -> dict | None:
             quantity_change=envelope.payload.quantity_change,
             reason=envelope.payload.reason,
             at=envelope.payload.at,
+            current_total_qty=envelope.payload.current_total_qty,
+            previous_total_qty=envelope.payload.previous_total_qty,
         )
 
         # Convert to dict
@@ -169,20 +175,33 @@ def load_events_window(
                 continue
             rows.append(parsed)
 
+    columns = [
+        "event_id",
+        "item_id",
+        "quantity_change",
+        "reason",
+        "at",
+        "current_total_qty",
+        "previous_total_qty",
+    ]
+
     if not rows:
         # Return empty DataFrame with correct dtypes
-        empty = pd.DataFrame(columns=["event_id", "item_id", "quantity_change", "reason", "at"])
+        empty = pd.DataFrame(columns=columns)
         empty["at"] = pd.to_datetime(empty["at"], utc=True)
         return empty
 
     rows.sort(key=lambda r: r["at"])  # enforce order
-    df = pd.DataFrame(rows, columns=["event_id", "item_id", "quantity_change", "reason", "at"])
+    df = pd.DataFrame(rows, columns=columns)
     # Ensure dtypes
     df["event_id"] = df["event_id"].astype(str)
     df["item_id"] = df["item_id"].astype(str)
     df["quantity_change"] = pd.to_numeric(df["quantity_change"], errors="raise").astype(int)
     df["reason"] = df["reason"].astype("string")
     df["at"] = pd.to_datetime(df["at"], utc=True, errors="raise")
+    # Inventory fields are nullable integers
+    df["current_total_qty"] = pd.to_numeric(df["current_total_qty"], errors="coerce").astype("Int64")
+    df["previous_total_qty"] = pd.to_numeric(df["previous_total_qty"], errors="coerce").astype("Int64")
     return df
 
 

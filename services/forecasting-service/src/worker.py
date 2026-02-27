@@ -164,8 +164,14 @@ class ForecastingWorker:
         )
 
         try:
-            # Run the forecasting pipeline
-            saved = self._pipeline.run_for_items(item_ids)
+            # Get event-carried inventory from aggregator
+            event_inventory = self._aggregator.get_item_inventory()
+
+            # Run the forecasting pipeline with event inventory
+            saved = self._pipeline.run_for_items(
+                item_ids,
+                event_inventory=event_inventory if event_inventory else None,
+            )
 
             # Commit Kafka offsets only after successful processing
             self._consumer.commit()
