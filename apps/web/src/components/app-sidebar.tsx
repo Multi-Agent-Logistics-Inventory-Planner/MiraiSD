@@ -162,9 +162,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="z-50 bg-background border-r">
-      <SidebarHeader className="p-2.5">
-        <Link href={user?.role === UserRole.EMPLOYEE ? "/storage" : "/"} className="flex items-center">
-          <Logo width={86} height={86} />
+      <SidebarHeader className="px-2 py-2.5">
+        <Link
+          href={user?.role === UserRole.EMPLOYEE ? "/storage" : "/"}
+          className="flex items-center -ml-2"
+        >
+          <Logo width={100} height={56} />
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -260,7 +263,7 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">
+                  <AvatarFallback className="text-xs dark:bg-[#363633]">
                     {getInitials(user.personName)}
                   </AvatarFallback>
                 </Avatar>
@@ -268,7 +271,7 @@ export function AppSidebar() {
                   <span className="text-sm font-medium truncate">
                     {user.personName || user.email}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] text-muted-foreground dark:bg-[#7c3aed] dark:text-foreground dark:px-2 dark:py-0.5 dark:rounded-sm dark:w-fit">
                     {user.role}
                   </span>
                 </div>
@@ -287,13 +290,9 @@ export function AppSidebar() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={signOut}
-                variant="destructive"
-                className="cursor-pointer"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Log out</span>
+              <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+                <LogOut className="h-4 w-4 dark:text-red-400" />
+                <span className="dark:text-red-400">Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
