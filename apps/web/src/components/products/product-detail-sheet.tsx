@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
+import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import type { ShipmentStatus } from "@/types/api";
@@ -75,9 +75,10 @@ export function ProductDetailSheet({
   onTransferClick,
   onEditClick,
 }: ProductDetailSheetProps) {
-  const { data: locations, isLoading: locationsLoading } = useInventoryByItemId(
+  const { data: inventoryData, isLoading: locationsLoading } = useProductInventoryEntries(
     product?.product.id
   );
+  const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } = useShipmentsByProduct(
     product?.product.id
   );
