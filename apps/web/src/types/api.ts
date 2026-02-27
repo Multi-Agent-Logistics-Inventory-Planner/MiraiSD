@@ -698,3 +698,61 @@ export interface UserReviewStats {
   selectedMonthPercentage: number | null;
   allTimeRank: number;
 }
+
+// Optimized aggregate types for reducing N+1 queries
+
+/**
+ * Location with inventory counts from the batch endpoint.
+ * Replaces the N+1 pattern of fetching counts per location.
+ */
+export interface LocationWithCounts {
+  id: string;
+  locationType: LocationType;
+  locationCode: string;
+  inventoryRecords: number;
+  totalQuantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Single inventory entry for a product at a specific location.
+ */
+export interface ProductInventoryEntry {
+  inventoryId: string;
+  locationType: LocationType;
+  locationId: string | null;
+  locationCode: string;
+  locationLabel: string;
+  quantity: number;
+  updatedAt: string;
+}
+
+/**
+ * All inventory entries for a product across all locations.
+ * Replaces the N+1 pattern of querying each location type.
+ */
+export interface ProductInventoryResponse {
+  productId: string;
+  productSku: string;
+  productName: string;
+  totalQuantity: number;
+  entries: ProductInventoryEntry[];
+}
+
+/**
+ * Aggregated inventory total for a single product.
+ * Used by dashboard to get totals without N+1 queries.
+ */
+export interface InventoryTotal {
+  itemId: string;
+  sku: string;
+  name: string;
+  imageUrl: string | null;
+  category: string;
+  subcategory: string | null;
+  unitCost: number | null;
+  isActive: boolean;
+  totalQuantity: number;
+  lastUpdatedAt: string | null;
+}
