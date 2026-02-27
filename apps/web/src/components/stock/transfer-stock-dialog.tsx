@@ -292,7 +292,7 @@ export function TransferStockDialog({
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
           {/* Location selectors */}
-          <div className="shrink-0 grid grid-cols-2 gap-4 sm:gap-16 bg-muted py-4 px-4 rounded-xl mt-4">
+          <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] grid grid-cols-2 gap-4 sm:gap-16 py-4 px-4 rounded-xl mt-4">
             <LocationSelector
               label="From"
               value={sourceLocation}

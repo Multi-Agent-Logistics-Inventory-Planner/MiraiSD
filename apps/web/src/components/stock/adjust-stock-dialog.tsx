@@ -410,7 +410,7 @@ export function AdjustStockDialog({
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
           {/* Location selector and action toggle */}
-          <div className="shrink-0 bg-muted py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
+          <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
             {/* Location section */}
             <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-1.5">
@@ -446,7 +446,7 @@ export function AdjustStockDialog({
               >
                 <ToggleGroupItem
                   value="subtract"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
+                  className="px-4 border-0 data-[state=on]:bg-rose-600 data-[state=on]:text-white data-[state=off]:bg-rose-500/20 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-rose-500/30 dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Subtract stock"
                 >
                   <Minus className="h-4 w-4" />
@@ -454,7 +454,7 @@ export function AdjustStockDialog({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="add"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
+                  className="px-4 border-0 data-[state=on]:bg-emerald-600 data-[state=on]:text-white data-[state=off]:bg-emerald-400/30 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-emerald-500/30 dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Add stock"
                 >
                   <Plus className="h-4 w-4" />
@@ -553,8 +553,8 @@ export function AdjustStockDialog({
               disabled={!canSubmit}
               className={`min-h-11 sm:min-h-9 border ${
                 action === "subtract"
-                  ? "dark:bg-amber-700 dark:text-white"
-                  : "dark:bg-emerald-700 dark:text-white"
+                  ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-amber-700 dark:hover:bg-amber-800"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
               }`}
             >
               {isAdjusting ? (
