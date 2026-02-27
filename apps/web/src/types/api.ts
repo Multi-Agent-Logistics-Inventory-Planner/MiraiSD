@@ -665,28 +665,9 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
 
 // Review types
 
-export interface ReviewEmployee {
-  id: string;
-  canonicalName: string;
-  nameVariants: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ReviewEmployeeRequest {
-  canonicalName?: string;
-  nameVariants?: string[];
-  isActive?: boolean;
-}
-
 export interface ReviewSummary {
-  // Legacy fields for backward compatibility
-  employeeId?: string;
-  employeeName?: string;
-  // New user-based fields
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
   totalReviews: number;
   averageReviewsPerDay: number;
   lastReviewDate: string | null;
@@ -695,10 +676,8 @@ export interface ReviewSummary {
 export interface Review {
   id: string;
   externalId: string;
-  employeeId?: string;
-  employeeName?: string;
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
   reviewDate: string;
   reviewText: string;
   rating: number;
@@ -713,5 +692,9 @@ export interface UserReviewStats {
   firstReviewDate: string | null;
   lastReviewDate: string | null;
   selectedMonthReviewCount: number;
+  /** Total reviews across all users in the selected month (null if no month selected). */
+  selectedMonthTotalReviews: number | null;
+  /** This user's share of reviews in the selected month, 0–100 (null if no month or no reviews). */
+  selectedMonthPercentage: number | null;
   allTimeRank: number;
 }

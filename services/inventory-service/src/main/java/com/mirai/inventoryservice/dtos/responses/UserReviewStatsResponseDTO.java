@@ -23,6 +23,10 @@ public class UserReviewStatsResponseDTO {
 
     // Selected month stats
     private Integer selectedMonthReviewCount;
+    /** Total reviews across all users in the selected month (null if no month selected). */
+    private Integer selectedMonthTotalReviews;
+    /** This user's share of reviews in the selected month, 0–100 (null if no month or no reviews). */
+    private Double selectedMonthPercentage;
 
     // Ranking
     private Integer allTimeRank;
