@@ -50,21 +50,25 @@ public final class StockMovementSpecifications {
         };
     }
 
-    private static Specification<StockMovement> isAfterDate(java.time.OffsetDateTime fromDate) {
+    private static Specification<StockMovement> isAfterDate(java.time.LocalDate fromDate) {
         return (root, query, cb) -> {
             if (fromDate == null) {
                 return cb.conjunction();
             }
-            return cb.greaterThanOrEqualTo(root.get("at"), fromDate);
+            // Convert LocalDate to start of day in UTC
+            java.time.OffsetDateTime fromDateTime = fromDate.atStartOfDay(java.time.ZoneOffset.UTC).toOffsetDateTime();
+            return cb.greaterThanOrEqualTo(root.get("at"), fromDateTime);
         };
     }
 
-    private static Specification<StockMovement> isBeforeDate(java.time.OffsetDateTime toDate) {
+    private static Specification<StockMovement> isBeforeDate(java.time.LocalDate toDate) {
         return (root, query, cb) -> {
             if (toDate == null) {
                 return cb.conjunction();
             }
-            return cb.lessThanOrEqualTo(root.get("at"), toDate);
+            // Convert LocalDate to end of day in UTC (start of next day)
+            java.time.OffsetDateTime toDateTime = toDate.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toOffsetDateTime();
+            return cb.lessThan(root.get("at"), toDateTime);
         };
     }
 }
