@@ -39,11 +39,13 @@ class EventAggregator:
     _events: list[NormalizedEvent] = field(default_factory=list)
     _item_last_seen: dict[str, float] = field(default_factory=dict)
     _batch_start_time: float | None = field(default=None)
+    _item_inventory: dict[str, int] = field(default_factory=dict)
 
     def add_event(self, event: NormalizedEvent) -> bool:
         """Add an event to the aggregator.
 
         Returns True if the event was added, False if it was debounced.
+        Always updates inventory tracking even for debounced events.
         """
         now = time.monotonic()
         item_id = event.item_id
@@ -52,6 +54,10 @@ class EventAggregator:
         if self._batch_start_time is None:
             self._batch_start_time = now
             logger.debug("Started new batch window")
+
+        # Track latest inventory if provided (always, even for debounced events)
+        if event.current_total_qty is not None:
+            self._item_inventory[item_id] = event.current_total_qty
 
         # Per-item debouncing: skip if same item seen within debounce window
         last_seen = self._item_last_seen.get(item_id)
@@ -132,12 +138,20 @@ class EventAggregator:
         """Get unique item IDs from accumulated events."""
         return {e.item_id for e in self._events}
 
+    def get_item_inventory(self) -> dict[str, int]:
+        """Get latest known inventory per item from events.
+
+        Returns a copy of the internal inventory dict.
+        """
+        return dict(self._item_inventory)
+
     def flush(self) -> list[NormalizedEvent]:
         """Flush and return all accumulated events, resetting state."""
         events = self._events
         self._events = []
         self._item_last_seen.clear()
         self._batch_start_time = None
+        self._item_inventory.clear()
         logger.debug("Flushed %d events", len(events))
         return events
 
@@ -146,6 +160,7 @@ class EventAggregator:
         self._events.clear()
         self._item_last_seen.clear()
         self._batch_start_time = None
+        self._item_inventory.clear()
 
     @property
     def event_count(self) -> int:
