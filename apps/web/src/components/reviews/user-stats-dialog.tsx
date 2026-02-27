@@ -8,24 +8,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   ChevronLeft,
   ChevronRight,
   Star,
-  Trophy,
-  Calendar,
-  TrendingUp,
 } from "lucide-react";
 import { getUserReviewStats, getUserReviews } from "@/lib/api/reviews";
 import type { UserReviewStats, Review, PaginatedResponse } from "@/types/api";
@@ -37,30 +24,6 @@ interface UserStatsDialogProps {
   userName: string | null;
   selectedYear: number;
   selectedMonth: number;
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  highlight = false,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  highlight?: boolean;
-}) {
-  return (
-    <Card className={highlight ? "border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20" : ""}>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <Icon className={`h-4 w-4 ${highlight ? "text-yellow-500" : "text-muted-foreground"}`} />
-        </div>
-        <p className="text-2xl font-bold mt-1">{value}</p>
-      </CardContent>
-    </Card>
-  );
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -182,78 +145,40 @@ export function UserStatsDialog({
     }
   }, [open, userId, reviewPage, fetchReviews]);
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "N/A";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const getRankSuffix = (rank: number) => {
-    if (rank === 1) return "st";
-    if (rank === 2) return "nd";
-    if (rank === 3) return "rd";
-    return "th";
-  };
+  const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleDateString("en-US", { month: "long" });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden !px-4 sm:!px-6">
         <DialogHeader className="text-left">
-          <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-row items-center gap-2">
+          <DialogTitle className="text-lg sm:text-xl font-semibold">
             {userName || "User Stats"}
-            {stats && stats.allTimeRank <= 3 && (
-              <Trophy className={`h-5 w-5 ${
-                stats.allTimeRank === 1 ? "text-yellow-500" :
-                stats.allTimeRank === 2 ? "text-gray-400" :
-                "text-amber-700"
-              }`} />
-            )}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          {isLoadingStats ? (
-            <>
-              <Skeleton className="h-20" />
-              <Skeleton className="h-20" />
-              <Skeleton className="h-20" />
-              <Skeleton className="h-20" />
-            </>
-          ) : stats ? (
-            <>
-              <StatCard
-                label="All-Time Reviews"
-                value={stats.allTimeReviewCount}
-                icon={Star}
-                highlight
-              />
-              <StatCard
-                label="All-Time Rank"
-                value={`${stats.allTimeRank}${getRankSuffix(stats.allTimeRank)}`}
-                icon={Trophy}
-                highlight={stats.allTimeRank <= 3}
-              />
-              <StatCard
-                label="This Month"
-                value={stats.selectedMonthReviewCount}
-                icon={TrendingUp}
-              />
-              <StatCard
-                label="First Review"
-                value={stats.firstReviewDate ? formatDate(stats.firstReviewDate) : "N/A"}
-                icon={Calendar}
-              />
-            </>
-          ) : (
-            <p className="col-span-2 text-center text-muted-foreground py-4">
-              No stats available
-            </p>
-          )}
-        </div>
+        {/* Stats */}
+        {isLoadingStats ? (
+          <div className="flex items-center gap-6 py-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        ) : stats ? (
+          <div className="flex items-center gap-6 py-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums">{stats.allTimeReviewCount}</span>
+              <span className="text-sm text-muted-foreground">all time</span>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums">{stats.selectedMonthReviewCount}</span>
+              <span className="text-sm text-muted-foreground">in {monthName}</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground py-4">
+            No stats available
+          </p>
+        )}
 
         {/* Reviews Section */}
         <div className="mt-6">
