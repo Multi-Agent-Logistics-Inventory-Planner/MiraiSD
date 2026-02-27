@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -17,6 +17,6 @@ public class AuditLogFilterDTO {
     private String search;
     private UUID actorId;
     private StockMovementReason reason;
-    private OffsetDateTime fromDate;
-    private OffsetDateTime toDate;
+    private LocalDate fromDate;
+    private LocalDate toDate;
 }

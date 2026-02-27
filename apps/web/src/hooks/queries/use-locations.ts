@@ -35,6 +35,9 @@ export function useLocationsOnly(locationType: LocationType) {
 }
 
 /**
+ * @deprecated Use useLocationsWithCounts() from use-locations-with-counts.ts instead.
+ * This function makes N+1 API calls and will be removed in a future version.
+ *
  * Fetch inventory counts only for specific location IDs.
  * This is optimized to only fetch data for visible items (pagination).
  */

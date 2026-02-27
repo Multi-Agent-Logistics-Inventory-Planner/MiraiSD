@@ -1,6 +1,5 @@
-import { LocationType, InventoryItem, AuditLogEntry } from "@/types/api";
-import { getLocationsByType } from "@/lib/api/locations";
-import { getInventoryByLocation } from "@/lib/api/inventory";
+import { AuditLogEntry, InventoryItem, ProductCategory, ProductSubcategory } from "@/types/api";
+import { getInventoryTotals } from "@/lib/api/inventory";
 import { getAuditLog } from "@/lib/api/stock-movements";
 
 export interface InventoryTotals {
@@ -14,63 +13,29 @@ export interface InventoryTotals {
   >;
 }
 
-const ALL_LOCATION_TYPES: LocationType[] = [
-  LocationType.BOX_BIN,
-  LocationType.RACK,
-  LocationType.CABINET,
-  LocationType.SINGLE_CLAW_MACHINE,
-  LocationType.DOUBLE_CLAW_MACHINE,
-  LocationType.KEYCHAIN_MACHINE,
-  LocationType.FOUR_CORNER_MACHINE,
-  LocationType.PUSHER_MACHINE,
-];
-
-function maxIso(a: string, b: string): string {
-  // ISO strings sort lexicographically if they are full ISO timestamps
-  return a >= b ? a : b;
-}
-
 /**
- * Fetch inventory across ALL location types + locations, then aggregate quantities by itemId.
-*/
+ * Fetch aggregated inventory totals for all items.
+ * Uses a single optimized backend query instead of N+1 calls.
+ */
 export async function getInventoryTotalsByItemId(): Promise<InventoryTotals> {
+  const totals = await getInventoryTotals();
+
   const byItemId: InventoryTotals["byItemId"] = {};
 
-  // 1) Fetch all locations for each type
-  const locationsByType = await Promise.all(
-    ALL_LOCATION_TYPES.map(async (locationType) => {
-      const locations = await getLocationsByType(locationType);
-      const ids = (locations as Array<{ id: string }>).map((l) => l.id);
-      return { locationType, ids };
-    })
-  );
-
-  // 2) Fetch inventories for each location and aggregate
-  await Promise.all(
-    locationsByType.flatMap(({ locationType, ids }) =>
-      ids.map(async (locationId) => {
-        const inventories = await getInventoryByLocation(locationType, locationId);
-        for (const inv of inventories) {
-          const itemId = inv.item.id;
-          const updatedAt = inv.updatedAt ?? inv.createdAt;
-
-          if (!byItemId[itemId]) {
-            byItemId[itemId] = {
-              item: inv.item,
-              quantity: inv.quantity ?? 0,
-              lastUpdatedAt: updatedAt,
-            };
-          } else {
-            byItemId[itemId].quantity += inv.quantity ?? 0;
-            byItemId[itemId].lastUpdatedAt = maxIso(
-              byItemId[itemId].lastUpdatedAt,
-              updatedAt
-            );
-          }
-        }
-      })
-    )
-  );
+  for (const total of totals) {
+    byItemId[total.itemId] = {
+      item: {
+        id: total.itemId,
+        sku: total.sku,
+        name: total.name,
+        imageUrl: total.imageUrl ?? undefined,
+        category: total.category as ProductCategory,
+        subcategory: total.subcategory as ProductSubcategory | undefined,
+      },
+      quantity: total.totalQuantity,
+      lastUpdatedAt: total.lastUpdatedAt ?? new Date().toISOString(),
+    };
+  }
 
   return { byItemId };
 }

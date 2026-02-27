@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
+import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -58,9 +58,10 @@ export function ProductModal({
   onTransferClick,
   onEditClick,
 }: ProductModalProps) {
-  const { data: locations, isLoading: locationsLoading } = useInventoryByItemId(
+  const { data: inventoryData, isLoading: locationsLoading } = useProductInventoryEntries(
     product?.product.id
   );
+  const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } =
     useShipmentsByProduct(product?.product.id);
   const { isAdmin } = usePermissions();

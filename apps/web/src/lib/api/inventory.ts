@@ -14,6 +14,8 @@ import {
   InventoryRequest,
   Inventory,
   InventoryItem,
+  ProductInventoryResponse,
+  InventoryTotal,
 } from "@/types/api";
 import { getLocationsByType } from "@/lib/api/locations";
 
@@ -520,6 +522,30 @@ export interface InventoryLocationEntry {
   locationLabel: string;
 }
 
+// Optimized batch API - fetches all inventory for a product in one request
+
+/**
+ * Fetch all inventory entries for a product across all location types in a single request.
+ * This is the optimized replacement for getInventoryEntriesByItemId.
+ *
+ * @param productId The product ID to look up
+ * @returns Product inventory response with all entries
+ */
+export async function getProductInventoryEntries(
+  productId: string
+): Promise<ProductInventoryResponse> {
+  return apiGet<ProductInventoryResponse>(`/api/inventory/by-product/${productId}`);
+}
+
+/**
+ * Fetch aggregated inventory totals for all products in a single query.
+ * Returns total quantity and last updated time for each product.
+ * Replaces the N+1 pattern of fetching inventory per location.
+ */
+export async function getInventoryTotals(): Promise<InventoryTotal[]> {
+  return apiGet<InventoryTotal[]>("/api/inventory/totals");
+}
+
 const ALL_LOCATION_TYPES: LocationType[] = [
   LocationType.BOX_BIN,
   LocationType.RACK,
@@ -595,6 +621,10 @@ function getLocationDetails(
   }
 }
 
+/**
+ * @deprecated Use getProductInventoryEntries() instead for better performance.
+ * This function makes N+1 API calls and will be removed in a future version.
+ */
 export async function getInventoryEntriesByItemId(
   itemId: string
 ): Promise<InventoryLocationEntry[]> {

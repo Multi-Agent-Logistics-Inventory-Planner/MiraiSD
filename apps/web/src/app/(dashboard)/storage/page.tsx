@@ -10,33 +10,9 @@ import { Can, Permission } from "@/components/rbac";
 import {
   LocationType,
   type StorageLocation,
-  type BoxBin,
-  type Rack,
-  type Cabinet,
-  type SingleClawMachine,
-  type DoubleClawMachine,
-  type KeychainMachine,
-  type FourCornerMachine,
-  type PusherMachine,
   type NotAssignedInventory,
 } from "@/types/api";
-
-function getLocationCode(location: StorageLocation): string {
-  if ("boxBinCode" in location) return (location as BoxBin).boxBinCode;
-  if ("rackCode" in location) return (location as Rack).rackCode;
-  if ("cabinetCode" in location) return (location as Cabinet).cabinetCode;
-  if ("singleClawMachineCode" in location)
-    return (location as SingleClawMachine).singleClawMachineCode;
-  if ("doubleClawMachineCode" in location)
-    return (location as DoubleClawMachine).doubleClawMachineCode;
-  if ("keychainMachineCode" in location)
-    return (location as KeychainMachine).keychainMachineCode;
-  if ("fourCornerMachineCode" in location)
-    return (location as FourCornerMachine).fourCornerMachineCode;
-  if ("pusherMachineCode" in location)
-    return (location as PusherMachine).pusherMachineCode;
-  return "";
-}
+import { toStorageLocation } from "@/lib/location-utils";
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationTable } from "@/components/locations/location-table";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
@@ -44,11 +20,7 @@ import { LocationForm } from "@/components/locations/location-form";
 import { NotAssignedTable } from "@/components/locations/not-assigned-table";
 import { NotAssignedDetailDialog } from "@/components/locations/not-assigned-detail-dialog";
 import { StoragePagination } from "@/components/locations/storage-pagination";
-import {
-  useLocationsOnly,
-  useLocationCounts,
-  type LocationWithCounts,
-} from "@/hooks/queries/use-locations";
+import { useLocationsWithCounts } from "@/hooks/queries/use-locations-with-counts";
 import { useNotAssignedInventory } from "@/hooks/queries/use-not-assigned-inventory";
 import {
   useCreateLocationMutation,
@@ -69,8 +41,8 @@ export default function LocationsPage() {
 
   const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
 
-  // Location-based queries (optimized: only fetch counts for visible page)
-  const locationsQuery = useLocationsOnly(locationType);
+  // Optimized: fetch all locations with counts in a single query
+  const locationsQuery = useLocationsWithCounts(locationType);
 
   // Not-assigned inventory query
   const notAssignedQuery = useNotAssignedInventory();
@@ -88,16 +60,13 @@ export default function LocationsPage() {
   const createMutation = useCreateLocationMutation(locationType);
   const updateMutation = useUpdateLocationMutation(locationType);
 
-  // Filter locations based on search
+  // Filter locations based on search (now using LocationWithCounts directly)
   const filteredLocations = useMemo(() => {
     const q = search.trim().toLowerCase();
     const data = locationsQuery.data ?? [];
     if (!q) return data;
 
-    return data.filter((x) => {
-      const code = getLocationCode(x);
-      return code.toLowerCase().includes(q);
-    });
+    return data.filter((x) => x.locationCode.toLowerCase().includes(q));
   }, [locationsQuery.data, search]);
 
   // Get paginated locations for the current page
@@ -105,23 +74,6 @@ export default function LocationsPage() {
     const start = (locationPage - 1) * PAGE_SIZE;
     return filteredLocations.slice(start, start + PAGE_SIZE);
   }, [filteredLocations, locationPage]);
-
-  // Fetch inventory counts only for visible locations (optimized query)
-  const countsQuery = useLocationCounts(locationType, paginatedLocations);
-
-  // Build LocationWithCounts for the current page
-  const locationItems = useMemo((): LocationWithCounts[] => {
-    const counts = countsQuery.data;
-    return paginatedLocations.map((location) => {
-      const countData = counts?.get(location.id);
-      return {
-        locationType,
-        location,
-        inventoryRecords: countData?.records ?? 0,
-        totalQuantity: countData?.quantity ?? 0,
-      };
-    });
-  }, [paginatedLocations, countsQuery.data, locationType]);
 
   // Filter not-assigned items based on search (by SKU or product name)
   const filteredNotAssigned = useMemo(() => {
@@ -258,10 +210,10 @@ export default function LocationsPage() {
               <Card className="py-0">
                 <CardContent className="p-0">
                   <LocationTable
-                    items={locationItems}
-                    isLoading={locationsQuery.isLoading || countsQuery.isLoading}
+                    items={paginatedLocations}
+                    isLoading={locationsQuery.isLoading}
                     onRowClick={(row) => {
-                      setSelected(row.location);
+                      setSelected(toStorageLocation(row));
                       setDetailOpen(true);
                     }}
                     pageSize={PAGE_SIZE}
@@ -273,7 +225,7 @@ export default function LocationsPage() {
                 page={locationPage}
                 pageSize={PAGE_SIZE}
                 totalItems={filteredLocations.length}
-                isLoading={locationsQuery.isLoading || countsQuery.isLoading}
+                isLoading={locationsQuery.isLoading}
                 onPageChange={setLocationPage}
               />
             </>
