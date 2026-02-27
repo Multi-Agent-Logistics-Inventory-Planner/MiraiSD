@@ -665,28 +665,9 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
 
 // Review types
 
-export interface ReviewEmployee {
-  id: string;
-  canonicalName: string;
-  nameVariants: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ReviewEmployeeRequest {
-  canonicalName?: string;
-  nameVariants?: string[];
-  isActive?: boolean;
-}
-
 export interface ReviewSummary {
-  // Legacy fields for backward compatibility
-  employeeId?: string;
-  employeeName?: string;
-  // New user-based fields
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
   totalReviews: number;
   averageReviewsPerDay: number;
   lastReviewDate: string | null;
@@ -695,10 +676,8 @@ export interface ReviewSummary {
 export interface Review {
   id: string;
   externalId: string;
-  employeeId?: string;
-  employeeName?: string;
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
   reviewDate: string;
   reviewText: string;
   rating: number;

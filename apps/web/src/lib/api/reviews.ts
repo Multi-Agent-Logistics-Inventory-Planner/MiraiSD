@@ -1,7 +1,5 @@
-import { apiGet, apiPost, apiPut } from "./client";
+import { apiGet, apiPut } from "./client";
 import {
-  ReviewEmployee,
-  ReviewEmployeeRequest,
   ReviewSummary,
   Review,
   PaginatedResponse,
@@ -11,35 +9,6 @@ import {
 } from "@/types/api";
 
 const BASE_PATH = "/api/reviews";
-
-// Employee endpoints
-
-export async function getReviewEmployees(): Promise<ReviewEmployee[]> {
-  return apiGet<ReviewEmployee[]>(`${BASE_PATH}/employees`);
-}
-
-export async function getReviewEmployeeById(id: string): Promise<ReviewEmployee> {
-  return apiGet<ReviewEmployee>(`${BASE_PATH}/employees/${id}`);
-}
-
-export async function createReviewEmployee(
-  data: ReviewEmployeeRequest
-): Promise<ReviewEmployee> {
-  return apiPost<ReviewEmployee, ReviewEmployeeRequest>(
-    `${BASE_PATH}/employees`,
-    data
-  );
-}
-
-export async function updateReviewEmployee(
-  id: string,
-  data: ReviewEmployeeRequest
-): Promise<ReviewEmployee> {
-  return apiPut<ReviewEmployee, ReviewEmployeeRequest>(
-    `${BASE_PATH}/employees/${id}`,
-    data
-  );
-}
 
 // Summary endpoints
 
@@ -52,7 +21,7 @@ export async function getReviewSummaries(
   );
 }
 
-// Individual review endpoints
+// User-based review tracking endpoints
 
 export interface ReviewSearchParams {
   fromDate?: string;
@@ -60,26 +29,6 @@ export interface ReviewSearchParams {
   page?: number;
   size?: number;
 }
-
-export async function getEmployeeReviews(
-  employeeId: string,
-  params: ReviewSearchParams = {}
-): Promise<PaginatedResponse<Review>> {
-  const searchParams = new URLSearchParams();
-  if (params.fromDate) searchParams.set("fromDate", params.fromDate);
-  if (params.toDate) searchParams.set("toDate", params.toDate);
-  if (params.page !== undefined) searchParams.set("page", String(params.page));
-  if (params.size !== undefined) searchParams.set("size", String(params.size));
-
-  const queryString = searchParams.toString();
-  const url = `${BASE_PATH}/employees/${employeeId}/reviews${
-    queryString ? `?${queryString}` : ""
-  }`;
-
-  return apiGet<PaginatedResponse<Review>>(url);
-}
-
-// User-based review tracking endpoints
 
 export async function getReviewTrackedUsers(): Promise<User[]> {
   return apiGet<User[]>(`${BASE_PATH}/users/tracked`);
@@ -100,15 +49,6 @@ export async function updateUserReviewTracking(
   return apiPut<User, UserReviewTrackingRequest>(
     `${BASE_PATH}/users/${userId}/tracking`,
     data
-  );
-}
-
-export async function getReviewSummariesByUser(
-  year: number,
-  month: number
-): Promise<ReviewSummary[]> {
-  return apiGet<ReviewSummary[]>(
-    `${BASE_PATH}/summaries/by-user?year=${year}&month=${month}`
   );
 }
 
