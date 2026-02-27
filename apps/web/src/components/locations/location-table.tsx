@@ -64,9 +64,15 @@ interface LocationTableProps {
   items: LocationWithCounts[];
   isLoading: boolean;
   onRowClick: (item: LocationWithCounts) => void;
+  pageSize?: number;
 }
 
-export function LocationTable({ items, isLoading, onRowClick }: LocationTableProps) {
+export function LocationTable({
+  items,
+  isLoading,
+  onRowClick,
+  pageSize = 10,
+}: LocationTableProps) {
   if (isLoading) {
     return (
       <Table>
@@ -79,7 +85,7 @@ export function LocationTable({ items, isLoading, onRowClick }: LocationTablePro
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: pageSize }).map((_, i) => (
             <TableRow key={i}>
               <TableCell><Skeleton className="h-4 w-16" /></TableCell>
               <TableCell><Skeleton className="h-5 w-20" /></TableCell>

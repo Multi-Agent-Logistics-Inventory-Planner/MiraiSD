@@ -43,7 +43,12 @@ import { LocationDetailSheet } from "@/components/locations/location-detail-shee
 import { LocationForm } from "@/components/locations/location-form";
 import { NotAssignedTable } from "@/components/locations/not-assigned-table";
 import { NotAssignedDetailDialog } from "@/components/locations/not-assigned-detail-dialog";
-import { useLocationsWithCounts } from "@/hooks/queries/use-locations";
+import { StoragePagination } from "@/components/locations/storage-pagination";
+import {
+  useLocationsOnly,
+  useLocationCounts,
+  type LocationWithCounts,
+} from "@/hooks/queries/use-locations";
 import { useNotAssignedInventory } from "@/hooks/queries/use-not-assigned-inventory";
 import {
   useCreateLocationMutation,
@@ -51,17 +56,21 @@ import {
 } from "@/hooks/mutations/use-location-mutations";
 import { useToast } from "@/hooks/use-toast";
 
+const PAGE_SIZE = 10;
+
 export default function LocationsPage() {
   const { toast } = useToast();
   const [locationType, setLocationType] = useState<LocationType>(
     LocationType.BOX_BIN,
   );
   const [search, setSearch] = useState("");
+  const [locationPage, setLocationPage] = useState(1);
+  const [notAssignedPage, setNotAssignedPage] = useState(1);
 
   const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
 
-  // Location-based queries (for all tabs except NOT_ASSIGNED)
-  const list = useLocationsWithCounts(locationType);
+  // Location-based queries (optimized: only fetch counts for visible page)
+  const locationsQuery = useLocationsOnly(locationType);
 
   // Not-assigned inventory query
   const notAssignedQuery = useNotAssignedInventory();
@@ -80,19 +89,42 @@ export default function LocationsPage() {
   const updateMutation = useUpdateLocationMutation(locationType);
 
   // Filter locations based on search
-  const locationItems = useMemo(() => {
+  const filteredLocations = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const data = list.data ?? [];
+    const data = locationsQuery.data ?? [];
     if (!q) return data;
 
     return data.filter((x) => {
-      const code = getLocationCode(x.location);
+      const code = getLocationCode(x);
       return code.toLowerCase().includes(q);
     });
-  }, [list.data, search]);
+  }, [locationsQuery.data, search]);
+
+  // Get paginated locations for the current page
+  const paginatedLocations = useMemo(() => {
+    const start = (locationPage - 1) * PAGE_SIZE;
+    return filteredLocations.slice(start, start + PAGE_SIZE);
+  }, [filteredLocations, locationPage]);
+
+  // Fetch inventory counts only for visible locations (optimized query)
+  const countsQuery = useLocationCounts(locationType, paginatedLocations);
+
+  // Build LocationWithCounts for the current page
+  const locationItems = useMemo((): LocationWithCounts[] => {
+    const counts = countsQuery.data;
+    return paginatedLocations.map((location) => {
+      const countData = counts?.get(location.id);
+      return {
+        locationType,
+        location,
+        inventoryRecords: countData?.records ?? 0,
+        totalQuantity: countData?.quantity ?? 0,
+      };
+    });
+  }, [paginatedLocations, countsQuery.data, locationType]);
 
   // Filter not-assigned items based on search (by SKU or product name)
-  const notAssignedItems = useMemo(() => {
+  const filteredNotAssigned = useMemo(() => {
     const q = search.trim().toLowerCase();
     const data = notAssignedQuery.data ?? [];
     if (!q) return data;
@@ -105,6 +137,26 @@ export default function LocationsPage() {
     });
   }, [notAssignedQuery.data, search]);
 
+  // Get paginated not-assigned items for the current page
+  const notAssignedItems = useMemo(() => {
+    const start = (notAssignedPage - 1) * PAGE_SIZE;
+    return filteredNotAssigned.slice(start, start + PAGE_SIZE);
+  }, [filteredNotAssigned, notAssignedPage]);
+
+  // Reset pagination when search or tab changes
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setLocationPage(1);
+    setNotAssignedPage(1);
+  };
+
+  const handleLocationTypeChange = (type: LocationType) => {
+    setLocationType(type);
+    setLocationPage(1);
+    setNotAssignedPage(1);
+    setSearch("");
+  };
+
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       <div className="flex items-center gap-2">
@@ -112,7 +164,7 @@ export default function LocationsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Storage</h1>
       </div>
       <div className="space-y-3">
-        <LocationTabs value={locationType} onValueChange={setLocationType} />
+        <LocationTabs value={locationType} onValueChange={handleLocationTypeChange} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-sm flex-1">
@@ -123,7 +175,7 @@ export default function LocationsPage() {
                   : "Search by location code..."
               }
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
           {!isNotAssigned && (
@@ -157,18 +209,29 @@ export default function LocationsPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="py-0">
-              <CardContent className="p-0">
-                <NotAssignedTable
-                  items={notAssignedItems}
-                  isLoading={notAssignedQuery.isLoading}
-                  onRowClick={(item) => {
-                    setSelectedNotAssigned(item);
-                    setNotAssignedDetailOpen(true);
-                  }}
-                />
-              </CardContent>
-            </Card>
+            <>
+              <Card className="py-0">
+                <CardContent className="p-0">
+                  <NotAssignedTable
+                    items={notAssignedItems}
+                    isLoading={notAssignedQuery.isLoading}
+                    onRowClick={(item) => {
+                      setSelectedNotAssigned(item);
+                      setNotAssignedDetailOpen(true);
+                    }}
+                    pageSize={PAGE_SIZE}
+                  />
+                </CardContent>
+              </Card>
+
+              <StoragePagination
+                page={notAssignedPage}
+                pageSize={PAGE_SIZE}
+                totalItems={filteredNotAssigned.length}
+                isLoading={notAssignedQuery.isLoading}
+                onPageChange={setNotAssignedPage}
+              />
+            </>
           )}
 
           <NotAssignedDetailDialog
@@ -179,30 +242,41 @@ export default function LocationsPage() {
         </>
       ) : (
         <>
-          {list.isError ? (
+          {locationsQuery.isError ? (
             <Card>
               <CardHeader>
                 <CardTitle>Could not load locations</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                {list.error instanceof Error
-                  ? list.error.message
+                {locationsQuery.error instanceof Error
+                  ? locationsQuery.error.message
                   : "Unknown error"}
               </CardContent>
             </Card>
           ) : (
-            <Card className="py-0">
-              <CardContent className="p-0">
-                <LocationTable
-                  items={locationItems}
-                  isLoading={list.isLoading}
-                  onRowClick={(row) => {
-                    setSelected(row.location);
-                    setDetailOpen(true);
-                  }}
-                />
-              </CardContent>
-            </Card>
+            <>
+              <Card className="py-0">
+                <CardContent className="p-0">
+                  <LocationTable
+                    items={locationItems}
+                    isLoading={locationsQuery.isLoading || countsQuery.isLoading}
+                    onRowClick={(row) => {
+                      setSelected(row.location);
+                      setDetailOpen(true);
+                    }}
+                    pageSize={PAGE_SIZE}
+                  />
+                </CardContent>
+              </Card>
+
+              <StoragePagination
+                page={locationPage}
+                pageSize={PAGE_SIZE}
+                totalItems={filteredLocations.length}
+                isLoading={locationsQuery.isLoading || countsQuery.isLoading}
+                onPageChange={setLocationPage}
+              />
+            </>
           )}
 
           <LocationDetailSheet
