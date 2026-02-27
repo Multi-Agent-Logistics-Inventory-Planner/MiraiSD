@@ -166,6 +166,10 @@ class SupabaseRepo:
         """Get current inventory quantities aggregated across all locations.
 
         Returns DataFrame with columns: item_id, as_of_ts, current_qty
+
+        Optimization: When item_ids is provided, the WHERE clause is pushed into
+        each UNION branch so PostgreSQL can filter early at each table scan,
+        rather than scanning all tables and filtering at the end.
         """
         # Union all inventory tables and sum quantities per item
         inventory_tables = [
@@ -180,9 +184,21 @@ class SupabaseRepo:
             ("not_assigned_inventory", "item_id"),
         ]
 
+        params: dict = {}
+
+        # Build UNION parts - push filter into each branch when item_ids provided
         union_parts = []
-        for table, _ in inventory_tables:
-            union_parts.append(f"SELECT item_id, quantity FROM {table}")
+        if item_ids:
+            # Push WHERE clause into each UNION branch for early filtering
+            params["item_ids"] = [str(iid) for iid in item_ids]
+            for table, _ in inventory_tables:
+                union_parts.append(
+                    f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids)"
+                )
+        else:
+            # No filter - simple select from each table
+            for table, _ in inventory_tables:
+                union_parts.append(f"SELECT item_id, quantity FROM {table}")
 
         union_query = " UNION ALL ".join(union_parts)
 
@@ -194,16 +210,6 @@ class SupabaseRepo:
             FROM ({union_query}) AS all_inventory
             GROUP BY item_id
         """
-
-        params: dict = {}
-        if item_ids:
-            # Wrap in another select to filter
-            query = f"""
-                SELECT item_id, as_of_ts, current_qty
-                FROM ({query}) AS inv
-                WHERE item_id = ANY(:item_ids)
-            """
-            params["item_ids"] = [str(iid) for iid in item_ids]
 
         with self._engine.connect() as conn:
             df = pd.read_sql(text(query), conn, params=params)
@@ -260,6 +266,60 @@ class SupabaseRepo:
         df["at"] = pd.to_datetime(df["at"], utc=True)
         return df
 
+    def _prepare_forecast_rows(self, forecasts_df: pd.DataFrame) -> list[dict]:
+        """Prepare DataFrame rows for batch INSERT using vectorized operations.
+
+        Converts DataFrame to list of dicts with proper type handling:
+        - Generates UUIDs for each row
+        - Converts item_id to string
+        - Handles NaN/None values for nullable columns
+        - Serializes features dict to JSON string
+
+        Returns list of dicts ready for SQLAlchemy executemany.
+        """
+        # Use to_dict('records') for vectorized conversion instead of iterrows()
+        raw_rows = forecasts_df.to_dict("records")
+
+        prepared_rows = []
+        for row in raw_rows:
+            # Handle features - convert to JSON string if dict
+            features = row["features"]
+            if isinstance(features, dict):
+                features_json = json.dumps(features)
+            elif isinstance(features, str):
+                features_json = features
+            else:
+                features_json = "{}"
+
+            prepared_rows.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "item_id": str(row["item_id"]),
+                    "computed_at": pd.to_datetime(row["computed_at"], utc=True),
+                    "horizon_days": int(row["horizon_days"]),
+                    "avg_daily_delta": (
+                        float(row["avg_daily_delta"]) if pd.notna(row["avg_daily_delta"]) else None
+                    ),
+                    "days_to_stockout": (
+                        float(row["days_to_stockout"]) if pd.notna(row["days_to_stockout"]) else None
+                    ),
+                    "suggested_reorder_qty": (
+                        int(row["suggested_reorder_qty"])
+                        if pd.notna(row["suggested_reorder_qty"])
+                        else None
+                    ),
+                    "suggested_order_date": (
+                        row["suggested_order_date"] if pd.notna(row["suggested_order_date"]) else None
+                    ),
+                    "confidence": (
+                        float(row["confidence"]) if pd.notna(row["confidence"]) else None
+                    ),
+                    "features": features_json,
+                }
+            )
+
+        return prepared_rows
+
     def upsert_forecasts(self, forecasts_df: pd.DataFrame) -> int:
         """Upsert forecast predictions to database.
 
@@ -268,6 +328,9 @@ class SupabaseRepo:
         suggested_reorder_qty, suggested_order_date, confidence, features
 
         Returns number of rows upserted.
+
+        Optimization: Uses single execute() call with list of dicts for batch
+        operation (executemany pattern) instead of N separate INSERT statements.
         """
         if forecasts_df.empty:
             return 0
@@ -287,32 +350,8 @@ class SupabaseRepo:
         if missing:
             raise ValueError(f"Missing required columns: {sorted(missing)}")
 
-        # Prepare rows for insertion
-        rows = []
-        for _, row in forecasts_df.iterrows():
-            # Handle features - convert to JSON string if dict
-            features = row["features"]
-            if isinstance(features, dict):
-                features_json = json.dumps(features)
-            elif isinstance(features, str):
-                features_json = features
-            else:
-                features_json = "{}"
-
-            rows.append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "item_id": str(row["item_id"]),
-                    "computed_at": pd.to_datetime(row["computed_at"], utc=True),
-                    "horizon_days": int(row["horizon_days"]),
-                    "avg_daily_delta": float(row["avg_daily_delta"]) if pd.notna(row["avg_daily_delta"]) else None,
-                    "days_to_stockout": float(row["days_to_stockout"]) if pd.notna(row["days_to_stockout"]) else None,
-                    "suggested_reorder_qty": int(row["suggested_reorder_qty"]) if pd.notna(row["suggested_reorder_qty"]) else None,
-                    "suggested_order_date": row["suggested_order_date"] if pd.notna(row["suggested_order_date"]) else None,
-                    "confidence": float(row["confidence"]) if pd.notna(row["confidence"]) else None,
-                    "features": features_json,
-                }
-            )
+        # Prepare rows using vectorized helper method
+        rows = self._prepare_forecast_rows(forecasts_df)
 
         # Insert with ON CONFLICT DO UPDATE (upsert by item_id + computed_at)
         upsert_query = """
@@ -335,9 +374,10 @@ class SupabaseRepo:
                 features = EXCLUDED.features
         """
 
+        # Single execute() call with list of dicts uses executemany internally
+        # This is O(1) database round-trips instead of O(N)
         with self._engine.begin() as conn:
-            for row in rows:
-                conn.execute(text(upsert_query), row)
+            conn.execute(text(upsert_query), rows)
 
         logger.info("Upserted %d forecast predictions", len(rows))
         return len(rows)
