@@ -177,7 +177,7 @@ export default function SettingsPage() {
                       <Label className="text-muted-foreground">Full name</Label>
                       <div className="flex items-center gap-4">
                         <Avatar className="h-12 w-12">
-                          <AvatarFallback className="dark:bg-[#363633]">
+                          <AvatarFallback className="bg-[#e4e3df] dark:bg-[#363633]">
                             {getInitials(fullName)}
                           </AvatarFallback>
                         </Avatar>
@@ -285,7 +285,7 @@ export default function SettingsPage() {
                             className={cn(
                               "flex flex-col items-center gap-2 rounded-lg p-4 transition-all cursor-pointer min-w-20",
                               isActive
-                                ? "bg-accent ring-1 dark:ring-[#3e3d3a]"
+                                ? "bg-accent ring-1 ring-[#3e3d3a]/15 dark:ring-[#3e3d3a]"
                                 : "bg-accent/50 hover:bg-accent",
                             )}
                           >

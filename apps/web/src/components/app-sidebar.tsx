@@ -191,7 +191,7 @@ export function AppSidebar() {
                 {can(Permission.INVENTORY_ADJUST) && (
                   <Button
                     size="sm"
-                    className="flex-1 dark:bg-[#363633] dark:text-foreground dark:hover:bg-[#363633]/75"
+                    className="flex-1 text-foreground bg-[#e4e3df] hover:bg-[#d1cfc7]/75 dark:bg-[#363633] dark:hover:bg-[#363633]"
                     onClick={() => setAdjustOpen(true)}
                   >
                     <ArrowUpDown className="h-3 w-3" />
@@ -201,7 +201,7 @@ export function AppSidebar() {
                 {can(Permission.INVENTORY_TRANSFER) && (
                   <Button
                     size="sm"
-                    className="flex-1 dark:bg-[#363633] dark:text-foreground dark:hover:bg-[#363633]/75"
+                    className="flex-1 text-foreground bg-[#e4e3df] hover:bg-[#d1cfc7]/75 dark:bg-[#363633] dark:hover:bg-[#363633]"
                     onClick={() => setTransferOpen(true)}
                   >
                     <RefreshCw className="h-3 w-3" />
@@ -263,7 +263,7 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs dark:bg-[#363633]">
+                  <AvatarFallback className="text-xs bg-[#e4e3df] dark:bg-[#363633]">
                     {getInitials(user.personName)}
                   </AvatarFallback>
                 </Avatar>
@@ -271,7 +271,7 @@ export function AppSidebar() {
                   <span className="text-sm font-medium truncate">
                     {user.personName || user.email}
                   </span>
-                  <span className="text-[10px] text-muted-foreground dark:bg-[#7c3aed] dark:text-foreground dark:px-2 dark:py-0.5 dark:rounded-sm dark:w-fit">
+                  <span className="text-[10px] text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground px-2 py-0.5 rounded-sm w-fit">
                     {user.role}
                   </span>
                 </div>
@@ -291,8 +291,8 @@ export function AppSidebar() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="cursor-pointer">
-                <LogOut className="h-4 w-4 dark:text-red-400" />
-                <span className="dark:text-red-400">Log out</span>
+                <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <span className="text-red-600 dark:text-red-400">Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

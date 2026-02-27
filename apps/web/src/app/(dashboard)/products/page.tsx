@@ -53,12 +53,9 @@ export default function ProductsPage() {
         row.product.name.toLowerCase().includes(q) ||
         row.product.sku.toLowerCase().includes(q);
       const matchesCategory =
-        !filters.category || row.product.category === filters.category;
-      const matchesSubcategory =
-        filters.subcategories.length === 0 ||
-        (row.product.subcategory !== undefined &&
-          filters.subcategories.includes(row.product.subcategory));
-      return matchesSearch && matchesCategory && matchesSubcategory;
+        filters.categories.length === 0 ||
+        filters.categories.includes(row.product.category);
+      return matchesSearch && matchesCategory;
     });
   }, [items, filters]);
 
