@@ -133,7 +133,7 @@ export default function LocationsPage() {
                   setEditing(null);
                   setFormOpen(true);
                 }}
-                className="dark:bg-[#7c3aed] dark:text-foreground"
+                className="text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Location

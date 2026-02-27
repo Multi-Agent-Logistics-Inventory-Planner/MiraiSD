@@ -5,38 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import { Toggle } from "@/components/ui/toggle";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ProductCategory,
-  ProductSubcategory,
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-} from "@/types/api";
-
-const CATEGORY_SUBCATEGORIES: Partial<
-  Record<ProductCategory, ProductSubcategory[]>
-> = {
-  [ProductCategory.BLIND_BOX]: Object.values(ProductSubcategory),
-};
-
-const ALL_VALUE = "ALL";
+import { ProductCategory, PRODUCT_CATEGORY_LABELS } from "@/types/api";
 
 export interface ProductFiltersState {
   search: string;
-  category: ProductCategory | "";
-  subcategories: ProductSubcategory[];
+  categories: ProductCategory[];
 }
 
 export const DEFAULT_PRODUCT_FILTERS: ProductFiltersState = {
   search: "",
-  category: "",
-  subcategories: [],
+  categories: [],
 };
 
 interface ProductFiltersProps {
@@ -52,47 +30,18 @@ export function ProductFilters({
   categories,
   onAddClick,
 }: ProductFiltersProps) {
-  const subcategoryOptions = state.category
-    ? CATEGORY_SUBCATEGORIES[state.category]
-    : undefined;
-
-  const handleCategoryChange = (value: string) => {
-    onChange({
-      ...state,
-      category: value === ALL_VALUE ? "" : (value as ProductCategory),
-      subcategories: [],
-    });
-  };
-
-  const toggleSubcategory = (sub: ProductSubcategory) => {
-    const isSelected = state.subcategories.includes(sub);
-    const newSubs = isSelected
-      ? state.subcategories.filter((s) => s !== sub)
-      : [...state.subcategories, sub];
-    onChange({ ...state, subcategories: newSubs });
+  const toggleCategory = (category: ProductCategory) => {
+    const isSelected = state.categories.includes(category);
+    const newCategories = isSelected
+      ? state.categories.filter((c) => c !== category)
+      : [...state.categories, category];
+    onChange({ ...state, categories: newCategories });
   };
 
   return (
     <div className="flex flex-col gap-3">
-      {subcategoryOptions && (
-        <div className="flex flex-wrap items-center gap-2">
-          {subcategoryOptions.map((sub) => (
-            <Toggle
-              key={sub}
-              pressed={state.subcategories.includes(sub)}
-              onPressedChange={() => toggleSubcategory(sub)}
-              variant="outline"
-              size="sm"
-              className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            >
-              {PRODUCT_SUBCATEGORY_LABELS[sub] ?? sub}
-            </Toggle>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <div className="relative flex-1 sm:flex-none sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by name or SKU"
@@ -102,37 +51,33 @@ export function ProductFilters({
           />
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
-          <Select
-            value={state.category || ALL_VALUE}
-            onValueChange={handleCategoryChange}
-          >
-            <SelectTrigger className="w-[180px] shrink-0">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {PRODUCT_CATEGORY_LABELS[category] ?? category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {onAddClick && (
+          <Can permission={Permission.PRODUCTS_CREATE}>
+            <Button
+              onClick={onAddClick}
+              size="sm"
+              className="shrink-0 text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground"
+            >
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Product</span>
+            </Button>
+          </Can>
+        )}
+      </div>
 
-          {onAddClick && (
-            <Can permission={Permission.PRODUCTS_CREATE}>
-              <Button
-                onClick={onAddClick}
-                size="sm"
-                className="shrink-0 dark:bg-[#7c3aed] dark:text-foreground"
-              >
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Add Product</span>
-              </Button>
-            </Can>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {categories.map((category) => (
+          <Toggle
+            key={category}
+            pressed={state.categories.includes(category)}
+            onPressedChange={() => toggleCategory(category)}
+            variant="outline"
+            size="sm"
+            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          >
+            {PRODUCT_CATEGORY_LABELS[category] ?? category}
+          </Toggle>
+        ))}
       </div>
     </div>
   );
