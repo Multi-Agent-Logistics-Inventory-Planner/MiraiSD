@@ -119,9 +119,9 @@ public class ReviewService {
         Page<Review> reviews;
 
         if (fromDate != null && toDate != null) {
-            reviews = reviewRepository.findByUserIdAndDateRange(userId, fromDate, toDate, pageable);
+            reviews = reviewRepository.findByUserIdAndDateRangeWithUser(userId, fromDate, toDate, pageable);
         } else {
-            reviews = reviewRepository.findByUserId(userId, pageable);
+            reviews = reviewRepository.findByUserIdWithUser(userId, pageable);
         }
 
         return reviews.map(this::toReviewDTO);
@@ -148,31 +148,32 @@ public class ReviewService {
             lastReviewDate = (LocalDate) row[2];
         }
 
-        // Get selected month stats
+        // Get selected month stats and percentage
         Integer selectedMonthReviewCount = 0;
+        Integer selectedMonthTotalReviews = null;
+        Double selectedMonthPercentage = null;
         if (year != null && month != null) {
             YearMonth yearMonth = YearMonth.of(year, month);
             LocalDate startDate = yearMonth.atDay(1);
             LocalDate endDate = yearMonth.atEndOfMonth();
 
             List<Object[]> monthResults = dailyCountRepository.getMonthlySummariesByUser(startDate, endDate);
+            long totalInMonth = 0;
             for (Object[] row : monthResults) {
+                long userTotal = ((Number) row[2]).longValue();
+                totalInMonth += userTotal;
                 if (userId.equals(row[0])) {
-                    selectedMonthReviewCount = ((Number) row[2]).intValue();
-                    break;
+                    selectedMonthReviewCount = (int) userTotal;
                 }
+            }
+            selectedMonthTotalReviews = (int) totalInMonth;
+            if (totalInMonth > 0) {
+                selectedMonthPercentage = 100.0 * selectedMonthReviewCount / totalInMonth;
             }
         }
 
-        // Calculate all-time rank
-        List<Object[]> rankings = dailyCountRepository.getAllTimeTotalsByUser();
-        int allTimeRank = 0;
-        for (int i = 0; i < rankings.size(); i++) {
-            if (userId.equals(rankings.get(i)[0])) {
-                allTimeRank = i + 1;
-                break;
-            }
-        }
+        // All-time rank (single query instead of loading all users' totals)
+        int allTimeRank = (int) dailyCountRepository.getAllTimeRankByUser(userId);
 
         return UserReviewStatsResponseDTO.builder()
                 .userId(userId)
@@ -181,6 +182,8 @@ public class ReviewService {
                 .firstReviewDate(firstReviewDate)
                 .lastReviewDate(lastReviewDate)
                 .selectedMonthReviewCount(selectedMonthReviewCount)
+                .selectedMonthTotalReviews(selectedMonthTotalReviews)
+                .selectedMonthPercentage(selectedMonthPercentage)
                 .allTimeRank(allTimeRank)
                 .build();
     }

@@ -69,4 +69,13 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
             "GROUP BY c.user.id " +
             "ORDER BY SUM(c.reviewCount) DESC")
     List<Object[]> getAllTimeTotalsByUser();
+
+    /** This user's all-time rank (1-based) without loading all users' totals. */
+    @Query(value = "SELECT 1 + COALESCE(COUNT(*), 0) FROM (" +
+            "SELECT c.user_id, SUM(c.review_count) AS total FROM review_daily_counts c " +
+            "WHERE c.user_id IS NOT NULL GROUP BY c.user_id " +
+            "HAVING SUM(c.review_count) > (" +
+            "SELECT COALESCE(SUM(c2.review_count), 0) FROM review_daily_counts c2 WHERE c2.user_id = :userId" +
+            ")) t", nativeQuery = true)
+    long getAllTimeRankByUser(@Param("userId") UUID userId);
 }

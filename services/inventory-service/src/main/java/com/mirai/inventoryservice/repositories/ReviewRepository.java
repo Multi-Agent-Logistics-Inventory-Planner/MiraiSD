@@ -22,13 +22,15 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     List<Review> findByReviewDateOrderByCreatedAtDesc(LocalDate date);
 
-    @Query("SELECT r FROM Review r WHERE r.user.id = :userId ORDER BY r.reviewDate DESC")
-    Page<Review> findByUserId(@Param("userId") UUID userId, Pageable pageable);
+    @Query(value = "SELECT r FROM Review r JOIN FETCH r.user u WHERE u.id = :userId ORDER BY r.reviewDate DESC",
+            countQuery = "SELECT COUNT(r) FROM Review r WHERE r.user.id = :userId")
+    Page<Review> findByUserIdWithUser(@Param("userId") UUID userId, Pageable pageable);
 
-    @Query("SELECT r FROM Review r WHERE r.user.id = :userId " +
-            "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate " +
-            "ORDER BY r.reviewDate DESC")
-    Page<Review> findByUserIdAndDateRange(
+    @Query(value = "SELECT r FROM Review r JOIN FETCH r.user u WHERE u.id = :userId " +
+            "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate ORDER BY r.reviewDate DESC",
+            countQuery = "SELECT COUNT(r) FROM Review r WHERE r.user.id = :userId " +
+                    "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate")
+    Page<Review> findByUserIdAndDateRangeWithUser(
             @Param("userId") UUID userId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,

@@ -692,5 +692,9 @@ export interface UserReviewStats {
   firstReviewDate: string | null;
   lastReviewDate: string | null;
   selectedMonthReviewCount: number;
+  /** Total reviews across all users in the selected month (null if no month selected). */
+  selectedMonthTotalReviews: number | null;
+  /** This user's share of reviews in the selected month, 0–100 (null if no month or no reviews). */
+  selectedMonthPercentage: number | null;
   allTimeRank: number;
 }

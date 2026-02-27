@@ -171,7 +171,12 @@ export function UserStatsDialog({
             <div className="h-8 w-px bg-border" />
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-semibold tabular-nums">{stats.selectedMonthReviewCount}</span>
-              <span className="text-sm text-muted-foreground">in {monthName}</span>
+              <span className="text-sm text-muted-foreground">
+                in {monthName}
+                {stats.selectedMonthPercentage != null && (
+                  <> · {stats.selectedMonthPercentage.toFixed(1)}% of reviews</>
+                )}
+              </span>
             </div>
           </div>
         ) : (
