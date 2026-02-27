@@ -56,7 +56,7 @@ export function ProductFilters({
 
         {onAddClick && (
           <Can permission={Permission.PRODUCTS_CREATE}>
-            <Button onClick={onAddClick} size="sm" className="shrink-0">
+            <Button onClick={onAddClick} size="sm" className="shrink-0 dark:bg-[#7c3aed] dark:text-foreground">
               <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Add Product</span>
             </Button>
