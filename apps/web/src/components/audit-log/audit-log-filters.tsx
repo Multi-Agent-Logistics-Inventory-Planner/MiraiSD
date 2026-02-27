@@ -118,7 +118,7 @@ export function AuditLogFilters({
 
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 dark:bg-input dark:border-[#41413d]">
             <Filter className="h-4 w-4" />
             Filters
             {filterCount > 0 && (
@@ -134,7 +134,9 @@ export function AuditLogFilters({
               <Label htmlFor="category-select">Category</Label>
               <Select
                 value={state.category}
-                onValueChange={(v) => updateField("category", v as CategoryFilter)}
+                onValueChange={(v) =>
+                  updateField("category", v as CategoryFilter)
+                }
               >
                 <SelectTrigger id="category-select">
                   <SelectValue placeholder="Select category" />
@@ -174,7 +176,9 @@ export function AuditLogFilters({
               <Label htmlFor="employee-select">Performed by</Label>
               <Select
                 value={state.actorId || "__all__"}
-                onValueChange={(v) => updateField("actorId", v === "__all__" ? "" : v)}
+                onValueChange={(v) =>
+                  updateField("actorId", v === "__all__" ? "" : v)
+                }
               >
                 <SelectTrigger id="employee-select">
                   <SelectValue placeholder="Select employee" />
@@ -199,7 +203,7 @@ export function AuditLogFilters({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !state.fromDate && "text-muted-foreground"
+                      !state.fromDate && "text-muted-foreground",
                     )}
                   >
                     {state.fromDate ? (
@@ -213,9 +217,14 @@ export function AuditLogFilters({
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={state.fromDate ? new Date(state.fromDate) : undefined}
+                    selected={
+                      state.fromDate ? new Date(state.fromDate) : undefined
+                    }
                     onSelect={(date) => {
-                      updateField("fromDate", date ? format(date, "yyyy-MM-dd") : "");
+                      updateField(
+                        "fromDate",
+                        date ? format(date, "yyyy-MM-dd") : "",
+                      );
                     }}
                     disabled={(date) => date > today}
                   />
@@ -232,7 +241,7 @@ export function AuditLogFilters({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !state.toDate && "text-muted-foreground"
+                      !state.toDate && "text-muted-foreground",
                     )}
                   >
                     {state.toDate ? (
@@ -248,7 +257,10 @@ export function AuditLogFilters({
                     mode="single"
                     selected={state.toDate ? new Date(state.toDate) : undefined}
                     onSelect={(date) => {
-                      updateField("toDate", date ? format(date, "yyyy-MM-dd") : "");
+                      updateField(
+                        "toDate",
+                        date ? format(date, "yyyy-MM-dd") : "",
+                      );
                     }}
                     disabled={(date) => date > today}
                   />

@@ -138,7 +138,7 @@ function NavItemLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={pathname === item.href}>
         <Link href={item.href}>
-          <item.icon className="h-4 w-4" />
+          <item.icon className="h-4 w-4 dark:text-[#faf9f5]" />
           <span>{item.title}</span>
         </Link>
       </SidebarMenuButton>
@@ -188,7 +188,7 @@ export function AppSidebar() {
                 {can(Permission.INVENTORY_ADJUST) && (
                   <Button
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 dark:bg-[#363633] dark:text-foreground dark:hover:bg-[#363633]/75"
                     onClick={() => setAdjustOpen(true)}
                   >
                     <ArrowUpDown className="h-3 w-3" />
@@ -198,7 +198,7 @@ export function AppSidebar() {
                 {can(Permission.INVENTORY_TRANSFER) && (
                   <Button
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 dark:bg-[#363633] dark:text-foreground dark:hover:bg-[#363633]/75"
                     onClick={() => setTransferOpen(true)}
                   >
                     <RefreshCw className="h-3 w-3" />
@@ -260,7 +260,9 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">{getInitials(user.personName)}</AvatarFallback>
+                  <AvatarFallback className="text-xs">
+                    {getInitials(user.personName)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-1 flex-col text-left min-w-0">
                   <span className="text-sm font-medium truncate">
