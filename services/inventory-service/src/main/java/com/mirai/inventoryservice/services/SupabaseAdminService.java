@@ -132,6 +132,53 @@ public class SupabaseAdminService {
         }
     }
 
+    /**
+     * Updates a user's metadata in Supabase auth.
+     *
+     * @param email the email of the user to update
+     * @param name the new display name
+     * @return true if updated successfully, false otherwise
+     */
+    public boolean updateUserMetadata(String email, String name) {
+        String userId = getSupabaseUserId(email);
+        if (userId == null) {
+            log.info("No Supabase user found for email: {}", email);
+            return false;
+        }
+
+        String url = supabaseUrl + "/auth/v1/admin/users/" + userId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", serviceRoleKey);
+        headers.setBearerAuth(serviceRoleKey);
+
+        ObjectNode body = objectMapper.createObjectNode();
+        ObjectNode userMetadata = objectMapper.createObjectNode();
+        userMetadata.put("name", name);
+        body.set("user_metadata", userMetadata);
+
+        HttpEntity<String> request;
+        try {
+            request = new HttpEntity<>(objectMapper.writeValueAsString(body), headers);
+        } catch (Exception e) {
+            log.error("Failed to serialize update request: {}", e.getMessage());
+            return false;
+        }
+
+        try {
+            restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
+            log.info("Updated Supabase user metadata for: {}", email);
+            return true;
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to update Supabase user: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return false;
+        } catch (Exception e) {
+            log.error("Error updating Supabase user: {}", e.getMessage());
+            return false;
+        }
+    }
+
     private String generateLink(String email, String role, String type) {
         String url = supabaseUrl + "/auth/v1/admin/generate_link";
 

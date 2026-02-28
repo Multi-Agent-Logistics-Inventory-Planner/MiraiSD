@@ -68,11 +68,20 @@ public class UserService {
     public User updateUser(UUID id, String fullName, String email, UserRole role) {
         User user = getUserById(id);
 
+        boolean nameChanged = fullName != null && !fullName.equals(user.getFullName());
+
         if (fullName != null) user.setFullName(fullName);
         if (email != null) user.setEmail(email);
         if (role != null) user.setRole(role);
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // Sync name change to Supabase auth
+        if (nameChanged) {
+            supabaseAdminService.updateUserMetadata(user.getEmail(), fullName);
+        }
+
+        return savedUser;
     }
 
     public void deleteUser(UUID id) {
