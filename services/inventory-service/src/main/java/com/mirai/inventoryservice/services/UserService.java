@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.repositories.InvitationRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.transaction.Transactional;
@@ -19,17 +20,28 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final InvitationRepository invitationRepository;
+    private final SupabaseAdminService supabaseAdminService;
 
-    public UserService(UserRepository userRepository, StockMovementRepository stockMovementRepository) {
+    public UserService(UserRepository userRepository,
+                       StockMovementRepository stockMovementRepository,
+                       InvitationRepository invitationRepository,
+                       SupabaseAdminService supabaseAdminService) {
         this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
+        this.invitationRepository = invitationRepository;
+        this.supabaseAdminService = supabaseAdminService;
     }
 
     public User createUser(String fullName, String email, UserRole role) {
+        String firstName = extractFirstName(fullName);
+
         User user = User.builder()
                 .fullName(fullName)
                 .email(email)
                 .role(role)
+                .canonicalName(firstName)
+                .isReviewTracked(true)
                 .build();
         return userRepository.save(user);
     }
@@ -56,16 +68,34 @@ public class UserService {
     public User updateUser(UUID id, String fullName, String email, UserRole role) {
         User user = getUserById(id);
 
+        boolean nameChanged = fullName != null && !fullName.equals(user.getFullName());
+
         if (fullName != null) user.setFullName(fullName);
         if (email != null) user.setEmail(email);
         if (role != null) user.setRole(role);
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // Sync name change to Supabase auth
+        if (nameChanged) {
+            supabaseAdminService.updateUserMetadata(user.getEmail(), fullName);
+        }
+
+        return savedUser;
     }
 
     public void deleteUser(UUID id) {
         User user = getUserById(id);
+        String email = user.getEmail();
+
+        // Delete local user record
         userRepository.delete(user);
+
+        // Delete invitation record if exists
+        invitationRepository.deleteByEmail(email);
+
+        // Delete user from Supabase auth
+        supabaseAdminService.deleteUserByEmail(email);
     }
 
     public boolean existsByEmail(String email) {
@@ -87,13 +117,29 @@ public class UserService {
         }
 
         String fullName = name != null ? name : email.split("@")[0];
+        String firstName = extractFirstName(fullName);
 
         User user = User.builder()
                 .fullName(fullName)
                 .email(email)
                 .role(userRole)
+                .canonicalName(firstName)
+                .isReviewTracked(true)
                 .build();
         return userRepository.save(user);
+    }
+
+    /**
+     * Extracts the first name from a full name string.
+     * @param fullName the full name (e.g., "John Doe")
+     * @return the first name (e.g., "John")
+     */
+    private String extractFirstName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return null;
+        }
+        String[] parts = fullName.trim().split("\\s+");
+        return parts[0];
     }
 
     public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {

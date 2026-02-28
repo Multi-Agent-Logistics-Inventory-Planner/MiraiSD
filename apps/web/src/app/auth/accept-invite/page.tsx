@@ -31,65 +31,91 @@ function AcceptInviteContent() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
-    const verifyToken = async () => {
-      if (!supabase) {
-        setError("Supabase client not configured");
+    if (!supabase) {
+      setError("Supabase client not configured");
+      setIsVerifying(false);
+      return;
+    }
+
+    const processAuth = async () => {
+      // First check if already have a session
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (sessionData.session?.user?.email) {
+        setEmail(sessionData.session.user.email);
         setIsVerifying(false);
         return;
       }
 
-      // Check if user is already authenticated (redirected from login page)
-      const fromInvite = searchParams.get("from_invite");
-      if (fromInvite === "true") {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.user?.email) {
-          setEmail(sessionData.session.user.email);
-          setIsVerifying(false);
-          return;
+      // Check URL fragment for tokens (Supabase puts tokens in fragment)
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        const typeFromHash = hashParams.get("type");
+
+        // Valid types: invite (new user) or magiclink (existing user resend)
+        const isValidType = typeFromHash === "invite" || typeFromHash === "magiclink";
+
+        if (accessToken && refreshToken && isValidType) {
+          // Manually set the session from fragment tokens
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            setError(sessionError.message);
+            setIsVerifying(false);
+            return;
+          }
+
+          if (data.user?.email) {
+            setEmail(data.user.email);
+            // Clear the hash from URL for cleaner look
+            window.history.replaceState(null, "", window.location.pathname);
+            setIsVerifying(false);
+            return;
+          }
         }
       }
 
-      // Original flow: verify token_hash
+      // Check query params as fallback (old flow with token_hash)
       const tokenHash = searchParams.get("token_hash");
       const type = searchParams.get("type");
 
-      if (!tokenHash || type !== "invite") {
-        // Check if already authenticated as fallback
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session?.user?.email) {
-          setEmail(sessionData.session.user.email);
+      if (tokenHash && (type === "invite" || type === "magiclink")) {
+        try {
+          const { data, error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: type as "invite" | "magiclink",
+          });
+
+          if (verifyError) {
+            setError(verifyError.message);
+            setIsVerifying(false);
+            return;
+          }
+
+          if (data.user?.email) {
+            setEmail(data.user.email);
+          }
+          setIsVerifying(false);
+          return;
+        } catch (err) {
+          setError("Failed to verify invitation");
           setIsVerifying(false);
           return;
         }
-        setError("Invalid invitation link");
-        setIsVerifying(false);
-        return;
       }
 
-      try {
-        const { data, error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: "invite",
-        });
-
-        if (verifyError) {
-          setError(verifyError.message);
-          setIsVerifying(false);
-          return;
-        }
-
-        if (data.user?.email) {
-          setEmail(data.user.email);
-        }
-
-        setIsVerifying(false);
-      } catch (err) {
-        setError("Failed to verify invitation");
-        setIsVerifying(false);
-      }
+      // No valid tokens found
+      setError("Invalid invitation link");
+      setIsVerifying(false);
     };
 
-    verifyToken();
+    processAuth();
   }, [searchParams, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,7 +174,13 @@ function AcceptInviteContent() {
         });
       }
 
-      router.push("/");
+      // Redirect based on role - employees go to storage, admins go to dashboard
+      const userRole = sessionData.session?.user?.user_metadata?.role;
+      if (userRole === "EMPLOYEE") {
+        router.push("/storage");
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       setError("Failed to complete profile setup");
       setIsLoading(false);

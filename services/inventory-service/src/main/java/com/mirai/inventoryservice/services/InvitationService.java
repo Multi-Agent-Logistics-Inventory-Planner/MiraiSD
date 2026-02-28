@@ -46,11 +46,17 @@ public class InvitationService {
             invitedBy = userService.createFromJwt(inviterEmail, inviterName, "ADMIN");
         }
 
-        // Generate invite link via Supabase (creates user in pending state)
-        String inviteLink = supabaseAdminService.generateInviteLink(email, role.name());
+        // Check if user already exists in Supabase (from a previous incomplete invite)
+        // If so, use magic link instead of invite link
+        String link;
+        if (supabaseAdminService.userExistsInSupabase(email)) {
+            link = supabaseAdminService.generateMagicLink(email, role.name());
+        } else {
+            link = supabaseAdminService.generateInviteLink(email, role.name());
+        }
 
         // Send custom email via Resend
-        emailService.sendInvitationEmail(email, inviteLink, role.name(), inviterName);
+        emailService.sendInvitationEmail(email, link, role.name(), inviterName);
 
         Invitation invitation = Invitation.builder()
                 .email(email)
@@ -78,9 +84,16 @@ public class InvitationService {
                 ? invitation.getInvitedBy().getFullName()
                 : "Your team";
 
-        // Generate new invite link and send email
-        String inviteLink = supabaseAdminService.generateInviteLink(email, invitation.getRole());
-        emailService.sendInvitationEmail(email, inviteLink, invitation.getRole(), inviterName);
+        // Check if user already exists in Supabase (clicked link but didn't complete setup)
+        // If so, use magic link instead of invite link
+        String link;
+        if (supabaseAdminService.userExistsInSupabase(email)) {
+            link = supabaseAdminService.generateMagicLink(email, invitation.getRole());
+        } else {
+            link = supabaseAdminService.generateInviteLink(email, invitation.getRole());
+        }
+
+        emailService.sendInvitationEmail(email, link, invitation.getRole(), inviterName);
 
         return invitation;
     }

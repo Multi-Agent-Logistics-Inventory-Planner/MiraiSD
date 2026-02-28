@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getSupabaseClient } from "@/lib/supabase";
 import { validateToken } from "@/lib/api/auth";
+import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/api";
 
 const passwordSchema = z.string().min(1, "Password is required");
@@ -28,6 +29,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -119,7 +121,10 @@ export function LoginForm() {
       }
 
       setError(null);
-      alert("Password reset email sent. Please check your inbox.");
+      toast({
+        title: "Password reset email sent",
+        description: "Please check your inbox for the reset link.",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
