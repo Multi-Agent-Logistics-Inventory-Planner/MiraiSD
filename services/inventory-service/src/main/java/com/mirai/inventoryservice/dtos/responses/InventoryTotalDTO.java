@@ -20,8 +20,10 @@ public class InventoryTotalDTO {
     private String sku;
     private String name;
     private String imageUrl;
-    private String category;
-    private String subcategory;
+    private UUID categoryId;
+    private String categoryName;
+    private UUID parentCategoryId;
+    private String parentCategoryName;
     private Double unitCost;
     private Boolean isActive;
     private int totalQuantity;

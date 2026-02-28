@@ -5,10 +5,10 @@ import com.mirai.inventoryservice.dtos.responses.DailySalesDTO;
 import com.mirai.inventoryservice.dtos.responses.MonthlySalesDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.StockMovement;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -45,31 +45,27 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public List<CategoryInventoryDTO> getInventoryByCategory() {
-        List<Product> products = productRepository.findAll();
-        
+        List<Product> products = productRepository.findAllWithCategories();
+
         // Group products by category
-        Map<ProductCategory, List<Product>> productsByCategory = products.stream()
+        Map<Category, List<Product>> productsByCategory = products.stream()
                 .collect(Collectors.groupingBy(Product::getCategory));
-        
+
         List<CategoryInventoryDTO> result = new ArrayList<>();
-        
-        // Use hardcoded categories from enum to ensure all are represented or just present ones
-        for (Map.Entry<ProductCategory, List<Product>> entry : productsByCategory.entrySet()) {
-            String categoryName = entry.getKey().name();
+
+        for (Map.Entry<Category, List<Product>> entry : productsByCategory.entrySet()) {
+            String categoryName = entry.getKey().getName();
             List<Product> categoryProducts = entry.getValue();
-            
+
             // Calculate total stock for this category
             int totalStock = 0;
             for (Product p : categoryProducts) {
-                // Reuse the logic from ForecastService to get stock from all inventory tables
-                // We'll need to expose a public method in ForecastService or move that logic to a shared helper
-                // For now, let's assume we can add a method to ForecastService
-                totalStock += forecastService.getCurrentStockPublic(p.getId()); 
+                totalStock += forecastService.getCurrentStockPublic(p.getId());
             }
-            
+
             result.add(new CategoryInventoryDTO(categoryName, (long) categoryProducts.size(), totalStock));
         }
-        
+
         return result;
     }
 

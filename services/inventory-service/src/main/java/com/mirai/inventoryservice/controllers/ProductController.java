@@ -4,7 +4,6 @@ import com.mirai.inventoryservice.dtos.mappers.ProductMapper;
 import com.mirai.inventoryservice.dtos.requests.ProductRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductResponseDTO;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.services.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -28,17 +27,17 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<List<ProductResponseDTO>> getAllProducts(
-            @RequestParam(required = false) ProductCategory category,
+            @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
         List<Product> products;
 
         if (search != null && !search.isBlank()) {
             products = productService.searchProducts(search);
-        } else if (category != null && activeOnly) {
-            products = productService.getActiveProductsByCategory(category);
-        } else if (category != null) {
-            products = productService.getProductsByCategory(category);
+        } else if (categoryId != null && activeOnly) {
+            products = productService.getActiveProductsByCategory(categoryId);
+        } else if (categoryId != null) {
+            products = productService.getProductsByCategory(categoryId);
         } else if (activeOnly) {
             products = productService.getActiveProducts();
         } else {
@@ -65,8 +64,7 @@ public class ProductController {
     public ResponseEntity<ProductResponseDTO> createProduct(@Valid @RequestBody ProductRequestDTO requestDTO) {
         Product product = productService.createProduct(
                 requestDTO.getSku(),
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
+                requestDTO.getCategoryId(),
                 requestDTO.getName(),
                 requestDTO.getDescription(),
                 requestDTO.getReorderPoint(),
@@ -87,8 +85,7 @@ public class ProductController {
         Product product = productService.updateProduct(
                 id,
                 requestDTO.getSku(),
-                requestDTO.getCategory(),
-                requestDTO.getSubcategory(),
+                requestDTO.getCategoryId(),
                 requestDTO.getName(),
                 requestDTO.getDescription(),
                 requestDTO.getReorderPoint(),

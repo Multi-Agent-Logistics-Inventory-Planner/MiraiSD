@@ -44,15 +44,19 @@ public class InventoryTotalsRepository {
             p.sku,
             p.name,
             p.image_url,
-            p.category,
-            p.subcategory,
+            c.id as category_id,
+            c.name as category_name,
+            parent.id as parent_category_id,
+            parent.name as parent_category_name,
             p.unit_cost,
             p.is_active,
             COALESCE(SUM(i.quantity), 0) as total_quantity,
             MAX(i.updated_at) as last_updated_at
         FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN categories parent ON c.parent_id = parent.id
         LEFT JOIN all_inventory i ON p.id = i.item_id
-        GROUP BY p.id, p.sku, p.name, p.image_url, p.category, p.subcategory, p.unit_cost, p.is_active
+        GROUP BY p.id, p.sku, p.name, p.image_url, c.id, c.name, parent.id, parent.name, p.unit_cost, p.is_active
         ORDER BY p.name
         """;
 
@@ -68,12 +72,14 @@ public class InventoryTotalsRepository {
                         .sku((String) row[1])
                         .name((String) row[2])
                         .imageUrl((String) row[3])
-                        .category((String) row[4])
-                        .subcategory((String) row[5])
-                        .unitCost(row[6] != null ? ((Number) row[6]).doubleValue() : null)
-                        .isActive((Boolean) row[7])
-                        .totalQuantity(((Number) row[8]).intValue())
-                        .lastUpdatedAt(TimestampUtils.toOffsetDateTime(row[9]))
+                        .categoryId((UUID) row[4])
+                        .categoryName((String) row[5])
+                        .parentCategoryId((UUID) row[6])
+                        .parentCategoryName((String) row[7])
+                        .unitCost(row[8] != null ? ((Number) row[8]).doubleValue() : null)
+                        .isActive((Boolean) row[9])
+                        .totalQuantity(((Number) row[10]).intValue())
+                        .lastUpdatedAt(TimestampUtils.toOffsetDateTime(row[11]))
                         .build())
                 .toList();
     }

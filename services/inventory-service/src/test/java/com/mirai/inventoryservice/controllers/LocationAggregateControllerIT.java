@@ -1,14 +1,15 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.models.storage.Rack;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
+import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.RackRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,18 +43,27 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private BoxBin testBoxBin;
     private Rack testRack;
     private Product testProduct;
+    private Category testCategory;
 
     @BeforeEach
     void setUp() {
+        testCategory = categoryRepository.save(Category.builder()
+                .name("Test Category")
+                .slug("test-category-" + UUID.randomUUID())
+                .build());
+
         testBoxBin = boxBinRepository.save(BoxBin.builder().boxBinCode("B99").build());
         testRack = rackRepository.save(Rack.builder().rackCode("R99").build());
         testProduct = productRepository.save(Product.builder()
                 .sku("TEST-001")
                 .name("Test Product")
-                .category(ProductCategory.PLUSHIE)
+                .category(testCategory)
                 .build());
     }
 

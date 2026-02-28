@@ -5,27 +5,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductResponseDTO {
+public class CategoryResponseDTO {
     private UUID id;
-    private String sku;
-    private CategoryResponseDTO category;
+    private UUID parentId;
     private String name;
-    private String description;
-    private Integer reorderPoint;
-    private Integer targetStockLevel;
-    private Integer leadTimeDays;
-    private BigDecimal unitCost;
+    private String slug;
+    private Integer displayOrder;
     private Boolean isActive;
-    private String imageUrl;
-    private String notes;
+    private List<CategoryResponseDTO> children;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }
