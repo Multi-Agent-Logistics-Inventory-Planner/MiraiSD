@@ -26,10 +26,14 @@ public class UserService {
     }
 
     public User createUser(String fullName, String email, UserRole role) {
+        String firstName = extractFirstName(fullName);
+
         User user = User.builder()
                 .fullName(fullName)
                 .email(email)
                 .role(role)
+                .canonicalName(firstName)
+                .isReviewTracked(true)
                 .build();
         return userRepository.save(user);
     }
@@ -87,13 +91,29 @@ public class UserService {
         }
 
         String fullName = name != null ? name : email.split("@")[0];
+        String firstName = extractFirstName(fullName);
 
         User user = User.builder()
                 .fullName(fullName)
                 .email(email)
                 .role(userRole)
+                .canonicalName(firstName)
+                .isReviewTracked(true)
                 .build();
         return userRepository.save(user);
+    }
+
+    /**
+     * Extracts the first name from a full name string.
+     * @param fullName the full name (e.g., "John Doe")
+     * @return the first name (e.g., "John")
+     */
+    private String extractFirstName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return null;
+        }
+        String[] parts = fullName.trim().split("\\s+");
+        return parts[0];
     }
 
     public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {
