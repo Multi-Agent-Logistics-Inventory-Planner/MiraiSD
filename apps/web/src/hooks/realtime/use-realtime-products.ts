@@ -6,8 +6,7 @@ interface ProductRow {
   id: string;
   name: string;
   sku: string;
-  category: string | null;
-  subcategory: string | null;
+  category_id: string | null;
   reorder_point: number | null;
   is_active: boolean;
 }

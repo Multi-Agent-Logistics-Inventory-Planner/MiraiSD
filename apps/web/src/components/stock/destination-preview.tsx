@@ -6,7 +6,7 @@ import { ImageOff } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PRODUCT_CATEGORY_LABELS, type Inventory } from "@/types/api";
+import type { Inventory } from "@/types/api";
 
 interface DestinationPreviewProps {
   inventory: Inventory[];
@@ -41,7 +41,7 @@ function DestinationItem({ inventory }: { inventory: Inventory }) {
           {item.name}
         </span>
         <Badge variant="secondary" className="text-xs flex-shrink-0">
-          {PRODUCT_CATEGORY_LABELS[item.category]}
+          {item.category.name}
         </Badge>
       </div>
       <span className="text-sm font-medium text-muted-foreground">

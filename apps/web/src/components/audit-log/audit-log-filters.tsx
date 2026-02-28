@@ -20,15 +20,13 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { StockMovementReason, ProductCategory, User } from "@/types/api";
+import { StockMovementReason, type User } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 export type ReasonFilter = StockMovementReason | "all";
-export type CategoryFilter = ProductCategory | "all";
 
 export interface AuditLogFiltersState {
   search: string;
-  category: CategoryFilter;
   actorId: string;
   reason: ReasonFilter;
   fromDate: string;
@@ -37,7 +35,6 @@ export interface AuditLogFiltersState {
 
 export const DEFAULT_AUDIT_LOG_FILTERS: AuditLogFiltersState = {
   search: "",
-  category: "all",
   actorId: "",
   reason: "all",
   fromDate: "",
@@ -60,17 +57,6 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.TRANSFER]: "Transfer",
 };
 
-const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  [ProductCategory.PLUSHIE]: "Plushie",
-  [ProductCategory.KEYCHAIN]: "Keychain",
-  [ProductCategory.FIGURINE]: "Figurine",
-  [ProductCategory.GACHAPON]: "Gachapon",
-  [ProductCategory.BLIND_BOX]: "Blind Box",
-  [ProductCategory.BUILD_KIT]: "Build Kit",
-  [ProductCategory.GUNDAM]: "Gundam",
-  [ProductCategory.KUJI]: "Kuji",
-  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
-};
 
 export function AuditLogFilters({
   state,
@@ -80,7 +66,6 @@ export function AuditLogFilters({
   const [filterOpen, setFilterOpen] = useState(false);
 
   const hasActiveFilters =
-    state.category !== "all" ||
     Boolean(state.actorId) ||
     state.reason !== "all" ||
     Boolean(state.fromDate) ||
@@ -97,7 +82,6 @@ export function AuditLogFilters({
   today.setHours(23, 59, 59, 999);
 
   const filterCount = [
-    state.category !== "all",
     state.reason !== "all",
     Boolean(state.actorId),
     Boolean(state.fromDate),
@@ -130,28 +114,6 @@ export function AuditLogFilters({
         </PopoverTrigger>
         <PopoverContent className="w-80" align="end">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="category-select">Category</Label>
-              <Select
-                value={state.category}
-                onValueChange={(v) =>
-                  updateField("category", v as CategoryFilter)
-                }
-              >
-                <SelectTrigger id="category-select">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="action-select">Action</Label>
               <Select

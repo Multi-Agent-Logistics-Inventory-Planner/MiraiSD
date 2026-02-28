@@ -1,10 +1,4 @@
-import type { Inventory, InventoryItem } from "@/types/api";
-import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-  type ProductCategory,
-  type ProductSubcategory,
-} from "@/types/api";
+import type { Inventory, InventoryItem, Category } from "@/types/api";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 
 export type AdjustAction = "add" | "subtract";
@@ -37,7 +31,6 @@ export function createNormalizedInventory(
       sku: product.sku,
       name: product.name,
       category: product.category,
-      subcategory: product.subcategory,
       imageUrl: product.imageUrl,
     },
     quantity: totalQuantity,
@@ -67,8 +60,10 @@ export interface ProductListProps {
   disabled: boolean;
   emptyMessage: string;
   searchQuery: string;
-  categoryFilters: ProductCategory[];
-  subcategoryFilters: ProductSubcategory[];
+  categoryFilters: string[];
+  childCategoryFilters: string[];
+  availableCategories: Category[];
+  availableChildCategories: Category[];
 }
 
 export interface QuantityControlsProps {
@@ -94,8 +89,10 @@ export interface AdjustSummaryProps {
  */
 export function getNoResultsMessage(
   searchQuery: string,
-  categoryFilters: ProductCategory[],
-  subcategoryFilters: ProductSubcategory[]
+  categoryFilters: string[],
+  childCategoryFilters: string[],
+  availableCategories: Category[] = [],
+  availableChildCategories: Category[] = []
 ): string {
   const parts: string[] = [];
 
@@ -105,16 +102,16 @@ export function getNoResultsMessage(
 
   if (categoryFilters.length > 0) {
     const categoryNames = categoryFilters
-      .map((c) => PRODUCT_CATEGORY_LABELS[c])
+      .map((id) => availableCategories.find((c) => c.id === id)?.name ?? id)
       .join(", ");
     parts.push(`in ${categoryNames}`);
   }
 
-  if (subcategoryFilters.length > 0) {
-    const subcategoryNames = subcategoryFilters
-      .map((s) => PRODUCT_SUBCATEGORY_LABELS[s])
+  if (childCategoryFilters.length > 0) {
+    const childCategoryNames = childCategoryFilters
+      .map((id) => availableChildCategories.find((s) => s.id === id)?.name ?? id)
       .join(", ");
-    parts.push(`(${subcategoryNames})`);
+    parts.push(`(${childCategoryNames})`);
   }
 
   if (parts.length === 0) {

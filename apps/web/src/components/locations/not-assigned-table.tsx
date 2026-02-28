@@ -101,7 +101,7 @@ export function NotAssignedTable({
             <TableCell>{item.item.name}</TableCell>
             <TableCell>
               <Badge variant="outline" className="text-xs">
-                {item.item.category}
+                {item.item.category.name}
               </Badge>
             </TableCell>
             <TableCell>{item.quantity}</TableCell>
