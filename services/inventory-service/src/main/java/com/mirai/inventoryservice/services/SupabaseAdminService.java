@@ -63,7 +63,17 @@ public class SupabaseAdminService {
      * @return true if user exists
      */
     public boolean userExistsInSupabase(String email) {
-        String url = supabaseUrl + "/auth/v1/admin/users?filter=email.eq." + email;
+        return getSupabaseUserId(email) != null;
+    }
+
+    /**
+     * Gets the Supabase user ID for an email address.
+     *
+     * @param email the email to look up
+     * @return the Supabase user ID, or null if not found
+     */
+    public String getSupabaseUserId(String email) {
+        String url = supabaseUrl + "/auth/v1/admin/users";
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", serviceRoleKey);
@@ -75,9 +85,49 @@ public class SupabaseAdminService {
 
             JsonNode responseJson = objectMapper.readTree(response.getBody());
             JsonNode users = responseJson.get("users");
-            return users != null && users.isArray() && users.size() > 0;
+
+            if (users != null && users.isArray()) {
+                for (JsonNode user : users) {
+                    if (email.equalsIgnoreCase(user.get("email").asText())) {
+                        return user.get("id").asText();
+                    }
+                }
+            }
+            return null;
         } catch (Exception e) {
-            log.warn("Failed to check if user exists: {}", e.getMessage());
+            log.warn("Failed to get Supabase user ID: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Deletes a user from Supabase auth by their email.
+     *
+     * @param email the email of the user to delete
+     * @return true if deleted successfully, false otherwise
+     */
+    public boolean deleteUserByEmail(String email) {
+        String userId = getSupabaseUserId(email);
+        if (userId == null) {
+            log.info("No Supabase user found for email: {}", email);
+            return false;
+        }
+
+        String url = supabaseUrl + "/auth/v1/admin/users/" + userId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", serviceRoleKey);
+        headers.setBearerAuth(serviceRoleKey);
+
+        try {
+            restTemplate.exchange(url, HttpMethod.DELETE, new HttpEntity<>(headers), String.class);
+            log.info("Deleted Supabase user: {}", email);
+            return true;
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to delete Supabase user: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return false;
+        } catch (Exception e) {
+            log.error("Error deleting Supabase user: {}", e.getMessage());
             return false;
         }
     }

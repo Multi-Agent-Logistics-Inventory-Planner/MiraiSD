@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.repositories.InvitationRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.transaction.Transactional;
@@ -19,10 +20,17 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final InvitationRepository invitationRepository;
+    private final SupabaseAdminService supabaseAdminService;
 
-    public UserService(UserRepository userRepository, StockMovementRepository stockMovementRepository) {
+    public UserService(UserRepository userRepository,
+                       StockMovementRepository stockMovementRepository,
+                       InvitationRepository invitationRepository,
+                       SupabaseAdminService supabaseAdminService) {
         this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
+        this.invitationRepository = invitationRepository;
+        this.supabaseAdminService = supabaseAdminService;
     }
 
     public User createUser(String fullName, String email, UserRole role) {
@@ -69,7 +77,16 @@ public class UserService {
 
     public void deleteUser(UUID id) {
         User user = getUserById(id);
+        String email = user.getEmail();
+
+        // Delete local user record
         userRepository.delete(user);
+
+        // Delete invitation record if exists
+        invitationRepository.deleteByEmail(email);
+
+        // Delete user from Supabase auth
+        supabaseAdminService.deleteUserByEmail(email);
     }
 
     public boolean existsByEmail(String email) {
