@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
-import type { ProductCategory, Product } from "@/types/api";
+import type { Product } from "@/types/api";
 import type { DashboardStats, StockLevelItem, StockStatus, CategoryData } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useInventoryTotals } from "@/hooks/queries/use-inventory-totals";
@@ -19,14 +19,6 @@ function getStatus(quantity: number, reorderPoint?: number): StockStatus {
   return "good";
 }
 
-function getCategoryLabel(category: ProductCategory): string {
-  return category
-    .toString()
-    .toLowerCase()
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 function getChartFill(index: number): string {
   const slot = (index % 5) + 1;
@@ -120,7 +112,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
       totalStockValue += qty * unitCost;
       unitCostByItemId.set(p.id, unitCost);
 
-      const catLabel = getCategoryLabel(p.category);
+      const catLabel = p.category.name;
       categoryQty.set(catLabel, (categoryQty.get(catLabel) ?? 0) + qty);
 
       return buildStockLevelItem(

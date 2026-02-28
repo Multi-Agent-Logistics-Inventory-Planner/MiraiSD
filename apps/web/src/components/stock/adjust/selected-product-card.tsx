@@ -5,7 +5,6 @@ import Image from "next/image";
 import { ImageOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { PRODUCT_CATEGORY_LABELS, type ProductCategory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 import { QuantityControls } from "./quantity-controls";
 import { AdjustSummary } from "./adjust-summary";
@@ -94,7 +93,7 @@ export function SelectedProductCard({
           <p className="font-medium truncate">{item.name}</p>
           {item.category && (
             <Badge variant="secondary" className="mt-1 text-xs font-normal">
-              {PRODUCT_CATEGORY_LABELS[item.category as ProductCategory]}
+              {item.category.name}
             </Badge>
           )}
         </div>

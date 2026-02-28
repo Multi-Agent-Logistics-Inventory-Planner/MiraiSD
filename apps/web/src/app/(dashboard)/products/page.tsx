@@ -18,12 +18,13 @@ import {
   useProductInventory,
   type ProductWithInventory,
 } from "@/hooks/queries/use-product-inventory";
-import type { ProductCategory } from "@/types/api";
+import { useCategories } from "@/hooks/queries/use-categories";
 
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
   const list = useProductInventory();
+  const { data: categories } = useCategories();
 
   const [filters, setFilters] = useState<ProductFiltersState>(
     DEFAULT_PRODUCT_FILTERS,
@@ -41,10 +42,6 @@ export default function ProductsPage() {
 
   const items = list.data ?? [];
 
-  const categories: ProductCategory[] = Array.from(
-    new Set(items.map((i) => i.product.category)),
-  );
-
   const filteredItems = useMemo(() => {
     return items.filter((row) => {
       const q = filters.search.trim().toLowerCase();
@@ -53,8 +50,8 @@ export default function ProductsPage() {
         row.product.name.toLowerCase().includes(q) ||
         row.product.sku.toLowerCase().includes(q);
       const matchesCategory =
-        filters.categories.length === 0 ||
-        filters.categories.includes(row.product.category);
+        filters.categoryIds.length === 0 ||
+        filters.categoryIds.includes(row.product.category.id);
       return matchesSearch && matchesCategory;
     });
   }, [items, filters]);
@@ -81,7 +78,7 @@ export default function ProductsPage() {
       <ProductFilters
         state={filters}
         onChange={handleFiltersChange}
-        categories={categories}
+        categories={categories ?? []}
         onAddClick={() => {
           setEditing(null);
           setFormOpen(true);

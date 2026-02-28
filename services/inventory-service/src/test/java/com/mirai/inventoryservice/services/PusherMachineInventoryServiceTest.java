@@ -2,8 +2,8 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.PusherMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.inventory.PusherMachineInventory;
 import com.mirai.inventoryservice.models.storage.PusherMachine;
 import com.mirai.inventoryservice.repositories.PusherMachineInventoryRepository;
@@ -42,6 +42,7 @@ class PusherMachineInventoryServiceTest {
     private PusherMachine testMachine;
     private Product testProduct;
     private PusherMachineInventory testInventory;
+    private Category testCategory;
     private UUID machineId;
     private UUID productId;
     private UUID inventoryId;
@@ -57,11 +58,17 @@ class PusherMachineInventoryServiceTest {
                 .pusherMachineCode("P1")
                 .build();
 
+        testCategory = Category.builder()
+                .id(UUID.randomUUID())
+                .name("Test Category")
+                .slug("test-category")
+                .build();
+
         testProduct = Product.builder()
                 .id(productId)
                 .sku("SKU-001")
                 .name("Test Product")
-                .category(ProductCategory.PLUSHIE)
+                .category(testCategory)
                 .build();
 
         testInventory = PusherMachineInventory.builder()
@@ -142,7 +149,7 @@ class PusherMachineInventoryServiceTest {
             PusherMachineInventory inventory2 = PusherMachineInventory.builder()
                     .id(UUID.randomUUID())
                     .pusherMachine(testMachine)
-                    .item(Product.builder().id(UUID.randomUUID()).sku("SKU-002").name("Product 2").category(ProductCategory.PLUSHIE).build())
+                    .item(Product.builder().id(UUID.randomUUID()).sku("SKU-002").name("Product 2").category(testCategory).build())
                     .quantity(5)
                     .build();
 

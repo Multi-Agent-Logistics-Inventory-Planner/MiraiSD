@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProductSelectCard } from "@/components/stock/product-select-card";
-import type { ProductCategory, ProductSubcategory } from "@/types/api";
+import type { Category } from "@/types/api";
 import { type NormalizedInventory, getNoResultsMessage } from "./types";
 
 interface ProductListProps {
@@ -15,8 +15,10 @@ interface ProductListProps {
   emptyMessage: string;
   noResultsMessage: string;
   searchQuery: string;
-  categoryFilters: ProductCategory[];
-  subcategoryFilters: ProductSubcategory[];
+  categoryFilters: string[];
+  childCategoryFilters: string[];
+  availableCategories: Category[];
+  availableChildCategories: Category[];
 }
 
 export function ProductList({
@@ -29,7 +31,9 @@ export function ProductList({
   noResultsMessage,
   searchQuery,
   categoryFilters,
-  subcategoryFilters,
+  childCategoryFilters,
+  availableCategories,
+  availableChildCategories,
 }: ProductListProps) {
   if (isLoading) {
     return (
@@ -48,24 +52,30 @@ export function ProductList({
   }
 
   const filteredItems = items.filter((inv) => {
+    const category = inv.item.category;
+    // Check if product's category matches root category filter
+    // A product matches if its category OR its category's parent is in the filter
     const matchesCategory =
       categoryFilters.length === 0 ||
-      categoryFilters.includes(inv.item.category);
-    const matchesSubcategory =
-      subcategoryFilters.length === 0 ||
-      (inv.item.subcategory &&
-        subcategoryFilters.includes(inv.item.subcategory));
+      categoryFilters.includes(category.id) ||
+      (category.parentId && categoryFilters.includes(category.parentId));
+    // Check if product's category matches child category filter (for products in subcategories)
+    const matchesChildCategory =
+      childCategoryFilters.length === 0 ||
+      (category.parentId && childCategoryFilters.includes(category.id));
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
       !query || inv.item.name.toLowerCase().includes(query);
-    return matchesCategory && matchesSubcategory && matchesSearch;
+    return matchesCategory && matchesChildCategory && matchesSearch;
   });
 
   if (filteredItems.length === 0) {
     const message = getNoResultsMessage(
       searchQuery,
       categoryFilters,
-      subcategoryFilters
+      childCategoryFilters,
+      availableCategories,
+      availableChildCategories
     );
     return (
       <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
@@ -92,4 +102,3 @@ export function ProductList({
     </div>
   );
 }
-

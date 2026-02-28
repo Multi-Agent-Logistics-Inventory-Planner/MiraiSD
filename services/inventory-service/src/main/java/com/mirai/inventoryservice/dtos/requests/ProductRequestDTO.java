@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.dtos.requests;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -11,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -20,9 +19,7 @@ public class ProductRequestDTO {
     private String sku;
 
     @NotNull(message = "Category is required")
-    private ProductCategory category;
-
-    private ProductSubcategory subcategory;
+    private UUID categoryId;
 
     @NotBlank(message = "Name is required")
     private String name;

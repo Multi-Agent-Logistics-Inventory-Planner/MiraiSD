@@ -1,4 +1,4 @@
-import { AuditLogEntry, InventoryItem, ProductCategory, ProductSubcategory } from "@/types/api";
+import type { AuditLogEntry, InventoryItem } from "@/types/api";
 import { getInventoryTotals } from "@/lib/api/inventory";
 import { getAuditLog } from "@/lib/api/stock-movements";
 
@@ -29,8 +29,17 @@ export async function getInventoryTotalsByItemId(): Promise<InventoryTotals> {
         sku: total.sku,
         name: total.name,
         imageUrl: total.imageUrl ?? undefined,
-        category: total.category as ProductCategory,
-        subcategory: total.subcategory as ProductSubcategory | undefined,
+        category: {
+          id: total.categoryId ?? "",
+          parentId: total.parentCategoryId ?? null,
+          name: total.categoryName ?? "",
+          slug: "",
+          displayOrder: 0,
+          isActive: true,
+          children: [],
+          createdAt: "",
+          updatedAt: "",
+        },
       },
       quantity: total.totalQuantity,
       lastUpdatedAt: total.lastUpdatedAt ?? new Date().toISOString(),

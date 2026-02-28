@@ -1,11 +1,9 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
-import com.mirai.inventoryservice.exceptions.InvalidSubcategoryException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -18,16 +16,20 @@ import java.util.UUID;
 @Transactional
 public class ProductService {
     private final ProductRepository productRepository;
+    private final CategoryService categoryService;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(
+            ProductRepository productRepository,
+            CategoryService categoryService) {
         this.productRepository = productRepository;
+        this.categoryService = categoryService;
     }
 
-    public Product createProduct(String sku, ProductCategory category, ProductSubcategory subcategory,
+    public Product createProduct(String sku, UUID categoryId,
                                  String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes) {
-        validateSubcategory(category, subcategory);
+        Category category = categoryService.getCategoryById(categoryId);
 
         if (sku != null && productRepository.existsBySku(sku)) {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
@@ -36,7 +38,6 @@ public class ProductService {
         Product product = Product.builder()
                 .sku(sku)
                 .category(category)
-                .subcategory(subcategory)
                 .name(name)
                 .description(description)
                 .reorderPoint(reorderPoint != null ? reorderPoint : 10)
@@ -52,63 +53,50 @@ public class ProductService {
     }
 
     public Product getProductById(UUID id) {
-        return productRepository.findById(id)
+        return productRepository.findByIdWithCategories(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + id));
     }
 
     public Product getProductBySku(String sku) {
-        return productRepository.findBySku(sku)
+        return productRepository.findBySkuWithCategories(sku)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with SKU: " + sku));
     }
 
     public List<Product> getAllProducts() {
-        return productRepository.findAll();
+        return productRepository.findAllWithCategories();
     }
 
     public List<Product> getActiveProducts() {
-        return productRepository.findByIsActiveTrue();
+        return productRepository.findByIsActiveTrueWithCategories();
     }
 
-    public List<Product> getProductsByCategory(ProductCategory category) {
-        return productRepository.findByCategory(category);
+    public List<Product> getProductsByCategory(UUID categoryId) {
+        return productRepository.findByCategoryIdWithCategories(categoryId);
     }
 
-    public List<Product> getActiveProductsByCategory(ProductCategory category) {
-        return productRepository.findByCategoryAndIsActiveTrue(category);
+    public List<Product> getActiveProductsByCategory(UUID categoryId) {
+        return productRepository.findByCategoryIdAndIsActiveTrueWithCategories(categoryId);
     }
 
     public List<Product> searchProducts(String query) {
-        return productRepository.search(query);
+        return productRepository.searchWithCategories(query);
     }
 
-    public Product updateProduct(UUID id, String sku, ProductCategory category, ProductSubcategory subcategory,
+    public Product updateProduct(UUID id, String sku, UUID categoryId,
                                  String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes) {
         Product product = getProductById(id);
-
-        // Determine effective category and subcategory for validation
-        ProductCategory effectiveCategory = category != null ? category : product.getCategory();
-        ProductSubcategory effectiveSubcategory = subcategory;
-        // If subcategory not provided, keep existing (unless category is changing away from BLIND_BOX)
-        if (subcategory == null && category == null) {
-            effectiveSubcategory = product.getSubcategory();
-        }
-        validateSubcategory(effectiveCategory, effectiveSubcategory);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
         }
 
         if (sku != null) product.setSku(sku);
-        if (category != null) {
-            product.setCategory(category);
-            // Auto-clear subcategory when changing away from BLIND_BOX
-            if (category != ProductCategory.BLIND_BOX) {
-                product.setSubcategory(null);
-            }
+        if (categoryId != null) {
+            Category newCategory = categoryService.getCategoryById(categoryId);
+            product.setCategory(newCategory);
         }
-        if (subcategory != null) product.setSubcategory(subcategory);
         if (name != null) product.setName(name);
         if (description != null) product.setDescription(description);
         if (reorderPoint != null) product.setReorderPoint(reorderPoint);
@@ -140,13 +128,5 @@ public class ProductService {
 
     public boolean existsBySku(String sku) {
         return productRepository.existsBySku(sku);
-    }
-
-    private void validateSubcategory(ProductCategory category, ProductSubcategory subcategory) {
-        if (subcategory != null && category != ProductCategory.BLIND_BOX) {
-            throw new InvalidSubcategoryException(
-                "Subcategory is only allowed for BLIND_BOX category"
-            );
-        }
     }
 }

@@ -6,11 +6,7 @@ import { ImageOff, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-  type Inventory,
-} from "@/types/api";
+import type { Inventory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface ProductTransferCardProps {
@@ -56,10 +52,7 @@ export function ProductTransferCard({
   }
 
   const hasImage = safeImageUrl && !imageError;
-  const categoryLabel = PRODUCT_CATEGORY_LABELS[item.category];
-  const subcategoryLabel = item.subcategory
-    ? PRODUCT_SUBCATEGORY_LABELS[item.subcategory]
-    : null;
+  const categoryLabel = item.category.name;
 
   return (
     <div className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
@@ -86,11 +79,6 @@ export function ProductTransferCard({
           <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
             {categoryLabel}
           </Badge>
-          {subcategoryLabel ? (
-            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
-              {subcategoryLabel}
-            </Badge>
-          ) : null}
         </div>
         <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 sm:hidden">
           Available: {maxQuantity}

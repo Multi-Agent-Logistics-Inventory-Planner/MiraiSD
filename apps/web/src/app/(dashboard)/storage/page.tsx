@@ -13,6 +13,7 @@ import {
   type NotAssignedInventory,
 } from "@/types/api";
 import { toStorageLocation } from "@/lib/location-utils";
+import { naturalSortCompare } from "@/lib/utils";
 import { LocationTabs } from "@/components/locations/location-tabs";
 import { LocationTable } from "@/components/locations/location-table";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
@@ -60,13 +61,17 @@ export default function LocationsPage() {
   const createMutation = useCreateLocationMutation(locationType);
   const updateMutation = useUpdateLocationMutation(locationType);
 
-  // Filter locations based on search (now using LocationWithCounts directly)
+  // Filter and sort locations based on search (now using LocationWithCounts directly)
   const filteredLocations = useMemo(() => {
     const q = search.trim().toLowerCase();
     const data = locationsQuery.data ?? [];
-    if (!q) return data;
+    const filtered = q
+      ? data.filter((x) => x.locationCode.toLowerCase().includes(q))
+      : data;
 
-    return data.filter((x) => x.locationCode.toLowerCase().includes(q));
+    return [...filtered].sort((a, b) =>
+      naturalSortCompare(a.locationCode, b.locationCode)
+    );
   }, [locationsQuery.data, search]);
 
   // Get paginated locations for the current page

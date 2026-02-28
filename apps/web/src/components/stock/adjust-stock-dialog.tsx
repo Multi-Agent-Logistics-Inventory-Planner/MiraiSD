@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  ProductCategory,
-  ProductSubcategory,
+  type Category,
   StockMovementReason,
 } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
@@ -67,10 +66,8 @@ export function AdjustStockDialog({
   const [action, setAction] = useState<AdjustAction>("subtract");
   const [quantity, setQuantity] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilters, setCategoryFilters] = useState<ProductCategory[]>([]);
-  const [subcategoryFilters, setSubcategoryFilters] = useState<
-    ProductSubcategory[]
-  >([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
 
   const adjustMutation = useAdjustStockMutation();
@@ -91,7 +88,7 @@ export function AdjustStockDialog({
       setQuantity(1);
       setSearchQuery("");
       setCategoryFilters([]);
-      setSubcategoryFilters([]);
+      setChildCategoryFilters([]);
       setQuantityWarning(null);
     }
   }, [open]);
@@ -112,7 +109,7 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
     setSearchQuery("");
     setCategoryFilters([]);
-    setSubcategoryFilters([]);
+    setChildCategoryFilters([]);
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
@@ -131,29 +128,34 @@ export function AdjustStockDialog({
   }, [productsWithStock]);
 
   const availableCategories = useMemo(() => {
-    const categories = new Set<ProductCategory>();
+    const categoryMap = new Map<string, Category>();
     const items = action === "subtract" ? inventory : productsWithStock;
     items.forEach((item) => {
       const category =
         "item" in item ? item.item.category : item.product.category;
       if (category) {
-        categories.add(category);
+        categoryMap.set(category.id, category);
       }
     });
-    return Array.from(categories).sort();
+    return Array.from(categoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [action, inventory, productsWithStock]);
 
-  const availableSubcategories = useMemo(() => {
-    const subcategories = new Set<ProductSubcategory>();
+  // Get child categories (categories with a parentId) from inventory or products
+  const availableChildCategories = useMemo(() => {
+    const childCategoryMap = new Map<string, Category>();
     const items = action === "subtract" ? inventory : productsWithStock;
     items.forEach((item) => {
-      const subcategory =
-        "item" in item ? item.item.subcategory : item.product.subcategory;
-      if (subcategory) {
-        subcategories.add(subcategory);
+      const category =
+        "item" in item ? item.item.category : item.product.category;
+      if (category?.parentId) {
+        childCategoryMap.set(category.id, category);
       }
     });
-    return Array.from(subcategories).sort();
+    return Array.from(childCategoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [action, inventory, productsWithStock]);
 
   const selectedInventory = useMemo(() => {
@@ -266,17 +268,14 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
   }
 
-  function handleCategoryChange(categories: ProductCategory[]) {
+  function handleCategoryChange(categories: string[]) {
     setCategoryFilters(categories);
-    // Clear subcategory filters if Blind Box is deselected
-    if (!categories.includes(ProductCategory.BLIND_BOX)) {
-      setSubcategoryFilters([]);
-    }
+    setChildCategoryFilters([]);
   }
 
   function handleClearFilters() {
     setCategoryFilters([]);
-    setSubcategoryFilters([]);
+    setChildCategoryFilters([]);
     setSearchQuery("");
   }
 
@@ -472,14 +471,14 @@ export function AdjustStockDialog({
                 itemCount={sourceListCount}
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
-                subcategoryFilters={subcategoryFilters}
+                childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
-                availableSubcategories={availableSubcategories}
+                availableChildCategories={availableChildCategories}
                 disabled={isAdjusting}
                 showFilters={sourceListCount > 0}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
-                onSubcategoryChange={setSubcategoryFilters}
+                onChildCategoryChange={setChildCategoryFilters}
                 onClearFilters={handleClearFilters}
               />
 
@@ -509,7 +508,9 @@ export function AdjustStockDialog({
                 noResultsMessage="No products found"
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
-                subcategoryFilters={subcategoryFilters}
+                childCategoryFilters={childCategoryFilters}
+                availableCategories={availableCategories}
+                availableChildCategories={availableChildCategories}
               />
             </div>
           ) : hasValidLocation &&

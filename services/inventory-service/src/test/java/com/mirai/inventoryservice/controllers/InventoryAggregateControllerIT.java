@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
 import com.mirai.inventoryservice.models.inventory.RackInventory;
 import com.mirai.inventoryservice.models.inventory.NotAssignedInventory;
@@ -32,6 +32,9 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
     private ProductRepository productRepository;
 
     @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
     private BoxBinRepository boxBinRepository;
 
     @Autowired
@@ -49,13 +52,19 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
     private Product testProduct;
     private BoxBin testBoxBin;
     private Rack testRack;
+    private Category testCategory;
 
     @BeforeEach
     void setUp() {
+        testCategory = categoryRepository.save(Category.builder()
+                .name("Test Category")
+                .slug("test-category-" + UUID.randomUUID())
+                .build());
+
         testProduct = productRepository.save(Product.builder()
                 .sku("TEST-AGG-001")
                 .name("Test Aggregate Product")
-                .category(ProductCategory.FIGURINE)
+                .category(testCategory)
                 .build());
 
         testBoxBin = boxBinRepository.save(BoxBin.builder().boxBinCode("B98").build());

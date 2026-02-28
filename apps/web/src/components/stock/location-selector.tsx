@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { useLocations } from "@/hooks/queries/use-locations";
 import { LocationType, type StorageLocation } from "@/types/api";
+import { naturalSortCompare } from "@/lib/utils";
 import {
   CODE_TO_LOCATION_TYPE,
   LOCATION_TYPE_OPTIONS,
@@ -117,7 +118,7 @@ export function LocationSelector({
         }
         return true;
       })
-      .sort((a, b) => a.code.localeCompare(b.code));
+      .sort((a, b) => naturalSortCompare(a.code, b.code));
   }, [locationsQuery.data, value.locationType, excludeLocation, isNotAssigned]);
 
   function handleTypeChange(typeCode: string) {

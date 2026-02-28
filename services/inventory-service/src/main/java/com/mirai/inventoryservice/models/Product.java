@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.models;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,10 +29,9 @@ public class Product {
     private String sku;
 
     @NotNull
-    @Column(nullable = false)
-    private ProductCategory category;
-
-    private ProductSubcategory subcategory;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
     @NotBlank
     @Column(nullable = false)

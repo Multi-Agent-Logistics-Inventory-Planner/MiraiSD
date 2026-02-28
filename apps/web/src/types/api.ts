@@ -1,53 +1,22 @@
-// Enums matching backend
+// Category types (dynamic, from database with self-referencing hierarchy)
 
-export enum ProductCategory {
-  PLUSHIE = "PLUSHIE",
-  KEYCHAIN = "KEYCHAIN",
-  FIGURINE = "FIGURINE",
-  GACHAPON = "GACHAPON",
-  BLIND_BOX = "BLIND_BOX",
-  BUILD_KIT = "BUILD_KIT",
-  GUNDAM = "GUNDAM",
-  KUJI = "KUJI",
-  MISCELLANEOUS = "MISCELLANEOUS",
+export interface Category {
+  id: string;
+  parentId: string | null;
+  name: string;
+  slug: string;
+  displayOrder: number;
+  isActive: boolean;
+  children: Category[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export enum ProductSubcategory {
-  DREAMS = "DREAMS",
-  POKEMON = "POKEMON",
-  POPMART = "POPMART",
-  SANRIO_SAN_X = "SANRIO_SAN_X",
-  FIFTY_TWO_TOYS = "FIFTY_TWO_TOYS",
-  ROLIFE = "ROLIFE",
-  TOY_CITY = "TOY_CITY",
-  MINISO = "MINISO",
-  MISCELLANEOUS = "MISCELLANEOUS",
+export interface CategoryRequest {
+  name: string;
+  parentId?: string;
+  displayOrder?: number;
 }
-
-// Display labels for enums
-export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
-  [ProductCategory.PLUSHIE]: "Plushie",
-  [ProductCategory.KEYCHAIN]: "Keychain",
-  [ProductCategory.FIGURINE]: "Figurine",
-  [ProductCategory.GACHAPON]: "Gachapon",
-  [ProductCategory.BLIND_BOX]: "Blind Box",
-  [ProductCategory.BUILD_KIT]: "Build Kit",
-  [ProductCategory.GUNDAM]: "Gundam",
-  [ProductCategory.KUJI]: "Kuji",
-  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
-};
-
-export const PRODUCT_SUBCATEGORY_LABELS: Record<ProductSubcategory, string> = {
-  [ProductSubcategory.DREAMS]: "Dreams",
-  [ProductSubcategory.POKEMON]: "Pokemon",
-  [ProductSubcategory.POPMART]: "Pop Mart",
-  [ProductSubcategory.SANRIO_SAN_X]: "Sanrio / San-X",
-  [ProductSubcategory.FIFTY_TWO_TOYS]: "52 Toys",
-  [ProductSubcategory.ROLIFE]: "Rolife",
-  [ProductSubcategory.TOY_CITY]: "Toy City",
-  [ProductSubcategory.MINISO]: "Miniso",
-  [ProductSubcategory.MISCELLANEOUS]: "Miscellaneous",
-};
 
 export enum LocationType {
   BOX_BIN = "BOX_BIN",
@@ -142,8 +111,7 @@ export interface AuthValidationResponse {
 export interface Product {
   id: string;
   sku: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  category: Category;
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -159,8 +127,7 @@ export interface Product {
 
 export interface ProductRequest {
   sku: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  categoryId: string;
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -299,8 +266,7 @@ export interface InventoryItem {
   id: string;
   sku: string;
   name: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  category: Category;
   imageUrl?: string;
 }
 
@@ -749,8 +715,10 @@ export interface InventoryTotal {
   sku: string;
   name: string;
   imageUrl: string | null;
-  category: string;
-  subcategory: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  parentCategoryId: string | null;
+  parentCategoryName: string | null;
   unitCost: number | null;
   isActive: boolean;
   totalQuantity: number;

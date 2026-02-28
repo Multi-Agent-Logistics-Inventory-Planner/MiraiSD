@@ -240,7 +240,7 @@ export function LocationDetailSheet({
                             variant="outline"
                             className={cn("text-xs")}
                           >
-                            {inv.item.category}
+                            {inv.item.category.name}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">{inv.quantity}</TableCell>

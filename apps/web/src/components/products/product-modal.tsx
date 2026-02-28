@@ -34,8 +34,6 @@ import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product"
 import { usePermissions } from "@/hooks/use-permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
   LOCATION_TYPE_LABELS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
@@ -135,13 +133,8 @@ export function ProductModal({
                 Category:
               </span>
               <Badge variant="secondary" className="text-xs shrink-0">
-                {PRODUCT_CATEGORY_LABELS[p.category]}
+                {p.category.name}
               </Badge>
-              {p.subcategory && (
-                <Badge variant="outline" className="text-xs shrink-0">
-                  {PRODUCT_SUBCATEGORY_LABELS[p.subcategory]}
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs sm:text-sm">

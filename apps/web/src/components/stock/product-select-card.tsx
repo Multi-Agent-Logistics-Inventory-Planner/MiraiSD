@@ -4,11 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Check, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-  type Inventory,
-} from "@/types/api";
+import type { Inventory } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
@@ -30,10 +26,7 @@ export function ProductSelectCard({
 
   const safeImageUrl = getSafeImageUrl(item.imageUrl);
   const hasImage = safeImageUrl && !imageError;
-  const categoryLabel = PRODUCT_CATEGORY_LABELS[item.category];
-  const subcategoryLabel = item.subcategory
-    ? PRODUCT_SUBCATEGORY_LABELS[item.subcategory]
-    : null;
+  const categoryLabel = item.category.name;
 
   return (
     <button
@@ -77,11 +70,6 @@ export function ProductSelectCard({
           <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
             {categoryLabel}
           </Badge>
-          {subcategoryLabel ? (
-            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
-              {subcategoryLabel}
-            </Badge>
-          ) : null}
         </div>
       </div>
 

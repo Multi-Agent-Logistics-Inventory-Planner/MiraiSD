@@ -1,9 +1,9 @@
 package com.mirai.inventoryservice.controllers;
 
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
@@ -11,6 +11,7 @@ import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
+import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
@@ -51,6 +52,7 @@ public class DevSeedController {
     private final BoxBinRepository boxBinRepository;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final ShipmentRepository shipmentRepository;
+    private final CategoryRepository categoryRepository;
 
     private final Random random = new Random();
 
@@ -64,17 +66,22 @@ public class DevSeedController {
         }
 
         // 1. Products (15)
-        ProductCategory[] categories = ProductCategory.values();
+        List<Category> categories = categoryRepository.findByParentIsNullAndIsActiveTrueOrderByDisplayOrderAsc();
+        if (categories.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "No categories found. Run the database migration first."
+            ));
+        }
         List<Product> products = new ArrayList<>();
         for (int i = 0; i < 15; i++) {
-            ProductCategory category = categories[i % categories.length];
+            Category category = categories.get(i % categories.size());
             BigDecimal unitCost = BigDecimal.valueOf(5 + random.nextInt(50))
                 .add(BigDecimal.valueOf(random.nextInt(100)).divide(BigDecimal.valueOf(100)));
             products.add(Product.builder()
                 .sku("DEV-" + String.format("%04d", i + 1))
                 .name("Test Product " + (i + 1))
                 .category(category)
-                .description("Development test product for " + category.name())
+                .description("Development test product for " + category.getName())
                 .unitCost(unitCost)
                 .reorderPoint(5 + random.nextInt(10))
                 .targetStockLevel(20 + random.nextInt(30))
@@ -259,11 +266,17 @@ public class DevSeedController {
     public ResponseEntity<Map<String, Object>> seedProducts(
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int count) {
 
+        List<Category> categories = categoryRepository.findByParentIsNullAndIsActiveTrueOrderByDisplayOrderAsc();
+        if (categories.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No categories found. Run the database migration first."
+            ));
+        }
+
         List<Product> products = new ArrayList<>();
-        ProductCategory[] categories = ProductCategory.values();
 
         for (int i = 0; i < count; i++) {
-            ProductCategory category = categories[random.nextInt(categories.length)];
+            Category category = categories.get(random.nextInt(categories.size()));
             BigDecimal unitCost = BigDecimal.valueOf(5 + random.nextInt(50))
                 .add(BigDecimal.valueOf(random.nextInt(100)).divide(BigDecimal.valueOf(100)));
 
@@ -271,7 +284,7 @@ public class DevSeedController {
                 .sku("DEV-" + String.format("%04d", i + 1))
                 .name("Test Product " + (i + 1))
                 .category(category)
-                .description("Development test product for " + category.name())
+                .description("Development test product for " + category.getName())
                 .unitCost(unitCost)
                 .reorderPoint(5 + random.nextInt(10))
                 .targetStockLevel(20 + random.nextInt(30))

@@ -2,8 +2,8 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.FourCornerMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.inventory.FourCornerMachineInventory;
 import com.mirai.inventoryservice.models.storage.FourCornerMachine;
 import com.mirai.inventoryservice.repositories.FourCornerMachineInventoryRepository;
@@ -42,6 +42,7 @@ class FourCornerMachineInventoryServiceTest {
     private FourCornerMachine testMachine;
     private Product testProduct;
     private FourCornerMachineInventory testInventory;
+    private Category testCategory;
     private UUID machineId;
     private UUID productId;
     private UUID inventoryId;
@@ -57,11 +58,17 @@ class FourCornerMachineInventoryServiceTest {
                 .fourCornerMachineCode("M1")
                 .build();
 
+        testCategory = Category.builder()
+                .id(UUID.randomUUID())
+                .name("Test Category")
+                .slug("test-category")
+                .build();
+
         testProduct = Product.builder()
                 .id(productId)
                 .sku("SKU-001")
                 .name("Test Product")
-                .category(ProductCategory.PLUSHIE)
+                .category(testCategory)
                 .build();
 
         testInventory = FourCornerMachineInventory.builder()
@@ -142,7 +149,7 @@ class FourCornerMachineInventoryServiceTest {
             FourCornerMachineInventory inventory2 = FourCornerMachineInventory.builder()
                     .id(UUID.randomUUID())
                     .fourCornerMachine(testMachine)
-                    .item(Product.builder().id(UUID.randomUUID()).sku("SKU-002").name("Product 2").category(ProductCategory.PLUSHIE).build())
+                    .item(Product.builder().id(UUID.randomUUID()).sku("SKU-002").name("Product 2").category(testCategory).build())
                     .quantity(5)
                     .build();
 
