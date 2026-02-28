@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import {
 } from "@/hooks/mutations/use-product-mutations";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
+import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { Product, ProductRequest, Category } from "@/types/api";
 
 const schema = z.object({
@@ -75,6 +76,7 @@ export function ProductForm({
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
@@ -316,6 +318,15 @@ export function ProductForm({
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setManageCategoriesOpen(true)}
+                      title="Manage categories"
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </Button>
                   </div>
                   {form.formState.errors.categoryId?.message ? (
                     <p className="text-xs text-destructive">
@@ -418,6 +429,11 @@ export function ProductForm({
         onOpenChange={setAddSubcategoryOpen}
         initialCategoryId={rootCategoryId}
         onSubcategoryCreated={handleSubcategoryCreated}
+      />
+
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onOpenChange={setManageCategoriesOpen}
       />
     </>
   );

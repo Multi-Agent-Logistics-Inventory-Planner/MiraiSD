@@ -6,3 +6,4 @@ export { ProductPagination } from "./product-pagination";
 export { ProductModal } from "./product-modal";
 export { ProductForm } from "./product-form";
 export { DeleteProductDialog } from "./delete-product-dialog";
+export { ManageCategoriesDialog } from "./manage-categories-dialog";
