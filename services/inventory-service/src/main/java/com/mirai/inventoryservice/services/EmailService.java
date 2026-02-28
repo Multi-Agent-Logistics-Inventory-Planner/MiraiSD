@@ -90,7 +90,7 @@ public class EmailService {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
             </head>
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                <div style="background: #2563eb; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
                     <h1 style="color: white; margin: 0; font-size: 24px;">Mirai Inventory</h1>
                 </div>
 
@@ -104,13 +104,13 @@ public class EmailService {
                     <p>Click the button below to accept your invitation and set up your account:</p>
 
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="%s" style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+                        <a href="%s" style="background: #2563eb; color: white; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
                             Accept Invitation
                         </a>
                     </div>
 
                     <p style="color: #666; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
-                    <p style="color: #667eea; font-size: 14px; word-break: break-all;">%s</p>
+                    <p style="color: #2563eb; font-size: 14px; word-break: break-all;">%s</p>
 
                     <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
 
