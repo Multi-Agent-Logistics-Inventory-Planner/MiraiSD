@@ -46,7 +46,6 @@ export default function SettingsPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -55,16 +54,15 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setFullName(user.personName || "");
-      setEmail(user.email || "");
     }
   }, [user]);
 
   async function handleSaveProfile() {
     if (!user?.personId) return;
-    if (!fullName || !email) {
+    if (!fullName) {
       toast({
         title: "Validation error",
-        description: "Name and email are required.",
+        description: "Name is required.",
         variant: "destructive",
       });
       return;
@@ -75,7 +73,7 @@ export default function SettingsPage() {
     try {
       await updateUser(user.personId, {
         fullName,
-        email,
+        email: user.email,
         role: user.role,
       });
       await refreshAuth();
@@ -128,8 +126,7 @@ export default function SettingsPage() {
     }
   }
 
-  const hasChanges =
-    fullName !== (user?.personName || "") || email !== (user?.email || "");
+  const hasChanges = fullName !== (user?.personName || "");
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -194,13 +191,7 @@ export default function SettingsPage() {
                   {/* Email */}
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Email</Label>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isSaving}
-                      className="max-w-md bg-accent/50 border-0"
-                    />
+                    <p className="text-sm">{user?.email}</p>
                   </div>
 
                   {/* Role */}

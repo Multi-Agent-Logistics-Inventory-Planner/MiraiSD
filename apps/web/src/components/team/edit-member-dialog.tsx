@@ -33,7 +33,6 @@ interface EditMemberDialogProps {
 
 export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: EditMemberDialogProps) {
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>(UserRole.EMPLOYEE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,15 +40,14 @@ export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: Edit
   useEffect(() => {
     if (member) {
       setFullName(member.fullName);
-      setEmail(member.email);
       setRole(member.role);
       setError(null);
     }
   }, [member]);
 
   const handleSubmit = async () => {
-    if (!member || !fullName || !email) {
-      setError("Name and email are required");
+    if (!member || !fullName) {
+      setError("Name is required");
       return;
     }
 
@@ -57,7 +55,7 @@ export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: Edit
     setError(null);
 
     try {
-      await updateUser(member.id, { fullName, email, role });
+      await updateUser(member.id, { fullName, email: member.email, role });
       onSuccess();
       onOpenChange(false);
     } catch (err) {
@@ -86,13 +84,7 @@ export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: Edit
           </div>
           <div className="grid gap-2">
             <Label htmlFor="edit-email">Email</Label>
-            <Input
-              id="edit-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isSubmitting}
-            />
+            <p className="text-sm text-muted-foreground py-2">{member?.email}</p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="edit-role">Role</Label>
