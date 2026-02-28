@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Settings2 } from "lucide-react";
+import { Loader2, Minus, Plus, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,16 +25,27 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { useAuth } from "@/hooks/use-auth";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import { useCategories, useChildCategories } from "@/hooks/queries/use-categories";
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
 } from "@/hooks/mutations/use-product-mutations";
+import { createInventory } from "@/lib/api/inventory";
+import { adjustStock } from "@/lib/api/stock-movements";
+import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
-import type { Product, ProductRequest, Category } from "@/types/api";
+import type { Product, ProductRequest, Category, StockMovementReason } from "@/types/api";
+import type { LocationSelection } from "@/types/transfer";
+
+const EMPTY_LOCATION: LocationSelection = {
+  locationType: null,
+  locationId: null,
+  locationCode: "",
+};
 
 const schema = z.object({
   sku: z.string().min(1, "SKU is required"),
@@ -68,6 +79,7 @@ export function ProductForm({
   initialProduct,
 }: ProductFormProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
@@ -81,6 +93,13 @@ export function ProductForm({
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
+
+  // Initial stock state (create mode only)
+  const [initialStockEnabled, setInitialStockEnabled] = useState(false);
+  const [initialStockLocation, setInitialStockLocation] =
+    useState<LocationSelection>(EMPTY_LOCATION);
+  const [initialStockQty, setInitialStockQty] = useState(1);
+  const [isAddingStock, setIsAddingStock] = useState(false);
 
   const childCategories = useChildCategories(rootCategoryId);
   const hasChildCategories = childCategories.length > 0;
@@ -150,6 +169,11 @@ export function ProductForm({
       form.reset();
       resetImage();
     }
+
+    // Always reset initial stock fields when dialog opens/closes
+    setInitialStockEnabled(false);
+    setInitialStockLocation(EMPTY_LOCATION);
+    setInitialStockQty(1);
   }, [open, initialProduct, form, resetImage]);
 
   // Update categoryId based on subcategory selection
@@ -164,7 +188,8 @@ export function ProductForm({
   const isSaving =
     createMutation.isPending ||
     updateMutation.isPending ||
-    imageUpload.isUploading;
+    imageUpload.isUploading ||
+    isAddingStock;
 
   async function onSubmit(values: FormValues) {
     // Upload image first if a new file was selected
@@ -213,8 +238,48 @@ export function ProductForm({
           });
         }
       } else {
-        await createMutation.mutateAsync(payload);
+        const newProduct = await createMutation.mutateAsync(payload);
         toast({ title: "Product created" });
+
+        // Optionally add initial stock after product creation
+        if (
+          initialStockEnabled &&
+          initialStockQty > 0 &&
+          initialStockLocation.locationType &&
+          initialStockLocation.locationId
+        ) {
+          setIsAddingStock(true);
+          try {
+            const actorId = user?.personId ?? user?.id ?? "";
+            const inv = await createInventory(
+              initialStockLocation.locationType,
+              initialStockLocation.locationId,
+              { itemId: newProduct.id, quantity: 0 }
+            );
+            await adjustStock(
+              initialStockLocation.locationType,
+              inv.id,
+              {
+                quantityChange: initialStockQty,
+                reason: "INITIAL_STOCK" as StockMovementReason,
+                actorId,
+              }
+            );
+            toast({ title: "Initial stock added" });
+          } catch (stockErr: unknown) {
+            const msg =
+              stockErr instanceof Error
+                ? stockErr.message
+                : "Stock could not be added";
+            toast({
+              title: "Product created, but stock was not added",
+              description: msg,
+              variant: "destructive",
+            });
+          } finally {
+            setIsAddingStock(false);
+          }
+        }
       }
       onOpenChange(false);
     } catch (err: unknown) {
@@ -397,6 +462,76 @@ export function ProductForm({
                   />
                 </div>
               </div>
+
+              {/* Initial stock — create mode only */}
+              {!initialProduct && (
+                <div className="border rounded-lg p-4 space-y-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-input accent-primary"
+                      checked={initialStockEnabled}
+                      onChange={(e) => setInitialStockEnabled(e.target.checked)}
+                      disabled={isSaving}
+                    />
+                    <span className="text-sm font-medium">Add initial stock</span>
+                  </label>
+
+                  {initialStockEnabled && (
+                    <div className="space-y-4 pt-1">
+                      <div className="grid gap-2">
+                        <Label>Location</Label>
+                        <LocationSelector
+                          label=""
+                          value={initialStockLocation}
+                          onChange={setInitialStockLocation}
+                          disabled={isSaving}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="initial-stock-qty">Quantity</Label>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shrink-0"
+                            disabled={initialStockQty <= 1 || isSaving}
+                            onClick={() =>
+                              setInitialStockQty((q) => Math.max(1, q - 1))
+                            }
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Input
+                            id="initial-stock-qty"
+                            type="number"
+                            min={1}
+                            className="text-center"
+                            value={initialStockQty}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              if (!isNaN(v) && v >= 1) setInitialStockQty(v);
+                            }}
+                            disabled={isSaving}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shrink-0"
+                            disabled={isSaving}
+                            onClick={() => setInitialStockQty((q) => q + 1)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter className="px-6 py-4">
