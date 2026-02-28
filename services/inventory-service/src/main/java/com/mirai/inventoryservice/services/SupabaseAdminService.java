@@ -41,6 +41,48 @@ public class SupabaseAdminService {
      * @return the invitation link
      */
     public String generateInviteLink(String email, String role) {
+        return generateLink(email, role, "invite");
+    }
+
+    /**
+     * Generates a magic link for an existing user.
+     * Used when resending invites to users who already exist in Supabase.
+     *
+     * @param email the email address
+     * @param role the role (for metadata)
+     * @return the magic link
+     */
+    public String generateMagicLink(String email, String role) {
+        return generateLink(email, role, "magiclink");
+    }
+
+    /**
+     * Checks if a user already exists in Supabase auth.
+     *
+     * @param email the email to check
+     * @return true if user exists
+     */
+    public boolean userExistsInSupabase(String email) {
+        String url = supabaseUrl + "/auth/v1/admin/users?filter=email.eq." + email;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", serviceRoleKey);
+        headers.setBearerAuth(serviceRoleKey);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+            JsonNode responseJson = objectMapper.readTree(response.getBody());
+            JsonNode users = responseJson.get("users");
+            return users != null && users.isArray() && users.size() > 0;
+        } catch (Exception e) {
+            log.warn("Failed to check if user exists: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private String generateLink(String email, String role, String type) {
         String url = supabaseUrl + "/auth/v1/admin/generate_link";
 
         HttpHeaders headers = new HttpHeaders();
@@ -49,7 +91,7 @@ public class SupabaseAdminService {
         headers.setBearerAuth(serviceRoleKey);
 
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("type", "invite");
+        body.put("type", type);
         body.put("email", email);
         body.put("redirect_to", invitationRedirectUrl);
 
@@ -61,21 +103,21 @@ public class SupabaseAdminService {
         try {
             request = new HttpEntity<>(objectMapper.writeValueAsString(body), headers);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to serialize invite request", e);
+            throw new RuntimeException("Failed to serialize request", e);
         }
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("Failed to generate invite link: {}", response.getBody());
-                throw new RuntimeException("Failed to generate invite link: " + response.getStatusCode());
+                log.error("Failed to generate {} link: {}", type, response.getBody());
+                throw new RuntimeException("Failed to generate link: " + response.getStatusCode());
             }
 
             JsonNode responseJson = objectMapper.readTree(response.getBody());
             String actionLink = responseJson.get("action_link").asText();
 
-            log.info("Generated invite link for {}", email);
+            log.info("Generated {} link for {}", type, email);
             return actionLink;
         } catch (HttpClientErrorException e) {
             log.error("Supabase generate_link error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
@@ -83,10 +125,10 @@ public class SupabaseAdminService {
             if (e.getStatusCode() == HttpStatus.UNPROCESSABLE_ENTITY) {
                 throw new RuntimeException("User already exists or email is invalid");
             }
-            throw new RuntimeException("Failed to generate invite link: " + e.getMessage());
+            throw new RuntimeException("Failed to generate link: " + e.getMessage());
         } catch (Exception e) {
             log.error("Error parsing Supabase response: {}", e.getMessage());
-            throw new RuntimeException("Failed to parse invite response: " + e.getMessage());
+            throw new RuntimeException("Failed to parse response: " + e.getMessage());
         }
     }
 
