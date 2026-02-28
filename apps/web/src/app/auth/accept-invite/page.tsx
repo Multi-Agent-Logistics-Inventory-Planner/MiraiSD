@@ -174,7 +174,13 @@ function AcceptInviteContent() {
         });
       }
 
-      router.push("/");
+      // Redirect based on role - employees go to storage, admins go to dashboard
+      const userRole = sessionData.session?.user?.user_metadata?.role;
+      if (userRole === "EMPLOYEE") {
+        router.push("/storage");
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       setError("Failed to complete profile setup");
       setIsLoading(false);
