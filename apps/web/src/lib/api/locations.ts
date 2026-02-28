@@ -18,6 +18,7 @@ import {
   KeychainMachineRequest,
   FourCornerMachineRequest,
   PusherMachineRequest,
+  LocationWithCounts,
 } from "@/types/api";
 
 // Generic location API functions
@@ -336,4 +337,20 @@ export async function getLocationsByType(
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }
+}
+
+// Optimized batch API - fetches all locations with inventory counts in one request
+
+/**
+ * Fetch all locations with their inventory counts in a single request.
+ * Replaces the N+1 pattern of fetching locations then counts individually.
+ *
+ * @param locationType Optional filter by location type
+ * @returns List of locations with inventory record counts and total quantities
+ */
+export async function getLocationsWithCounts(
+  locationType?: LocationType
+): Promise<LocationWithCounts[]> {
+  const params = locationType ? `?type=${locationType}` : "";
+  return apiGet<LocationWithCounts[]>(`/api/locations/with-counts${params}`);
 }

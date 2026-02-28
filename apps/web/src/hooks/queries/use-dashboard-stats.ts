@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
-import type { ProductCategory, Product } from "@/types/api";
+import type { Product } from "@/types/api";
 import type { DashboardStats, StockLevelItem, StockStatus, CategoryData } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useInventoryTotals } from "@/hooks/queries/use-inventory-totals";
+import { getAuditLogLast30Days } from "@/lib/api/dashboard";
 
 function getStatus(quantity: number, reorderPoint?: number): StockStatus {
   if (quantity <= 0) return "out-of-stock";
@@ -17,15 +19,6 @@ function getStatus(quantity: number, reorderPoint?: number): StockStatus {
   return "good";
 }
 
-function getCategoryLabel(category: ProductCategory): string {
-  // Convert enum-ish values like "BLIND_BOX" -> "Blind Box"
-  return category
-    .toString()
-    .toLowerCase()
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 function getChartFill(index: number): string {
   const slot = (index % 5) + 1;
@@ -42,7 +35,8 @@ function toRelativeTime(isoOrDateLike: string | undefined): string {
 function buildStockLevelItem(
   product: Product,
   quantity: number,
-  lastUpdatedAt: string | undefined
+  lastUpdatedAt: string | undefined,
+  daysToStockout?: number
 ): StockLevelItem {
   const maxStock =
     product.targetStockLevel ??
@@ -57,12 +51,23 @@ function buildStockLevelItem(
     maxStock: Math.max(1, maxStock),
     status: getStatus(quantity, product.reorderPoint),
     lastUpdated: toRelativeTime(lastUpdatedAt),
+    daysToStockout,
   };
 }
 
-export function useDashboardStats() {
+interface UseDashboardStatsOptions {
+  forecastByItemId?: Record<string, number>;
+}
+
+export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
+  const { forecastByItemId } = options;
   const productsQuery = useProducts();
   const totalsQuery = useInventoryTotals();
+  const auditLogQuery = useQuery({
+    queryKey: ["audit-log", "last-30-days"],
+    queryFn: getAuditLogLast30Days,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const data: DashboardStats | null = useMemo(() => {
     const products = productsQuery.data;
@@ -77,44 +82,79 @@ export function useDashboardStats() {
     let outOfStockItems = 0;
 
     const categoryQty = new Map<string, number>();
+    const unitCostByItemId = new Map<string, number>();
+
+    const lastMovementByItemId = new Map<string, string>();
+    for (const entry of auditLogQuery.data ?? []) {
+      const existing = lastMovementByItemId.get(entry.itemId);
+      if (!existing || entry.at > existing) {
+        lastMovementByItemId.set(entry.itemId, entry.at);
+      }
+    }
 
     const stockLevels: StockLevelItem[] = products.map((p) => {
       const total = totalsByItemId[p.id];
       const qty = total?.quantity ?? 0;
 
       const status = getStatus(qty, p.reorderPoint);
-      if (status === "low") lowStockItems += 1;
+      const reorderPoint = p.reorderPoint ?? 0;
+      const approachingThreshold = reorderPoint > 0 ? Math.floor(reorderPoint * 1.5) : 0;
+      const isApproaching =
+        status === "good" &&
+        qty > 0 &&
+        approachingThreshold > 0 &&
+        qty <= approachingThreshold;
+      if (status === "low" || isApproaching) lowStockItems += 1;
       if (status === "critical") criticalItems += 1;
       if (status === "out-of-stock") outOfStockItems += 1;
 
       const unitCost = p.unitCost ?? 0;
       totalStockValue += qty * unitCost;
+      unitCostByItemId.set(p.id, unitCost);
 
-      const catLabel = getCategoryLabel(p.category);
+      const catLabel = p.category.name;
       categoryQty.set(catLabel, (categoryQty.get(catLabel) ?? 0) + qty);
 
-      return buildStockLevelItem(p, qty, total?.lastUpdatedAt);
+      return buildStockLevelItem(
+        p,
+        qty,
+        lastMovementByItemId.get(p.id) ?? total?.lastUpdatedAt,
+        forecastByItemId?.[p.id]
+      );
     });
 
-    // Sort: worst status first, then lowest stock
-    const statusRank: Record<StockStatus, number> = {
-      "out-of-stock": 0,
-      critical: 1,
-      low: 2,
-      good: 3,
-    };
-    stockLevels.sort((a, b) => {
-      const ra = statusRank[a.status];
-      const rb = statusRank[b.status];
-      if (ra !== rb) return ra - rb;
-      return a.stock - b.stock;
-    });
+    // Compute stockValueChange from 30-day audit log
+    let stockValueChange: number | null = null;
+    if (auditLogQuery.data && auditLogQuery.data.length > 0) {
+      let netValueChange = 0;
+      for (const entry of auditLogQuery.data) {
+        const unitCost = unitCostByItemId.get(entry.itemId) ?? 0;
+        netValueChange += entry.quantityChange * unitCost;
+      }
+      const previousValue = totalStockValue - netValueChange;
+      if (previousValue !== 0) {
+        stockValueChange = Math.round((netValueChange / Math.abs(previousValue)) * 1000) / 10;
+      }
+    }
 
     const categoriesSorted = Array.from(categoryQty.entries())
       .filter(([, qty]) => qty > 0)
       .sort((a, b) => b[1] - a[1]);
 
-    const categoryDistribution: CategoryData[] = categoriesSorted.map(
+    const categoryTotal = categoriesSorted.reduce((sum, [, qty]) => sum + qty, 0);
+    const smallCategoryThreshold = categoryTotal * 0.05;
+    const significantCategories = categoriesSorted.filter(
+      ([, qty]) => qty >= smallCategoryThreshold
+    );
+    const otherTotal = categoriesSorted
+      .filter(([, qty]) => qty < smallCategoryThreshold)
+      .reduce((sum, [, qty]) => sum + qty, 0);
+    const groupedCategories: Array<[string, number]> =
+      otherTotal > 0
+        ? [...significantCategories, ["Other", otherTotal]]
+        : significantCategories;
+
+    const categoryDistribution: CategoryData[] = groupedCategories.map(
       ([name, value], idx) => ({
         name,
         value,
@@ -124,7 +164,7 @@ export function useDashboardStats() {
 
     return {
       totalStockValue,
-      stockValueChange: 0,
+      stockValueChange,
       lowStockItems,
       criticalItems,
       outOfStockItems,
@@ -132,7 +172,7 @@ export function useDashboardStats() {
       stockLevels,
       categoryDistribution,
     };
-  }, [productsQuery.data, totalsQuery.data]);
+  }, [productsQuery.data, totalsQuery.data, auditLogQuery.data, forecastByItemId]);
 
   return {
     data,
@@ -140,4 +180,3 @@ export function useDashboardStats() {
     error: productsQuery.error ?? totalsQuery.error,
   };
 }
-

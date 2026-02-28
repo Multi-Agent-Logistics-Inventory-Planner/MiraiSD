@@ -9,80 +9,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { LocationWithCounts } from "@/hooks/queries/use-locations";
-import type {
-  LocationType,
-  StorageLocation,
-  BoxBin,
-  Rack,
-  Cabinet,
-  SingleClawMachine,
-  DoubleClawMachine,
-  KeychainMachine,
-  FourCornerMachine,
-  PusherMachine,
-} from "@/types/api";
-
-function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
-  switch (locationType) {
-    case "BOX_BIN":
-      return (loc as BoxBin).boxBinCode;
-    case "RACK":
-      return (loc as Rack).rackCode;
-    case "CABINET":
-      return (loc as Cabinet).cabinetCode;
-    case "SINGLE_CLAW_MACHINE":
-      return (loc as SingleClawMachine).singleClawMachineCode;
-    case "DOUBLE_CLAW_MACHINE":
-      return (loc as DoubleClawMachine).doubleClawMachineCode;
-    case "KEYCHAIN_MACHINE":
-      return (loc as KeychainMachine).keychainMachineCode;
-    case "FOUR_CORNER_MACHINE":
-      return (loc as FourCornerMachine).fourCornerMachineCode;
-    case "PUSHER_MACHINE":
-      return (loc as PusherMachine).pusherMachineCode;
-    default:
-      return loc.id;
-  }
-}
-
-const LOCATION_TYPE_SHORT_LABELS: Record<LocationType, string> = {
-  BOX_BIN: "Box Bin",
-  RACK: "Rack",
-  CABINET: "Cabinet",
-  SINGLE_CLAW_MACHINE: "Single Claw",
-  DOUBLE_CLAW_MACHINE: "Double Claw",
-  KEYCHAIN_MACHINE: "Keychain",
-  FOUR_CORNER_MACHINE: "Four Corner",
-  PUSHER_MACHINE: "Pusher",
-  NOT_ASSIGNED: "Not Assigned",
-};
+import type { LocationWithCounts } from "@/types/api";
 
 interface LocationTableProps {
   items: LocationWithCounts[];
   isLoading: boolean;
   onRowClick: (item: LocationWithCounts) => void;
+  pageSize?: number;
 }
 
-export function LocationTable({ items, isLoading, onRowClick }: LocationTableProps) {
+export function LocationTable({
+  items,
+  isLoading,
+  onRowClick,
+  pageSize = 10,
+}: LocationTableProps) {
   if (isLoading) {
     return (
       <Table>
         <TableHeader className="bg-muted">
           <TableRow>
             <TableHead className="rounded-tl-lg">Location Code</TableHead>
-            <TableHead>Type</TableHead>
             <TableHead>Items</TableHead>
             <TableHead className="rounded-tr-lg">Total Units</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: pageSize }).map((_, i) => (
             <TableRow key={i}>
               <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-              <TableCell><Skeleton className="h-5 w-20" /></TableCell>
               <TableCell><Skeleton className="h-4 w-8" /></TableCell>
               <TableCell><Skeleton className="h-4 w-12" /></TableCell>
             </TableRow>
@@ -106,34 +62,24 @@ export function LocationTable({ items, isLoading, onRowClick }: LocationTablePro
       <TableHeader className="bg-muted">
         <TableRow>
           <TableHead className="rounded-tl-lg">Location Code</TableHead>
-          <TableHead>Type</TableHead>
           <TableHead>Items</TableHead>
           <TableHead className="rounded-tr-lg">Total Units</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {items.map((item) => {
-          const code = getLocationCode(item.locationType, item.location);
-
-          return (
-            <TableRow
-              key={item.location.id}
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => onRowClick(item)}
-            >
-              <TableCell className="font-mono text-sm">
-                {code}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="text-xs">
-                  {LOCATION_TYPE_SHORT_LABELS[item.locationType]}
-                </Badge>
-              </TableCell>
-              <TableCell>{item.inventoryRecords}</TableCell>
-              <TableCell>{item.totalQuantity}</TableCell>
-            </TableRow>
-          );
-        })}
+        {items.map((item) => (
+          <TableRow
+            key={item.id}
+            className="cursor-pointer hover:bg-muted/50"
+            onClick={() => onRowClick(item)}
+          >
+            <TableCell className="font-mono text-sm">
+              {item.locationCode}
+            </TableCell>
+            <TableCell>{item.inventoryRecords}</TableCell>
+            <TableCell>{item.totalQuantity}</TableCell>
+          </TableRow>
+        ))}
       </TableBody>
     </Table>
   );

@@ -19,14 +19,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
+import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import type { ShipmentStatus } from "@/types/api";
 import {
   LocationType,
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
 } from "@/types/api";
 
 interface ProductDetailSheetProps {
@@ -75,9 +73,10 @@ export function ProductDetailSheet({
   onTransferClick,
   onEditClick,
 }: ProductDetailSheetProps) {
-  const { data: locations, isLoading: locationsLoading } = useInventoryByItemId(
+  const { data: inventoryData, isLoading: locationsLoading } = useProductInventoryEntries(
     product?.product.id
   );
+  const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } = useShipmentsByProduct(
     product?.product.id
   );
@@ -135,10 +134,7 @@ export function ProductDetailSheet({
           <div className="flex-1 space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Category:</span>
-              <Badge variant="secondary">{PRODUCT_CATEGORY_LABELS[p.category]}</Badge>
-              {p.subcategory && (
-                <Badge variant="outline">{PRODUCT_SUBCATEGORY_LABELS[p.subcategory]}</Badge>
-              )}
+              <Badge variant="secondary">{p.category.name}</Badge>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Unit Cost:</span>

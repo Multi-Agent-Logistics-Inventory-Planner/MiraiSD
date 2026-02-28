@@ -18,9 +18,15 @@ interface NotAssignedTableProps {
   items: NotAssignedInventory[];
   isLoading: boolean;
   onRowClick: (item: NotAssignedInventory) => void;
+  pageSize?: number;
 }
 
-export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTableProps) {
+export function NotAssignedTable({
+  items,
+  isLoading,
+  onRowClick,
+  pageSize = 10,
+}: NotAssignedTableProps) {
   if (isLoading) {
     return (
       <Table>
@@ -33,7 +39,7 @@ export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTa
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: pageSize }).map((_, i) => (
             <TableRow key={i}>
               <TableCell><Skeleton className="h-4 w-20" /></TableCell>
               <TableCell><Skeleton className="h-4 w-48" /></TableCell>
@@ -95,7 +101,7 @@ export function NotAssignedTable({ items, isLoading, onRowClick }: NotAssignedTa
             <TableCell>{item.item.name}</TableCell>
             <TableCell>
               <Badge variant="outline" className="text-xs">
-                {item.item.category}
+                {item.item.category.name}
               </Badge>
             </TableCell>
             <TableCell>{item.quantity}</TableCell>

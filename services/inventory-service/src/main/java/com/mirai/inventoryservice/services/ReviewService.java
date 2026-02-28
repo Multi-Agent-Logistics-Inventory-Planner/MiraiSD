@@ -1,14 +1,12 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.dtos.responses.ReviewEmployeeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.UserReviewStatsResponseDTO;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.review.Review;
-import com.mirai.inventoryservice.models.review.ReviewEmployee;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
-import com.mirai.inventoryservice.repositories.ReviewEmployeeRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -26,81 +24,21 @@ import java.util.stream.Collectors;
 @Service
 public class ReviewService {
 
-    private final ReviewEmployeeRepository employeeRepository;
     private final ReviewDailyCountRepository dailyCountRepository;
     private final ReviewRepository reviewRepository;
     private final UserRepository userRepository;
 
     public ReviewService(
-            ReviewEmployeeRepository employeeRepository,
             ReviewDailyCountRepository dailyCountRepository,
             ReviewRepository reviewRepository,
             UserRepository userRepository) {
-        this.employeeRepository = employeeRepository;
         this.dailyCountRepository = dailyCountRepository;
         this.reviewRepository = reviewRepository;
         this.userRepository = userRepository;
     }
 
     // -------------------------------------------------------------------------
-    // Employee methods
-    // -------------------------------------------------------------------------
-
-    public List<ReviewEmployeeResponseDTO> getAllEmployees() {
-        return employeeRepository.findByIsActiveTrueOrderByCanonicalNameAsc()
-                .stream()
-                .map(this::toEmployeeDTO)
-                .collect(Collectors.toList());
-    }
-
-    public ReviewEmployeeResponseDTO getEmployeeById(UUID id) {
-        ReviewEmployee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Review employee not found: " + id));
-        return toEmployeeDTO(employee);
-    }
-
-    @Transactional
-    public ReviewEmployeeResponseDTO createEmployee(String canonicalName, List<String> nameVariants) {
-        if (employeeRepository.existsByCanonicalName(canonicalName)) {
-            throw new IllegalArgumentException("Employee with name already exists: " + canonicalName);
-        }
-
-        ReviewEmployee employee = ReviewEmployee.builder()
-                .canonicalName(canonicalName)
-                .nameVariants(nameVariants)
-                .isActive(true)
-                .build();
-
-        employee = employeeRepository.save(employee);
-        return toEmployeeDTO(employee);
-    }
-
-    @Transactional
-    public ReviewEmployeeResponseDTO updateEmployee(UUID id, String canonicalName, List<String> nameVariants, Boolean isActive) {
-        ReviewEmployee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Review employee not found: " + id));
-
-        if (canonicalName != null && !canonicalName.equals(employee.getCanonicalName())) {
-            if (employeeRepository.existsByCanonicalName(canonicalName)) {
-                throw new IllegalArgumentException("Employee with name already exists: " + canonicalName);
-            }
-            employee.setCanonicalName(canonicalName);
-        }
-
-        if (nameVariants != null) {
-            employee.setNameVariants(nameVariants);
-        }
-
-        if (isActive != null) {
-            employee.setIsActive(isActive);
-        }
-
-        employee = employeeRepository.save(employee);
-        return toEmployeeDTO(employee);
-    }
-
-    // -------------------------------------------------------------------------
-    // User-based review tracking methods (new)
+    // User-based review tracking methods
     // -------------------------------------------------------------------------
 
     public List<UserResponseDTO> getReviewTrackedUsers() {
@@ -153,31 +91,6 @@ public class ReviewService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        List<Object[]> results = dailyCountRepository.getMonthlySummaries(startDate, endDate);
-
-        return results.stream()
-                .map(row -> {
-                    UUID employeeId = (UUID) row[0];
-                    String employeeName = (String) row[1];
-                    Long totalReviews = (Long) row[2];
-                    Double avgPerDay = (Double) row[3];
-
-                    return ReviewSummaryResponseDTO.builder()
-                            .employeeId(employeeId)
-                            .employeeName(employeeName)
-                            .totalReviews(totalReviews.intValue())
-                            .averageReviewsPerDay(avgPerDay)
-                            .lastReviewDate(null)
-                            .build();
-                })
-                .collect(Collectors.toList());
-    }
-
-    public List<ReviewSummaryResponseDTO> getMonthlySummariesByUser(int year, int month) {
-        YearMonth yearMonth = YearMonth.of(year, month);
-        LocalDate startDate = yearMonth.atDay(1);
-        LocalDate endDate = yearMonth.atEndOfMonth();
-
         List<Object[]> results = dailyCountRepository.getMonthlySummariesByUser(startDate, endDate);
 
         return results.stream()
@@ -202,34 +115,82 @@ public class ReviewService {
     // Individual review methods
     // -------------------------------------------------------------------------
 
-    public Page<ReviewResponseDTO> getEmployeeReviews(UUID employeeId, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+    public Page<ReviewResponseDTO> getUserReviews(UUID userId, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         Page<Review> reviews;
 
         if (fromDate != null && toDate != null) {
-            reviews = reviewRepository.findByEmployeeIdAndDateRange(employeeId, fromDate, toDate, pageable);
+            reviews = reviewRepository.findByUserIdAndDateRangeWithUser(userId, fromDate, toDate, pageable);
         } else {
-            reviews = reviewRepository.findByEmployeeId(employeeId, pageable);
+            reviews = reviewRepository.findByUserIdWithUser(userId, pageable);
         }
 
         return reviews.map(this::toReviewDTO);
     }
 
     // -------------------------------------------------------------------------
-    // Helper methods
+    // User stats methods
     // -------------------------------------------------------------------------
 
-    private ReviewEmployeeResponseDTO toEmployeeDTO(ReviewEmployee employee) {
-        return ReviewEmployeeResponseDTO.builder()
-                .id(employee.getId())
-                .canonicalName(employee.getCanonicalName())
-                .nameVariants(employee.getNameVariants() != null
-                        ? employee.getNameVariants()
-                        : List.of())
-                .isActive(employee.getIsActive())
-                .createdAt(employee.getCreatedAt())
-                .updatedAt(employee.getUpdatedAt())
+    public UserReviewStatsResponseDTO getUserReviewStats(UUID userId, Integer year, Integer month) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        // Get all-time stats
+        List<Object[]> allTimeResults = dailyCountRepository.getAllTimeStatsByUser(userId);
+        Integer allTimeReviewCount = 0;
+        LocalDate firstReviewDate = null;
+        LocalDate lastReviewDate = null;
+
+        if (!allTimeResults.isEmpty() && allTimeResults.get(0)[0] != null) {
+            Object[] row = allTimeResults.get(0);
+            allTimeReviewCount = ((Number) row[0]).intValue();
+            firstReviewDate = (LocalDate) row[1];
+            lastReviewDate = (LocalDate) row[2];
+        }
+
+        // Get selected month stats and percentage
+        Integer selectedMonthReviewCount = 0;
+        Integer selectedMonthTotalReviews = null;
+        Double selectedMonthPercentage = null;
+        if (year != null && month != null) {
+            YearMonth yearMonth = YearMonth.of(year, month);
+            LocalDate startDate = yearMonth.atDay(1);
+            LocalDate endDate = yearMonth.atEndOfMonth();
+
+            List<Object[]> monthResults = dailyCountRepository.getMonthlySummariesByUser(startDate, endDate);
+            long totalInMonth = 0;
+            for (Object[] row : monthResults) {
+                long userTotal = ((Number) row[2]).longValue();
+                totalInMonth += userTotal;
+                if (userId.equals(row[0])) {
+                    selectedMonthReviewCount = (int) userTotal;
+                }
+            }
+            selectedMonthTotalReviews = (int) totalInMonth;
+            if (totalInMonth > 0) {
+                selectedMonthPercentage = 100.0 * selectedMonthReviewCount / totalInMonth;
+            }
+        }
+
+        // All-time rank (single query instead of loading all users' totals)
+        int allTimeRank = (int) dailyCountRepository.getAllTimeRankByUser(userId);
+
+        return UserReviewStatsResponseDTO.builder()
+                .userId(userId)
+                .userName(user.getFullName())
+                .allTimeReviewCount(allTimeReviewCount)
+                .firstReviewDate(firstReviewDate)
+                .lastReviewDate(lastReviewDate)
+                .selectedMonthReviewCount(selectedMonthReviewCount)
+                .selectedMonthTotalReviews(selectedMonthTotalReviews)
+                .selectedMonthPercentage(selectedMonthPercentage)
+                .allTimeRank(allTimeRank)
                 .build();
     }
+
+    // -------------------------------------------------------------------------
+    // Helper methods
+    // -------------------------------------------------------------------------
 
     private UserResponseDTO toUserDTO(User user) {
         return UserResponseDTO.builder()
@@ -251,8 +212,8 @@ public class ReviewService {
         return ReviewResponseDTO.builder()
                 .id(review.getId())
                 .externalId(review.getExternalId())
-                .employeeId(review.getEmployee() != null ? review.getEmployee().getId() : null)
-                .employeeName(review.getEmployee() != null ? review.getEmployee().getCanonicalName() : null)
+                .userId(review.getUser() != null ? review.getUser().getId() : null)
+                .userName(review.getUser() != null ? review.getUser().getFullName() : null)
                 .reviewDate(review.getReviewDate())
                 .reviewText(review.getReviewText())
                 .rating(review.getRating())

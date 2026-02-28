@@ -1,53 +1,22 @@
-// Enums matching backend
+// Category types (dynamic, from database with self-referencing hierarchy)
 
-export enum ProductCategory {
-  PLUSHIE = "PLUSHIE",
-  KEYCHAIN = "KEYCHAIN",
-  FIGURINE = "FIGURINE",
-  GACHAPON = "GACHAPON",
-  BLIND_BOX = "BLIND_BOX",
-  BUILD_KIT = "BUILD_KIT",
-  GUNDAM = "GUNDAM",
-  KUJI = "KUJI",
-  MISCELLANEOUS = "MISCELLANEOUS",
+export interface Category {
+  id: string;
+  parentId: string | null;
+  name: string;
+  slug: string;
+  displayOrder: number;
+  isActive: boolean;
+  children: Category[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export enum ProductSubcategory {
-  DREAMS = "DREAMS",
-  POKEMON = "POKEMON",
-  POPMART = "POPMART",
-  SANRIO_SAN_X = "SANRIO_SAN_X",
-  FIFTY_TWO_TOYS = "FIFTY_TWO_TOYS",
-  ROLIFE = "ROLIFE",
-  TOY_CITY = "TOY_CITY",
-  MINISO = "MINISO",
-  MISCELLANEOUS = "MISCELLANEOUS",
+export interface CategoryRequest {
+  name: string;
+  parentId?: string;
+  displayOrder?: number;
 }
-
-// Display labels for enums
-export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
-  [ProductCategory.PLUSHIE]: "Plushie",
-  [ProductCategory.KEYCHAIN]: "Keychain",
-  [ProductCategory.FIGURINE]: "Figurine",
-  [ProductCategory.GACHAPON]: "Gachapon",
-  [ProductCategory.BLIND_BOX]: "Blind Box",
-  [ProductCategory.BUILD_KIT]: "Build Kit",
-  [ProductCategory.GUNDAM]: "Gundam",
-  [ProductCategory.KUJI]: "Kuji",
-  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
-};
-
-export const PRODUCT_SUBCATEGORY_LABELS: Record<ProductSubcategory, string> = {
-  [ProductSubcategory.DREAMS]: "Dreams",
-  [ProductSubcategory.POKEMON]: "Pokemon",
-  [ProductSubcategory.POPMART]: "Pop Mart",
-  [ProductSubcategory.SANRIO_SAN_X]: "Sanrio / San-X",
-  [ProductSubcategory.FIFTY_TWO_TOYS]: "52 Toys",
-  [ProductSubcategory.ROLIFE]: "Rolife",
-  [ProductSubcategory.TOY_CITY]: "Toy City",
-  [ProductSubcategory.MINISO]: "Miniso",
-  [ProductSubcategory.MISCELLANEOUS]: "Miscellaneous",
-};
 
 export enum LocationType {
   BOX_BIN = "BOX_BIN",
@@ -142,8 +111,7 @@ export interface AuthValidationResponse {
 export interface Product {
   id: string;
   sku: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  category: Category;
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -159,8 +127,7 @@ export interface Product {
 
 export interface ProductRequest {
   sku: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  categoryId: string;
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -299,8 +266,7 @@ export interface InventoryItem {
   id: string;
   sku: string;
   name: string;
-  category: ProductCategory;
-  subcategory?: ProductSubcategory;
+  category: Category;
   imageUrl?: string;
 }
 
@@ -665,28 +631,9 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
 
 // Review types
 
-export interface ReviewEmployee {
-  id: string;
-  canonicalName: string;
-  nameVariants: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ReviewEmployeeRequest {
-  canonicalName?: string;
-  nameVariants?: string[];
-  isActive?: boolean;
-}
-
 export interface ReviewSummary {
-  // Legacy fields for backward compatibility
-  employeeId?: string;
-  employeeName?: string;
-  // New user-based fields
-  userId?: string;
-  userName?: string;
+  userId: string;
+  userName: string;
   totalReviews: number;
   averageReviewsPerDay: number;
   lastReviewDate: string | null;
@@ -695,11 +642,85 @@ export interface ReviewSummary {
 export interface Review {
   id: string;
   externalId: string;
-  employeeId: string;
-  employeeName: string;
+  userId: string;
+  userName: string;
   reviewDate: string;
   reviewText: string;
   rating: number;
   reviewerName: string;
   createdAt: string;
+}
+
+export interface UserReviewStats {
+  userId: string;
+  userName: string;
+  allTimeReviewCount: number;
+  firstReviewDate: string | null;
+  lastReviewDate: string | null;
+  selectedMonthReviewCount: number;
+  /** Total reviews across all users in the selected month (null if no month selected). */
+  selectedMonthTotalReviews: number | null;
+  /** This user's share of reviews in the selected month, 0–100 (null if no month or no reviews). */
+  selectedMonthPercentage: number | null;
+  allTimeRank: number;
+}
+
+// Optimized aggregate types for reducing N+1 queries
+
+/**
+ * Location with inventory counts from the batch endpoint.
+ * Replaces the N+1 pattern of fetching counts per location.
+ */
+export interface LocationWithCounts {
+  id: string;
+  locationType: LocationType;
+  locationCode: string;
+  inventoryRecords: number;
+  totalQuantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Single inventory entry for a product at a specific location.
+ */
+export interface ProductInventoryEntry {
+  inventoryId: string;
+  locationType: LocationType;
+  locationId: string | null;
+  locationCode: string;
+  locationLabel: string;
+  quantity: number;
+  updatedAt: string;
+}
+
+/**
+ * All inventory entries for a product across all locations.
+ * Replaces the N+1 pattern of querying each location type.
+ */
+export interface ProductInventoryResponse {
+  productId: string;
+  productSku: string;
+  productName: string;
+  totalQuantity: number;
+  entries: ProductInventoryEntry[];
+}
+
+/**
+ * Aggregated inventory total for a single product.
+ * Used by dashboard to get totals without N+1 queries.
+ */
+export interface InventoryTotal {
+  itemId: string;
+  sku: string;
+  name: string;
+  imageUrl: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  parentCategoryId: string | null;
+  parentCategoryName: string | null;
+  unitCost: number | null;
+  isActive: boolean;
+  totalQuantity: number;
+  lastUpdatedAt: string | null;
 }

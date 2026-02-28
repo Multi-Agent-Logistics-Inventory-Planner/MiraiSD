@@ -102,7 +102,7 @@ export function NotAssignedDetailDialog({
             <DialogTitle className="flex items-center gap-3">
               <span className="text-xl font-semibold">{inventory.item.name}</span>
               <Badge variant="outline" className="text-xs">
-                {inventory.item.category}
+                {inventory.item.category.name}
               </Badge>
             </DialogTitle>
           </DialogHeader>
@@ -115,7 +115,7 @@ export function NotAssignedDetailDialog({
               </div>
               <div>
                 <Label className="text-muted-foreground text-xs">Category</Label>
-                <p className="font-medium">{inventory.item.category}</p>
+                <p className="font-medium">{inventory.item.category.name}</p>
               </div>
             </div>
 

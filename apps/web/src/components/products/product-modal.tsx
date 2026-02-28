@@ -28,14 +28,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
-import { useInventoryByItemId } from "@/hooks/queries/use-inventory-by-item";
+import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
   LOCATION_TYPE_LABELS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
@@ -58,9 +56,10 @@ export function ProductModal({
   onTransferClick,
   onEditClick,
 }: ProductModalProps) {
-  const { data: locations, isLoading: locationsLoading } = useInventoryByItemId(
+  const { data: inventoryData, isLoading: locationsLoading } = useProductInventoryEntries(
     product?.product.id
   );
+  const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } =
     useShipmentsByProduct(product?.product.id);
   const { isAdmin } = usePermissions();
@@ -134,13 +133,8 @@ export function ProductModal({
                 Category:
               </span>
               <Badge variant="secondary" className="text-xs shrink-0">
-                {PRODUCT_CATEGORY_LABELS[p.category]}
+                {p.category.name}
               </Badge>
-              {p.subcategory && (
-                <Badge variant="outline" className="text-xs shrink-0">
-                  {PRODUCT_SUBCATEGORY_LABELS[p.subcategory]}
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs sm:text-sm">

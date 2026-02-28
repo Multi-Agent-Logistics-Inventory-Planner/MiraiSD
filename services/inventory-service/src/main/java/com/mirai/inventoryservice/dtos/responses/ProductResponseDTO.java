@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.dtos.responses;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,8 +16,7 @@ import java.util.UUID;
 public class ProductResponseDTO {
     private UUID id;
     private String sku;
-    private ProductCategory category;
-    private ProductSubcategory subcategory;
+    private CategoryResponseDTO category;
     private String name;
     private String description;
     private Integer reorderPoint;

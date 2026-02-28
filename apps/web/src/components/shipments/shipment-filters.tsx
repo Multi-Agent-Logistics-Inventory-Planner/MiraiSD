@@ -28,7 +28,7 @@ export function ShipmentFilters({
         />
       </div>
       <Can permission={Permission.SHIPMENTS_CREATE}>
-        <Button onClick={onAddClick} size="sm" className="shrink-0">
+        <Button onClick={onAddClick} size="sm" className="shrink-0 text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground">
           <Plus className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">New Shipment</span>
         </Button>

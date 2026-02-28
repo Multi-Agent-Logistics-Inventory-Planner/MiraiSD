@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  ProductCategory,
-  ProductSubcategory,
+  type Category,
   StockMovementReason,
 } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
@@ -59,25 +58,23 @@ export function AdjustStockDialog({
 
   const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
-    null
+    null,
   );
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null
+    null,
   );
   const [action, setAction] = useState<AdjustAction>("subtract");
   const [quantity, setQuantity] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilters, setCategoryFilters] = useState<ProductCategory[]>([]);
-  const [subcategoryFilters, setSubcategoryFilters] = useState<
-    ProductSubcategory[]
-  >([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
 
   const adjustMutation = useAdjustStockMutation();
 
   const inventoryQuery = useLocationInventory(
     location.locationType ?? undefined,
-    location.locationId ?? undefined
+    location.locationId ?? undefined,
   );
 
   const productInventoryQuery = useProductInventory();
@@ -91,7 +88,7 @@ export function AdjustStockDialog({
       setQuantity(1);
       setSearchQuery("");
       setCategoryFilters([]);
-      setSubcategoryFilters([]);
+      setChildCategoryFilters([]);
       setQuantityWarning(null);
     }
   }, [open]);
@@ -112,7 +109,7 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
     setSearchQuery("");
     setCategoryFilters([]);
-    setSubcategoryFilters([]);
+    setChildCategoryFilters([]);
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
@@ -131,29 +128,34 @@ export function AdjustStockDialog({
   }, [productsWithStock]);
 
   const availableCategories = useMemo(() => {
-    const categories = new Set<ProductCategory>();
+    const categoryMap = new Map<string, Category>();
     const items = action === "subtract" ? inventory : productsWithStock;
     items.forEach((item) => {
       const category =
         "item" in item ? item.item.category : item.product.category;
       if (category) {
-        categories.add(category);
+        categoryMap.set(category.id, category);
       }
     });
-    return Array.from(categories).sort();
+    return Array.from(categoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [action, inventory, productsWithStock]);
 
-  const availableSubcategories = useMemo(() => {
-    const subcategories = new Set<ProductSubcategory>();
+  // Get child categories (categories with a parentId) from inventory or products
+  const availableChildCategories = useMemo(() => {
+    const childCategoryMap = new Map<string, Category>();
     const items = action === "subtract" ? inventory : productsWithStock;
     items.forEach((item) => {
-      const subcategory =
-        "item" in item ? item.item.subcategory : item.product.subcategory;
-      if (subcategory) {
-        subcategories.add(subcategory);
+      const category =
+        "item" in item ? item.item.category : item.product.category;
+      if (category?.parentId) {
+        childCategoryMap.set(category.id, category);
       }
     });
-    return Array.from(subcategories).sort();
+    return Array.from(childCategoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [action, inventory, productsWithStock]);
 
   const selectedInventory = useMemo(() => {
@@ -181,8 +183,8 @@ export function AdjustStockDialog({
 
   const currentQtyAtLocation =
     action === "subtract"
-      ? selectedInventory?.quantity ?? 0
-      : existingInventoryForProduct?.quantity ?? 0;
+      ? (selectedInventory?.quantity ?? 0)
+      : (existingInventoryForProduct?.quantity ?? 0);
 
   const selectedProductName =
     action === "subtract"
@@ -225,7 +227,9 @@ export function AdjustStockDialog({
 
     if (action === "subtract" && parsed > currentQtyAtLocation) {
       setQuantity(currentQtyAtLocation);
-      setQuantityWarning(`Clamped to available stock (${currentQtyAtLocation})`);
+      setQuantityWarning(
+        `Clamped to available stock (${currentQtyAtLocation})`,
+      );
     } else {
       setQuantity(Math.max(1, parsed));
       setQuantityWarning(null);
@@ -264,17 +268,14 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
   }
 
-  function handleCategoryChange(categories: ProductCategory[]) {
+  function handleCategoryChange(categories: string[]) {
     setCategoryFilters(categories);
-    // Clear subcategory filters if Blind Box is deselected
-    if (!categories.includes(ProductCategory.BLIND_BOX)) {
-      setSubcategoryFilters([]);
-    }
+    setChildCategoryFilters([]);
   }
 
   function handleClearFilters() {
     setCategoryFilters([]);
-    setSubcategoryFilters([]);
+    setChildCategoryFilters([]);
     setSearchQuery("");
   }
 
@@ -357,7 +358,7 @@ export function AdjustStockDialog({
           const newInventory = await createInventory(
             location.locationType,
             location.locationId,
-            { itemId: selectedProduct.product.id, quantity: 0 }
+            { itemId: selectedProduct.product.id, quantity: 0 },
           );
           inventoryId = newInventory.id;
         }
@@ -408,7 +409,7 @@ export function AdjustStockDialog({
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
           {/* Location selector and action toggle */}
-          <div className="shrink-0 bg-muted py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
+          <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
             {/* Location section */}
             <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-1.5">
@@ -444,7 +445,7 @@ export function AdjustStockDialog({
               >
                 <ToggleGroupItem
                   value="subtract"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  className="px-4 border-0 data-[state=on]:bg-rose-600 data-[state=on]:text-white data-[state=off]:bg-rose-500/20 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-rose-500/30 dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Subtract stock"
                 >
                   <Minus className="h-4 w-4" />
@@ -452,7 +453,7 @@ export function AdjustStockDialog({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="add"
-                  className="px-4 border-0 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=off]:bg-transparent data-[state=off]:hover:bg-muted"
+                  className="px-4 border-0 data-[state=on]:bg-emerald-600 data-[state=on]:text-white data-[state=off]:bg-emerald-400/30 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-emerald-500/30 dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Add stock"
                 >
                   <Plus className="h-4 w-4" />
@@ -470,23 +471,27 @@ export function AdjustStockDialog({
                 itemCount={sourceListCount}
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
-                subcategoryFilters={subcategoryFilters}
+                childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
-                availableSubcategories={availableSubcategories}
+                availableChildCategories={availableChildCategories}
                 disabled={isAdjusting}
                 showFilters={sourceListCount > 0}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
-                onSubcategoryChange={setSubcategoryFilters}
+                onChildCategoryChange={setChildCategoryFilters}
                 onClearFilters={handleClearFilters}
               />
 
               <ProductList
                 items={
-                  action === "subtract" ? normalizedInventory : normalizedProducts
+                  action === "subtract"
+                    ? normalizedInventory
+                    : normalizedProducts
                 }
                 selectedId={
-                  action === "subtract" ? selectedInventoryId : selectedProductId
+                  action === "subtract"
+                    ? selectedInventoryId
+                    : selectedProductId
                 }
                 onSelect={handleProductSelect}
                 isLoading={
@@ -503,7 +508,9 @@ export function AdjustStockDialog({
                 noResultsMessage="No products found"
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
-                subcategoryFilters={subcategoryFilters}
+                childCategoryFilters={childCategoryFilters}
+                availableCategories={availableCategories}
+                availableChildCategories={availableChildCategories}
               />
             </div>
           ) : hasValidLocation &&
@@ -545,7 +552,11 @@ export function AdjustStockDialog({
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="min-h-11 sm:min-h-9"
+              className={`min-h-11 sm:min-h-9 border ${
+                action === "subtract"
+                  ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-amber-700 dark:hover:bg-amber-800"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+              }`}
             >
               {isAdjusting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

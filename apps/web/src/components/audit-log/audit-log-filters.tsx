@@ -20,15 +20,13 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { StockMovementReason, ProductCategory, User } from "@/types/api";
+import { StockMovementReason, type User } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 export type ReasonFilter = StockMovementReason | "all";
-export type CategoryFilter = ProductCategory | "all";
 
 export interface AuditLogFiltersState {
   search: string;
-  category: CategoryFilter;
   actorId: string;
   reason: ReasonFilter;
   fromDate: string;
@@ -37,7 +35,6 @@ export interface AuditLogFiltersState {
 
 export const DEFAULT_AUDIT_LOG_FILTERS: AuditLogFiltersState = {
   search: "",
-  category: "all",
   actorId: "",
   reason: "all",
   fromDate: "",
@@ -60,17 +57,6 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.TRANSFER]: "Transfer",
 };
 
-const CATEGORY_LABELS: Record<ProductCategory, string> = {
-  [ProductCategory.PLUSHIE]: "Plushie",
-  [ProductCategory.KEYCHAIN]: "Keychain",
-  [ProductCategory.FIGURINE]: "Figurine",
-  [ProductCategory.GACHAPON]: "Gachapon",
-  [ProductCategory.BLIND_BOX]: "Blind Box",
-  [ProductCategory.BUILD_KIT]: "Build Kit",
-  [ProductCategory.GUNDAM]: "Gundam",
-  [ProductCategory.KUJI]: "Kuji",
-  [ProductCategory.MISCELLANEOUS]: "Miscellaneous",
-};
 
 export function AuditLogFilters({
   state,
@@ -80,7 +66,6 @@ export function AuditLogFilters({
   const [filterOpen, setFilterOpen] = useState(false);
 
   const hasActiveFilters =
-    state.category !== "all" ||
     Boolean(state.actorId) ||
     state.reason !== "all" ||
     Boolean(state.fromDate) ||
@@ -97,7 +82,6 @@ export function AuditLogFilters({
   today.setHours(23, 59, 59, 999);
 
   const filterCount = [
-    state.category !== "all",
     state.reason !== "all",
     Boolean(state.actorId),
     Boolean(state.fromDate),
@@ -118,7 +102,7 @@ export function AuditLogFilters({
 
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 dark:bg-input dark:border-[#41413d]">
             <Filter className="h-4 w-4" />
             Filters
             {filterCount > 0 && (
@@ -130,26 +114,6 @@ export function AuditLogFilters({
         </PopoverTrigger>
         <PopoverContent className="w-80" align="end">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="category-select">Category</Label>
-              <Select
-                value={state.category}
-                onValueChange={(v) => updateField("category", v as CategoryFilter)}
-              >
-                <SelectTrigger id="category-select">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="action-select">Action</Label>
               <Select
@@ -174,7 +138,9 @@ export function AuditLogFilters({
               <Label htmlFor="employee-select">Performed by</Label>
               <Select
                 value={state.actorId || "__all__"}
-                onValueChange={(v) => updateField("actorId", v === "__all__" ? "" : v)}
+                onValueChange={(v) =>
+                  updateField("actorId", v === "__all__" ? "" : v)
+                }
               >
                 <SelectTrigger id="employee-select">
                   <SelectValue placeholder="Select employee" />
@@ -199,7 +165,7 @@ export function AuditLogFilters({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !state.fromDate && "text-muted-foreground"
+                      !state.fromDate && "text-muted-foreground",
                     )}
                   >
                     {state.fromDate ? (
@@ -213,9 +179,14 @@ export function AuditLogFilters({
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={state.fromDate ? new Date(state.fromDate) : undefined}
+                    selected={
+                      state.fromDate ? new Date(state.fromDate) : undefined
+                    }
                     onSelect={(date) => {
-                      updateField("fromDate", date ? format(date, "yyyy-MM-dd") : "");
+                      updateField(
+                        "fromDate",
+                        date ? format(date, "yyyy-MM-dd") : "",
+                      );
                     }}
                     disabled={(date) => date > today}
                   />
@@ -232,7 +203,7 @@ export function AuditLogFilters({
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !state.toDate && "text-muted-foreground"
+                      !state.toDate && "text-muted-foreground",
                     )}
                   >
                     {state.toDate ? (
@@ -248,7 +219,10 @@ export function AuditLogFilters({
                     mode="single"
                     selected={state.toDate ? new Date(state.toDate) : undefined}
                     onSelect={(date) => {
-                      updateField("toDate", date ? format(date, "yyyy-MM-dd") : "");
+                      updateField(
+                        "toDate",
+                        date ? format(date, "yyyy-MM-dd") : "",
+                      );
                     }}
                     disabled={(date) => date > today}
                   />

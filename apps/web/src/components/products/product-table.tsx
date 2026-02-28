@@ -13,10 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
-import {
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-} from "@/types/api";
 
 interface ProductTableProps {
   items: ProductWithInventory[];
@@ -71,7 +67,6 @@ export function ProductTable({
           <TableHead className="text-left rounded-tl-xl sm:rounded-none">Product</TableHead>
           <TableHead className="hidden sm:table-cell">SKU</TableHead>
           <TableHead className="hidden sm:table-cell">Category</TableHead>
-          <TableHead className="hidden sm:table-cell">Subcategory</TableHead>
           <TableHead>Stock</TableHead>
           <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
           <TableHead className="rounded-tr-xl sm:rounded-none w-12"></TableHead>
@@ -89,7 +84,7 @@ export function ProductTable({
               No products found.
             </TableCell>
             <TableCell
-              colSpan={7}
+              colSpan={6}
               className="h-24 text-center text-muted-foreground hidden sm:table-cell"
             >
               No products found.
@@ -126,12 +121,7 @@ export function ProductTable({
                 {row.product.sku}
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {PRODUCT_CATEGORY_LABELS[row.product.category]}
-              </TableCell>
-              <TableCell className="hidden sm:table-cell text-muted-foreground">
-                {row.product.subcategory
-                  ? PRODUCT_SUBCATEGORY_LABELS[row.product.subcategory]
-                  : ""}
+                {row.product.category.name}
               </TableCell>
               <TableCell>{row.totalQuantity}</TableCell>
               <TableCell className="hidden sm:table-cell">

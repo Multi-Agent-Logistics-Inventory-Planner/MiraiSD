@@ -5,25 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import { Toggle } from "@/components/ui/toggle";
-import {
-  ProductCategory,
-  PRODUCT_CATEGORY_LABELS,
-} from "@/types/api";
+import type { Category } from "@/types/api";
 
 export interface ProductFiltersState {
   search: string;
-  categories: ProductCategory[];
+  categoryIds: string[];
 }
 
 export const DEFAULT_PRODUCT_FILTERS: ProductFiltersState = {
   search: "",
-  categories: [],
+  categoryIds: [],
 };
 
 interface ProductFiltersProps {
   state: ProductFiltersState;
   onChange: (next: ProductFiltersState) => void;
-  categories: ProductCategory[];
+  categories: Category[];
   onAddClick?: () => void;
 }
 
@@ -33,12 +30,12 @@ export function ProductFilters({
   categories,
   onAddClick,
 }: ProductFiltersProps) {
-  const toggleCategory = (category: ProductCategory) => {
-    const isSelected = state.categories.includes(category);
-    const newCategories = isSelected
-      ? state.categories.filter((c) => c !== category)
-      : [...state.categories, category];
-    onChange({ ...state, categories: newCategories });
+  const toggleCategory = (categoryId: string) => {
+    const isSelected = state.categoryIds.includes(categoryId);
+    const newCategoryIds = isSelected
+      ? state.categoryIds.filter((id) => id !== categoryId)
+      : [...state.categoryIds, categoryId];
+    onChange({ ...state, categoryIds: newCategoryIds });
   };
 
   return (
@@ -56,7 +53,11 @@ export function ProductFilters({
 
         {onAddClick && (
           <Can permission={Permission.PRODUCTS_CREATE}>
-            <Button onClick={onAddClick} size="sm" className="shrink-0">
+            <Button
+              onClick={onAddClick}
+              size="sm"
+              className="shrink-0 text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground"
+            >
               <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Add Product</span>
             </Button>
@@ -67,14 +68,14 @@ export function ProductFilters({
       <div className="flex flex-wrap items-center gap-2">
         {categories.map((category) => (
           <Toggle
-            key={category}
-            pressed={state.categories.includes(category)}
-            onPressedChange={() => toggleCategory(category)}
+            key={category.id}
+            pressed={state.categoryIds.includes(category.id)}
+            onPressedChange={() => toggleCategory(category.id)}
             variant="outline"
             size="sm"
             className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
           >
-            {PRODUCT_CATEGORY_LABELS[category] ?? category}
+            {category.name}
           </Toggle>
         ))}
       </div>

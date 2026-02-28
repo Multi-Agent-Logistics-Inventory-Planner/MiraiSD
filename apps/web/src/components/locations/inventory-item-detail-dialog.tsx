@@ -116,7 +116,7 @@ export function InventoryItemDetailDialog({
             <DialogTitle className="flex items-center gap-3">
               <span className="text-xl font-semibold">{inventory.item.name}</span>
               <Badge variant="outline" className="text-xs">
-                {inventory.item.category}
+                {inventory.item.category.name}
               </Badge>
             </DialogTitle>
           </DialogHeader>

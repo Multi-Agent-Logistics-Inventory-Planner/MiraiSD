@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import math
 from statistics import NormalDist
-from typing import Optional
+from typing import Optional, Union
+
+import numpy as np
+import pandas as pd
 
 
 def z_for_service_level(alpha: float) -> float:
@@ -92,3 +95,119 @@ def suggest_order(
     if needed <= 0.0:
         return 0
     return int(math.ceil(needed))
+
+
+# -----------------------------------------------------------------------------
+# Vectorized Policy Functions
+# -----------------------------------------------------------------------------
+
+
+def compute_safety_stock_vectorized(
+    mu_hat: pd.Series,
+    sigma_d_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    alpha: float,
+) -> pd.Series:
+    """Vectorized safety stock computation.
+
+    SS = z(alpha) * sigma_d * sqrt(L)
+
+    Args:
+        mu_hat: Series of mean daily demand estimates.
+        sigma_d_hat: Series of demand standard deviations.
+        L: Lead time (scalar or Series).
+        alpha: Service level (e.g., 0.95).
+
+    Returns:
+        Series of safety stock values.
+    """
+    z = z_for_service_level(alpha)
+    L_arr = L if isinstance(L, pd.Series) else L
+    sigma_d_safe = sigma_d_hat.clip(lower=0.0)
+    L_safe = np.maximum(L_arr, 0.0) if isinstance(L_arr, pd.Series) else max(L_arr, 0.0)
+    return z * sigma_d_safe * np.sqrt(L_safe)
+
+
+def reorder_point_vectorized(
+    mu_hat: pd.Series,
+    safety_stock: pd.Series,
+    L: Union[pd.Series, int, float],
+) -> pd.Series:
+    """Vectorized reorder point computation.
+
+    ROP = mu * L + safety_stock
+
+    Args:
+        mu_hat: Series of mean daily demand estimates.
+        safety_stock: Series of safety stock values.
+        L: Lead time (scalar or Series).
+
+    Returns:
+        Series of reorder point values.
+    """
+    L_arr = L if isinstance(L, pd.Series) else L
+    L_safe = np.maximum(L_arr, 0.0) if isinstance(L_arr, pd.Series) else max(L_arr, 0.0)
+    ss_safe = safety_stock.clip(lower=0.0)
+    return mu_hat * L_safe + ss_safe
+
+
+def days_to_stockout_vectorized(
+    current_qty: pd.Series,
+    mu_hat: pd.Series,
+    epsilon: float = 0.1,
+) -> pd.Series:
+    """Vectorized days to stockout computation.
+
+    Returns infinity when mu_hat < epsilon, otherwise qty / mu.
+
+    Args:
+        current_qty: Series of current inventory quantities.
+        mu_hat: Series of mean daily demand estimates.
+        epsilon: Minimum demand threshold - returns inf if mu < epsilon.
+
+    Returns:
+        Series of days to stockout values (inf when mu < epsilon).
+    """
+    eps = max(epsilon, 1e-12)
+    qty_safe = current_qty.clip(lower=0.0)
+
+    # Initialize result with infinity
+    result = pd.Series(np.inf, index=mu_hat.index)
+
+    # Only compute for rows where mu_hat >= epsilon
+    mask = mu_hat >= eps
+    result[mask] = qty_safe[mask] / mu_hat[mask]
+
+    return result
+
+
+def suggest_order_vectorized(
+    current_qty: pd.Series,
+    mu_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    safety_stock: pd.Series,
+    target_days: int,
+) -> pd.Series:
+    """Vectorized order suggestion computation.
+
+    Q = max(0, ceil(target_days * mu - current_qty))
+
+    Args:
+        current_qty: Series of current inventory quantities.
+        mu_hat: Series of mean daily demand estimates.
+        L: Lead time (scalar or Series) - included for API consistency.
+        safety_stock: Series of safety stock values - included for API consistency.
+        target_days: Target days of cover.
+
+    Returns:
+        Series of suggested order quantities (integers).
+    """
+    target_days_safe = max(target_days, 0)
+    mu_safe = mu_hat.clip(lower=0.0)
+    qty_safe = current_qty.clip(lower=0.0)
+
+    target_cycle_stock = target_days_safe * mu_safe
+    needed = target_cycle_stock - qty_safe
+
+    # Apply ceiling and clip to 0, then convert to int
+    return np.ceil(needed).clip(lower=0).astype(int)

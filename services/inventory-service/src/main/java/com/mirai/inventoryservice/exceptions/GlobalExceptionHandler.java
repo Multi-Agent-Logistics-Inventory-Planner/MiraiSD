@@ -37,7 +37,8 @@ public class GlobalExceptionHandler {
             PusherMachineInventoryNotFoundException.class,
             UserNotFoundException.class,
             ProductNotFoundException.class,
-            ShipmentNotFoundException.class
+            ShipmentNotFoundException.class,
+            CategoryNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
@@ -53,8 +54,8 @@ public class GlobalExceptionHandler {
             InsufficientInventoryException.class,
             InvalidInventoryOperationException.class,
             InvalidShipmentStatusException.class,
-            InvalidSubcategoryException.class,
-            TrackingException.class
+            TrackingException.class,
+            CategoryInUseException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
@@ -68,7 +69,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             DuplicateSkuException.class,
-            DuplicateLocationCodeException.class
+            DuplicateLocationCodeException.class,
+            DuplicateCategoryException.class
     })
     public ResponseEntity<ErrorResponse> handleConflictException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()

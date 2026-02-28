@@ -26,7 +26,10 @@ export function TeamFilters({
           className="pl-9"
         />
       </div>
-      <Button onClick={onInviteClick}>
+      <Button
+        onClick={onInviteClick}
+        className="text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground"
+      >
         <Mail className="mr-2 h-4 w-4" />
         Invite Employee
       </Button>

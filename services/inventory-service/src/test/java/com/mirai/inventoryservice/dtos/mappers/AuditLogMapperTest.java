@@ -1,11 +1,11 @@
 package com.mirai.inventoryservice.dtos.mappers;
 
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
+import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.enums.ProductCategory;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.enums.UserRole;
 import com.mirai.inventoryservice.models.storage.*;
@@ -232,11 +232,17 @@ class AuditLogMapperTest {
             BoxBin fromBoxBin = createBoxBin(fromLocationId, "B1");
             BoxBin toBoxBin = createBoxBin(toLocationId, "B2");
 
+            Category testCategory = Category.builder()
+                    .id(UUID.randomUUID())
+                    .name("Test Category")
+                    .slug("test-category")
+                    .build();
+
             Product product = Product.builder()
                     .id(UUID.randomUUID())
                     .sku("SKU-001")
                     .name("Test Product")
-                    .category(ProductCategory.PLUSHIE)
+                    .category(testCategory)
                     .build();
 
             OffsetDateTime timestamp = OffsetDateTime.now();
@@ -478,11 +484,17 @@ class AuditLogMapperTest {
     }
 
     private StockMovement createMovement(UUID actorId, LocationType locationType, UUID fromLocationId, UUID toLocationId) {
+        Category testCategory = Category.builder()
+                .id(UUID.randomUUID())
+                .name("Test Category")
+                .slug("test-category")
+                .build();
+
         Product product = Product.builder()
                 .id(UUID.randomUUID())
                 .sku("SKU-" + UUID.randomUUID().toString().substring(0, 8))
                 .name("Test Product")
-                .category(ProductCategory.PLUSHIE)
+                .category(testCategory)
                 .build();
 
         return StockMovement.builder()

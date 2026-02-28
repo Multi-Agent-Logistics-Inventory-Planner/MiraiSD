@@ -90,7 +90,7 @@ function TableSkeleton() {
 
 function formatQuantityChange(change: number): React.ReactNode {
   if (change > 0) {
-    return <span className="text-green-600 font-medium">+{change}</span>;
+    return <span className="text-emerald-700 font-medium">+{change}</span>;
   }
   if (change < 0) {
     return <span className="text-red-600 font-medium">{change}</span>;

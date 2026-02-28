@@ -16,8 +16,8 @@ import java.util.UUID;
 public class ReviewResponseDTO {
     private UUID id;
     private String externalId;
-    private UUID employeeId;
-    private String employeeName;
+    private UUID userId;
+    private String userName;
     private LocalDate reviewDate;
     private String reviewText;
     private Integer rating;

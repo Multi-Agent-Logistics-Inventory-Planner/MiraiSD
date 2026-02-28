@@ -21,33 +21,47 @@ export function useLocations(locationType: LocationType) {
 }
 
 /**
- * Convenience hook for the locations page: fetch locations and compute item counts.
+ * Fetch locations without inventory counts (single API call).
+ * Use this for getting the full list for filtering/pagination.
  */
-export function useLocationsWithCounts(locationType: LocationType) {
+export function useLocationsOnly(locationType: LocationType) {
   return useQuery({
-    queryKey: ["locationsWithCounts", locationType],
-    queryFn: async (): Promise<LocationWithCounts[]> => {
-      const locations = (await getLocationsByType(locationType)) as StorageLocation[];
-
-      const inventoriesByLocation = await Promise.all(
-        locations.map(async (loc) => {
-          const inv = (await getInventoryByLocation(locationType, loc.id)) as Inventory[];
-          return inv;
-        })
-      );
-
-      return locations.map((loc, idx) => {
-        const inv = inventoriesByLocation[idx] ?? [];
-        const totalQuantity = inv.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
-        return {
-          locationType,
-          location: loc,
-          inventoryRecords: inv.length,
-          totalQuantity,
-        };
-      });
+    queryKey: ["locationsOnly", locationType],
+    queryFn: async (): Promise<StorageLocation[]> => {
+      return (await getLocationsByType(locationType)) as StorageLocation[];
     },
     enabled: locationType !== LocationType.NOT_ASSIGNED,
   });
 }
+
+/**
+ * @deprecated Use useLocationsWithCounts() from use-locations-with-counts.ts instead.
+ * This function makes N+1 API calls and will be removed in a future version.
+ *
+ * Fetch inventory counts only for specific location IDs.
+ * This is optimized to only fetch data for visible items (pagination).
+ */
+export function useLocationCounts(
+  locationType: LocationType,
+  locations: StorageLocation[]
+) {
+  return useQuery({
+    queryKey: ["locationCounts", locationType, locations.map((l) => l.id)],
+    queryFn: async (): Promise<Map<string, { records: number; quantity: number }>> => {
+      const counts = new Map<string, { records: number; quantity: number }>();
+
+      await Promise.all(
+        locations.map(async (loc) => {
+          const inv = (await getInventoryByLocation(locationType, loc.id)) as Inventory[];
+          const totalQuantity = inv.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+          counts.set(loc.id, { records: inv.length, quantity: totalQuantity });
+        })
+      );
+
+      return counts;
+    },
+    enabled: locationType !== LocationType.NOT_ASSIGNED && locations.length > 0,
+  });
+}
+
 

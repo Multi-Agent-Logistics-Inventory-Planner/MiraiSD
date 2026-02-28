@@ -1,7 +1,5 @@
 package com.mirai.inventoryservice.dtos.responses;
 
-import com.mirai.inventoryservice.models.enums.ProductCategory;
-import com.mirai.inventoryservice.models.enums.ProductSubcategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +15,6 @@ public class ProductSummaryDTO {
     private UUID id;
     private String sku;
     private String name;
-    private ProductCategory category;
-    private ProductSubcategory subcategory;
+    private CategoryResponseDTO category;
     private String imageUrl;
 }

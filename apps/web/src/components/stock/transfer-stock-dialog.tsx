@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { ProductCategory, ProductSubcategory } from "@/types/api";
+import type { Category } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
@@ -54,10 +54,8 @@ export function TransferStockDialog({
     Record<string, number>
   >({});
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilters, setCategoryFilters] = useState<ProductCategory[]>([]);
-  const [subcategoryFilters, setSubcategoryFilters] = useState<
-    ProductSubcategory[]
-  >([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
 
   const batchTransferMutation = useBatchTransferMutation();
 
@@ -78,7 +76,7 @@ export function TransferStockDialog({
       setTransferQuantities({});
       setSearchQuery("");
       setCategoryFilters([]);
-      setSubcategoryFilters([]);
+      setChildCategoryFilters([]);
     }
   }, [open]);
 
@@ -95,17 +93,20 @@ export function TransferStockDialog({
     let result = sourceInventory;
 
     if (categoryFilters.length > 0) {
-      result = result.filter((inv) =>
-        categoryFilters.includes(inv.item.category)
-      );
+      result = result.filter((inv) => {
+        const category = inv.item.category;
+        // Match if category or its parent is in filter
+        return categoryFilters.includes(category.id) ||
+          (category.parentId && categoryFilters.includes(category.parentId));
+      });
     }
 
-    if (subcategoryFilters.length > 0) {
-      result = result.filter(
-        (inv) =>
-          inv.item.subcategory &&
-          subcategoryFilters.includes(inv.item.subcategory)
-      );
+    if (childCategoryFilters.length > 0) {
+      result = result.filter((inv) => {
+        const category = inv.item.category;
+        // Match child categories (categories with a parentId)
+        return category.parentId && childCategoryFilters.includes(category.id);
+      });
     }
 
     if (searchQuery.trim()) {
@@ -116,30 +117,36 @@ export function TransferStockDialog({
     }
 
     return result;
-  }, [sourceInventory, searchQuery, categoryFilters, subcategoryFilters]);
+  }, [sourceInventory, searchQuery, categoryFilters, childCategoryFilters]);
 
   const availableCategories = useMemo(() => {
-    const categories = new Set<ProductCategory>();
+    const categoryMap = new Map<string, Category>();
     sourceInventory.forEach((inv) => {
       if (inv.item.category) {
-        categories.add(inv.item.category);
+        categoryMap.set(inv.item.category.id, inv.item.category);
       }
     });
-    return Array.from(categories).sort();
+    return Array.from(categoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [sourceInventory]);
 
-  const availableSubcategories = useMemo(() => {
-    const subcategories = new Set<ProductSubcategory>();
+  // Get child categories (categories with a parentId) from inventory
+  const availableChildCategories = useMemo(() => {
+    const childCategoryMap = new Map<string, Category>();
     sourceInventory.forEach((inv) => {
-      if (inv.item.subcategory) {
-        subcategories.add(inv.item.subcategory);
+      const category = inv.item.category;
+      if (category.parentId) {
+        childCategoryMap.set(category.id, category);
       }
     });
-    return Array.from(subcategories).sort();
+    return Array.from(childCategoryMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }, [sourceInventory]);
 
   const hasActiveFilters =
-    categoryFilters.length > 0 || subcategoryFilters.length > 0;
+    categoryFilters.length > 0 || childCategoryFilters.length > 0;
 
   const transferItems = useMemo(() => {
     return sourceInventory.filter((inv) => {
@@ -178,17 +185,14 @@ export function TransferStockDialog({
     }));
   }
 
-  function handleCategoryChange(categories: ProductCategory[]) {
+  function handleCategoryChange(categories: string[]) {
     setCategoryFilters(categories);
-    // Clear subcategory filters if Blind Box is deselected
-    if (!categories.includes(ProductCategory.BLIND_BOX)) {
-      setSubcategoryFilters([]);
-    }
+    setChildCategoryFilters([]);
   }
 
   function handleClearFilters() {
     setCategoryFilters([]);
-    setSubcategoryFilters([]);
+    setChildCategoryFilters([]);
     setSearchQuery("");
   }
 
@@ -292,7 +296,7 @@ export function TransferStockDialog({
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
           {/* Location selectors */}
-          <div className="shrink-0 grid grid-cols-2 gap-4 sm:gap-16 bg-muted py-4 px-4 rounded-xl mt-4">
+          <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] grid grid-cols-2 gap-4 sm:gap-16 py-4 px-4 rounded-xl mt-4">
             <LocationSelector
               label="From"
               value={sourceLocation}
@@ -339,14 +343,14 @@ export function TransferStockDialog({
                 itemCount={sourceInventory.length}
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
-                subcategoryFilters={subcategoryFilters}
+                childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
-                availableSubcategories={availableSubcategories}
+                availableChildCategories={availableChildCategories}
                 disabled={isTransferring}
                 showFilters={sourceInventory.length > 0}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
-                onSubcategoryChange={setSubcategoryFilters}
+                onChildCategoryChange={setChildCategoryFilters}
                 onClearFilters={handleClearFilters}
               />
 
@@ -360,7 +364,7 @@ export function TransferStockDialog({
                 </div>
               ) : filteredInventory.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
-                  {getNoResultsMessage(searchQuery, categoryFilters, subcategoryFilters)}
+                  {getNoResultsMessage(searchQuery, categoryFilters, childCategoryFilters, availableCategories, availableChildCategories)}
                 </div>
               ) : (
                 <div className="flex-1 min-h-0">

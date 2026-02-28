@@ -1,4 +1,4 @@
-import { apiClient, apiGet } from './client'
+import { apiGet } from './client'
 import type { ForecastPrediction, PaginatedResponse } from '@/types/api'
 
 const BASE_PATH = '/api/forecasts'
@@ -22,4 +22,9 @@ export async function getAtRiskForecasts(daysThreshold: number = 7): Promise<For
 
 export async function getForecastByItem(itemId: string): Promise<ForecastPrediction> {
   return apiGet<ForecastPrediction>(`${BASE_PATH}/${itemId}`)
+}
+
+export async function getAllForecasts(): Promise<ForecastPrediction[]> {
+  const response = await getForecasts({ page: 1, limit: 100 })
+  return response.content
 }

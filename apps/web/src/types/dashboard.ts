@@ -8,6 +8,7 @@ export interface StockLevelItem {
   maxStock: number;
   status: StockStatus;
   lastUpdated: string;
+  daysToStockout?: number;
 }
 
 export interface CategoryData {
@@ -24,7 +25,7 @@ export interface ActivityItem {
 
 export interface DashboardStats {
   totalStockValue: number;
-  stockValueChange: number;
+  stockValueChange: number | null;
   lowStockItems: number;
   criticalItems: number;
   outOfStockItems: number;

@@ -14,27 +14,22 @@ import {
   MultiSelect,
   type MultiSelectOption,
 } from "@/components/ui/multi-select";
-import {
-  ProductCategory,
-  PRODUCT_CATEGORY_LABELS,
-  PRODUCT_SUBCATEGORY_LABELS,
-  type ProductSubcategory,
-} from "@/types/api";
+import type { Category } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 interface ProductFilterHeaderProps {
   title: string;
   itemCount: number;
   searchQuery: string;
-  categoryFilters: ProductCategory[];
-  subcategoryFilters: ProductSubcategory[];
-  availableCategories: ProductCategory[];
-  availableSubcategories: ProductSubcategory[];
+  categoryFilters: string[];
+  childCategoryFilters: string[];
+  availableCategories: Category[];
+  availableChildCategories: Category[];
   disabled: boolean;
   showFilters: boolean;
   onSearchChange: (value: string) => void;
-  onCategoryChange: (categories: ProductCategory[]) => void;
-  onSubcategoryChange: (subcategories: ProductSubcategory[]) => void;
+  onCategoryChange: (categories: string[]) => void;
+  onChildCategoryChange: (childCategories: string[]) => void;
   onClearFilters: () => void;
 }
 
@@ -43,35 +38,34 @@ export function ProductFilterHeader({
   itemCount,
   searchQuery,
   categoryFilters,
-  subcategoryFilters,
+  childCategoryFilters,
   availableCategories,
-  availableSubcategories,
+  availableChildCategories,
   disabled,
   showFilters,
   onSearchChange,
   onCategoryChange,
-  onSubcategoryChange,
+  onChildCategoryChange,
   onClearFilters,
 }: ProductFilterHeaderProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const hasActiveFilters =
-    categoryFilters.length > 0 || subcategoryFilters.length > 0;
-  const totalActiveFilters = categoryFilters.length + subcategoryFilters.length;
+    categoryFilters.length > 0 || childCategoryFilters.length > 0;
+  const totalActiveFilters = categoryFilters.length + childCategoryFilters.length;
 
-  // Subcategory filter is only enabled when Blind Box category is selected
-  const isSubcategoryEnabled = categoryFilters.includes(ProductCategory.BLIND_BOX);
+  const hasChildCategories = availableChildCategories.length > 0;
 
-  const categoryOptions: MultiSelectOption<ProductCategory>[] =
+  const categoryOptions: MultiSelectOption<string>[] =
     availableCategories.map((category) => ({
-      value: category,
-      label: PRODUCT_CATEGORY_LABELS[category],
+      value: category.id,
+      label: category.name,
     }));
 
-  const subcategoryOptions: MultiSelectOption<ProductSubcategory>[] =
-    availableSubcategories.map((subcategory) => ({
-      value: subcategory,
-      label: PRODUCT_SUBCATEGORY_LABELS[subcategory],
+  const childCategoryOptions: MultiSelectOption<string>[] =
+    availableChildCategories.map((childCategory) => ({
+      value: childCategory.id,
+      label: childCategory.name,
     }));
 
   return (
@@ -108,12 +102,12 @@ export function ProductFilterHeader({
               className="w-32"
             />
             <MultiSelect
-              options={subcategoryOptions}
-              selected={subcategoryFilters}
-              onChange={onSubcategoryChange}
+              options={childCategoryOptions}
+              selected={childCategoryFilters}
+              onChange={onChildCategoryChange}
               placeholder="Subcategory"
               label="Subcategories"
-              disabled={disabled || !isSubcategoryEnabled}
+              disabled={disabled || !hasChildCategories}
               className="w-36"
             />
           </div>
@@ -166,18 +160,18 @@ export function ProductFilterHeader({
                       </div>
                     ) : (
                       availableCategories.map((category) => {
-                        const isSelected = categoryFilters.includes(category);
+                        const isSelected = categoryFilters.includes(category.id);
                         return (
                           <button
-                            key={category}
+                            key={category.id}
                             type="button"
                             onClick={() => {
                               if (isSelected) {
                                 onCategoryChange(
-                                  categoryFilters.filter((c) => c !== category)
+                                  categoryFilters.filter((c) => c !== category.id)
                                 );
                               } else {
-                                onCategoryChange([...categoryFilters, category]);
+                                onCategoryChange([...categoryFilters, category.id]);
                               }
                             }}
                             className={cn(
@@ -197,9 +191,7 @@ export function ProductFilterHeader({
                             >
                               {isSelected && <Check className="h-3 w-3" />}
                             </div>
-                            <span className="truncate">
-                              {PRODUCT_CATEGORY_LABELS[category]}
-                            </span>
+                            <span className="truncate">{category.name}</span>
                           </button>
                         );
                       })
@@ -207,17 +199,17 @@ export function ProductFilterHeader({
                   </div>
                 </div>
 
-                {/* Subcategory filter section - only shown when Blind Box is selected */}
-                {isSubcategoryEnabled && (
+                {/* Child category filter section - only shown when child categories are available */}
+                {hasChildCategories && (
                   <div className="p-2">
                     <div className="flex items-center justify-between px-2 pb-2">
                       <span className="text-xs font-medium text-muted-foreground">
                         Subcategory
                       </span>
-                      {subcategoryFilters.length > 0 && (
+                      {childCategoryFilters.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => onSubcategoryChange([])}
+                          onClick={() => onChildCategoryChange([])}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                           aria-label="Clear subcategory filters"
                         >
@@ -226,24 +218,24 @@ export function ProductFilterHeader({
                       )}
                     </div>
                     <div className="space-y-0.5">
-                      {availableSubcategories.length === 0 ? (
+                      {availableChildCategories.length === 0 ? (
                         <div className="py-2 px-2 text-sm text-muted-foreground">
                           No subcategories available
                         </div>
                       ) : (
-                        availableSubcategories.map((subcategory) => {
-                          const isSelected = subcategoryFilters.includes(subcategory);
+                        availableChildCategories.map((childCategory) => {
+                          const isSelected = childCategoryFilters.includes(childCategory.id);
                           return (
                             <button
-                              key={subcategory}
+                              key={childCategory.id}
                               type="button"
                               onClick={() => {
                                 if (isSelected) {
-                                  onSubcategoryChange(
-                                    subcategoryFilters.filter((s) => s !== subcategory)
+                                  onChildCategoryChange(
+                                    childCategoryFilters.filter((s) => s !== childCategory.id)
                                   );
                                 } else {
-                                  onSubcategoryChange([...subcategoryFilters, subcategory]);
+                                  onChildCategoryChange([...childCategoryFilters, childCategory.id]);
                                 }
                               }}
                               className={cn(
@@ -263,9 +255,7 @@ export function ProductFilterHeader({
                               >
                                 {isSelected && <Check className="h-3 w-3" />}
                               </div>
-                              <span className="truncate">
-                                {PRODUCT_SUBCATEGORY_LABELS[subcategory]}
-                              </span>
+                              <span className="truncate">{childCategory.name}</span>
                             </button>
                           );
                         })

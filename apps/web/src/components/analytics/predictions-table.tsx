@@ -38,20 +38,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { ForecastPrediction, PaginatedResponse } from "@/types/api"
+import type { ForecastPrediction } from "@/types/api"
 
 type SortField = "itemSku" | "itemName" | "currentStock" | "avgDailyDelta" | "daysToStockout" | "suggestedReorderQty" | "suggestedOrderDate"
 type SortDirection = "asc" | "desc"
 type RiskFilter = "all" | "critical" | "warning" | "safe"
 
 interface PredictionsTableProps {
-  data: PaginatedResponse<ForecastPrediction> | undefined
+  data: ForecastPrediction[]
   isLoading: boolean
   isError: boolean
-  page: number
-  pageSize: number
-  onPageChange: (page: number) => void
-  onPageSizeChange: (size: number) => void
 }
 
 function getDaysToStockoutBadgeClass(days: number): string {
@@ -182,15 +178,13 @@ export function PredictionsTable({
   data,
   isLoading,
   isError,
-  page,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
 }: PredictionsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all")
   const [sortField, setSortField] = useState<SortField>("daysToStockout")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -199,18 +193,32 @@ export function PredictionsTable({
       setSortField(field)
       setSortDirection("asc")
     }
+    setPage(1)
   }
 
   const filteredAndSortedData = filterAndSortData(
-    data?.content,
+    data,
     searchTerm,
     riskFilter,
     sortField,
     sortDirection
   )
 
+  const totalElements = filteredAndSortedData.length
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize))
+  const pagedData = filteredAndSortedData.slice((page - 1) * pageSize, page * pageSize)
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) setPage(newPage)
+  }
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize)
+    setPage(1)
+  }
+
   const handleExportCSV = () => {
-    if (!data?.content || data.content.length === 0) return
+    if (data.length === 0) return
 
     const headers = [
       "SKU",
@@ -274,7 +282,7 @@ export function PredictionsTable({
               <SelectItem value="safe">Safe (&gt;7 days)</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data?.content?.length}>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data?.length}>
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
@@ -340,7 +348,7 @@ export function PredictionsTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedData.length === 0 ? (
+                  {pagedData.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground">
                         {searchTerm || riskFilter !== "all"
@@ -349,7 +357,7 @@ export function PredictionsTable({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAndSortedData.map((prediction) => (
+                    pagedData.map((prediction) => (
                       <TableRow key={prediction.id}>
                         <TableCell className="font-mono text-sm">
                           {prediction.itemSku}
@@ -382,12 +390,12 @@ export function PredictionsTable({
               </Table>
             </div>
 
-            <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Rows per page:</span>
                 <Select
                   value={pageSize.toString()}
-                  onValueChange={(v) => onPageSizeChange(Number(v))}
+                  onValueChange={(v) => handlePageSizeChange(Number(v))}
                 >
                   <SelectTrigger className="h-8 w-[70px]">
                     <SelectValue />
@@ -399,64 +407,64 @@ export function PredictionsTable({
                   </SelectContent>
                 </Select>
                 <span>
-                  {data ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, data.totalElements)} of ${data.totalElements}` : ""}
+                  {totalElements > 0
+                    ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalElements)} of ${totalElements}`
+                    : ""}
                 </span>
               </div>
 
-              {data && data.totalPages > 1 && (
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          onPageChange(page - 1)
-                        }}
-                        className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        handlePageChange(page - 1)
+                      }}
+                      className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
 
-                    {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
-                      let pageNum: number
-                      if (data.totalPages <= 5) {
-                        pageNum = i + 1
-                      } else if (page <= 3) {
-                        pageNum = i + 1
-                      } else if (page >= data.totalPages - 2) {
-                        pageNum = data.totalPages - 4 + i
-                      } else {
-                        pageNum = page - 2 + i
-                      }
-                      return (
-                        <PaginationItem key={pageNum}>
-                          <PaginationLink
-                            href="#"
-                            isActive={page === pageNum}
-                            onClick={(e) => {
-                              e.preventDefault()
-                              onPageChange(pageNum)
-                            }}
-                          >
-                            {pageNum}
-                          </PaginationLink>
-                        </PaginationItem>
-                      )
-                    })}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (page <= 3) {
+                      pageNum = i + 1
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = page - 2 + i
+                    }
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <PaginationLink
+                          href="#"
+                          isActive={page === pageNum}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handlePageChange(pageNum)
+                          }}
+                        >
+                          {pageNum}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  })}
 
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          onPageChange(page + 1)
-                        }}
-                        className={page >= data.totalPages ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        handlePageChange(page + 1)
+                      }}
+                      className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           </div>
         )}
