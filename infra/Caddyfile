@@ -1,0 +1,16 @@
+{
+    email admin@mirai-inventory.com
+}
+
+# Replace api.YOUR-TEST-DOMAIN.com with your actual domain
+# DNS Setup: Add A record pointing "api" subdomain to your droplet IP
+api.YOUR-TEST-DOMAIN.com {
+    reverse_proxy inventory-service:4000 {
+        health_uri /actuator/health
+        health_interval 30s
+    }
+
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header X-XSS-Protection "1; mode=block"
+}

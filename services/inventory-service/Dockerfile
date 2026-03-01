@@ -10,13 +10,16 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:21.0.5_11-jdk AS runner
+FROM eclipse-temurin:21-jre-alpine AS runner
 
 WORKDIR /app
 
-# Create non-root user
-RUN groupadd --system --gid 1001 appgroup && \
-    useradd --system --uid 1001 --gid appgroup appuser
+# Create non-root user (Alpine syntax)
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 -G appgroup appuser
+
+# Add curl for health checks
+RUN apk add --no-cache curl
 
 COPY --from=builder --chown=appuser:appgroup ./app/target/inventory-service-0.0.1-SNAPSHOT.jar ./app.jar
 
