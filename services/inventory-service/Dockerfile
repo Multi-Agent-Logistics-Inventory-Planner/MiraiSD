@@ -14,7 +14,14 @@ FROM eclipse-temurin:21-jdk AS runner
 
 WORKDIR /app
 
-COPY --from=builder ./app/target/inventory-service-0.0.1-SNAPSHOT.jar ./app.jar
+# Create non-root user
+RUN groupadd --system --gid 1001 appgroup && \
+    useradd --system --uid 1001 --gid appgroup appuser
+
+COPY --from=builder --chown=appuser:appgroup ./app/target/inventory-service-0.0.1-SNAPSHOT.jar ./app.jar
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 4000
 
