@@ -10,7 +10,7 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:21-jdk AS runner
+FROM eclipse-temurin:21.0.5_11-jdk AS runner
 
 WORKDIR /app
 
@@ -25,4 +25,5 @@ USER appuser
 
 EXPOSE 4000
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Use shell form to expand JAVA_OPTS environment variable
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

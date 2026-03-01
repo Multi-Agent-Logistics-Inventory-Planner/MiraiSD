@@ -9,10 +9,13 @@
 #
 # Network isolation is enforced by the 'mirai' bridge network - only containers
 # attached to this network can communicate with Kafka.
+#
+# RESOURCE LIMITS: Configured for DigitalOcean Basic 2GB Droplet
+# Total container memory: ~1.5GB (leaving ~500MB for system overhead)
 
 services:
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.8.1
     container_name: kafka
     ports:
       - "29092:29092"  # External access from host (localhost:29092)
@@ -34,6 +37,15 @@ services:
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      # JVM memory limits for 2GB droplet
+      - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     volumes:
       - kafka-data:/var/lib/kafka/data
     dns:
@@ -61,6 +73,16 @@ services:
       - "4000:4000"
     env_file:
       - ../.env
+    environment:
+      # JVM memory limits (75% of container limit)
+      - JAVA_OPTS=-Xmx288m -Xms288m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -99,6 +121,13 @@ services:
       - BATCH_WINDOW_SECONDS=30        # Max time to wait before processing a batch
       - BATCH_SIZE_TRIGGER=50          # Process immediately if batch reaches this size
       - ITEM_DEBOUNCE_SECONDS=5.0      # Dedupe rapid updates to same item within this window
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.75'
+        reservations:
+          memory: 128M
     depends_on:
       kafka:
         condition: service_healthy
@@ -137,6 +166,13 @@ services:
       - SLACK_ENABLED=${SLACK_ENABLED:-true}
       # Alert settings
       - ALERT_DEBOUNCE_SECONDS=${ALERT_DEBOUNCE_SECONDS:-300}
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
     depends_on:
       kafka:
         condition: service_healthy
@@ -173,6 +209,13 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL:-}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
       - NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
     depends_on:
       inventory-service:
         condition: service_healthy
