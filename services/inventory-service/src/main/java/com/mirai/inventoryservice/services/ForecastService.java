@@ -5,15 +5,7 @@ import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
-import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
-import com.mirai.inventoryservice.repositories.CabinetInventoryRepository;
-import com.mirai.inventoryservice.repositories.RackInventoryRepository;
-import com.mirai.inventoryservice.repositories.DoubleClawMachineInventoryRepository;
-import com.mirai.inventoryservice.repositories.SingleClawMachineInventoryRepository;
-import com.mirai.inventoryservice.repositories.FourCornerMachineInventoryRepository;
-import com.mirai.inventoryservice.repositories.KeychainMachineInventoryRepository;
-import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
-import com.mirai.inventoryservice.repositories.PusherMachineInventoryRepository;
+import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,17 +27,7 @@ public class ForecastService {
 
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final ProductRepository productRepository;
-    
-    // Inventory Repositories
-    private final BoxBinInventoryRepository boxBinInventoryRepository;
-    private final CabinetInventoryRepository cabinetInventoryRepository;
-    private final RackInventoryRepository rackInventoryRepository;
-    private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
-    private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
-    private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
-    private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
-    private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
-    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
+    private final InventoryTotalsRepository inventoryTotalsRepository;
 
     @Transactional(readOnly = true)
     public Page<ForecastPredictionResponseDTO> getAllForecasts(Pageable pageable) {
@@ -66,20 +48,23 @@ public class ForecastService {
         return forecastPredictionRepository.findFirstByItemIdOrderByComputedAtDesc(itemId)
                 .map(p -> {
                     Product product = productRepository.findById(p.getItemId()).orElse(null);
-                    return convertToDTO(p, product);
+                    Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+                    return convertToDTO(p, product, stockMap);
                 })
                 .orElse(null);
     }
 
     private Page<ForecastPredictionResponseDTO> mapToDTOs(Page<ForecastPrediction> predictions) {
         Map<UUID, Product> productMap = getProductMap(predictions.getContent());
-        return predictions.map(p -> convertToDTO(p, productMap.get(p.getItemId())));
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        return predictions.map(p -> convertToDTO(p, productMap.get(p.getItemId()), stockMap));
     }
 
     private List<ForecastPredictionResponseDTO> mapToDTOList(List<ForecastPrediction> predictions) {
         Map<UUID, Product> productMap = getProductMap(predictions);
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
         return predictions.stream()
-                .map(p -> convertToDTO(p, productMap.get(p.getItemId())))
+                .map(p -> convertToDTO(p, productMap.get(p.getItemId()), stockMap))
                 .collect(Collectors.toList());
     }
 
@@ -87,37 +72,32 @@ public class ForecastService {
         Set<UUID> itemIds = predictions.stream()
                 .map(ForecastPrediction::getItemId)
                 .collect(Collectors.toSet());
-        
+
         return productRepository.findAllById(itemIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
-    
+
+    /**
+     * Get all stock totals as a map. Use this for batch operations.
+     */
+    public Map<UUID, Integer> getAllStockTotals() {
+        return inventoryTotalsRepository.findAllStockTotalsMap();
+    }
+
+    /**
+     * Get current stock for a single item. For batch operations, use getAllStockTotals() instead.
+     */
     public Integer getCurrentStockPublic(UUID itemId) {
         if (itemId == null) return 0;
-        
-        int total = 0;
-        total += getSafeSum(boxBinInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(cabinetInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(rackInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(doubleClawMachineInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(singleClawMachineInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(keychainMachineInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(pusherMachineInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(fourCornerMachineInventoryRepository.sumQuantityByProductId(itemId));
-        total += getSafeSum(notAssignedInventoryRepository.sumQuantityByProductId(itemId));
-
-        return total;
-    }
-    
-    private int getSafeSum(Integer sum) {
-        return sum != null ? sum : 0;
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        return stockMap.getOrDefault(itemId, 0);
     }
 
-    private ForecastPredictionResponseDTO convertToDTO(ForecastPrediction prediction, Product product) {
+    private ForecastPredictionResponseDTO convertToDTO(ForecastPrediction prediction, Product product, Map<UUID, Integer> stockMap) {
         String itemName = product != null ? product.getName() : "Unknown Item";
         String itemSku = product != null ? product.getSku() : "UNKNOWN";
-        Integer currentStock = getCurrentStockPublic(prediction.getItemId());
-        
+        Integer currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
+
         return new ForecastPredictionResponseDTO(
             prediction.getId(),
             prediction.getItemId(),
