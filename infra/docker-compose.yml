@@ -11,7 +11,8 @@
 # attached to this network can communicate with Kafka.
 #
 # RESOURCE LIMITS: Configured for DigitalOcean Basic 2GB Droplet
-# Total container memory: ~1.5GB (leaving ~500MB for system overhead)
+# Total container memory: ~1.4GB (leaving ~600MB for system overhead)
+# - kafka: 512M, inventory-service: 512M, forecasting: 192M, messaging: 128M, caddy: 64M
 
 services:
   kafka:
@@ -55,12 +56,13 @@ services:
     networks:
       - mirai
     # H1: Healthcheck to detect broker readiness
+    # Note: start_period increased for resource-constrained droplets
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 6
+      start_period: 45s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -79,15 +81,19 @@ services:
     env_file:
       - ../.env
     environment:
-      # JVM memory limits (75% of container limit)
-      - JAVA_OPTS=-Xmx288m -Xms288m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
+      # JVM memory limits optimized for container startup
+      # - Heap: 256m (leaves room for metaspace + native memory)
+      # - UseContainerSupport: respect container memory limits
+      # - MaxMetaspaceSize: cap class metadata memory
+      # - TieredStopAtLevel=1: faster startup (JIT compiles less aggressively)
+      - JAVA_OPTS=-Xmx256m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=96m -XX:TieredStopAtLevel=1
     deploy:
       resources:
         limits:
-          memory: 384M
-          cpus: '0.5'
+          memory: 512M
+          cpus: '0.75'
         reservations:
-          memory: 256M
+          memory: 384M
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -97,12 +103,15 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+    # Note: Spring Boot on 2GB droplet takes 2-3 minutes to fully initialize
+    # start_period: time before healthchecks count against retries
+    # Total allowed: start_period + (retries * interval) = 180 + 150 = 330s
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/actuator/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 180s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -152,8 +161,8 @@ services:
       test: ["CMD-SHELL", "find /tmp/forecasting-worker-heartbeat -mmin -1 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 45s
+      retries: 4
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -202,8 +211,8 @@ services:
       test: ["CMD-SHELL", "find /tmp/messaging-worker-heartbeat -mmin -1 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 45s
+      retries: 4
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
