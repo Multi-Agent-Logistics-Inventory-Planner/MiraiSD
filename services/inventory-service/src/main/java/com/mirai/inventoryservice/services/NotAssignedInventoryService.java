@@ -1,7 +1,10 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.exceptions.NotAssignedInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.NotAssignedInventory;
 import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
 import jakarta.transaction.Transactional;
@@ -16,31 +19,40 @@ import java.util.UUID;
 public class NotAssignedInventoryService {
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public NotAssignedInventoryService(
             NotAssignedInventoryRepository notAssignedInventoryRepository,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public NotAssignedInventory addInventory(UUID productId, Integer quantity) {
         Product product = productService.getProductById(productId);
 
-        // Check if entry already exists - if so, add to existing quantity
+        // Check if entry already exists - if so, adjust existing quantity
         Optional<NotAssignedInventory> existing = notAssignedInventoryRepository.findByItem_Id(productId);
         if (existing.isPresent()) {
             NotAssignedInventory inv = existing.get();
-            inv.setQuantity(inv.getQuantity() + quantity);
-            return notAssignedInventoryRepository.save(inv);
+            AdjustStockRequestDTO adjustRequest = AdjustStockRequestDTO.builder()
+                    .quantityChange(quantity)
+                    .reason(StockMovementReason.RESTOCK)
+                    .build();
+            stockMovementService.adjustInventory(LocationType.NOT_ASSIGNED, inv.getId(), adjustRequest);
+            return notAssignedInventoryRepository.findById(inv.getId())
+                    .orElseThrow(() -> new NotAssignedInventoryNotFoundException("Inventory not found after adjustment"));
         }
 
-        NotAssignedInventory inventory = NotAssignedInventory.builder()
-                .item(product)
-                .quantity(quantity)
-                .build();
+        // Create new inventory with tracking
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.NOT_ASSIGNED, null, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return notAssignedInventoryRepository.save(inventory);
+        return notAssignedInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotAssignedInventoryNotFoundException("Failed to create inventory"));
     }
 
     public NotAssignedInventory getInventoryById(UUID inventoryId) {
@@ -70,13 +82,16 @@ public class NotAssignedInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        NotAssignedInventory inventory = getInventoryById(inventoryId);
-        notAssignedInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.NOT_ASSIGNED, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 
     /**
      * Find or create NotAssignedInventory for a product.
      * Used by ShipmentService when receiving items without a destination.
+     * Note: This creates without tracking - ShipmentService handles its own tracking.
      */
     public NotAssignedInventory findOrCreate(Product product) {
         return notAssignedInventoryRepository.findByItem_Id(product.getId())
