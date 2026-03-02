@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface DoubleClawMachineInventoryRepository extends JpaRepository<DoubleClawMachineInventory, UUID> {
-    List<DoubleClawMachineInventory> findByDoubleClawMachine_Id(UUID doubleClawMachineId);
+    @Query("SELECT i FROM DoubleClawMachineInventory i JOIN FETCH i.doubleClawMachine JOIN FETCH i.item WHERE i.doubleClawMachine.id = :machineId")
+    List<DoubleClawMachineInventory> findByDoubleClawMachine_Id(@Param("machineId") UUID machineId);
 
-    List<DoubleClawMachineInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM DoubleClawMachineInventory i JOIN FETCH i.doubleClawMachine WHERE i.item.id = :productId")
+    List<DoubleClawMachineInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<DoubleClawMachineInventory> findByDoubleClawMachine_IdAndItem_Id(UUID doubleClawMachineId, UUID productId);
+    @Query("SELECT i FROM DoubleClawMachineInventory i JOIN FETCH i.doubleClawMachine JOIN FETCH i.item WHERE i.doubleClawMachine.id = :machineId AND i.item.id = :itemId")
+    Optional<DoubleClawMachineInventory> findByDoubleClawMachine_IdAndItem_Id(@Param("machineId") UUID machineId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM DoubleClawMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface BoxBinInventoryRepository extends JpaRepository<BoxBinInventory, UUID> {
-    List<BoxBinInventory> findByBoxBin_Id(UUID boxBinId);
+    @Query("SELECT i FROM BoxBinInventory i JOIN FETCH i.boxBin JOIN FETCH i.item WHERE i.boxBin.id = :boxBinId")
+    List<BoxBinInventory> findByBoxBin_Id(@Param("boxBinId") UUID boxBinId);
 
-    List<BoxBinInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM BoxBinInventory i JOIN FETCH i.boxBin WHERE i.item.id = :productId")
+    List<BoxBinInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<BoxBinInventory> findByBoxBin_IdAndItem_Id(UUID boxBinId, UUID productId);
+    @Query("SELECT i FROM BoxBinInventory i JOIN FETCH i.boxBin JOIN FETCH i.item WHERE i.boxBin.id = :boxBinId AND i.item.id = :itemId")
+    Optional<BoxBinInventory> findByBoxBin_IdAndItem_Id(@Param("boxBinId") UUID boxBinId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM BoxBinInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

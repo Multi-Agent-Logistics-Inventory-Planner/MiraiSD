@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
-import { useAuth } from "@/hooks/use-auth";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import { useCategories, useChildCategories } from "@/hooks/queries/use-categories";
 import {
@@ -33,12 +32,11 @@ import {
   useUpdateProductMutation,
 } from "@/hooks/mutations/use-product-mutations";
 import { createInventory } from "@/lib/api/inventory";
-import { adjustStock } from "@/lib/api/stock-movements";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
-import type { Product, ProductRequest, Category, StockMovementReason } from "@/types/api";
+import type { Product, ProductRequest, Category } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 
 const EMPTY_LOCATION: LocationSelection = {
@@ -79,7 +77,6 @@ export function ProductForm({
   initialProduct,
 }: ProductFormProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
@@ -250,20 +247,10 @@ export function ProductForm({
         ) {
           setIsAddingStock(true);
           try {
-            const actorId = user?.personId ?? user?.id ?? "";
-            const inv = await createInventory(
+            await createInventory(
               initialStockLocation.locationType,
               initialStockLocation.locationId,
-              { itemId: newProduct.id, quantity: 0 }
-            );
-            await adjustStock(
-              initialStockLocation.locationType,
-              inv.id,
-              {
-                quantityChange: initialStockQty,
-                reason: "INITIAL_STOCK" as StockMovementReason,
-                actorId,
-              }
+              { itemId: newProduct.id, quantity: initialStockQty }
             );
             toast({ title: "Initial stock added" });
           } catch (stockErr: unknown) {

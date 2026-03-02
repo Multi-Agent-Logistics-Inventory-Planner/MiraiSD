@@ -17,14 +17,12 @@ import type { NotAssignedInventory } from "@/types/api";
 interface NotAssignedTableProps {
   items: NotAssignedInventory[];
   isLoading: boolean;
-  onRowClick: (item: NotAssignedInventory) => void;
   pageSize?: number;
 }
 
 export function NotAssignedTable({
   items,
   isLoading,
-  onRowClick,
   pageSize = 10,
 }: NotAssignedTableProps) {
   if (isLoading) {
@@ -73,11 +71,7 @@ export function NotAssignedTable({
       </TableHeader>
       <TableBody>
         {items.map((item) => (
-          <TableRow
-            key={item.id}
-            className="cursor-pointer hover:bg-muted/50"
-            onClick={() => onRowClick(item)}
-          >
+          <TableRow key={item.id}>
             <TableCell className="py-2">
               <div className="flex items-center gap-3">
                 {item.item.imageUrl ? (

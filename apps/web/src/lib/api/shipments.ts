@@ -4,16 +4,44 @@ import {
   ShipmentRequest,
   ShipmentStatus,
   ReceiveShipmentRequest,
+  PaginatedResponse,
 } from "@/types/api";
 
 const BASE_PATH = "/api/shipments";
 
+export interface ShipmentFilters {
+  status?: ShipmentStatus;
+  search?: string;
+}
+
 /**
- * Get all shipments, optionally filtered by status
+ * Get all shipments, optionally filtered by status (legacy, no pagination)
  */
 export async function getShipments(status?: ShipmentStatus): Promise<Shipment[]> {
   const path = status ? `${BASE_PATH}?status=${status}` : BASE_PATH;
   return apiGet<Shipment[]>(path);
+}
+
+/**
+ * Get shipments with server-side pagination and filtering
+ */
+export async function getShipmentsPaged(
+  filters: ShipmentFilters = {},
+  page: number = 0,
+  size: number = 20
+): Promise<PaginatedResponse<Shipment>> {
+  const params = new URLSearchParams();
+  params.append("page", page.toString());
+  params.append("size", size.toString());
+
+  if (filters.status) {
+    params.append("status", filters.status);
+  }
+  if (filters.search) {
+    params.append("search", filters.search);
+  }
+
+  return apiGet<PaginatedResponse<Shipment>>(`${BASE_PATH}?${params.toString()}`);
 }
 
 /**

@@ -11,11 +11,11 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
+import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +40,15 @@ public class AnalyticsService {
 
     private final ProductRepository productRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
-    private final ForecastService forecastService;
+    private final InventoryTotalsRepository inventoryTotalsRepository;
     private final StockMovementRepository stockMovementRepository;
 
     @Transactional(readOnly = true)
     public List<CategoryInventoryDTO> getInventoryByCategory() {
         List<Product> products = productRepository.findAllWithCategories();
+
+        // Bulk fetch all stock totals in a single query
+        Map<UUID, Integer> stockTotals = inventoryTotalsRepository.findAllStockTotalsMap();
 
         // Group products by category
         Map<Category, List<Product>> productsByCategory = products.stream()
@@ -57,11 +60,10 @@ public class AnalyticsService {
             String categoryName = entry.getKey().getName();
             List<Product> categoryProducts = entry.getValue();
 
-            // Calculate total stock for this category
-            int totalStock = 0;
-            for (Product p : categoryProducts) {
-                totalStock += forecastService.getCurrentStockPublic(p.getId());
-            }
+            // Calculate total stock for this category using pre-fetched map
+            int totalStock = categoryProducts.stream()
+                    .mapToInt(p -> stockTotals.getOrDefault(p.getId(), 0))
+                    .sum();
 
             result.add(new CategoryInventoryDTO(categoryName, (long) categoryProducts.size(), totalStock));
         }
@@ -88,15 +90,11 @@ public class AnalyticsService {
         // 2. Stockout Rate: % of items with 0 stock (now includes all 9 inventory tables)
         List<Product> allProducts = productRepository.findAll();
 
-        // Cache stock per product to avoid duplicate DB calls in stockout + turnover
-        Map<UUID, Integer> stockByProduct = allProducts.stream()
-                .collect(Collectors.toMap(
-                        Product::getId,
-                        p -> forecastService.getCurrentStockPublic(p.getId())
-                ));
+        // Bulk fetch all stock totals in a single query
+        Map<UUID, Integer> stockByProduct = inventoryTotalsRepository.findAllStockTotalsMap();
 
-        long outOfStockCount = stockByProduct.values().stream()
-                .filter(stock -> stock == 0)
+        long outOfStockCount = allProducts.stream()
+                .filter(p -> stockByProduct.getOrDefault(p.getId(), 0) == 0)
                 .count();
 
         BigDecimal stockoutRate = BigDecimal.ZERO;
@@ -119,13 +117,9 @@ public class AnalyticsService {
         OffsetDateTime startDateTime = today.minusMonths(12).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         // COGS: sum of abs(quantityChange) * unitCost for SALE movements in last 12 months
-        Specification<StockMovement> salesSpec = (root, query, cb) ->
-            cb.and(
-                cb.equal(root.get("reason"), StockMovementReason.SALE),
-                cb.greaterThanOrEqualTo(root.get("at"), startDateTime)
-            );
-
-        List<StockMovement> salesMovements = stockMovementRepository.findAll(salesSpec);
+        // Use JOIN FETCH query to avoid N+1 on item
+        List<StockMovement> salesMovements = stockMovementRepository.findByReasonAndAtAfterWithItem(
+                StockMovementReason.SALE, startDateTime);
 
         BigDecimal cogs = BigDecimal.ZERO;
         for (StockMovement movement : salesMovements) {
@@ -163,13 +157,9 @@ public class AnalyticsService {
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-        Specification<StockMovement> salesSpec = (root, query, cb) ->
-            cb.and(
-                cb.equal(root.get("reason"), StockMovementReason.SALE),
-                cb.greaterThanOrEqualTo(root.get("at"), startDateTime)
-            );
-
-        List<StockMovement> salesMovements = stockMovementRepository.findAll(salesSpec);
+        // Use JOIN FETCH query to avoid N+1 on item
+        List<StockMovement> salesMovements = stockMovementRepository.findByReasonAndAtAfterWithItem(
+                StockMovementReason.SALE, startDateTime);
 
         Map<String, BigDecimal> monthlyRevenue = new TreeMap<>();
         Map<String, Integer> monthlyUnits = new TreeMap<>();

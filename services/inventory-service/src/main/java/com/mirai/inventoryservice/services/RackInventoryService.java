@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.RackInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.RackInventory;
-import com.mirai.inventoryservice.models.storage.Rack;
 import com.mirai.inventoryservice.repositories.RackInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class RackInventoryService {
     private final RackInventoryRepository rackInventoryRepository;
     private final RackService rackService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public RackInventoryService(
             RackInventoryRepository rackInventoryRepository,
             RackService rackService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.rackInventoryRepository = rackInventoryRepository;
         this.rackService = rackService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public RackInventory addInventory(UUID rackId, UUID productId, Integer quantity) {
-        Rack rack = rackService.getRackById(rackId);
+        rackService.getRackById(rackId); // Validate rack exists
         Product product = productService.getProductById(productId);
 
         Optional<RackInventory> existing = rackInventoryRepository
@@ -40,13 +44,12 @@ public class RackInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this rack");
         }
 
-        RackInventory inventory = RackInventory.builder()
-                .rack(rack)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.RACK, rackId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return rackInventoryRepository.save(inventory);
+        return rackInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new RackInventoryNotFoundException("Failed to create inventory"));
     }
 
     public RackInventory getInventoryById(UUID inventoryId) {
@@ -73,8 +76,9 @@ public class RackInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        RackInventory inventory = getInventoryById(inventoryId);
-        rackInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.RACK, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }
-

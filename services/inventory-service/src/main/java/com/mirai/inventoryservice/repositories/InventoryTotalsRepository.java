@@ -6,7 +6,9 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -82,5 +84,38 @@ public class InventoryTotalsRepository {
                         .lastUpdatedAt(TimestampUtils.toOffsetDateTime(row[11]))
                         .build())
                 .toList();
+    }
+
+    private static final String STOCK_TOTALS_SQL = """
+        SELECT item_id, COALESCE(SUM(quantity), 0) as total_quantity FROM (
+            SELECT item_id, quantity FROM box_bin_inventory
+            UNION ALL SELECT item_id, quantity FROM rack_inventory
+            UNION ALL SELECT item_id, quantity FROM cabinet_inventory
+            UNION ALL SELECT item_id, quantity FROM single_claw_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM double_claw_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM keychain_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM not_assigned_inventory
+        ) combined GROUP BY item_id
+        """;
+
+    /**
+     * Get stock totals for all products as a Map<UUID, Integer>.
+     * Single query across all inventory tables.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<UUID, Integer> findAllStockTotalsMap() {
+        List<Object[]> results = entityManager
+                .createNativeQuery(STOCK_TOTALS_SQL)
+                .getResultList();
+
+        Map<UUID, Integer> stockMap = new HashMap<>();
+        for (Object[] row : results) {
+            UUID itemId = (UUID) row[0];
+            Integer quantity = ((Number) row[1]).intValue();
+            stockMap.put(itemId, quantity);
+        }
+        return stockMap;
     }
 }

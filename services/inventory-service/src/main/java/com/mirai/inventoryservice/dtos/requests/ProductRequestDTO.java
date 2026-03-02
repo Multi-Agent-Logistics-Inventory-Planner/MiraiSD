@@ -41,4 +41,6 @@ public class ProductRequestDTO {
     private String imageUrl;
 
     private String notes;
+
+    private Integer initialStock;
 }

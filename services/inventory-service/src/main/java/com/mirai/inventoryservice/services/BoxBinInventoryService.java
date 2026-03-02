@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.BoxBinInventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
-import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class BoxBinInventoryService {
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final BoxBinService boxBinService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public BoxBinInventoryService(
             BoxBinInventoryRepository boxBinInventoryRepository,
             BoxBinService boxBinService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.boxBinService = boxBinService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public BoxBinInventory addInventory(UUID boxBinId, UUID productId, Integer quantity) {
-        BoxBin boxBin = boxBinService.getBoxBinById(boxBinId);
+        boxBinService.getBoxBinById(boxBinId); // Validate box bin exists
         Product product = productService.getProductById(productId);
 
         Optional<BoxBinInventory> existing = boxBinInventoryRepository
@@ -40,13 +44,12 @@ public class BoxBinInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this box bin");
         }
 
-        BoxBinInventory inventory = BoxBinInventory.builder()
-                .boxBin(boxBin)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.BOX_BIN, boxBinId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return boxBinInventoryRepository.save(inventory);
+        return boxBinInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new BoxBinInventoryNotFoundException("Failed to create inventory"));
     }
 
     public BoxBinInventory getInventoryById(UUID inventoryId) {
@@ -73,8 +76,10 @@ public class BoxBinInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        BoxBinInventory inventory = getInventoryById(inventoryId);
-        boxBinInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.BOX_BIN, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }
 

@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface FourCornerMachineInventoryRepository extends JpaRepository<FourCornerMachineInventory, UUID> {
-    List<FourCornerMachineInventory> findByFourCornerMachine_Id(UUID fourCornerMachineId);
+    @Query("SELECT i FROM FourCornerMachineInventory i JOIN FETCH i.fourCornerMachine JOIN FETCH i.item WHERE i.fourCornerMachine.id = :machineId")
+    List<FourCornerMachineInventory> findByFourCornerMachine_Id(@Param("machineId") UUID machineId);
 
-    List<FourCornerMachineInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM FourCornerMachineInventory i JOIN FETCH i.fourCornerMachine WHERE i.item.id = :productId")
+    List<FourCornerMachineInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<FourCornerMachineInventory> findByFourCornerMachine_IdAndItem_Id(UUID fourCornerMachineId, UUID productId);
+    @Query("SELECT i FROM FourCornerMachineInventory i JOIN FETCH i.fourCornerMachine JOIN FETCH i.item WHERE i.fourCornerMachine.id = :machineId AND i.item.id = :itemId")
+    Optional<FourCornerMachineInventory> findByFourCornerMachine_IdAndItem_Id(@Param("machineId") UUID machineId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM FourCornerMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

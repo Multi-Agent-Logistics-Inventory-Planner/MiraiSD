@@ -9,6 +9,7 @@ import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.*;
 import com.mirai.inventoryservice.models.storage.*;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
@@ -27,6 +28,7 @@ import java.util.UUID;
 @Service
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
+    private final ProductRepository productRepository;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
@@ -48,6 +50,7 @@ public class StockMovementService {
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
+            ProductRepository productRepository,
             BoxBinInventoryRepository boxBinInventoryRepository,
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
@@ -67,6 +70,7 @@ public class StockMovementService {
             PusherMachineRepository pusherMachineRepository,
             EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
+        this.productRepository = productRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
@@ -135,8 +139,12 @@ public class StockMovementService {
                 .metadata(metadata)
                 .build();
 
-        // Trigger auto-creates event_outbox entry
-        return stockMovementRepository.save(movement);
+        StockMovement savedMovement = stockMovementRepository.save(movement);
+
+        // Update product active status based on total inventory
+        updateProductActiveStatus(savedMovement.getItem());
+
+        return savedMovement;
     }
 
     /**
@@ -234,9 +242,112 @@ public class StockMovementService {
                 .metadata(depositMetadata)
                 .build();
 
-        // Trigger auto-creates event_outbox entries for both movements
         stockMovementRepository.save(withdrawal);
         stockMovementRepository.save(deposit);
+
+        // Update product active status based on total inventory
+        updateProductActiveStatus(getInventoryProduct(sourceInventory));
+    }
+
+    /**
+     * Create new inventory at a location with tracking.
+     * Creates the inventory record and a stock movement for audit.
+     *
+     * @param locationType The type of storage location
+     * @param locationId The ID of the storage location (null for NOT_ASSIGNED)
+     * @param product The product to add
+     * @param quantity The initial quantity
+     * @param reason The reason for adding (typically INITIAL_STOCK or RESTOCK)
+     * @param actorId The user performing the action (optional)
+     * @param notes Additional notes (optional)
+     * @return The created inventory ID
+     */
+    @Transactional
+    public UUID createInventoryWithTracking(LocationType locationType, UUID locationId,
+                                            Product product, int quantity,
+                                            StockMovementReason reason, UUID actorId, String notes) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
+        }
+
+        // Create the inventory record
+        Object inventory = createInventoryAtLocation(locationType, locationId, product, quantity);
+        UUID inventoryId = getInventoryId(inventory);
+
+        // Create stock movement record
+        Map<String, Object> metadata = new HashMap<>();
+        if (notes != null) {
+            metadata.put("notes", notes);
+        }
+        metadata.put("inventory_id", inventoryId.toString());
+
+        StockMovement movement = StockMovement.builder()
+                .item(product)
+                .locationType(locationType)
+                .toLocationId(locationId)
+                .previousQuantity(0)
+                .currentQuantity(quantity)
+                .quantityChange(quantity)
+                .reason(reason)
+                .actorId(actorId)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        stockMovementRepository.save(movement);
+
+        // Update product active status
+        updateProductActiveStatus(product);
+
+        return inventoryId;
+    }
+
+    /**
+     * Remove inventory from a location with tracking.
+     * Deletes the inventory record and creates a stock movement for audit.
+     *
+     * @param locationType The type of storage location
+     * @param inventoryId The ID of the inventory record to remove
+     * @param reason The reason for removal (typically REMOVED, DAMAGE, or SALE)
+     * @param actorId The user performing the action (optional)
+     * @param notes Additional notes (optional)
+     */
+    @Transactional
+    public void removeInventoryWithTracking(LocationType locationType, UUID inventoryId,
+                                            StockMovementReason reason, UUID actorId, String notes) {
+        // Load the inventory to get current state
+        Object inventory = loadInventory(locationType, inventoryId);
+        int currentQuantity = getInventoryQuantity(inventory);
+        Product product = getInventoryProduct(inventory);
+        UUID locationId = getLocationId(inventory, locationType);
+
+        // Delete the inventory record
+        deleteInventory(locationType, inventory);
+
+        // Create stock movement record
+        Map<String, Object> metadata = new HashMap<>();
+        if (notes != null) {
+            metadata.put("notes", notes);
+        }
+        metadata.put("inventory_id", inventoryId.toString());
+
+        StockMovement movement = StockMovement.builder()
+                .item(product)
+                .locationType(locationType)
+                .fromLocationId(locationId)
+                .previousQuantity(currentQuantity)
+                .currentQuantity(0)
+                .quantityChange(-currentQuantity)
+                .reason(reason)
+                .actorId(actorId)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        stockMovementRepository.save(movement);
+
+        // Update product active status
+        updateProductActiveStatus(product);
     }
 
     /**
@@ -258,6 +369,21 @@ public class StockMovementService {
     }
 
     // ========= Helper Methods =========
+
+    /**
+     * Updates the product's active status based on total inventory.
+     * - If total inventory is 0, deactivate the product
+     * - If total inventory > 0, activate the product
+     */
+    private void updateProductActiveStatus(Product product) {
+        int totalInventory = calculateTotalInventory(product.getId());
+        boolean shouldBeActive = totalInventory > 0;
+
+        if (product.getIsActive() != shouldBeActive) {
+            product.setIsActive(shouldBeActive);
+            productRepository.save(product);
+        }
+    }
 
     @NonNull
     private Object loadInventory(LocationType locationType, UUID inventoryId) {
@@ -495,6 +621,7 @@ public class StockMovementService {
      * Calls the database function calculate_total_inventory() for consistency.
      */
     public int calculateTotalInventory(UUID productId) {
+        entityManager.flush();
         Object result = entityManager.createNativeQuery("SELECT calculate_total_inventory(:productId)")
                 .setParameter("productId", productId)
                 .getSingleResult();

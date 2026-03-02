@@ -25,6 +25,8 @@ import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;
 import com.mirai.inventoryservice.repositories.*;
 import com.mirai.inventoryservice.repositories.NotAssignedInventoryRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.mirai.inventoryservice.models.audit.Notification;
@@ -36,13 +38,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentItemRepository shipmentItemRepository;
+    private final ProductRepository productRepository;
     private final ProductService productService;
     private final UserService userService;
     private final UserRepository userRepository;
@@ -69,6 +75,7 @@ public class ShipmentService {
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             ShipmentItemRepository shipmentItemRepository,
+            ProductRepository productRepository,
             ProductService productService,
             UserService userService,
             UserRepository userRepository,
@@ -93,6 +100,7 @@ public class ShipmentService {
             NotificationService notificationService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
+        this.productRepository = productRepository;
         this.productService = productService;
         this.userService = userService;
         this.userRepository = userRepository;
@@ -135,9 +143,19 @@ public class ShipmentService {
             shipment.setCreatedBy(user);
         }
 
+        // Issue 9 fix: Batch fetch all products upfront
+        Set<UUID> productIds = requestDTO.getItems().stream()
+                .map(ShipmentItemRequestDTO::getItemId)
+                .collect(Collectors.toSet());
+        Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
         List<ShipmentItem> items = new ArrayList<>();
         for (ShipmentItemRequestDTO itemDTO : requestDTO.getItems()) {
-            Product product = productService.getProductById(itemDTO.getItemId());
+            Product product = productMap.get(itemDTO.getItemId());
+            if (product == null) {
+                throw new ProductNotFoundException("Product not found with id: " + itemDTO.getItemId());
+            }
 
             ShipmentItem item = ShipmentItem.builder()
                     .shipment(shipment)
@@ -168,6 +186,14 @@ public class ShipmentService {
 
     public List<Shipment> listShipmentsByStatus(ShipmentStatus status) {
         return shipmentRepository.findByStatusOrderByCreatedAtDesc(status);
+    }
+
+    public Page<Shipment> listShipmentsPaged(ShipmentStatus status, String search, Pageable pageable) {
+        if (search != null && !search.isBlank()) {
+            String searchPattern = "%" + search.toLowerCase() + "%";
+            return shipmentRepository.findByStatusAndSearch(status, searchPattern, pageable);
+        }
+        return shipmentRepository.findByStatusPaged(status, pageable);
     }
 
     public List<Shipment> getShipmentsContainingProduct(UUID productId) {
@@ -235,9 +261,26 @@ public class ShipmentService {
             shipment.setActualDeliveryDate(requestDTO.getActualDeliveryDate());
         }
 
+        // Issue 7 fix: Resolve actor ID once before the loop
+        UUID validatedActorId = null;
+        if (requestDTO.getReceivedBy() != null) {
+            if (userRepository.findById(requestDTO.getReceivedBy()).isPresent()) {
+                validatedActorId = requestDTO.getReceivedBy();
+            }
+        }
+
+        // Issue 8 fix: Batch fetch all shipment items upfront
+        Set<UUID> shipmentItemIds = requestDTO.getItemReceipts().stream()
+                .map(ReceiveShipmentRequestDTO.ItemReceiptDTO::getShipmentItemId)
+                .collect(Collectors.toSet());
+        Map<UUID, ShipmentItem> shipmentItemMap = shipmentItemRepository.findAllById(shipmentItemIds).stream()
+                .collect(Collectors.toMap(ShipmentItem::getId, Function.identity()));
+
         for (ReceiveShipmentRequestDTO.ItemReceiptDTO receipt : requestDTO.getItemReceipts()) {
-            ShipmentItem shipmentItem = shipmentItemRepository.findById(receipt.getShipmentItemId())
-                    .orElseThrow(() -> new IllegalArgumentException("Shipment item not found: " + receipt.getShipmentItemId()));
+            ShipmentItem shipmentItem = shipmentItemMap.get(receipt.getShipmentItemId());
+            if (shipmentItem == null) {
+                throw new IllegalArgumentException("Shipment item not found: " + receipt.getShipmentItemId());
+            }
 
             if (!shipmentItem.getShipment().getId().equals(shipmentId)) {
                 throw new IllegalArgumentException("Shipment item does not belong to this shipment");
@@ -316,7 +359,7 @@ public class ShipmentService {
                     addToNotAssignedInventory(
                             shipmentItem.getItem(),
                             allocation.getQuantity(),
-                            requestDTO.getReceivedBy(),
+                            validatedActorId,
                             shipment.getShipmentNumber(),
                             shipment.getId()
                     );
@@ -327,7 +370,7 @@ public class ShipmentService {
                             locationId,
                             shipmentItem.getItem(),
                             allocation.getQuantity(),
-                            requestDTO.getReceivedBy()
+                            validatedActorId
                     );
                 }
             }
@@ -353,7 +396,7 @@ public class ShipmentService {
         return shipmentRepository.save(shipment);
     }
 
-    private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID actorId) {
+    private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId) {
         Object inventory = findOrCreateInventory(locationType, locationId, product);
         int currentQuantity = getInventoryQuantity(inventory);
         setInventoryQuantity(inventory, currentQuantity + quantity);
@@ -362,16 +405,6 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", inventoryId.toString());
         metadata.put("shipment_receipt", true);
-
-        // Validate actorId exists in users table, set to null if not found
-        UUID validatedActorId = null;
-        if (actorId != null) {
-            // Use repository directly to avoid transaction rollback issues
-            if (userRepository.findById(actorId).isPresent()) {
-                validatedActorId = actorId;
-            }
-            // If user not found, validatedActorId remains null (actorId is nullable)
-        }
 
         StockMovement movement = StockMovement.builder()
                 .item(product)
@@ -388,7 +421,7 @@ public class ShipmentService {
         stockMovementRepository.save(movement);
     }
 
-    private void addToNotAssignedInventory(Product product, int quantity, UUID actorId, String shipmentNumber, UUID shipmentId) {
+    private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, String shipmentNumber, UUID shipmentId) {
         NotAssignedInventory inventory = notAssignedInventoryRepository
                 .findByItem_Id(product.getId())
                 .orElseGet(() -> {
@@ -404,14 +437,6 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
-
-        // Validate actorId exists in users table, set to null if not found
-        UUID validatedActorId = null;
-        if (actorId != null) {
-            if (userRepository.findById(actorId).isPresent()) {
-                validatedActorId = actorId;
-            }
-        }
 
         StockMovement movement = StockMovement.builder()
                 .item(product)

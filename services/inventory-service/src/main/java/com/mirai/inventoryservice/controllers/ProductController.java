@@ -72,7 +72,8 @@ public class ProductController {
                 requestDTO.getLeadTimeDays(),
                 requestDTO.getUnitCost(),
                 requestDTO.getImageUrl(),
-                requestDTO.getNotes()
+                requestDTO.getNotes(),
+                requestDTO.getInitialStock()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(productMapper.toResponseDTO(product));
     }

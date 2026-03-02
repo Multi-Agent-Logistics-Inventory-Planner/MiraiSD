@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface PusherMachineInventoryRepository extends JpaRepository<PusherMachineInventory, UUID> {
-    List<PusherMachineInventory> findByPusherMachine_Id(UUID pusherMachineId);
+    @Query("SELECT i FROM PusherMachineInventory i JOIN FETCH i.pusherMachine JOIN FETCH i.item WHERE i.pusherMachine.id = :machineId")
+    List<PusherMachineInventory> findByPusherMachine_Id(@Param("machineId") UUID machineId);
 
-    List<PusherMachineInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM PusherMachineInventory i JOIN FETCH i.pusherMachine WHERE i.item.id = :productId")
+    List<PusherMachineInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<PusherMachineInventory> findByPusherMachine_IdAndItem_Id(UUID pusherMachineId, UUID productId);
+    @Query("SELECT i FROM PusherMachineInventory i JOIN FETCH i.pusherMachine JOIN FETCH i.item WHERE i.pusherMachine.id = :machineId AND i.item.id = :itemId")
+    Optional<PusherMachineInventory> findByPusherMachine_IdAndItem_Id(@Param("machineId") UUID machineId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM PusherMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

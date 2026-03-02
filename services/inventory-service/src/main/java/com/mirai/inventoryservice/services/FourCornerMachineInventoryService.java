@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.FourCornerMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.FourCornerMachineInventory;
-import com.mirai.inventoryservice.models.storage.FourCornerMachine;
 import com.mirai.inventoryservice.repositories.FourCornerMachineInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class FourCornerMachineInventoryService {
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final FourCornerMachineService fourCornerMachineService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public FourCornerMachineInventoryService(
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             FourCornerMachineService fourCornerMachineService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.fourCornerMachineService = fourCornerMachineService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public FourCornerMachineInventory addInventory(UUID fourCornerMachineId, UUID productId, Integer quantity) {
-        FourCornerMachine machine = fourCornerMachineService.getFourCornerMachineById(fourCornerMachineId);
+        fourCornerMachineService.getFourCornerMachineById(fourCornerMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
         Optional<FourCornerMachineInventory> existing = fourCornerMachineInventoryRepository
@@ -40,13 +44,12 @@ public class FourCornerMachineInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this machine");
         }
 
-        FourCornerMachineInventory inventory = FourCornerMachineInventory.builder()
-                .fourCornerMachine(machine)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.FOUR_CORNER_MACHINE, fourCornerMachineId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return fourCornerMachineInventoryRepository.save(inventory);
+        return fourCornerMachineInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("Failed to create inventory"));
     }
 
     public FourCornerMachineInventory getInventoryById(UUID inventoryId) {
@@ -73,7 +76,9 @@ public class FourCornerMachineInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        FourCornerMachineInventory inventory = getInventoryById(inventoryId);
-        fourCornerMachineInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.FOUR_CORNER_MACHINE, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }

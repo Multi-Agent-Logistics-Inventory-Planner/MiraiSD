@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface CabinetInventoryRepository extends JpaRepository<CabinetInventory, UUID> {
-    List<CabinetInventory> findByCabinet_Id(UUID cabinetId);
+    @Query("SELECT i FROM CabinetInventory i JOIN FETCH i.cabinet JOIN FETCH i.item WHERE i.cabinet.id = :cabinetId")
+    List<CabinetInventory> findByCabinet_Id(@Param("cabinetId") UUID cabinetId);
 
-    List<CabinetInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM CabinetInventory i JOIN FETCH i.cabinet WHERE i.item.id = :productId")
+    List<CabinetInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<CabinetInventory> findByCabinet_IdAndItem_Id(UUID cabinetId, UUID productId);
+    @Query("SELECT i FROM CabinetInventory i JOIN FETCH i.cabinet JOIN FETCH i.item WHERE i.cabinet.id = :cabinetId AND i.item.id = :itemId")
+    Optional<CabinetInventory> findByCabinet_IdAndItem_Id(@Param("cabinetId") UUID cabinetId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM CabinetInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

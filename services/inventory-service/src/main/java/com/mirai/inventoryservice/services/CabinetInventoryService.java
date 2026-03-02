@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.CabinetInventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.CabinetInventory;
-import com.mirai.inventoryservice.models.storage.Cabinet;
 import com.mirai.inventoryservice.repositories.CabinetInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class CabinetInventoryService {
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final CabinetService cabinetService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public CabinetInventoryService(
             CabinetInventoryRepository cabinetInventoryRepository,
             CabinetService cabinetService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.cabinetService = cabinetService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public CabinetInventory addInventory(UUID cabinetId, UUID productId, Integer quantity) {
-        Cabinet cabinet = cabinetService.getCabinetById(cabinetId);
+        cabinetService.getCabinetById(cabinetId); // Validate cabinet exists
         Product product = productService.getProductById(productId);
 
         Optional<CabinetInventory> existing = cabinetInventoryRepository
@@ -40,13 +44,12 @@ public class CabinetInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this cabinet");
         }
 
-        CabinetInventory inventory = CabinetInventory.builder()
-                .cabinet(cabinet)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.CABINET, cabinetId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return cabinetInventoryRepository.save(inventory);
+        return cabinetInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new CabinetInventoryNotFoundException("Failed to create inventory"));
     }
 
     public CabinetInventory getInventoryById(UUID inventoryId) {
@@ -73,7 +76,9 @@ public class CabinetInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        CabinetInventory inventory = getInventoryById(inventoryId);
-        cabinetInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.CABINET, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }

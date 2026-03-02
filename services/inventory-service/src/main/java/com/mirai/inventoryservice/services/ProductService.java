@@ -4,8 +4,11 @@ import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,23 +20,30 @@ import java.util.UUID;
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
+    private final StockMovementService stockMovementService;
 
     public ProductService(
             ProductRepository productRepository,
-            CategoryService categoryService) {
+            CategoryService categoryService,
+            @Lazy StockMovementService stockMovementService) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
+        this.stockMovementService = stockMovementService;
     }
 
     public Product createProduct(String sku, UUID categoryId,
                                  String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
-                                 BigDecimal unitCost, String imageUrl, String notes) {
+                                 BigDecimal unitCost, String imageUrl, String notes,
+                                 Integer initialStock) {
         Category category = categoryService.getCategoryById(categoryId);
 
         if (sku != null && productRepository.existsBySku(sku)) {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
         }
+
+        // If initial stock is provided, product starts active; otherwise inactive
+        boolean startsActive = initialStock != null && initialStock > 0;
 
         Product product = Product.builder()
                 .sku(sku)
@@ -46,10 +56,25 @@ public class ProductService {
                 .unitCost(unitCost)
                 .imageUrl(imageUrl)
                 .notes(notes)
-                .isActive(true)
+                .isActive(startsActive)
                 .build();
 
-        return productRepository.save(product);
+        Product savedProduct = productRepository.save(product);
+
+        // If initial stock provided, create tracked inventory in NotAssigned
+        if (initialStock != null && initialStock > 0) {
+            stockMovementService.createInventoryWithTracking(
+                    LocationType.NOT_ASSIGNED,
+                    null,
+                    savedProduct,
+                    initialStock,
+                    StockMovementReason.INITIAL_STOCK,
+                    null,
+                    "Initial stock on product creation"
+            );
+        }
+
+        return savedProduct;
     }
 
     public Product getProductById(UUID id) {

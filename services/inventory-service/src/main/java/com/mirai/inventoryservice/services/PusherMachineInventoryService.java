@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.PusherMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.PusherMachineInventory;
-import com.mirai.inventoryservice.models.storage.PusherMachine;
 import com.mirai.inventoryservice.repositories.PusherMachineInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class PusherMachineInventoryService {
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
     private final PusherMachineService pusherMachineService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public PusherMachineInventoryService(
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
             PusherMachineService pusherMachineService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
         this.pusherMachineService = pusherMachineService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public PusherMachineInventory addInventory(UUID pusherMachineId, UUID productId, Integer quantity) {
-        PusherMachine machine = pusherMachineService.getPusherMachineById(pusherMachineId);
+        pusherMachineService.getPusherMachineById(pusherMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
         Optional<PusherMachineInventory> existing = pusherMachineInventoryRepository
@@ -40,13 +44,12 @@ public class PusherMachineInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this machine");
         }
 
-        PusherMachineInventory inventory = PusherMachineInventory.builder()
-                .pusherMachine(machine)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.PUSHER_MACHINE, pusherMachineId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return pusherMachineInventoryRepository.save(inventory);
+        return pusherMachineInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new PusherMachineInventoryNotFoundException("Failed to create inventory"));
     }
 
     public PusherMachineInventory getInventoryById(UUID inventoryId) {
@@ -73,7 +76,9 @@ public class PusherMachineInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        PusherMachineInventory inventory = getInventoryById(inventoryId);
-        pusherMachineInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.PUSHER_MACHINE, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }

@@ -36,7 +36,6 @@ const PAGE_SIZE = 20;
 
 export default function ShipmentsPage() {
   const { toast } = useToast();
-  const shipmentsQuery = useShipments();
   const deleteMutation = useDeleteShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
 
@@ -53,34 +52,25 @@ export default function ShipmentsPage() {
     null
   );
 
-  const shipments = shipmentsQuery.data ?? [];
+  // Use server-side pagination with search filter
+  const shipmentsQuery = useShipments(
+    { search: searchQuery || undefined },
+    page,
+    PAGE_SIZE
+  );
 
-  // Get counts for each status tab
+  const shipments = shipmentsQuery.data?.content ?? [];
+  const totalElements = shipmentsQuery.data?.totalElements ?? 0;
+
+  // Get counts for each status tab (from current page data)
   const statusCounts = useMemo(() => {
     return getShipmentDisplayStatusCounts(shipments);
   }, [shipments]);
 
-  // Filter shipments by tab and search
+  // Filter shipments by display status (client-side filtering on server-paginated data)
   const filteredShipments = useMemo(() => {
-    const byStatus = filterShipmentsByDisplayStatus(shipments, activeTab);
-
-    if (searchQuery.trim().length === 0) {
-      return byStatus;
-    }
-
-    const q = searchQuery.trim().toLowerCase();
-    return byStatus.filter(
-      (shipment) =>
-        shipment.shipmentNumber.toLowerCase().includes(q) ||
-        shipment.supplierName?.toLowerCase().includes(q)
-    );
-  }, [shipments, activeTab, searchQuery]);
-
-  // Paginate filtered shipments
-  const paginatedShipments = useMemo(() => {
-    const start = page * PAGE_SIZE;
-    return filteredShipments.slice(start, start + PAGE_SIZE);
-  }, [filteredShipments, page]);
+    return filterShipmentsByDisplayStatus(shipments, activeTab);
+  }, [shipments, activeTab]);
 
   // Reset page when tab or search changes
   const handleTabChange = (value: string) => {
@@ -190,7 +180,7 @@ export default function ShipmentsPage() {
         <Card className="py-0">
           <CardContent className="p-0">
             <ShipmentsTable
-              shipments={paginatedShipments}
+              shipments={filteredShipments}
               isLoading={shipmentsQuery.isLoading}
               onRowClick={handleRowClick}
               showActualDeliveryDate={activeTab === "COMPLETED"}
@@ -202,7 +192,7 @@ export default function ShipmentsPage() {
       <ShipmentPagination
         page={page}
         pageSize={PAGE_SIZE}
-        totalItems={filteredShipments.length}
+        totalItems={totalElements}
         isLoading={shipmentsQuery.isLoading}
         onPageChange={setPage}
       />

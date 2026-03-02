@@ -18,6 +18,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "stock_movements")
+@NamedEntityGraph(name = "StockMovement.withItem", attributeNodes = @NamedAttributeNode("item"))
 @Data
 @Builder
 @NoArgsConstructor

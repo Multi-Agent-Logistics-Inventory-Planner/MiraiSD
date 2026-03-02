@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.SingleClawMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.SingleClawMachineInventory;
-import com.mirai.inventoryservice.models.storage.SingleClawMachine;
 import com.mirai.inventoryservice.repositories.SingleClawMachineInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class SingleClawMachineInventoryService {
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final SingleClawMachineService singleClawMachineService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public SingleClawMachineInventoryService(
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             SingleClawMachineService singleClawMachineService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.singleClawMachineService = singleClawMachineService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public SingleClawMachineInventory addInventory(UUID singleClawMachineId, UUID productId, Integer quantity) {
-        SingleClawMachine machine = singleClawMachineService.getSingleClawMachineById(singleClawMachineId);
+        singleClawMachineService.getSingleClawMachineById(singleClawMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
         Optional<SingleClawMachineInventory> existing = singleClawMachineInventoryRepository
@@ -40,13 +44,12 @@ public class SingleClawMachineInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this machine");
         }
 
-        SingleClawMachineInventory inventory = SingleClawMachineInventory.builder()
-                .singleClawMachine(machine)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.SINGLE_CLAW_MACHINE, singleClawMachineId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return singleClawMachineInventoryRepository.save(inventory);
+        return singleClawMachineInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new SingleClawMachineInventoryNotFoundException("Failed to create inventory"));
     }
 
     public SingleClawMachineInventory getInventoryById(UUID inventoryId) {
@@ -73,7 +76,9 @@ public class SingleClawMachineInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        SingleClawMachineInventory inventory = getInventoryById(inventoryId);
-        singleClawMachineInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.SINGLE_CLAW_MACHINE, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }

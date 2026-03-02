@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -42,6 +43,11 @@ public class UserController {
     @GetMapping("/{id}/last-audit")
     public ResponseEntity<OffsetDateTime> getLastAudit(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.getLastAuditDate(id).orElse(null));
+    }
+
+    @GetMapping("/last-audits")
+    public ResponseEntity<Map<UUID, OffsetDateTime>> getAllLastAudits() {
+        return ResponseEntity.ok(userService.getAllLastAuditDates());
     }
 
     @GetMapping("/email/{email}")

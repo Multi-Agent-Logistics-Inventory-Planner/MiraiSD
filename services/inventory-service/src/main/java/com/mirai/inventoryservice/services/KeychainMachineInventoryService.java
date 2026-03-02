@@ -3,8 +3,9 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.exceptions.KeychainMachineInventoryNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.KeychainMachineInventory;
-import com.mirai.inventoryservice.models.storage.KeychainMachine;
 import com.mirai.inventoryservice.repositories.KeychainMachineInventoryRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -19,18 +20,21 @@ public class KeychainMachineInventoryService {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final KeychainMachineService keychainMachineService;
     private final ProductService productService;
+    private final StockMovementService stockMovementService;
 
     public KeychainMachineInventoryService(
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             KeychainMachineService keychainMachineService,
-            ProductService productService) {
+            ProductService productService,
+            StockMovementService stockMovementService) {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.keychainMachineService = keychainMachineService;
         this.productService = productService;
+        this.stockMovementService = stockMovementService;
     }
 
     public KeychainMachineInventory addInventory(UUID keychainMachineId, UUID productId, Integer quantity) {
-        KeychainMachine machine = keychainMachineService.getKeychainMachineById(keychainMachineId);
+        keychainMachineService.getKeychainMachineById(keychainMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
         Optional<KeychainMachineInventory> existing = keychainMachineInventoryRepository
@@ -40,13 +44,12 @@ public class KeychainMachineInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this machine");
         }
 
-        KeychainMachineInventory inventory = KeychainMachineInventory.builder()
-                .keychainMachine(machine)
-                .item(product)
-                .quantity(quantity)
-                .build();
+        UUID inventoryId = stockMovementService.createInventoryWithTracking(
+                LocationType.KEYCHAIN_MACHINE, keychainMachineId, product, quantity,
+                StockMovementReason.INITIAL_STOCK, null, null);
 
-        return keychainMachineInventoryRepository.save(inventory);
+        return keychainMachineInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new KeychainMachineInventoryNotFoundException("Failed to create inventory"));
     }
 
     public KeychainMachineInventory getInventoryById(UUID inventoryId) {
@@ -73,7 +76,9 @@ public class KeychainMachineInventoryService {
     }
 
     public void deleteInventory(UUID inventoryId) {
-        KeychainMachineInventory inventory = getInventoryById(inventoryId);
-        keychainMachineInventoryRepository.delete(inventory);
+        getInventoryById(inventoryId); // Validate exists
+        stockMovementService.removeInventoryWithTracking(
+                LocationType.KEYCHAIN_MACHINE, inventoryId,
+                StockMovementReason.REMOVED, null, null);
     }
 }
