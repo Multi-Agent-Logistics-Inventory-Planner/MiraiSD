@@ -56,13 +56,14 @@ services:
     networks:
       - mirai
     # H1: Healthcheck to detect broker readiness
-    # Note: start_period increased for resource-constrained droplets
+    # Note: Using lightweight TCP check instead of kafka-broker-api-versions.sh
+    # which spawns a JVM and causes OOM issues on 2GB droplets
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/9092) >/dev/null 2>&1 && (echo > /dev/tcp/localhost/9093) >/dev/null 2>&1"]
       interval: 10s
-      timeout: 10s
-      retries: 6
-      start_period: 45s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
