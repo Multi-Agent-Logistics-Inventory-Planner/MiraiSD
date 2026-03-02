@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   description: 'Track inventory, manage shipments, and forecast stock levels with AI-powered analytics',
   generator: 'v0.app',
   icons: {
-    icon: '/mirai-logo.png',
-    apple: '/mirai-logo.png',
+    icon: '/favicon.ico',
+    apple: '/favicon.ico',
   },
 }
 
