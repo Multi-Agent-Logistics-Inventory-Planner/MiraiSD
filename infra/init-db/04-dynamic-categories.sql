@@ -82,10 +82,19 @@ ON CONFLICT (category_id, slug) DO UPDATE SET
     updated_at = NOW();
 
 -- ============================================
--- 5. ADD FK COLUMNS TO PRODUCTS TABLE
+-- 5-7. PRODUCTS TABLE MIGRATIONS
 -- ============================================
+-- Skip if products table doesn't exist yet (Hibernate will create it)
 DO $$
 BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'products'
+    ) THEN
+        RAISE NOTICE 'products table does not exist yet; skipping migration (Hibernate will create it with category_id)';
+        RETURN;
+    END IF;
+
     -- Add category_id column if it doesn't exist
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -105,51 +114,39 @@ BEGIN
     ) THEN
         ALTER TABLE public.products ADD COLUMN subcategory_id UUID REFERENCES public.subcategories(id) ON DELETE SET NULL;
     END IF;
-END $$;
 
--- Create indexes on new FK columns
-CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_subcategory_id ON public.products(subcategory_id);
+    -- Create indexes on FK columns
+    CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
+    CREATE INDEX IF NOT EXISTS idx_products_subcategory_id ON public.products(subcategory_id);
 
--- ============================================
--- 6. MIGRATE EXISTING PRODUCT DATA
--- ============================================
--- Populate category_id from existing category string
-UPDATE public.products p
-SET category_id = c.id
-FROM public.categories c
-WHERE p.category = c.name
-  AND p.category_id IS NULL;
+    -- Populate category_id from existing category string
+    UPDATE public.products p
+    SET category_id = c.id
+    FROM public.categories c
+    WHERE p.category = c.name
+      AND p.category_id IS NULL;
 
--- Populate subcategory_id from existing subcategory string
--- Match subcategory name to subcategories linked to Blind Box
-UPDATE public.products p
-SET subcategory_id = s.id
-FROM public.subcategories s
-JOIN public.categories c ON s.category_id = c.id
-WHERE c.slug = 'blind-box'
-  AND (
-    (p.subcategory = 'Dreams' AND s.slug = 'dreams') OR
-    (p.subcategory = 'Pokemon' AND s.slug = 'pokemon') OR
-    (p.subcategory = 'Popmart' AND s.slug = 'popmart') OR
-    (p.subcategory = 'Sanrio/San-X' AND s.slug = 'sanrio-san-x') OR
-    (p.subcategory = '52 Toys' AND s.slug = 'fifty-two-toys') OR
-    (p.subcategory = 'Rolife' AND s.slug = 'rolife') OR
-    (p.subcategory = 'Toy City' AND s.slug = 'toy-city') OR
-    (p.subcategory = 'Miniso' AND s.slug = 'miniso') OR
-    (p.subcategory = 'Miscellaneous' AND s.slug = 'miscellaneous')
-  )
-  AND p.subcategory_id IS NULL;
+    -- Populate subcategory_id from existing subcategory string
+    UPDATE public.products p
+    SET subcategory_id = s.id
+    FROM public.subcategories s
+    JOIN public.categories c ON s.category_id = c.id
+    WHERE c.slug = 'blind-box'
+      AND (
+        (p.subcategory = 'Dreams' AND s.slug = 'dreams') OR
+        (p.subcategory = 'Pokemon' AND s.slug = 'pokemon') OR
+        (p.subcategory = 'Popmart' AND s.slug = 'popmart') OR
+        (p.subcategory = 'Sanrio/San-X' AND s.slug = 'sanrio-san-x') OR
+        (p.subcategory = '52 Toys' AND s.slug = 'fifty-two-toys') OR
+        (p.subcategory = 'Rolife' AND s.slug = 'rolife') OR
+        (p.subcategory = 'Toy City' AND s.slug = 'toy-city') OR
+        (p.subcategory = 'Miniso' AND s.slug = 'miniso') OR
+        (p.subcategory = 'Miscellaneous' AND s.slug = 'miscellaneous')
+      )
+      AND p.subcategory_id IS NULL;
 
--- ============================================
--- 7. MAKE category_id NOT NULL (after migration)
--- ============================================
--- Only run this if all products have been migrated
-DO $$
-BEGIN
-    -- Check if any products still have NULL category_id
+    -- Make category_id NOT NULL if all products have been migrated
     IF NOT EXISTS (SELECT 1 FROM public.products WHERE category_id IS NULL) THEN
-        -- Make category_id NOT NULL
         ALTER TABLE public.products ALTER COLUMN category_id SET NOT NULL;
     ELSE
         RAISE NOTICE 'Some products still have NULL category_id - skipping NOT NULL constraint';

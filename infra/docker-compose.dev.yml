@@ -79,6 +79,8 @@ services:
     env_file:
       - ../.env
     environment:
+      # JVM memory settings to prevent Metaspace OOM
+      - JAVA_OPTS=-XX:MaxMetaspaceSize=384m -Xmx768m -XX:+UseG1GC
       # Local PostgreSQL (overrides .env)
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-dev:5432/mirai_inventory
