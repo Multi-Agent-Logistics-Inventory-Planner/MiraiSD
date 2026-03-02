@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import type { Product } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
-import { useInventoryTotals } from "@/hooks/queries/use-inventory-totals";
 
 export interface ProductWithInventory {
   product: Product;
@@ -25,29 +24,26 @@ function getStatus(totalQuantity: number, reorderPoint?: number): StockStatus {
 
 export function useProductInventory() {
   const productsQuery = useProducts();
-  const totalsQuery = useInventoryTotals();
 
   const data: ProductWithInventory[] | null = useMemo(() => {
     const products = productsQuery.data;
-    const totals = totalsQuery.data?.byItemId;
-    if (!products || !totals) return null;
+    if (!products) return null;
 
     return products.map((p) => {
-      const t = totals[p.id];
-      const qty = t?.quantity ?? 0;
+      const qty = p.quantity ?? 0;
       return {
         product: p,
         totalQuantity: qty,
-        lastUpdatedAt: t?.lastUpdatedAt,
+        lastUpdatedAt: p.updatedAt,
         status: getStatus(qty, p.reorderPoint),
       };
     });
-  }, [productsQuery.data, totalsQuery.data]);
+  }, [productsQuery.data]);
 
   return {
     data,
-    isLoading: productsQuery.isLoading || totalsQuery.isLoading,
-    error: productsQuery.error ?? totalsQuery.error,
+    isLoading: productsQuery.isLoading,
+    error: productsQuery.error,
   };
 }
 

@@ -53,7 +53,7 @@ async function invalidateStockQueries(
   productId?: string,
   locationType?: LocationType
 ) {
-  await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+  await qc.invalidateQueries({ queryKey: ["products"] });
 
   // Invalidate not-assigned inventory if dealing with NOT_ASSIGNED location
   if (locationType === LocationType.NOT_ASSIGNED) {
@@ -131,7 +131,7 @@ export function useBatchTransferMutation() {
       return { successful, failed };
     },
     onSuccess: async ({ successful }, variables) => {
-      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+      await qc.invalidateQueries({ queryKey: ["products"] });
 
       // Invalidate not-assigned inventory if source or destination is NOT_ASSIGNED
       if (

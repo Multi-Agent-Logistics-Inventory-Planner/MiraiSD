@@ -53,7 +53,7 @@ export function useReceiveShipmentMutation() {
     mutationFn: ({ id, payload }) => receiveShipment(id, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["shipments"] });
-      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
+      await qc.invalidateQueries({ queryKey: ["products"] });
     },
   });
 }

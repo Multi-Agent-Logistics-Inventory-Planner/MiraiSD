@@ -6,7 +6,6 @@ import { formatDistanceToNowStrict } from "date-fns";
 import type { Product } from "@/types/api";
 import type { DashboardStats, StockLevelItem, StockStatus, CategoryData } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
-import { useInventoryTotals } from "@/hooks/queries/use-inventory-totals";
 import { getAuditLogLast30Days } from "@/lib/api/dashboard";
 
 function getStatus(quantity: number, reorderPoint?: number): StockStatus {
@@ -62,7 +61,6 @@ interface UseDashboardStatsOptions {
 export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
   const { forecastByItemId } = options;
   const productsQuery = useProducts();
-  const totalsQuery = useInventoryTotals();
   const auditLogQuery = useQuery({
     queryKey: ["audit-log", "last-30-days"],
     queryFn: getAuditLogLast30Days,
@@ -71,10 +69,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
 
   const data: DashboardStats | null = useMemo(() => {
     const products = productsQuery.data;
-    const totals = totalsQuery.data?.byItemId;
-    if (!products || !totals) return null;
-
-    const totalsByItemId = totals;
+    if (!products) return null;
 
     let totalStockValue = 0;
     let lowStockItems = 0;
@@ -93,8 +88,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
     }
 
     const stockLevels: StockLevelItem[] = products.map((p) => {
-      const total = totalsByItemId[p.id];
-      const qty = total?.quantity ?? 0;
+      const qty = p.quantity ?? 0;
 
       const status = getStatus(qty, p.reorderPoint);
       const reorderPoint = p.reorderPoint ?? 0;
@@ -118,7 +112,7 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
       return buildStockLevelItem(
         p,
         qty,
-        lastMovementByItemId.get(p.id) ?? total?.lastUpdatedAt,
+        lastMovementByItemId.get(p.id) ?? p.updatedAt,
         forecastByItemId?.[p.id]
       );
     });
@@ -172,11 +166,11 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
       stockLevels,
       categoryDistribution,
     };
-  }, [productsQuery.data, totalsQuery.data, auditLogQuery.data, forecastByItemId]);
+  }, [productsQuery.data, auditLogQuery.data, forecastByItemId]);
 
   return {
     data,
-    isLoading: productsQuery.isLoading || totalsQuery.isLoading,
-    error: productsQuery.error ?? totalsQuery.error,
+    isLoading: productsQuery.isLoading || auditLogQuery.isLoading,
+    error: productsQuery.error ?? auditLogQuery.error,
   };
 }

@@ -77,7 +77,7 @@ function invalidateLocationInventory(
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locationInventory", locationType, locationId] }),
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
-    qc.invalidateQueries({ queryKey: ["inventoryTotals"] }),
+    qc.invalidateQueries({ queryKey: ["products"] }),
     qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
   ]);
 }

@@ -19,7 +19,7 @@ export function useRealtimeProducts(enabled = true) {
   return useSupabaseRealtime<ProductRow>({
     table: "products",
     event: "*",
-    queryKeys: [["products"], ["inventoryTotals"], ["dashboard"]],
+    queryKeys: [["products"], ["dashboard"]],
     enabled,
   });
 }
