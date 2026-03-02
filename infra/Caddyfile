@@ -1,0 +1,14 @@
+{
+    email admin@mirai-inventory.com
+}
+
+api.yummyyummy.site {
+    reverse_proxy inventory-service:4000 {
+        health_uri /actuator/health
+        health_interval 30s
+    }
+
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header X-XSS-Protection "1; mode=block"
+}
