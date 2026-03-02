@@ -4,8 +4,11 @@ import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
@@ -29,5 +32,13 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     // Find most recent movement by actor (user)
     Optional<StockMovement> findTopByActorIdOrderByAtDesc(UUID actorId);
+
+    // Bulk query: find most recent movement timestamp for each actor
+    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm WHERE sm.actorId IS NOT NULL GROUP BY sm.actorId")
+    List<Object[]> findLatestMovementTimestampsByActor();
+
+    // Audit log query with eager fetch of item to avoid N+1
+    @EntityGraph(value = "StockMovement.withItem")
+    Page<StockMovement> findAll(Specification<StockMovement> spec, Pageable pageable);
 }
 

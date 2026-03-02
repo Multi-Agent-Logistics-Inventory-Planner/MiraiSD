@@ -8,6 +8,9 @@ import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.services.ShipmentService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,8 +39,19 @@ public class ShipmentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ShipmentResponseDTO>> listShipments(
-            @RequestParam(required = false) ShipmentStatus status) {
+    public ResponseEntity<?> listShipments(
+            @RequestParam(required = false) ShipmentStatus status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        // If pagination params are provided, use paginated response
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Shipment> shipmentPage = shipmentService.listShipmentsPaged(status, search, pageable);
+            Page<ShipmentResponseDTO> dtoPage = shipmentPage.map(shipmentMapper::toResponseDTO);
+            return ResponseEntity.ok(dtoPage);
+        }
+        // Legacy: return list without pagination
         List<Shipment> shipments = status != null
                 ? shipmentService.listShipmentsByStatus(status)
                 : shipmentService.listShipments();

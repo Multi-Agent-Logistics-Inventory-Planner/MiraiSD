@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   // Current-month shipment activities
   const activities: ActivityItem[] = useMemo(() => {
-    const list = shipments.data ?? []
+    const list = shipments.data?.content ?? []
     return list
       .filter((s) => {
         const when = new Date(s.createdAt ?? s.orderDate)
@@ -86,7 +86,7 @@ export default function DashboardPage() {
           time,
         }
       })
-  }, [shipments.data, now])
+  }, [shipments.data?.content, now])
 
   // Redirect employees to storage page
   const canViewDashboard = can(Permission.DASHBOARD_VIEW)

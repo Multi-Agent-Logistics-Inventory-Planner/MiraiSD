@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   TeamTable,
@@ -10,75 +11,28 @@ import {
   TeamMemberRow,
 } from "@/components/team";
 import { useToast } from "@/hooks/use-toast";
-import { getSupabaseClient } from "@/lib/supabase";
-import { getUsers, getUserLastAudit, deleteUser } from "@/lib/api/users";
+import { useTeamData } from "@/hooks/queries/use-team-data";
+import { deleteUser } from "@/lib/api/users";
 import {
-  getPendingInvitations,
   resendInvitation,
   cancelInvitation,
 } from "@/lib/api/invitations";
-import { User, Invitation } from "@/types/api";
+import { User, UserRole } from "@/types/api";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function TeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [tableData, setTableData] = useState<TeamMemberRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const supabase = getSupabaseClient();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const session = supabase ? await supabase.auth.getSession() : null;
-      if (!session?.data.session?.access_token) return;
+  const { data: tableData = [], isLoading } = useTeamData();
 
-      const [usersData, invitationsData] = await Promise.all([
-        getUsers(),
-        getPendingInvitations().catch(() => [] as Invitation[]),
-      ]);
-
-      const membersWithAudit = await Promise.all(
-        usersData.map(async (user) => {
-          const lastAudit = await getUserLastAudit(user.id).catch(() => null);
-          return {
-            id: user.id,
-            fullName: user.fullName,
-            email: user.email,
-            role: user.role,
-            status: "active" as const,
-            lastAudit,
-            createdAt: user.createdAt,
-            type: "member" as const,
-          };
-        })
-      );
-
-      const invitationRows: TeamMemberRow[] = invitationsData.map((inv) => ({
-        id: inv.id,
-        fullName: "-",
-        email: inv.email,
-        role: inv.role,
-        status: "pending" as const,
-        lastAudit: null,
-        createdAt: inv.invitedAt,
-        type: "invitation" as const,
-      }));
-
-      setTableData([...membersWithAudit, ...invitationRows]);
-    } catch (error) {
-      // Error handled silently - data will remain empty
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const invalidateTeamData = () => {
+    queryClient.invalidateQueries({ queryKey: ["team-data"] });
+  };
 
   const filteredData = tableData.filter((row) => {
     return (
@@ -101,18 +55,18 @@ export default function TeamPage() {
     }
   };
 
-  const handleEditMember = async (row: TeamMemberRow) => {
+  const handleEditMember = (row: TeamMemberRow) => {
     if (row.type !== "member") return;
-    try {
-      const users = await getUsers();
-      const user = users.find((u) => u.id === row.id);
-      if (user) {
-        setEditingMember(user);
-        setIsEditDialogOpen(true);
-      }
-    } catch (error) {
-      // Error handled silently
-    }
+    const user: User = {
+      id: row.id,
+      fullName: row.fullName,
+      email: row.email,
+      role: row.role as UserRole,
+      createdAt: row.createdAt,
+      updatedAt: row.createdAt,
+    };
+    setEditingMember(user);
+    setIsEditDialogOpen(true);
   };
 
   const handleDelete = async (row: TeamMemberRow) => {
@@ -124,7 +78,7 @@ export default function TeamPage() {
         await cancelInvitation(row.email);
         toast({ title: "Invitation cancelled successfully" });
       }
-      fetchData();
+      invalidateTeamData();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Operation failed";
       toast({
@@ -163,14 +117,14 @@ export default function TeamPage() {
       <InviteMemberDialog
         open={isInviteDialogOpen}
         onOpenChange={setIsInviteDialogOpen}
-        onSuccess={fetchData}
+        onSuccess={invalidateTeamData}
       />
 
       <EditMemberDialog
         member={editingMember}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
-        onSuccess={fetchData}
+        onSuccess={invalidateTeamData}
       />
     </div>
   );

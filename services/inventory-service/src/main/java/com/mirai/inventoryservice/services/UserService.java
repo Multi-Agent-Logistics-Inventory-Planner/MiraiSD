@@ -11,7 +11,9 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -145,6 +147,17 @@ public class UserService {
     public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {
         return stockMovementRepository.findTopByActorIdOrderByAtDesc(userId)
                 .map(StockMovement::getAt);
+    }
+
+    public Map<UUID, OffsetDateTime> getAllLastAuditDates() {
+        List<Object[]> results = stockMovementRepository.findLatestMovementTimestampsByActor();
+        Map<UUID, OffsetDateTime> map = new HashMap<>();
+        for (Object[] row : results) {
+            UUID actorId = (UUID) row[0];
+            OffsetDateTime timestamp = (OffsetDateTime) row[1];
+            map.put(actorId, timestamp);
+        }
+        return map;
     }
 }
 

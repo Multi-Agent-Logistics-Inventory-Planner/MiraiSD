@@ -58,3 +58,10 @@ export async function deleteUser(id: string): Promise<void> {
 export async function getUserLastAudit(id: string): Promise<string | null> {
   return apiGet<string | null>(`${BASE_PATH}/${id}/last-audit`);
 }
+
+/**
+ * Get the last audit dates for all users in a single request
+ */
+export async function getAllLastAudits(): Promise<Record<string, string>> {
+  return apiGet<Record<string, string>>(`${BASE_PATH}/last-audits`);
+}
