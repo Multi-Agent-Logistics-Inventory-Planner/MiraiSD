@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface SingleClawMachineInventoryRepository extends JpaRepository<SingleClawMachineInventory, UUID> {
-    List<SingleClawMachineInventory> findBySingleClawMachine_Id(UUID singleClawMachineId);
+    @Query("SELECT i FROM SingleClawMachineInventory i JOIN FETCH i.singleClawMachine JOIN FETCH i.item WHERE i.singleClawMachine.id = :machineId")
+    List<SingleClawMachineInventory> findBySingleClawMachine_Id(@Param("machineId") UUID machineId);
 
-    List<SingleClawMachineInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM SingleClawMachineInventory i JOIN FETCH i.singleClawMachine WHERE i.item.id = :productId")
+    List<SingleClawMachineInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<SingleClawMachineInventory> findBySingleClawMachine_IdAndItem_Id(UUID singleClawMachineId, UUID productId);
+    @Query("SELECT i FROM SingleClawMachineInventory i JOIN FETCH i.singleClawMachine JOIN FETCH i.item WHERE i.singleClawMachine.id = :machineId AND i.item.id = :itemId")
+    Optional<SingleClawMachineInventory> findBySingleClawMachine_IdAndItem_Id(@Param("machineId") UUID machineId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM SingleClawMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);

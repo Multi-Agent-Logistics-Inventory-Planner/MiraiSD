@@ -12,11 +12,14 @@ import java.util.UUID;
 
 @Repository
 public interface RackInventoryRepository extends JpaRepository<RackInventory, UUID> {
-    List<RackInventory> findByRack_Id(UUID rackId);
+    @Query("SELECT i FROM RackInventory i JOIN FETCH i.rack JOIN FETCH i.item WHERE i.rack.id = :rackId")
+    List<RackInventory> findByRack_Id(@Param("rackId") UUID rackId);
 
-    List<RackInventory> findByItem_Id(UUID productId);
+    @Query("SELECT i FROM RackInventory i JOIN FETCH i.rack WHERE i.item.id = :productId")
+    List<RackInventory> findByItem_Id(@Param("productId") UUID productId);
 
-    Optional<RackInventory> findByRack_IdAndItem_Id(UUID rackId, UUID productId);
+    @Query("SELECT i FROM RackInventory i JOIN FETCH i.rack JOIN FETCH i.item WHERE i.rack.id = :rackId AND i.item.id = :itemId")
+    Optional<RackInventory> findByRack_IdAndItem_Id(@Param("rackId") UUID rackId, @Param("itemId") UUID itemId);
 
     @Query("SELECT SUM(i.quantity) FROM RackInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
