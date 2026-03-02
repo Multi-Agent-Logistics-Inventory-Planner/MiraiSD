@@ -119,6 +119,7 @@ export interface Product {
   leadTimeDays?: number;
   unitCost?: number;
   isActive: boolean;
+  quantity: number;
   imageUrl?: string;
   notes?: string;
   createdAt: string;

@@ -10,7 +10,6 @@ export function useCreateProductMutation() {
     mutationFn: (payload) => createProduct(payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["products"] });
-      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
     },
   });
 }
@@ -21,7 +20,6 @@ export function useUpdateProductMutation() {
     mutationFn: ({ id, payload }) => updateProduct(id, payload),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["products"] });
-      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
     },
   });
 }
@@ -32,7 +30,6 @@ export function useDeleteProductMutation() {
     mutationFn: ({ id }) => deleteProduct(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["products"] });
-      await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
     },
   });
 }

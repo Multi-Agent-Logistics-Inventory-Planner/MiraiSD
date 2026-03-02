@@ -371,18 +371,16 @@ public class StockMovementService {
     // ========= Helper Methods =========
 
     /**
-     * Updates the product's active status based on total inventory.
-     * - If total inventory is 0, deactivate the product
-     * - If total inventory > 0, activate the product
+     * Updates the product's denormalized quantity and active status based on total inventory.
+     * Always persists so the products table stays in sync without a 9-table union query on reads.
      */
     private void updateProductActiveStatus(Product product) {
         int totalInventory = calculateTotalInventory(product.getId());
         boolean shouldBeActive = totalInventory > 0;
 
-        if (product.getIsActive() != shouldBeActive) {
-            product.setIsActive(shouldBeActive);
-            productRepository.save(product);
-        }
+        product.setQuantity(totalInventory);
+        product.setIsActive(shouldBeActive);
+        productRepository.save(product);
     }
 
     @NonNull

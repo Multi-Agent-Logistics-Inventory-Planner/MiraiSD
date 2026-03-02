@@ -10,7 +10,7 @@ import {
 function invalidateNotAssignedInventory(qc: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
-    qc.invalidateQueries({ queryKey: ["inventoryTotals"] }),
+    qc.invalidateQueries({ queryKey: ["products"] }),
     qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
   ]);
 }

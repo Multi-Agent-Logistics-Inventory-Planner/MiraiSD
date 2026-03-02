@@ -24,6 +24,7 @@ public class ProductResponseDTO {
     private Integer leadTimeDays;
     private BigDecimal unitCost;
     private Boolean isActive;
+    private Integer quantity;
     private String imageUrl;
     private String notes;
     private OffsetDateTime createdAt;

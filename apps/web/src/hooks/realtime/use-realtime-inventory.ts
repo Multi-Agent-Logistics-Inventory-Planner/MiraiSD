@@ -46,8 +46,8 @@ export function useRealtimeInventory(enabled = true) {
         queryKey: ["productInventoryEntries", item_id],
       });
 
-      // 4. Keep dashboard/totals invalidation (global views)
-      queryClient.invalidateQueries({ queryKey: ["inventoryTotals"] });
+      // 4. Refresh products (quantity is now denormalized on the product row)
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     enabled,
@@ -73,7 +73,7 @@ export function useRealtimeProductInventory(itemId: string, enabled = true) {
         queryKey: ["productInventoryEntries", itemId],
       });
       queryClient.invalidateQueries({
-        queryKey: ["inventoryTotals"],
+        queryKey: ["products"],
       });
       queryClient.invalidateQueries({
         queryKey: ["movementHistory", itemId],

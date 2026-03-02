@@ -59,6 +59,10 @@ public class Product {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "quantity")
+    @Builder.Default
+    private Integer quantity = 0;
+
     @Column(name = "image_url")
     private String imageUrl;
 
