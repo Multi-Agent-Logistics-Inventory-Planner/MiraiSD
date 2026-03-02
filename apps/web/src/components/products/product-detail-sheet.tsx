@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
@@ -167,7 +168,7 @@ export function ProductDetailSheet({
             Current Qty{" "}
             <span className="text-foreground">({totalQuantity.toLocaleString()})</span>
           </h3>
-          <div className="rounded-lg border overflow-hidden">
+          <Card className="p-0">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
@@ -211,13 +212,13 @@ export function ProductDetailSheet({
                 )}
               </TableBody>
             </Table>
-          </div>
+          </Card>
         </div>
 
         {/* Recent Orders Section */}
         <div className="mt-6">
           <h3 className="text-base font-medium text-primary mb-3">Recent Orders</h3>
-          <div className="rounded-lg border overflow-hidden">
+          <Card className="p-0">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
@@ -273,7 +274,7 @@ export function ProductDetailSheet({
                 )}
               </TableBody>
             </Table>
-          </div>
+          </Card>
         </div>
       </DialogContent>
     </Dialog>
