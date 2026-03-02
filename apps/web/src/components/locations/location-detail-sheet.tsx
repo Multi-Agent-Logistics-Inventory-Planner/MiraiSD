@@ -46,7 +46,6 @@ import type {
   FourCornerMachine,
   PusherMachine,
 } from "@/types/api";
-import { cn } from "@/lib/utils";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import {
   useCreateInventoryMutation,
@@ -54,7 +53,6 @@ import {
   useDeleteLocationMutation,
 } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
-import { InventoryItemDetailDialog } from "@/components/locations/inventory-item-detail-dialog";
 import { Can } from "@/components/rbac/can";
 import { Permission } from "@/lib/rbac/permissions";
 
@@ -104,8 +102,6 @@ export function LocationDetailSheet({
 
   const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null);
-  const [inventoryDetailOpen, setInventoryDetailOpen] = useState(false);
 
   const code = location ? getLocationCode(locationType, location) : "";
 
@@ -206,14 +202,7 @@ export function LocationDetailSheet({
                     ))
                   ) : (inventoryQuery.data as Inventory[] | undefined)?.length ? (
                     (inventoryQuery.data as Inventory[]).map((inv) => (
-                      <TableRow
-                        key={inv.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setSelectedInventory(inv);
-                          setInventoryDetailOpen(true);
-                        }}
-                      >
+                      <TableRow key={inv.id}>
                         <TableCell className="py-2">
                           <div className="flex items-center gap-3">
                             {inv.item.imageUrl ? (
@@ -238,7 +227,7 @@ export function LocationDetailSheet({
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={cn("text-xs")}
+                            className="text-xs"
                           >
                             {inv.item.category.name}
                           </Badge>
@@ -278,37 +267,44 @@ export function LocationDetailSheet({
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete location?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {totalQty > 0 ? "Cannot Delete Location" : "Delete location?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <span className="font-medium">{code}</span>.
+              {totalQty > 0 ? (
+                <>
+                  This location cannot be deleted because it still has{" "}
+                  <span className="font-semibold">{totalQty}</span> units in
+                  storage. Please remove all inventory from this location before
+                  deleting it.
+                </>
+              ) : (
+                <>
+                  This will permanently delete{" "}
+                  <span className="font-medium">{code}</span>. This action
+                  cannot be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                if (!locationId) return;
-                await deleteLocation.mutateAsync({ id: locationId });
-                onOpenChange(false);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
+            {totalQty === 0 && (
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  if (!locationId) return;
+                  await deleteLocation.mutateAsync({ id: locationId });
+                  onOpenChange(false);
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {locationId && (
-        <InventoryItemDetailDialog
-          open={inventoryDetailOpen}
-          onOpenChange={setInventoryDetailOpen}
-          inventory={selectedInventory}
-          locationType={locationType}
-          locationId={locationId}
-          locationCode={code}
-        />
-      )}
     </>
   );
 }
