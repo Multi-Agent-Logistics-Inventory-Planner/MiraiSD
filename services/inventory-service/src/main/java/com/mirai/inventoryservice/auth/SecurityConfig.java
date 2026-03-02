@@ -59,15 +59,27 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Get production origin from environment variable, default to Vercel deployment
-        String productionOrigin = environment.getProperty("cors.allowed.origin",
-            "https://mirai-inventory.vercel.app");
+        // Get additional allowed origins from environment variable (comma-separated)
+        String additionalOrigins = environment.getProperty("cors.allowed.origins", "");
 
-        // Only allow specific origins: production and local development
-        configuration.setAllowedOrigins(Arrays.asList(
-            productionOrigin,
+        // Default allowed origins: custom domain, Vercel deployments, and local development
+        java.util.List<String> allowedOrigins = new java.util.ArrayList<>(Arrays.asList(
+            "https://www.yummyyummy.site",
+            "https://yummyyummy.site",
+            "https://mirai-inventory.vercel.app",
+            "https://mirai-inventory-felipes-projects-59edcd3e.vercel.app",
             "http://localhost:3000"
         ));
+
+        // Add any additional origins from environment variable
+        if (!additionalOrigins.isEmpty()) {
+            Arrays.stream(additionalOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .forEach(allowedOrigins::add);
+        }
+
+        configuration.setAllowedOrigins(allowedOrigins);
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
