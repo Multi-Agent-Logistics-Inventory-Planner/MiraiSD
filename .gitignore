@@ -178,3 +178,5 @@ codemaps/
 # IDE - Cursor
 .cursor/
 docs/
+.vercel
+.env*.local
