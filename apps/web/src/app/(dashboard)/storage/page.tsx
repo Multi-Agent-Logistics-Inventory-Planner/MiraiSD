@@ -10,7 +10,6 @@ import { Can, Permission } from "@/components/rbac";
 import {
   LocationType,
   type StorageLocation,
-  type NotAssignedInventory,
 } from "@/types/api";
 import { toStorageLocation } from "@/lib/location-utils";
 import { naturalSortCompare } from "@/lib/utils";
@@ -19,7 +18,6 @@ import { LocationTable } from "@/components/locations/location-table";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
 import { LocationForm } from "@/components/locations/location-form";
 import { NotAssignedTable } from "@/components/locations/not-assigned-table";
-import { NotAssignedDetailDialog } from "@/components/locations/not-assigned-detail-dialog";
 import { StoragePagination } from "@/components/locations/storage-pagination";
 import { useLocationsWithCounts } from "@/hooks/queries/use-locations-with-counts";
 import { useNotAssignedInventory } from "@/hooks/queries/use-not-assigned-inventory";
@@ -50,10 +48,6 @@ export default function LocationsPage() {
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<StorageLocation | null>(null);
-
-  const [notAssignedDetailOpen, setNotAssignedDetailOpen] = useState(false);
-  const [selectedNotAssigned, setSelectedNotAssigned] =
-    useState<NotAssignedInventory | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StorageLocation | null>(null);
@@ -172,10 +166,6 @@ export default function LocationsPage() {
                   <NotAssignedTable
                     items={notAssignedItems}
                     isLoading={notAssignedQuery.isLoading}
-                    onRowClick={(item) => {
-                      setSelectedNotAssigned(item);
-                      setNotAssignedDetailOpen(true);
-                    }}
                     pageSize={PAGE_SIZE}
                   />
                 </CardContent>
@@ -191,11 +181,6 @@ export default function LocationsPage() {
             </>
           )}
 
-          <NotAssignedDetailDialog
-            open={notAssignedDetailOpen}
-            onOpenChange={setNotAssignedDetailOpen}
-            inventory={selectedNotAssigned}
-          />
         </>
       ) : (
         <>
