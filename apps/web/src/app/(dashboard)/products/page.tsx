@@ -49,12 +49,23 @@ export default function ProductsPage() {
         q.length === 0 ||
         row.product.name.toLowerCase().includes(q) ||
         row.product.sku.toLowerCase().includes(q);
-      const matchesCategory =
-        filters.categoryIds.length === 0 ||
-        filters.categoryIds.includes(row.product.category.id);
+
+      let matchesCategory = true;
+      if (filters.selectedSubcategoryId) {
+        matchesCategory = row.product.category.id === filters.selectedSubcategoryId;
+      } else if (filters.selectedCategoryId) {
+        const selectedCat = (categories ?? []).find(
+          (c) => c.id === filters.selectedCategoryId
+        );
+        const childIds = selectedCat?.children.map((c) => c.id) ?? [];
+        matchesCategory =
+          row.product.category.id === filters.selectedCategoryId ||
+          childIds.includes(row.product.category.id);
+      }
+
       return matchesSearch && matchesCategory;
     });
-  }, [items, filters]);
+  }, [items, filters, categories]);
 
   const paginatedItems = useMemo(() => {
     const start = page * PAGE_SIZE;
