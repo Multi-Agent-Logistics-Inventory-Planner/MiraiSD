@@ -56,10 +56,10 @@ services:
     networks:
       - mirai
     # H1: Healthcheck to detect broker readiness
-    # Note: Using lightweight TCP check instead of kafka-broker-api-versions.sh
+    # Note: Using lightweight nc (netcat) instead of kafka-broker-api-versions.sh
     # which spawns a JVM and causes OOM issues on 2GB droplets
     healthcheck:
-      test: ["CMD-SHELL", "(echo > /dev/tcp/localhost/9092) >/dev/null 2>&1 && (echo > /dev/tcp/localhost/9093) >/dev/null 2>&1"]
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
       interval: 10s
       timeout: 5s
       retries: 10
