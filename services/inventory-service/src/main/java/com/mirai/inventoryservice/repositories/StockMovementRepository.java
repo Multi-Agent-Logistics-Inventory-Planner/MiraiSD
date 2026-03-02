@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import org.springframework.data.repository.query.Param;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,5 +43,12 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // Audit log query with eager fetch of item to avoid N+1
     @EntityGraph(value = "StockMovement.withItem")
     Page<StockMovement> findAll(Specification<StockMovement> spec, Pageable pageable);
+
+    // Analytics queries with JOIN FETCH on item to avoid N+1
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since")
+    List<StockMovement> findByReasonAndAtAfterWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since);
+
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since AND sm.at < :until")
+    List<StockMovement> findByReasonAndAtBetweenWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since, @Param("until") OffsetDateTime until);
 }
 
