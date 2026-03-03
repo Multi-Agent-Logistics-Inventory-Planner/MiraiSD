@@ -36,6 +36,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
 
     // Notifications - view only
     Permission.NOTIFICATIONS_VIEW,
+
+    // Machine Displays - full access for employees to manage displays
+    Permission.MACHINE_DISPLAYS_VIEW,
+    Permission.MACHINE_DISPLAYS_MANAGE,
   ]),
 };
 

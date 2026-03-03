@@ -725,3 +725,41 @@ export interface InventoryTotal {
   totalQuantity: number;
   lastUpdatedAt: string | null;
 }
+
+// Machine Display types
+
+export interface MachineDisplay {
+  id: string;
+  locationType: LocationType;
+  machineId: string;
+  machineCode: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  startedAt: string;
+  endedAt: string | null;
+  actorId: string | null;
+  actorName: string | null;
+  daysActive: number;
+  stale: boolean;
+}
+
+export interface SetMachineDisplayRequest {
+  locationType: LocationType;
+  machineId: string;
+  productId: string;
+  actorId?: string;
+}
+
+export interface SetMachineDisplayBatchRequest {
+  locationType: LocationType;
+  machineId: string;
+  productIds: string[];
+  actorId?: string;
+}
+
+export interface MachineDisplayFilters {
+  locationType?: LocationType;
+  staleOnly?: boolean;
+  thresholdDays?: number;
+}

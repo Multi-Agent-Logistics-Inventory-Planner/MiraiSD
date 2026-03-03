@@ -50,6 +50,10 @@ export const Permission = {
   // Reviews
   REVIEWS_VIEW: "reviews:view",
   REVIEWS_MANAGE: "reviews:manage",
+
+  // Machine Displays
+  MACHINE_DISPLAYS_VIEW: "machine_displays:view",
+  MACHINE_DISPLAYS_MANAGE: "machine_displays:manage",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];
@@ -69,4 +73,5 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey> = {
   "/team": Permission.TEAM_VIEW,
   "/settings": Permission.SETTINGS_VIEW,
   "/reviews": Permission.REVIEWS_VIEW,
+  "/machine-displays": Permission.MACHINE_DISPLAYS_VIEW,
 };

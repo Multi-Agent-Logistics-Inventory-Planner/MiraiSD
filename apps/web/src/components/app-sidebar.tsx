@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Star,
   ChevronsUpDown,
+  Monitor,
 } from "lucide-react";
 
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -84,6 +85,12 @@ const inventoryItems: NavItem[] = [
     href: "/shipments",
     icon: Package,
     permission: Permission.SHIPMENTS_VIEW,
+  },
+  {
+    title: "Machine Displays",
+    href: "/machine-displays",
+    icon: Monitor,
+    permission: Permission.MACHINE_DISPLAYS_VIEW,
   },
 ];
 
