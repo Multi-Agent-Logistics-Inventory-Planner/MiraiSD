@@ -146,14 +146,18 @@ export function AuditLogTable({
               </TableCell>
               <TableCell className="text-center">
                 {entry.reason === StockMovementReason.TRANSFER &&
-                entry.fromLocationCode &&
                 entry.toLocationCode ? (
                   <span className="text-sm">
-                    {entry.fromLocationCode} → {entry.toLocationCode}
+                    {entry.fromLocationCode ?? "NA"} → {entry.toLocationCode}
+                  </span>
+                ) : entry.reason === StockMovementReason.TRANSFER &&
+                  entry.fromLocationCode ? (
+                  <span className="text-sm">
+                    {entry.fromLocationCode} → NA
                   </span>
                 ) : (
                   <span className="text-sm">
-                    {entry.toLocationCode ?? "-"}
+                    {entry.toLocationCode ?? entry.fromLocationCode ?? "-"}
                   </span>
                 )}
               </TableCell>

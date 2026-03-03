@@ -78,8 +78,21 @@ public class AuditLogMapper {
             Map<UUID, String> actorNames,
             Map<LocationType, Map<UUID, String>> locationCodes) {
 
-        Map<UUID, String> locationCodesForType = locationCodes.getOrDefault(
-                movement.getLocationType(), Collections.emptyMap());
+        // Look up location codes - try movement's type first, then search all types
+        String fromCode = findLocationCode(movement.getFromLocationId(), movement.getLocationType(), locationCodes);
+        String toCode = findLocationCode(movement.getToLocationId(), movement.getLocationType(), locationCodes);
+
+        // For NOT_ASSIGNED locations, use "NA" as the code
+        if (movement.getLocationType() == LocationType.NOT_ASSIGNED) {
+            if (movement.getFromLocationId() != null && fromCode == null) {
+                fromCode = "NA";
+            }
+            if (movement.getToLocationId() != null && toCode == null && movement.getFromLocationId() == null) {
+                // This is a subtract from NOT_ASSIGNED, toLocationId points to destination
+                // but we're the source, so we should show NA as from
+                fromCode = "NA";
+            }
+        }
 
         return AuditLogEntryDTO.builder()
                 .id(movement.getId())
@@ -88,9 +101,9 @@ public class AuditLogMapper {
                 .itemSku(movement.getItem().getSku())
                 .itemName(movement.getItem().getName())
                 .fromLocationId(movement.getFromLocationId())
-                .fromLocationCode(locationCodesForType.get(movement.getFromLocationId()))
+                .fromLocationCode(fromCode)
                 .toLocationId(movement.getToLocationId())
-                .toLocationCode(locationCodesForType.get(movement.getToLocationId()))
+                .toLocationCode(toCode)
                 .previousQuantity(movement.getPreviousQuantity())
                 .currentQuantity(movement.getCurrentQuantity())
                 .quantityChange(movement.getQuantityChange())
@@ -99,6 +112,34 @@ public class AuditLogMapper {
                 .actorName(actorNames.get(movement.getActorId()))
                 .at(movement.getAt())
                 .build();
+    }
+
+    /**
+     * Find location code by ID, first checking the preferred type, then all types.
+     * This handles cross-type transfers where toLocationId may belong to a different type.
+     */
+    private String findLocationCode(UUID locationId, LocationType preferredType,
+            Map<LocationType, Map<UUID, String>> locationCodes) {
+        if (locationId == null) {
+            return null;
+        }
+
+        // Try preferred type first
+        Map<UUID, String> preferredCodes = locationCodes.getOrDefault(preferredType, Collections.emptyMap());
+        String code = preferredCodes.get(locationId);
+        if (code != null) {
+            return code;
+        }
+
+        // Search all types for cross-type transfers
+        for (Map<UUID, String> codes : locationCodes.values()) {
+            code = codes.get(locationId);
+            if (code != null) {
+                return code;
+            }
+        }
+
+        return null;
     }
 
     private Map<UUID, String> batchFetchActorNames(List<StockMovement> movements) {
@@ -117,6 +158,7 @@ public class AuditLogMapper {
 
     private Map<LocationType, Map<UUID, String>> batchFetchLocationCodes(List<StockMovement> movements) {
         Map<LocationType, Set<UUID>> locationIdsByType = new EnumMap<>(LocationType.class);
+        Set<UUID> crossTypeLocationIds = new HashSet<>(); // IDs that need cross-type lookup
 
         for (StockMovement movement : movements) {
             LocationType type = movement.getLocationType();
@@ -127,17 +169,44 @@ public class AuditLogMapper {
             }
             if (movement.getToLocationId() != null) {
                 locationIdsByType.get(type).add(movement.getToLocationId());
+                // NOT_ASSIGNED transfers may have toLocationId in a different type
+                if (type == LocationType.NOT_ASSIGNED) {
+                    crossTypeLocationIds.add(movement.getToLocationId());
+                }
             }
         }
 
         Map<LocationType, Map<UUID, String>> result = new EnumMap<>(LocationType.class);
 
+        // Fetch codes for each type's own IDs
         for (Map.Entry<LocationType, Set<UUID>> entry : locationIdsByType.entrySet()) {
             LocationType type = entry.getKey();
             Set<UUID> ids = entry.getValue();
 
-            if (!ids.isEmpty()) {
+            if (!ids.isEmpty() && type != LocationType.NOT_ASSIGNED) {
                 result.put(type, fetchLocationCodesForType(type, ids));
+            }
+        }
+
+        // For cross-type transfers, find unresolved IDs in other location types
+        if (!crossTypeLocationIds.isEmpty()) {
+            // Remove IDs already resolved
+            for (Map<UUID, String> codes : result.values()) {
+                crossTypeLocationIds.removeAll(codes.keySet());
+            }
+
+            // Query remaining types for unresolved IDs
+            if (!crossTypeLocationIds.isEmpty()) {
+                for (LocationType type : LocationType.values()) {
+                    if (type != LocationType.NOT_ASSIGNED && !result.containsKey(type)) {
+                        Map<UUID, String> codes = fetchLocationCodesForType(type, crossTypeLocationIds);
+                        if (!codes.isEmpty()) {
+                            result.put(type, codes);
+                            crossTypeLocationIds.removeAll(codes.keySet());
+                            if (crossTypeLocationIds.isEmpty()) break;
+                        }
+                    }
+                }
             }
         }
 
