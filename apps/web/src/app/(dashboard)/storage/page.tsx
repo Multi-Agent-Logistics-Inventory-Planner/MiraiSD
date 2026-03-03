@@ -27,7 +27,7 @@ import {
 } from "@/hooks/mutations/use-location-mutations";
 import { useToast } from "@/hooks/use-toast";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 
 export default function LocationsPage() {
   const { toast } = useToast();
