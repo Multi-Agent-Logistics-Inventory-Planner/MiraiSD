@@ -680,8 +680,8 @@ export function LocationDetailSheet({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-          <DialogHeader className="px-6 pt-6 pb-4">
+        <DialogContent className="sm:max-w-2xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
             <DialogTitle className="flex items-center gap-3">
               <span className="text-xl font-semibold">{code || "Location"}</span>
             </DialogTitle>
@@ -690,7 +690,7 @@ export function LocationDetailSheet({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
             {isMachine ? (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="w-full mb-4">
