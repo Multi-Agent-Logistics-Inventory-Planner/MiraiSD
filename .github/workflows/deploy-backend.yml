@@ -1,0 +1,182 @@
+name: Deploy Backend to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-backend.yml'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  DEPLOY_PATH: /opt/mirai
+
+jobs:
+  deploy:
+    name: Deploy Backend Services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Detect which services changed
+          INVENTORY_CHANGED=false
+          FORECASTING_CHANGED=false
+          MESSAGING_CHANGED=false
+          INFRA_CHANGED=false
+
+          if echo "$CHANGED_FILES" | grep -q "^services/inventory-service/"; then
+            INVENTORY_CHANGED=true
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^services/forecasting-service/"; then
+            FORECASTING_CHANGED=true
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^services/messaging-service/"; then
+            MESSAGING_CHANGED=true
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^infra/"; then
+            INFRA_CHANGED=true
+          fi
+
+          echo "inventory_changed=$INVENTORY_CHANGED" >> $GITHUB_OUTPUT
+          echo "forecasting_changed=$FORECASTING_CHANGED" >> $GITHUB_OUTPUT
+          echo "messaging_changed=$MESSAGING_CHANGED" >> $GITHUB_OUTPUT
+          echo "infra_changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
+
+          # Build list of services to rebuild
+          SERVICES_TO_REBUILD=""
+          if [ "$INVENTORY_CHANGED" = "true" ]; then
+            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD inventory-service"
+          fi
+          if [ "$FORECASTING_CHANGED" = "true" ]; then
+            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD forecasting-service"
+          fi
+          if [ "$MESSAGING_CHANGED" = "true" ]; then
+            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD messaging-service"
+          fi
+
+          echo "services_to_rebuild=$SERVICES_TO_REBUILD" >> $GITHUB_OUTPUT
+          echo "Services to rebuild: $SERVICES_TO_REBUILD"
+
+      - name: Deploy to DigitalOcean
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+
+            echo "=== Deployment started at $(date) ==="
+
+            # Navigate to project directory
+            cd ${{ env.DEPLOY_PATH }}
+
+            # Pull latest changes
+            echo "Pulling latest changes from main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Navigate to infra directory
+            cd infra
+
+            # Determine what to rebuild
+            INFRA_CHANGED="${{ steps.changes.outputs.infra_changed }}"
+            SERVICES="${{ steps.changes.outputs.services_to_rebuild }}"
+
+            if [ "$INFRA_CHANGED" = "true" ] || [ -z "$SERVICES" ]; then
+              echo "Infrastructure changed or full rebuild needed. Rebuilding all services..."
+              docker compose build --no-cache
+              docker compose up -d --force-recreate
+            else
+              echo "Rebuilding specific services: $SERVICES"
+              for SERVICE in $SERVICES; do
+                echo "Building $SERVICE..."
+                docker compose build --no-cache $SERVICE
+              done
+
+              echo "Restarting services with zero-downtime..."
+              for SERVICE in $SERVICES; do
+                echo "Restarting $SERVICE..."
+                docker compose up -d --no-deps --force-recreate $SERVICE
+              done
+            fi
+
+            # Clean up old images
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f
+
+            # Wait for services to be healthy
+            # Spring Boot on 2GB droplet takes 2-3 minutes to initialize
+            echo "Waiting for services to become healthy..."
+            sleep 180
+
+            # Check service health
+            echo "Checking service health..."
+            docker compose ps
+
+            # Show recent logs for verification
+            echo "=== Recent logs ==="
+            docker compose logs --tail=20
+
+            echo "=== Deployment completed at $(date) ==="
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}/infra
+
+            # Check if all services are running
+            RUNNING=$(docker compose ps --format json | jq -r '.State' | grep -c "running" || echo "0")
+            TOTAL=$(docker compose ps --format json | jq -r '.State' | wc -l)
+
+            echo "Services running: $RUNNING / $TOTAL"
+
+            # Health check on inventory-service
+            if curl -sf http://localhost:4000/actuator/health > /dev/null 2>&1; then
+              echo "inventory-service health check: PASSED"
+            else
+              echo "inventory-service health check: FAILED"
+              exit 1
+            fi
+
+            echo "Deployment verification completed successfully"
+
+      - name: Notify on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}/infra
+            echo "=== Deployment failed. Checking logs ==="
+            docker compose logs --tail=50
