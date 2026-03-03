@@ -138,10 +138,13 @@ public class MachineDisplayService {
         List<MachineDisplay> existingDisplays = machineDisplayRepository
                 .findActiveByLocationTypeAndMachineId(locationType, machineId);
 
-        for (MachineDisplay display : existingDisplays) {
-            display.setEndedAt(OffsetDateTime.now());
-            machineDisplayRepository.save(display);
+        if (existingDisplays.isEmpty()) {
+            return;
         }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        existingDisplays.forEach(display -> display.setEndedAt(now));
+        machineDisplayRepository.saveAll(existingDisplays);
     }
 
     /**
@@ -191,7 +194,7 @@ public class MachineDisplayService {
      */
     public Page<MachineDisplayDTO> getAllActiveDisplays(Pageable pageable) {
         Page<MachineDisplay> displays = machineDisplayRepository.findByEndedAtIsNull(pageable);
-        return displays.map(this::toDTO);
+        return toDTOPage(displays);
     }
 
     /**
@@ -218,7 +221,7 @@ public class MachineDisplayService {
     public Page<MachineDisplayDTO> getMachineHistory(LocationType locationType, UUID machineId, Pageable pageable) {
         Page<MachineDisplay> displays = machineDisplayRepository
                 .findByLocationTypeAndMachineIdOrderByStartedAtDesc(locationType, machineId, pageable);
-        return displays.map(this::toDTO);
+        return toDTOPage(displays);
     }
 
     /**
@@ -293,6 +296,42 @@ public class MachineDisplayService {
                 .collect(Collectors.toList());
     }
 
+    private Page<MachineDisplayDTO> toDTOPage(Page<MachineDisplay> displays) {
+        if (displays.isEmpty()) {
+            return displays.map(d -> null); // Returns empty page with same metadata
+        }
+
+        List<MachineDisplay> content = displays.getContent();
+
+        // Batch fetch actor names to avoid N+1
+        Set<UUID> actorIds = content.stream()
+                .map(MachineDisplay::getActorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, String> actorNames = batchResolveActorNames(actorIds);
+
+        // Batch fetch machine codes
+        Map<String, String> machineCodes = batchResolveMachineCodes(content);
+
+        // Map content with pre-fetched data
+        List<MachineDisplayDTO> dtoContent = content.stream()
+                .map(display -> {
+                    String key = display.getLocationType() + ":" + display.getMachineId();
+                    String machineCode = machineCodes.get(key);
+                    String actorName = display.getActorId() != null ? actorNames.get(display.getActorId()) : null;
+
+                    return MachineDisplayDTO.fromEntity(display, machineCode, actorName, staleThresholdDays);
+                })
+                .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.PageImpl<>(
+                dtoContent,
+                displays.getPageable(),
+                displays.getTotalElements()
+        );
+    }
+
     private String resolveLocationCode(UUID locationId, LocationType locationType) {
         if (locationId == null) return null;
 
@@ -334,16 +373,66 @@ public class MachineDisplayService {
                         Collectors.mapping(MachineDisplay::getMachineId, Collectors.toSet())
                 ));
 
+        // Batch fetch codes per location type (1 query per type instead of N queries per machine)
         for (Map.Entry<LocationType, Set<UUID>> entry : machineIdsByType.entrySet()) {
             LocationType locationType = entry.getKey();
             Set<UUID> machineIds = entry.getValue();
 
-            for (UUID machineId : machineIds) {
-                String code = resolveLocationCode(machineId, locationType);
-                result.put(locationType + ":" + machineId, code);
+            if (machineIds.isEmpty()) continue;
+
+            String tableName = getTableNameForLocationType(locationType);
+            String codeColumn = getCodeColumnForLocationType(locationType);
+
+            if (tableName == null || codeColumn == null) {
+                // Handle NOT_ASSIGNED or unknown types
+                for (UUID machineId : machineIds) {
+                    result.put(locationType + ":" + machineId, "NA");
+                }
+                continue;
+            }
+
+            // Single query to fetch all codes for this location type
+            @SuppressWarnings("unchecked")
+            List<Object[]> rows = entityManager.createNativeQuery(
+                    "SELECT id, " + codeColumn + " FROM " + tableName + " WHERE id IN (:ids)")
+                    .setParameter("ids", machineIds)
+                    .getResultList();
+
+            for (Object[] row : rows) {
+                UUID id = (UUID) row[0];
+                String code = (String) row[1];
+                result.put(locationType + ":" + id, code);
             }
         }
 
         return result;
+    }
+
+    private String getTableNameForLocationType(LocationType locationType) {
+        return switch (locationType) {
+            case BOX_BIN -> "box_bins";
+            case SINGLE_CLAW_MACHINE -> "single_claw_machines";
+            case DOUBLE_CLAW_MACHINE -> "double_claw_machines";
+            case KEYCHAIN_MACHINE -> "keychain_machines";
+            case CABINET -> "cabinets";
+            case RACK -> "racks";
+            case FOUR_CORNER_MACHINE -> "four_corner_machines";
+            case PUSHER_MACHINE -> "pusher_machines";
+            case NOT_ASSIGNED -> null;
+        };
+    }
+
+    private String getCodeColumnForLocationType(LocationType locationType) {
+        return switch (locationType) {
+            case BOX_BIN -> "box_bin_code";
+            case SINGLE_CLAW_MACHINE -> "single_claw_machine_code";
+            case DOUBLE_CLAW_MACHINE -> "double_claw_machine_code";
+            case KEYCHAIN_MACHINE -> "keychain_machine_code";
+            case CABINET -> "cabinet_code";
+            case RACK -> "rack_code";
+            case FOUR_CORNER_MACHINE -> "four_corner_machine_code";
+            case PUSHER_MACHINE -> "pusher_machine_code";
+            case NOT_ASSIGNED -> null;
+        };
     }
 }
