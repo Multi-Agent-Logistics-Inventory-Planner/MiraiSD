@@ -161,15 +161,11 @@ export default function LocationsPage() {
             </Card>
           ) : (
             <>
-              <Card className="py-0">
-                <CardContent className="p-0">
-                  <NotAssignedTable
-                    items={notAssignedItems}
-                    isLoading={notAssignedQuery.isLoading}
-                    pageSize={PAGE_SIZE}
-                  />
-                </CardContent>
-              </Card>
+              <NotAssignedTable
+                items={notAssignedItems}
+                isLoading={notAssignedQuery.isLoading}
+                pageSize={PAGE_SIZE}
+              />
 
               <StoragePagination
                 page={notAssignedPage}
