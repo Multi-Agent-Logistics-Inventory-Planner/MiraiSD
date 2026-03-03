@@ -5,6 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { LocationWithCounts } from "@/types/api";
 
+// Column counts are all divisors of 12: full pages always produce complete rows.
+// Empty grid cells on partial last pages have no styling so they're invisible whitespace.
+const GRID = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 p-4";
+
 interface LocationTableProps {
   items: LocationWithCounts[];
   isLoading: boolean;
@@ -16,11 +20,11 @@ export function LocationTable({
   items,
   isLoading,
   onRowClick,
-  pageSize = 10,
+  pageSize = 12,
 }: LocationTableProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
+      <div className={GRID}>
         {Array.from({ length: pageSize }).map((_, i) => (
           <div key={i} className="rounded-xl border bg-card p-4">
             <Skeleton className="h-5 w-16 mb-3" />
@@ -49,7 +53,7 @@ export function LocationTable({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
+    <div className={GRID}>
       {items.map((item) => (
         <button
           key={item.id}
@@ -66,9 +70,7 @@ export function LocationTable({
           <span
             className={cn(
               "absolute top-3 right-3 h-2 w-2 rounded-full transition-colors",
-              item.totalQuantity > 0
-                ? "bg-emerald-500"
-                : "bg-muted-foreground/25"
+              item.totalQuantity > 0 ? "bg-emerald-500" : "bg-muted-foreground/25"
             )}
           />
 
