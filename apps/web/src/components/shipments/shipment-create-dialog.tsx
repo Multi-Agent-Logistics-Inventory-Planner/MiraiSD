@@ -212,7 +212,7 @@ export function ShipmentCreateDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="p-6">
+          <DialogHeader className="p-4 sm:p-6">
             <DialogTitle>Create New Shipment</DialogTitle>
             <DialogDescription>
               Add a new inbound shipment to track incoming inventory.
@@ -223,9 +223,9 @@ export function ShipmentCreateDialog({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col flex-1 min-h-0"
           >
-            <div className="overflow-y-auto px-6 pb-4 space-y-4">
+            <div className="overflow-y-auto px-4 sm:px-6 pb-4 space-y-4">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="shipmentNumber">Shipment Number</Label>
                   <Input
@@ -248,7 +248,7 @@ export function ShipmentCreateDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="orderDate">Order Date</Label>
                   <Input
@@ -274,7 +274,7 @@ export function ShipmentCreateDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="trackingId">Tracking Number (optional)</Label>
                   <Input
@@ -298,7 +298,7 @@ export function ShipmentCreateDialog({
 
               {/* Items */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <Label>Items</Label>
                   <div className="flex items-center gap-2">
                     <Button
@@ -360,7 +360,7 @@ export function ShipmentCreateDialog({
                     return (
                       <div
                         key={field.id}
-                        className="flex items-start gap-3 p-3 border rounded-lg bg-muted/30"
+                        className="flex flex-col sm:flex-row sm:items-start gap-3 p-3 border rounded-lg bg-muted/30"
                       >
                         <div className="flex-1 space-y-3">
                           {/* Product Selector */}
@@ -386,7 +386,7 @@ export function ShipmentCreateDialog({
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent
-                                className="w-[400px] p-0"
+                                className="w-[calc(100vw-3rem)] sm:w-[400px] p-0"
                                 align="start"
                               >
                                 <Command>
@@ -438,7 +438,7 @@ export function ShipmentCreateDialog({
                             )}
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="grid gap-2">
                               <Label className="text-xs">Quantity</Label>
                               <Input
@@ -476,7 +476,7 @@ export function ShipmentCreateDialog({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="shrink-0 mt-6"
+                            className="shrink-0 self-end sm:mt-6"
                             onClick={() => remove(index)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -499,7 +499,7 @@ export function ShipmentCreateDialog({
               </div>
             </div>
 
-            <DialogFooter className="px-6 py-4 border-t">
+            <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t">
               <Button
                 type="button"
                 variant="outline"
