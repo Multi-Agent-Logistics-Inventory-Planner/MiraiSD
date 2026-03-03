@@ -157,7 +157,7 @@ export function AuditLogTable({
                   </span>
                 ) : (
                   <span className="text-sm">
-                    {entry.toLocationCode ?? entry.fromLocationCode ?? "-"}
+                    {entry.toLocationCode ?? entry.fromLocationCode ?? "NA"}
                   </span>
                 )}
               </TableCell>
