@@ -176,8 +176,10 @@ public class StockMovementService {
             destinationInventory = loadInventory(request.getDestinationLocationType(), destinationInventoryId);
             destinationQuantity = getInventoryQuantity(destinationInventory);
         } else {
-            // Create new inventory at destination
-            if (request.getDestinationLocationId() == null) {
+            // Create new inventory at destination.
+            // NOT_ASSIGNED has no physical location, so locationId is not required for it.
+            if (request.getDestinationLocationId() == null
+                    && request.getDestinationLocationType() != com.mirai.inventoryservice.models.enums.LocationType.NOT_ASSIGNED) {
                 throw new IllegalArgumentException("Either destinationInventoryId or destinationLocationId must be provided");
             }
             destinationInventory = createInventoryAtLocation(
