@@ -36,9 +36,14 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth ->
             auth
                 // Public endpoints (no authentication required)
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/validate").permitAll()
                 .requestMatchers("/health").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
+                // Only expose health endpoint publicly; other actuator endpoints require ADMIN role
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
+
+                // Block dev endpoints in all profiles (defense in depth)
+                .requestMatchers("/api/dev/**").denyAll()
 
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

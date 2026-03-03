@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   ShoppingBag,
   Warehouse,
-  Package,
+  Truck,
   BarChart3,
   Bell,
   ClipboardList,
@@ -82,7 +82,7 @@ const inventoryItems: NavItem[] = [
   {
     title: "Shipments",
     href: "/shipments",
-    icon: Package,
+    icon: Truck,
     permission: Permission.SHIPMENTS_VIEW,
   },
 ];

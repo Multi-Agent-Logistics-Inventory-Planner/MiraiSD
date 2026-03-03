@@ -1,6 +1,5 @@
 "use client"
 
-import { useMemo, useRef } from "react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAllForecasts, useAtRiskForecasts } from "@/hooks/queries/use-forecasts"
 import {
@@ -9,7 +8,6 @@ import {
 } from "@/hooks/queries/use-analytics"
 import {
   KPICards,
-  CriticalActionPanel,
   PredictionsTable,
   PerformanceMetrics,
   SalesMetricsCard,
@@ -18,8 +16,6 @@ import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
 
 export default function AnalyticsPage() {
-  const tableRef = useRef<HTMLDivElement>(null)
-
   const { user } = useAuth()
   const isAdmin = user?.role === UserRole.ADMIN
 
@@ -36,11 +32,6 @@ export default function AnalyticsPage() {
 
   const { data: salesData, isLoading: isLoadingSales } = useSalesSummary()
 
-  const criticalItems = useMemo(
-    () => atRiskData?.filter((item) => item.daysToStockout <= 3) ?? [],
-    [atRiskData]
-  )
-
   const itemsAtRisk = atRiskData?.length ?? 0
 
   const reorderValue =
@@ -48,10 +39,6 @@ export default function AnalyticsPage() {
       (sum, p) => sum + p.suggestedReorderQty * (p.unitCost ?? 0),
       0
     ) ?? 0
-
-  const handleViewCritical = () => {
-    tableRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
 
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
@@ -68,23 +55,15 @@ export default function AnalyticsPage() {
           isLoading={isLoadingAtRisk || isLoadingMetrics}
         />
 
-        <CriticalActionPanel
-          criticalItems={criticalItems}
-          isLoading={isLoadingAtRisk}
-          onViewCritical={handleViewCritical}
-        />
-
         {isAdmin && (
           <SalesMetricsCard data={salesData} isLoading={isLoadingSales} />
         )}
 
-        <div ref={tableRef}>
-          <PredictionsTable
-            data={allForecastsData ?? []}
-            isLoading={isLoadingForecasts}
-            isError={isForecastError}
-          />
-        </div>
+        <PredictionsTable
+          data={allForecastsData ?? []}
+          isLoading={isLoadingForecasts}
+          isError={isForecastError}
+        />
 
         <PerformanceMetrics
           metrics={metricsData}
