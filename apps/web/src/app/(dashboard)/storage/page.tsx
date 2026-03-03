@@ -197,19 +197,15 @@ export default function LocationsPage() {
             </Card>
           ) : (
             <>
-              <Card className="py-0">
-                <CardContent className="p-0">
-                  <LocationTable
-                    items={paginatedLocations}
-                    isLoading={locationsQuery.isLoading}
-                    onRowClick={(row) => {
-                      setSelected(toStorageLocation(row));
-                      setDetailOpen(true);
-                    }}
-                    pageSize={PAGE_SIZE}
-                  />
-                </CardContent>
-              </Card>
+              <LocationTable
+                items={paginatedLocations}
+                isLoading={locationsQuery.isLoading}
+                onRowClick={(row) => {
+                  setSelected(toStorageLocation(row));
+                  setDetailOpen(true);
+                }}
+                pageSize={PAGE_SIZE}
+              />
 
               <StoragePagination
                 page={locationPage}
