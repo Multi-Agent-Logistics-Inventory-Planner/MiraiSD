@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Monitor,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,14 +50,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { LocationType } from "@/types/api";
 import type {
@@ -291,9 +282,9 @@ export function LocationDetailSheet({
   // ── Products tab content ──────────────────────────────────────────────────
 
   const productsTabContent = (
-    <div className="space-y-4">
+    <>
       {location && (
-        <div className="flex items-center gap-2">
+        <div className="shrink-0 flex items-center gap-2 py-4">
           <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Inventory
@@ -319,74 +310,65 @@ export function LocationDetailSheet({
       )}
 
       {inventoryQuery.isError ? (
-        <Card className="p-4 text-sm text-muted-foreground">
-          Failed to load inventory.
-        </Card>
+        <p className="shrink-0 text-sm text-muted-foreground pb-2">Failed to load inventory.</p>
       ) : null}
 
-      <Card className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>SKU</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+          <div className="pb-6 pr-3">
             {inventoryQuery.isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-10" /></TableCell>
-                </TableRow>
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-3 sm:py-4 border-b last:border-b-0">
+                  <Skeleton className="h-12 w-12 sm:h-20 sm:w-20 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3.5 w-20" />
+                  </div>
+                  <Skeleton className="h-5 w-8" />
+                </div>
               ))
             ) : (inventoryQuery.data as Inventory[] | undefined)?.length ? (
               (inventoryQuery.data as Inventory[]).map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell className="py-2">
-                    <div className="flex items-center gap-3">
-                      {inv.item.imageUrl ? (
-                        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-muted">
-                          <Image
-                            src={inv.item.imageUrl}
-                            alt={inv.item.name}
-                            fill
-                            sizes="32px"
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                          <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                      )}
-                      <span className="font-mono text-sm">{inv.item.sku}</span>
+                <div key={inv.id} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
+                  <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                    {inv.item.imageUrl ? (
+                      <Image
+                        src={inv.item.imageUrl}
+                        alt={inv.item.name}
+                        fill
+                        sizes="(max-width: 640px) 48px, 80px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <ImageOff className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-xs sm:text-base truncate">{inv.item.name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
+                        {inv.item.category.name}
+                      </Badge>
+                      <span className="font-mono text-[10px] sm:text-xs text-muted-foreground">{inv.item.sku}</span>
                     </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{inv.item.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {inv.item.category.name}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">{inv.quantity}</TableCell>
-                </TableRow>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 shrink-0">
+                    <span className="text-sm font-semibold tabular-nums">{inv.quantity}</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">in stock</span>
+                  </div>
+                </div>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
-                  No inventory in this location yet.
-                </TableCell>
-              </TableRow>
+              <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                No inventory in this location yet.
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </Card>
-    </div>
+          </div>
+        </ScrollArea>
+      </div>
+    </>
   );
 
   // ── Display tab content ───────────────────────────────────────────────────
@@ -636,42 +618,40 @@ export function LocationDetailSheet({
         )}
       </div>
 
-      <ScrollArea className="max-h-72">
-        {isHistoryLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="border rounded-lg p-3 space-y-1">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            ))}
-          </div>
-        ) : historyItems.length === 0 ? (
-          <div className="text-sm text-muted-foreground text-center py-6">
-            No display history yet.
-          </div>
-        ) : (
-          <div className="space-y-2 pr-2">
-            {historyItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between p-3 border rounded-lg text-sm"
-              >
-                <div>
-                  <div className="font-medium">{item.productName}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {format(new Date(item.startedAt), "MMM d")} –{" "}
-                    {format(new Date(item.endedAt!), "MMM d, yyyy")}
-                  </div>
+      {isHistoryLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="border rounded-lg p-3 space-y-1">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))}
+        </div>
+      ) : historyItems.length === 0 ? (
+        <div className="text-sm text-muted-foreground text-center py-6">
+          No display history yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {historyItems.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between p-3 border rounded-lg text-sm"
+            >
+              <div>
+                <div className="font-medium">{item.productName}</div>
+                <div className="text-xs text-muted-foreground">
+                  {format(new Date(item.startedAt), "MMM d")} –{" "}
+                  {format(new Date(item.endedAt!), "MMM d, yyyy")}
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {formatDuration(item.startedAt, item.endedAt)}
-                </Badge>
               </div>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
+              <Badge variant="outline" className="text-xs">
+                {formatDuration(item.startedAt, item.endedAt)}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -690,10 +670,10 @@ export function LocationDetailSheet({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
             {isMachine ? (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="w-full mb-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+                <TabsList className="w-full shrink-0 mt-4">
                   <TabsTrigger value="products" className="flex-1">
                     Products
                   </TabsTrigger>
@@ -704,12 +684,18 @@ export function LocationDetailSheet({
                     History
                   </TabsTrigger>
                 </TabsList>
-                <TabsContent value="products">{productsTabContent}</TabsContent>
-                <TabsContent value="display">{displayTabContent}</TabsContent>
-                <TabsContent value="history">{historyTabContent}</TabsContent>
+                <TabsContent value="products" className="flex flex-col flex-1 min-h-0 mt-0">
+                  {productsTabContent}
+                </TabsContent>
+                <TabsContent value="display" className="flex-1 min-h-0 overflow-y-auto mt-0 pb-6">
+                  {displayTabContent}
+                </TabsContent>
+                <TabsContent value="history" className="flex-1 min-h-0 overflow-y-auto mt-0 pb-6">
+                  {historyTabContent}
+                </TabsContent>
               </Tabs>
             ) : (
-              <div className="space-y-4">{productsTabContent}</div>
+              <div className="flex flex-col flex-1 min-h-0">{productsTabContent}</div>
             )}
           </div>
         </DialogContent>
