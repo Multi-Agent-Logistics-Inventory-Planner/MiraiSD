@@ -86,17 +86,22 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
 
   return (
     <div className="py-3 border-b last:border-b-0">
-      <div className="flex items-start gap-4">
-        <span className="text-sm text-muted-foreground w-6">{index + 1}</span>
+      <div className="flex items-start gap-3">
+        <span className="text-sm text-muted-foreground w-6 hidden sm:block shrink-0">{index + 1}</span>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
           <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
+            <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
+            {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
+            {lineTotal && <span className="font-medium text-foreground">{formatCurrency(lineTotal)}</span>}
+          </div>
         </div>
-        <div className="text-right text-sm">
+        <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{item.orderedQuantity} ordered</p>
           <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
         </div>
-        <div className="text-right text-sm w-20">
+        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
           {item.unitCost ? (
             <>
               <p>{formatCurrency(item.unitCost)}</p>
@@ -106,7 +111,7 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
             <span className="text-muted-foreground">-</span>
           )}
         </div>
-        <div className="text-right text-sm font-medium w-24">
+        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
           {lineTotal ? formatCurrency(lineTotal) : "-"}
         </div>
       </div>
@@ -251,8 +256,8 @@ export function ShipmentDetailSheet({
             </div>
 
             {/* Items Header */}
-            <div className="px-4 py-2 border-b bg-muted/20">
-              <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
+            <div className="px-4 py-2 border-b bg-muted/20 hidden sm:block">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
                 <span className="w-6">#</span>
                 <span className="flex-1">Name</span>
                 <span className="text-right w-24">Qty</span>
@@ -317,7 +322,7 @@ export function ShipmentDetailSheet({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   {shipment.supplierName && (
                     <div>
                       <p className="text-muted-foreground text-xs mb-1">Supplier</p>
@@ -474,7 +479,7 @@ export function ShipmentDetailSheet({
                     )}
                     {tracking && !trackingLoading && (
                       <>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground text-xs mb-1">Status</p>
                             <p className="font-medium">{tracking.status}</p>

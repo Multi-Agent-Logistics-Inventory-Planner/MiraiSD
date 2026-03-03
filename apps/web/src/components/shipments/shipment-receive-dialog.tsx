@@ -107,14 +107,14 @@ function AllocationRow({
     allocation.locationType !== LocationType.NOT_ASSIGNED;
 
   return (
-    <div className="flex items-center gap-2 py-1">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 py-2 sm:py-1">
       <Select
         value={allocation.locationType}
         onValueChange={(value) =>
           onUpdate({ locationType: value as LocationType, locationId: "" })
         }
       >
-        <SelectTrigger className="w-32 h-8 text-xs">
+        <SelectTrigger className="w-full sm:w-32 h-10 sm:h-8 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -132,7 +132,7 @@ function AllocationRow({
           onValueChange={(value) => onUpdate({ locationId: value })}
           disabled={locationsQuery.isLoading}
         >
-          <SelectTrigger className="w-28 h-8 text-xs">
+          <SelectTrigger className="w-full sm:w-28 h-10 sm:h-8 text-xs">
             <SelectValue placeholder="Location" />
           </SelectTrigger>
           <SelectContent>
@@ -145,29 +145,31 @@ function AllocationRow({
         </Select>
       )}
 
-      <Input
-        type="number"
-        min={0}
-        max={maxQuantity}
-        value={allocation.quantity}
-        onChange={(e) => {
-          const num = parseInt(e.target.value, 10);
-          onUpdate({ quantity: Number.isNaN(num) ? 0 : Math.max(0, num) });
-        }}
-        className="w-20 h-8 text-xs text-right"
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          max={maxQuantity}
+          value={allocation.quantity}
+          onChange={(e) => {
+            const num = parseInt(e.target.value, 10);
+            onUpdate({ quantity: Number.isNaN(num) ? 0 : Math.max(0, num) });
+          }}
+          className="flex-1 sm:w-20 sm:flex-none h-10 sm:h-8 text-xs text-right"
+        />
 
-      {canRemove && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-          onClick={onRemove}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      )}
+        {canRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-10 w-10 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+            onClick={onRemove}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -342,7 +344,7 @@ export function ShipmentReceiveDialog({
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-48"
+              className="w-full sm:w-48"
             />
           </div>
 
@@ -361,7 +363,7 @@ export function ShipmentReceiveDialog({
                     isComplete ? "opacity-50" : ""
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
                     <div>
                       <div className="font-medium">{item.item.name}</div>
                       <div className="text-xs text-muted-foreground font-mono">
