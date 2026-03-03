@@ -374,7 +374,7 @@ export function LocationDetailSheet({
   // ── Display tab content ───────────────────────────────────────────────────
 
   const addDisplayEmptyState = (
-    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
       <div className="rounded-full bg-muted p-3">
         <Monitor className="h-6 w-6 text-muted-foreground" />
       </div>
@@ -451,8 +451,8 @@ export function LocationDetailSheet({
   );
 
   const displayTabContent = !hasDisplay ? addDisplayEmptyState : (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <>
+      <div className="shrink-0 flex items-center justify-between py-4">
         <p className="text-sm font-medium">Current Products</p>
         <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
           <PopoverTrigger asChild>
@@ -519,52 +519,75 @@ export function LocationDetailSheet({
         </Popover>
       </div>
 
-      {activeDisplaysForMachine.length === 0 ? (
-        <div className="text-sm text-muted-foreground text-center py-6 border rounded-lg">
-          No products currently displayed
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {activeDisplaysForMachine.map((item) => (
-            <div
-              key={item.id}
-              className={cn(
-                "flex items-center justify-between p-3 border rounded-lg",
-                item.stale && "border-amber-300 bg-amber-50 dark:bg-amber-950/20"
-              )}
-            >
-              <div className="flex-1">
-                <div className="font-medium text-sm">{item.productName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {item.productSku} · {item.daysActive} days
-                </div>
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+          <div className="pb-6 pr-3">
+            {activeDisplaysForMachine.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                No products currently displayed
               </div>
-              <div className="flex items-center gap-2">
-                {item.stale && (
-                  <Badge variant="secondary" className="text-amber-600 text-xs">
-                    Stale
-                  </Badge>
-                )}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleClearClick(item)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ) : (
+              activeDisplaysForMachine.map((item) => {
+                const product = products.find((p) => p.id === item.productId);
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0",
+                      item.stale && "bg-amber-50 dark:bg-amber-950/20"
+                    )}
+                  >
+                    <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                      {product?.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={item.productName}
+                          fill
+                          sizes="(max-width: 640px) 48px, 80px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="font-mono text-[10px] sm:text-xs text-muted-foreground">{item.productSku}</span>
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">· {item.daysActive} days</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.stale && (
+                        <Badge variant="secondary" className="text-amber-600 text-xs">
+                          Stale
+                        </Badge>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleClearClick(item)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </>
   );
 
   // ── History tab content ───────────────────────────────────────────────────
 
   const historyTabContent = !hasDisplay ? (
-    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
       <div className="rounded-full bg-muted p-3">
         <History className="h-6 w-6 text-muted-foreground" />
       </div>
@@ -580,8 +603,8 @@ export function LocationDetailSheet({
       </Button>
     </div>
   ) : (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <>
+      <div className="shrink-0 flex items-center justify-between py-4">
         <h3 className="text-sm font-medium flex items-center gap-2">
           <History className="h-4 w-4" />
           Display History
@@ -618,41 +641,65 @@ export function LocationDetailSheet({
         )}
       </div>
 
-      {isHistoryLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-3 space-y-1">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-          ))}
-        </div>
-      ) : historyItems.length === 0 ? (
-        <div className="text-sm text-muted-foreground text-center py-6">
-          No display history yet.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {historyItems.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between p-3 border rounded-lg text-sm"
-            >
-              <div>
-                <div className="font-medium">{item.productName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {format(new Date(item.startedAt), "MMM d")} –{" "}
-                  {format(new Date(item.endedAt!), "MMM d, yyyy")}
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+          <div className="pb-6 pr-3">
+            {isHistoryLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
+                  <Skeleton className="h-12 w-12 sm:h-20 sm:w-20 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-5 w-16 shrink-0" />
                 </div>
+              ))
+            ) : historyItems.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                No display history yet.
               </div>
-              <Badge variant="outline" className="text-xs">
-                {formatDuration(item.startedAt, item.endedAt)}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ) : (
+              historyItems.map((item) => {
+                const product = products.find((p) => p.id === item.productId);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0"
+                  >
+                    <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                      {product?.imageUrl ? (
+                        <Image
+                          src={product.imageUrl}
+                          alt={item.productName}
+                          fill
+                          sizes="(max-width: 640px) 48px, 80px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <ImageOff className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                        {format(new Date(item.startedAt), "MMM d")} –{" "}
+                        {format(new Date(item.endedAt!), "MMM d, yyyy")}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-xs shrink-0 ml-2">
+                      {formatDuration(item.startedAt, item.endedAt)}
+                    </Badge>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </>
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -687,10 +734,10 @@ export function LocationDetailSheet({
                 <TabsContent value="products" className="flex flex-col flex-1 min-h-0 mt-0">
                   {productsTabContent}
                 </TabsContent>
-                <TabsContent value="display" className="flex-1 min-h-0 overflow-y-auto mt-0 pb-6">
+                <TabsContent value="display" className="flex flex-col flex-1 min-h-0 mt-0">
                   {displayTabContent}
                 </TabsContent>
-                <TabsContent value="history" className="flex-1 min-h-0 overflow-y-auto mt-0 pb-6">
+                <TabsContent value="history" className="flex flex-col flex-1 min-h-0 mt-0">
                   {historyTabContent}
                 </TabsContent>
               </Tabs>
