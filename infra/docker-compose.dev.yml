@@ -3,6 +3,7 @@
 
 # seed data (one call seeds everything):
 # curl -X POST "http://localhost:4000/api/dev/seed/all"
+# curl -X POST "http://localhost:4000/api/dev/seed/reviews"
 # trigger forecasting: curl -X POST "http://localhost:5010/forecasts/trigger"
 
 services:
