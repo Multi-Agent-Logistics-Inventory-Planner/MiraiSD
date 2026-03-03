@@ -109,7 +109,9 @@ jobs:
             if [ "$INFRA_CHANGED" = "true" ] || [ -z "$SERVICES" ]; then
               echo "Infrastructure changed or full rebuild needed. Rebuilding all services..."
               docker compose build --no-cache
-              docker compose up -d --force-recreate
+              # Stop and remove any conflicting containers before recreating
+              docker compose down --remove-orphans || true
+              docker compose up -d
             else
               echo "Rebuilding specific services: $SERVICES"
               for SERVICE in $SERVICES; do
