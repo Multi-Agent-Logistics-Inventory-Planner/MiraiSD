@@ -150,6 +150,143 @@ class SecurityConfigTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // Dev endpoint security tests (defense in depth)
+    @Test
+    void testDevEndpoint_IsDeniedWithoutAuth() throws Exception {
+        // Dev endpoints should be blocked even without authentication
+        mockMvc.perform(post("/api/dev/seed/all"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void testDevEndpoint_IsDeniedWithUserAuth() throws Exception {
+        // Given - authenticated user
+        String token = createValidToken("user-123", "John Doe", "user");
+        String bearerToken = "Bearer " + token;
+
+        when(jwtService.extractPersonId(token)).thenReturn("user-123");
+        when(jwtService.extractName(token)).thenReturn("John Doe");
+        when(jwtService.extractRole(token)).thenReturn("user");
+        when(jwtService.validateToken(token)).thenReturn(true);
+
+        // When & Then - dev endpoints should be denied even with valid user auth
+        mockMvc.perform(post("/api/dev/seed/all")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testDevEndpoint_IsDeniedWithAdminAuth() throws Exception {
+        // Given - authenticated admin
+        String token = createValidToken("admin-123", "Admin User", "admin");
+        String bearerToken = "Bearer " + token;
+
+        when(jwtService.extractPersonId(token)).thenReturn("admin-123");
+        when(jwtService.extractName(token)).thenReturn("Admin User");
+        when(jwtService.extractRole(token)).thenReturn("admin");
+        when(jwtService.validateToken(token)).thenReturn(true);
+
+        // When & Then - dev endpoints should be denied even with admin auth (defense in depth)
+        mockMvc.perform(post("/api/dev/seed/all")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testDevEndpoint_AllPathsDenied() throws Exception {
+        // Given - authenticated admin
+        String token = createValidToken("admin-123", "Admin User", "admin");
+        String bearerToken = "Bearer " + token;
+
+        when(jwtService.extractPersonId(token)).thenReturn("admin-123");
+        when(jwtService.extractName(token)).thenReturn("Admin User");
+        when(jwtService.extractRole(token)).thenReturn("admin");
+        when(jwtService.validateToken(token)).thenReturn(true);
+
+        // When & Then - all dev sub-paths should be denied
+        mockMvc.perform(post("/api/dev/seed/sales")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/dev/seed/products")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/dev/anything")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    // Actuator endpoint security tests
+    @Test
+    void testActuatorHealth_IsPublic() throws Exception {
+        // When & Then - health endpoint should be accessible without auth
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testActuatorHealthSubpath_IsPublic() throws Exception {
+        // When & Then - health subpaths (like liveness/readiness) should be public
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testActuatorOtherEndpoints_RequireAuth() throws Exception {
+        // When & Then - other actuator endpoints should require authentication
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/actuator/env"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void testActuatorOtherEndpoints_RequireAdminRole() throws Exception {
+        // Given - authenticated user (not admin)
+        String token = createValidToken("user-123", "John Doe", "user");
+        String bearerToken = "Bearer " + token;
+
+        when(jwtService.extractPersonId(token)).thenReturn("user-123");
+        when(jwtService.extractName(token)).thenReturn("John Doe");
+        when(jwtService.extractRole(token)).thenReturn("user");
+        when(jwtService.validateToken(token)).thenReturn(true);
+
+        // When & Then - actuator endpoints should be forbidden for non-admin users
+        mockMvc.perform(get("/actuator/info")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/actuator/metrics")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testActuatorOtherEndpoints_AllowedForAdmin() throws Exception {
+        // Given - authenticated admin
+        String token = createValidToken("admin-123", "Admin User", "admin");
+        String bearerToken = "Bearer " + token;
+
+        when(jwtService.extractPersonId(token)).thenReturn("admin-123");
+        when(jwtService.extractName(token)).thenReturn("Admin User");
+        when(jwtService.extractRole(token)).thenReturn("admin");
+        when(jwtService.validateToken(token)).thenReturn(true);
+
+        // When & Then - actuator endpoints should be accessible for admin
+        // Note: May return 404 if actuator endpoints aren't fully enabled in test profile
+        mockMvc.perform(get("/actuator/info")
+                        .header("Authorization", bearerToken))
+                .andExpect(status().isNotFound()); // 404 means security allowed it through
+    }
+
     // Helper methods
     private String createValidToken(String personId, String name, String role) {
         Map<String, Object> userMetadata = new HashMap<>();
