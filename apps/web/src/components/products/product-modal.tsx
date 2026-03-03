@@ -233,6 +233,7 @@ export function ProductModal({
           )}
         </div>
 
+        {/* Current Stock Section */}
         <div className="mt-4 sm:mt-6">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Current Stock{" "}
@@ -242,8 +243,8 @@ export function ProductModal({
           </h3>
           <div className="rounded-lg border">
             <Table>
-              <TableHeader className="bg-muted">
-                <TableRow>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Location</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
@@ -298,14 +299,15 @@ export function ProductModal({
           </div>
         </div>
 
+        {/* Recent Orders Section */}
         <div className="mt-4 sm:mt-6">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Recent Orders
           </h3>
           <div className="rounded-lg border">
             <Table>
-              <TableHeader className="bg-muted">
-                <TableRow>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Order</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
