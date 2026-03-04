@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -264,6 +264,107 @@ class SupabaseRepo:
         df["quantity_change"] = df["quantity_change"].astype(int)
         df["reason"] = df["reason"].astype(str)
         df["at"] = pd.to_datetime(df["at"], utc=True)
+        return df
+
+    def get_shipment_lead_times(
+        self,
+        item_ids: list[str] | None = None,
+        lookback_months: int | None = None,
+        max_shipments: int | None = None,
+    ) -> pd.DataFrame:
+        """Load shipment lead times from delivered shipments.
+
+        Returns DataFrame with columns: item_id, lead_time_days
+        Rows are the most recent N delivered shipments per item within the lookback window.
+        """
+        lb = lookback_months if lookback_months is not None else config.LEAD_TIME_LOOKBACK_MONTHS
+        ms = max_shipments if max_shipments is not None else config.LEAD_TIME_MAX_SHIPMENTS
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=lb * 30)
+
+        query = """
+            WITH ranked AS (
+                SELECT
+                    si.item_id::text AS item_id,
+                    (s.actual_delivery_date - s.order_date) AS lead_time_days,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY si.item_id ORDER BY s.actual_delivery_date DESC
+                    ) AS rn
+                FROM shipments s
+                JOIN shipment_items si ON si.shipment_id = s.id
+                WHERE s.status = 'DELIVERED'
+                  AND s.actual_delivery_date IS NOT NULL
+                  AND s.order_date IS NOT NULL
+                  AND s.actual_delivery_date >= :cutoff_date
+        """
+        params: dict = {"cutoff_date": cutoff_date, "max_shipments": ms}
+
+        if item_ids:
+            query += " AND si.item_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+
+        query += """
+            )
+            SELECT item_id, lead_time_days FROM ranked WHERE rn <= :max_shipments
+        """
+
+        try:
+            with self._engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception:
+            logger.warning("Failed to query shipment lead times (table may not exist)")
+            return pd.DataFrame(columns=["item_id", "lead_time_days"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["item_id", "lead_time_days"])
+
+        df["item_id"] = df["item_id"].astype(str)
+        df["lead_time_days"] = pd.to_numeric(df["lead_time_days"], errors="coerce")
+        return df
+
+    def get_historical_forecasts(
+        self,
+        item_ids: list[str],
+        target_date: datetime,
+        tolerance_hours: int = 24,
+    ) -> pd.DataFrame:
+        """Load historical forecast predictions closest to a target date.
+
+        Returns DataFrame with columns: item_id, computed_at, mu_hat
+        One row per item (the forecast closest to target_date within tolerance).
+        """
+        target_start = target_date - timedelta(hours=tolerance_hours)
+        target_end = target_date + timedelta(hours=tolerance_hours)
+
+        query = """
+            SELECT DISTINCT ON (item_id)
+                item_id::text AS item_id,
+                computed_at,
+                (features->>'mu_hat')::float AS mu_hat
+            FROM forecast_predictions
+            WHERE item_id = ANY(:item_ids)
+              AND computed_at BETWEEN :target_start AND :target_end
+            ORDER BY item_id, ABS(EXTRACT(EPOCH FROM (computed_at - :target_date)))
+        """
+        params = {
+            "item_ids": [uuid.UUID(iid) for iid in item_ids],
+            "target_start": target_start,
+            "target_end": target_end,
+            "target_date": target_date,
+        }
+
+        try:
+            with self._engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception:
+            logger.warning("Failed to query historical forecasts")
+            return pd.DataFrame(columns=["item_id", "computed_at", "mu_hat"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["item_id", "computed_at", "mu_hat"])
+
+        df["item_id"] = df["item_id"].astype(str)
+        df["computed_at"] = pd.to_datetime(df["computed_at"], utc=True)
+        df["mu_hat"] = df["mu_hat"].astype(float)
         return df
 
     def _prepare_forecast_rows(self, forecasts_df: pd.DataFrame) -> list[dict]:

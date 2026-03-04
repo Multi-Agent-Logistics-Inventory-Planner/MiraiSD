@@ -10,7 +10,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
@@ -63,7 +63,7 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 6 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
+          <TableCell className="rounded-l-lg">
             <Skeleton className="h-4 w-24" />
           </TableCell>
           <TableCell>
@@ -78,7 +78,7 @@ function TableSkeleton() {
           <TableCell>
             <Skeleton className="h-4 w-20" />
           </TableCell>
-          <TableCell>
+          <TableCell className="rounded-r-lg">
             <Skeleton className="h-4 w-16" />
           </TableCell>
         </TableRow>
@@ -114,16 +114,14 @@ export function TeamTable({
   return (
     <>
     <Table>
-      <TableHeader className="bg-muted">
-        <TableRow>
-          <TableHead className="rounded-tl-xl">Name</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead className="text-center">Role</TableHead>
-          <TableHead className="text-center">Status</TableHead>
-          <TableHead className="text-center">Last Audit</TableHead>
-          <TableHead className="w-[120px] rounded-tr-xl">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
+      <DataTableHeader>
+        <TableHead className="rounded-l-lg">Name</TableHead>
+        <TableHead>Email</TableHead>
+        <TableHead className="text-center">Role</TableHead>
+        <TableHead className="text-center">Status</TableHead>
+        <TableHead className="text-center">Last Audit</TableHead>
+        <TableHead className="w-[120px] rounded-r-lg">Actions</TableHead>
+      </DataTableHeader>
       <TableBody>
         {isLoading ? (
           <TableSkeleton />
@@ -139,7 +137,7 @@ export function TeamTable({
         ) : (
           data.map((row) => (
             <TableRow key={row.id}>
-              <TableCell className="font-medium">{row.fullName}</TableCell>
+              <TableCell className="font-medium rounded-l-lg">{row.fullName}</TableCell>
               <TableCell>{row.email}</TableCell>
               <TableCell className="text-center">
                 <Badge
@@ -166,7 +164,7 @@ export function TeamTable({
                   ? new Date(row.lastAudit).toLocaleDateString()
                   : "-"}
               </TableCell>
-              <TableCell>
+              <TableCell className="rounded-r-lg">
                 <div className="flex items-center gap-1">
                   {row.status === "pending" && (
                     <Button

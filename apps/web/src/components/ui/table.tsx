@@ -104,6 +104,24 @@ function TableCaption({
   );
 }
 
+interface DataTableHeaderProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+function DataTableHeader({ children, className }: DataTableHeaderProps) {
+  return (
+    <TableHeader
+      className={cn(
+        "bg-table-header [&_tr]:border-b-0 text-table-header-foreground",
+        className,
+      )}
+    >
+      <TableRow className="border-b-0">{children}</TableRow>
+    </TableHeader>
+  );
+}
+
 export {
   Table,
   TableHeader,
@@ -113,4 +131,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  DataTableHeader,
 };

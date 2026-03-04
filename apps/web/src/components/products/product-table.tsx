@@ -9,7 +9,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
@@ -25,17 +25,14 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 10 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
+          <TableCell className="py-2 rounded-l-lg">
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 rounded-md shrink-0" />
               <Skeleton className="h-4 w-40" />
             </div>
           </TableCell>
-          <TableCell className="hidden sm:table-cell">
-            <Skeleton className="h-4 w-24" />
-          </TableCell>
-          <TableCell className="hidden sm:table-cell">
-            <Skeleton className="h-4 w-24" />
+          <TableCell>
+            <Skeleton className="h-6 w-16 rounded-full" />
           </TableCell>
           <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-24" />
@@ -46,7 +43,7 @@ function TableSkeleton() {
           <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-20" />
           </TableCell>
-          <TableCell>
+          <TableCell className="hidden sm:table-cell rounded-r-lg">
             <Skeleton className="h-8 w-8" />
           </TableCell>
         </TableRow>
@@ -61,17 +58,15 @@ export function ProductTable({
   onSelect,
 }: ProductTableProps) {
   return (
-    <Table>
-      <TableHeader className="bg-muted">
-        <TableRow>
-          <TableHead className="text-left rounded-tl-xl sm:rounded-none">Product</TableHead>
-          <TableHead className="hidden sm:table-cell">SKU</TableHead>
-          <TableHead className="hidden sm:table-cell">Category</TableHead>
-          <TableHead>Stock</TableHead>
-          <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
-          <TableHead className="rounded-tr-xl sm:rounded-none w-12"></TableHead>
-        </TableRow>
-      </TableHeader>
+    <Table className="border-none">
+      <DataTableHeader>
+        <TableHead className="text-left rounded-l-lg">Product</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead className="hidden sm:table-cell">Category</TableHead>
+        <TableHead>Stock</TableHead>
+        <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
+        <TableHead className="hidden sm:table-cell rounded-r-lg w-12"></TableHead>
+      </DataTableHeader>
       <TableBody>
         {isLoading ? (
           <TableSkeleton />
@@ -97,7 +92,7 @@ export function ProductTable({
               className="cursor-pointer"
               onClick={() => onSelect(row)}
             >
-              <TableCell className="py-2">
+              <TableCell className="py-2 rounded-l-lg">
                 <div className="flex items-center gap-3">
                   {row.product.imageUrl ? (
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -117,8 +112,16 @@ export function ProductTable({
                   <span className="font-medium">{row.product.name}</span>
                 </div>
               </TableCell>
-              <TableCell className="hidden sm:table-cell font-mono text-xs text-muted-foreground">
-                {row.product.sku}
+              <TableCell>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                    row.product.isActive
+                      ? "bg-green-400 text-green-800"
+                      : "bg-red-300 text-red-800"
+                  }`}
+                >
+                  {row.product.isActive ? "Active" : "Inactive"}
+                </span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 {row.product.category.name}
@@ -129,7 +132,7 @@ export function ProductTable({
                   ? `$${row.product.unitCost.toFixed(2)}`
                   : "-"}
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden sm:table-cell rounded-r-lg">
                 <Button
                   variant="ghost"
                   size="icon"

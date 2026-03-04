@@ -10,7 +10,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
@@ -49,7 +49,7 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 8 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
+          <TableCell className="rounded-l-lg">
             <Skeleton className="h-4 w-16" />
           </TableCell>
           <TableCell>
@@ -64,7 +64,7 @@ function TableSkeleton() {
           <TableCell>
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell>
+          <TableCell className="rounded-r-lg">
             <Skeleton className="h-4 w-28" />
           </TableCell>
         </TableRow>
@@ -138,16 +138,14 @@ export function MachineDisplayTable({
 
   return (
     <Table>
-      <TableHeader className="bg-muted">
-        <TableRow>
-          <TableHead className="w-24 rounded-tl-xl">Machine</TableHead>
-          <TableHead>Products</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead className="text-center">Days Active</TableHead>
-          <TableHead>Set By</TableHead>
-          <TableHead className="rounded-tr-xl">Started</TableHead>
-        </TableRow>
-      </TableHeader>
+      <DataTableHeader>
+        <TableHead className="w-24 rounded-l-lg">Machine</TableHead>
+        <TableHead>Products</TableHead>
+        <TableHead>Type</TableHead>
+        <TableHead className="text-center">Days Active</TableHead>
+        <TableHead>Set By</TableHead>
+        <TableHead className="rounded-r-lg">Started</TableHead>
+      </DataTableHeader>
       <TableBody>
         {isLoading ? (
           <TableSkeleton />
@@ -170,7 +168,7 @@ export function MachineDisplayTable({
               )}
               onClick={() => onRowClick?.(group.displays[0])}
             >
-              <TableCell className="font-mono font-medium">
+              <TableCell className="font-mono font-medium rounded-l-lg">
                 <div className="flex items-center gap-2">
                   {group.machineCode}
                   {group.hasStaleProducts && (
@@ -229,7 +227,7 @@ export function MachineDisplayTable({
               <TableCell className="text-muted-foreground">
                 {group.actorName ?? "-"}
               </TableCell>
-              <TableCell className="text-muted-foreground whitespace-nowrap">
+              <TableCell className="text-muted-foreground whitespace-nowrap rounded-r-lg">
                 {format(new Date(group.earliestStartedAt), "MMM d, yyyy")}
               </TableCell>
             </TableRow>

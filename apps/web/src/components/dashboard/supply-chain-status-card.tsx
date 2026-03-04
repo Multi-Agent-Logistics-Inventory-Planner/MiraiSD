@@ -60,7 +60,7 @@ function LoadingSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="text-center py-6">
+    <div className="text-center">
       <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
       <p className="text-sm text-muted-foreground mb-3">
         No upcoming shipments
@@ -172,7 +172,7 @@ export function SupplyChainStatusCard({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2">
+        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 min-h-[140px] flex flex-col justify-center">
           {!nextShipment ? (
             <EmptyState />
           ) : (

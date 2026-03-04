@@ -24,12 +24,11 @@ class EventPayload(BaseModel):
     current_total_qty: int | None = None
     previous_total_qty: int | None = None
 
-    @field_validator("at")
+    @field_validator("at", mode="before")
     @classmethod
     def validate_at(cls, v):
-        """Ensure datetime is UTC-aware."""
+        """Parse datetime strings including PostgreSQL timestamptz format."""
         if isinstance(v, str):
-            # Parse ISO string
             v = pd.to_datetime(v, utc=True)
         if hasattr(v, "tzinfo") and v.tzinfo is None:
             v = v.replace(tzinfo=datetime.UTC)
@@ -46,6 +45,18 @@ class EventEnvelope(BaseModel):
     entity_type: str | None = None
     entity_id: str | None = None
     created_at: datetime | None = None
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def validate_created_at(cls, v):
+        """Parse datetime strings including PostgreSQL timestamptz format."""
+        if v is None:
+            return v
+        if isinstance(v, str):
+            v = pd.to_datetime(v, utc=True)
+        if hasattr(v, "tzinfo") and v.tzinfo is None:
+            v = v.replace(tzinfo=datetime.UTC)
+        return v
 
 
 class NormalizedEvent(BaseModel):

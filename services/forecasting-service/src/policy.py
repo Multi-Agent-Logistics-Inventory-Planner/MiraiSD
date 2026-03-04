@@ -107,25 +107,33 @@ def compute_safety_stock_vectorized(
     sigma_d_hat: pd.Series,
     L: Union[pd.Series, int, float],
     alpha: float,
+    sigma_L: Optional[Union[pd.Series, float]] = None,
 ) -> pd.Series:
     """Vectorized safety stock computation.
 
-    SS = z(alpha) * sigma_d * sqrt(L)
+    Without sigma_L: SS = z(alpha) * sigma_d * sqrt(L)
+    With sigma_L:    SS = z(alpha) * sqrt(L * sigma_d^2 + mu^2 * sigma_L^2)
 
     Args:
         mu_hat: Series of mean daily demand estimates.
         sigma_d_hat: Series of demand standard deviations.
         L: Lead time (scalar or Series).
         alpha: Service level (e.g., 0.95).
+        sigma_L: Lead time standard deviation (scalar or Series). None = demand-only.
 
     Returns:
         Series of safety stock values.
     """
     z = z_for_service_level(alpha)
-    L_arr = L if isinstance(L, pd.Series) else L
     sigma_d_safe = sigma_d_hat.clip(lower=0.0)
-    L_safe = np.maximum(L_arr, 0.0) if isinstance(L_arr, pd.Series) else max(L_arr, 0.0)
-    return z * sigma_d_safe * np.sqrt(L_safe)
+    L_safe = np.maximum(L, 0.0) if isinstance(L, pd.Series) else max(L, 0.0)
+
+    if sigma_L is None:
+        return z * sigma_d_safe * np.sqrt(L_safe)
+
+    # Full formula: SS = z * sqrt(L * sigma_d^2 + mu^2 * sigma_L^2)
+    sigma_L_safe = sigma_L.clip(lower=0.0) if isinstance(sigma_L, pd.Series) else max(float(sigma_L), 0.0)
+    return z * np.sqrt(L_safe * sigma_d_safe**2 + mu_hat**2 * sigma_L_safe**2)
 
 
 def reorder_point_vectorized(

@@ -7,7 +7,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -63,13 +63,13 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 10 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell>
+          <TableCell className="rounded-l-lg">
             <Skeleton className="h-6 w-10" />
           </TableCell>
           <TableCell>
             <Skeleton className="h-4 w-32" />
           </TableCell>
-          <TableCell className="text-right">
+          <TableCell className="text-right rounded-r-lg">
             <Skeleton className="h-4 w-8 ml-auto" />
           </TableCell>
         </TableRow>
@@ -101,13 +101,11 @@ function LeaderboardTable({
 
   return (
     <Table>
-      <TableHeader className="bg-muted">
-        <TableRow>
-          <TableHead className="w-20 rounded-tl-xl">Rank</TableHead>
-          <TableHead>Employee</TableHead>
-          <TableHead className="text-right rounded-tr-xl">Reviews</TableHead>
-        </TableRow>
-      </TableHeader>
+      <DataTableHeader>
+        <TableHead className="w-20 rounded-l-lg">Rank</TableHead>
+        <TableHead>Employee</TableHead>
+        <TableHead className="text-right rounded-r-lg">Reviews</TableHead>
+      </DataTableHeader>
       <TableBody>
         {isLoading ? (
           <TableSkeleton />
@@ -120,7 +118,7 @@ function LeaderboardTable({
                 className="cursor-pointer transition-colors hover:bg-muted/50"
                 onClick={() => onUserClick(summary.userId, summary.userName)}
               >
-                <TableCell>
+                <TableCell className="rounded-l-lg">
                   <div className="flex items-center gap-2">
                     {globalIndex === 0 && (
                       <>
@@ -154,7 +152,7 @@ function LeaderboardTable({
                 <TableCell className="font-medium">
                   {summary.userName}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right rounded-r-lg">
                   <span className="font-semibold">{summary.totalReviews}</span>
                 </TableCell>
               </TableRow>

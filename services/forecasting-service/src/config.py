@@ -21,6 +21,15 @@ SERVICE_LEVEL_DEFAULT = float(os.getenv("SERVICE_LEVEL_DEFAULT", "0.95"))
 LEAD_TIME_STD_DEFAULT_DAYS = float(os.getenv("LEAD_TIME_STD_DEFAULT_DAYS", "0.0"))
 EPSILON_MU = float(os.getenv("EPSILON_MU", "0.1"))
 
+# Dynamic lead time from shipment history
+LEAD_TIME_LOOKBACK_MONTHS = int(os.getenv("LEAD_TIME_LOOKBACK_MONTHS", "6"))
+LEAD_TIME_MIN_SHIPMENTS = int(os.getenv("LEAD_TIME_MIN_SHIPMENTS", "2"))
+LEAD_TIME_MAX_SHIPMENTS = int(os.getenv("LEAD_TIME_MAX_SHIPMENTS", "10"))
+
+# Rolling backtest accuracy
+BACKTEST_HORIZON_DAYS = int(os.getenv("BACKTEST_HORIZON_DAYS", "14"))
+MAPE_EPSILON = float(os.getenv("MAPE_EPSILON", "0.1"))
+
 # API settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "5000"))

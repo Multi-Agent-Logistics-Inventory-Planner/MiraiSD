@@ -98,13 +98,13 @@ export function TopReviewersCard() {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2">
+        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 min-h-[140px] flex flex-col justify-center">
           {error ? (
             <div className="text-center py-6 text-muted-foreground">
               <p className="text-sm">Failed to load reviewers</p>
             </div>
           ) : hasNoData ? (
-            <div className="text-center py-6 text-muted-foreground">
+            <div className="text-center text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No reviews this month</p>
             </div>

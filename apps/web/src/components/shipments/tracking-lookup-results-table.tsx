@@ -6,7 +6,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -34,19 +34,17 @@ export function TrackingLookupResultsTable({
 
   return (
     <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Tracking Number</TableHead>
-          <TableHead>Carrier</TableHead>
-          <TableHead>Order Status</TableHead>
-          <TableHead>Date Ordered</TableHead>
-          <TableHead>Expected Delivery</TableHead>
-        </TableRow>
-      </TableHeader>
+      <DataTableHeader>
+        <TableHead className="rounded-l-lg">Tracking Number</TableHead>
+        <TableHead>Carrier</TableHead>
+        <TableHead>Order Status</TableHead>
+        <TableHead>Date Ordered</TableHead>
+        <TableHead className="rounded-r-lg">Expected Delivery</TableHead>
+      </DataTableHeader>
       <TableBody>
         {trackings.map((tracking) => (
           <TableRow key={tracking.trackingNumber}>
-            <TableCell className="font-mono">
+            <TableCell className="font-mono rounded-l-lg">
               {tracking.trackingNumber}
             </TableCell>
             <TableCell className="capitalize">{tracking.carrier}</TableCell>
@@ -60,7 +58,7 @@ export function TrackingLookupResultsTable({
                 ? format(new Date(tracking.dateOrdered), "MMM d, yyyy")
                 : "—"}
             </TableCell>
-            <TableCell>
+            <TableCell className="rounded-r-lg">
               {tracking.expectedDelivery
                 ? format(new Date(tracking.expectedDelivery), "MMM d, yyyy")
                 : "—"}

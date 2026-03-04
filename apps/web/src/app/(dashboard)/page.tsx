@@ -151,14 +151,14 @@ export default function DashboardPage() {
       onReset={handleRetry}
     >
       <div className="flex flex-col min-h-screen">
-        <div className="flex-1 p-4 md:p-8 space-y-4">
+        <div className="flex-1 p-4 md:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="md:hidden" />
             <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {lastSyncedLabel && (
               <span className="text-xs text-muted-foreground hidden sm:block">
                 {lastSyncedLabel}
@@ -201,7 +201,7 @@ export default function DashboardPage() {
         />
 
         {/* Supply Chain Status + Top Reviewers */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
           <SupplyChainStatusCard
             nextShipment={supplyChainData.nextShipment}
             additionalShipmentCount={supplyChainData.additionalCount}
@@ -211,7 +211,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Risk Distribution + Filterable Stock List (related - clicking risk filters list) */}
-        <div className="grid lg:grid-cols-5 border bg-card/95 dark:bg-[#191919] rounded-2xl">
+        <div className="grid lg:grid-cols-5 border bg-card/95 dark:bg-[#2b2b29] rounded-2xl">
           <div className="lg:col-span-2">
             <RiskDistributionDonut
               data={metricsQuery.data?.riskDistribution ?? []}
@@ -232,7 +232,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Demand Velocity + Activity Feed */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <DemandVelocityCard
               items={metricsQuery.data?.demandVelocity ?? []}
