@@ -106,7 +106,7 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="py-0">
+        <Card className="p-2 border-none">
           <CardContent className="p-0">
             <ProductTable
               items={paginatedItems}
