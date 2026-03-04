@@ -2,10 +2,73 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _parse_datetime(value: str | datetime) -> datetime:
+    """Parse datetime from various formats including PostgreSQL timestamptz.
+
+    Handles:
+    - ISO 8601: '2026-03-02T23:17:20.516350+00:00'
+    - PostgreSQL: '2026-03-02 23:17:20.51635+00'
+    - With/without microseconds
+    - Various timezone offset formats (+00, +00:00, Z)
+    """
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    if not isinstance(value, str):
+        raise ValueError(f"Expected str or datetime, got {type(value)}")
+
+    # Normalize PostgreSQL format to ISO 8601
+    # Replace space with 'T' between date and time
+    normalized = re.sub(r"(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})", r"\1T\2", value)
+
+    # Normalize microseconds to exactly 6 digits (Python requires 3 or 6)
+    # PostgreSQL may produce 1-6 digits, other systems may send nanoseconds (7+)
+    normalized = re.sub(r"\.(\d+)([+-]|Z|$)", _normalize_microseconds, normalized)
+
+    # Normalize timezone: +00 -> +00:00, -05 -> -05:00
+    # Match timezone at end that doesn't have colon (e.g., +00, -0530)
+    normalized = re.sub(r"([+-])(\d{2})(\d{2})?$", _normalize_tz_offset, normalized)
+
+    # Handle 'Z' suffix
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+
+    try:
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError as e:
+        raise ValueError(f"Cannot parse datetime '{value}': {e}") from e
+
+
+def _normalize_microseconds(match: re.Match) -> str:
+    """Normalize microseconds to exactly 6 digits (truncate or pad)."""
+    microseconds = match.group(1)
+    suffix = match.group(2)
+    # Truncate if longer than 6, pad if shorter
+    if len(microseconds) > 6:
+        normalized = microseconds[:6]
+    else:
+        normalized = microseconds.ljust(6, "0")
+    return f".{normalized}{suffix}"
+
+
+def _normalize_tz_offset(match: re.Match) -> str:
+    """Normalize timezone offset to +HH:MM format."""
+    sign = match.group(1)
+    hours = match.group(2)
+    minutes = match.group(3) or "00"
+    return f"{sign}{hours}:{minutes}"
 
 
 class EventPayload(BaseModel):
@@ -15,6 +78,12 @@ class EventPayload(BaseModel):
     quantity_change: int = Field(..., description="Change in quantity (can be negative)")
     reason: str = Field(..., description="Reason for change (sale, restock, etc.)")
     at: datetime = Field(..., description="Timestamp of the event")
+
+    @field_validator("at", mode="before")
+    @classmethod
+    def validate_at(cls, v: str | datetime) -> datetime:
+        """Parse datetime from ISO 8601 or PostgreSQL timestamptz format."""
+        return _parse_datetime(v)
 
     # Location codes (e.g., "B1", "S2", "D1", "K1", "C1", "R3", etc.)
     to_location_code: str | None = Field(None, description="Target location code")
@@ -48,6 +117,12 @@ class EventEnvelope(BaseModel):
     entity_id: str = Field(..., description="Entity UUID")
     payload: EventPayload = Field(..., description="Event payload")
     created_at: datetime = Field(..., description="Event creation timestamp")
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def validate_created_at(cls, v: str | datetime) -> datetime:
+        """Parse datetime from ISO 8601 or PostgreSQL timestamptz format."""
+        return _parse_datetime(v)
 
 
 @dataclass
