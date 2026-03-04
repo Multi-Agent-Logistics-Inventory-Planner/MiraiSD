@@ -358,6 +358,7 @@ export interface ShipmentItem {
   item: InventoryItem;
   orderedQuantity: number;
   receivedQuantity: number;
+  damagedQuantity: number;
   unitCost?: number;
   destinationLocationType?: LocationType;
   destinationLocationId?: string;
@@ -417,6 +418,8 @@ export interface ShipmentItemReceipt {
   shipmentItemId: string;
   // New: multi-destination allocations
   allocations?: DestinationAllocation[];
+  // Damaged items (not added to inventory)
+  damagedQuantity?: number;
   // Legacy fields for backward compatibility
   receivedQuantity?: number;
   destinationLocationType?: LocationType;

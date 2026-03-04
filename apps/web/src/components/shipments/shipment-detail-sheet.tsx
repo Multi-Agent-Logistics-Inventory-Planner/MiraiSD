@@ -115,6 +115,9 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{item.orderedQuantity} ordered</p>
           <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
+          {(item.damagedQuantity ?? 0) > 0 && (
+            <p className="text-xs text-amber-600">{item.damagedQuantity} damaged</p>
+          )}
         </div>
         <div className="hidden sm:block text-right text-sm w-20 shrink-0">
           {item.unitCost ? (
