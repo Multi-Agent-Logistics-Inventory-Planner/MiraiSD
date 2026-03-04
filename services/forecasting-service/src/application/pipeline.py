@@ -13,6 +13,8 @@ from .. import config
 from .. import features as feat
 from .. import forecast as fc
 from .. import policy
+from ..backtest import compute_mape
+from ..lead_time import compute_lead_time_stats
 from ..adapters.supabase_repo import SupabaseRepo
 
 if TYPE_CHECKING:
@@ -67,6 +69,18 @@ class ForecastingPipeline:
 
         logger.debug("Loaded %d items", len(items_df))
 
+        # Step 1b: Load dynamic lead times from shipment history
+        shipment_lt_df = self._repo.get_shipment_lead_times(item_ids=item_list)
+        lead_time_stats_df = compute_lead_time_stats(
+            shipment_lt_df,
+            items_df[["item_id", "lead_time_days"]],
+        )
+        logger.debug(
+            "Computed lead time stats for %d items (%d from shipments)",
+            len(lead_time_stats_df),
+            int((lead_time_stats_df["source"] == "shipment_history").sum()),
+        )
+
         # Step 2: Load current inventory - prefer event-carried state
         if event_inventory:
             inventory_df = self._build_inventory_from_events(item_ids, event_inventory)
@@ -107,14 +121,39 @@ class ForecastingPipeline:
             logger.warning("No features built, skipping forecast")
             return 0
 
-        estimates_df = fc.estimate_mu_sigma(features_df, method="ma14")
+        estimates_df = fc.estimate_mu_sigma(features_df, method="dow_weighted")
         logger.debug("Estimated demand for %d items", len(estimates_df))
+
+        # Step 5b: Compute backtest MAPE
+        mape_df = pd.DataFrame(columns=["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"])
+        backtest_target = datetime.now(timezone.utc) - timedelta(days=config.BACKTEST_HORIZON_DAYS)
+        historical_fc_df = self._repo.get_historical_forecasts(
+            item_ids=item_list, target_date=backtest_target,
+        )
+        if not historical_fc_df.empty and not movements_df.empty:
+            # Build actual daily usage for the backtest window
+            backtest_start = backtest_target
+            backtest_end = datetime.now(timezone.utc)
+            backtest_movements = movements_df[
+                (movements_df["at"] >= backtest_start) & (movements_df["at"] <= backtest_end)
+            ]
+            if not backtest_movements.empty:
+                backtest_daily = feat.build_daily_usage(backtest_movements)
+                mape_df = compute_mape(
+                    historical_fc_df,
+                    backtest_daily,
+                    horizon_days=config.BACKTEST_HORIZON_DAYS,
+                    epsilon=config.MAPE_EPSILON,
+                )
+                logger.debug("Computed MAPE for %d items", len(mape_df))
 
         # Step 6: Merge all data and compute policy
         forecasts_df = self._compute_forecasts(
             items_df=items_df,
             inventory_df=inventory_df,
             estimates_df=estimates_df,
+            lead_time_stats_df=lead_time_stats_df,
+            mape_df=mape_df,
         )
 
         if forecasts_df.empty:
@@ -233,6 +272,8 @@ class ForecastingPipeline:
         items_df: pd.DataFrame,
         inventory_df: pd.DataFrame,
         estimates_df: pd.DataFrame,
+        lead_time_stats_df: pd.DataFrame | None = None,
+        mape_df: pd.DataFrame | None = None,
     ) -> pd.DataFrame:
         """Compute forecast predictions using vectorized operations.
 
@@ -257,6 +298,36 @@ class ForecastingPipeline:
         if merged.empty:
             return pd.DataFrame()
 
+        # Merge dynamic lead time stats if available
+        sigma_L_series = None
+        if lead_time_stats_df is not None and not lead_time_stats_df.empty:
+            merged = merged.merge(
+                lead_time_stats_df[["item_id", "avg_lead_time", "sigma_L", "shipment_count", "source"]].rename(
+                    columns={"source": "lead_time_source"}
+                ),
+                on="item_id",
+                how="left",
+            )
+            # Use dynamic lead time where available, fall back to static
+            if "lead_time_days" in merged.columns:
+                merged["lead_time_days"] = merged["avg_lead_time"].fillna(
+                    merged["lead_time_days"]
+                ).fillna(7)
+            else:
+                merged["lead_time_days"] = merged["avg_lead_time"].fillna(7)
+            merged["sigma_L"] = merged["sigma_L"].fillna(config.LEAD_TIME_STD_DEFAULT_DAYS)
+            sigma_L_series = merged["sigma_L"].astype(float)
+
+        # Merge MAPE if available
+        if mape_df is not None and not mape_df.empty:
+            merged = merged.merge(
+                mape_df[["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"]].rename(
+                    columns={"forecast_mu": "backtest_forecast_mu", "actual_mu": "backtest_actual_mu"}
+                ),
+                on="item_id",
+                how="left",
+            )
+
         # Extract columns as Series for vectorized operations
         mu_hat = merged["mu_hat"].astype(float)
         sigma_d_hat = merged["sigma_d_hat"].astype(float)
@@ -264,18 +335,19 @@ class ForecastingPipeline:
 
         # Handle lead_time_days column (may not exist)
         if "lead_time_days" in merged.columns:
-            lead_time = merged["lead_time_days"].fillna(7).astype(int)
+            lead_time = merged["lead_time_days"].fillna(7).astype(float)
         else:
-            lead_time = 7  # Scalar default
+            lead_time = 7.0  # Scalar default
 
         service_level = config.SERVICE_LEVEL_DEFAULT
 
-        # Vectorized policy computations
+        # Vectorized policy computations (with sigma_L if available)
         ss = policy.compute_safety_stock_vectorized(
             mu_hat=mu_hat,
             sigma_d_hat=sigma_d_hat,
             L=lead_time,
             alpha=service_level,
+            sigma_L=sigma_L_series,
         )
 
         rop = policy.reorder_point_vectorized(
@@ -298,8 +370,15 @@ class ForecastingPipeline:
             target_days=config.TARGET_DAYS,
         )
 
-        # Vectorized confidence computation
-        confidence = 1.0 - np.minimum(1.0, sigma_d_hat / np.maximum(mu_hat, 0.1))
+        # Confidence: blend variability score with MAPE when available
+        variability_score = 1.0 - np.minimum(1.0, sigma_d_hat / np.maximum(mu_hat, 0.1))
+        if "mape" in merged.columns:
+            has_mape = merged["mape"].notna()
+            mape_score = (1.0 - merged["mape"].fillna(0.0)).clip(lower=0.0)
+            confidence = pd.Series(variability_score, index=merged.index)
+            confidence[has_mape] = 0.4 * variability_score[has_mape] + 0.6 * mape_score[has_mape]
+        else:
+            confidence = variability_score
         confidence = np.round(confidence, 3)
 
         # Vectorized order date computation
@@ -310,24 +389,47 @@ class ForecastingPipeline:
         # Build the features dict for each row (must use iteration for dict creation)
         features_list = []
         for i in range(len(merged)):
-            lt = int(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else int(lead_time)
-            features_list.append(
-                {
-                    "mu_hat": round(float(mu_hat.iloc[i]), 4),
-                    "sigma_d_hat": round(float(sigma_d_hat.iloc[i]), 4),
-                    "safety_stock": round(float(ss.iloc[i]), 2),
-                    "reorder_point": round(float(rop.iloc[i]), 2),
-                    "current_qty": int(current_qty.iloc[i]),
-                    "lead_time_days": lt,
-                    "service_level": service_level,
-                }
-            )
+            lt = float(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else float(lead_time)
+            feat_dict = {
+                "mu_hat": round(float(mu_hat.iloc[i]), 4),
+                "sigma_d_hat": round(float(sigma_d_hat.iloc[i]), 4),
+                "safety_stock": round(float(ss.iloc[i]), 2),
+                "reorder_point": round(float(rop.iloc[i]), 2),
+                "current_qty": int(current_qty.iloc[i]),
+                "lead_time_days": round(lt, 1),
+                "service_level": service_level,
+            }
+
+            # Add dynamic lead time info
+            if "sigma_L" in merged.columns:
+                feat_dict["sigma_L"] = round(float(merged["sigma_L"].iloc[i]), 2)
+            if "lead_time_source" in merged.columns:
+                feat_dict["lead_time_source"] = str(merged["lead_time_source"].iloc[i])
+            if "shipment_count" in merged.columns:
+                feat_dict["shipment_count"] = int(merged["shipment_count"].iloc[i])
+
+            # Add MAPE info
+            if "mape" in merged.columns and pd.notna(merged["mape"].iloc[i]):
+                feat_dict["mape"] = round(float(merged["mape"].iloc[i]), 4)
+            if "backtest_forecast_mu" in merged.columns and pd.notna(merged["backtest_forecast_mu"].iloc[i]):
+                feat_dict["backtest_forecast_mu"] = round(float(merged["backtest_forecast_mu"].iloc[i]), 4)
+            if "backtest_actual_mu" in merged.columns and pd.notna(merged["backtest_actual_mu"].iloc[i]):
+                feat_dict["backtest_actual_mu"] = round(float(merged["backtest_actual_mu"].iloc[i]), 4)
+
+            # Add DOW multipliers
+            if "dow_multipliers" in merged.columns:
+                dm = merged["dow_multipliers"].iloc[i]
+                if isinstance(dm, dict):
+                    feat_dict["dow_multipliers"] = {str(k): v for k, v in dm.items()}
+                    feat_dict["dow_adjusted"] = True
+
+            features_list.append(feat_dict)
 
         # Compute order dates (vectorized where possible)
         order_dates = []
         for i in range(len(merged)):
             d_out = float(days_out.iloc[i])
-            lt = int(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else int(lead_time)
+            lt = float(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else float(lead_time)
 
             if d_out < float("inf") and d_out > lt:
                 order_date = (now + timedelta(days=int(d_out - lt))).date()

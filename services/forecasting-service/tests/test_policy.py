@@ -1,11 +1,13 @@
 import math
 
+import numpy as np
 import pandas as pd
 
 from src.policy import (
     z_for_service_level,
     sigma_lead_time,
     compute_safety_stock,
+    compute_safety_stock_vectorized,
     reorder_point,
     days_to_stockout,
     suggest_order,
@@ -66,5 +68,43 @@ def test_policy_edge_cases_with_prints():
         assert False, "Expected ValueError for invalid alpha"
     except ValueError:
         pass
+
+
+def test_vectorized_sigma_L_none_matches_current():
+    """sigma_L=None should match the existing demand-only behavior."""
+    mu = pd.Series([5.0, 3.0])
+    sigma_d = pd.Series([2.0, 1.0])
+    L = pd.Series([7.0, 14.0])
+
+    ss_without = compute_safety_stock_vectorized(mu, sigma_d, L, 0.95, sigma_L=None)
+    ss_zero = compute_safety_stock_vectorized(mu, sigma_d, L, 0.95, sigma_L=pd.Series([0.0, 0.0]))
+
+    # With sigma_L=0, full formula reduces to demand-only: z * sqrt(L * sigma_d^2 + 0) = z * sigma_d * sqrt(L)
+    np.testing.assert_array_almost_equal(ss_without.values, ss_zero.values, decimal=9)
+
+
+def test_vectorized_sigma_L_increases_safety_stock():
+    """sigma_L > 0 should produce higher safety stock than sigma_L=None."""
+    mu = pd.Series([5.0, 10.0])
+    sigma_d = pd.Series([2.0, 3.0])
+    L = pd.Series([7.0, 7.0])
+
+    ss_without = compute_safety_stock_vectorized(mu, sigma_d, L, 0.95, sigma_L=None)
+    ss_with = compute_safety_stock_vectorized(mu, sigma_d, L, 0.95, sigma_L=pd.Series([2.0, 3.0]))
+
+    for i in range(len(mu)):
+        assert ss_with.iloc[i] > ss_without.iloc[i], (
+            f"Item {i}: sigma_L > 0 should increase safety stock"
+        )
+
+
+def test_vectorized_sigma_L_scalar():
+    """sigma_L as scalar float should work."""
+    mu = pd.Series([5.0])
+    sigma_d = pd.Series([2.0])
+    L = 7.0
+
+    ss = compute_safety_stock_vectorized(mu, sigma_d, L, 0.95, sigma_L=1.5)
+    assert ss.iloc[0] > 0
 
 
