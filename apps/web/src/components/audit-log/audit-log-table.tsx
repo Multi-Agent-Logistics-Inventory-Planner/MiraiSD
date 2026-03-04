@@ -237,7 +237,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
               key={entry.id}
               className={cn(
                 "border-b transition-colors",
-                isExpanded ? "bg-muted/20" : "hover:bg-muted/10"
+                isExpanded ? "bg-muted/50" : "hover:bg-muted/10"
               )}
             >
               {/* ── Mobile row ── */}
