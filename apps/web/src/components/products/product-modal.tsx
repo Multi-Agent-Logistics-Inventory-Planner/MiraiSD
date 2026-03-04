@@ -22,7 +22,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ import {
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
 } from "@/types/api";
+import { Card, CardContent } from "../ui/card";
 
 interface ProductModalProps {
   open: boolean;
@@ -56,9 +57,8 @@ export function ProductModal({
   onTransferClick,
   onEditClick,
 }: ProductModalProps) {
-  const { data: inventoryData, isLoading: locationsLoading } = useProductInventoryEntries(
-    product?.product.id
-  );
+  const { data: inventoryData, isLoading: locationsLoading } =
+    useProductInventoryEntries(product?.product.id);
   const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } =
     useShipmentsByProduct(product?.product.id);
@@ -78,7 +78,7 @@ export function ProductModal({
           setDeleteDialogOpen(false);
           onOpenChange(false);
         },
-      }
+      },
     );
   };
 
@@ -98,7 +98,7 @@ export function ProductModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden !px-4 sm:!px-6">
+      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden px-4! sm:px-6! dark:bg-background">
         <DialogHeader className="text-left">
           <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-row items-center gap-2 sm:gap-3">
             <span className="break-words">{p.name}</span>
@@ -241,61 +241,65 @@ export function ProductModal({
               ({totalQuantity.toLocaleString()})
             </span>
           </h3>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Location</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {locationsLoading ? (
-                  <>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton className="h-4 w-12" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-10 ml-auto" />
+          <div className="rounded-lg">
+            <Card className="p-2 border-none">
+              <CardContent className="p-0">
+                <Table>
+                  <DataTableHeader>
+                    <TableHead className="rounded-l-lg">Location</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right rounded-r-lg">
+                      Qty
+                    </TableHead>
+                  </DataTableHeader>
+                  <TableBody>
+                    {locationsLoading ? (
+                      <>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-12" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-20" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-10 ml-auto" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    ) : !locations || locations.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="h-16 text-center text-muted-foreground"
+                        >
+                          <div className="flex flex-col items-center gap-1 py-6">
+                            <MapPin className="h-5 w-5 text-muted-foreground/50" />
+                            <span>No inventory at any location</span>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </>
-                ) : !locations || locations.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-16 text-center text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center gap-1 py-6">
-                        <MapPin className="h-5 w-5 text-muted-foreground/50" />
-                        <span>No inventory at any location</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  locations.map((entry) => (
-                    <TableRow key={entry.inventoryId}>
-                      <TableCell className="font-mono">
-                        {entry.locationCode}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {LOCATION_TYPE_LABELS[entry.locationType]}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {entry.quantity.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                    ) : (
+                      locations.map((entry) => (
+                        <TableRow key={entry.inventoryId}>
+                          <TableCell className="font-mono rounded-l-lg">
+                            {entry.locationCode}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {LOCATION_TYPE_LABELS[entry.locationType]}
+                          </TableCell>
+                          <TableCell className="text-right font-medium rounded-r-lg">
+                            {entry.quantity.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -304,78 +308,84 @@ export function ProductModal({
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Recent Orders
           </h3>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Order</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shipmentsLoading ? (
-                  <>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <Skeleton className="h-4 w-20" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-16" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-12 ml-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </>
-                ) : !shipments || shipments.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="h-16 text-center text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center gap-1 py-6">
-                        <Package className="h-5 w-5 text-muted-foreground/50" />
-                        <span>No orders found</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  shipments.map((shipment) => {
-                    const itemQty = shipment.items
-                      .filter((item) => item.item.id === p.id)
-                      .reduce((sum, item) => sum + item.orderedQuantity, 0);
-                    return (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-mono">
-                          {shipment.shipmentNumber}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={SHIPMENT_STATUS_VARIANTS[shipment.status]}
-                            className="text-xs"
-                          >
-                            {SHIPMENT_STATUS_LABELS[shipment.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(shipment.orderDate)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {itemQty.toLocaleString()}
+          <div className="rounded-lg">
+            <Card className="p-2 border-none">
+              <CardContent className="p-0">
+                <Table>
+                  <DataTableHeader>
+                    <TableHead className="rounded-l-lg">Order</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right rounded-r-lg">
+                      Qty
+                    </TableHead>
+                  </DataTableHeader>
+                  <TableBody>
+                    {shipmentsLoading ? (
+                      <>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-20" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-5 w-16" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-24" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-12 ml-auto" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    ) : !shipments || shipments.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="h-16 text-center text-muted-foreground"
+                        >
+                          <div className="flex flex-col items-center gap-1 py-6">
+                            <Package className="h-5 w-5 text-muted-foreground/50" />
+                            <span>No orders found</span>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                    ) : (
+                      shipments.map((shipment) => {
+                        const itemQty = shipment.items
+                          .filter((item) => item.item.id === p.id)
+                          .reduce((sum, item) => sum + item.orderedQuantity, 0);
+                        return (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-mono rounded-l-lg">
+                              {shipment.shipmentNumber}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  SHIPMENT_STATUS_VARIANTS[shipment.status]
+                                }
+                                className="text-xs"
+                              >
+                                {SHIPMENT_STATUS_LABELS[shipment.status]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(shipment.orderDate)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium rounded-r-lg">
+                              {itemQty.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </DialogContent>

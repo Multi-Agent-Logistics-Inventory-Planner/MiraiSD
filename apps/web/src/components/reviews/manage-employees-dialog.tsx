@@ -18,7 +18,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
@@ -296,18 +296,16 @@ export function ManageEmployeesDialog({
               <>
                 <div className="border rounded-lg">
                   <Table>
-                    <TableHeader className="bg-muted">
-                      <TableRow>
-                        <TableHead className="rounded-tl-lg">User</TableHead>
-                        <TableHead>Aliases</TableHead>
-                        <TableHead className="w-[100px] text-center">Tracked</TableHead>
-                        <TableHead className="w-[60px] rounded-tr-lg">Edit</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                    <DataTableHeader>
+                      <TableHead className="rounded-l-lg">User</TableHead>
+                      <TableHead>Aliases</TableHead>
+                      <TableHead className="w-[100px] text-center">Tracked</TableHead>
+                      <TableHead className="w-[60px] rounded-r-lg">Edit</TableHead>
+                    </DataTableHeader>
                     <TableBody>
                       {paginatedUsers.map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell>
+                          <TableCell className="rounded-l-lg">
                             <div className="flex flex-col">
                               <span className="font-medium">{user.fullName}</span>
                               <span className="text-xs text-muted-foreground">{user.canonicalName}</span>
@@ -348,7 +346,7 @@ export function ManageEmployeesDialog({
                               />
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="rounded-r-lg">
                             <Button
                               variant="ghost"
                               size="icon"

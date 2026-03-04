@@ -13,7 +13,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -128,19 +128,17 @@ export function NotificationsTable({
 
         {/* Desktop loading skeleton */}
         <Table className="hidden sm:table">
-          <TableHeader className="bg-muted">
-            <TableRow>
-              <TableHead className="w-[50px] rounded-tl-lg" />
-              <TableHead>Type</TableHead>
-              <TableHead className="w-full">Content</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="w-[100px] rounded-tr-lg" />
-            </TableRow>
-          </TableHeader>
+          <DataTableHeader>
+            <TableHead className="w-[50px] rounded-l-lg" />
+            <TableHead>Type</TableHead>
+            <TableHead className="w-full">Content</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="w-[100px] rounded-r-lg" />
+          </DataTableHeader>
           <TableBody>
             {Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={i}>
-                <TableCell>
+                <TableCell className="rounded-l-lg">
                   <Skeleton className="h-4 w-4" />
                 </TableCell>
                 <TableCell>
@@ -152,7 +150,7 @@ export function NotificationsTable({
                 <TableCell>
                   <Skeleton className="h-4 w-20" />
                 </TableCell>
-                <TableCell>
+                <TableCell className="rounded-r-lg">
                   <Skeleton className="h-8 w-16" />
                 </TableCell>
               </TableRow>
@@ -238,15 +236,13 @@ export function NotificationsTable({
 
       {/* Desktop table layout */}
       <Table className="hidden sm:table">
-        <TableHeader className="bg-muted">
-          <TableRow>
-            <TableHead className="w-[50px] rounded-tl-lg" />
-            <TableHead>Type</TableHead>
-            <TableHead className="w-full">Content</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead className="w-[100px] rounded-tr-lg" />
-          </TableRow>
-        </TableHeader>
+        <DataTableHeader>
+          <TableHead className="w-[50px] rounded-l-lg" />
+          <TableHead>Type</TableHead>
+          <TableHead className="w-full">Content</TableHead>
+          <TableHead>Date</TableHead>
+          <TableHead className="w-[100px] rounded-r-lg" />
+        </DataTableHeader>
         <TableBody>
           {notifications.map((notification) => (
             <TableRow
@@ -254,7 +250,7 @@ export function NotificationsTable({
               className="cursor-pointer hover:bg-muted/50"
               onClick={() => onRowClick(notification)}
             >
-              <TableCell>{getSeverityIcon(notification.severity)}</TableCell>
+              <TableCell className="rounded-l-lg">{getSeverityIcon(notification.severity)}</TableCell>
               <TableCell>
                 <Badge
                   variant="outline"
@@ -274,7 +270,7 @@ export function NotificationsTable({
               <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                 {formatTimestamp(notification.createdAt)}
               </TableCell>
-              <TableCell>
+              <TableCell className="rounded-r-lg">
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {isResolved ? (
                     <Button

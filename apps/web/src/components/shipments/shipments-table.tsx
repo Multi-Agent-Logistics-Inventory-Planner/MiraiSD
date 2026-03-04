@@ -6,7 +6,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -58,27 +58,25 @@ export function ShipmentsTable({
   if (isLoading) {
     return (
       <Table>
-        <TableHeader className="bg-muted">
-          <TableRow>
-            <TableHead className="rounded-tl-lg">Shipment #</TableHead>
-            <TableHead>Supplier</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Items</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Order Date</TableHead>
-            <TableHead className="rounded-tr-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
-          </TableRow>
-        </TableHeader>
+        <DataTableHeader>
+          <TableHead className="rounded-l-lg">Shipment #</TableHead>
+          <TableHead>Supplier</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Items</TableHead>
+          <TableHead>Progress</TableHead>
+          <TableHead>Order Date</TableHead>
+          <TableHead className="rounded-r-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
+        </DataTableHeader>
         <TableBody>
           {Array.from({ length: 5 }).map((_, i) => (
             <TableRow key={i}>
-              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+              <TableCell className="rounded-l-lg"><Skeleton className="h-4 w-20" /></TableCell>
               <TableCell><Skeleton className="h-4 w-32" /></TableCell>
               <TableCell><Skeleton className="h-5 w-16" /></TableCell>
               <TableCell><Skeleton className="h-4 w-8" /></TableCell>
               <TableCell><Skeleton className="h-4 w-16" /></TableCell>
               <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+              <TableCell className="rounded-r-lg"><Skeleton className="h-4 w-24" /></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -97,17 +95,15 @@ export function ShipmentsTable({
 
   return (
     <Table>
-      <TableHeader className="bg-muted">
-        <TableRow>
-          <TableHead className="rounded-tl-lg">Shipment #</TableHead>
-          <TableHead>Supplier</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Items</TableHead>
-          <TableHead>Progress</TableHead>
-          <TableHead>Order Date</TableHead>
-          <TableHead className="rounded-tr-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
-        </TableRow>
-      </TableHeader>
+      <DataTableHeader>
+        <TableHead className="rounded-l-lg">Shipment #</TableHead>
+        <TableHead>Supplier</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead>Items</TableHead>
+        <TableHead>Progress</TableHead>
+        <TableHead>Order Date</TableHead>
+        <TableHead className="rounded-r-lg">{showActualDeliveryDate ? "Delivery Date" : "Est. Delivery"}</TableHead>
+      </DataTableHeader>
       <TableBody>
         {shipments.map((shipment) => {
           const progress = getReceiveProgress(shipment);
@@ -119,7 +115,7 @@ export function ShipmentsTable({
               className="cursor-pointer hover:bg-muted/50"
               onClick={() => onRowClick(shipment)}
             >
-              <TableCell className="font-mono text-sm">
+              <TableCell className="font-mono text-sm rounded-l-lg">
                 {shipment.shipmentNumber}
               </TableCell>
               <TableCell>{shipment.supplierName || "-"}</TableCell>
@@ -148,7 +144,7 @@ export function ShipmentsTable({
                 </div>
               </TableCell>
               <TableCell>{formatDate(shipment.orderDate)}</TableCell>
-              <TableCell>
+              <TableCell className="rounded-r-lg">
                 {formatDate(showActualDeliveryDate ? shipment.actualDeliveryDate : shipment.expectedDeliveryDate)}
               </TableCell>
             </TableRow>

@@ -20,7 +20,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table"
 import {
@@ -301,52 +301,50 @@ export function PredictionsTable({
           <div className="space-y-4">
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead aria-sort={getAriaSort("itemSku", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("itemSku")}>
-                        SKU
-                        <SortIcon field="itemSku" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("itemName", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("itemName")}>
-                        Item Name
-                        <SortIcon field="itemName" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("currentStock", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("currentStock")}>
-                        Stock
-                        <SortIcon field="currentStock" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("avgDailyDelta", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("avgDailyDelta")}>
-                        Daily Demand
-                        <SortIcon field="avgDailyDelta" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("daysToStockout", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("daysToStockout")}>
-                        Days to Stockout
-                        <SortIcon field="daysToStockout" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("suggestedReorderQty", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("suggestedReorderQty")}>
-                        Reorder Qty
-                        <SortIcon field="suggestedReorderQty" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                    <TableHead aria-sort={getAriaSort("suggestedOrderDate", sortField, sortDirection)}>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("suggestedOrderDate")}>
-                        Order By
-                        <SortIcon field="suggestedOrderDate" currentSortField={sortField} sortDirection={sortDirection} />
-                      </Button>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
+                <DataTableHeader>
+                  <TableHead className="rounded-l-lg" aria-sort={getAriaSort("itemSku", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("itemSku")}>
+                      SKU
+                      <SortIcon field="itemSku" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead aria-sort={getAriaSort("itemName", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("itemName")}>
+                      Item Name
+                      <SortIcon field="itemName" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead aria-sort={getAriaSort("currentStock", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("currentStock")}>
+                      Stock
+                      <SortIcon field="currentStock" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead aria-sort={getAriaSort("avgDailyDelta", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("avgDailyDelta")}>
+                      Daily Demand
+                      <SortIcon field="avgDailyDelta" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead aria-sort={getAriaSort("daysToStockout", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("daysToStockout")}>
+                      Days to Stockout
+                      <SortIcon field="daysToStockout" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead aria-sort={getAriaSort("suggestedReorderQty", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("suggestedReorderQty")}>
+                      Reorder Qty
+                      <SortIcon field="suggestedReorderQty" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="rounded-r-lg" aria-sort={getAriaSort("suggestedOrderDate", sortField, sortDirection)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("suggestedOrderDate")}>
+                      Order By
+                      <SortIcon field="suggestedOrderDate" currentSortField={sortField} sortDirection={sortDirection} />
+                    </Button>
+                  </TableHead>
+                </DataTableHeader>
                 <TableBody>
                   {pagedData.length === 0 ? (
                     <TableRow>
@@ -359,7 +357,7 @@ export function PredictionsTable({
                   ) : (
                     pagedData.map((prediction) => (
                       <TableRow key={prediction.id}>
-                        <TableCell className="font-mono text-sm">
+                        <TableCell className="font-mono text-sm rounded-l-lg">
                           {prediction.itemSku}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate font-medium">
@@ -378,7 +376,7 @@ export function PredictionsTable({
                           </Badge>
                         </TableCell>
                         <TableCell>{prediction.suggestedReorderQty} units</TableCell>
-                        <TableCell>
+                        <TableCell className="rounded-r-lg">
                           {prediction.suggestedOrderDate
                             ? format(new Date(prediction.suggestedOrderDate), "MMM d, yyyy")
                             : "-"}

@@ -8,7 +8,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+  DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -73,22 +73,20 @@ export function MovementHistoryTable({
   return (
     <div className="space-y-4">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Timestamp</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead className="text-right">Change</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead>From {"->"} To</TableHead>
-            <TableHead>Actor</TableHead>
-            <TableHead>Notes</TableHead>
-          </TableRow>
-        </TableHeader>
+        <DataTableHeader>
+          <TableHead className="rounded-l-lg">Timestamp</TableHead>
+          <TableHead>Product</TableHead>
+          <TableHead className="text-right">Change</TableHead>
+          <TableHead>Reason</TableHead>
+          <TableHead>From {"->"} To</TableHead>
+          <TableHead>Actor</TableHead>
+          <TableHead className="rounded-r-lg">Notes</TableHead>
+        </DataTableHeader>
         <TableBody>
           {isLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <TableRow key={i}>
-                <TableCell>
+                <TableCell className="rounded-l-lg">
                   <Skeleton className="h-4 w-28" />
                 </TableCell>
                 <TableCell>
@@ -106,7 +104,7 @@ export function MovementHistoryTable({
                 <TableCell>
                   <Skeleton className="h-4 w-20" />
                 </TableCell>
-                <TableCell>
+                <TableCell className="rounded-r-lg">
                   <Skeleton className="h-4 w-32" />
                 </TableCell>
               </TableRow>
@@ -147,7 +145,7 @@ export function MovementHistoryTable({
 
               return (
                 <TableRow key={movement.id}>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground rounded-l-lg">
                     {formatDate(movement.at)}
                   </TableCell>
                   <TableCell>
@@ -174,7 +172,7 @@ export function MovementHistoryTable({
                   <TableCell className="font-mono text-xs">
                     {formatId(movement.actorId)}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-xs text-muted-foreground rounded-r-lg">
                     {movement.metadata?.notes ?? "—"}
                   </TableCell>
                 </TableRow>
