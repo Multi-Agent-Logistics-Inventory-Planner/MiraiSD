@@ -1,4 +1,7 @@
 export { ShipmentsTable } from "./shipments-table";
+export { ShipmentsList } from "./shipments-list";
+export { ShipmentCard } from "./shipment-card";
+export { ShipmentProgress } from "./shipment-progress";
 export { ShipmentDetailSheet } from "./shipment-detail-sheet";
 export { ShipmentCreateDialog } from "./shipment-create-dialog";
 export { ShipmentReceiveDialog } from "./shipment-receive-dialog";

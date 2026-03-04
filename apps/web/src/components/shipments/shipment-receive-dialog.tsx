@@ -266,12 +266,9 @@ export function ShipmentReceiveDialog({
   async function handleSubmit() {
     if (!shipment) return;
 
-    if (!user?.personId) {
-      toast({
-        title: "Error",
-        description: "Your user account is not linked to a person record. Please contact an administrator.",
-        variant: "destructive",
-      });
+    const actorId = user?.personId || user?.id;
+    if (!actorId) {
+      toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
 
@@ -310,7 +307,7 @@ export function ShipmentReceiveDialog({
         id: shipment.id,
         payload: {
           actualDeliveryDate: deliveryDate,
-          receivedBy: user.personId,
+          receivedBy: actorId,
           itemReceipts,
         },
       });
