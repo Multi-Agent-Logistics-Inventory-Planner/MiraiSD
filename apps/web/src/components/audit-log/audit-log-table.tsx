@@ -181,7 +181,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
         <div>Action</div>
         <div>Product</div>
         <div>Location</div>
-        <div>When</div>
+        <div>Time</div>
       </div>
 
       {/* Rows */}
