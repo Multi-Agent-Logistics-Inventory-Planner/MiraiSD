@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, PackageCheck, Truck, CheckCircle2 } from "lucide-react";
+import { Package, PackageCheck, Truck, CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShipmentStatus } from "@/types/api";
 
@@ -17,13 +17,20 @@ interface StageConfig {
   label: string;
 }
 
+// Stages aligned with shipping API flow
 const STAGES: StageConfig[] = [
   { icon: Package, label: "Order Placed" },
-  { icon: PackageCheck, label: "Processing" },
-  { icon: Truck, label: "Shipping" },
-  { icon: CheckCircle2, label: "Delivered" },
+  { icon: PackageCheck, label: "Packaging" },
+  { icon: Truck, label: "On the Way" },
+  { icon: CircleCheck, label: "Delivered" },
 ];
 
+/**
+ * Maps shipment status to progress stages:
+ * - PENDING (no items received): Order placed (complete) → Packaging (active)
+ * - PENDING (partial received) or IN_TRANSIT: On the Way (active)
+ * - DELIVERED or fully received: All stages complete
+ */
 function getStageStates(
   status: ShipmentStatus,
   receivedQuantity: number,
@@ -32,22 +39,23 @@ function getStageStates(
   const hasPartialReceived = receivedQuantity > 0 && receivedQuantity < orderedQuantity;
   const isFullyReceived = receivedQuantity >= orderedQuantity && orderedQuantity > 0;
 
+  // Stage 4: Delivered - all complete
   if (status === "DELIVERED" || isFullyReceived) {
     return ["completed", "completed", "completed", "completed"];
   }
 
-  if (status === "IN_TRANSIT") {
+  // Stage 3: In Transit OR partial received - on the way is active
+  // Partial receipt is used as a proxy for "on the way" when no tracking
+  if (status === "IN_TRANSIT" || hasPartialReceived) {
     return ["completed", "completed", "active", "pending"];
   }
 
+  // Stage 2: Pending with no items received - packaging is active
   if (status === "PENDING") {
-    if (hasPartialReceived) {
-      return ["completed", "active", "pending", "pending"];
-    }
     return ["completed", "active", "pending", "pending"];
   }
 
-  // CANCELLED or unknown
+  // CANCELLED or unknown - only order placed is complete
   return ["completed", "pending", "pending", "pending"];
 }
 

@@ -34,6 +34,12 @@ function formatCurrency(value?: number) {
 function getStatusText(shipment: Shipment): { text: string; date: string } {
   const displayStatus = getShipmentDisplayStatus(shipment);
 
+  // Calculate if partial received (used as proxy for "on the way" without tracking)
+  const totalReceived = shipment.items.reduce((sum, item) => sum + item.receivedQuantity, 0);
+  const totalOrdered = shipment.items.reduce((sum, item) => sum + item.orderedQuantity, 0);
+  const hasPartialReceived = totalReceived > 0 && totalReceived < totalOrdered;
+
+  // Delivered
   if (displayStatus === "COMPLETED") {
     return {
       text: "Delivered",
@@ -41,20 +47,23 @@ function getStatusText(shipment: Shipment): { text: string; date: string } {
     };
   }
 
-  if (shipment.status === "IN_TRANSIT") {
+  // On the way - either IN_TRANSIT status or partial items received
+  if (shipment.status === "IN_TRANSIT" || hasPartialReceived) {
     return {
-      text: "Order is on shipping",
+      text: "Order on the way",
       date: formatDate(shipment.expectedDeliveryDate || shipment.orderDate),
     };
   }
 
-  if (displayStatus === "PARTIAL") {
+  // Being packaged (PENDING status, no items received yet)
+  if (shipment.status === "PENDING") {
     return {
-      text: "Product in packaging",
+      text: "Order being packaged",
       date: formatDate(shipment.orderDate),
     };
   }
 
+  // Default: Order placed
   return {
     text: "Order placed",
     date: formatDate(shipment.orderDate),
