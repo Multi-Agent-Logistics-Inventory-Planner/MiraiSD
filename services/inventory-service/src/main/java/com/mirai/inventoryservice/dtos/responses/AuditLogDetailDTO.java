@@ -41,6 +41,7 @@ public class AuditLogDetailDTO {
         private UUID itemId;
         private String itemSku;
         private String itemName;
+        private String itemImageUrl;
         private String fromLocationCode;
         private String toLocationCode;
         private Integer previousQuantity;

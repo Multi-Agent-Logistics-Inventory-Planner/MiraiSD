@@ -84,11 +84,13 @@ public class AuditLogDTOMapper {
 
     private AuditLogDetailDTO.MovementDetailDTO toMovementDetailDTO(
             StockMovement movement, Map<UUID, String> locationCodeCache) {
+        // item is already JOIN FETCHed — accessing imageUrl costs zero extra queries
         return AuditLogDetailDTO.MovementDetailDTO.builder()
                 .id(movement.getId())
                 .itemId(movement.getItem().getId())
                 .itemSku(movement.getItem().getSku())
                 .itemName(movement.getItem().getName())
+                .itemImageUrl(movement.getItem().getImageUrl())
                 .fromLocationCode(movement.getFromLocationId() != null
                         ? locationCodeCache.get(movement.getFromLocationId()) : null)
                 .toLocationCode(movement.getToLocationId() != null

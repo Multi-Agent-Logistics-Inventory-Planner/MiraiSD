@@ -501,6 +501,7 @@ export interface AuditLogMovement {
   itemId: string;
   itemSku: string;
   itemName: string;
+  itemImageUrl?: string;
   fromLocationCode?: string;
   toLocationCode?: string;
   previousQuantity?: number;

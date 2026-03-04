@@ -123,9 +123,24 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
             key={movement.id}
             className="grid grid-cols-[1fr_auto_auto] gap-x-4 md:gap-x-8 px-3 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
-            <div>
-              <p className="text-sm font-medium leading-tight">{movement.itemName}</p>
-              <p className="text-xs text-muted-foreground">{movement.itemSku}</p>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {movement.itemImageUrl ? (
+                <img
+                  src={movement.itemImageUrl}
+                  alt={movement.itemName}
+                  className="h-8 w-8 rounded-md object-cover shrink-0 border border-border/50"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-md bg-muted shrink-0 flex items-center justify-center border border-border/50">
+                  <span className="text-[10px] font-medium text-muted-foreground select-none">
+                    {movement.itemName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-tight truncate">{movement.itemName}</p>
+                <p className="text-xs text-muted-foreground">{movement.itemSku}</p>
+              </div>
             </div>
             <span className="text-sm text-muted-foreground w-14 md:w-28 text-right self-center tabular-nums">
               {movementLocationLabel(
