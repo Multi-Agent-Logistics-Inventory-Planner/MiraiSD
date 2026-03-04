@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -17,6 +18,7 @@ import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.storage.BoxBin;
+import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
@@ -62,8 +64,21 @@ import java.util.UUID;
 @Validated
 public class DevSeedController {
 
+    // Seed data configuration constants
+    private static final int SEED_DATA_DAYS_RANGE = 60;
+    private static final int BUSINESS_HOURS_START = 8;
+    private static final int BUSINESS_HOURS_DURATION = 12;
+    private static final int MAX_ITEMS_PER_ACTION = 5;
+    private static final int MAX_QUANTITY_PER_ITEM = 10;
+    private static final int BASE_STOCK_QUANTITY = 10;
+    private static final int STOCK_QUANTITY_RANGE = 20;
+    private static final int PRODUCT_SUMMARY_DISPLAY_LIMIT = 3;
+    private static final int NOTES_INTERVAL = 5;
+    private static final String DEV_SEED_AUDIT_SOURCE = "dev_seed_audit";
+
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final AuditLogRepository auditLogRepository;
     private final BoxBinRepository boxBinRepository;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final ShipmentRepository shipmentRepository;
@@ -802,6 +817,218 @@ public class DevSeedController {
             "reviewsDeleted", seedReviews.size(),
             "dailyCountsDeleted", dailyCountsDeleted,
             "usersReset", seedUsers.size()
+        ));
+    }
+
+    /**
+     * Seed audit logs with associated stock movements for the audit log page.
+     * Creates realistic grouped operations spanning the last 60 days.
+     */
+    @PostMapping("/seed/audit-logs")
+    public ResponseEntity<Map<String, Object>> seedAuditLogs(
+            @RequestParam(defaultValue = "50") @Min(10) @Max(200) int count) {
+
+        List<Product> products = productRepository.findAll();
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        List<BoxBin> boxBins = boxBinRepository.findAll();
+        if (boxBins.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No box bins found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        // Actor names for realistic data
+        String[] actorNames = {
+            "John Smith", "Sarah Johnson", "Mike Chen", "Emily Davis",
+            "David Wilson", "Jessica Brown", "Chris Lee", "Amanda Garcia"
+        };
+
+        // Reason distribution weights
+        StockMovementReason[] reasons = {
+            StockMovementReason.TRANSFER, StockMovementReason.TRANSFER,
+            StockMovementReason.RESTOCK, StockMovementReason.RESTOCK,
+            StockMovementReason.ADJUSTMENT,
+            StockMovementReason.SALE, StockMovementReason.SALE, StockMovementReason.SALE,
+            StockMovementReason.DAMAGE,
+            StockMovementReason.RETURN
+        };
+
+        List<AuditLog> auditLogs = new ArrayList<>();
+        List<StockMovement> allMovements = new ArrayList<>();
+        Map<String, Integer> reasonCounts = new HashMap<>();
+
+        for (int i = 0; i < count; i++) {
+            // Random timestamp within configured days range during business hours
+            int daysAgo = random.nextInt(SEED_DATA_DAYS_RANGE);
+            int hoursOffset = random.nextInt(BUSINESS_HOURS_DURATION) + BUSINESS_HOURS_START;
+            OffsetDateTime timestamp = OffsetDateTime.now(ZoneOffset.UTC)
+                .minusDays(daysAgo)
+                .withHour(hoursOffset)
+                .withMinute(random.nextInt(60));
+
+            // Select reason and actor
+            StockMovementReason reason = reasons[random.nextInt(reasons.length)];
+            String actorName = actorNames[random.nextInt(actorNames.length)];
+            UUID actorId = UUID.nameUUIDFromBytes(actorName.getBytes());
+
+            // Determine number of items in this action
+            int itemCount = 1 + random.nextInt(MAX_ITEMS_PER_ACTION);
+            int totalQuantity = 0;
+
+            // Select random products for this action
+            List<Product> selectedProducts = new ArrayList<>();
+            for (int j = 0; j < itemCount && j < products.size(); j++) {
+                Product product = products.get(random.nextInt(products.size()));
+                if (!selectedProducts.contains(product)) {
+                    selectedProducts.add(product);
+                }
+            }
+            itemCount = selectedProducts.size();
+
+            // Build product summary
+            StringBuilder summary = new StringBuilder();
+            for (int j = 0; j < Math.min(PRODUCT_SUMMARY_DISPLAY_LIMIT, selectedProducts.size()); j++) {
+                if (j > 0) summary.append(", ");
+                summary.append(selectedProducts.get(j).getName());
+            }
+            if (selectedProducts.size() > PRODUCT_SUMMARY_DISPLAY_LIMIT) {
+                summary.append(" +").append(selectedProducts.size() - PRODUCT_SUMMARY_DISPLAY_LIMIT).append(" more");
+            }
+
+            // Select locations based on reason
+            BoxBin fromBin = boxBins.get(random.nextInt(boxBins.size()));
+            BoxBin toBin = boxBins.get(random.nextInt(boxBins.size()));
+            while (toBin.equals(fromBin) && boxBins.size() > 1) {
+                toBin = boxBins.get(random.nextInt(boxBins.size()));
+            }
+
+            UUID fromLocationId = null;
+            UUID toLocationId = null;
+            String fromLocationCode = null;
+            String toLocationCode = null;
+
+            switch (reason) {
+                case TRANSFER -> {
+                    fromLocationId = fromBin.getId();
+                    toLocationId = toBin.getId();
+                    fromLocationCode = fromBin.getBoxBinCode();
+                    toLocationCode = toBin.getBoxBinCode();
+                }
+                case RESTOCK, INITIAL_STOCK -> {
+                    toLocationId = toBin.getId();
+                    toLocationCode = toBin.getBoxBinCode();
+                }
+                case SALE, DAMAGE, REMOVED -> {
+                    fromLocationId = fromBin.getId();
+                    fromLocationCode = fromBin.getBoxBinCode();
+                }
+                case ADJUSTMENT, RETURN -> {
+                    toLocationId = toBin.getId();
+                    toLocationCode = toBin.getBoxBinCode();
+                }
+            }
+
+            // Create the audit log entry
+            AuditLog auditLog = AuditLog.builder()
+                .actorId(actorId)
+                .actorName(actorName)
+                .reason(reason)
+                .primaryFromLocationId(fromLocationId)
+                .primaryToLocationId(toLocationId)
+                .primaryFromLocationCode(fromLocationCode)
+                .primaryToLocationCode(toLocationCode)
+                .itemCount(itemCount)
+                .productSummary(summary.toString())
+                .notes(i % NOTES_INTERVAL == 0 ? "Seed generated audit log entry" : null)
+                .createdAt(timestamp)
+                .build();
+
+            // Create stock movements for each product
+            List<StockMovement> movements = new ArrayList<>();
+            for (Product product : selectedProducts) {
+                int qty = 1 + random.nextInt(MAX_QUANTITY_PER_ITEM);
+                totalQuantity += qty;
+
+                int quantityChange = switch (reason) {
+                    case SALE, DAMAGE, REMOVED -> -qty;
+                    case RESTOCK, RETURN, INITIAL_STOCK -> qty;
+                    case TRANSFER, ADJUSTMENT -> random.nextBoolean() ? qty : -qty;
+                };
+
+                int previousQty = BASE_STOCK_QUANTITY + random.nextInt(STOCK_QUANTITY_RANGE);
+                StockMovement movement = StockMovement.builder()
+                    .auditLog(auditLog)
+                    .locationType(LocationType.BOX_BIN)
+                    .item(product)
+                    .fromLocationId(fromLocationId)
+                    .toLocationId(toLocationId)
+                    .quantityChange(quantityChange)
+                    .previousQuantity(previousQty)
+                    .currentQuantity(Math.max(0, previousQty + quantityChange))
+                    .reason(reason)
+                    .actorId(actorId)
+                    .at(timestamp)
+                    .metadata(Map.of("source", DEV_SEED_AUDIT_SOURCE))
+                    .build();
+
+                movements.add(movement);
+            }
+
+            auditLog.setTotalQuantityMoved(totalQuantity);
+            auditLog.setMovements(movements);
+
+            auditLogs.add(auditLog);
+            allMovements.addAll(movements);
+            reasonCounts.merge(reason.name(), 1, Integer::sum);
+        }
+
+        // Save audit logs first (cascading doesn't work here due to bidirectional)
+        auditLogRepository.saveAll(auditLogs);
+        stockMovementRepository.saveAll(allMovements);
+
+        log.info("Seeded {} audit logs with {} stock movements", auditLogs.size(), allMovements.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "auditLogsCreated", auditLogs.size(),
+            "stockMovementsCreated", allMovements.size(),
+            "reasonDistribution", reasonCounts
+        ));
+    }
+
+    @DeleteMapping("/seed/audit-logs")
+    public ResponseEntity<Map<String, Object>> clearSeedAuditLogs() {
+        // Find all stock movements with dev_seed_audit source using database-level filtering
+        List<StockMovement> seedMovements = stockMovementRepository.findByMetadataSource(DEV_SEED_AUDIT_SOURCE);
+
+        // Collect unique audit log IDs
+        List<UUID> auditLogIds = seedMovements.stream()
+            .filter(m -> m.getAuditLog() != null)
+            .map(m -> m.getAuditLog().getId())
+            .distinct()
+            .toList();
+
+        // Delete stock movements first (due to FK constraint)
+        stockMovementRepository.deleteAll(seedMovements);
+
+        // Delete associated audit logs
+        int auditLogsDeleted = 0;
+        for (UUID auditLogId : auditLogIds) {
+            auditLogRepository.deleteById(auditLogId);
+            auditLogsDeleted++;
+        }
+
+        log.info("Cleared {} seeded stock movements and {} audit logs", seedMovements.size(), auditLogsDeleted);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "stockMovementsDeleted", seedMovements.size(),
+            "auditLogsDeleted", auditLogsDeleted
         ));
     }
 }

@@ -54,5 +54,9 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // Find all movements for a specific audit log
     @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId ORDER BY sm.id")
     List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId);
+
+    // Find stock movements by metadata source (used for dev seed cleanup)
+    @Query(value = "SELECT * FROM stock_movements WHERE metadata->>'source' = :source", nativeQuery = true)
+    List<StockMovement> findByMetadataSource(@Param("source") String source);
 }
 
