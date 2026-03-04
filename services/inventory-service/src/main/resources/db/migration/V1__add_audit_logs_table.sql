@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     primary_to_location_code VARCHAR(50),
     item_count INTEGER NOT NULL DEFAULT 1,
     total_quantity_moved INTEGER NOT NULL DEFAULT 0,
+    product_summary VARCHAR(512),
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -134,12 +134,13 @@ public class StockMovementService {
         AuditLog auditLog = createAuditLog(
                 request.getActorId(),
                 request.getReason(),
-                null, // fromLocationId (not applicable for adjustments)
-                null, // fromLocationCode
+                null,
+                null,
                 locationId,
                 locationCode,
-                1, // Single item
+                1,
                 Math.abs(request.getQuantityChange()),
+                getInventoryProduct(inventory).getName(),
                 request.getNotes()
         );
 
@@ -198,6 +199,7 @@ public class StockMovementService {
                 destLocationCode,
                 1,
                 request.getQuantity(),
+                getInventoryProduct(sourceInventory).getName(),
                 request.getNotes()
         );
 
@@ -223,6 +225,10 @@ public class StockMovementService {
 
         int totalQuantity = transfers.stream().mapToInt(TransferInventoryRequestDTO::getQuantity).sum();
 
+        String productSummary = transfers.size() == 1
+                ? getInventoryProduct(firstSource).getName()
+                : transfers.size() + " products";
+
         AuditLog auditLog = createAuditLog(
                 first.getActorId(),
                 StockMovementReason.TRANSFER,
@@ -232,6 +238,7 @@ public class StockMovementService {
                 destLocationCode,
                 transfers.size(),
                 totalQuantity,
+                productSummary,
                 first.getNotes()
         );
 
@@ -389,6 +396,7 @@ public class StockMovementService {
                 locationCode,
                 1,
                 quantity,
+                product.getName(),
                 notes
         );
 
@@ -454,6 +462,7 @@ public class StockMovementService {
                 null,
                 1,
                 currentQuantity,
+                product.getName(),
                 notes
         );
 
@@ -763,7 +772,8 @@ public class StockMovementService {
 
     /**
      * Create an audit log entry for a stock movement action.
-     * This groups related stock movements together for UI display.
+     * productSummary is denormalized at write-time so the list view never needs to
+     * lazy-load movements just to display the product name.
      */
     private AuditLog createAuditLog(
             UUID actorId,
@@ -774,6 +784,7 @@ public class StockMovementService {
             String toLocationCode,
             int itemCount,
             int totalQuantityMoved,
+            String productSummary,
             String notes
     ) {
         String actorName = null;
@@ -793,6 +804,7 @@ public class StockMovementService {
                 .primaryToLocationCode(toLocationCode)
                 .itemCount(itemCount)
                 .totalQuantityMoved(totalQuantityMoved)
+                .productSummary(productSummary)
                 .notes(notes)
                 .build();
 

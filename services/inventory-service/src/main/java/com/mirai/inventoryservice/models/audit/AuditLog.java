@@ -58,6 +58,10 @@ public class AuditLog {
     @Builder.Default
     private Integer totalQuantityMoved = 0;
 
+    // Denormalized at write-time so the list view never needs to lazy-load movements
+    @Column(name = "product_summary", length = 512)
+    private String productSummary;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

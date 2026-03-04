@@ -36,37 +36,37 @@ public class AuditLogSpecifications {
                 predicate = cb.and(predicate, cb.lessThan(root.get("createdAt"), toDateTime));
             }
 
-            // Filter by product (requires join to stock_movements)
-            if (filters.getProductId() != null) {
-                // Ensure distinct results when joining
+            // Filters that require a JOIN to stock_movements are handled with a single
+            // shared join to avoid cartesian products when multiple such filters are active.
+            boolean needsMovementsJoin = filters.getProductId() != null
+                    || filters.getLocationId() != null
+                    || (filters.getSearch() != null && !filters.getSearch().isBlank());
+
+            if (needsMovementsJoin) {
                 query.distinct(true);
-                Join<AuditLog, StockMovement> movementsJoin = root.join("movements", JoinType.INNER);
-                predicate = cb.and(predicate, cb.equal(movementsJoin.get("item").get("id"), filters.getProductId()));
-            }
+                Join<AuditLog, StockMovement> sm = root.join("movements", JoinType.LEFT);
 
-            // Filter by location (requires join to stock_movements)
-            if (filters.getLocationId() != null) {
-                query.distinct(true);
-                Join<AuditLog, StockMovement> movementsJoin = root.join("movements", JoinType.INNER);
-                Predicate fromLocation = cb.equal(movementsJoin.get("fromLocationId"), filters.getLocationId());
-                Predicate toLocation = cb.equal(movementsJoin.get("toLocationId"), filters.getLocationId());
-                predicate = cb.and(predicate, cb.or(fromLocation, toLocation));
-            }
+                if (filters.getProductId() != null) {
+                    predicate = cb.and(predicate,
+                            cb.equal(sm.get("item").get("id"), filters.getProductId()));
+                }
 
-            // Search by actor name or product name
-            if (filters.getSearch() != null && !filters.getSearch().isBlank()) {
-                String searchPattern = "%" + filters.getSearch().toLowerCase() + "%";
+                if (filters.getLocationId() != null) {
+                    predicate = cb.and(predicate, cb.or(
+                            cb.equal(sm.get("fromLocationId"), filters.getLocationId()),
+                            cb.equal(sm.get("toLocationId"), filters.getLocationId())
+                    ));
+                }
 
-                // Search in actor name
-                Predicate actorNameMatch = cb.like(cb.lower(root.get("actorName")), searchPattern);
-
-                // Search in product name (requires join)
-                query.distinct(true);
-                Join<AuditLog, StockMovement> movementsJoin = root.join("movements", JoinType.LEFT);
-                Predicate productNameMatch = cb.like(cb.lower(movementsJoin.get("item").get("name")), searchPattern);
-                Predicate productSkuMatch = cb.like(cb.lower(movementsJoin.get("item").get("sku")), searchPattern);
-
-                predicate = cb.and(predicate, cb.or(actorNameMatch, productNameMatch, productSkuMatch));
+                if (filters.getSearch() != null && !filters.getSearch().isBlank()) {
+                    String pattern = "%" + filters.getSearch().toLowerCase() + "%";
+                    predicate = cb.and(predicate, cb.or(
+                            cb.like(cb.lower(root.get("actorName")), pattern),
+                            cb.like(cb.lower(root.get("productSummary")), pattern),
+                            cb.like(cb.lower(sm.get("item").get("name")), pattern),
+                            cb.like(cb.lower(sm.get("item").get("sku")), pattern)
+                    ));
+                }
             }
 
             return predicate;
