@@ -102,7 +102,7 @@ export default function TeamPage() {
         onInviteClick={() => setIsInviteDialogOpen(true)}
       />
 
-      <Card className="py-0">
+      <Card className="p-2 border-none">
         <CardContent className="p-0">
           <TeamTable
             data={filteredData}
