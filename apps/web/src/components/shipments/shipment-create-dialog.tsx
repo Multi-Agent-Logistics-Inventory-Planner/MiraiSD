@@ -380,7 +380,9 @@ export function ShipmentCreateDialog({
                                   disabled={productsQuery.isLoading}
                                 >
                                   {selectedProduct
-                                    ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                    ? selectedProduct.sku
+                                      ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                      : selectedProduct.name
                                     : "Select product..."}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                                 </Button>
@@ -399,7 +401,7 @@ export function ShipmentCreateDialog({
                                       {products.map((p) => (
                                         <CommandItem
                                           key={p.id}
-                                          value={`${p.name} ${p.sku}`}
+                                          value={`${p.name} ${p.sku ?? ""}`.trim()}
                                           onSelect={() =>
                                             handleSelectProduct(index, p)
                                           }
@@ -416,9 +418,11 @@ export function ShipmentCreateDialog({
                                             <span className="text-sm">
                                               {p.name}
                                             </span>
-                                            <span className="text-xs text-muted-foreground">
-                                              {p.sku}
-                                            </span>
+                                            {p.sku ? (
+                                              <span className="text-xs text-muted-foreground">
+                                                {p.sku}
+                                              </span>
+                                            ) : null}
                                           </div>
                                         </CommandItem>
                                       ))}
