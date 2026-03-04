@@ -2,13 +2,20 @@
 
 import { useState, useMemo } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AuditLogFilters,
   AuditLogFiltersState,
   AuditLogTable,
   AuditLogPagination,
   DEFAULT_AUDIT_LOG_FILTERS,
+  type ReasonFilter,
 } from "@/components/audit-log";
 import { useAuditLogs } from "@/hooks/queries/use-audit-log";
 import { useUsers } from "@/hooks/queries/use-users";
@@ -17,34 +24,28 @@ import {
   StockMovementReason,
 } from "@/types/api";
 
+const REASON_LABELS: Record<StockMovementReason, string> = {
+  [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
+  [StockMovementReason.RESTOCK]: "Restock",
+  [StockMovementReason.SALE]: "Sale",
+  [StockMovementReason.DAMAGE]: "Damage",
+  [StockMovementReason.ADJUSTMENT]: "Adjustment",
+  [StockMovementReason.RETURN]: "Return",
+  [StockMovementReason.TRANSFER]: "Transfer",
+};
+
 function buildApiFilters(state: AuditLogFiltersState): AuditLogFiltersType {
   const filters: AuditLogFiltersType = {};
-
-  if (state.search) {
-    filters.search = state.search;
-  }
-  if (state.actorId) {
-    filters.actorId = state.actorId;
-  }
-  if (state.reason !== "all") {
-    filters.reason = state.reason as StockMovementReason;
-  }
-  if (state.fromDate) {
-    // Send as ISO date string (YYYY-MM-DD) for LocalDate parsing on backend
-    filters.fromDate = state.fromDate;
-  }
-  if (state.toDate) {
-    // Send as ISO date string (YYYY-MM-DD) for LocalDate parsing on backend
-    filters.toDate = state.toDate;
-  }
-
+  if (state.search) filters.search = state.search;
+  if (state.actorId) filters.actorId = state.actorId;
+  if (state.reason !== "all") filters.reason = state.reason as StockMovementReason;
+  if (state.fromDate) filters.fromDate = state.fromDate;
+  if (state.toDate) filters.toDate = state.toDate;
   return filters;
 }
 
 export default function AuditLogPage() {
-  const [filters, setFilters] = useState<AuditLogFiltersState>(
-    DEFAULT_AUDIT_LOG_FILTERS,
-  );
+  const [filters, setFilters] = useState<AuditLogFiltersState>(DEFAULT_AUDIT_LOG_FILTERS);
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -59,27 +60,53 @@ export default function AuditLogPage() {
 
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
-      <div className="flex items-center gap-2">
-        <SidebarTrigger className="md:hidden" />
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
+      {/* Page header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="md:hidden" />
+          <h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1>
+        </div>
+
+        {/* "View" quick filter matching the reference design */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">View:</span>
+          <Select
+            value={filters.reason}
+            onValueChange={(v) =>
+              handleFiltersChange({ ...filters, reason: v as ReasonFilter })
+            }
+          >
+            <SelectTrigger className="w-36 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="all">All</SelectItem>
+              {Object.entries(REASON_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {/* Search + advanced filters */}
       <AuditLogFilters
         state={filters}
         onChange={handleFiltersChange}
         users={users}
       />
 
-      <Card className="py-0">
-        <CardContent className="p-0">
-          <AuditLogTable
-            data={data}
-            isLoading={isLoading}
-            page={page}
-            onPageChange={setPage}
-          />
-        </CardContent>
-      </Card>
+      {/* Borderless table */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <AuditLogTable
+          data={data}
+          isLoading={isLoading}
+          page={page}
+          onPageChange={setPage}
+        />
+      </div>
 
       <AuditLogPagination
         data={data}
