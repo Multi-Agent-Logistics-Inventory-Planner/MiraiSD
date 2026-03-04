@@ -51,7 +51,6 @@ function formatLocation(entry: AuditLog): string {
   return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? "—";
 }
 
-
 function QuantityChange({ change }: { change: number }) {
   if (change > 0)
     return <span className="text-emerald-600 font-medium tabular-nums">+{change}</span>;
@@ -61,15 +60,9 @@ function QuantityChange({ change }: { change: number }) {
 }
 
 /**
- * Returns the location label for a single movement row inside the expanded detail.
- *
- * For transfers we use the AuditLog-level primaryFrom/ToLocationCode (correctly
- * stored at write-time) rather than the per-movement codes, which can be wrong for
- * deposit movements due to a locationType mismatch in the mapper.
- *
- * Each row shows only the side that's relevant to that movement:
- *   withdrawal (quantityChange < 0) → "FROM location"  e.g. "NA"
- *   deposit    (quantityChange > 0) → "TO location"    e.g. "S1"
+ * For transfers, uses AuditLog-level location codes (correctly stored at write-time)
+ * rather than per-movement codes which can be wrong due to a locationType mismatch.
+ * Withdrawal rows show the FROM location; deposit rows show the TO location.
  */
 function movementLocationLabel(
   movement: AuditLogMovement,
@@ -79,10 +72,23 @@ function movementLocationLabel(
 ): string {
   if (reason === StockMovementReason.TRANSFER) {
     return movement.quantityChange < 0
-      ? (primaryFrom ?? "NA")   // withdrawal: show where stock left from
-      : (primaryTo ?? "NA");    // deposit:    show where stock arrived at
+      ? (primaryFrom ?? "NA")
+      : (primaryTo ?? "NA");
   }
   return movement.toLocationCode ?? movement.fromLocationCode ?? "—";
+}
+
+function ActionPill({ reason }: { reason: StockMovementReason }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        getReasonStyle(reason)
+      )}
+    >
+      {REASON_LABELS[reason]}
+    </span>
+  );
 }
 
 function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
@@ -90,7 +96,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 px-12 py-5 bg-muted/30">
+      <div className="flex items-center gap-2 px-4 md:px-12 py-5">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         <span className="text-sm text-muted-foreground">Loading details…</span>
       </div>
@@ -100,28 +106,28 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
   if (!detail) return null;
 
   return (
-    <div className="px-12 py-4 bg-muted/20 border-b">
+    <div className="px-4 md:px-12 pb-4 pt-1">
       {detail.notes && (
         <p className="text-sm text-muted-foreground mb-3 italic">"{detail.notes}"</p>
       )}
       <div className="space-y-1">
         {/* Sub-header */}
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
           <span>Product</span>
-          <span className="text-right w-28">Location</span>
+          <span className="text-right w-14 md:w-28">Location</span>
           <span className="text-right w-16">Change</span>
         </div>
 
         {detail.movements.map((movement) => (
           <div
             key={movement.id}
-            className="grid grid-cols-[1fr_auto_auto] gap-x-8 px-3 py-2 rounded-md hover:bg-muted/40 transition-colors"
+            className="grid grid-cols-[1fr_auto_auto] gap-x-4 md:gap-x-8 px-3 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
             <div>
               <p className="text-sm font-medium leading-tight">{movement.itemName}</p>
               <p className="text-xs text-muted-foreground">{movement.itemSku}</p>
             </div>
-            <span className="text-sm text-muted-foreground w-28 text-right self-center tabular-nums">
+            <span className="text-sm text-muted-foreground w-14 md:w-28 text-right self-center tabular-nums">
               {movementLocationLabel(
                 movement,
                 detail.reason,
@@ -144,16 +150,31 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
 
 function RowSkeleton() {
   return (
-    <div className="grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-4 border-b">
-      <Skeleton className="h-4 w-4 rounded" />
-      <div className="space-y-1.5">
-        <Skeleton className="h-3.5 w-28" />
-        <Skeleton className="h-3 w-20" />
+    <div className="border-b px-4 py-4">
+      {/* Mobile skeleton */}
+      <div className="flex items-start gap-3 md:hidden">
+        <Skeleton className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-3 w-20" />
+        </div>
       </div>
-      <Skeleton className="h-6 w-20 rounded-full" />
-      <Skeleton className="h-3.5 w-32" />
-      <Skeleton className="h-3.5 w-16" />
-      <Skeleton className="h-3.5 w-28" />
+      {/* Desktop skeleton */}
+      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center">
+        <Skeleton className="h-4 w-4 rounded" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-3.5 w-28" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+        <Skeleton className="h-6 w-20 rounded-full" />
+        <Skeleton className="h-3.5 w-32" />
+        <Skeleton className="h-3.5 w-16" />
+        <Skeleton className="h-3.5 w-28" />
+      </div>
     </div>
   );
 }
@@ -174,8 +195,8 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
 
   return (
     <div className="w-full">
-      {/* Table header */}
-      <div className="grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-2.5 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide select-none">
+      {/* Desktop-only table header */}
+      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-2.5 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide select-none">
         <div />
         <div>User</div>
         <div>Action</div>
@@ -184,7 +205,6 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
         <div>Time</div>
       </div>
 
-      {/* Rows */}
       {isLoading ? (
         Array.from({ length: 10 }).map((_, i) => <RowSkeleton key={i} />)
       ) : entries.length === 0 ? (
@@ -195,18 +215,53 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
         entries.map((entry) => {
           const isExpanded = expandedId === entry.id;
           return (
-            <div key={entry.id}>
-              {/* Main row */}
+            // Outer wrapper owns the border-b and the shared background.
+            // This makes the expanded detail feel like part of the same row —
+            // no divider between the header and the detail, only at the very bottom.
+            <div
+              key={entry.id}
+              className={cn(
+                "border-b transition-colors",
+                isExpanded ? "bg-muted/20" : "hover:bg-muted/10"
+              )}
+            >
+              {/* ── Mobile row ── */}
               <div
-                className={cn(
-                  "grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-4 border-b cursor-pointer select-none transition-colors",
-                  isExpanded
-                    ? "bg-muted/30"
-                    : "hover:bg-muted/20"
-                )}
+                className="flex items-start gap-3 px-4 py-4 cursor-pointer select-none md:hidden"
                 onClick={() => toggleRow(entry.id)}
               >
-                {/* Chevron */}
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 mt-0.5 shrink-0 text-muted-foreground transition-transform duration-150",
+                    isExpanded && "rotate-90"
+                  )}
+                />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">
+                      {entry.actorName ?? "—"}
+                    </p>
+                    <ActionPill reason={entry.reason} />
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {entry.productSummary ?? "—"}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      {formatLocation(entry)}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                      {format(new Date(entry.createdAt), "MM-dd-yyyy h:mm a")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Desktop row ── */}
+              <div
+                className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-4 cursor-pointer select-none"
+                onClick={() => toggleRow(entry.id)}
+              >
                 <ChevronRight
                   className={cn(
                     "h-4 w-4 text-muted-foreground transition-transform duration-150",
@@ -224,27 +279,21 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                   </p>
                 </div>
 
-                {/* Action pill */}
+                {/* Action */}
                 <div>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                      getReasonStyle(entry.reason)
-                    )}
-                  >
-                    {REASON_LABELS[entry.reason]}
-                  </span>
+                  <ActionPill reason={entry.reason} />
                 </div>
 
                 {/* Product */}
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{entry.productSummary ?? "—"}</p>
-                  {entry.itemCount > 1 && (
-                    <p className="text-xs text-muted-foreground">{entry.itemCount} items · {entry.totalQuantityMoved} units</p>
-                  )}
-                  {entry.itemCount === 1 && (
-                    <p className="text-xs text-muted-foreground">{entry.totalQuantityMoved} units</p>
-                  )}
+                  <p className="text-sm font-medium truncate">
+                    {entry.productSummary ?? "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.itemCount > 1
+                      ? `${entry.itemCount} items · ${entry.totalQuantityMoved} units`
+                      : `${entry.totalQuantityMoved} units`}
+                  </p>
                 </div>
 
                 {/* Location */}
@@ -252,16 +301,14 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                   {formatLocation(entry)}
                 </p>
 
-                {/* When */}
+                {/* Time */}
                 <p className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
                   {format(new Date(entry.createdAt), "MM-dd-yyyy h:mm a")}
                 </p>
               </div>
 
-              {/* Expanded detail */}
-              {isExpanded && (
-                <ExpandedDetail auditLogId={entry.id} />
-              )}
+              {/* Expanded detail — no border or background needed, inherits from wrapper */}
+              {isExpanded && <ExpandedDetail auditLogId={entry.id} />}
             </div>
           );
         })
