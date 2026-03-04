@@ -289,9 +289,6 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                   <p className="text-sm font-medium leading-tight truncate">
                     {entry.actorName ?? "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {format(new Date(entry.createdAt), "MMM d, yyyy")}
-                  </p>
                 </div>
 
                 {/* Action */}
