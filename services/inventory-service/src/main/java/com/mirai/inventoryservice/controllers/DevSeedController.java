@@ -2,19 +2,32 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.audit.ForecastPrediction;
+import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.NotificationSeverity;
+import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.models.enums.UserRole;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
+import com.mirai.inventoryservice.models.review.Review;
+import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.storage.BoxBin;
 import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
+import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
+import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -35,9 +48,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/dev")
@@ -53,6 +68,11 @@ public class DevSeedController {
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final ShipmentRepository shipmentRepository;
     private final CategoryRepository categoryRepository;
+    private final ForecastPredictionRepository forecastPredictionRepository;
+    private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReviewDailyCountRepository reviewDailyCountRepository;
 
     private final Random random = new Random();
 
@@ -318,6 +338,470 @@ public class DevSeedController {
         return ResponseEntity.ok(Map.of(
             "success", true,
             "deletedCount", seedMovements.size()
+        ));
+    }
+
+    /**
+     * Seed forecast predictions for all products with distribution across risk bands.
+     * Risk bands: Critical (<=3d), Warning (4-7d), Healthy (8-30d), Safe (31-60d), Overstocked (>60d)
+     */
+    @PostMapping("/seed/forecasts")
+    public ResponseEntity<Map<String, Object>> seedForecasts() {
+        List<Product> products = productRepository.findAll();
+
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        // Get current inventory quantities
+        Map<UUID, Integer> inventoryByProduct = new HashMap<>();
+        boxBinInventoryRepository.findAll().forEach(inv ->
+            inventoryByProduct.merge(inv.getItem().getId(), inv.getQuantity(), Integer::sum)
+        );
+
+        List<ForecastPrediction> forecasts = new ArrayList<>();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        int productIndex = 0;
+
+        // Distribution: 10% critical-urgent, 10% critical, 20% warning, 30% healthy, 20% safe, 10% overstocked
+        for (Product product : products) {
+            int currentStock = inventoryByProduct.getOrDefault(product.getId(), 0);
+            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 7;
+
+            // Determine risk band based on product index for even distribution
+            String riskBand;
+            double daysToStockout;
+            int mod = productIndex % 10;
+
+            if (mod == 0) {
+                // Critical urgent (0-1 days) - 10%
+                riskBand = "critical_urgent";
+                daysToStockout = 0.5 + random.nextDouble();
+            } else if (mod == 1) {
+                // Critical (2-3 days) - 10%
+                riskBand = "critical";
+                daysToStockout = 2 + random.nextDouble() * 1.5;
+            } else if (mod <= 3) {
+                // Warning (4-7 days) - 20%
+                riskBand = "warning";
+                daysToStockout = 4 + random.nextDouble() * 3;
+            } else if (mod <= 6) {
+                // Healthy (8-30 days) - 30%
+                riskBand = "healthy";
+                daysToStockout = 8 + random.nextDouble() * 22;
+            } else if (mod <= 8) {
+                // Safe (31-60 days) - 20%
+                riskBand = "safe";
+                daysToStockout = 31 + random.nextDouble() * 29;
+            } else {
+                // Overstocked (>60 days) - 10%
+                riskBand = "overstocked";
+                daysToStockout = 61 + random.nextDouble() * 120;
+            }
+
+            // Calculate daily consumption rate
+            double avgDailyDelta = currentStock > 0 && daysToStockout > 0
+                ? -1 * (currentStock / daysToStockout)
+                : -1 * (2 + random.nextDouble() * 8);
+
+            // Calculate reorder quantity
+            int reorderQty = riskBand.equals("overstocked")
+                ? 0
+                : Math.max(10, (int) Math.ceil(Math.abs(avgDailyDelta) * leadTimeDays * 1.5));
+
+            // Calculate order date
+            LocalDate orderDate = daysToStockout <= leadTimeDays
+                ? LocalDate.now()
+                : LocalDate.now().plusDays((long) (daysToStockout - leadTimeDays));
+
+            // Confidence varies by risk band (more sales data = higher confidence)
+            double confidence = switch (riskBand) {
+                case "critical_urgent", "critical" -> 0.85 + random.nextDouble() * 0.10;
+                case "warning" -> 0.75 + random.nextDouble() * 0.15;
+                case "healthy" -> 0.70 + random.nextDouble() * 0.15;
+                case "safe" -> 0.65 + random.nextDouble() * 0.15;
+                default -> 0.50 + random.nextDouble() * 0.20;
+            };
+
+            // Build features map
+            Map<String, Object> features = Map.of(
+                "ma7", Math.abs(avgDailyDelta) * (0.9 + random.nextDouble() * 0.2),
+                "ma14", Math.abs(avgDailyDelta) * (0.85 + random.nextDouble() * 0.3),
+                "std14", Math.abs(avgDailyDelta) * 0.3 * random.nextDouble(),
+                "risk_band", riskBand,
+                "seed_generated", true
+            );
+
+            ForecastPrediction forecast = ForecastPrediction.builder()
+                .itemId(product.getId())
+                .horizonDays(30)
+                .avgDailyDelta(BigDecimal.valueOf(avgDailyDelta).setScale(2, java.math.RoundingMode.HALF_UP))
+                .daysToStockout(BigDecimal.valueOf(daysToStockout).setScale(1, java.math.RoundingMode.HALF_UP))
+                .suggestedReorderQty(reorderQty)
+                .suggestedOrderDate(orderDate)
+                .confidence(BigDecimal.valueOf(confidence).setScale(2, java.math.RoundingMode.HALF_UP))
+                .features(features)
+                .computedAt(now)
+                .build();
+
+            forecasts.add(forecast);
+            productIndex++;
+        }
+
+        forecastPredictionRepository.saveAll(forecasts);
+
+        // Count by risk band for response
+        Map<String, Long> distribution = new HashMap<>();
+        forecasts.forEach(f -> {
+            String band = (String) f.getFeatures().get("risk_band");
+            distribution.merge(band, 1L, Long::sum);
+        });
+
+        log.info("Seeded {} forecast predictions across risk bands: {}", forecasts.size(), distribution);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "forecastsCreated", forecasts.size(),
+            "distribution", distribution
+        ));
+    }
+
+    /**
+     * Seed notifications with various types and severities for dashboard visualization.
+     */
+    @PostMapping("/seed/notifications")
+    public ResponseEntity<Map<String, Object>> seedNotifications() {
+        List<Product> products = productRepository.findAll();
+
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        List<Notification> notifications = new ArrayList<>();
+        int limit = Math.min(30, products.size());
+
+        for (int i = 0; i < limit; i++) {
+            Product product = products.get(i);
+            NotificationType type;
+            NotificationSeverity severity;
+            String message;
+
+            // Vary notification types based on index
+            switch (i % 6) {
+                case 0 -> {
+                    type = NotificationType.LOW_STOCK;
+                    severity = NotificationSeverity.WARNING;
+                    message = String.format("Low stock alert: %s (%s) is running low", product.getName(), product.getSku());
+                }
+                case 1 -> {
+                    type = NotificationType.OUT_OF_STOCK;
+                    severity = NotificationSeverity.CRITICAL;
+                    message = String.format("Out of stock: %s (%s) has no inventory", product.getName(), product.getSku());
+                }
+                case 2 -> {
+                    type = NotificationType.REORDER_SUGGESTION;
+                    severity = NotificationSeverity.INFO;
+                    message = String.format("Reorder suggested: Consider ordering %s (%s)", product.getName(), product.getSku());
+                }
+                case 3 -> {
+                    type = NotificationType.LOW_STOCK;
+                    severity = NotificationSeverity.CRITICAL;
+                    message = String.format("Critical stock level: %s (%s) needs attention", product.getName(), product.getSku());
+                }
+                case 4 -> {
+                    type = NotificationType.SYSTEM_ALERT;
+                    severity = NotificationSeverity.INFO;
+                    message = String.format("Stock update: %s (%s) inventory adjusted", product.getName(), product.getSku());
+                }
+                default -> {
+                    type = NotificationType.UNASSIGNED_ITEM;
+                    severity = NotificationSeverity.WARNING;
+                    message = String.format("Unassigned: %s (%s) needs location", product.getName(), product.getSku());
+                }
+            }
+
+            // Some notifications are resolved
+            OffsetDateTime resolvedAt = (i % 3 == 0)
+                ? OffsetDateTime.now(ZoneOffset.UTC).minusDays(random.nextInt(7))
+                : null;
+
+            Notification notification = Notification.builder()
+                .type(type)
+                .severity(severity)
+                .message(message)
+                .itemId(product.getId())
+                .via(List.of("DASHBOARD"))
+                .metadata(Map.of(
+                    "seed_generated", true,
+                    "product_sku", product.getSku()
+                ))
+                .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(random.nextInt(14)))
+                .deliveredAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(random.nextInt(14)))
+                .resolvedAt(resolvedAt)
+                .build();
+
+            notifications.add(notification);
+        }
+
+        // Add system notifications
+        notifications.add(Notification.builder()
+            .type(NotificationType.SYSTEM_ALERT)
+            .severity(NotificationSeverity.INFO)
+            .message("Weekly inventory report generated successfully")
+            .via(List.of("DASHBOARD"))
+            .metadata(Map.of("seed_generated", true))
+            .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1))
+            .deliveredAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1))
+            .build());
+
+        notifications.add(Notification.builder()
+            .type(NotificationType.SYSTEM_ALERT)
+            .severity(NotificationSeverity.INFO)
+            .message("Forecasting service completed daily predictions")
+            .via(List.of("DASHBOARD"))
+            .metadata(Map.of("seed_generated", true))
+            .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusHours(2))
+            .deliveredAt(OffsetDateTime.now(ZoneOffset.UTC).minusHours(2))
+            .build());
+
+        notificationRepository.saveAll(notifications);
+
+        long active = notifications.stream().filter(n -> n.getResolvedAt() == null).count();
+        long resolved = notifications.size() - active;
+
+        log.info("Seeded {} notifications ({} active, {} resolved)", notifications.size(), active, resolved);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "notificationsCreated", notifications.size(),
+            "active", active,
+            "resolved", resolved
+        ));
+    }
+
+    @DeleteMapping("/seed/forecasts")
+    public ResponseEntity<Map<String, Object>> clearSeedForecasts() {
+        List<ForecastPrediction> seedForecasts = forecastPredictionRepository.findAll().stream()
+            .filter(f -> f.getFeatures() != null && Boolean.TRUE.equals(f.getFeatures().get("seed_generated")))
+            .toList();
+
+        forecastPredictionRepository.deleteAll(seedForecasts);
+
+        log.info("Cleared {} seeded forecasts", seedForecasts.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "deletedCount", seedForecasts.size()
+        ));
+    }
+
+    @DeleteMapping("/seed/notifications")
+    public ResponseEntity<Map<String, Object>> clearSeedNotifications() {
+        List<Notification> seedNotifications = notificationRepository.findAll().stream()
+            .filter(n -> n.getMetadata() != null && Boolean.TRUE.equals(n.getMetadata().get("seed_generated")))
+            .toList();
+
+        notificationRepository.deleteAll(seedNotifications);
+
+        log.info("Cleared {} seeded notifications", seedNotifications.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "deletedCount", seedNotifications.size()
+        ));
+    }
+
+    /**
+     * Seed review data for the reviews leaderboard page.
+     * Creates test users if needed, enables review tracking, and generates
+     * daily review counts and individual reviews spanning 4 months.
+     */
+    @PostMapping("/seed/reviews")
+    public ResponseEntity<Map<String, Object>> seedReviews() {
+        // Sample reviewer names for generated reviews
+        String[] reviewerNames = {
+            "John D.", "Sarah M.", "Mike R.", "Emily K.", "David L.",
+            "Jessica P.", "Chris W.", "Amanda H.", "Brian T.", "Nicole S."
+        };
+
+        // Sample review texts
+        String[] reviewTexts = {
+            "Great service! Very helpful staff.",
+            "Amazing experience, will definitely come back!",
+            "The employee was so patient and knowledgeable.",
+            "Best arcade service I've ever received.",
+            "Super friendly and accommodating.",
+            "Went above and beyond to help us.",
+            "Made our visit memorable!",
+            "Exceptional customer service.",
+            "Very professional and courteous.",
+            "Highly recommend this place!"
+        };
+
+        // Employee data for review tracking
+        String[][] employeeData = {
+            {"AJ", "aj@mirai.test", "AJ"},
+            {"Angelina", "angelina@mirai.test", "Angelina"},
+            {"Averey", "averey@mirai.test", "Averey", "Avery"},
+            {"Christine", "christine@mirai.test", "Christine", "Christina", "Kristine"},
+            {"Emma", "emma@mirai.test", "Emma", "Ema"},
+            {"Grace", "grace@mirai.test", "Grace"},
+            {"Lucas", "lucas@mirai.test", "Lucas"},
+            {"Matthew", "matthew@mirai.test", "Matthew", "Mathew", "Matt"},
+            {"Mina", "mina@mirai.test", "Mina"},
+            {"Victoria", "victoria@mirai.test", "Victoria"}
+        };
+
+        List<User> trackedUsers = new ArrayList<>();
+
+        // Create or update users for review tracking
+        for (String[] emp : employeeData) {
+            String name = emp[0];
+            String email = emp[1];
+            List<String> variants = new ArrayList<>();
+            for (int i = 2; i < emp.length; i++) {
+                variants.add(emp[i]);
+            }
+
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                user = User.builder()
+                    .fullName(name)
+                    .email(email)
+                    .role(UserRole.EMPLOYEE)
+                    .canonicalName(name)
+                    .nameVariants(variants)
+                    .isReviewTracked(true)
+                    .build();
+            } else {
+                user.setCanonicalName(name);
+                user.setNameVariants(variants);
+                user.setIsReviewTracked(true);
+            }
+            trackedUsers.add(userRepository.save(user));
+        }
+
+        // Generate review data spanning 4 months
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusMonths(4).withDayOfMonth(1);
+        int totalDailyCounts = 0;
+        int totalReviews = 0;
+
+        List<ReviewDailyCount> dailyCounts = new ArrayList<>();
+        List<Review> reviews = new ArrayList<>();
+
+        for (User user : trackedUsers) {
+            // Vary the activity level per user (some are more active)
+            int baseReviewsPerDay = 1 + random.nextInt(4);
+            double activityMultiplier = 0.5 + random.nextDouble();
+
+            LocalDate currentDate = startDate;
+            while (!currentDate.isAfter(today)) {
+                // Skip some days randomly (weekends, days off)
+                if (random.nextDouble() < 0.3) {
+                    currentDate = currentDate.plusDays(1);
+                    continue;
+                }
+
+                // Calculate reviews for this day
+                int reviewCount = (int) Math.max(1,
+                    Math.round(baseReviewsPerDay * activityMultiplier * (0.5 + random.nextDouble())));
+
+                // Create daily count
+                ReviewDailyCount dailyCount = ReviewDailyCount.builder()
+                    .user(user)
+                    .date(currentDate)
+                    .reviewCount(reviewCount)
+                    .build();
+                dailyCounts.add(dailyCount);
+                totalDailyCounts++;
+
+                // Create individual reviews for this day
+                for (int i = 0; i < reviewCount; i++) {
+                    String externalId = String.format("seed-%s-%s-%d",
+                        user.getId().toString().substring(0, 8),
+                        currentDate.toString(),
+                        i);
+
+                    Review review = Review.builder()
+                        .externalId(externalId)
+                        .user(user)
+                        .reviewDate(currentDate)
+                        .reviewText(reviewTexts[random.nextInt(reviewTexts.length)])
+                        .rating(3 + random.nextInt(3)) // 3-5 stars
+                        .reviewerName(reviewerNames[random.nextInt(reviewerNames.length)])
+                        .build();
+                    reviews.add(review);
+                    totalReviews++;
+                }
+
+                currentDate = currentDate.plusDays(1);
+            }
+        }
+
+        reviewDailyCountRepository.saveAll(dailyCounts);
+        reviewRepository.saveAll(reviews);
+
+        // Calculate summary stats
+        Map<String, Integer> userReviewCounts = new HashMap<>();
+        for (ReviewDailyCount dc : dailyCounts) {
+            String userName = dc.getUser().getFullName();
+            userReviewCounts.merge(userName, dc.getReviewCount(), Integer::sum);
+        }
+
+        log.info("Seeded review data: {} users, {} daily counts, {} reviews",
+            trackedUsers.size(), totalDailyCounts, totalReviews);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "usersCreated", trackedUsers.size(),
+            "dailyCountsCreated", totalDailyCounts,
+            "reviewsCreated", totalReviews,
+            "dateRange", Map.of(
+                "from", startDate.toString(),
+                "to", today.toString()
+            ),
+            "userSummary", userReviewCounts
+        ));
+    }
+
+    @DeleteMapping("/seed/reviews")
+    public ResponseEntity<Map<String, Object>> clearSeedReviews() {
+        // Delete reviews with seed external IDs
+        List<Review> seedReviews = reviewRepository.findAll().stream()
+            .filter(r -> r.getExternalId() != null && r.getExternalId().startsWith("seed-"))
+            .toList();
+        reviewRepository.deleteAll(seedReviews);
+
+        // Delete daily counts for seed users (users with @mirai.test email)
+        List<User> seedUsers = userRepository.findAll().stream()
+            .filter(u -> u.getEmail() != null && u.getEmail().endsWith("@mirai.test"))
+            .toList();
+
+        int dailyCountsDeleted = 0;
+        for (User user : seedUsers) {
+            List<ReviewDailyCount> userCounts = reviewDailyCountRepository.findAll().stream()
+                .filter(dc -> user.equals(dc.getUser()))
+                .toList();
+            reviewDailyCountRepository.deleteAll(userCounts);
+            dailyCountsDeleted += userCounts.size();
+
+            // Reset review tracking on seed users
+            user.setIsReviewTracked(false);
+            userRepository.save(user);
+        }
+
+        log.info("Cleared seed reviews: {} reviews, {} daily counts", seedReviews.size(), dailyCountsDeleted);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "reviewsDeleted", seedReviews.size(),
+            "dailyCountsDeleted", dailyCountsDeleted,
+            "usersReset", seedUsers.size()
         ));
     }
 }

@@ -82,12 +82,12 @@ services:
     env_file:
       - ../.env
     environment:
-      # JVM memory limits optimized for container startup
-      # - Heap: 256m (leaves room for metaspace + native memory)
+      # JVM memory limits optimized for 512M container on 2GB droplet
+      # - Heap: 192m max (reduced to leave room for metaspace)
+      # - MaxMetaspaceSize: 128m (Spring Boot + Kafka + Hibernate needs this)
+      # - ReservedCodeCacheSize: 32m (caps JIT compiler memory)
       # - UseContainerSupport: respect container memory limits
-      # - MaxMetaspaceSize: cap class metadata memory
-      # - TieredStopAtLevel=1: faster startup (JIT compiles less aggressively)
-      - JAVA_OPTS=-Xmx256m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=96m -XX:TieredStopAtLevel=1
+      - JAVA_OPTS=-Xmx192m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m
     deploy:
       resources:
         limits:
