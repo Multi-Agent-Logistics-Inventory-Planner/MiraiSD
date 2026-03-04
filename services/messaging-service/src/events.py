@@ -155,3 +155,4 @@ class NormalizedEvent:
     actor_id: str | None = None
     stock_movement_id: str | None = None
 
+
