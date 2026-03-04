@@ -102,9 +102,11 @@ export function ProductModal({
         <DialogHeader className="text-left">
           <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-row items-center gap-2 sm:gap-3">
             <span className="break-words">{p.name}</span>
-            <span className="font-mono text-xs sm:text-sm font-normal text-muted-foreground">
-              {p.sku}
-            </span>
+            {p.sku && (
+              <span className="font-mono text-xs sm:text-sm font-normal text-muted-foreground">
+                {p.sku}
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 

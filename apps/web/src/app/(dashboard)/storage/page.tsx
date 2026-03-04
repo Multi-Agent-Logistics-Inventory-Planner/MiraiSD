@@ -82,7 +82,7 @@ export default function LocationsPage() {
 
     return data.filter((x) => {
       return (
-        x.item.sku.toLowerCase().includes(q) ||
+        (x.item.sku?.toLowerCase().includes(q) ?? false) ||
         x.item.name.toLowerCase().includes(q)
       );
     });

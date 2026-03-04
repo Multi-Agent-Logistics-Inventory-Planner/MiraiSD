@@ -103,7 +103,7 @@ function filterAndSortData(
     const term = searchTerm.toLowerCase()
     filtered = filtered.filter(
       (item) =>
-        item.itemSku.toLowerCase().includes(term) ||
+        (item.itemSku?.toLowerCase().includes(term) ?? false) ||
         item.itemName.toLowerCase().includes(term)
     )
   }
@@ -129,8 +129,8 @@ function filterAndSortData(
 
     switch (sortField) {
       case "itemSku":
-        aVal = a.itemSku
-        bVal = b.itemSku
+        aVal = a.itemSku ?? ""
+        bVal = b.itemSku ?? ""
         break
       case "itemName":
         aVal = a.itemName
@@ -231,7 +231,7 @@ export function PredictionsTable({
     ]
 
     const rows = filteredAndSortedData.map((item) => [
-      sanitizeCSVField(item.itemSku),
+      sanitizeCSVField(item.itemSku ?? ""),
       sanitizeCSVField(item.itemName),
       item.currentStock,
       item.avgDailyDelta.toFixed(2),

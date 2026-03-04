@@ -44,7 +44,7 @@ function buildStockLevelItem(
 
   return {
     itemId: product.id,
-    sku: product.sku,
+    sku: product.sku ?? undefined,
     name: product.name,
     stock: quantity,
     maxStock: Math.max(1, maxStock),

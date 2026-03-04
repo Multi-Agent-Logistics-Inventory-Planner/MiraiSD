@@ -90,7 +90,7 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
         <span className="text-sm text-muted-foreground w-6 hidden sm:block shrink-0">{index + 1}</span>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
-          <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>
+          {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
             <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
             {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
