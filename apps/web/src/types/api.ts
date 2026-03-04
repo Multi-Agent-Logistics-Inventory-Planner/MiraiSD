@@ -110,7 +110,7 @@ export interface AuthValidationResponse {
 
 export interface Product {
   id: string;
-  sku: string;
+  sku?: string | null;
   category: Category;
   name: string;
   description?: string;
@@ -127,7 +127,7 @@ export interface Product {
 }
 
 export interface ProductRequest {
-  sku: string;
+  sku?: string;
   categoryId: string;
   name: string;
   description?: string;
@@ -265,7 +265,7 @@ export interface PusherMachineRequest {
 // Inventory item embedded in response (simplified product)
 export interface InventoryItem {
   id: string;
-  sku: string;
+  sku?: string | null;
   name: string;
   category: Category;
   imageUrl?: string;
@@ -456,7 +456,7 @@ export interface AuditLogEntry {
   id: number;
   locationType: LocationType;
   itemId: string;
-  itemSku: string;
+  itemSku?: string | null;
   itemName: string;
   fromLocationId?: string;
   fromLocationCode?: string;
@@ -499,7 +499,7 @@ export interface AuditLog {
 export interface AuditLogMovement {
   id: number;
   itemId: string;
-  itemSku: string;
+  itemSku?: string | null;
   itemName: string;
   itemImageUrl?: string;
   fromLocationCode?: string;
@@ -550,7 +550,7 @@ export interface ForecastPrediction {
   id: string;
   itemId: string;
   itemName: string;
-  itemSku: string;
+  itemSku?: string | null;
   currentStock: number;
   horizonDays: number;
   avgDailyDelta: number;
@@ -761,7 +761,7 @@ export interface ProductInventoryResponse {
  */
 export interface InventoryTotal {
   itemId: string;
-  sku: string;
+  sku?: string | null;
   name: string;
   imageUrl: string | null;
   categoryId: string | null;
@@ -783,7 +783,7 @@ export interface MachineDisplay {
   machineCode: string;
   productId: string;
   productName: string;
-  productSku: string;
+  productSku?: string | null;
   startedAt: string;
   endedAt: string | null;
   actorId: string | null;

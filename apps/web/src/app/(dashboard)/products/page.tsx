@@ -48,7 +48,7 @@ export default function ProductsPage() {
       const matchesSearch =
         q.length === 0 ||
         row.product.name.toLowerCase().includes(q) ||
-        row.product.sku.toLowerCase().includes(q);
+        (row.product.sku?.toLowerCase().includes(q) ?? false);
 
       let matchesCategory = true;
       if (filters.selectedSubcategoryId) {

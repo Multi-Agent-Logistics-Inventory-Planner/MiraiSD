@@ -128,7 +128,7 @@ export function useActivityFeed(filters: ActivityFeedFilters = DEFAULT_FILTERS) 
         metadata: {
           itemId: entry.itemId,
           itemName: entry.itemName,
-          itemSku: entry.itemSku,
+          itemSku: entry.itemSku ?? undefined,
           quantity: entry.quantityChange,
         },
       });
