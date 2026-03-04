@@ -139,7 +139,6 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
               )}
               <div className="min-w-0">
                 <p className="text-sm font-medium leading-tight truncate">{movement.itemName}</p>
-                <p className="text-xs text-muted-foreground">{movement.itemSku}</p>
               </div>
             </div>
             <span className="text-sm text-muted-foreground text-center self-center tabular-nums">
@@ -237,7 +236,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
               key={entry.id}
               className={cn(
                 "border-b transition-colors",
-                isExpanded ? "bg-muted/50" : "hover:bg-muted/10"
+                isExpanded ? "bg-black/[0.06] dark:bg-white/[0.06]" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
               )}
             >
               {/* ── Mobile row ── */}
