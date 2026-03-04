@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { adjustStock, transferStock } from "@/lib/api/stock-movements";
+import { adjustStock, batchTransferStock, transferStock } from "@/lib/api/stock-movements";
 import {
   LocationType,
   type AdjustStockRequest,
@@ -34,18 +33,6 @@ interface BatchTransferVariables {
   destinationLocationId: string;
   sourceLocationType?: LocationType;
   destinationLocationType?: LocationType;
-}
-
-export interface BatchTransferProgress {
-  completed: number;
-  total: number;
-  currentItem?: string;
-  errors: Array<{ productName: string; error: string }>;
-}
-
-interface BatchTransferResult {
-  successful: StockMovement[];
-  failed: Array<{ productName: string; error: string }>;
 }
 
 async function invalidateStockQueries(
@@ -89,51 +76,13 @@ export function useTransferStockMutation() {
 
 export function useBatchTransferMutation() {
   const qc = useQueryClient();
-  const [progress, setProgress] = useState<BatchTransferProgress>({
-    completed: 0,
-    total: 0,
-    errors: [],
-  });
 
-  const mutation = useMutation<BatchTransferResult, Error, BatchTransferVariables>({
-    mutationFn: async ({ transfers }) => {
-      const successful: StockMovement[] = [];
-      const failed: Array<{ productName: string; error: string }> = [];
-
-      setProgress({
-        completed: 0,
-        total: transfers.length,
-        errors: [],
-      });
-
-      for (let i = 0; i < transfers.length; i++) {
-        const transfer = transfers[i];
-        setProgress((prev) => ({
-          ...prev,
-          currentItem: transfer.productName,
-        }));
-
-        try {
-          const result = await transferStock(transfer.payload);
-          successful.push(result);
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : "Transfer failed";
-          failed.push({ productName: transfer.productName, error: errorMessage });
-        }
-
-        setProgress((prev) => ({
-          ...prev,
-          completed: i + 1,
-          errors: failed,
-        }));
-      }
-
-      return { successful, failed };
-    },
-    onSuccess: async ({ successful }, variables) => {
+  return useMutation<void, Error, BatchTransferVariables>({
+    mutationFn: ({ transfers }) =>
+      batchTransferStock({ transfers: transfers.map((t) => t.payload) }),
+    onSuccess: async (_data, variables) => {
       await qc.invalidateQueries({ queryKey: ["products"] });
 
-      // Invalidate not-assigned inventory if source or destination is NOT_ASSIGNED
       if (
         variables.sourceLocationType === LocationType.NOT_ASSIGNED ||
         variables.destinationLocationType === LocationType.NOT_ASSIGNED
@@ -154,10 +103,5 @@ export function useBatchTransferMutation() {
         });
       }
     },
-    onSettled: () => {
-      setProgress({ completed: 0, total: 0, errors: [] });
-    },
   });
-
-  return { ...mutation, progress };
 }

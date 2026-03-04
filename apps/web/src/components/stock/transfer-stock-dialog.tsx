@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import { LocationType, type Category } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -249,7 +248,7 @@ export function TransferStockDialog({
     });
 
     try {
-      const result = await batchTransferMutation.mutateAsync({
+      await batchTransferMutation.mutateAsync({
         transfers,
         sourceLocationId: srcLocationId,
         destinationLocationId: destLocationId,
@@ -257,32 +256,17 @@ export function TransferStockDialog({
         destinationLocationType: destLocationType,
       });
 
-      if (result.failed.length === 0) {
-        toast({
-          title: "Transfer complete",
-          description: `Successfully transferred ${result.successful.length} item(s).`,
-        });
-        onOpenChange(false);
-      } else if (result.successful.length > 0) {
-        toast({
-          title: "Partial transfer",
-          description: `${result.successful.length} succeeded, ${result.failed.length} failed.`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Transfer failed",
-          description: "All transfers failed. Please try again.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Transfer complete",
+        description: `Successfully transferred ${transfers.length} item(s).`,
+      });
+      onOpenChange(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Transfer failed";
       toast({ title: "Transfer failed", description: message });
     }
   }
 
-  const progress = batchTransferMutation.progress;
   const isTransferring = batchTransferMutation.isPending;
 
   const locationLabel = sourceLocation.locationType
@@ -418,24 +402,6 @@ export function TransferStockDialog({
               </div>
             </div>
           </div>
-
-          {/* Progress indicator */}
-          {isTransferring && progress.total > 0 ? (
-            <div className="px-6 pt-4 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Transferring: {progress.currentItem}
-                </span>
-                <span>
-                  {progress.completed}/{progress.total}
-                </span>
-              </div>
-              <Progress
-                value={(progress.completed / progress.total) * 100}
-                className="h-2"
-              />
-            </div>
-          ) : null}
 
           {/* Footer buttons */}
           <DialogFooter className="px-6 py-4">

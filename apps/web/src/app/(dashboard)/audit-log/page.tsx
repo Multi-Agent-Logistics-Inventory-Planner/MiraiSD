@@ -10,7 +10,7 @@ import {
   AuditLogPagination,
   DEFAULT_AUDIT_LOG_FILTERS,
 } from "@/components/audit-log";
-import { useAuditLog } from "@/hooks/queries/use-audit-log";
+import { useAuditLogs } from "@/hooks/queries/use-audit-log";
 import { useUsers } from "@/hooks/queries/use-users";
 import {
   AuditLogFilters as AuditLogFiltersType,
@@ -30,12 +30,12 @@ function buildApiFilters(state: AuditLogFiltersState): AuditLogFiltersType {
     filters.reason = state.reason as StockMovementReason;
   }
   if (state.fromDate) {
-    filters.fromDate = new Date(state.fromDate).toISOString();
+    // Send as ISO date string (YYYY-MM-DD) for LocalDate parsing on backend
+    filters.fromDate = state.fromDate;
   }
   if (state.toDate) {
-    const endOfDay = new Date(state.toDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    filters.toDate = endOfDay.toISOString();
+    // Send as ISO date string (YYYY-MM-DD) for LocalDate parsing on backend
+    filters.toDate = state.toDate;
   }
 
   return filters;
@@ -49,7 +49,7 @@ export default function AuditLogPage() {
   const pageSize = 20;
 
   const apiFilters = useMemo(() => buildApiFilters(filters), [filters]);
-  const { data, isLoading } = useAuditLog(apiFilters, page, pageSize);
+  const { data, isLoading } = useAuditLogs(apiFilters, page, pageSize);
   const { data: users } = useUsers();
 
   const handleFiltersChange = (next: AuditLogFiltersState) => {

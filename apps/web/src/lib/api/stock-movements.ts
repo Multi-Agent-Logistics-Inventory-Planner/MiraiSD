@@ -4,9 +4,12 @@ import {
   StockMovement,
   AdjustStockRequest,
   TransferStockRequest,
+  BatchTransferStockRequest,
   PaginatedResponse,
   AuditLogEntry,
   AuditLogFilters,
+  AuditLog,
+  AuditLogDetail,
 } from "@/types/api";
 
 /**
@@ -27,13 +30,26 @@ export async function adjustStock(
 }
 
 /**
- * Transfer stock between locations
+ * Transfer stock between locations (single item)
  */
 export async function transferStock(
   data: TransferStockRequest
 ): Promise<StockMovement> {
   return apiPost<StockMovement, TransferStockRequest>(
     "/api/stock-movements/transfer",
+    data
+  );
+}
+
+/**
+ * Transfer multiple inventory items in a single batch.
+ * Creates one audit log entry for the entire operation.
+ */
+export async function batchTransferStock(
+  data: BatchTransferStockRequest
+): Promise<void> {
+  return apiPost<void, BatchTransferStockRequest>(
+    "/api/stock-movements/batch-transfer",
     data
   );
 }
@@ -88,4 +104,55 @@ export async function getAuditLog(
   return apiGet<PaginatedResponse<AuditLogEntry>>(
     `/api/stock-movements/audit-log?${params.toString()}`
   );
+}
+
+/**
+ * Get grouped audit logs with optional filters (paginated)
+ * Returns one row per user action, with summary info
+ * @param filters - Optional filters for the audit log
+ * @param page - Page number (0-indexed)
+ * @param size - Page size
+ */
+export async function getAuditLogs(
+  filters: AuditLogFilters = {},
+  page: number = 0,
+  size: number = 20
+): Promise<PaginatedResponse<AuditLog>> {
+  const params = new URLSearchParams();
+  params.append("page", page.toString());
+  params.append("size", size.toString());
+
+  if (filters.search) {
+    params.append("search", filters.search);
+  }
+  if (filters.actorId) {
+    params.append("actorId", filters.actorId);
+  }
+  if (filters.reason) {
+    params.append("reason", filters.reason);
+  }
+  if (filters.fromDate) {
+    params.append("fromDate", filters.fromDate);
+  }
+  if (filters.toDate) {
+    params.append("toDate", filters.toDate);
+  }
+  if (filters.productId) {
+    params.append("productId", filters.productId);
+  }
+  if (filters.locationId) {
+    params.append("locationId", filters.locationId);
+  }
+
+  return apiGet<PaginatedResponse<AuditLog>>(
+    `/api/audit-logs?${params.toString()}`
+  );
+}
+
+/**
+ * Get audit log detail by ID (includes all movements)
+ * @param id - The audit log ID
+ */
+export async function getAuditLogDetail(id: string): Promise<AuditLogDetail> {
+  return apiGet<AuditLogDetail>(`/api/audit-logs/${id}`);
 }

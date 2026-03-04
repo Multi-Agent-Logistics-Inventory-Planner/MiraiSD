@@ -477,6 +477,49 @@ export interface AuditLogFilters {
   reason?: StockMovementReason;
   fromDate?: string;
   toDate?: string;
+  productId?: string;
+  locationId?: string;
+}
+
+// New audit log types (grouped actions)
+export interface AuditLog {
+  id: string;
+  actorId?: string;
+  actorName?: string;
+  reason: StockMovementReason;
+  primaryFromLocationCode?: string;
+  primaryToLocationCode?: string;
+  itemCount: number;
+  totalQuantityMoved: number;
+  notes?: string;
+  createdAt: string;
+  productSummary: string;
+}
+
+export interface AuditLogMovement {
+  id: number;
+  itemId: string;
+  itemSku: string;
+  itemName: string;
+  fromLocationCode?: string;
+  toLocationCode?: string;
+  previousQuantity?: number;
+  currentQuantity?: number;
+  quantityChange: number;
+}
+
+export interface AuditLogDetail {
+  id: string;
+  actorId?: string;
+  actorName?: string;
+  reason: StockMovementReason;
+  primaryFromLocationCode?: string;
+  primaryToLocationCode?: string;
+  itemCount: number;
+  totalQuantityMoved: number;
+  notes?: string;
+  createdAt: string;
+  movements: AuditLogMovement[];
 }
 
 export interface AdjustStockRequest {
@@ -495,6 +538,10 @@ export interface TransferStockRequest {
   quantity: number;
   actorId: string;
   notes?: string;
+}
+
+export interface BatchTransferStockRequest {
+  transfers: TransferStockRequest[];
 }
 
 // Forecast types
