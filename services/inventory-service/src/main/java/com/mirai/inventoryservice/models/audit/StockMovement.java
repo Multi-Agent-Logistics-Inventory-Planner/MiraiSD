@@ -28,6 +28,10 @@ public class StockMovement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "audit_log_id")
+    private AuditLog auditLog;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "location_type", nullable = false)

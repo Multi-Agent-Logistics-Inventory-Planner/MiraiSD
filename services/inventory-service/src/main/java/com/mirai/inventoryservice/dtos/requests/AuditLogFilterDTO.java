@@ -19,4 +19,6 @@ public class AuditLogFilterDTO {
     private StockMovementReason reason;
     private LocalDate fromDate;
     private LocalDate toDate;
+    private UUID productId;
+    private UUID locationId;
 }

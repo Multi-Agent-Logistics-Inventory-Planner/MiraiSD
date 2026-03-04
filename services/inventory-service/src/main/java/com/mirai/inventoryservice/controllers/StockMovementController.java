@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.dtos.mappers.AuditLogMapper;
 import com.mirai.inventoryservice.dtos.mappers.StockMovementMapper;
 import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
+import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.StockMovementResponseDTO;
@@ -56,6 +57,12 @@ public class StockMovementController {
     @PostMapping("/transfer")
     public ResponseEntity<Void> transferInventory(@Valid @RequestBody TransferInventoryRequestDTO requestDTO) {
         stockMovementService.transferInventory(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/batch-transfer")
+    public ResponseEntity<Void> batchTransferInventory(@Valid @RequestBody BatchTransferInventoryRequestDTO requestDTO) {
+        stockMovementService.batchTransferInventory(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

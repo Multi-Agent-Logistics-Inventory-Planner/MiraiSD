@@ -2,8 +2,10 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
+import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -28,7 +30,9 @@ import java.util.UUID;
 @Service
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
+    private final AuditLogRepository auditLogRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
@@ -50,7 +54,9 @@ public class StockMovementService {
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
+            AuditLogRepository auditLogRepository,
             ProductRepository productRepository,
+            UserRepository userRepository,
             BoxBinInventoryRepository boxBinInventoryRepository,
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
@@ -70,7 +76,9 @@ public class StockMovementService {
             PusherMachineRepository pusherMachineRepository,
             EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
+        this.auditLogRepository = auditLogRepository;
         this.productRepository = productRepository;
+        this.userRepository = userRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
@@ -93,7 +101,7 @@ public class StockMovementService {
 
     /**
      * Adjust inventory quantity (restock, sale, damage, etc.)
-     * Creates a single stock movement record
+     * Creates a single stock movement record linked to an audit log
      */
     @Transactional
     public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
@@ -119,6 +127,22 @@ public class StockMovementService {
             saveInventory(locationType, inventory);
         }
 
+        UUID locationId = getLocationId(inventory, locationType);
+        String locationCode = resolveLocationCode(locationId, locationType);
+
+        // Create audit log entry
+        AuditLog auditLog = createAuditLog(
+                request.getActorId(),
+                request.getReason(),
+                null, // fromLocationId (not applicable for adjustments)
+                null, // fromLocationCode
+                locationId,
+                locationCode,
+                1, // Single item
+                Math.abs(request.getQuantityChange()),
+                request.getNotes()
+        );
+
         // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         if (request.getNotes() != null) {
@@ -127,9 +151,10 @@ public class StockMovementService {
         metadata.put("inventory_id", inventoryId.toString());
 
         StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(getInventoryProduct(inventory))
                 .locationType(locationType)
-                .toLocationId(getLocationId(inventory, locationType))
+                .toLocationId(locationId)
                 .previousQuantity(currentQuantity)
                 .currentQuantity(newQuantity)
                 .quantityChange(request.getQuantityChange())
@@ -148,17 +173,82 @@ public class StockMovementService {
     }
 
     /**
-     * Transfer inventory between two locations
-     * Creates TWO stock movement records (withdrawal + deposit)
-     * If destination inventory doesn't exist, creates it automatically
+     * Transfer inventory between two locations for a single item.
+     * Creates TWO stock movement records (withdrawal + deposit) linked to a single audit log.
+     * If destination inventory doesn't exist, creates it automatically.
      */
     @Transactional
     public void transferInventory(TransferInventoryRequestDTO request) {
-        // Load source inventory
         Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
         int sourceQuantity = getInventoryQuantity(sourceInventory);
 
-        // 2. Validate sufficient quantity
+        UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
+        String sourceLocationCode = resolveLocationCode(sourceLocationId, request.getSourceLocationType());
+
+        // Resolve destination location code before executing so the AuditLog captures it
+        UUID destLocationId = resolveDestinationLocationId(request);
+        String destLocationCode = resolveLocationCode(destLocationId, request.getDestinationLocationType());
+
+        AuditLog auditLog = createAuditLog(
+                request.getActorId(),
+                StockMovementReason.TRANSFER,
+                sourceLocationId,
+                sourceLocationCode,
+                destLocationId,
+                destLocationCode,
+                1,
+                request.getQuantity(),
+                request.getNotes()
+        );
+
+        executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
+    }
+
+    /**
+     * Transfer multiple inventory items between two locations in a single batch.
+     * Creates ONE audit log entry covering all items, with itemCount = number of distinct products.
+     */
+    @Transactional
+    public void batchTransferInventory(BatchTransferInventoryRequestDTO batchRequest) {
+        List<TransferInventoryRequestDTO> transfers = batchRequest.getTransfers();
+
+        // Use first transfer's location info for the shared AuditLog
+        TransferInventoryRequestDTO first = transfers.get(0);
+        Object firstSource = loadInventory(first.getSourceLocationType(), first.getSourceInventoryId());
+        UUID sourceLocationId = getLocationId(firstSource, first.getSourceLocationType());
+        String sourceLocationCode = resolveLocationCode(sourceLocationId, first.getSourceLocationType());
+
+        UUID destLocationId = resolveDestinationLocationId(first);
+        String destLocationCode = resolveLocationCode(destLocationId, first.getDestinationLocationType());
+
+        int totalQuantity = transfers.stream().mapToInt(TransferInventoryRequestDTO::getQuantity).sum();
+
+        AuditLog auditLog = createAuditLog(
+                first.getActorId(),
+                StockMovementReason.TRANSFER,
+                sourceLocationId,
+                sourceLocationCode,
+                destLocationId,
+                destLocationCode,
+                transfers.size(),
+                totalQuantity,
+                first.getNotes()
+        );
+
+        for (TransferInventoryRequestDTO request : transfers) {
+            Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
+            int sourceQuantity = getInventoryQuantity(sourceInventory);
+            executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
+        }
+    }
+
+    /**
+     * Core transfer logic: validates, moves inventory, creates withdrawal + deposit StockMovements
+     * linked to the provided AuditLog. Used by both single and batch transfer paths.
+     */
+    private void executeTransfer(TransferInventoryRequestDTO request,
+                                  Object sourceInventory, int sourceQuantity,
+                                  AuditLog auditLog) {
         if (sourceQuantity < request.getQuantity()) {
             throw new InsufficientInventoryException(
                     String.format("Cannot transfer %d items. Source only has %d available.",
@@ -166,18 +256,14 @@ public class StockMovementService {
             );
         }
 
-        // 3. Load or create destination inventory
         Object destinationInventory;
         int destinationQuantity;
         UUID destinationInventoryId = request.getDestinationInventoryId();
 
         if (destinationInventoryId != null) {
-            // Load existing destination inventory
             destinationInventory = loadInventory(request.getDestinationLocationType(), destinationInventoryId);
             destinationQuantity = getInventoryQuantity(destinationInventory);
         } else {
-            // Create new inventory at destination.
-            // NOT_ASSIGNED has no physical location, so locationId is not required for it.
             if (request.getDestinationLocationId() == null
                     && request.getDestinationLocationType() != com.mirai.inventoryservice.models.enums.LocationType.NOT_ASSIGNED) {
                 throw new IllegalArgumentException("Either destinationInventoryId or destinationLocationId must be provided");
@@ -202,6 +288,9 @@ public class StockMovementService {
         }
         saveInventory(request.getDestinationLocationType(), destinationInventory);
 
+        UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
+        UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
+
         Map<String, Object> withdrawalMetadata = new HashMap<>();
         Map<String, Object> depositMetadata = new HashMap<>();
         if (request.getNotes() != null) {
@@ -213,10 +302,8 @@ public class StockMovementService {
         depositMetadata.put("transfer", true);
         depositMetadata.put("inventory_id", destinationInventoryId.toString());
 
-        UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
-        UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
-
         StockMovement withdrawal = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(getInventoryProduct(sourceInventory))
                 .locationType(request.getSourceLocationType())
                 .fromLocationId(sourceLocationId)
@@ -231,6 +318,7 @@ public class StockMovementService {
                 .build();
 
         StockMovement deposit = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(getInventoryProduct(destinationInventory))
                 .locationType(request.getDestinationLocationType())
                 .fromLocationId(sourceLocationId)
@@ -247,8 +335,22 @@ public class StockMovementService {
         stockMovementRepository.save(withdrawal);
         stockMovementRepository.save(deposit);
 
-        // Update product active status based on total inventory
         updateProductActiveStatus(getInventoryProduct(sourceInventory));
+    }
+
+    /**
+     * Resolves the physical destination location UUID for a transfer request.
+     * Returns null for NOT_ASSIGNED (no physical location).
+     */
+    private UUID resolveDestinationLocationId(TransferInventoryRequestDTO request) {
+        if (request.getDestinationLocationId() != null) {
+            return request.getDestinationLocationId();
+        }
+        if (request.getDestinationInventoryId() != null) {
+            Object destInventory = loadInventory(request.getDestinationLocationType(), request.getDestinationInventoryId());
+            return getLocationId(destInventory, request.getDestinationLocationType());
+        }
+        return null; // NOT_ASSIGNED
     }
 
     /**
@@ -275,6 +377,20 @@ public class StockMovementService {
         // Create the inventory record
         Object inventory = createInventoryAtLocation(locationType, locationId, product, quantity);
         UUID inventoryId = getInventoryId(inventory);
+        String locationCode = resolveLocationCode(locationId, locationType);
+
+        // Create audit log entry
+        AuditLog auditLog = createAuditLog(
+                actorId,
+                reason,
+                null,
+                null,
+                locationId,
+                locationCode,
+                1,
+                quantity,
+                notes
+        );
 
         // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
@@ -284,6 +400,7 @@ public class StockMovementService {
         metadata.put("inventory_id", inventoryId.toString());
 
         StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(product)
                 .locationType(locationType)
                 .toLocationId(locationId)
@@ -322,9 +439,23 @@ public class StockMovementService {
         int currentQuantity = getInventoryQuantity(inventory);
         Product product = getInventoryProduct(inventory);
         UUID locationId = getLocationId(inventory, locationType);
+        String locationCode = resolveLocationCode(locationId, locationType);
 
         // Delete the inventory record
         deleteInventory(locationType, inventory);
+
+        // Create audit log entry
+        AuditLog auditLog = createAuditLog(
+                actorId,
+                reason,
+                locationId,
+                locationCode,
+                null,
+                null,
+                1,
+                currentQuantity,
+                notes
+        );
 
         // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
@@ -334,6 +465,7 @@ public class StockMovementService {
         metadata.put("inventory_id", inventoryId.toString());
 
         StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(product)
                 .locationType(locationType)
                 .fromLocationId(locationId)
@@ -627,5 +759,43 @@ public class StockMovementService {
                 .getSingleResult();
 
         return ((Number) result).intValue();
+    }
+
+    /**
+     * Create an audit log entry for a stock movement action.
+     * This groups related stock movements together for UI display.
+     */
+    private AuditLog createAuditLog(
+            UUID actorId,
+            StockMovementReason reason,
+            UUID fromLocationId,
+            String fromLocationCode,
+            UUID toLocationId,
+            String toLocationCode,
+            int itemCount,
+            int totalQuantityMoved,
+            String notes
+    ) {
+        String actorName = null;
+        if (actorId != null) {
+            actorName = userRepository.findById(actorId)
+                    .map(com.mirai.inventoryservice.models.audit.User::getFullName)
+                    .orElse(null);
+        }
+
+        AuditLog auditLog = AuditLog.builder()
+                .actorId(actorId)
+                .actorName(actorName)
+                .reason(reason)
+                .primaryFromLocationId(fromLocationId)
+                .primaryFromLocationCode(fromLocationCode)
+                .primaryToLocationId(toLocationId)
+                .primaryToLocationCode(toLocationCode)
+                .itemCount(itemCount)
+                .totalQuantityMoved(totalQuantityMoved)
+                .notes(notes)
+                .build();
+
+        return auditLogRepository.save(auditLog);
     }
 }

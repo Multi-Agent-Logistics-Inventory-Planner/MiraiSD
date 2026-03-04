@@ -50,5 +50,9 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since AND sm.at < :until")
     List<StockMovement> findByReasonAndAtBetweenWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since, @Param("until") OffsetDateTime until);
+
+    // Find all movements for a specific audit log
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId ORDER BY sm.id")
+    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId);
 }
 
