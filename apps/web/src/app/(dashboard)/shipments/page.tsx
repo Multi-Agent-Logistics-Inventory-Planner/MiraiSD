@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  ShipmentsTable,
+  ShipmentsList,
   ShipmentDetailSheet,
   ShipmentCreateDialog,
   ShipmentReceiveDialog,
@@ -177,16 +177,11 @@ export default function ShipmentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="py-0">
-          <CardContent className="p-0">
-            <ShipmentsTable
-              shipments={filteredShipments}
-              isLoading={shipmentsQuery.isLoading}
-              onRowClick={handleRowClick}
-              showActualDeliveryDate={activeTab === "COMPLETED"}
-            />
-          </CardContent>
-        </Card>
+        <ShipmentsList
+          shipments={filteredShipments}
+          isLoading={shipmentsQuery.isLoading}
+          onShipmentClick={handleRowClick}
+        />
       )}
 
       <ShipmentPagination

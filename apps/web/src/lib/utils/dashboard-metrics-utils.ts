@@ -251,7 +251,7 @@ export function computeSparklineFromAuditLog(
 interface ForecastForVelocity {
   itemId: string;
   itemName: string;
-  itemSku: string;
+  itemSku?: string | null;
   avgDailyDelta: number;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { format } from "date-fns";
 import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2, Pencil, Check, X } from "lucide-react";
 import {
@@ -83,14 +84,28 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
   const allocations = item.allocations ?? [];
   const hasAllocations = allocations.length > 0;
   const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
+  const imageUrl = item.item?.imageUrl;
 
   return (
     <div className="py-3 border-b last:border-b-0">
-      <div className="flex items-start gap-3">
-        <span className="text-sm text-muted-foreground w-6 hidden sm:block shrink-0">{index + 1}</span>
+      <div className="flex items-center gap-3">
+        {/* Product Image */}
+        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={item.item?.name || "Product"}
+              fill
+              sizes="40px"
+              className="object-cover"
+            />
+          ) : (
+            <Package className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
-          <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>
+          {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
             <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
             {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
@@ -116,7 +131,7 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
         </div>
       </div>
       {hasAllocations && (
-        <div className="mt-2 ml-10 flex items-start gap-2">
+        <div className="mt-2 flex items-start gap-2">
           <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
           <div className="flex flex-wrap gap-1">
             {allocations.map((allocation) => (
@@ -258,7 +273,6 @@ export function ShipmentDetailSheet({
             {/* Items Header */}
             <div className="px-4 py-2 border-b bg-muted/20 hidden sm:block">
               <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                <span className="w-6">#</span>
                 <span className="flex-1">Name</span>
                 <span className="text-right w-24">Qty</span>
                 <span className="text-right w-20">Price</span>

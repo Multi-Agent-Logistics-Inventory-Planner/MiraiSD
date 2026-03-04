@@ -46,7 +46,7 @@ const EMPTY_LOCATION: LocationSelection = {
 };
 
 const schema = z.object({
-  sku: z.string().min(1, "SKU is required"),
+  sku: z.string().optional(),
   name: z.string().min(1, "Name is required"),
   categoryId: z.string().min(1, "Category is required"),
   description: z.string().optional(),
@@ -129,7 +129,7 @@ export function ProductForm({
         setRootCategoryId(cat.parentId);
         setSubcategoryId(cat.id);
         form.reset({
-          sku: initialProduct.sku,
+          sku: initialProduct.sku ?? "",
           name: initialProduct.name,
           categoryId: cat.id, // The actual category is the subcategory
           description: initialProduct.description ?? "",
@@ -146,7 +146,7 @@ export function ProductForm({
         setRootCategoryId(cat.id);
         setSubcategoryId("");
         form.reset({
-          sku: initialProduct.sku,
+          sku: initialProduct.sku ?? "",
           name: initialProduct.name,
           categoryId: cat.id,
           description: initialProduct.description ?? "",
@@ -204,7 +204,7 @@ export function ProductForm({
     }
 
     const payload: ProductRequest = {
-      sku: values.sku.trim(),
+      sku: values.sku?.trim() || undefined,
       name: values.name.trim(),
       categoryId: values.categoryId, // This is either rootCategoryId or subcategoryId
       description: values.description || undefined,

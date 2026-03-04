@@ -170,7 +170,7 @@ export function ShipmentCreateDialog({
   function handleSelectProduct(index: number, product: Product) {
     form.setValue(`items.${index}.productId`, product.id);
     form.setValue(`items.${index}.productName`, product.name);
-    form.setValue(`items.${index}.productSku`, product.sku);
+    form.setValue(`items.${index}.productSku`, product.sku ?? "");
     if (product.unitCost) {
       form.setValue(`items.${index}.unitCost`, product.unitCost);
     }

@@ -11,7 +11,7 @@ export type StockStatus = "good" | "low" | "critical" | "out-of-stock";
 
 export interface StockLevelItem {
   itemId: string;
-  sku: string;
+  sku?: string | null;
   name: string;
   stock: number;
   maxStock: number;
@@ -83,7 +83,7 @@ export const RISK_BAND_LABELS: Record<RiskBand, string> = {
 export interface ActionRequiredItem {
   itemId: string;
   itemName: string;
-  itemSku: string;
+  itemSku?: string | null;
   imageUrl: string | null;
   daysToStockout: number;
   currentStock: number;
@@ -141,7 +141,7 @@ export interface PerformanceMetricsWithTrends {
 export interface DemandVelocityItem {
   itemId: string;
   itemName: string;
-  itemSku: string;
+  itemSku?: string | null;
   currentDelta: number;
   previousDelta: number;
   changePercent: number;
@@ -188,7 +188,7 @@ export interface QuickStats {
 export interface FilterableStockItem {
   itemId: string;
   itemName: string;
-  itemSku: string;
+  itemSku?: string | null;
   imageUrl: string | null;
   status: RiskBand;
   daysToStockout: number | null;
