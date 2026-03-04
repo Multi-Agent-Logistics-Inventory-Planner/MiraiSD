@@ -176,7 +176,7 @@ public class ShipmentService {
     }
 
     public Shipment getShipmentById(UUID id) {
-        return shipmentRepository.findById(id)
+        return shipmentRepository.findByIdWithAssociations(id)
                 .orElseThrow(() -> new ShipmentNotFoundException("Shipment not found with id: " + id));
     }
 

@@ -63,7 +63,8 @@ public class ShipmentItem {
     @Column(columnDefinition = "text")
     private String notes;
 
-    @OneToMany(mappedBy = "shipmentItem", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "shipmentItem", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<ShipmentItemAllocation> allocations = new ArrayList<>();
 
