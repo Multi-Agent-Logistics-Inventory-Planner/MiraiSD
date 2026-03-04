@@ -6,13 +6,6 @@ import { Search, Filter, X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -20,6 +13,13 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { StockMovementReason, type User } from "@/types/api";
 import { cn } from "@/lib/utils";
 
@@ -47,16 +47,6 @@ interface AuditLogFiltersProps {
   users?: User[];
 }
 
-const REASON_LABELS: Record<StockMovementReason, string> = {
-  [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
-  [StockMovementReason.RESTOCK]: "Restock",
-  [StockMovementReason.SALE]: "Sale",
-  [StockMovementReason.DAMAGE]: "Damage",
-  [StockMovementReason.ADJUSTMENT]: "Adjustment",
-  [StockMovementReason.RETURN]: "Return",
-  [StockMovementReason.TRANSFER]: "Transfer",
-};
-
 
 export function AuditLogFilters({
   state,
@@ -67,7 +57,6 @@ export function AuditLogFilters({
 
   const hasActiveFilters =
     Boolean(state.actorId) ||
-    state.reason !== "all" ||
     Boolean(state.fromDate) ||
     Boolean(state.toDate);
 
@@ -82,7 +71,6 @@ export function AuditLogFilters({
   today.setHours(23, 59, 59, 999);
 
   const filterCount = [
-    state.reason !== "all",
     Boolean(state.actorId),
     Boolean(state.fromDate),
     Boolean(state.toDate),
@@ -114,26 +102,6 @@ export function AuditLogFilters({
         </PopoverTrigger>
         <PopoverContent className="w-80" align="end">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="action-select">Action</Label>
-              <Select
-                value={state.reason}
-                onValueChange={(v) => updateField("reason", v as ReasonFilter)}
-              >
-                <SelectTrigger id="action-select">
-                  <SelectValue placeholder="Select action" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All actions</SelectItem>
-                  {Object.entries(REASON_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="employee-select">Performed by</Label>
               <Select
