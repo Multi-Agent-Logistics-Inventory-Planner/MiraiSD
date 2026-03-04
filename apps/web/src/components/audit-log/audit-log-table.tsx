@@ -112,16 +112,16 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
       )}
       <div className="space-y-1">
         {/* Sub-header */}
-        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="grid grid-cols-[1fr_7rem_5rem] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
           <span>Product</span>
-          <span className="text-right w-14 md:w-28">Location</span>
-          <span className="text-right w-16">Change</span>
+          <span className="text-center">Location</span>
+          <span className="text-center">Change</span>
         </div>
 
         {detail.movements.map((movement) => (
           <div
             key={movement.id}
-            className="grid grid-cols-[1fr_auto_auto] gap-x-4 md:gap-x-8 px-3 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            className="grid grid-cols-[1fr_7rem_5rem] gap-x-4 md:gap-x-8 px-3 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               {movement.itemImageUrl ? (
@@ -142,7 +142,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
                 <p className="text-xs text-muted-foreground">{movement.itemSku}</p>
               </div>
             </div>
-            <span className="text-sm text-muted-foreground w-14 md:w-28 text-right self-center tabular-nums">
+            <span className="text-sm text-muted-foreground text-center self-center tabular-nums">
               {movementLocationLabel(
                 movement,
                 detail.reason,
@@ -150,7 +150,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
                 detail.primaryToLocationCode
               )}
             </span>
-            <div className="w-16 text-right self-center">
+            <div className="text-center self-center">
               <QuantityChange change={movement.quantityChange} />
               <p className="text-xs text-muted-foreground tabular-nums">
                 {movement.previousQuantity ?? 0} → {movement.currentQuantity ?? 0}
