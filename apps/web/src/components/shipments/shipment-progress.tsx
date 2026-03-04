@@ -67,11 +67,15 @@ export function ShipmentProgress({
   const stageStates = getStageStates(status, receivedQuantity, orderedQuantity);
 
   // Calculate progress percentage for the bar
-  const completedCount = stageStates.filter((s) => s === "completed").length;
-  const hasActive = stageStates.some((s) => s === "active");
-  const progressPercent = hasActive
-    ? ((completedCount + 0.5) / STAGES.length) * 100
-    : (completedCount / STAGES.length) * 100;
+  // The bar should extend to the active stage (or last completed stage)
+  const activeIndex = stageStates.findIndex((s) => s === "active");
+  const lastCompletedIndex = stageStates.lastIndexOf("completed");
+  const targetIndex = activeIndex !== -1 ? activeIndex : lastCompletedIndex;
+
+  // Calculate percentage: icons are at 0%, 33.3%, 66.6%, 100%
+  const progressPercent = targetIndex >= 0
+    ? (targetIndex / (STAGES.length - 1)) * 100
+    : 0;
 
   return (
     <div className="w-full py-2">

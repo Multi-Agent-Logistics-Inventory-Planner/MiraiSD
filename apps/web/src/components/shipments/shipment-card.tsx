@@ -1,11 +1,12 @@
 "use client";
 
-import { MoreVertical } from "lucide-react";
+import Image from "next/image";
+import { MoreVertical, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ShipmentProgress } from "./shipment-progress";
-import type { Shipment } from "@/types/api";
+import type { Shipment, ShipmentItem } from "@/types/api";
 import {
   getShipmentDisplayStatus,
   SHIPMENT_DISPLAY_STATUS_LABELS,
@@ -70,25 +71,30 @@ function getStatusText(shipment: Shipment): { text: string; date: string } {
   };
 }
 
-function getInitials(name?: string): string {
-  if (!name) return "?";
-  return name.charAt(0).toUpperCase();
-}
+function ProductThumbnail({ item }: { item: ShipmentItem }) {
+  const imageUrl = item.item?.imageUrl;
+  const quantity = item.orderedQuantity;
 
-function getAvatarColor(name?: string): string {
-  if (!name) return "bg-gray-500";
-  const colors = [
-    "bg-violet-500",
-    "bg-blue-500",
-    "bg-emerald-500",
-    "bg-amber-500",
-    "bg-rose-500",
-    "bg-cyan-500",
-    "bg-indigo-500",
-    "bg-pink-500",
-  ];
-  const index = name.charCodeAt(0) % colors.length;
-  return colors[index];
+  return (
+    <div className="relative">
+      <div className="relative h-12 w-12 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={item.item?.name || "Product"}
+            fill
+            sizes="48px"
+            className="object-cover"
+          />
+        ) : (
+          <Package className="h-5 w-5 text-muted-foreground" />
+        )}
+      </div>
+      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-[10px] font-medium text-muted-foreground">
+        {quantity}
+      </span>
+    </div>
+  );
 }
 
 export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
@@ -105,9 +111,6 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
     0
   );
 
-  // Get primary product info (first item)
-  const primaryItem = shipment.items[0];
-  const productName = primaryItem?.item?.name || "No items";
   const itemCount = shipment.items.length;
 
   // Calculate total cost
@@ -129,21 +132,20 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
       onClick={onClick}
     >
       {/* Header Row */}
-      <div className="flex items-start justify-between gap-4 mb-3">
+      <div className="flex items-start justify-between gap-4 mb-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="font-mono text-sm font-semibold text-primary">
+          <div className="flex items-center gap-2 flex-wrap">
+            {shipment.supplierName && (
+              <span className="font-semibold text-sm">
+                {shipment.supplierName}
+              </span>
+            )}
+            <span className="font-mono text-sm text-muted-foreground">
               {shipment.shipmentNumber}
             </span>
-            <span className="text-sm text-foreground font-medium truncate">
-              {productName}
-              {itemCount > 1 && (
-                <span className="text-muted-foreground ml-1">
-                  +{itemCount - 1} more
-                </span>
-              )}
-              <span className="text-muted-foreground ml-1">x{totalOrdered}</span>
-            </span>
+          </div>
+          <div className="text-sm text-muted-foreground mt-0.5">
+            {itemCount} item{itemCount !== 1 ? "s" : ""} ({totalOrdered} units)
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -177,23 +179,11 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
         </div>
       </div>
 
-      {/* Supplier Row */}
-      <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-        {shipment.supplierName && (
-          <>
-            <div
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white",
-                getAvatarColor(shipment.supplierName)
-              )}
-            >
-              {getInitials(shipment.supplierName)}
-            </div>
-            <span>{shipment.supplierName}</span>
-            <span className="text-muted-foreground/50">•</span>
-          </>
-        )}
-        <span>{shipment.items.length} item{shipment.items.length !== 1 ? "s" : ""}</span>
+      {/* Product Images Row */}
+      <div className="flex items-start gap-3 mb-4 overflow-x-auto pb-1">
+        {shipment.items.map((item) => (
+          <ProductThumbnail key={item.id} item={item} />
+        ))}
       </div>
 
       {/* Status Section */}
