@@ -51,6 +51,10 @@ public class ReceiveShipmentRequestDTO {
         // Multi-destination allocations (preferred)
         private List<DestinationAllocationDTO> allocations;
 
+        // Damaged quantity - items that arrived damaged (not added to inventory)
+        @Min(value = 0, message = "Damaged quantity must be non-negative")
+        private Integer damagedQuantity;
+
         // Legacy fields for backward compatibility
         @Min(value = 0, message = "Received quantity must be non-negative")
         private Integer receivedQuantity;
