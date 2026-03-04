@@ -88,7 +88,7 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
 
   return (
     <div className="py-3 border-b last:border-b-0">
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         {/* Product Image */}
         <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
           {imageUrl ? (
