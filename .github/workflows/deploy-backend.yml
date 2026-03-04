@@ -62,16 +62,16 @@ jobs:
           echo "messaging_changed=$MESSAGING_CHANGED" >> $GITHUB_OUTPUT
           echo "infra_changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
 
-          # Build list of services to rebuild
+          # Build list of services to rebuild (space-separated, no leading space)
           SERVICES_TO_REBUILD=""
           if [ "$INVENTORY_CHANGED" = "true" ]; then
-            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD inventory-service"
+            SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }inventory-service"
           fi
           if [ "$FORECASTING_CHANGED" = "true" ]; then
-            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD forecasting-service"
+            SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }forecasting-service"
           fi
           if [ "$MESSAGING_CHANGED" = "true" ]; then
-            SERVICES_TO_REBUILD="$SERVICES_TO_REBUILD messaging-service"
+            SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }messaging-service"
           fi
 
           echo "services_to_rebuild=$SERVICES_TO_REBUILD" >> $GITHUB_OUTPUT
@@ -85,13 +85,13 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT || 22 }}
           command_timeout: 30m
-          script_stop: true
           script: |
-            set -e
+            set -ex
 
             echo "=== Deployment started at $(date) ==="
 
             # Navigate to project directory
+            echo "Navigating to ${{ env.DEPLOY_PATH }}..."
             cd ${{ env.DEPLOY_PATH }}
 
             # Pull latest changes
@@ -100,11 +100,15 @@ jobs:
             git reset --hard origin/main
 
             # Navigate to infra directory
+            echo "Navigating to infra directory..."
             cd infra
 
             # Determine what to rebuild
             INFRA_CHANGED="${{ steps.changes.outputs.infra_changed }}"
             SERVICES="${{ steps.changes.outputs.services_to_rebuild }}"
+
+            echo "INFRA_CHANGED=$INFRA_CHANGED"
+            echo "SERVICES=$SERVICES"
 
             if [ "$INFRA_CHANGED" = "true" ] || [ -z "$SERVICES" ]; then
               echo "Infrastructure changed or full rebuild needed. Rebuilding all services..."
