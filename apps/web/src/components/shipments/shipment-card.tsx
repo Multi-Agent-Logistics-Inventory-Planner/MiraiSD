@@ -147,9 +147,11 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="font-semibold text-sm">
-            {totalCost > 0 ? formatCurrency(totalCost) : "-"}
-          </span>
+          {totalCost > 0 && (
+            <span className="font-semibold text-sm">
+              {formatCurrency(totalCost)}
+            </span>
+          )}
           {displayStatus && (
             <Badge
               variant="outline"
