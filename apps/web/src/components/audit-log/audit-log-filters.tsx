@@ -33,6 +33,9 @@ export const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
   [StockMovementReason.RETURN]: "Return",
   [StockMovementReason.TRANSFER]: "Transfer",
+  [StockMovementReason.DISPLAY_SET]: "Display Set",
+  [StockMovementReason.DISPLAY_REMOVED]: "Display Removed",
+  [StockMovementReason.DISPLAY_SWAP]: "Display Swap",
 };
 
 export interface AuditLogFiltersState {
