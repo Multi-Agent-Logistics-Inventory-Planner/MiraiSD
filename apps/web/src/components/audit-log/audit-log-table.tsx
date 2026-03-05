@@ -204,7 +204,7 @@ function RowSkeleton() {
         </div>
       </div>
       {/* Desktop skeleton */}
-      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center">
+      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_7rem_6rem] gap-x-6 items-center">
         <Skeleton className="h-4 w-4 rounded" />
         <div className="space-y-1.5">
           <Skeleton className="h-3.5 w-28" />
@@ -213,7 +213,8 @@ function RowSkeleton() {
         <Skeleton className="h-6 w-20 rounded-full" />
         <Skeleton className="h-3.5 w-32" />
         <Skeleton className="h-3.5 w-16" />
-        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-3.5 w-20" />
+        <Skeleton className="h-3.5 w-20" />
       </div>
     </div>
   );
@@ -236,12 +237,13 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
   return (
     <div className="w-full">
       {/* Desktop-only table header */}
-      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-2.5 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide select-none">
+      <div className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_7rem_6rem] gap-x-6 items-center px-4 py-2.5 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide select-none">
         <div />
         <div>User</div>
         <div>Action</div>
         <div>Product</div>
         <div>Location</div>
+        <div>Date</div>
         <div>Time</div>
       </div>
 
@@ -254,6 +256,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
       ) : (
         entries.map((entry) => {
           const isExpanded = expandedId === entry.id;
+          const createdAt = new Date(entry.createdAt);
           return (
             // Outer wrapper owns the border-b and the shared background.
             // This makes the expanded detail feel like part of the same row —
@@ -299,7 +302,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
 
               {/* ── Desktop row ── */}
               <div
-                className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_9rem] gap-x-6 items-center px-4 py-4 cursor-pointer select-none"
+                className="hidden md:grid grid-cols-[2rem_1fr_8rem_1fr_7rem_7rem_6rem] gap-x-6 items-center px-4 py-4 cursor-pointer select-none"
                 onClick={() => toggleRow(entry.id)}
               >
                 <ChevronRight
@@ -340,9 +343,14 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                   {formatLocation(entry)}
                 </p>
 
+                {/* Date */}
+                <p className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                  {format(createdAt, "MM-dd-yyyy")}
+                </p>
+
                 {/* Time */}
                 <p className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
-                  {format(new Date(entry.createdAt), "MM-dd-yyyy h:mm a")}
+                  {format(createdAt, "h:mm a")}
                 </p>
               </div>
 
