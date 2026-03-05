@@ -21,7 +21,16 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
   [StockMovementReason.RETURN]: "Return",
   [StockMovementReason.TRANSFER]: "Transfer",
+  [StockMovementReason.DISPLAY_SET]: "Display Set",
+  [StockMovementReason.DISPLAY_REMOVED]: "Display Removed",
+  [StockMovementReason.DISPLAY_SWAP]: "Display Swap",
 };
+
+const DISPLAY_REASONS = new Set<StockMovementReason>([
+  StockMovementReason.DISPLAY_SET,
+  StockMovementReason.DISPLAY_REMOVED,
+  StockMovementReason.DISPLAY_SWAP,
+]);
 
 function getReasonStyle(reason: StockMovementReason): string {
   switch (reason) {
@@ -36,6 +45,10 @@ function getReasonStyle(reason: StockMovementReason): string {
       return "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400";
     case StockMovementReason.RETURN:
       return "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400";
+    case StockMovementReason.DISPLAY_SET:
+    case StockMovementReason.DISPLAY_REMOVED:
+    case StockMovementReason.DISPLAY_SWAP:
+      return "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-400";
     case StockMovementReason.ADJUSTMENT:
     default:
       return "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400";
@@ -47,6 +60,9 @@ function formatLocation(entry: AuditLog): string {
     const from = entry.primaryFromLocationCode ?? "NA";
     const to = entry.primaryToLocationCode ?? "NA";
     return `${from} → ${to}`;
+  }
+  if (DISPLAY_REASONS.has(entry.reason)) {
+    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? "—";
   }
   return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? "—";
 }
@@ -105,11 +121,20 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
 
   if (!detail) return null;
 
+  const isDisplayOperation = DISPLAY_REASONS.has(detail.reason);
+
   return (
     <div className="px-4 md:px-12 pb-4 pt-1">
       {detail.notes && (
         <p className="text-sm text-muted-foreground mb-3 italic">"{detail.notes}"</p>
       )}
+      {isDisplayOperation ? (
+        <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{detail.productSummary ?? "—"}</span>
+          <span>·</span>
+          <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "—"}</span>
+        </div>
+      ) : (
       <div className="space-y-1">
         {/* Sub-header */}
         <div className="grid grid-cols-[1fr_7rem_5rem] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -158,6 +183,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -300,11 +326,13 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                   <p className="text-sm font-medium truncate">
                     {entry.productSummary ?? "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {entry.itemCount > 1
-                      ? `${entry.itemCount} items · ${entry.totalQuantityMoved} units`
-                      : `${entry.totalQuantityMoved} units`}
-                  </p>
+                  {!DISPLAY_REASONS.has(entry.reason) && (
+                    <p className="text-xs text-muted-foreground">
+                      {entry.itemCount > 1
+                        ? `${entry.itemCount} items · ${entry.totalQuantityMoved} units`
+                        : `${entry.totalQuantityMoved} units`}
+                    </p>
+                  )}
                 </div>
 
                 {/* Location */}

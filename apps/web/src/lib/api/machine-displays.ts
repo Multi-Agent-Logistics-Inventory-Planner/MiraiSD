@@ -7,6 +7,14 @@ import {
   PaginatedResponse,
 } from "@/types/api";
 
+export interface SwapMachineDisplayRequest {
+  outgoingDisplayId: string;
+  incomingProductId: string;
+  locationType: LocationType;
+  machineId: string;
+  actorId?: string;
+}
+
 /**
  * Get all active machine displays
  */
@@ -153,6 +161,19 @@ export async function clearDisplayById(
 ): Promise<void> {
   const params = actorId ? `?actorId=${actorId}` : "";
   return apiDelete<void>(`/api/machine-displays/by-id/${displayId}${params}`);
+}
+
+/**
+ * Atomically swap one displayed product for another on the same machine.
+ * Returns the updated list of active displays for the machine.
+ */
+export async function swapMachineDisplay(
+  data: SwapMachineDisplayRequest
+): Promise<MachineDisplay[]> {
+  return apiPost<MachineDisplay[], SwapMachineDisplayRequest>(
+    "/api/machine-displays/swap",
+    data
+  );
 }
 
 /**

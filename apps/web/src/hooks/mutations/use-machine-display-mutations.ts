@@ -4,16 +4,10 @@ import {
   setMachineDisplayBatch,
   clearMachineDisplay,
   clearDisplayById,
+  swapMachineDisplay,
+  type SwapMachineDisplayRequest,
 } from "@/lib/api/machine-displays";
 import { SetMachineDisplayRequest, SetMachineDisplayBatchRequest, MachineDisplay, LocationType } from "@/types/api";
-
-interface SwapDisplayVariables {
-  outgoingDisplayId: string;
-  incomingProductId: string;
-  locationType: LocationType;
-  machineId: string;
-  actorId?: string;
-}
 
 /**
  * Mutation to set or swap a machine display
@@ -78,16 +72,14 @@ export function useClearDisplayByIdMutation() {
 
 /**
  * Mutation to atomically swap one displayed product for another.
- * Ends the outgoing display record then creates a new one for the incoming product.
+ * Delegates to the backend /swap endpoint which handles both ops in one transaction
+ * and writes a DISPLAY_SWAP audit log entry.
  */
 export function useSwapDisplayMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, SwapDisplayVariables>({
-    mutationFn: async ({ outgoingDisplayId, incomingProductId, locationType, machineId, actorId }) => {
-      await clearDisplayById(outgoingDisplayId, actorId);
-      await setMachineDisplayBatch({ locationType, machineId, productIds: [incomingProductId], actorId });
-    },
+  return useMutation<MachineDisplay[], Error, SwapMachineDisplayRequest>({
+    mutationFn: swapMachineDisplay,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
     },
