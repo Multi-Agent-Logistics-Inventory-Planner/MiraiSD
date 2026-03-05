@@ -119,7 +119,7 @@ export function AddInventoryDialog({
                 <Command>
                   <CommandInput placeholder="Search products..." />
                   <CommandList>
-                    <CommandEmpty>No products found.</CommandEmpty>
+                    <CommandEmpty>No products found</CommandEmpty>
                     <CommandGroup>
                       {products.map((p) => {
                         const existingInv = existingInventory.find((inv) => inv.item.id === p.id);

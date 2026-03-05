@@ -241,8 +241,8 @@ export function ActionRequiredPanel({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <Card className="py-4 shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <Skeleton className="h-5 w-5" />
             <Skeleton className="h-5 w-40" />
@@ -259,8 +259,11 @@ export function ActionRequiredPanel({
 
   return (
     <TooltipProvider>
-      <Card className="shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <Card className="py-4 shadow-none">
+        <CardHeader className={cn(
+          "flex flex-row items-center justify-between",
+          !isCollapsed && "pb-2"
+        )}>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-[#d97757]" />
             <CardTitle className="text-base font-semibold">
@@ -361,7 +364,7 @@ export function ActionRequiredPanel({
             <div className="flex justify-end pt-2">
               <Link
                 href="/products?status=low"
-                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                className="text-sm text-muted-foreground hover:text-foreground/75 flex items-center gap-1 transition-colors"
               >
                 View All
                 <ArrowRight className="h-4 w-4" />

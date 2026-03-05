@@ -297,7 +297,7 @@ export default function ReviewsPage() {
           if (open) setPickerYear(selectedYear);
         }}>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2 dark:bg-input dark:border-[#41413d] text-muted-foreground">
               <CalendarIcon className="h-4 w-4" />
               <span>{formattedMonthYear}</span>
             </Button>
@@ -354,11 +354,10 @@ export default function ReviewsPage() {
           <Button
             variant="outline"
             onClick={() => setIsManageDialogOpen(true)}
-            size="sm"
-            className="sm:size-default"
+            className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
           >
-            <Settings className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Manage Employees</span>
+            <Settings className="h-4 w-4 mr-2" />
+            Manage Employees
           </Button>
         )}
       </div>

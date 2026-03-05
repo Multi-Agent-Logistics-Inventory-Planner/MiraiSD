@@ -218,7 +218,7 @@ export function MachineDisplayDetailModal({
                     <Command>
                       <CommandInput placeholder="Search products..." />
                       <CommandList>
-                        <CommandEmpty>No products available.</CommandEmpty>
+                        <CommandEmpty>No products </CommandEmpty>
                         <CommandGroup>
                           {availableProducts.map((product) => (
                             <CommandItem

@@ -446,7 +446,7 @@ export function ShipmentCreateDialog({
                                   <CommandInput placeholder="Search products..." />
                                   <CommandList>
                                     <CommandEmpty>
-                                      No products found.
+                                      No products found
                                     </CommandEmpty>
                                     <CommandGroup>
                                       {products.map((p) => (

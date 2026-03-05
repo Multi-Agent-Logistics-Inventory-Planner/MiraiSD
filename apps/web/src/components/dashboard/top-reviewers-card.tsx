@@ -82,7 +82,7 @@ export function TopReviewersCard() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Star className="h-4 w-4 text-muted-foreground" />
-            Monthly Top Reviewers
+            Monthly Reviews
             {data && (
               <span className="text-muted-foreground font-normal ml-1">
                 ({data.totalReviews})
@@ -90,7 +90,7 @@ export function TopReviewersCard() {
             )}
           </CardTitle>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/reviews" className="gap-1">
+            <Link href="/reviews" className="gap-1 text-muted-foreground hover:text-muted-foreground">
               View All
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>

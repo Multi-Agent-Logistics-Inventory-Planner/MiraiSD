@@ -249,7 +249,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
         Array.from({ length: 10 }).map((_, i) => <RowSkeleton key={i} />)
       ) : entries.length === 0 ? (
         <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          No audit log entries found.
+          No audit log entries found
         </div>
       ) : (
         entries.map((entry) => {

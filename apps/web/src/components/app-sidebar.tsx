@@ -34,6 +34,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -134,15 +135,48 @@ function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
 }
 
 function NavItemLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const { setOpenMobile } = useSidebar();
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={pathname === item.href}>
-        <Link href={item.href}>
+        <Link href={item.href} onClick={() => setOpenMobile(false)}>
           <item.icon className="h-4 w-4 dark:text-[#faf9f5]" />
           <span>{item.title}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  );
+}
+
+function LogoLink({ href }: { href: string }) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <Link
+      href={href}
+      className="flex items-center -ml-2"
+      onClick={() => setOpenMobile(false)}
+    >
+      <Logo width={100} height={56} />
+    </Link>
+  );
+}
+
+function SettingsLink() {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <DropdownMenuItem asChild>
+      <Link
+        href="/settings"
+        className="cursor-pointer"
+        onClick={() => setOpenMobile(false)}
+      >
+        <Settings className="h-4 w-4" />
+        <span>Settings</span>
+      </Link>
+    </DropdownMenuItem>
   );
 }
 
@@ -163,12 +197,7 @@ export function AppSidebar() {
   return (
     <Sidebar className="z-50 bg-background border-r">
       <SidebarHeader className="px-2 py-2.5">
-        <Link
-          href={user?.role === UserRole.EMPLOYEE ? "/storage" : "/"}
-          className="flex items-center -ml-2"
-        >
-          <Logo width={100} height={56} />
-        </Link>
+        <LogoLink href={user?.role === UserRole.EMPLOYEE ? "/storage" : "/"} />
       </SidebarHeader>
       <SidebarContent>
         {can(dashboardItem.permission) && (
@@ -283,12 +312,7 @@ export function AppSidebar() {
               align="center"
               className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
             >
-              <DropdownMenuItem asChild>
-                <Link href="/settings" className="cursor-pointer">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </Link>
-              </DropdownMenuItem>
+              <SettingsLink />
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                 <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />

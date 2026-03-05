@@ -254,7 +254,7 @@ export function SetDisplayDialog({
                 <Command>
                   <CommandInput placeholder="Search products..." />
                   <CommandList>
-                    <CommandEmpty>No products found.</CommandEmpty>
+                    <CommandEmpty>No products found</CommandEmpty>
                     <CommandGroup>
                       {products.map((product) => (
                         <CommandItem

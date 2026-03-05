@@ -400,7 +400,7 @@ export function LocationDetailSheet({
               ))
             ) : (
               <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
-                No inventory in this location yet.
+                No inventory in this location yet
               </div>
             )}
           </div>
@@ -433,7 +433,7 @@ export function LocationDetailSheet({
           <Command>
             <CommandInput placeholder="Search products..." />
             <CommandList>
-              <CommandEmpty>No products available.</CommandEmpty>
+              <CommandEmpty>No products available</CommandEmpty>
               <CommandGroup>
                 {availableProducts.map((product) => (
                   <CommandItem
@@ -503,7 +503,7 @@ export function LocationDetailSheet({
             <Command>
               <CommandInput placeholder="Search products..." />
               <CommandList>
-                <CommandEmpty>No products available.</CommandEmpty>
+                <CommandEmpty>No products available</CommandEmpty>
                 <CommandGroup>
                   {availableProducts.map((product) => (
                     <CommandItem
@@ -705,7 +705,7 @@ export function LocationDetailSheet({
               ))
             ) : historyItems.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
-                No display history yet.
+                No display history yet
               </div>
             ) : (
               historyItems.map((item) => {
