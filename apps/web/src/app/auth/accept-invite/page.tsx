@@ -189,11 +189,11 @@ function AcceptInviteContent() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-[#262624] dark:to-[#262624] p-4">
+        <Card className="w-full max-w-md shadow-lg">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="mt-4 text-sm text-gray-600">
+            <p className="mt-4 text-sm text-muted-foreground">
               Verifying invitation...
             </p>
           </CardContent>
@@ -204,8 +204,8 @@ function AcceptInviteContent() {
 
   if (error && !email) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-[#262624] dark:to-[#262624] p-4">
+        <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
             <CardTitle className="text-red-600">Invalid Invitation</CardTitle>
             <CardDescription>
@@ -223,8 +223,8 @@ function AcceptInviteContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-[#262624] dark:to-[#262624] p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
@@ -242,7 +242,7 @@ function AcceptInviteContent() {
                   type="email"
                   value={email}
                   disabled
-                  className="bg-gray-100"
+                  className="bg-muted"
                 />
               </div>
             )}
@@ -312,11 +312,11 @@ function AcceptInviteContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100 dark:from-[#262624] dark:to-[#262624] p-4">
+      <Card className="w-full max-w-md shadow-lg">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="mt-4 text-sm text-gray-600">Loading...</p>
+          <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
         </CardContent>
       </Card>
     </div>
