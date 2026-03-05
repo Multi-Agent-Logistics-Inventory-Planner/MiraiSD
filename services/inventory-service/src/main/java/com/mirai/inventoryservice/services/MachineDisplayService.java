@@ -2,10 +2,12 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.MachineDisplayDTO;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
@@ -26,6 +28,7 @@ public class MachineDisplayService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
+    private final AuditLogService auditLogService;
 
     @Value("${machine-display.stale-threshold-days:14}")
     private int staleThresholdDays;
@@ -34,11 +37,13 @@ public class MachineDisplayService {
             MachineDisplayRepository machineDisplayRepository,
             ProductRepository productRepository,
             UserRepository userRepository,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            AuditLogService auditLogService) {
         this.machineDisplayRepository = machineDisplayRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.entityManager = entityManager;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -47,11 +52,9 @@ public class MachineDisplayService {
      */
     @Transactional
     public MachineDisplay setDisplay(SetMachineDisplayRequestDTO request) {
-        // Validate product exists
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getProductId()));
 
-        // Check if this product is already displayed on this machine
         List<MachineDisplay> existingDisplays = machineDisplayRepository
                 .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
 
@@ -62,7 +65,6 @@ public class MachineDisplayService {
             throw new IllegalArgumentException("Product is already displayed on this machine");
         }
 
-        // Create new display record (allows multiple products per machine)
         MachineDisplay newDisplay = MachineDisplay.builder()
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
@@ -71,7 +73,20 @@ public class MachineDisplayService {
                 .actorId(request.getActorId())
                 .build();
 
-        return machineDisplayRepository.save(newDisplay);
+        MachineDisplay saved = machineDisplayRepository.save(newDisplay);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SET,
+                null, null,
+                request.getMachineId(), machineCode,
+                1, 0,
+                product.getName(),
+                null
+        );
+
+        return saved;
     }
 
     /**
@@ -126,8 +141,23 @@ public class MachineDisplayService {
                         .build())
                 .collect(Collectors.toList());
 
-        // Batch save all displays (1 batch insert instead of N)
-        return machineDisplayRepository.saveAll(newDisplays);
+        List<MachineDisplay> saved = machineDisplayRepository.saveAll(newDisplays);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        List<String> productNames = newProductIds.stream()
+                .map(id -> productsById.get(id).getName())
+                .collect(Collectors.toList());
+        auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SET,
+                null, null,
+                request.getMachineId(), machineCode,
+                productNames.size(), 0,
+                buildProductSummary(productNames),
+                null
+        );
+
+        return saved;
     }
 
     /**
@@ -145,6 +175,20 @@ public class MachineDisplayService {
         OffsetDateTime now = OffsetDateTime.now();
         existingDisplays.forEach(display -> display.setEndedAt(now));
         machineDisplayRepository.saveAll(existingDisplays);
+
+        String machineCode = resolveLocationCode(machineId, locationType);
+        List<String> productNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        auditLogService.createAuditLog(
+                actorId,
+                StockMovementReason.DISPLAY_REMOVED,
+                machineId, machineCode,
+                null, null,
+                productNames.size(), 0,
+                buildProductSummary(productNames),
+                null
+        );
     }
 
     /**
@@ -152,7 +196,7 @@ public class MachineDisplayService {
      */
     @Transactional
     public void clearDisplayById(UUID displayId, UUID actorId) {
-        MachineDisplay display = machineDisplayRepository.findById(displayId)
+        MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
                 .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
 
         if (display.getEndedAt() != null) {
@@ -161,6 +205,72 @@ public class MachineDisplayService {
 
         display.setEndedAt(OffsetDateTime.now());
         machineDisplayRepository.save(display);
+
+        String machineCode = resolveLocationCode(display.getMachineId(), display.getLocationType());
+        auditLogService.createAuditLog(
+                actorId,
+                StockMovementReason.DISPLAY_REMOVED,
+                display.getMachineId(), machineCode,
+                null, null,
+                1, 0,
+                display.getProduct().getName(),
+                null
+        );
+    }
+
+    /**
+     * Atomically swap one displayed product for another on the same machine.
+     * Ends the outgoing display record and creates a new one for the incoming product.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> swapDisplay(SwapMachineDisplayRequestDTO request) {
+        MachineDisplay outgoing = machineDisplayRepository.findByIdWithProduct(request.getOutgoingDisplayId())
+                .orElseThrow(() -> new IllegalArgumentException("Display not found: " + request.getOutgoingDisplayId()));
+
+        if (outgoing.getEndedAt() != null) {
+            throw new IllegalArgumentException("Display is already ended");
+        }
+
+        String outgoingProductName = outgoing.getProduct().getName();
+
+        outgoing.setEndedAt(OffsetDateTime.now());
+        machineDisplayRepository.save(outgoing);
+
+        Product incoming = productRepository.findById(request.getIncomingProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getIncomingProductId()));
+
+        List<MachineDisplay> currentDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+
+        boolean alreadyDisplayed = currentDisplays.stream()
+                .anyMatch(d -> d.getProduct().getId().equals(request.getIncomingProductId()));
+
+        if (alreadyDisplayed) {
+            throw new IllegalArgumentException("Product is already displayed on this machine");
+        }
+
+        MachineDisplay newDisplay = MachineDisplay.builder()
+                .locationType(request.getLocationType())
+                .machineId(request.getMachineId())
+                .product(incoming)
+                .startedAt(OffsetDateTime.now())
+                .actorId(request.getActorId())
+                .build();
+        machineDisplayRepository.save(newDisplay);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        String productSummary = outgoingProductName + " → " + incoming.getName();
+        auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SWAP,
+                request.getMachineId(), machineCode,
+                request.getMachineId(), machineCode,
+                1, 0,
+                productSummary,
+                null
+        );
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
     }
 
     /**
@@ -420,6 +530,13 @@ public class MachineDisplayService {
             case PUSHER_MACHINE -> "pusher_machines";
             case NOT_ASSIGNED -> null;
         };
+    }
+
+    private String buildProductSummary(List<String> productNames) {
+        if (productNames.isEmpty()) return null;
+        if (productNames.size() == 1) return productNames.get(0);
+        if (productNames.size() == 2) return productNames.get(0) + " + " + productNames.get(1);
+        return productNames.get(0) + " + " + (productNames.size() - 1) + " more";
     }
 
     private String getCodeColumnForLocationType(LocationType locationType) {

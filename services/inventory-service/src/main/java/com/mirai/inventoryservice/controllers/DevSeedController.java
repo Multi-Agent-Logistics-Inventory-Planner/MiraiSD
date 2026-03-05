@@ -958,6 +958,7 @@ public class DevSeedController {
                     case SALE, DAMAGE, REMOVED -> -qty;
                     case RESTOCK, RETURN, INITIAL_STOCK -> qty;
                     case TRANSFER, ADJUSTMENT -> random.nextBoolean() ? qty : -qty;
+                    case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> 0;
                 };
 
                 int previousQty = BASE_STOCK_QUANTITY + random.nextInt(STOCK_QUANTITY_RANGE);
