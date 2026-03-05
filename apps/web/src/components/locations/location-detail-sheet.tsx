@@ -119,6 +119,8 @@ function getLocationCode(locationType: LocationType, loc: StorageLocation): stri
       return (loc as FourCornerMachine).fourCornerMachineCode;
     case "PUSHER_MACHINE":
       return (loc as PusherMachine).pusherMachineCode;
+    case "WINDOW":
+      return (loc as Window).windowCode;
     default:
       return loc.id;
   }

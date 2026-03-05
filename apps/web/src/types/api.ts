@@ -27,6 +27,7 @@ export enum LocationType {
   RACK = "RACK",
   FOUR_CORNER_MACHINE = "FOUR_CORNER_MACHINE",
   PUSHER_MACHINE = "PUSHER_MACHINE",
+  WINDOW = "WINDOW",
   NOT_ASSIGNED = "NOT_ASSIGNED",
 }
 
@@ -39,6 +40,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.RACK]: "Rack",
   [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
   [LocationType.PUSHER_MACHINE]: "Pusher",
+  [LocationType.WINDOW]: "Window",
   [LocationType.NOT_ASSIGNED]: "Not Assigned",
 };
 
@@ -221,6 +223,10 @@ export interface PusherMachine extends BaseLocation {
   pusherMachineCode: string;
 }
 
+export interface Window extends BaseLocation {
+  windowCode: string;
+}
+
 // Union type for all locations
 export type StorageLocation =
   | BoxBin
@@ -230,7 +236,8 @@ export type StorageLocation =
   | DoubleClawMachine
   | KeychainMachine
   | FourCornerMachine
-  | PusherMachine;
+  | PusherMachine
+  | Window;
 
 // Location request types
 export interface BoxBinRequest {
@@ -263,6 +270,10 @@ export interface FourCornerMachineRequest {
 
 export interface PusherMachineRequest {
   pusherMachineCode: string;
+}
+
+export interface WindowRequest {
+  windowCode: string;
 }
 
 // Inventory item embedded in response (simplified product)
@@ -324,6 +335,11 @@ export interface PusherMachineInventory extends BaseInventory {
   pusherMachineCode: string;
 }
 
+export interface WindowInventory extends BaseInventory {
+  windowId: string;
+  windowCode: string;
+}
+
 export interface NotAssignedInventory extends BaseInventory {
   // No location fields - NOT_ASSIGNED has no physical location
 }
@@ -338,6 +354,7 @@ export type Inventory =
   | KeychainMachineInventory
   | FourCornerMachineInventory
   | PusherMachineInventory
+  | WindowInventory
   | NotAssignedInventory;
 
 // Inventory request
@@ -669,6 +686,7 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
   [LocationType.FOUR_CORNER_MACHINE]: /^M\d+$/,
   [LocationType.PUSHER_MACHINE]: /^P\d+$/,
+  [LocationType.WINDOW]: /^W\d+$/,
   [LocationType.NOT_ASSIGNED]: /^$/,  // No pattern for NOT_ASSIGNED
 };
 
@@ -682,6 +700,7 @@ export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
   [LocationType.FOUR_CORNER_MACHINE]: "four-corner-machines",
   [LocationType.PUSHER_MACHINE]: "pusher-machines",
+  [LocationType.WINDOW]: "windows",
   [LocationType.NOT_ASSIGNED]: "not-assigned",
 };
 

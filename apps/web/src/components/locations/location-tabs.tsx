@@ -16,15 +16,16 @@ import { LocationType } from "@/types/api";
 import { Button } from "@/components/ui/button";
 
 const LOCATION_TABS: Array<{ type: LocationType; label: string; icon: LucideIcon }> = [
-  { type: LocationType.BOX_BIN,            label: "Box Bins",     icon: Box },
-  { type: LocationType.RACK,               label: "Racks",        icon: Layers },
-  { type: LocationType.CABINET,            label: "Cabinets",     icon: Archive },
-  { type: LocationType.SINGLE_CLAW_MACHINE,label: "Single Claw",  icon: Gamepad2 },
-  { type: LocationType.DOUBLE_CLAW_MACHINE,label: "Double Claw",  icon: Gamepad },
-  { type: LocationType.KEYCHAIN_MACHINE,   label: "Keychain",     icon: Key },
-  { type: LocationType.FOUR_CORNER_MACHINE,label: "Four Corner",  icon: LayoutGrid },
-  { type: LocationType.PUSHER_MACHINE,     label: "Pusher",       icon: ChevronsRight },
-  { type: LocationType.NOT_ASSIGNED,       label: "Not Assigned", icon: CircleHelp },
+  { type: LocationType.BOX_BIN,             label: "Box Bins",     icon: Box },
+  { type: LocationType.RACK,                label: "Racks",        icon: Layers },
+  { type: LocationType.CABINET,             label: "Cabinets",     icon: Archive },
+  { type: LocationType.WINDOW,              label: "Windows",      icon: Archive },
+  { type: LocationType.SINGLE_CLAW_MACHINE, label: "Single Claw",  icon: Gamepad2 },
+  { type: LocationType.DOUBLE_CLAW_MACHINE, label: "Double Claw",  icon: Gamepad },
+  { type: LocationType.KEYCHAIN_MACHINE,    label: "Keychain",     icon: Key },
+  { type: LocationType.FOUR_CORNER_MACHINE, label: "Four Corner",  icon: LayoutGrid },
+  { type: LocationType.PUSHER_MACHINE,      label: "Pusher",       icon: ChevronsRight },
+  { type: LocationType.NOT_ASSIGNED,        label: "Not Assigned", icon: CircleHelp },
 ];
 
 interface LocationTabsProps {

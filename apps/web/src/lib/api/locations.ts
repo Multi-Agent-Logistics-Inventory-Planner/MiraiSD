@@ -10,6 +10,7 @@ import {
   KeychainMachine,
   FourCornerMachine,
   PusherMachine,
+  Window,
   BoxBinRequest,
   RackRequest,
   CabinetRequest,
@@ -18,6 +19,7 @@ import {
   KeychainMachineRequest,
   FourCornerMachineRequest,
   PusherMachineRequest,
+  WindowRequest,
   LocationWithCounts,
 } from "@/types/api";
 
@@ -304,6 +306,34 @@ export async function deletePusherMachine(id: string): Promise<void> {
   return apiDelete<void>(`${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`);
 }
 
+// Window API
+
+export async function getWindows(): Promise<Window[]> {
+  return apiGet<Window[]>(getBasePath(LocationType.WINDOW));
+}
+
+export async function getWindowById(id: string): Promise<Window> {
+  return apiGet<Window>(`${getBasePath(LocationType.WINDOW)}/${id}`);
+}
+
+export async function createWindow(data: WindowRequest): Promise<Window> {
+  return apiPost<Window, WindowRequest>(getBasePath(LocationType.WINDOW), data);
+}
+
+export async function updateWindow(
+  id: string,
+  data: WindowRequest
+): Promise<Window> {
+  return apiPut<Window, WindowRequest>(
+    `${getBasePath(LocationType.WINDOW)}/${id}`,
+    data
+  );
+}
+
+export async function deleteWindow(id: string): Promise<void> {
+  return apiDelete<void>(`${getBasePath(LocationType.WINDOW)}/${id}`);
+}
+
 // Helper to get all locations of a specific type
 export async function getLocationsByType(
   locationType: LocationType
@@ -316,6 +346,7 @@ export async function getLocationsByType(
   | KeychainMachine[]
   | FourCornerMachine[]
   | PusherMachine[]
+  | Window[]
 > {
   switch (locationType) {
     case LocationType.BOX_BIN:
@@ -334,6 +365,8 @@ export async function getLocationsByType(
       return getFourCornerMachines();
     case LocationType.PUSHER_MACHINE:
       return getPusherMachines();
+    case LocationType.WINDOW:
+      return getWindows();
     default:
       throw new Error(`Unknown location type: ${locationType}`);
   }

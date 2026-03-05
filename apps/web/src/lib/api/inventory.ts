@@ -10,6 +10,7 @@ import {
   KeychainMachineInventory,
   FourCornerMachineInventory,
   PusherMachineInventory,
+  WindowInventory,
   NotAssignedInventory,
   InventoryRequest,
   Inventory,
@@ -412,6 +413,55 @@ export async function deletePusherMachineInventory(
   );
 }
 
+// Window Inventory
+
+export async function getWindowInventory(
+  windowId: string
+): Promise<WindowInventory[]> {
+  return apiGet<WindowInventory[]>(
+    getInventoryPath(LocationType.WINDOW, windowId)
+  );
+}
+
+export async function getWindowInventoryItem(
+  windowId: string,
+  inventoryId: string
+): Promise<WindowInventory> {
+  return apiGet<WindowInventory>(
+    `${getInventoryPath(LocationType.WINDOW, windowId)}/${inventoryId}`
+  );
+}
+
+export async function createWindowInventory(
+  windowId: string,
+  data: InventoryRequest
+): Promise<WindowInventory> {
+  return apiPost<WindowInventory, InventoryRequest>(
+    getInventoryPath(LocationType.WINDOW, windowId),
+    data
+  );
+}
+
+export async function updateWindowInventory(
+  windowId: string,
+  inventoryId: string,
+  data: InventoryRequest
+): Promise<WindowInventory> {
+  return apiPut<WindowInventory, InventoryRequest>(
+    `${getInventoryPath(LocationType.WINDOW, windowId)}/${inventoryId}`,
+    data
+  );
+}
+
+export async function deleteWindowInventory(
+  windowId: string,
+  inventoryId: string
+): Promise<void> {
+  return apiDelete<void>(
+    `${getInventoryPath(LocationType.WINDOW, windowId)}/${inventoryId}`
+  );
+}
+
 // NotAssigned Inventory
 
 export async function getNotAssignedInventory(): Promise<NotAssignedInventory[]> {
@@ -473,6 +523,8 @@ export async function getInventoryByLocation(
       return getFourCornerMachineInventory(locationId);
     case LocationType.PUSHER_MACHINE:
       return getPusherMachineInventory(locationId);
+    case LocationType.WINDOW:
+      return getWindowInventory(locationId);
     case LocationType.NOT_ASSIGNED:
       // NOT_ASSIGNED doesn't have a locationId
       return getNotAssignedInventory() as unknown as Inventory[];
@@ -504,6 +556,8 @@ export async function createInventory(
       return createFourCornerMachineInventory(locationId, data);
     case LocationType.PUSHER_MACHINE:
       return createPusherMachineInventory(locationId, data);
+    case LocationType.WINDOW:
+      return createWindowInventory(locationId, data);
     case LocationType.NOT_ASSIGNED:
       // NOT_ASSIGNED doesn't have a locationId, so we ignore it
       return createNotAssignedInventory(data) as unknown as Inventory;
@@ -555,6 +609,7 @@ const ALL_LOCATION_TYPES: LocationType[] = [
   LocationType.KEYCHAIN_MACHINE,
   LocationType.FOUR_CORNER_MACHINE,
   LocationType.PUSHER_MACHINE,
+  LocationType.WINDOW,
 ];
 
 function formatLocationType(locationType: LocationType): string {
@@ -614,6 +669,13 @@ function getLocationDetails(
       return {
         locationId: inv.pusherMachineId,
         locationCode: inv.pusherMachineCode,
+      };
+    }
+    case LocationType.WINDOW: {
+      const inv = inventory as WindowInventory;
+      return {
+        locationId: inv.windowId,
+        locationCode: inv.windowCode,
       };
     }
     default:
