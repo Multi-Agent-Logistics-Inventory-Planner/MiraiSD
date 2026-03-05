@@ -2,16 +2,11 @@
 
 import Image from "next/image";
 import { MoreVertical, Package } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ShipmentProgress } from "./shipment-progress";
 import type { Shipment, ShipmentItem } from "@/types/api";
-import {
-  getShipmentDisplayStatus,
-  SHIPMENT_DISPLAY_STATUS_LABELS,
-  SHIPMENT_DISPLAY_STATUS_COLORS,
-} from "@/lib/shipment-utils";
+import { getShipmentDisplayStatus } from "@/lib/shipment-utils";
 
 interface ShipmentCardProps {
   shipment: Shipment;
@@ -36,15 +31,23 @@ function getStatusText(shipment: Shipment): { text: string; date: string } {
   const displayStatus = getShipmentDisplayStatus(shipment);
 
   // Calculate if partial received (used as proxy for "on the way" without tracking)
-  const totalReceived = shipment.items.reduce((sum, item) => sum + item.receivedQuantity, 0);
-  const totalOrdered = shipment.items.reduce((sum, item) => sum + item.orderedQuantity, 0);
+  const totalReceived = shipment.items.reduce(
+    (sum, item) => sum + item.receivedQuantity,
+    0,
+  );
+  const totalOrdered = shipment.items.reduce(
+    (sum, item) => sum + item.orderedQuantity,
+    0,
+  );
   const hasPartialReceived = totalReceived > 0 && totalReceived < totalOrdered;
 
   // Delivered
   if (displayStatus === "COMPLETED") {
     return {
       text: "Delivered",
-      date: formatDate(shipment.actualDeliveryDate || shipment.expectedDeliveryDate),
+      date: formatDate(
+        shipment.actualDeliveryDate || shipment.expectedDeliveryDate,
+      ),
     };
   }
 
@@ -104,11 +107,11 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
   // Calculate totals
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
-    0
+    0,
   );
   const totalReceived = shipment.items.reduce(
     (sum, item) => sum + item.receivedQuantity,
-    0
+    0,
   );
 
   const itemCount = shipment.items.length;
@@ -127,7 +130,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
     <div
       className={cn(
         "rounded-xl border bg-card p-4 transition-colors cursor-pointer",
-        "hover:bg-muted/50"
+        "hover:bg-muted/50",
       )}
       onClick={onClick}
     >
@@ -153,17 +156,6 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
             <span className="font-semibold text-sm">
               {formatCurrency(totalCost)}
             </span>
-          )}
-          {displayStatus && (
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs font-medium",
-                SHIPMENT_DISPLAY_STATUS_COLORS[displayStatus]
-              )}
-            >
-              {SHIPMENT_DISPLAY_STATUS_LABELS[displayStatus]}
-            </Badge>
           )}
           <Button
             variant="ghost"
@@ -198,7 +190,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
             )}
           </div>
           {displayStatus === "COMPLETED" ? (
-            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="text-sm font-medium text-emerald-700">
               Fulfilled
             </span>
           ) : shipment.trackingId ? (

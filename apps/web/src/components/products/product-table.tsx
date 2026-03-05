@@ -114,10 +114,10 @@ export function ProductTable({
               </TableCell>
               <TableCell>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                  className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ${
                     row.product.isActive
-                      ? "bg-green-400 text-green-800"
-                      : "bg-red-300 text-red-800"
+                      ? "bg-[#20d760] text-black"
+                      : "bg-[#e50815] text-white"
                   }`}
                 >
                   {row.product.isActive ? "Active" : "Inactive"}

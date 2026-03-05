@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { Search, Filter, X, Calendar as CalendarIcon } from "lucide-react";
+import { Search, SlidersHorizontal, X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,6 +24,16 @@ import { StockMovementReason, type User } from "@/types/api";
 import { cn } from "@/lib/utils";
 
 export type ReasonFilter = StockMovementReason | "all";
+
+export const REASON_LABELS: Record<StockMovementReason, string> = {
+  [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
+  [StockMovementReason.RESTOCK]: "Restock",
+  [StockMovementReason.SALE]: "Sale",
+  [StockMovementReason.DAMAGE]: "Damage",
+  [StockMovementReason.ADJUSTMENT]: "Adjustment",
+  [StockMovementReason.RETURN]: "Return",
+  [StockMovementReason.TRANSFER]: "Transfer",
+};
 
 export interface AuditLogFiltersState {
   search: string;
@@ -57,6 +67,7 @@ export function AuditLogFilters({
 
   const hasActiveFilters =
     Boolean(state.actorId) ||
+    state.reason !== "all" ||
     Boolean(state.fromDate) ||
     Boolean(state.toDate);
 
@@ -72,6 +83,7 @@ export function AuditLogFilters({
 
   const filterCount = [
     Boolean(state.actorId),
+    state.reason !== "all",
     Boolean(state.fromDate),
     Boolean(state.toDate),
   ].filter(Boolean).length;
@@ -90,8 +102,8 @@ export function AuditLogFilters({
 
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="gap-2 dark:bg-input dark:border-[#41413d]">
-            <Filter className="h-4 w-4" />
+          <Button variant="outline" className="gap-2 dark:bg-input dark:border-[#41413d] dark:text-muted-foreground">
+            <SlidersHorizontal className="h-4 w-4" />
             Filters
             {filterCount > 0 && (
               <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
@@ -102,26 +114,48 @@ export function AuditLogFilters({
         </PopoverTrigger>
         <PopoverContent className="w-80" align="end">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="employee-select">Performed by</Label>
-              <Select
-                value={state.actorId || "__all__"}
-                onValueChange={(v) =>
-                  updateField("actorId", v === "__all__" ? "" : v)
-                }
-              >
-                <SelectTrigger id="employee-select">
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All employees</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="employee-select">Performed by</Label>
+                <Select
+                  value={state.actorId || "__all__"}
+                  onValueChange={(v) =>
+                    updateField("actorId", v === "__all__" ? "" : v)
+                  }
+                >
+                  <SelectTrigger id="employee-select" className="bg-background text-muted-foreground">
+                    <SelectValue placeholder="All employees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All employees</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="view-select">View</Label>
+                <Select
+                  value={state.reason}
+                  onValueChange={(v) => updateField("reason", v as ReasonFilter)}
+                >
+                  <SelectTrigger id="view-select" className="w-full bg-background text-muted-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {Object.entries(REASON_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -132,7 +166,7 @@ export function AuditLogFilters({
                     id="from-date"
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal dark:bg-input dark:border-[#41413d]",
                       !state.fromDate && "text-muted-foreground",
                     )}
                   >
@@ -171,7 +205,7 @@ export function AuditLogFilters({
                     id="to-date"
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal dark:bg-input dark:border-[#41413d]",
                       !state.toDate && "text-muted-foreground",
                     )}
                   >

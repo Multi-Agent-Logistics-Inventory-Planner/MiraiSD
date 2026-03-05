@@ -106,7 +106,7 @@ export function NotificationFilters({
           onTypeFilterChange(value === "ALL" ? undefined : (value as NotificationType))
         }
       >
-        <SelectTrigger className="w-[170px]">
+        <SelectTrigger className="w-[170px] dark:bg-input dark:border-[#41413d] text-muted-foreground">
           <SelectValue placeholder="All Types" />
         </SelectTrigger>
         <SelectContent>
@@ -123,7 +123,7 @@ export function NotificationFilters({
           <Button
             variant="outline"
             className={cn(
-              "justify-start text-left font-normal",
+              "justify-start text-left font-normal dark:bg-input dark:border-[#41413d]",
               !dateRange.from && "text-muted-foreground"
             )}
           >

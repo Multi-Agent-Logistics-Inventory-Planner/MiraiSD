@@ -3,19 +3,11 @@
 import { useState, useMemo } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   AuditLogFilters,
   AuditLogFiltersState,
   AuditLogTable,
   AuditLogPagination,
   DEFAULT_AUDIT_LOG_FILTERS,
-  type ReasonFilter,
 } from "@/components/audit-log";
 import { useAuditLogs } from "@/hooks/queries/use-audit-log";
 import { useUsers } from "@/hooks/queries/use-users";
@@ -23,16 +15,6 @@ import {
   AuditLogFilters as AuditLogFiltersType,
   StockMovementReason,
 } from "@/types/api";
-
-const REASON_LABELS: Record<StockMovementReason, string> = {
-  [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
-  [StockMovementReason.RESTOCK]: "Restock",
-  [StockMovementReason.SALE]: "Sale",
-  [StockMovementReason.DAMAGE]: "Damage",
-  [StockMovementReason.ADJUSTMENT]: "Adjustment",
-  [StockMovementReason.RETURN]: "Return",
-  [StockMovementReason.TRANSFER]: "Transfer",
-};
 
 function buildApiFilters(state: AuditLogFiltersState): AuditLogFiltersType {
   const filters: AuditLogFiltersType = {};
@@ -61,34 +43,9 @@ export default function AuditLogPage() {
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       {/* Page header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <SidebarTrigger className="md:hidden" />
-          <h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1>
-        </div>
-
-        {/* "View" quick filter matching the reference design */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">View:</span>
-          <Select
-            value={filters.reason}
-            onValueChange={(v) =>
-              handleFiltersChange({ ...filters, reason: v as ReasonFilter })
-            }
-          >
-            <SelectTrigger className="w-36 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="all">All</SelectItem>
-              {Object.entries(REASON_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
+        <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
       </div>
 
       {/* Search + advanced filters */}
