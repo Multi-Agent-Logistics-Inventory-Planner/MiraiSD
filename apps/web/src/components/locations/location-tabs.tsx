@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   ChevronsRight,
   CircleHelp,
+  PanelsTopLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LocationType } from "@/types/api";
@@ -19,7 +20,7 @@ const LOCATION_TABS: Array<{ type: LocationType; label: string; icon: LucideIcon
   { type: LocationType.BOX_BIN,             label: "Box Bins",     icon: Box },
   { type: LocationType.RACK,                label: "Racks",        icon: Layers },
   { type: LocationType.CABINET,             label: "Cabinets",     icon: Archive },
-  { type: LocationType.WINDOW,              label: "Windows",      icon: Archive },
+  { type: LocationType.WINDOW,              label: "Windows",      icon: PanelsTopLeft },
   { type: LocationType.SINGLE_CLAW_MACHINE, label: "Single Claw",  icon: Gamepad2 },
   { type: LocationType.DOUBLE_CLAW_MACHINE, label: "Double Claw",  icon: Gamepad },
   { type: LocationType.KEYCHAIN_MACHINE,    label: "Keychain",     icon: Key },
