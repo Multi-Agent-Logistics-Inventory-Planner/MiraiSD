@@ -82,7 +82,7 @@ export function TopReviewersCard() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Star className="h-4 w-4 text-muted-foreground" />
-            Monthly Top Reviewers
+            Monthly Reviews
             {data && (
               <span className="text-muted-foreground font-normal ml-1">
                 ({data.totalReviews})

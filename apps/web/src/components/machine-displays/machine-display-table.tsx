@@ -155,7 +155,7 @@ export function MachineDisplayTable({
               colSpan={6}
               className="h-24 text-center text-muted-foreground"
             >
-              No machine displays found.
+              No machine displays found
             </TableCell>
           </TableRow>
         ) : (

@@ -131,7 +131,7 @@ export function TeamTable({
               colSpan={6}
               className="h-24 text-center text-muted-foreground"
             >
-              No team members found.
+              No team members found
             </TableCell>
           </TableRow>
         ) : (

@@ -124,7 +124,7 @@ export function MovementHistoryTable({
                 colSpan={7}
                 className="py-6 text-center text-sm text-muted-foreground"
               >
-                No stock movements found.
+                No stock movements found
               </TableCell>
             </TableRow>
           ) : (

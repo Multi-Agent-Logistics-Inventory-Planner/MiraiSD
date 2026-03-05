@@ -108,7 +108,7 @@ export function ManageCategoriesDialog({
               </div>
             ) : !categories || categories.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No categories found.
+                No categories found
               </p>
             ) : (
               <ul className="space-y-1">

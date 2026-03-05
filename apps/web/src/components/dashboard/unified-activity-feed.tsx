@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Filter,
   Check,
+  Activity,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,10 @@ export function UnifiedActivityFeed({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Activity</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground" />
+          Activity
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -207,7 +211,10 @@ export function UnifiedActivityFeed({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">Activity</CardTitle>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground" />
+          Activity
+        </CardTitle>
         <div className="flex items-center gap-2">
           <Toggle
             size="sm"

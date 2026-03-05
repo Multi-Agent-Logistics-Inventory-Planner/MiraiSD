@@ -76,13 +76,13 @@ export function ProductTable({
               colSpan={3}
               className="h-24 text-center text-muted-foreground sm:hidden"
             >
-              No products found.
+              No products found
             </TableCell>
             <TableCell
               colSpan={6}
               className="h-24 text-center text-muted-foreground hidden sm:table-cell"
             >
-              No products found.
+              No products found
             </TableCell>
           </TableRow>
         ) : (

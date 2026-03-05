@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { ArrowUpDown,TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -126,7 +126,7 @@ export function DemandVelocityCard({
       <Card className="h-full">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-muted-foreground" />
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Demand Velocity</CardTitle>
           </div>
         </CardHeader>
@@ -143,7 +143,7 @@ export function DemandVelocityCard({
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-muted-foreground" />
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
           <CardTitle className="text-base">Demand Velocity</CardTitle>
         </div>
         <p className="text-xs text-muted-foreground">

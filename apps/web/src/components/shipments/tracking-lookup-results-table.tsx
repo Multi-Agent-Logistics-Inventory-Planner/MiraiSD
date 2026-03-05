@@ -11,10 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { type TrackingLookupResponse } from "@/lib/api/tracking";
-import {
-  SHIPMENT_STATUS_LABELS,
-  SHIPMENT_STATUS_VARIANTS,
-} from "@/types/api";
+import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_VARIANTS } from "@/types/api";
 
 interface TrackingLookupResultsTableProps {
   trackings: TrackingLookupResponse[];
