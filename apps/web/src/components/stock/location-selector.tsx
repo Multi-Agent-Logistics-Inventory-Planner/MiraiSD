@@ -210,7 +210,7 @@ export function LocationSelector({
             disabled={disabled || !value.locationType || locationsQuery.isLoading}
           >
             <SelectTrigger
-              className="w-24 shrink-0 bg-background"
+              className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 bg-background"
               aria-label={`${label || "Location"} code`}
             >
               <SelectValue placeholder={locationsQuery.isLoading ? "..." : "Code"} />
