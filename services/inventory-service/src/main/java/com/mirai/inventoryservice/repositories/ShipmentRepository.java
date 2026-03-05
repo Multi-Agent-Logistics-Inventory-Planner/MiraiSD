@@ -31,12 +31,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     List<Shipment> findByItemsContainingProduct(@Param("productId") UUID productId);
 
     // Single shipment with JOIN FETCH to avoid N+1
+    // Note: allocations are loaded via @BatchSize(size=50) to avoid MultipleBagFetchException
     @Query("SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "LEFT JOIN FETCH s.items si " +
             "LEFT JOIN FETCH si.item " +
-            "LEFT JOIN FETCH si.allocations " +
             "WHERE s.id = :id")
     Optional<Shipment> findByIdWithAssociations(@Param("id") UUID id);
 

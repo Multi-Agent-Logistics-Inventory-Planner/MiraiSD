@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +80,10 @@ interface ItemAllocation {
 
 interface ItemAllocations {
   [itemId: string]: ItemAllocation[];
+}
+
+interface DamagedQuantities {
+  [itemId: string]: number;
 }
 
 interface ShipmentReceiveDialogProps {
@@ -185,17 +197,19 @@ export function ShipmentReceiveDialog({
 
   const [deliveryDate, setDeliveryDate] = useState<string>("");
   const [itemAllocations, setItemAllocations] = useState<ItemAllocations>({});
+  const [damagedQuantities, setDamagedQuantities] = useState<DamagedQuantities>({});
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open && shipment) {
-      const today = new Date().toISOString().split("T")[0];
-      setDeliveryDate(today);
+      setDeliveryDate(format(new Date(), "yyyy-MM-dd"));
 
-      // Initialize each item with one default allocation
+      // Initialize each item with one default allocation and zero damaged
       const initialAllocations: ItemAllocations = {};
+      const initialDamaged: DamagedQuantities = {};
       shipment.items.forEach((item) => {
-        const remaining = item.orderedQuantity - item.receivedQuantity;
+        // Remaining = ordered - received - already damaged
+        const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
         initialAllocations[item.id] = [
           {
             id: crypto.randomUUID(),
@@ -204,8 +218,10 @@ export function ShipmentReceiveDialog({
             quantity: remaining > 0 ? remaining : 0,
           },
         ];
+        initialDamaged[item.id] = 0;
       });
       setItemAllocations(initialAllocations);
+      setDamagedQuantities(initialDamaged);
     }
   }, [open, shipment]);
 
@@ -253,14 +269,27 @@ export function ShipmentReceiveDialog({
     );
   };
 
+  const getDamagedQuantity = (itemId: string) => {
+    return damagedQuantities[itemId] || 0;
+  };
+
+  const setDamagedQuantity = (itemId: string, quantity: number) => {
+    setDamagedQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(0, quantity),
+    }));
+  };
+
   const hasAnyToReceive = shipment.items.some(
-    (item) => getTotalAllocated(item.id) > 0
+    (item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0
   );
 
   const hasValidationErrors = shipment.items.some((item) => {
-    const remaining = item.orderedQuantity - item.receivedQuantity;
+    // Remaining = ordered - already received - already damaged
+    const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
     const allocated = getTotalAllocated(item.id);
-    return allocated > remaining;
+    const damaged = getDamagedQuantity(item.id);
+    return (allocated + damaged) > remaining;
   });
 
   async function handleSubmit() {
@@ -273,7 +302,7 @@ export function ShipmentReceiveDialog({
     }
 
     const itemReceipts: ShipmentItemReceipt[] = shipment.items
-      .filter((item) => getTotalAllocated(item.id) > 0)
+      .filter((item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0)
       .map((item) => {
         const allocations: DestinationAllocation[] = (
           itemAllocations[item.id] || []
@@ -288,9 +317,12 @@ export function ShipmentReceiveDialog({
             quantity: a.quantity,
           }));
 
+        const damaged = getDamagedQuantity(item.id);
+
         return {
           shipmentItemId: item.id,
-          allocations,
+          allocations: allocations.length > 0 ? allocations : undefined,
+          damagedQuantity: damaged > 0 ? damaged : undefined,
         };
       });
 
@@ -335,22 +367,46 @@ export function ShipmentReceiveDialog({
 
         <div className="space-y-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="deliveryDate">Actual Delivery Date</Label>
-            <Input
-              id="deliveryDate"
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full sm:w-48"
-            />
+            <Label>Actual Delivery Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full sm:w-48 justify-start text-left font-normal",
+                    !deliveryDate && "text-muted-foreground"
+                  )}
+                >
+                  {deliveryDate
+                    ? format(new Date(deliveryDate + "T00:00:00"), "MM/dd/yyyy")
+                    : <span>mm/dd/yyyy</span>}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={deliveryDate ? new Date(deliveryDate + "T00:00:00") : undefined}
+                  onSelect={(date) => {
+                    if (!date) { setDeliveryDate(""); return; }
+                    const y = date.getUTCFullYear();
+                    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+                    const d = String(date.getUTCDate()).padStart(2, "0");
+                    setDeliveryDate(`${y}-${m}-${d}`);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-4">
             {shipment.items.map((item) => {
-              const remaining = item.orderedQuantity - item.receivedQuantity;
+              // Remaining = ordered - received - already damaged
+              const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
               const isComplete = remaining <= 0;
               const allocated = getTotalAllocated(item.id);
-              const isOverAllocated = allocated > remaining;
+              const damaged = getDamagedQuantity(item.id);
+              const isOverAllocated = (allocated + damaged) > remaining;
               const allocations = itemAllocations[item.id] || [];
 
               return (
@@ -374,6 +430,11 @@ export function ShipmentReceiveDialog({
                       <div>
                         Received: <span className="font-medium">{item.receivedQuantity}</span>
                       </div>
+                      {(item.damagedQuantity || 0) > 0 && (
+                        <div>
+                          Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span>
+                        </div>
+                      )}
                       <div>
                         Remaining:{" "}
                         <span className="font-medium text-primary">
@@ -392,8 +453,8 @@ export function ShipmentReceiveDialog({
                             isOverAllocated ? "text-destructive font-medium" : ""
                           }
                         >
-                          (Total: {allocated}
-                          {isOverAllocated && ` — exceeds remaining by ${allocated - remaining}`})
+                          (Good: {allocated}{damaged > 0 ? `, Damaged: ${damaged}` : ""}
+                          {isOverAllocated && ` — exceeds remaining by ${allocated + damaged - remaining}`})
                         </span>
                       </div>
 
@@ -424,6 +485,31 @@ export function ShipmentReceiveDialog({
                         <Plus className="h-3 w-3 mr-1" />
                         Add destination
                       </Button>
+
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                            Damaged items:
+                          </Label>
+                          <Input
+                            id={`damaged-${item.id}`}
+                            type="number"
+                            min={0}
+                            max={remaining}
+                            value={getDamagedQuantity(item.id)}
+                            onChange={(e) => {
+                              const num = parseInt(e.target.value, 10);
+                              setDamagedQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                            }}
+                            className="w-20 h-8 text-xs text-right"
+                          />
+                          {getDamagedQuantity(item.id) > 0 && (
+                            <span className="text-xs text-amber-600">
+                              Won&apos;t be added to inventory
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { format } from "date-fns";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -85,7 +87,7 @@ export function ShipmentCreateDialog({
     defaultValues: {
       shipmentNumber: "",
       supplierName: "",
-      orderDate: new Date().toISOString().split("T")[0],
+      orderDate: format(new Date(), "yyyy-MM-dd"),
       expectedDeliveryDate: "",
       trackingId: "",
       totalCost: undefined,
@@ -113,7 +115,7 @@ export function ShipmentCreateDialog({
       form.reset({
         shipmentNumber: generateShipmentNumber(),
         supplierName: "",
-        orderDate: new Date().toISOString().split("T")[0],
+        orderDate: format(new Date(), "yyyy-MM-dd"),
         expectedDeliveryDate: "",
         trackingId: "",
         totalCost: undefined,
@@ -207,6 +209,17 @@ export function ShipmentCreateDialog({
   }
 
   const isSaving = createMutation.isPending;
+  const orderDateValue = form.watch("orderDate");
+  const expectedDeliveryDateValue = form.watch("expectedDeliveryDate");
+
+  // react-day-picker v9 passes UTC midnight dates to onSelect,
+  // so we must read UTC parts to get the correct calendar date.
+  function toDateString(date: Date): string {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
 
   return (
     <>
@@ -250,12 +263,32 @@ export function ShipmentCreateDialog({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="orderDate">Order Date</Label>
-                  <Input
-                    id="orderDate"
-                    type="date"
-                    {...form.register("orderDate")}
-                  />
+                  <Label>Order Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !orderDateValue && "text-muted-foreground"
+                        )}
+                      >
+                        {orderDateValue
+                          ? format(new Date(orderDateValue + "T00:00:00"), "MM/dd/yyyy")
+                          : <span>mm/dd/yyyy</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={orderDateValue ? new Date(orderDateValue + "T00:00:00") : undefined}
+                        onSelect={(date) =>
+                          form.setValue("orderDate", date ? toDateString(date) : "", { shouldValidate: true })
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
                   {form.formState.errors.orderDate?.message && (
                     <p className="text-xs text-destructive">
                       {form.formState.errors.orderDate.message}
@@ -263,14 +296,32 @@ export function ShipmentCreateDialog({
                   )}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="expectedDeliveryDate">
-                    Expected Delivery Date
-                  </Label>
-                  <Input
-                    id="expectedDeliveryDate"
-                    type="date"
-                    {...form.register("expectedDeliveryDate")}
-                  />
+                  <Label>Expected Delivery Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !expectedDeliveryDateValue && "text-muted-foreground"
+                        )}
+                      >
+                        {expectedDeliveryDateValue
+                          ? format(new Date(expectedDeliveryDateValue + "T00:00:00"), "MM/dd/yyyy")
+                          : <span>mm/dd/yyyy</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={expectedDeliveryDateValue ? new Date(expectedDeliveryDateValue + "T00:00:00") : undefined}
+                        onSelect={(date) =>
+                          form.setValue("expectedDeliveryDate", date ? toDateString(date) : "", { shouldValidate: true })
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
@@ -380,7 +431,9 @@ export function ShipmentCreateDialog({
                                   disabled={productsQuery.isLoading}
                                 >
                                   {selectedProduct
-                                    ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                    ? selectedProduct.sku
+                                      ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                      : selectedProduct.name
                                     : "Select product..."}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                                 </Button>
@@ -399,7 +452,7 @@ export function ShipmentCreateDialog({
                                       {products.map((p) => (
                                         <CommandItem
                                           key={p.id}
-                                          value={`${p.name} ${p.sku}`}
+                                          value={`${p.name} ${p.sku ?? ""}`.trim()}
                                           onSelect={() =>
                                             handleSelectProduct(index, p)
                                           }
@@ -416,9 +469,11 @@ export function ShipmentCreateDialog({
                                             <span className="text-sm">
                                               {p.name}
                                             </span>
-                                            <span className="text-xs text-muted-foreground">
-                                              {p.sku}
-                                            </span>
+                                            {p.sku ? (
+                                              <span className="text-xs text-muted-foreground">
+                                                {p.sku}
+                                              </span>
+                                            ) : null}
                                           </div>
                                         </CommandItem>
                                       ))}

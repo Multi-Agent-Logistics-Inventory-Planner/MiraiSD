@@ -51,7 +51,7 @@ const STATUS_LABELS: Record<ShipmentStatus, string> = {
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -115,6 +115,9 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{item.orderedQuantity} ordered</p>
           <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
+          {(item.damagedQuantity ?? 0) > 0 && (
+            <p className="text-xs text-amber-600">{item.damagedQuantity} damaged</p>
+          )}
         </div>
         <div className="hidden sm:block text-right text-sm w-20 shrink-0">
           {item.unitCost ? (

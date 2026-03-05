@@ -50,6 +50,12 @@ public class ShipmentItem {
     @Builder.Default
     private Integer receivedQuantity = 0;
 
+    @NotNull
+    @Min(0)
+    @Column(name = "damaged_quantity", nullable = false)
+    @Builder.Default
+    private Integer damagedQuantity = 0;
+
     @Column(name = "unit_cost")
     private BigDecimal unitCost;
 

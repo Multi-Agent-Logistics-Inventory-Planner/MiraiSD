@@ -314,25 +314,35 @@ public class ShipmentService {
                         .build());
             }
 
-            // Calculate total quantity from allocations
+            // Calculate total quantity from allocations (good items to add to inventory)
             int quantityToReceive = allocations.stream()
                     .mapToInt(ReceiveShipmentRequestDTO.DestinationAllocationDTO::getQuantity)
                     .sum();
 
-            int currentReceivedQuantity = shipmentItem.getReceivedQuantity();
-            int newReceivedQuantity = currentReceivedQuantity + quantityToReceive;
+            // Get damaged quantity (items that won't be added to inventory)
+            int damagedQuantity = receipt.getDamagedQuantity() != null ? receipt.getDamagedQuantity() : 0;
 
-            // Validate that we're not receiving more than ordered
-            if (newReceivedQuantity > shipmentItem.getOrderedQuantity()) {
+            int currentReceivedQuantity = shipmentItem.getReceivedQuantity();
+            int currentDamagedQuantity = shipmentItem.getDamagedQuantity();
+            int newReceivedQuantity = currentReceivedQuantity + quantityToReceive;
+            int newDamagedQuantity = currentDamagedQuantity + damagedQuantity;
+
+            // Validate that we're not receiving/damaging more than ordered
+            int totalAccountedFor = newReceivedQuantity + newDamagedQuantity;
+            if (totalAccountedFor > shipmentItem.getOrderedQuantity()) {
                 throw new IllegalArgumentException(
-                    String.format("Cannot receive %d items for shipment item %s. " +
-                            "Already received: %d, Ordered: %d, Attempting to receive: %d",
-                            newReceivedQuantity, receipt.getShipmentItemId(),
-                            currentReceivedQuantity, shipmentItem.getOrderedQuantity(), quantityToReceive));
+                    String.format("Cannot process %d items for shipment item %s. " +
+                            "Already received: %d, Already damaged: %d, Ordered: %d, " +
+                            "Attempting to receive: %d, Attempting to mark damaged: %d",
+                            quantityToReceive + damagedQuantity, receipt.getShipmentItemId(),
+                            currentReceivedQuantity, currentDamagedQuantity, shipmentItem.getOrderedQuantity(),
+                            quantityToReceive, damagedQuantity));
             }
 
-            // Accumulate received quantity
+            // Accumulate received quantity (only good items)
             shipmentItem.setReceivedQuantity(newReceivedQuantity);
+            // Accumulate damaged quantity (tracked but not added to inventory)
+            shipmentItem.setDamagedQuantity(newDamagedQuantity);
 
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
@@ -376,9 +386,9 @@ public class ShipmentService {
             }
         }
 
-        // Check if all items are fully received
+        // Check if all items are fully accounted for (received + damaged = ordered)
         boolean allItemsFullyReceived = shipment.getItems().stream()
-                .allMatch(item -> item.getReceivedQuantity() >= item.getOrderedQuantity());
+                .allMatch(item -> (item.getReceivedQuantity() + item.getDamagedQuantity()) >= item.getOrderedQuantity());
 
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {
