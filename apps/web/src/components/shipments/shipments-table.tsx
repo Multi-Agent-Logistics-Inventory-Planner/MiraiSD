@@ -29,7 +29,7 @@ interface ShipmentsTableProps {
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
     month: "2-digit",
     day: "2-digit",
     year: "numeric",

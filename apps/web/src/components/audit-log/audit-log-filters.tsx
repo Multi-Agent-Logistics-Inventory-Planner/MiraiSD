@@ -137,7 +137,7 @@ export function AuditLogFilters({
                     )}
                   >
                     {state.fromDate ? (
-                      format(new Date(state.fromDate), "MM/dd/yyyy")
+                      format(new Date(state.fromDate + "T00:00:00"), "MM/dd/yyyy")
                     ) : (
                       <span>mm/dd/yyyy</span>
                     )}
@@ -148,13 +148,14 @@ export function AuditLogFilters({
                   <Calendar
                     mode="single"
                     selected={
-                      state.fromDate ? new Date(state.fromDate) : undefined
+                      state.fromDate ? new Date(state.fromDate + "T00:00:00") : undefined
                     }
                     onSelect={(date) => {
-                      updateField(
-                        "fromDate",
-                        date ? format(date, "yyyy-MM-dd") : "",
-                      );
+                      if (!date) { updateField("fromDate", ""); return; }
+                      const y = date.getUTCFullYear();
+                      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+                      const d = String(date.getUTCDate()).padStart(2, "0");
+                      updateField("fromDate", `${y}-${m}-${d}`);
                     }}
                     disabled={(date) => date > today}
                   />
@@ -175,7 +176,7 @@ export function AuditLogFilters({
                     )}
                   >
                     {state.toDate ? (
-                      format(new Date(state.toDate), "MM/dd/yyyy")
+                      format(new Date(state.toDate + "T00:00:00"), "MM/dd/yyyy")
                     ) : (
                       <span>mm/dd/yyyy</span>
                     )}
@@ -185,12 +186,13 @@ export function AuditLogFilters({
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={state.toDate ? new Date(state.toDate) : undefined}
+                    selected={state.toDate ? new Date(state.toDate + "T00:00:00") : undefined}
                     onSelect={(date) => {
-                      updateField(
-                        "toDate",
-                        date ? format(date, "yyyy-MM-dd") : "",
-                      );
+                      if (!date) { updateField("toDate", ""); return; }
+                      const y = date.getUTCFullYear();
+                      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+                      const d = String(date.getUTCDate()).padStart(2, "0");
+                      updateField("toDate", `${y}-${m}-${d}`);
                     }}
                     disabled={(date) => date > today}
                   />

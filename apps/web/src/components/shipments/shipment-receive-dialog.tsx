@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -194,8 +202,7 @@ export function ShipmentReceiveDialog({
   // Reset form when dialog opens
   useEffect(() => {
     if (open && shipment) {
-      const today = new Date().toISOString().split("T")[0];
-      setDeliveryDate(today);
+      setDeliveryDate(format(new Date(), "yyyy-MM-dd"));
 
       // Initialize each item with one default allocation and zero damaged
       const initialAllocations: ItemAllocations = {};
@@ -360,14 +367,36 @@ export function ShipmentReceiveDialog({
 
         <div className="space-y-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="deliveryDate">Actual Delivery Date</Label>
-            <Input
-              id="deliveryDate"
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full sm:w-48"
-            />
+            <Label>Actual Delivery Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full sm:w-48 justify-start text-left font-normal",
+                    !deliveryDate && "text-muted-foreground"
+                  )}
+                >
+                  {deliveryDate
+                    ? format(new Date(deliveryDate + "T00:00:00"), "MM/dd/yyyy")
+                    : <span>mm/dd/yyyy</span>}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={deliveryDate ? new Date(deliveryDate + "T00:00:00") : undefined}
+                  onSelect={(date) => {
+                    if (!date) { setDeliveryDate(""); return; }
+                    const y = date.getUTCFullYear();
+                    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+                    const d = String(date.getUTCDate()).padStart(2, "0");
+                    setDeliveryDate(`${y}-${m}-${d}`);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-4">
