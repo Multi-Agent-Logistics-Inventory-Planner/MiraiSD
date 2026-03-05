@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Monitor,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +84,9 @@ import {
 import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
+  useSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
+import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -183,6 +186,7 @@ export function LocationDetailSheet({
 
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
+  const swapDisplayMutation = useSwapDisplayMutation();
 
   const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -191,6 +195,8 @@ export function LocationDetailSheet({
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [productToSwap, setProductToSwap] = useState<MachineDisplay | null>(null);
 
   // Reset state when dialog opens / location changes
   useEffect(() => {
@@ -277,6 +283,38 @@ export function LocationDetailSheet({
     }
     setClearDialogOpen(false);
     setProductToClear(null);
+  }
+
+  function handleSwapClick(item: MachineDisplay) {
+    setProductToSwap(item);
+    setSwapDialogOpen(true);
+  }
+
+  async function handleSwap(outgoingDisplayId: string, incomingProductId: string) {
+    if (!locationId) return;
+    const incoming = products.find((p) => p.id === incomingProductId);
+    const outgoing = activeDisplaysForMachine.find((d) => d.id === outgoingDisplayId);
+    try {
+      await swapDisplayMutation.mutateAsync({
+        outgoingDisplayId,
+        incomingProductId,
+        locationType,
+        machineId: locationId,
+        actorId: user?.personId,
+      });
+      toast({
+        title: "Display swapped",
+        description: `"${outgoing?.productName}" replaced with "${incoming?.name}".`,
+      });
+      setSwapDialogOpen(false);
+      setProductToSwap(null);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to swap display.",
+        variant: "destructive",
+      });
+    }
   }
 
   // ── Products tab content ──────────────────────────────────────────────────
@@ -568,8 +606,18 @@ export function LocationDetailSheet({
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => handleSwapClick(item)}
+                        title="Swap product"
+                      >
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => handleClearClick(item)}
+                        title="Remove product"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -818,6 +866,20 @@ export function LocationDetailSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SwapDisplayDialog
+        open={swapDialogOpen}
+        onOpenChange={(next) => {
+          setSwapDialogOpen(next);
+          if (!next) setProductToSwap(null);
+        }}
+        outgoingDisplay={productToSwap}
+        products={products}
+        activeDisplaysForMachine={activeDisplaysForMachine}
+        actorId={user?.personId}
+        onSwap={handleSwap}
+        isSubmitting={swapDisplayMutation.isPending}
+      />
     </>
   );
 }

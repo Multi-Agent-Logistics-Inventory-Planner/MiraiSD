@@ -8,6 +8,9 @@ public enum StockMovementReason {
     ADJUSTMENT,
     RETURN,
     TRANSFER,
-    REMOVED
+    REMOVED,
+    DISPLAY_SET,
+    DISPLAY_REMOVED,
+    DISPLAY_SWAP
 }
 

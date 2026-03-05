@@ -19,6 +19,13 @@ import java.util.UUID;
 public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, UUID> {
 
     /**
+     * Find a display by ID with its product eagerly loaded (avoids lazy-load extra query).
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.id = :id")
+    Optional<MachineDisplay> findByIdWithProduct(@Param("id") UUID id);
+
+    /**
      * Find the current active display for a machine (where ended_at is null)
      * @deprecated Use findActiveByLocationTypeAndMachineId for multiple products support
      */

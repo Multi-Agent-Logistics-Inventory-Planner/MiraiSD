@@ -50,6 +50,9 @@ export enum StockMovementReason {
   ADJUSTMENT = "ADJUSTMENT",
   RETURN = "RETURN",
   TRANSFER = "TRANSFER",
+  DISPLAY_SET = "DISPLAY_SET",
+  DISPLAY_REMOVED = "DISPLAY_REMOVED",
+  DISPLAY_SWAP = "DISPLAY_SWAP",
 }
 
 export enum ShipmentStatus {
@@ -521,6 +524,7 @@ export interface AuditLogDetail {
   primaryToLocationCode?: string;
   itemCount: number;
   totalQuantityMoved: number;
+  productSummary?: string;
   notes?: string;
   createdAt: string;
   movements: AuditLogMovement[];

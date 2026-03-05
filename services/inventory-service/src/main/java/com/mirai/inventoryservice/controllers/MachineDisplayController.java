@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.MachineDisplayDTO;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -52,6 +53,16 @@ public class MachineDisplayController {
         List<MachineDisplayDTO> dtos = machineDisplayService.getActiveDisplaysForMachine(
                 request.getLocationType(), request.getMachineId());
         return ResponseEntity.status(HttpStatus.CREATED).body(dtos);
+    }
+
+    /**
+     * Atomically swap one displayed product for another on the same machine.
+     */
+    @PostMapping("/swap")
+    public ResponseEntity<List<MachineDisplayDTO>> swapDisplay(
+            @Valid @RequestBody SwapMachineDisplayRequestDTO request) {
+        List<MachineDisplayDTO> updatedDisplays = machineDisplayService.swapDisplay(request);
+        return ResponseEntity.ok(updatedDisplays);
     }
 
     /**

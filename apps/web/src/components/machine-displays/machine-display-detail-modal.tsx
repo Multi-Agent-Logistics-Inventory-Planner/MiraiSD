@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { History, Plus, X, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { History, Plus, X, Trash2, ChevronLeft, ChevronRight, ArrowLeftRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,7 @@ import {
   SetMachineDisplayBatchRequest,
 } from "@/types/api";
 import { useMachineDisplayHistoryPaged } from "@/hooks/queries/use-machine-displays";
+import { SwapDisplayDialog } from "./swap-display-dialog";
 
 interface MachineDisplayDetailModalProps {
   display: MachineDisplay | null;
@@ -56,6 +57,7 @@ interface MachineDisplayDetailModalProps {
   actorId?: string;
   onAddProducts: (data: SetMachineDisplayBatchRequest) => Promise<void>;
   onClearDisplay: (displayId: string) => Promise<void>;
+  onSwapDisplay?: (outgoingDisplayId: string, incomingProductId: string) => Promise<void>;
   isSubmitting?: boolean;
   /** All currently active displays for this machine */
   activeDisplaysForMachine?: MachineDisplay[];
@@ -96,6 +98,7 @@ export function MachineDisplayDetailModal({
   actorId,
   onAddProducts,
   onClearDisplay,
+  onSwapDisplay,
   isSubmitting = false,
   activeDisplaysForMachine = [],
 }: MachineDisplayDetailModalProps) {
@@ -103,6 +106,8 @@ export function MachineDisplayDetailModal({
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [productToSwap, setProductToSwap] = useState<MachineDisplay | null>(null);
   const [historyPage, setHistoryPage] = useState(0);
 
   // Reset page when display changes or modal opens
@@ -162,6 +167,19 @@ export function MachineDisplayDetailModal({
       setClearDialogOpen(false);
       setProductToClear(null);
     }
+  };
+
+  const handleSwapClick = (displayItem: MachineDisplay) => {
+    setProductToSwap(displayItem);
+    setSwapDialogOpen(true);
+  };
+
+  const handleSwap = async (outgoingDisplayId: string, incomingProductId: string) => {
+    if (onSwapDisplay) {
+      await onSwapDisplay(outgoingDisplayId, incomingProductId);
+    }
+    setSwapDialogOpen(false);
+    setProductToSwap(null);
   };
 
   const selectedProducts = products.filter((p) =>
@@ -282,11 +300,23 @@ export function MachineDisplayDetailModal({
                             Stale
                           </Badge>
                         )}
+                        {onSwapDisplay && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => handleSwapClick(item)}
+                            title="Swap product"
+                          >
+                            <ArrowLeftRight className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => handleClearClick(item)}
+                          title="Remove product"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -390,6 +420,21 @@ export function MachineDisplayDetailModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Swap Dialog */}
+      <SwapDisplayDialog
+        open={swapDialogOpen}
+        onOpenChange={(next) => {
+          setSwapDialogOpen(next);
+          if (!next) setProductToSwap(null);
+        }}
+        outgoingDisplay={productToSwap}
+        products={products}
+        activeDisplaysForMachine={activeDisplaysForMachine}
+        actorId={actorId}
+        onSwap={handleSwap}
+        isSubmitting={isSubmitting}
+      />
     </>
   );
 }

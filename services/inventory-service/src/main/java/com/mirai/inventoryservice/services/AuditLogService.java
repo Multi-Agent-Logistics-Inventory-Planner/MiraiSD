@@ -48,6 +48,7 @@ public class AuditLogService {
             String primaryToLocationCode,
             int itemCount,
             int totalQuantityMoved,
+            String productSummary,
             String notes
     ) {
         String actorName = null;
@@ -67,6 +68,7 @@ public class AuditLogService {
                 .primaryToLocationCode(primaryToLocationCode)
                 .itemCount(itemCount)
                 .totalQuantityMoved(totalQuantityMoved)
+                .productSummary(productSummary)
                 .notes(notes)
                 .build();
 
