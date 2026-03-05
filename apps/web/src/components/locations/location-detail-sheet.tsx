@@ -65,6 +65,7 @@ import type {
   KeychainMachine,
   FourCornerMachine,
   PusherMachine,
+  Window as WindowLocation,
   MachineDisplay,
   SetMachineDisplayBatchRequest,
 } from "@/types/api";
@@ -120,7 +121,7 @@ function getLocationCode(locationType: LocationType, loc: StorageLocation): stri
     case "PUSHER_MACHINE":
       return (loc as PusherMachine).pusherMachineCode;
     case "WINDOW":
-      return (loc as Window).windowCode;
+      return (loc as WindowLocation).windowCode;
     default:
       return loc.id;
   }
