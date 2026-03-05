@@ -9,5 +9,6 @@ public enum LocationType {
     RACK,
     FOUR_CORNER_MACHINE,
     PUSHER_MACHINE,
+    WINDOW,
     NOT_ASSIGNED
 }

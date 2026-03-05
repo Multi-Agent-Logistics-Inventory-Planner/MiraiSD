@@ -52,6 +52,9 @@ public class LocationAggregateRepository {
             UNION ALL
             SELECT id, 'PUSHER_MACHINE' as location_type, pusher_machine_code as location_code, created_at, updated_at
             FROM pusher_machines
+            UNION ALL
+            SELECT id, 'WINDOW' as location_type, window_code as location_code, created_at, updated_at
+            FROM windows
         ) l
         LEFT JOIN (
             SELECT box_bin_id as location_id, 'BOX_BIN' as location_type,
@@ -85,6 +88,10 @@ public class LocationAggregateRepository {
             SELECT pusher_machine_id as location_id, 'PUSHER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM pusher_machine_inventory GROUP BY pusher_machine_id
+            UNION ALL
+            SELECT window_id as location_id, 'WINDOW' as location_type,
+                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
+            FROM window_inventory GROUP BY window_id
         ) i ON l.id = i.location_id AND l.location_type = i.location_type
         ORDER BY l.location_type, l.location_code
         """;
@@ -122,6 +129,9 @@ public class LocationAggregateRepository {
             UNION ALL
             SELECT id, 'PUSHER_MACHINE' as location_type, pusher_machine_code as location_code, created_at, updated_at
             FROM pusher_machines WHERE 'PUSHER_MACHINE' = :locationType
+            UNION ALL
+            SELECT id, 'WINDOW' as location_type, window_code as location_code, created_at, updated_at
+            FROM windows WHERE 'WINDOW' = :locationType
         ) l
         LEFT JOIN (
             SELECT box_bin_id as location_id, 'BOX_BIN' as location_type,
@@ -155,6 +165,10 @@ public class LocationAggregateRepository {
             SELECT pusher_machine_id as location_id, 'PUSHER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM pusher_machine_inventory WHERE 'PUSHER_MACHINE' = :locationType GROUP BY pusher_machine_id
+            UNION ALL
+            SELECT window_id as location_id, 'WINDOW' as location_type,
+                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
+            FROM window_inventory WHERE 'WINDOW' = :locationType GROUP BY window_id
         ) i ON l.id = i.location_id AND l.location_type = i.location_type
         ORDER BY l.location_code
         """;

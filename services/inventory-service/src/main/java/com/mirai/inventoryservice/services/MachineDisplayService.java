@@ -528,7 +528,7 @@ public class MachineDisplayService {
             case RACK -> "racks";
             case FOUR_CORNER_MACHINE -> "four_corner_machines";
             case PUSHER_MACHINE -> "pusher_machines";
-            case NOT_ASSIGNED -> null;
+            case WINDOW, NOT_ASSIGNED -> null;
         };
     }
 
@@ -549,7 +549,7 @@ public class MachineDisplayService {
             case RACK -> "rack_code";
             case FOUR_CORNER_MACHINE -> "four_corner_machine_code";
             case PUSHER_MACHINE -> "pusher_machine_code";
-            case NOT_ASSIGNED -> null;
+            case WINDOW, NOT_ASSIGNED -> null;
         };
     }
 }
