@@ -47,7 +47,7 @@ export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
               variant={active ? "default" : "outline"}
               size="sm"
               onClick={() => onValueChange(type)}
-              className={active ? "" : "bg-[#f2f2f2] dark:bg-[#30302e] border-none"}
+              className={active ? "" : "bg-[#f2f2f2] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"}
             >
               <Icon className="h-3.5 w-3.5" />
               {label}

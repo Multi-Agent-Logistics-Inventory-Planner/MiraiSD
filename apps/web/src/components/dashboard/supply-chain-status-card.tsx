@@ -160,7 +160,7 @@ export function SupplyChainStatusCard({
             Incoming Shipment
           </CardTitle>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/shipments" className="gap-1">
+            <Link href="/shipments" className="gap-1 text-muted-foreground hover:text-muted-foreground">
               View All
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
