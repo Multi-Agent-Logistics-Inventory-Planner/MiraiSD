@@ -198,7 +198,7 @@ export function FilterableStockList({
             <p className="text-sm text-muted-foreground py-4 text-center flex-1 flex items-center justify-center">
               {selectedRiskBand
                 ? `No items in ${RISK_BAND_LABELS[selectedRiskBand]} status.`
-                : "No inventory data available."}
+                : "No inventory data available"}
             </p>
           ) : (
             <>

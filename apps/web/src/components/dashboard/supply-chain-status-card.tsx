@@ -65,12 +65,6 @@ function EmptyState() {
       <p className="text-sm text-muted-foreground mb-3">
         No upcoming shipments
       </p>
-      <Button asChild size="sm">
-        <Link href="/shipments/new" className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" />
-          Create Order
-        </Link>
-      </Button>
     </div>
   );
 }

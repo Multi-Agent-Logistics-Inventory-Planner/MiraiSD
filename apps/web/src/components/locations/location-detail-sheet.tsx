@@ -395,7 +395,7 @@ export function LocationDetailSheet({
           <Command>
             <CommandInput placeholder="Search products..." />
             <CommandList>
-              <CommandEmpty>No products available.</CommandEmpty>
+              <CommandEmpty>No products available</CommandEmpty>
               <CommandGroup>
                 {availableProducts.map((product) => (
                   <CommandItem
@@ -465,7 +465,7 @@ export function LocationDetailSheet({
             <Command>
               <CommandInput placeholder="Search products..." />
               <CommandList>
-                <CommandEmpty>No products available.</CommandEmpty>
+                <CommandEmpty>No products available</CommandEmpty>
                 <CommandGroup>
                   {availableProducts.map((product) => (
                     <CommandItem

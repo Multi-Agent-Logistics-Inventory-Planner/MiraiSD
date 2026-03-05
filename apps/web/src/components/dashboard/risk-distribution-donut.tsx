@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import type { RiskDistributionSegment, RiskBand } from "@/types/dashboard";
+import { Package } from "lucide-react";
 
 interface RiskDistributionDonutProps {
   data: RiskDistributionSegment[];
@@ -98,7 +99,7 @@ export function RiskDistributionDonut({
         <CardContent>
           <div className="h-[280px] flex items-center justify-center">
             <p className="text-sm text-muted-foreground">
-              No forecast data available.
+              No forecast data available
             </p>
           </div>
         </CardContent>

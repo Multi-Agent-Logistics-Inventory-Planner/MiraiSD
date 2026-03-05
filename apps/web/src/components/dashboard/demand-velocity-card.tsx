@@ -13,7 +13,13 @@ interface DemandVelocityCardProps {
   isLoading?: boolean;
 }
 
-function Sparkline({ data, className }: { data: number[]; className?: string }) {
+function Sparkline({
+  data,
+  className,
+}: {
+  data: number[];
+  className?: string;
+}) {
   if (data.length === 0) return null;
 
   const max = Math.max(...data, 1);
@@ -23,7 +29,8 @@ function Sparkline({ data, className }: { data: number[]; className?: string }) 
   const width = 60;
 
   const points = data.map((value, index) => {
-    const x = data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
+    const x =
+      data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
     const y = height - ((value - min) / range) * height;
     return `${x},${y}`;
   });
@@ -69,7 +76,10 @@ function VelocityRow({ item }: { item: DemandVelocityItem }) {
       />
       <Badge
         variant="secondary"
-        className={cn("flex items-center gap-1 min-w-16 justify-center", colorClass)}
+        className={cn(
+          "flex items-center gap-1 min-w-16 justify-center",
+          colorClass,
+        )}
       >
         <Icon className="h-3 w-3" />
         <span>{Math.abs(item.changePercent).toFixed(0)}%</span>
@@ -78,7 +88,10 @@ function VelocityRow({ item }: { item: DemandVelocityItem }) {
   );
 }
 
-export function DemandVelocityCard({ items, isLoading }: DemandVelocityCardProps) {
+export function DemandVelocityCard({
+  items,
+  isLoading,
+}: DemandVelocityCardProps) {
   if (isLoading) {
     return (
       <Card className="h-full">
@@ -118,8 +131,8 @@ export function DemandVelocityCard({ items, isLoading }: DemandVelocityCardProps
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No demand data available yet.
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            No demand data available yet
           </p>
         </CardContent>
       </Card>

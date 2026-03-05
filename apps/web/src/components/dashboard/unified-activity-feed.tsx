@@ -245,7 +245,7 @@ export function UnifiedActivityFeed({
       <CardContent>
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No activity to show.
+            No activity to show
           </p>
         ) : (
           <div
