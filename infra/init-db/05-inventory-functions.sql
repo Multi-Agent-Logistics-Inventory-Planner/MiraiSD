@@ -25,6 +25,8 @@ BEGIN
         SELECT quantity AS qty FROM keychain_machine_inventory WHERE item_id = p_product_id
         UNION ALL
         SELECT quantity AS qty FROM pusher_machine_inventory WHERE item_id = p_product_id
+        UNION ALL
+        SELECT quantity AS qty FROM window_inventory WHERE item_id = p_product_id
     ) AS all_inventory;
 
     RETURN total;
@@ -61,6 +63,8 @@ BEGIN
             SELECT four_corner_machine_code INTO result FROM four_corner_machines WHERE id = p_location_id;
         WHEN 'PUSHER_MACHINE' THEN
             SELECT pusher_machine_code INTO result FROM pusher_machines WHERE id = p_location_id;
+        WHEN 'WINDOW' THEN
+            SELECT window_code INTO result FROM windows WHERE id = p_location_id;
         WHEN 'NOT_ASSIGNED' THEN
             RETURN 'NA';
         ELSE

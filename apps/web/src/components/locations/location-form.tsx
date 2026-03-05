@@ -29,6 +29,8 @@ function getCodeField(locationType: LocationType): string {
       return "fourCornerMachineCode";
     case "PUSHER_MACHINE":
       return "pusherMachineCode";
+    case "WINDOW":
+      return "windowCode";
     default:
       return "code";
   }

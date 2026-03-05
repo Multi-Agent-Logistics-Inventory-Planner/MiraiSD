@@ -41,6 +41,7 @@ public class StockMovementService {
     private final RackInventoryRepository rackInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final WindowInventoryRepository windowInventoryRepository;
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
     private final BoxBinRepository boxBinRepository;
     private final SingleClawMachineRepository singleClawMachineRepository;
@@ -50,6 +51,7 @@ public class StockMovementService {
     private final RackRepository rackRepository;
     private final FourCornerMachineRepository fourCornerMachineRepository;
     private final PusherMachineRepository pusherMachineRepository;
+    private final WindowRepository windowRepository;
     private final EntityManager entityManager;
 
     public StockMovementService(
@@ -65,6 +67,7 @@ public class StockMovementService {
             RackInventoryRepository rackInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
+            WindowInventoryRepository windowInventoryRepository,
             NotAssignedInventoryRepository notAssignedInventoryRepository,
             BoxBinRepository boxBinRepository,
             SingleClawMachineRepository singleClawMachineRepository,
@@ -74,6 +77,7 @@ public class StockMovementService {
             RackRepository rackRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
+            WindowRepository windowRepository,
             EntityManager entityManager) {
         this.stockMovementRepository = stockMovementRepository;
         this.auditLogRepository = auditLogRepository;
@@ -87,6 +91,7 @@ public class StockMovementService {
         this.rackInventoryRepository = rackInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
+        this.windowInventoryRepository = windowInventoryRepository;
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
         this.boxBinRepository = boxBinRepository;
         this.singleClawMachineRepository = singleClawMachineRepository;
@@ -96,6 +101,7 @@ public class StockMovementService {
         this.rackRepository = rackRepository;
         this.fourCornerMachineRepository = fourCornerMachineRepository;
         this.pusherMachineRepository = pusherMachineRepository;
+        this.windowRepository = windowRepository;
         this.entityManager = entityManager;
     }
 
@@ -545,6 +551,8 @@ public class StockMovementService {
                     .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("FourCornerMachine inventory not found: " + inventoryId));
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new PusherMachineInventoryNotFoundException("PusherMachine inventory not found: " + inventoryId));
+            case WINDOW -> windowInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new WindowInventoryNotFoundException("Window inventory not found: " + inventoryId));
             case NOT_ASSIGNED -> notAssignedInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new NotAssignedInventoryNotFoundException("NotAssigned inventory not found: " + inventoryId));
         };
@@ -560,6 +568,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getQuantity();
             case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
             case PusherMachineInventory pmi -> pmi.getQuantity();
+            case WindowInventory wi -> wi.getQuantity();
             case NotAssignedInventory nai -> nai.getQuantity();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
@@ -575,6 +584,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.setQuantity(quantity);
             case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
             case PusherMachineInventory pmi -> pmi.setQuantity(quantity);
+            case WindowInventory wi -> wi.setQuantity(quantity);
             case NotAssignedInventory nai -> nai.setQuantity(quantity);
             default -> throw new IllegalArgumentException("Unknown inventory type");
         }
@@ -590,6 +600,7 @@ public class StockMovementService {
             case RACK -> rackInventoryRepository.save((RackInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
+            case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory);
             case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
         }
     }
@@ -604,6 +615,7 @@ public class StockMovementService {
             case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
+            case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
             case NOT_ASSIGNED -> notAssignedInventoryRepository.delete((NotAssignedInventory) inventory);
         }
     }
@@ -618,6 +630,7 @@ public class StockMovementService {
             case RACK -> ((RackInventory) inventory).getRack().getId();
             case FOUR_CORNER_MACHINE -> ((FourCornerMachineInventory) inventory).getFourCornerMachine().getId();
             case PUSHER_MACHINE -> ((PusherMachineInventory) inventory).getPusherMachine().getId();
+            case WINDOW -> ((WindowInventory) inventory).getWindow().getId();
             case NOT_ASSIGNED -> null;  // No location for NOT_ASSIGNED
         };
     }
@@ -632,6 +645,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getItem();
             case FourCornerMachineInventory fcmi -> fcmi.getItem();
             case PusherMachineInventory pmi -> pmi.getItem();
+            case WindowInventory wi -> wi.getItem();
             case NotAssignedInventory nai -> nai.getItem();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };
@@ -715,6 +729,15 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield pusherMachineInventoryRepository.save(inv);
             }
+            case WINDOW -> {
+                Window window = windowRepository.findById(locationId)
+                        .orElseThrow(() -> new WindowNotFoundException("Window not found: " + locationId));
+                WindowInventory inv = new WindowInventory();
+                inv.setWindow(window);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield windowInventoryRepository.save(inv);
+            }
             case NOT_ASSIGNED -> {
                 NotAssignedInventory inv = new NotAssignedInventory();
                 inv.setItem(product);
@@ -737,6 +760,7 @@ public class StockMovementService {
             case RackInventory ri -> ri.getId();
             case FourCornerMachineInventory fcmi -> fcmi.getId();
             case PusherMachineInventory pmi -> pmi.getId();
+            case WindowInventory wi -> wi.getId();
             case NotAssignedInventory nai -> nai.getId();
             default -> throw new IllegalArgumentException("Unknown inventory type");
         };

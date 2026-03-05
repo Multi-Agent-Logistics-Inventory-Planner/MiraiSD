@@ -45,6 +45,8 @@ function getLocationCode(
       return "rackCode" in location ? location.rackCode : "";
     case "CABINET":
       return "cabinetCode" in location ? location.cabinetCode : "";
+    case "WINDOW":
+      return "windowCode" in location ? location.windowCode : "";
     case "SINGLE_CLAW_MACHINE":
       return "singleClawMachineCode" in location
         ? location.singleClawMachineCode

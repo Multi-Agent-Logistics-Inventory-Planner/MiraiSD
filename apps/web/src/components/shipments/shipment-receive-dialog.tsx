@@ -43,6 +43,7 @@ import type {
   SingleClawMachine,
   DoubleClawMachine,
   KeychainMachine,
+  Window,
 } from "@/types/api";
 import { LocationType } from "@/types/api";
 
@@ -56,6 +57,7 @@ function getLocationCode(location: StorageLocation): string {
     return (location as DoubleClawMachine).doubleClawMachineCode;
   if ("keychainMachineCode" in location)
     return (location as KeychainMachine).keychainMachineCode;
+  if ("windowCode" in location) return (location as Window).windowCode;
   return "";
 }
 
@@ -64,6 +66,7 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.BOX_BIN]: "Box/Bin",
   [LocationType.RACK]: "Rack",
   [LocationType.CABINET]: "Cabinet",
+  [LocationType.WINDOW]: "Window",
   [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
   [LocationType.KEYCHAIN_MACHINE]: "Keychain",

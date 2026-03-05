@@ -16,6 +16,7 @@ const LOCATION_CODE_KEYS: Record<LocationType, string | null> = {
   [LocationType.KEYCHAIN_MACHINE]: "keychainMachineCode",
   [LocationType.FOUR_CORNER_MACHINE]: "fourCornerMachineCode",
   [LocationType.PUSHER_MACHINE]: "pusherMachineCode",
+  [LocationType.WINDOW]: "windowCode",
   [LocationType.NOT_ASSIGNED]: null,
 };
 

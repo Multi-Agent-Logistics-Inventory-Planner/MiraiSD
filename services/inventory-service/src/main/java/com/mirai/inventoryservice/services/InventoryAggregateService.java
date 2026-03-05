@@ -39,6 +39,7 @@ public class InventoryAggregateService implements DisposableBean {
     private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
+    private final WindowInventoryRepository windowInventoryRepository;
     private final NotAssignedInventoryRepository notAssignedInventoryRepository;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -53,6 +54,7 @@ public class InventoryAggregateService implements DisposableBean {
             KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
+            WindowInventoryRepository windowInventoryRepository,
             NotAssignedInventoryRepository notAssignedInventoryRepository) {
         this.productRepository = productRepository;
         this.boxBinInventoryRepository = boxBinInventoryRepository;
@@ -63,6 +65,7 @@ public class InventoryAggregateService implements DisposableBean {
         this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
+        this.windowInventoryRepository = windowInventoryRepository;
         this.notAssignedInventoryRepository = notAssignedInventoryRepository;
     }
 
@@ -132,12 +135,15 @@ public class InventoryAggregateService implements DisposableBean {
         CompletableFuture<List<ProductInventoryEntryDTO>> pusherFuture = CompletableFuture.supplyAsync(
                 () -> mapPusherMachineInventory(pusherMachineInventoryRepository.findByItem_Id(productId)), executor);
 
+        CompletableFuture<List<ProductInventoryEntryDTO>> windowFuture = CompletableFuture.supplyAsync(
+                () -> mapWindowInventory(windowInventoryRepository.findByItem_Id(productId)), executor);
+
         CompletableFuture<List<ProductInventoryEntryDTO>> notAssignedFuture = CompletableFuture.supplyAsync(
                 () -> mapNotAssignedInventory(notAssignedInventoryRepository.findAllByItem_Id(productId)), executor);
 
         CompletableFuture.allOf(
                 boxBinFuture, rackFuture, cabinetFuture, singleClawFuture,
-                doubleClawFuture, keychainFuture, fourCornerFuture, pusherFuture,
+                doubleClawFuture, keychainFuture, fourCornerFuture, pusherFuture, windowFuture,
                 notAssignedFuture
         ).join();
 
@@ -149,6 +155,7 @@ public class InventoryAggregateService implements DisposableBean {
         allEntries.addAll(keychainFuture.join());
         allEntries.addAll(fourCornerFuture.join());
         allEntries.addAll(pusherFuture.join());
+        allEntries.addAll(windowFuture.join());
         allEntries.addAll(notAssignedFuture.join());
 
         allEntries.sort((a, b) -> a.getLocationLabel().compareToIgnoreCase(b.getLocationLabel()));
@@ -262,6 +269,20 @@ public class InventoryAggregateService implements DisposableBean {
                         .locationId(inv.getPusherMachine().getId())
                         .locationCode(inv.getPusherMachine().getPusherMachineCode())
                         .locationLabel("Pusher " + inv.getPusherMachine().getPusherMachineCode())
+                        .quantity(inv.getQuantity())
+                        .updatedAt(inv.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    private List<ProductInventoryEntryDTO> mapWindowInventory(List<WindowInventory> inventories) {
+        return inventories.stream()
+                .map(inv -> ProductInventoryEntryDTO.builder()
+                        .inventoryId(inv.getId())
+                        .locationType(LocationType.WINDOW.name())
+                        .locationId(inv.getWindow().getId())
+                        .locationCode(inv.getWindow().getWindowCode())
+                        .locationLabel("Window " + inv.getWindow().getWindowCode())
                         .quantity(inv.getQuantity())
                         .updatedAt(inv.getUpdatedAt())
                         .build())

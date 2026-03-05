@@ -39,6 +39,8 @@ public class InventoryTotalsRepository {
             UNION ALL
             SELECT item_id, quantity, updated_at FROM pusher_machine_inventory
             UNION ALL
+            SELECT item_id, quantity, updated_at FROM window_inventory
+            UNION ALL
             SELECT item_id, quantity, updated_at FROM not_assigned_inventory
         )
         SELECT
@@ -96,6 +98,7 @@ public class InventoryTotalsRepository {
             UNION ALL SELECT item_id, quantity FROM keychain_machine_inventory
             UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
             UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
+            UNION ALL SELECT item_id, quantity FROM window_inventory
             UNION ALL SELECT item_id, quantity FROM not_assigned_inventory
         ) combined GROUP BY item_id
         """;

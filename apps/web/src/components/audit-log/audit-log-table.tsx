@@ -62,9 +62,11 @@ function formatLocation(entry: AuditLog): string {
     return `${from} → ${to}`;
   }
   if (DISPLAY_REASONS.has(entry.reason)) {
-    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? "—";
+    const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
+    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? fallback;
   }
-  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? "—";
+  const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
+  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? fallback;
 }
 
 function QuantityChange({ change }: { change: number }) {
@@ -91,7 +93,8 @@ function movementLocationLabel(
       ? (primaryFrom ?? "NA")
       : (primaryTo ?? "NA");
   }
-  return movement.toLocationCode ?? movement.fromLocationCode ?? "—";
+  const fallback = reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
+  return movement.toLocationCode ?? movement.fromLocationCode ?? fallback;
 }
 
 function ActionPill({ reason }: { reason: StockMovementReason }) {

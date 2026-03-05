@@ -34,6 +34,7 @@ import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product"
 import { usePermissions } from "@/hooks/use-permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
+  LocationType,
   LOCATION_TYPE_LABELS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
@@ -284,19 +285,25 @@ export function ProductModal({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      locations.map((entry) => (
-                        <TableRow key={entry.inventoryId}>
-                          <TableCell className="font-mono rounded-l-lg">
-                            {entry.locationCode}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {LOCATION_TYPE_LABELS[entry.locationType]}
-                          </TableCell>
-                          <TableCell className="text-right font-medium rounded-r-lg">
-                            {entry.quantity.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      locations.map((entry) => {
+                        const locationLabel =
+                          entry.locationType === LocationType.NOT_ASSIGNED
+                            ? "NA"
+                            : entry.locationCode || "-";
+                        return (
+                          <TableRow key={entry.inventoryId}>
+                            <TableCell className="font-mono rounded-l-lg">
+                              {locationLabel}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {LOCATION_TYPE_LABELS[entry.locationType]}
+                            </TableCell>
+                            <TableCell className="text-right font-medium rounded-r-lg">
+                              {entry.quantity.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

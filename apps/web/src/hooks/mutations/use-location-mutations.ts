@@ -32,6 +32,9 @@ import {
   createPusherMachine,
   updatePusherMachine,
   deletePusherMachine,
+  createWindow,
+  updateWindow,
+  deleteWindow,
 } from "@/lib/api/locations";
 import {
   createBoxBinInventory,
@@ -58,6 +61,9 @@ import {
   createPusherMachineInventory,
   updatePusherMachineInventory,
   deletePusherMachineInventory,
+  createWindowInventory,
+  updateWindowInventory,
+  deleteWindowInventory,
 } from "@/lib/api/inventory";
 
 type LocationPayload = Record<string, string>;
@@ -104,6 +110,8 @@ export function useCreateLocationMutation(locationType: LocationType) {
           return createFourCornerMachine(payload as any);
         case "PUSHER_MACHINE":
           return createPusherMachine(payload as any);
+        case "WINDOW":
+          return createWindow(payload as any);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -136,6 +144,8 @@ export function useUpdateLocationMutation(locationType: LocationType) {
           return updateFourCornerMachine(id, payload as any);
         case "PUSHER_MACHINE":
           return updatePusherMachine(id, payload as any);
+        case "WINDOW":
+          return updateWindow(id, payload as any);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -168,6 +178,8 @@ export function useDeleteLocationMutation(locationType: LocationType) {
           return deleteFourCornerMachine(id);
         case "PUSHER_MACHINE":
           return deletePusherMachine(id);
+        case "WINDOW":
+          return deleteWindow(id);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -200,6 +212,8 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
           return (await createFourCornerMachineInventory(locationId, payload)) as any;
         case "PUSHER_MACHINE":
           return (await createPusherMachineInventory(locationId, payload)) as any;
+        case "WINDOW":
+          return (await createWindowInventory(locationId, payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -235,6 +249,8 @@ export function useUpdateInventoryMutation(
           return (await updateFourCornerMachineInventory(locationId, inventoryId, payload)) as any;
         case "PUSHER_MACHINE":
           return (await updatePusherMachineInventory(locationId, inventoryId, payload)) as any;
+        case "WINDOW":
+          return (await updateWindowInventory(locationId, inventoryId, payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -270,6 +286,8 @@ export function useDeleteInventoryMutation(
           return deleteFourCornerMachineInventory(locationId, inventoryId);
         case "PUSHER_MACHINE":
           return deletePusherMachineInventory(locationId, inventoryId);
+        case "WINDOW":
+          return deleteWindowInventory(locationId, inventoryId);
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
