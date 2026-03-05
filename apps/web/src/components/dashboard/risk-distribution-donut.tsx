@@ -72,7 +72,7 @@ export function RiskDistributionDonut({
 
   if (isLoading) {
     return (
-      <Card className="h-full">
+      <Card className="h-full border-0 border-b sm:border-r rounded-xl shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <ChartPie className="h-4 w-4 text-muted-foreground" />
@@ -95,7 +95,7 @@ export function RiskDistributionDonut({
 
   if (data.length === 0 || totalItems === 0) {
     return (
-      <Card className="h-full">
+      <Card className="h-full border-0 border-b sm:border-r rounded-xl shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <ChartPie className="h-4 w-4 text-muted-foreground" />
@@ -122,7 +122,7 @@ export function RiskDistributionDonut({
   };
 
   return (
-    <Card className="h-full shadow-none">
+    <Card className="h-full border-0 border-b sm:border-r rounded-xl shadow-none">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
             <ChartPie className="h-4 w-4 text-muted-foreground" />

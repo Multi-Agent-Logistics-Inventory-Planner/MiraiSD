@@ -90,7 +90,9 @@ function buildStockItems(
   });
 }
 
-function sortByDaysToStockout(items: FilterableStockItem[]): FilterableStockItem[] {
+function sortByDaysToStockout(
+  items: FilterableStockItem[],
+): FilterableStockItem[] {
   return [...items].sort((a, b) => {
     const da = a.daysToStockout ?? Infinity;
     const db = b.daysToStockout ?? Infinity;
@@ -170,9 +172,9 @@ export function FilterableStockList({
       <CardHeader className="flex flex-row items-center justify-between px-6">
         <div className="flex items-center gap-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Layers className="h-4 w-4 text-muted-foreground" />
-              Stock Levels
-            </CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            Stock Levels
+          </CardTitle>
           {selectedRiskBand && (
             <Badge
               variant="secondary"
@@ -190,7 +192,7 @@ export function FilterableStockList({
           )}
         </div>
         <Button asChild variant="ghost" size="sm">
-          <Link href="/products" className="gap-1">
+          <Link href="/products" className="gap-1 text-muted-foreground hover:text-muted-foreground">
             View All
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
