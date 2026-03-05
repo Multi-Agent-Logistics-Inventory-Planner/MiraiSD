@@ -123,8 +123,8 @@ export default function DashboardPage() {
 
   // Handle activity filter changes
   const handleActivityFilterChange = useCallback(
-    (types: ActivityEventType[], showResolved: boolean) => {
-      setActivityFilters({ types, showResolved });
+    (types: ActivityEventType[]) => {
+      setActivityFilters((prev) => ({ ...prev, types }));
     },
     [],
   );
@@ -166,13 +166,12 @@ export default function DashboardPage() {
             )}
             <Button
               variant="outline"
-              size="sm"
               onClick={handleSync}
               disabled={isSyncing}
-              className="gap-1.5"
+              className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] hover:text-white/90 dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground dark:hover:text-gray-300 gap-1.5"
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`}
+                className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`}
               />
               Sync
             </Button>

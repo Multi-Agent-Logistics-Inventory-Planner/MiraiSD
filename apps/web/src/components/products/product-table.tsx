@@ -76,13 +76,13 @@ export function ProductTable({
               colSpan={3}
               className="h-24 text-center text-muted-foreground sm:hidden"
             >
-              No products found.
+              No products found
             </TableCell>
             <TableCell
               colSpan={6}
               className="h-24 text-center text-muted-foreground hidden sm:table-cell"
             >
-              No products found.
+              No products found
             </TableCell>
           </TableRow>
         ) : (
@@ -114,10 +114,10 @@ export function ProductTable({
               </TableCell>
               <TableCell>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                  className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ${
                     row.product.isActive
-                      ? "bg-green-400 text-green-800"
-                      : "bg-red-300 text-red-800"
+                      ? "bg-[#20d760] text-black"
+                      : "bg-[#e50815] text-white"
                   }`}
                 >
                   {row.product.isActive ? "Active" : "Inactive"}

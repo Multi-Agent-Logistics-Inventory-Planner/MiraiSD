@@ -34,10 +34,12 @@ const STAGES: StageConfig[] = [
 function getStageStates(
   status: ShipmentStatus,
   receivedQuantity: number,
-  orderedQuantity: number
+  orderedQuantity: number,
 ): ProgressStage[] {
-  const hasPartialReceived = receivedQuantity > 0 && receivedQuantity < orderedQuantity;
-  const isFullyReceived = receivedQuantity >= orderedQuantity && orderedQuantity > 0;
+  const hasPartialReceived =
+    receivedQuantity > 0 && receivedQuantity < orderedQuantity;
+  const isFullyReceived =
+    receivedQuantity >= orderedQuantity && orderedQuantity > 0;
 
   // Stage 4: Delivered - all complete
   if (status === "DELIVERED" || isFullyReceived) {
@@ -73,9 +75,8 @@ export function ShipmentProgress({
   const targetIndex = activeIndex !== -1 ? activeIndex : lastCompletedIndex;
 
   // Calculate percentage: icons are at 0%, 33.3%, 66.6%, 100%
-  const progressPercent = targetIndex >= 0
-    ? (targetIndex / (STAGES.length - 1)) * 100
-    : 0;
+  const progressPercent =
+    targetIndex >= 0 ? (targetIndex / (STAGES.length - 1)) * 100 : 0;
 
   return (
     <div className="w-full py-2">
@@ -85,7 +86,7 @@ export function ShipmentProgress({
 
         {/* Progress bar filled */}
         <div
-          className="absolute top-1/2 left-0 h-1 -translate-y-1/2 bg-emerald-500 rounded-full transition-all duration-300"
+          className="absolute top-1/2 left-0 h-1 -translate-y-1/2 bg-emerald-600/50 rounded-full transition-all duration-300"
           style={{ width: `${progressPercent}%` }}
         />
 
@@ -103,11 +104,11 @@ export function ShipmentProgress({
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
                   state === "completed" &&
-                    "border-emerald-500 bg-emerald-500 text-white",
+                    "border-emerald-700 bg-emerald-700 text-white",
                   state === "active" &&
-                    "border-blue-500 bg-blue-500 text-white",
+                    "border-emerald-700 bg-card text-white",
                   state === "pending" &&
-                    "border-muted-foreground/30 bg-background text-muted-foreground/50"
+                    "border-muted-foreground/30 bg-background text-muted-foreground/50",
                 )}
               >
                 <Icon className="h-4 w-4" />

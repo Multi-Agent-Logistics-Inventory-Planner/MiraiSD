@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import type { RiskDistributionSegment, RiskBand } from "@/types/dashboard";
+import { ChartPie } from "lucide-react";
 
 interface RiskDistributionDonutProps {
   data: RiskDistributionSegment[];
@@ -73,7 +74,10 @@ export function RiskDistributionDonut({
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Risk Distribution</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ChartPie className="h-4 w-4 text-muted-foreground" />
+            Risk Distribution
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center gap-4 h-[280px]">
@@ -93,12 +97,15 @@ export function RiskDistributionDonut({
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Risk Distribution</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ChartPie className="h-4 w-4 text-muted-foreground" />
+            Risk Distribution
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[280px] flex items-center justify-center">
             <p className="text-sm text-muted-foreground">
-              No forecast data available.
+              No forecast data available
             </p>
           </div>
         </CardContent>
@@ -117,7 +124,10 @@ export function RiskDistributionDonut({
   return (
     <Card className="h-full shadow-none">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Risk Distribution</CardTitle>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ChartPie className="h-4 w-4 text-muted-foreground" />
+            Risk Distribution
+          </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-4 h-[280px]">

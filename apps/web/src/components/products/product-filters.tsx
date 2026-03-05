@@ -105,7 +105,7 @@ export function ProductFilters({
               <Button
                 variant={isFiltered ? "default" : "outline"}
                 size="sm"
-                className="shrink-0"
+                className="shrink-0 dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
               >
                 <SlidersHorizontal className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">
@@ -143,7 +143,7 @@ export function ProductFilters({
               <Button
                 onClick={onAddClick}
                 size="sm"
-                className="shrink-0 text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground"
+                className="shrink-0 text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
               >
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Add Product</span>

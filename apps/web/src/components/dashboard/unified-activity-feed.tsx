@@ -12,12 +12,12 @@ import {
   ChevronDown,
   Filter,
   Check,
+  Activity,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Toggle } from "@/components/ui/toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ interface UnifiedActivityFeedProps {
   isLoading?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
-  onFilterChange?: (types: ActivityEventType[], showResolved: boolean) => void;
+  onFilterChange?: (types: ActivityEventType[]) => void;
 }
 
 const EVENT_ICONS: Record<ActivityEventType, React.ReactNode> = {
@@ -138,29 +138,18 @@ export function UnifiedActivityFeed({
     "adjustment",
     "transfer",
   ]);
-  const [showResolved, setShowResolved] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleTypeToggle = useCallback(
-    (type: ActivityEventType) => {
-      setSelectedTypes((prev) => {
-        const newTypes = prev.includes(type)
-          ? prev.filter((t) => t !== type)
-          : [...prev, type];
-        onFilterChange?.(newTypes, showResolved);
-        return newTypes;
-      });
-    },
-    [onFilterChange, showResolved]
-  );
+  // Call onFilterChange after state updates to avoid setState-during-render error
+  useEffect(() => {
+    onFilterChange?.(selectedTypes);
+  }, [selectedTypes, onFilterChange]);
 
-  const handleResolvedToggle = useCallback(() => {
-    setShowResolved((prev) => {
-      const newValue = !prev;
-      onFilterChange?.(selectedTypes, newValue);
-      return newValue;
-    });
-  }, [onFilterChange, selectedTypes]);
+  const handleTypeToggle = useCallback((type: ActivityEventType) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  }, []);
 
   // Virtualized scroll detection for loading more
   const handleScroll = useCallback(() => {
@@ -184,7 +173,10 @@ export function UnifiedActivityFeed({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Activity</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground" />
+          Activity
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -207,19 +199,14 @@ export function UnifiedActivityFeed({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">Activity</CardTitle>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground" />
+          Activity
+        </CardTitle>
         <div className="flex items-center gap-2">
-          <Toggle
-            size="sm"
-            pressed={showResolved}
-            onPressedChange={handleResolvedToggle}
-            className="text-xs"
-          >
-            Show resolved
-          </Toggle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
+              <Button variant="outline" size="sm" className="h-8 dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]">
                 <Filter className="mr-1 h-3 w-3" />
                 Filter
                 <ChevronDown className="ml-1 h-3 w-3" />
@@ -245,7 +232,7 @@ export function UnifiedActivityFeed({
       <CardContent>
         {events.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No activity to show.
+            No activity to show
           </p>
         ) : (
           <div

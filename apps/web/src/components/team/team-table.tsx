@@ -39,18 +39,18 @@ export type TeamMemberRow = {
 function getStatusColor(status: "active" | "pending") {
   switch (status) {
     case "active":
-      return "bg-green-100 text-green-700";
+      return "bg-[#20d760] text-black";
     case "pending":
-      return "bg-amber-100 text-amber-700";
+      return "bg-[#ffce00] text-black";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-[#e50815] text-white";
   }
 }
 
 function getRoleColor(role: "admin" | "employee") {
   switch (role) {
     case "admin":
-      return "bg-purple-100 text-purple-700";
+      return "bg-[#0b66c2] text-white dark:bg-[#7c3aed] dark:text-purple-100";
     case "employee":
       return "bg-gray-100 text-gray-700";
     default:
@@ -131,7 +131,7 @@ export function TeamTable({
               colSpan={6}
               className="h-24 text-center text-muted-foreground"
             >
-              No team members found.
+              No team members found
             </TableCell>
           </TableRow>
         ) : (
@@ -141,7 +141,6 @@ export function TeamTable({
               <TableCell>{row.email}</TableCell>
               <TableCell className="text-center">
                 <Badge
-                  variant="outline"
                   className={cn(
                     "text-xs",
                     getRoleColor(row.role.toLowerCase() as "admin" | "employee")
@@ -153,7 +152,6 @@ export function TeamTable({
               </TableCell>
               <TableCell className="text-center">
                 <Badge
-                  variant="outline"
                   className={cn("text-xs", getStatusColor(row.status))}
                 >
                   {row.status.charAt(0).toUpperCase() + row.status.slice(1)}

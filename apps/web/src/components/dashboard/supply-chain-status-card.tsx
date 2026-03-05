@@ -33,24 +33,26 @@ function formatDeliveryCountdown(date: Date): string {
 
 function LoadingSkeleton() {
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className="gap-3">
+      <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <Skeleton className="h-5 w-36" />
           <Skeleton className="h-8 w-24" />
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-5 w-20" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-12 w-12 rounded-md" />
-            <Skeleton className="h-12 w-12 rounded-md" />
-            <Skeleton className="h-12 w-12 rounded-md" />
-            <Skeleton className="h-12 w-12 rounded-md" />
+      <CardContent className="pt-0">
+        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 min-h-[140px]">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-12 w-12 rounded-md" />
+              <Skeleton className="h-12 w-12 rounded-md" />
+              <Skeleton className="h-12 w-12 rounded-md" />
+              <Skeleton className="h-12 w-12 rounded-md" />
+            </div>
           </div>
         </div>
       </CardContent>
@@ -65,12 +67,6 @@ function EmptyState() {
       <p className="text-sm text-muted-foreground mb-3">
         No upcoming shipments
       </p>
-      <Button asChild size="sm">
-        <Link href="/shipments/new" className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" />
-          Create Order
-        </Link>
-      </Button>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   X,
   ArrowRight,
   ImageOff,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -168,7 +169,10 @@ export function FilterableStockList({
     <Card className="h-full bg-transparent border-none shadow-none py-6">
       <CardHeader className="flex flex-row items-center justify-between px-6">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-base">Stock Levels</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              Stock Levels
+            </CardTitle>
           {selectedRiskBand && (
             <Badge
               variant="secondary"
@@ -198,7 +202,7 @@ export function FilterableStockList({
             <p className="text-sm text-muted-foreground py-4 text-center flex-1 flex items-center justify-center">
               {selectedRiskBand
                 ? `No items in ${RISK_BAND_LABELS[selectedRiskBand]} status.`
-                : "No inventory data available."}
+                : "No inventory data available"}
             </p>
           ) : (
             <>
