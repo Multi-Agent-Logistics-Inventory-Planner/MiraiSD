@@ -21,14 +21,17 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
     private final StockMovementService stockMovementService;
+    private final SupabaseBroadcastService broadcastService;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryService categoryService,
-            @Lazy StockMovementService stockMovementService) {
+            @Lazy StockMovementService stockMovementService,
+            SupabaseBroadcastService broadcastService) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
+        this.broadcastService = broadcastService;
     }
 
     public Product createProduct(String sku, UUID categoryId,
@@ -60,6 +63,9 @@ public class ProductService {
                 .build();
 
         Product savedProduct = productRepository.save(product);
+
+        // Broadcast product creation so clients refresh product lists/details
+        broadcastService.broadcastProductUpdated(List.of(savedProduct.getId().toString()));
 
         // If initial stock provided, create tracked inventory in NotAssigned
         if (initialStock != null && initialStock > 0) {
@@ -131,24 +137,29 @@ public class ProductService {
         if (imageUrl != null) product.setImageUrl(imageUrl);
         if (notes != null) product.setNotes(notes);
 
-        return productRepository.save(product);
+        Product saved = productRepository.save(product);
+        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
+        return saved;
     }
 
     public void deactivateProduct(UUID id) {
         Product product = getProductById(id);
         product.setIsActive(false);
-        productRepository.save(product);
+        Product saved = productRepository.save(product);
+        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
     }
 
     public void activateProduct(UUID id) {
         Product product = getProductById(id);
         product.setIsActive(true);
-        productRepository.save(product);
+        Product saved = productRepository.save(product);
+        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
     }
 
     public void deleteProduct(UUID id) {
         Product product = getProductById(id);
         productRepository.delete(product);
+        broadcastService.broadcastProductUpdated(List.of(id.toString()));
     }
 
     public boolean existsBySku(String sku) {

@@ -74,6 +74,8 @@ public class ShipmentService {
     private final PusherMachineRepository pusherMachineRepository;
     private final WindowRepository windowRepository;
     private final NotificationService notificationService;
+    private final StockMovementService stockMovementService;
+    private final SupabaseBroadcastService broadcastService;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
@@ -102,7 +104,9 @@ public class ShipmentService {
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
             WindowRepository windowRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            StockMovementService stockMovementService,
+            SupabaseBroadcastService broadcastService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productRepository = productRepository;
@@ -130,6 +134,8 @@ public class ShipmentService {
         this.windowInventoryRepository = windowInventoryRepository;
         this.windowRepository = windowRepository;
         this.notificationService = notificationService;
+        this.stockMovementService = stockMovementService;
+        this.broadcastService = broadcastService;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -179,7 +185,12 @@ public class ShipmentService {
         }
 
         shipment.setItems(items);
-        return shipmentRepository.save(shipment);
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastShipmentUpdated();
+
+        return savedShipment;
     }
 
     public Shipment getShipmentById(UUID id) {
@@ -238,7 +249,12 @@ public class ShipmentService {
             shipment.setTrackingId(requestDTO.getTrackingId());
         }
 
-        return shipmentRepository.save(shipment);
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastShipmentUpdated();
+
+        return savedShipment;
     }
 
     public void deleteShipment(UUID id) {
@@ -247,6 +263,9 @@ public class ShipmentService {
             throw new InvalidShipmentStatusException("Cannot delete a delivered shipment");
         }
         shipmentRepository.delete(shipment);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastShipmentUpdated();
     }
 
     /**
@@ -283,11 +302,15 @@ public class ShipmentService {
         Map<UUID, ShipmentItem> shipmentItemMap = shipmentItemRepository.findAllById(shipmentItemIds).stream()
                 .collect(Collectors.toMap(ShipmentItem::getId, Function.identity()));
 
+        Set<UUID> affectedProductIds = new java.util.HashSet<>();
+
         for (ReceiveShipmentRequestDTO.ItemReceiptDTO receipt : requestDTO.getItemReceipts()) {
             ShipmentItem shipmentItem = shipmentItemMap.get(receipt.getShipmentItemId());
             if (shipmentItem == null) {
                 throw new IllegalArgumentException("Shipment item not found: " + receipt.getShipmentItemId());
             }
+
+            affectedProductIds.add(shipmentItem.getItem().getId());
 
             if (!shipmentItem.getShipment().getId().equals(shipmentId)) {
                 throw new IllegalArgumentException("Shipment item does not belong to this shipment");
@@ -420,7 +443,17 @@ public class ShipmentService {
                     .ifPresent(shipment::setReceivedBy);
         }
 
-        return shipmentRepository.save(shipment);
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Ensure product quantity/isActive denormalized fields stay in sync for UI reads
+        stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+
+        // Broadcast real-time updates to connected clients
+        broadcastService.broadcastShipmentUpdated();
+        broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
+
+        return savedShipment;
     }
 
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId) {
