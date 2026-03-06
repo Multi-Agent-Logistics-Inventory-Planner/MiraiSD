@@ -5,9 +5,11 @@ import Image from "next/image";
 import { ImageOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { StockMovementReason } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 import { QuantityControls } from "./quantity-controls";
 import { AdjustSummary } from "./adjust-summary";
+import { ReasonSelector } from "./reason-selector";
 import type { AdjustAction, NormalizedInventory } from "./types";
 
 interface SelectedProductCardProps {
@@ -15,11 +17,13 @@ interface SelectedProductCardProps {
   existingQuantityAtLocation: number;
   action: AdjustAction;
   quantity: number;
+  reason: StockMovementReason;
   quantityWarning: string | null;
   locationLabel: string;
   disabled: boolean;
   onClearSelection: () => void;
   onQuantityChange: (value: string) => void;
+  onReasonChange: (reason: StockMovementReason) => void;
   onIncrement: () => void;
   onDecrement: () => void;
 }
@@ -29,11 +33,13 @@ export function SelectedProductCard({
   existingQuantityAtLocation,
   action,
   quantity,
+  reason,
   quantityWarning,
   locationLabel,
   disabled,
   onClearSelection,
   onQuantityChange,
+  onReasonChange,
   onIncrement,
   onDecrement,
 }: SelectedProductCardProps) {
@@ -113,6 +119,14 @@ export function SelectedProductCard({
       {quantityWarning && (
         <p className="text-xs text-amber-600">{quantityWarning}</p>
       )}
+
+      {/* Reason selector */}
+      <ReasonSelector
+        action={action}
+        value={reason}
+        onChange={onReasonChange}
+        disabled={disabled}
+      />
 
       {/* Summary */}
       <AdjustSummary

@@ -1,7 +1,29 @@
 import type { Inventory, InventoryItem, Category } from "@/types/api";
+import { StockMovementReason } from "@/types/api";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 
 export type AdjustAction = "add" | "subtract";
+
+export interface ReasonOption {
+  readonly value: StockMovementReason;
+  readonly label: string;
+}
+
+export const REASON_OPTIONS_BY_ACTION: Record<AdjustAction, readonly ReasonOption[]> = {
+  subtract: [
+    { value: StockMovementReason.SALE, label: "Sale" },
+    { value: StockMovementReason.ADJUSTMENT, label: "Adjustment" },
+  ],
+  add: [
+    { value: StockMovementReason.RESTOCK, label: "Restock" },
+    { value: StockMovementReason.ADJUSTMENT, label: "Adjustment" },
+  ],
+} as const;
+
+export const DEFAULT_REASON_BY_ACTION: Record<AdjustAction, StockMovementReason> = {
+  subtract: StockMovementReason.SALE,
+  add: StockMovementReason.RESTOCK,
+} as const;
 
 /**
  * Normalized inventory representation for the adjust dialog

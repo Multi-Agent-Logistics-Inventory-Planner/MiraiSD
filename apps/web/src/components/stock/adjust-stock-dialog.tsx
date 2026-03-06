@@ -16,6 +16,7 @@ import {
   type Category,
   StockMovementReason,
 } from "@/types/api";
+import { DEFAULT_REASON_BY_ACTION } from "./adjust/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ export function AdjustStockDialog({
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
+  const [reason, setReason] = useState<StockMovementReason>(DEFAULT_REASON_BY_ACTION["subtract"]);
 
   const adjustMutation = useAdjustStockMutation();
 
@@ -90,6 +92,7 @@ export function AdjustStockDialog({
       setCategoryFilters([]);
       setChildCategoryFilters([]);
       setQuantityWarning(null);
+      setReason(DEFAULT_REASON_BY_ACTION["subtract"]);
     }
   }, [open]);
 
@@ -110,6 +113,7 @@ export function AdjustStockDialog({
     setSearchQuery("");
     setCategoryFilters([]);
     setChildCategoryFilters([]);
+    setReason(DEFAULT_REASON_BY_ACTION[action]);
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
@@ -306,11 +310,6 @@ export function AdjustStockDialog({
       });
       return;
     }
-
-    const reason =
-      action === "subtract"
-        ? StockMovementReason.SALE
-        : StockMovementReason.ADJUSTMENT;
 
     try {
       if (action === "subtract") {
@@ -521,11 +520,13 @@ export function AdjustStockDialog({
               existingQuantityAtLocation={currentQtyAtLocation}
               action={action}
               quantity={quantity}
+              reason={reason}
               quantityWarning={quantityWarning}
               locationLabel={locationLabel}
               disabled={isAdjusting}
               onClearSelection={handleClearSelection}
               onQuantityChange={handleQuantityChange}
+              onReasonChange={setReason}
               onIncrement={handleIncrement}
               onDecrement={handleDecrement}
             />
