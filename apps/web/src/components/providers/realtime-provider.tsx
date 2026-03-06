@@ -1,9 +1,6 @@
 "use client";
 
-import { useRealtimeNotifications } from "@/hooks/realtime/use-realtime-notifications";
-import { useRealtimeProducts } from "@/hooks/realtime/use-realtime-products";
-import { useRealtimeInventory } from "@/hooks/realtime/use-realtime-inventory";
-import { useRealtimeShipments } from "@/hooks/realtime/use-realtime-shipments";
+import { useRealtimeBroadcast } from "@/hooks/realtime/use-realtime-broadcast";
 
 interface RealtimeProviderProps {
   children: React.ReactNode;
@@ -25,11 +22,9 @@ interface RealtimeProviderProps {
  * ```
  */
 export function RealtimeProvider({ children, enabled = true }: RealtimeProviderProps) {
-  // Subscribe to all real-time channels
-  useRealtimeNotifications(enabled);
-  useRealtimeProducts(enabled);
-  useRealtimeInventory(enabled);
-  useRealtimeShipments(enabled);
+  // Subscribe to broadcast channel for real-time updates from backend
+  // This single subscription handles all entity types (inventory, products, shipments, etc.)
+  useRealtimeBroadcast(enabled);
 
   return <>{children}</>;
 }
