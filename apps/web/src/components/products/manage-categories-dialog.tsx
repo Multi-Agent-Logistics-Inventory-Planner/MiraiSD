@@ -149,7 +149,7 @@ export function ManageCategoriesDialog({
                 No categories found
               </p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {categories.map((category) => {
                   const hasChildren = category.children.length > 0;
                   const isExpanded = expandedIds.has(category.id);
@@ -157,7 +157,7 @@ export function ManageCategoriesDialog({
 
                   return (
                     <li key={category.id}>
-                      <div className="flex items-center gap-2 py-2 px-2 rounded-md hover:bg-muted/50 group">
+                      <div className="flex items-center gap-2 py-2 px-2 rounded-full border bg-muted/30 hover:bg-muted/60 group">
                         <button
                           type="button"
                           className="flex items-center gap-2 flex-1 text-left min-w-0"
@@ -248,12 +248,12 @@ export function ManageCategoriesDialog({
                       </div>
 
                       {hasChildren && isExpanded && (
-                        <ul className="ml-6 mt-1 space-y-1 border-l pl-4">
+                        <ul className="ml-6 mt-2 space-y-2 border-l pl-4">
                           {category.children.map((child) => {
                             const isEditingChild = editingId === child.id;
                             return (
                               <li key={child.id}>
-                                <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 group">
+                                <div className="flex items-center gap-2 py-1.5 px-2 rounded-full border bg-muted/30 hover:bg-muted/60 group">
                                   {isEditingChild ? (
                                     <Input
                                       autoFocus
