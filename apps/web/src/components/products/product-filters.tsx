@@ -145,7 +145,7 @@ export function ProductFilters({
                 <>
                   <Separator />
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     className="w-full"
                     onClick={() => {
