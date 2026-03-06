@@ -155,13 +155,10 @@
   }
   html {
     overscroll-behavior: none;
-    height: 100%;
-    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground;
     overscroll-behavior: none;
-    height: 100%;
-    overflow: auto;
+    min-height: 100dvh;
   }
 }
