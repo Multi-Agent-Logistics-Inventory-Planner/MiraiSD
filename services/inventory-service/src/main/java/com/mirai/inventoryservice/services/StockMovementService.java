@@ -811,15 +811,15 @@ public class StockMovementService {
             String productSummary,
             String notes
     ) {
+        com.mirai.inventoryservice.models.audit.User user = null;
         String actorName = null;
         if (actorId != null) {
-            actorName = userRepository.findById(actorId)
-                    .map(com.mirai.inventoryservice.models.audit.User::getFullName)
-                    .orElse(null);
+            user = userRepository.findById(actorId).orElse(null);
+            actorName = user != null ? user.getFullName() : null;
         }
 
         AuditLog auditLog = AuditLog.builder()
-                .actorId(actorId)
+                .user(user)
                 .actorName(actorName)
                 .reason(reason)
                 .primaryFromLocationId(fromLocationId)

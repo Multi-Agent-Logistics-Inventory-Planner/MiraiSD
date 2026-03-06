@@ -25,7 +25,11 @@ public class AuditLog {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "actor_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actor_id")
+    private User user;
+
+    @Column(name = "actor_id", insertable = false, updatable = false)
     private UUID actorId;
 
     @Column(name = "actor_name")
