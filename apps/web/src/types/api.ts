@@ -647,6 +647,7 @@ export interface Notification {
   message: string;
   recipientId?: string;
   itemId?: string;
+  itemName?: string;
   inventoryId?: string;
   via?: string[];
   metadata?: Record<string, unknown>;

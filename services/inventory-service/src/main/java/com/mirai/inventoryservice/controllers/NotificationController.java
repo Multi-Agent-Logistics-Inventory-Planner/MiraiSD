@@ -5,13 +5,14 @@ import com.mirai.inventoryservice.dtos.requests.NotificationFilterDTO;
 import com.mirai.inventoryservice.dtos.responses.NotificationResponseDTO;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.enums.NotificationType;
+import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.services.NotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,10 @@ import org.springframework.web.bind.annotation.*;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -27,12 +31,15 @@ import java.util.UUID;
 public class NotificationController {
     private final NotificationService notificationService;
     private final NotificationMapper notificationMapper;
+    private final ProductRepository productRepository;
 
     public NotificationController(
             NotificationService notificationService,
-            NotificationMapper notificationMapper) {
+            NotificationMapper notificationMapper,
+            ProductRepository productRepository) {
         this.notificationService = notificationService;
         this.notificationMapper = notificationMapper;
+        this.productRepository = productRepository;
     }
 
     @GetMapping
@@ -44,26 +51,34 @@ public class NotificationController {
         } else {
             notifications = notificationService.getAllNotifications();
         }
-        return ResponseEntity.ok(notificationMapper.toResponseDTOList(notifications));
+        List<NotificationResponseDTO> response = notificationMapper.toResponseDTOList(notifications);
+        populateItemNames(response);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/unread")
     public ResponseEntity<List<NotificationResponseDTO>> getUnreadNotifications(
             @RequestParam UUID recipientId) {
         List<Notification> notifications = notificationService.getUnreadNotifications(recipientId);
-        return ResponseEntity.ok(notificationMapper.toResponseDTOList(notifications));
+        List<NotificationResponseDTO> response = notificationMapper.toResponseDTOList(notifications);
+        populateItemNames(response);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<NotificationResponseDTO> getNotificationById(@PathVariable UUID id) {
         Notification notification = notificationService.getNotificationById(id);
-        return ResponseEntity.ok(notificationMapper.toResponseDTO(notification));
+        NotificationResponseDTO response = notificationMapper.toResponseDTO(notification);
+        populateItemName(response);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/read")
     public ResponseEntity<NotificationResponseDTO> markAsRead(@PathVariable UUID id) {
         Notification notification = notificationService.markAsRead(id);
-        return ResponseEntity.ok(notificationMapper.toResponseDTO(notification));
+        NotificationResponseDTO response = notificationMapper.toResponseDTO(notification);
+        populateItemName(response);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/read-all")
@@ -95,19 +110,25 @@ public class NotificationController {
                 .toDate(toDate)
                 .build();
         Page<Notification> notifications = notificationService.getNotifications(filters, pageable);
-        return ResponseEntity.ok(notifications.map(notificationMapper::toResponseDTO));
+        Page<NotificationResponseDTO> response = notifications.map(notificationMapper::toResponseDTO);
+        populateItemNames(response.getContent());
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/resolve")
     public ResponseEntity<NotificationResponseDTO> resolveNotification(@PathVariable UUID id) {
         Notification notification = notificationService.resolveNotification(id);
-        return ResponseEntity.ok(notificationMapper.toResponseDTO(notification));
+        NotificationResponseDTO response = notificationMapper.toResponseDTO(notification);
+        populateItemName(response);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/unresolve")
     public ResponseEntity<NotificationResponseDTO> unresolveNotification(@PathVariable UUID id) {
         Notification notification = notificationService.unresolveNotification(id);
-        return ResponseEntity.ok(notificationMapper.toResponseDTO(notification));
+        NotificationResponseDTO response = notificationMapper.toResponseDTO(notification);
+        populateItemName(response);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/counts")
@@ -117,6 +138,32 @@ public class NotificationController {
                 "resolved", notificationService.countResolved()
         );
         return ResponseEntity.ok(counts);
+    }
+
+    private void populateItemName(NotificationResponseDTO dto) {
+        if (dto == null || dto.getItemId() == null) return;
+        productRepository.findById(dto.getItemId())
+                .ifPresent(product -> dto.setItemName(product.getName()));
+    }
+
+    private void populateItemNames(List<NotificationResponseDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) return;
+
+        Set<UUID> itemIds = dtos.stream()
+                .map(NotificationResponseDTO::getItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (itemIds.isEmpty()) return;
+
+        Map<UUID, String> itemNameById = productRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
+
+        for (NotificationResponseDTO dto : dtos) {
+            UUID itemId = dto.getItemId();
+            if (itemId != null) {
+                dto.setItemName(itemNameById.get(itemId));
+            }
+        }
     }
 }
 
