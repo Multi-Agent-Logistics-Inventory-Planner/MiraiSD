@@ -111,7 +111,7 @@ export function AddInventoryDialog({
                   className="justify-between"
                   disabled={productsQuery.isLoading}
                 >
-                  {selected ? `${selected.name} (${selected.sku})` : "Select product..."}
+                  {selected ? `${selected.name}${selected.sku ? ` (${selected.sku})` : ""}` : "Select product..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -126,7 +126,7 @@ export function AddInventoryDialog({
                         return (
                           <CommandItem
                             key={p.id}
-                            value={`${p.name} ${p.sku}`}
+                            value={`${p.name}${p.sku ? ` ${p.sku}` : ""}`}
                             onSelect={() => {
                               setProductId(p.id);
                               setComboOpen(false);
