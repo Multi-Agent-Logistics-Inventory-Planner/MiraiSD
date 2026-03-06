@@ -37,9 +37,6 @@ function TableSkeleton() {
           <TableCell>
             <Skeleton className="h-4 w-16" />
           </TableCell>
-          <TableCell className="hidden sm:table-cell">
-            <Skeleton className="h-4 w-20" />
-          </TableCell>
           <TableCell className="hidden sm:table-cell rounded-r-lg">
             <Skeleton className="h-8 w-8" />
           </TableCell>
@@ -60,7 +57,6 @@ export function ProductTable({
         <TableHead className="text-left rounded-l-lg">Product</TableHead>
         <TableHead className="hidden sm:table-cell">Category</TableHead>
         <TableHead>Stock</TableHead>
-        <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
         <TableHead className="hidden sm:table-cell rounded-r-lg w-12"></TableHead>
       </DataTableHeader>
       <TableBody>
@@ -112,12 +108,7 @@ export function ProductTable({
                 {row.product.category.name}
               </TableCell>
               <TableCell>{row.totalQuantity}</TableCell>
-              <TableCell className="hidden sm:table-cell">
-                {row.product.unitCost != null
-                  ? `$${row.product.unitCost.toFixed(2)}`
-                  : "-"}
-              </TableCell>
-              <TableCell className="hidden sm:table-cell rounded-r-lg">
+                  <TableCell className="hidden sm:table-cell rounded-r-lg">
                 <Button
                   variant="ghost"
                   size="icon"
