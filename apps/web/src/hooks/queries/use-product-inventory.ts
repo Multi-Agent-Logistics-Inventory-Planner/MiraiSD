@@ -22,15 +22,16 @@ function getStatus(totalQuantity: number, reorderPoint?: number): StockStatus {
   return "good";
 }
 
-export function useProductInventory() {
-  const productsQuery = useProducts();
+export function useProductInventory(rootOnly = false) {
+  const productsQuery = useProducts(rootOnly);
 
   const data: ProductWithInventory[] | null = useMemo(() => {
     const products = productsQuery.data;
     if (!products) return null;
 
     return products.map((p) => {
-      const qty = p.quantity ?? 0;
+      // For parent products with children, use totalChildStock
+      const qty = p.hasChildren ? (p.totalChildStock ?? 0) : (p.quantity ?? 0);
       return {
         product: p,
         totalQuantity: qty,

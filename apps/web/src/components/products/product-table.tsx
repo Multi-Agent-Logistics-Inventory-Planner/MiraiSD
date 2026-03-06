@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { ImageOff, MoreVertical } from "lucide-react";
+import { ImageOff, MoreVertical, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,28 @@ export function ProductTable({
     return map;
   }, [categories]);
 
+  // Set of Kuji category IDs (root and children)
+  const kujiCategoryIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!categories) return ids;
+
+    const kujiCat = categories.find(
+      (c) => c.name.toLowerCase() === "kuji" || c.slug?.toLowerCase() === "kuji"
+    );
+    if (kujiCat) {
+      ids.add(kujiCat.id);
+      for (const child of kujiCat.children) {
+        ids.add(child.id);
+      }
+    }
+    return ids;
+  }, [categories]);
+
+  // Check if a product should show the Kuji/folder indicator
+  const isKujiProduct = (row: ProductWithInventory) => {
+    return row.product.hasChildren || kujiCategoryIds.has(row.product.category.id);
+  };
+
   return (
     <div className="overflow-hidden sm:overflow-visible w-full">
       <Table className="border-none table-fixed w-full">
@@ -138,8 +160,13 @@ export function ProductTable({
                       <ImageOff className="h-4 w-4 text-muted-foreground" />
                     </div>
                   )}
-                  <span className="font-medium truncate min-w-0">
+                  <span className="font-medium truncate min-w-0 flex items-center gap-1.5">
                     {row.product.name}
+                    {isKujiProduct(row) && (
+                      <span title="Click to manage prizes">
+                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      </span>
+                    )}
                   </span>
                 </div>
               </TableCell>

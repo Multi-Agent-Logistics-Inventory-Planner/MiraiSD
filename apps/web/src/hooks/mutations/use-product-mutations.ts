@@ -8,8 +8,18 @@ export function useCreateProductMutation() {
   const qc = useQueryClient();
   return useMutation<Product, Error, ProductRequest>({
     mutationFn: (payload) => createProduct(payload),
-    onSuccess: async () => {
+    onSuccess: async (newProduct) => {
+      // Invalidate all product queries (list, with-children, children)
       await qc.invalidateQueries({ queryKey: ["products"] });
+      // Also invalidate the parent's children query if this is a child product
+      if (newProduct.parentId) {
+        await qc.invalidateQueries({
+          queryKey: ["products", newProduct.parentId, "with-children"],
+        });
+        await qc.invalidateQueries({
+          queryKey: ["products", newProduct.parentId, "children"],
+        });
+      }
     },
   });
 }

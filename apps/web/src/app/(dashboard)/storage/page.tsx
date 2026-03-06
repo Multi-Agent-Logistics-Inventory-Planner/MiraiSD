@@ -74,7 +74,7 @@ export default function LocationsPage() {
     return filteredLocations.slice(start, start + PAGE_SIZE);
   }, [filteredLocations, locationPage]);
 
-  // Filter not-assigned items based on search (by SKU or product name)
+  // Filter not-assigned items based on search (data already filtered to root products by hook)
   const filteredNotAssigned = useMemo(() => {
     const q = search.trim().toLowerCase();
     const data = notAssignedQuery.data ?? [];

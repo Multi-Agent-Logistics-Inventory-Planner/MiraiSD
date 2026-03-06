@@ -113,10 +113,32 @@ export interface AuthValidationResponse {
 
 // Product types
 
+export interface ProductSummary {
+  id: string;
+  sku?: string | null;
+  name: string;
+  letter?: string | null;
+  category: Category;
+  imageUrl?: string;
+  isActive: boolean;
+  quantity: number;
+  parentId?: string | null;
+  hasChildren?: boolean;
+}
+
 export interface Product {
   id: string;
   sku?: string | null;
+  letter?: string | null;
   category: Category;
+  // Parent-child relationship fields
+  parentId?: string | null;
+  parentName?: string | null;
+  parentSku?: string | null;
+  children?: ProductSummary[];
+  totalChildStock?: number;
+  hasChildren?: boolean;
+  // Core fields
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -133,9 +155,12 @@ export interface Product {
 
 export interface ProductRequest {
   sku?: string;
-  categoryId: string;
+  categoryId?: string;
+  parentId?: string;
+  letter?: string;
   name: string;
   description?: string;
+  initialStock?: number;
   reorderPoint?: number;
   targetStockLevel?: number;
   leadTimeDays?: number;
@@ -283,6 +308,8 @@ export interface InventoryItem {
   name: string;
   category: Category;
   imageUrl?: string;
+  /** Set for child/prize products; null for root products. Used to hide prizes from storage. */
+  parentId?: string | null;
 }
 
 // Base Inventory type
