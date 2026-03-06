@@ -58,9 +58,9 @@ export default function LoginPage() {
 
   return (
     <Card className="shadow-lg">
-      <CardHeader className="space-y-1 text-center">
-        <div className="flex justify-center mb-4">
-          <Logo width={120} height={120} />
+      <CardHeader className="space-y-1 text-center pb-2 sm:pb-6">
+        <div className="flex justify-center mb-2 sm:mb-4">
+          <Logo width={80} height={80} />
         </div>
         <CardTitle className="text-2xl">Welcome back</CardTitle>
         <CardDescription>
