@@ -233,7 +233,7 @@ export function ProductForm({
         }
       } else {
         const newProduct = await createMutation.mutateAsync(payload);
-        toast({ title: "Product created" });
+        toast({ title: "Product created", variant: "success" });
 
         // Optionally add initial stock after product creation
         if (
