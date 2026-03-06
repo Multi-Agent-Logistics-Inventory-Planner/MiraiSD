@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, SlidersHorizontal, Pencil } from "lucide-react";
+import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { Category } from "@/types/api";
 
 export interface ProductFiltersState {
@@ -48,7 +47,6 @@ export function ProductFilters({
   onAddClick,
 }: ProductFiltersProps) {
   const [filterOpen, setFilterOpen] = useState(false);
-  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const rootCategories = categories.filter((c) => !c.parentId);
   const selectedCategory = rootCategories.find((c) => c.id === state.selectedCategoryId) ?? null;
@@ -68,7 +66,7 @@ export function ProductFilters({
           placeholder="Search by name or SKU"
           value={state.search}
           onChange={(e) => onChange({ ...state, search: e.target.value })}
-          className="pl-9"
+          className="pl-9 text-sm sm:text-base"
         />
       </div>
 
@@ -78,12 +76,12 @@ export function ProductFilters({
             <Button
               variant={hasActiveFilters ? "default" : "outline"}
               size="sm"
-              className="shrink-0 dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
+              className="shrink-0 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
             >
               <SlidersHorizontal className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Filter</span>
               {filterCount > 0 && (
-                <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-background text-[10px] font-medium text-foreground">
+                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-table-header text-[10px] font-medium text-table-header-foreground">
                   {filterCount}
                 </span>
               )}
@@ -93,73 +91,54 @@ export function ProductFilters({
             <div className="grid grid-cols-1 gap-3">
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Category</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={state.selectedCategoryId ?? "__all__"}
-                    onValueChange={(v) => {
-                      if (v === "__all__") {
-                        onChange({ ...state, selectedCategoryId: null, selectedSubcategoryId: null });
-                      } else {
-                        onChange({ ...state, selectedCategoryId: v, selectedSubcategoryId: null });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="All categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">All categories</SelectItem>
-                      {rootCategories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Can permission={Permission.SETTINGS_MANAGE}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      onClick={() => setManageCategoriesOpen(true)}
-                      title="Edit categories"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  </Can>
-                </div>
+                <Select
+                  value={state.selectedCategoryId ?? "__all__"}
+                  onValueChange={(v) => {
+                    if (v === "__all__") {
+                      onChange({ ...state, selectedCategoryId: null, selectedSubcategoryId: null });
+                    } else {
+                      onChange({ ...state, selectedCategoryId: v, selectedSubcategoryId: null });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All categories</SelectItem>
+                    {rootCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Subcategory</Label>
-                <div className="flex items-center gap-1.5">
-                  <Select
-                    value={state.selectedSubcategoryId ?? "__all__"}
-                    onValueChange={(v) => {
-                      onChange({
-                        ...state,
-                        selectedSubcategoryId: v === "__all__" ? null : v,
-                      });
-                    }}
-                    disabled={!state.selectedCategoryId || subcategories.length === 0}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="All subcategories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">All subcategories</SelectItem>
-                      {subcategories.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Can permission={Permission.SETTINGS_MANAGE}>
-                    <div className="w-9 h-9 shrink-0" />
-                  </Can>
-                </div>
+                <Select
+                  value={state.selectedSubcategoryId ?? "__all__"}
+                  onValueChange={(v) => {
+                    onChange({
+                      ...state,
+                      selectedSubcategoryId: v === "__all__" ? null : v,
+                    });
+                  }}
+                  disabled={!state.selectedCategoryId || subcategories.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All subcategories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All subcategories</SelectItem>
+                    {subcategories.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {hasActiveFilters && (
@@ -196,10 +175,6 @@ export function ProductFilters({
         )}
       </div>
 
-      <ManageCategoriesDialog
-        open={manageCategoriesOpen}
-        onOpenChange={setManageCategoriesOpen}
-      />
     </div>
   );
 }

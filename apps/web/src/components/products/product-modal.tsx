@@ -99,19 +99,21 @@ export function ProductModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden px-4! sm:px-6! dark:bg-background">
-        <DialogHeader className="text-left">
-          <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-row items-center gap-2 sm:gap-3">
-            <span className="break-words">{p.name}</span>
+      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-hidden px-4! sm:px-6! dark:bg-background">
+        <DialogHeader className="text-left min-w-0 overflow-hidden">
+          <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+            <span className="min-w-0 truncate" title={p.name}>
+              {p.name}
+            </span>
             {p.sku && (
-              <span className="font-mono text-xs sm:text-sm font-normal text-muted-foreground">
+              <span className="font-mono text-xs sm:text-sm font-normal text-muted-foreground shrink-0">
                 {p.sku}
               </span>
             )}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex gap-4 sm:gap-6 mt-2">
+        <div className="flex gap-4 sm:gap-6 mt-2 min-w-0">
           <div className="shrink-0">
             {p.imageUrl ? (
               <div className="relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-lg bg-muted">
@@ -237,14 +239,14 @@ export function ProductModal({
         </div>
 
         {/* Current Stock Section */}
-        <div className="mt-4 sm:mt-6">
+        <div className="mt-4 sm:mt-6 min-w-0">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Current Stock{" "}
             <span className="text-foreground">
               ({totalQuantity.toLocaleString()})
             </span>
           </h3>
-          <div className="rounded-lg">
+          <div className="rounded-lg overflow-x-auto">
             <Card className="p-2 border-none">
               <CardContent className="p-0">
                 <Table>
@@ -313,18 +315,22 @@ export function ProductModal({
         </div>
 
         {/* Recent Orders Section */}
-        <div className="mt-4 sm:mt-6">
+        <div className="mt-4 sm:mt-6 min-w-0">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Recent Orders
           </h3>
-          <div className="rounded-lg">
+          <div className="rounded-lg overflow-x-auto">
             <Card className="p-2 border-none">
               <CardContent className="p-0">
                 <Table>
                   <DataTableHeader>
-                    <TableHead className="rounded-l-lg">Order</TableHead>
+                    <TableHead className="hidden sm:table-cell rounded-l-lg">
+                      Order
+                    </TableHead>
+                    <TableHead className="rounded-l-lg sm:rounded-none">
+                      Date
+                    </TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
                     <TableHead className="text-right rounded-r-lg">
                       Qty
                     </TableHead>
@@ -334,14 +340,14 @@ export function ProductModal({
                       <>
                         {Array.from({ length: 3 }).map((_, i) => (
                           <TableRow key={i}>
+                            <TableCell className="hidden sm:table-cell">
+                              <Skeleton className="h-4 w-20" />
+                            </TableCell>
                             <TableCell>
                               <Skeleton className="h-4 w-20" />
                             </TableCell>
                             <TableCell>
                               <Skeleton className="h-5 w-16" />
-                            </TableCell>
-                            <TableCell>
-                              <Skeleton className="h-4 w-24" />
                             </TableCell>
                             <TableCell>
                               <Skeleton className="h-4 w-12 ml-auto" />
@@ -352,8 +358,17 @@ export function ProductModal({
                     ) : !shipments || shipments.length === 0 ? (
                       <TableRow>
                         <TableCell
+                          colSpan={3}
+                          className="h-16 text-center text-muted-foreground sm:hidden"
+                        >
+                          <div className="flex flex-col items-center gap-1 py-6">
+                            <Package className="h-5 w-5 text-muted-foreground/50" />
+                            <span>No orders found</span>
+                          </div>
+                        </TableCell>
+                        <TableCell
                           colSpan={4}
-                          className="h-16 text-center text-muted-foreground"
+                          className="hidden sm:table-cell h-16 text-center text-muted-foreground"
                         >
                           <div className="flex flex-col items-center gap-1 py-6">
                             <Package className="h-5 w-5 text-muted-foreground/50" />
@@ -368,8 +383,11 @@ export function ProductModal({
                           .reduce((sum, item) => sum + item.orderedQuantity, 0);
                         return (
                           <TableRow key={shipment.id}>
-                            <TableCell className="font-mono rounded-l-lg">
+                            <TableCell className="hidden sm:table-cell font-mono rounded-l-lg">
                               {shipment.shipmentNumber}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground rounded-l-lg sm:rounded-none">
+                              {formatDate(shipment.orderDate)}
                             </TableCell>
                             <TableCell>
                               <Badge
@@ -380,9 +398,6 @@ export function ProductModal({
                               >
                                 {SHIPMENT_STATUS_LABELS[shipment.status]}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {formatDate(shipment.orderDate)}
                             </TableCell>
                             <TableCell className="text-right font-medium rounded-r-lg">
                               {itemQty.toLocaleString()}
