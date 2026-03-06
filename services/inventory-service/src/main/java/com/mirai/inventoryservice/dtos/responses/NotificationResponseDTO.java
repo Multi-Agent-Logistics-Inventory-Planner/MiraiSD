@@ -23,6 +23,7 @@ public class NotificationResponseDTO {
     private String message;
     private UUID recipientId;
     private UUID itemId;
+    private String itemName;
     private UUID inventoryId;
     private List<String> via;
     private Map<String, Object> metadata;

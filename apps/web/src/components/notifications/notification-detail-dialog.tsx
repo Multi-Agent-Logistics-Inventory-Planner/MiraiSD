@@ -171,8 +171,10 @@ export function NotificationDetailDialog({
                 <>
                   {notification.itemId && (
                     <div>
-                      <p className="text-muted-foreground text-xs mb-1">Item ID</p>
-                      <p className="font-mono text-xs">{notification.itemId}</p>
+                      <p className="text-muted-foreground text-xs mb-1">Item</p>
+                      <p className="font-medium text-sm">
+                        {notification.itemName ?? notification.itemId}
+                      </p>
                     </div>
                   )}
                   {notification.inventoryId && (
