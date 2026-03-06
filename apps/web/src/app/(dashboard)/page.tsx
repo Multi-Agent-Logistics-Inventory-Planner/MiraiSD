@@ -24,8 +24,6 @@ import {
 } from "@/hooks/queries/use-activity-feed";
 import { useAllForecasts } from "@/hooks/queries/use-forecasts";
 import { useProducts } from "@/hooks/queries/use-products";
-import { useRealtimeDashboard } from "@/hooks/realtime";
-
 import { ActionRequiredPanel } from "@/components/dashboard/action-required-panel";
 import { RiskDistributionDonut } from "@/components/dashboard/risk-distribution-donut";
 import { DemandVelocityCard } from "@/components/dashboard/demand-velocity-card";
@@ -53,9 +51,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { can, role } = usePermissions();
-
-  // Enable real-time updates for dashboard
-  useRealtimeDashboard();
 
   // Data hooks
   const metricsQuery = useDashboardMetrics();

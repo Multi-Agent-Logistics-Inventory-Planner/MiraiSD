@@ -49,6 +49,9 @@ export function useRealtimeInventory(enabled = true) {
       // 4. Refresh products (quantity is now denormalized on the product row)
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+
+      // 5. Invalidate not-assigned inventory (items may have been assigned)
+      queryClient.invalidateQueries({ queryKey: ["notAssignedInventory"] });
     },
     enabled,
   });

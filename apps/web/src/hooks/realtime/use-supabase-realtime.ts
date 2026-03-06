@@ -60,14 +60,20 @@ export function useSupabaseRealtime<T>({
     const supabase = getSupabaseClient();
 
     if (!supabase || !enabled) {
+      if (enabled && !supabase && typeof window !== "undefined") {
+        console.warn(
+          "[Realtime] Supabase client not available. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+        );
+      }
       return;
     }
 
     // Check if we're in a secure context (HTTPS or localhost)
-    // WebSocket connections require a secure context in modern browsers
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      // Silently disable realtime in insecure context
-      return;
+      // Don't hard-disable: in many dev setups (LAN IP) secureContext is false but realtime can still work.
+      console.warn(
+        "[Realtime] window is not a secure context (https/localhost recommended). Attempting realtime subscription anyway."
+      );
     }
 
     // Create a unique channel name
@@ -109,8 +115,17 @@ export function useSupabaseRealtime<T>({
             });
           }
         )
-        .subscribe(() => {
-          // Subscription status handled silently
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            // Keep this as debug-ish signal; it's extremely helpful when users report “no realtime”
+            // and we need to know if the WS connected.
+            // eslint-disable-next-line no-console
+            console.log(`[Realtime] Subscribed to ${channelName}`);
+          } else if (status === "CHANNEL_ERROR") {
+            console.warn(`[Realtime] Channel error for ${channelName}`);
+          } else if (status === "TIMED_OUT") {
+            console.warn(`[Realtime] Channel timed out for ${channelName}`);
+          }
         });
 
       channelRef.current = channel;

@@ -8,5 +8,6 @@ export function useNotAssignedInventory() {
   return useQuery<NotAssignedInventory[]>({
     queryKey: ["notAssignedInventory"],
     queryFn: getNotAssignedInventory,
+    staleTime: 30_000, // 30 seconds
   });
 }

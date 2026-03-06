@@ -17,9 +17,11 @@ import java.util.UUID;
 @Transactional
 public class NotificationService {
     private final NotificationRepository notificationRepository;
+    private final SupabaseBroadcastService broadcastService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository, SupabaseBroadcastService broadcastService) {
         this.notificationRepository = notificationRepository;
+        this.broadcastService = broadcastService;
     }
 
     public List<Notification> getAllNotifications() {
@@ -86,7 +88,9 @@ public class NotificationService {
     }
 
     public Notification createNotification(Notification notification) {
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        broadcastService.broadcastNotificationCreated();
+        return saved;
     }
 }
 

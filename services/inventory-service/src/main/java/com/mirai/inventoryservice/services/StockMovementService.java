@@ -22,9 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -53,6 +55,7 @@ public class StockMovementService {
     private final PusherMachineRepository pusherMachineRepository;
     private final WindowRepository windowRepository;
     private final EntityManager entityManager;
+    private final SupabaseBroadcastService broadcastService;
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
@@ -78,7 +81,8 @@ public class StockMovementService {
             FourCornerMachineRepository fourCornerMachineRepository,
             PusherMachineRepository pusherMachineRepository,
             WindowRepository windowRepository,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            SupabaseBroadcastService broadcastService) {
         this.stockMovementRepository = stockMovementRepository;
         this.auditLogRepository = auditLogRepository;
         this.productRepository = productRepository;
@@ -103,6 +107,7 @@ public class StockMovementService {
         this.pusherMachineRepository = pusherMachineRepository;
         this.windowRepository = windowRepository;
         this.entityManager = entityManager;
+        this.broadcastService = broadcastService;
     }
 
     /**
@@ -174,7 +179,14 @@ public class StockMovementService {
         StockMovement savedMovement = stockMovementRepository.save(movement);
 
         // Update product active status based on total inventory
-        updateProductActiveStatus(savedMovement.getItem());
+        boolean productChanged = updateProductActiveStatus(savedMovement.getItem());
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastInventoryUpdated(locationType.name(), savedMovement.getItem().getId().toString());
+        broadcastService.broadcastAuditLogCreated(savedMovement.getItem().getId().toString());
+        if (productChanged) {
+            broadcastService.broadcastProductUpdated(List.of(savedMovement.getItem().getId().toString()));
+        }
 
         return savedMovement;
     }
@@ -210,6 +222,10 @@ public class StockMovementService {
         );
 
         executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
     }
 
     /**
@@ -253,6 +269,10 @@ public class StockMovementService {
             int sourceQuantity = getInventoryQuantity(sourceInventory);
             executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
         }
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
     }
 
     /**
@@ -430,7 +450,14 @@ public class StockMovementService {
         stockMovementRepository.save(movement);
 
         // Update product active status
-        updateProductActiveStatus(product);
+        boolean productChanged = updateProductActiveStatus(product);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastInventoryUpdated(locationType.name(), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        if (productChanged) {
+            broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
+        }
 
         return inventoryId;
     }
@@ -496,7 +523,14 @@ public class StockMovementService {
         stockMovementRepository.save(movement);
 
         // Update product active status
-        updateProductActiveStatus(product);
+        boolean productChanged = updateProductActiveStatus(product);
+
+        // Broadcast real-time update to connected clients
+        broadcastService.broadcastInventoryUpdated(locationType.name(), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        if (productChanged) {
+            broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
+        }
     }
 
     /**
@@ -523,13 +557,45 @@ public class StockMovementService {
      * Updates the product's denormalized quantity and active status based on total inventory.
      * Always persists so the products table stays in sync without a 9-table union query on reads.
      */
-    private void updateProductActiveStatus(Product product) {
+    private boolean updateProductActiveStatus(Product product) {
         int totalInventory = calculateTotalInventory(product.getId());
         boolean shouldBeActive = totalInventory > 0;
+
+        boolean changed = !Objects.equals(product.getQuantity(), totalInventory)
+                || !Objects.equals(product.getIsActive(), shouldBeActive);
+
+        if (!changed) {
+            return false;
+        }
 
         product.setQuantity(totalInventory);
         product.setIsActive(shouldBeActive);
         productRepository.save(product);
+        return true;
+    }
+
+    /**
+     * Sync denormalized product totals (quantity/isActive) and broadcast changes.
+     * Useful for flows that create StockMovements without using StockMovementService (e.g. shipments).
+     */
+    @Transactional
+    public void syncProductTotals(List<UUID> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return;
+        }
+
+        List<Product> products = productRepository.findAllById(productIds);
+        List<String> changedIds = new ArrayList<>();
+
+        for (Product p : products) {
+            if (updateProductActiveStatus(p)) {
+                changedIds.add(p.getId().toString());
+            }
+        }
+
+        if (!changedIds.isEmpty()) {
+            broadcastService.broadcastProductUpdated(changedIds);
+        }
     }
 
     @NonNull

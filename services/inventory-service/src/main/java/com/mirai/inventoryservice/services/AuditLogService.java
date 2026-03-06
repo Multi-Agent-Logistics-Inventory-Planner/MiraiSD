@@ -34,6 +34,7 @@ public class AuditLogService {
     private final StockMovementRepository stockMovementRepository;
     private final AuditLogDTOMapper auditLogMapper;
     private final UserRepository userRepository;
+    private final SupabaseBroadcastService broadcastService;
 
     /**
      * Create a new audit log entry
@@ -74,6 +75,10 @@ public class AuditLogService {
 
         AuditLog saved = auditLogRepository.save(auditLog);
         log.info("Created audit log: {} for reason: {}", saved.getId(), reason);
+
+        // Broadcast so connected clients refresh audit log views / activity feed
+        broadcastService.broadcastAuditLogCreated();
+
         return saved;
     }
 
