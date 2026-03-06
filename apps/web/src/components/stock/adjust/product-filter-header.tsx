@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, Search, X, Check } from "lucide-react";
+import { Plus, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  MultiSelect,
-  type MultiSelectOption,
-} from "@/components/ui/multi-select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Category } from "@/types/api";
-import { cn } from "@/lib/utils";
 
 interface ProductFilterHeaderProps {
   title: string;
@@ -31,6 +34,7 @@ interface ProductFilterHeaderProps {
   onCategoryChange: (categories: string[]) => void;
   onChildCategoryChange: (childCategories: string[]) => void;
   onClearFilters: () => void;
+  onAddClick?: () => void;
 }
 
 export function ProductFilterHeader({
@@ -47,26 +51,37 @@ export function ProductFilterHeader({
   onCategoryChange,
   onChildCategoryChange,
   onClearFilters,
+  onAddClick,
 }: ProductFilterHeaderProps) {
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const selectedCategoryId = categoryFilters[0] ?? null;
+  const selectedChildCategoryId = childCategoryFilters[0] ?? null;
 
   const hasActiveFilters =
     categoryFilters.length > 0 || childCategoryFilters.length > 0;
-  const totalActiveFilters = categoryFilters.length + childCategoryFilters.length;
+  const filterCount = [
+    Boolean(selectedCategoryId),
+    Boolean(selectedChildCategoryId),
+  ].filter(Boolean).length;
 
-  const hasChildCategories = availableChildCategories.length > 0;
+  function handleCategorySelect(value: string) {
+    if (value === "__all__") {
+      onCategoryChange([]);
+      onChildCategoryChange([]);
+    } else {
+      onCategoryChange([value]);
+      onChildCategoryChange([]);
+    }
+  }
 
-  const categoryOptions: MultiSelectOption<string>[] =
-    availableCategories.map((category) => ({
-      value: category.id,
-      label: category.name,
-    }));
-
-  const childCategoryOptions: MultiSelectOption<string>[] =
-    availableChildCategories.map((childCategory) => ({
-      value: childCategory.id,
-      label: childCategory.name,
-    }));
+  function handleChildCategorySelect(value: string) {
+    if (value === "__all__") {
+      onChildCategoryChange([]);
+    } else {
+      onChildCategoryChange([value]);
+    }
+  }
 
   return (
     <div className="shrink-0 flex flex-col gap-2 mb-2">
@@ -76,7 +91,6 @@ export function ProductFilterHeader({
 
       {showFilters && (
         <div className="flex items-center gap-2">
-          {/* Search input - always visible */}
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -90,195 +104,107 @@ export function ProductFilterHeader({
             />
           </div>
 
-          {/* Desktop: Show multi-selects inline */}
-          <div className="hidden sm:flex items-center gap-2">
-            <MultiSelect
-              options={categoryOptions}
-              selected={categoryFilters}
-              onChange={onCategoryChange}
-              placeholder="Category"
-              label="Categories"
-              disabled={disabled || availableCategories.length === 0}
-              className="w-32"
-            />
-            <MultiSelect
-              options={childCategoryOptions}
-              selected={childCategoryFilters}
-              onChange={onChildCategoryChange}
-              placeholder="Subcategory"
-              label="Subcategories"
-              disabled={disabled || !hasChildCategories}
-              className="w-36"
-            />
-          </div>
-
-          {/* Mobile: Show filter button with popover */}
-          <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <Popover open={filterOpen} onOpenChange={setFilterOpen}>
             <PopoverTrigger asChild>
               <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className={cn(
-                  "h-9 w-9 shrink-0 sm:hidden relative",
-                  hasActiveFilters && "border-primary text-primary"
-                )}
+                variant={hasActiveFilters ? "default" : "outline"}
+                size="sm"
+                className="shrink-0 h-9 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
                 disabled={disabled}
-                aria-label="Filter products"
               >
-                <Filter className="h-4 w-4" />
-                {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
-                    {totalActiveFilters}
+                <SlidersHorizontal className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Filter</span>
+                {filterCount > 0 && (
+                  <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-table-header text-[10px] font-medium text-table-header-foreground">
+                    {filterCount}
                   </span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-0">
-              <div className="divide-y">
-                {/* Category filter section */}
-                <div className="p-2">
-                  <div className="flex items-center justify-between px-2 pb-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Category
-                    </span>
-                    {categoryFilters.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onCategoryChange([])}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label="Clear category filters"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-0.5">
-                    {availableCategories.length === 0 ? (
-                      <div className="py-2 px-2 text-sm text-muted-foreground">
-                        No categories available
-                      </div>
-                    ) : (
-                      availableCategories.map((category) => {
-                        const isSelected = categoryFilters.includes(category.id);
-                        return (
-                          <button
-                            key={category.id}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                onCategoryChange(
-                                  categoryFilters.filter((c) => c !== category.id)
-                                );
-                              } else {
-                                onCategoryChange([...categoryFilters, category.id]);
-                              }
-                            }}
-                            className={cn(
-                              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm outline-none cursor-pointer",
-                              "hover:bg-accent hover:text-accent-foreground",
-                              "focus:bg-accent focus:text-accent-foreground",
-                              "active:bg-accent/80 transition-colors"
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
-                                isSelected
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-input"
-                              )}
-                            >
-                              {isSelected && <Check className="h-3 w-3" />}
-                            </div>
-                            <span className="truncate">{category.name}</span>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
+            <PopoverContent className="w-64" align="end">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Category
+                  </Label>
+                  <Select
+                    value={selectedCategoryId ?? "__all__"}
+                    onValueChange={handleCategorySelect}
+                    disabled={disabled || availableCategories.length === 0}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All categories</SelectItem>
+                      {availableCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                {/* Child category filter section - only shown when child categories are available */}
-                {hasChildCategories && (
-                  <div className="p-2">
-                    <div className="flex items-center justify-between px-2 pb-2">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Subcategory
-                      </span>
-                      {childCategoryFilters.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => onChildCategoryChange([])}
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="Clear subcategory filters"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-0.5">
-                      {availableChildCategories.length === 0 ? (
-                        <div className="py-2 px-2 text-sm text-muted-foreground">
-                          No subcategories available
-                        </div>
-                      ) : (
-                        availableChildCategories.map((childCategory) => {
-                          const isSelected = childCategoryFilters.includes(childCategory.id);
-                          return (
-                            <button
-                              key={childCategory.id}
-                              type="button"
-                              onClick={() => {
-                                if (isSelected) {
-                                  onChildCategoryChange(
-                                    childCategoryFilters.filter((s) => s !== childCategory.id)
-                                  );
-                                } else {
-                                  onChildCategoryChange([...childCategoryFilters, childCategory.id]);
-                                }
-                              }}
-                              className={cn(
-                                "flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm outline-none cursor-pointer",
-                                "hover:bg-accent hover:text-accent-foreground",
-                                "focus:bg-accent focus:text-accent-foreground",
-                                "active:bg-accent/80 transition-colors"
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
-                                  isSelected
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-input"
-                                )}
-                              >
-                                {isSelected && <Check className="h-3 w-3" />}
-                              </div>
-                              <span className="truncate">{childCategory.name}</span>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Subcategory
+                  </Label>
+                  <Select
+                    value={selectedChildCategoryId ?? "__all__"}
+                    onValueChange={handleChildCategorySelect}
+                    disabled={
+                      disabled ||
+                      !selectedCategoryId ||
+                      availableChildCategories.length === 0
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All subcategories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All subcategories</SelectItem>
+                      {availableChildCategories.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {hasActiveFilters && (
+                  <>
+                    <Separator />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        onClearFilters();
+                        setFilterOpen(false);
+                      }}
+                    >
+                      Remove filters
+                    </Button>
+                  </>
                 )}
               </div>
             </PopoverContent>
           </Popover>
 
-          {/* Clear filters button - always visible but disabled when no filters */}
-          <Button
-            type="button"
-            variant={hasActiveFilters ? "destructive" : "outline"}
-            size="icon"
-            className="h-9 w-9 shrink-0"
-            onClick={onClearFilters}
-            disabled={disabled || !hasActiveFilters}
-            aria-label="Clear filters"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {onAddClick && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 h-9 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
+              onClick={onAddClick}
+              disabled={disabled}
+            >
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add New</span>
+            </Button>
+          )}
         </div>
       )}
     </div>

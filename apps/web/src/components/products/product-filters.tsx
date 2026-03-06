@@ -101,7 +101,7 @@ export function ProductFilters({
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
@@ -127,7 +127,7 @@ export function ProductFilters({
                   }}
                   disabled={!state.selectedCategoryId || subcategories.length === 0}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="All subcategories" />
                   </SelectTrigger>
                   <SelectContent>

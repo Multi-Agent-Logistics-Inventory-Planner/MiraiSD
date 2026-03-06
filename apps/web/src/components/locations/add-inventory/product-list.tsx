@@ -2,18 +2,16 @@
 
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ProductSelectCard } from "@/components/stock/product-select-card";
-import type { Category } from "@/types/api";
-import { type NormalizedInventory, getNoResultsMessage } from "./types";
+import { ProductCard } from "./product-card";
+import type { Product, Category, Inventory } from "@/types/api";
 
 interface ProductListProps {
-  items: NormalizedInventory[];
+  products: Product[];
+  existingInventory: Inventory[];
   selectedId: string | null;
-  onSelect: (id: string, quantity: number) => void;
+  onSelect: (productId: string) => void;
   isLoading: boolean;
   disabled: boolean;
-  emptyMessage: string;
-  noResultsMessage: string;
   searchQuery: string;
   categoryFilters: string[];
   childCategoryFilters: string[];
@@ -21,14 +19,47 @@ interface ProductListProps {
   availableChildCategories: Category[];
 }
 
+function getNoResultsMessage(
+  searchQuery: string,
+  categoryFilters: string[],
+  childCategoryFilters: string[],
+  availableCategories: Category[] = [],
+  availableChildCategories: Category[] = []
+): string {
+  const parts: string[] = [];
+
+  if (searchQuery) {
+    parts.push(`matching "${searchQuery}"`);
+  }
+
+  if (categoryFilters.length > 0) {
+    const categoryNames = categoryFilters
+      .map((id) => availableCategories.find((c) => c.id === id)?.name ?? id)
+      .join(", ");
+    parts.push(`in ${categoryNames}`);
+  }
+
+  if (childCategoryFilters.length > 0) {
+    const childCategoryNames = childCategoryFilters
+      .map((id) => availableChildCategories.find((s) => s.id === id)?.name ?? id)
+      .join(", ");
+    parts.push(`(${childCategoryNames})`);
+  }
+
+  if (parts.length === 0) {
+    return "No products found";
+  }
+
+  return `No products ${parts.join(" ")}`;
+}
+
 export function ProductList({
-  items,
+  products,
+  existingInventory,
   selectedId,
   onSelect,
   isLoading,
   disabled,
-  emptyMessage,
-  noResultsMessage,
   searchQuery,
   categoryFilters,
   childCategoryFilters,
@@ -43,33 +74,32 @@ export function ProductList({
     );
   }
 
-  if (items.length === 0) {
+  if (products.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
-        {emptyMessage}
+        No products available
       </div>
     );
   }
 
-  const filteredItems = items.filter((inv) => {
-    const category = inv.item.category;
+  const filteredProducts = products.filter((product) => {
+    const category = product.category;
     // Check if product's category matches root category filter
-    // A product matches if its category OR its category's parent is in the filter
     const matchesCategory =
       categoryFilters.length === 0 ||
       categoryFilters.includes(category.id) ||
       (category.parentId && categoryFilters.includes(category.parentId));
-    // Check if product's category matches child category filter (for products in subcategories)
+    // Check if product's category matches child category filter
     const matchesChildCategory =
       childCategoryFilters.length === 0 ||
       (category.parentId && childCategoryFilters.includes(category.id));
     const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      !query || inv.item.name.toLowerCase().includes(query);
+      !query || product.name.toLowerCase().includes(query);
     return matchesCategory && matchesChildCategory && matchesSearch;
   });
 
-  if (filteredItems.length === 0) {
+  if (filteredProducts.length === 0) {
     const message = getNoResultsMessage(
       searchQuery,
       categoryFilters,
@@ -79,21 +109,27 @@ export function ProductList({
     );
     return (
       <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
-        {message || noResultsMessage}
+        {message}
       </div>
     );
   }
+
+  // Create a map for quick lookup of existing inventory
+  const existingMap = new Map(
+    existingInventory.map((inv) => [inv.item.id, inv.quantity])
+  );
 
   return (
     <div className="flex-1 min-h-0 w-full overflow-hidden">
       <ScrollArea className="h-full w-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
         <div className="w-full overflow-hidden pb-2 pr-3">
-          {filteredItems.map((inv) => (
-            <ProductSelectCard
-              key={inv.id}
-              inventory={inv}
-              selected={selectedId === inv.id}
-              onSelect={() => onSelect(inv.id, inv.quantity)}
+          {filteredProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              existingQuantity={existingMap.get(product.id)}
+              selected={selectedId === product.id}
+              onSelect={() => onSelect(product.id)}
               disabled={disabled}
             />
           ))}

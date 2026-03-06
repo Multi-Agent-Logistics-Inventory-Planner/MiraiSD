@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   type Category,
+  LocationType,
   StockMovementReason,
 } from "@/types/api";
 import { DEFAULT_REASON_BY_ACTION } from "./adjust/types";
@@ -21,10 +22,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
-import { useProductInventory } from "@/hooks/queries/use-product-inventory";
 import { useAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
-import { createInventory } from "@/lib/api/inventory";
-import { parseQuantityInput, clampQuantity } from "@/lib/utils/validation";
+import {
+  useCreateInventoryMutation,
+  useUpdateInventoryMutation,
+} from "@/hooks/mutations/use-location-mutations";
+import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
+import type { InventoryRequest } from "@/types/api";
+import { parseQuantityInput } from "@/lib/utils/validation";
 import { LocationSelector } from "./location-selector";
 import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
 import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
@@ -34,7 +39,6 @@ import {
   ProductFilterHeader,
   type AdjustAction,
   type NormalizedInventory,
-  createNormalizedInventory,
   normalizeInventory,
 } from "./adjust";
 
@@ -61,9 +65,7 @@ export function AdjustStockDialog({
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
     null,
   );
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null,
-  );
+  const [addInventoryDialogOpen, setAddInventoryDialogOpen] = useState(false);
   const [action, setAction] = useState<AdjustAction>("subtract");
   const [quantity, setQuantity] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,13 +81,20 @@ export function AdjustStockDialog({
     location.locationId ?? undefined,
   );
 
-  const productInventoryQuery = useProductInventory();
+  const createInventoryMutation = useCreateInventoryMutation(
+    location.locationType ?? LocationType.BOX_BIN,
+    location.locationId ?? ""
+  );
+  const updateInventoryMutation = useUpdateInventoryMutation(
+    location.locationType ?? LocationType.BOX_BIN,
+    location.locationId ?? ""
+  );
 
   useEffect(() => {
     if (!open) {
       setLocation(EMPTY_LOCATION);
       setSelectedInventoryId(null);
-      setSelectedProductId(null);
+      setAddInventoryDialogOpen(false);
       setAction("subtract");
       setQuantity(1);
       setSearchQuery("");
@@ -99,7 +108,7 @@ export function AdjustStockDialog({
   useEffect(() => {
     if (location.locationId) {
       setSelectedInventoryId(null);
-      setSelectedProductId(null);
+      setAddInventoryDialogOpen(false);
       setQuantity(1);
       setQuantityWarning(null);
     }
@@ -107,7 +116,7 @@ export function AdjustStockDialog({
 
   useEffect(() => {
     setSelectedInventoryId(null);
-    setSelectedProductId(null);
+    setAddInventoryDialogOpen(false);
     setQuantity(1);
     setQuantityWarning(null);
     setSearchQuery("");
@@ -117,83 +126,47 @@ export function AdjustStockDialog({
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
-  const allProductsWithInventory = productInventoryQuery.data ?? [];
-
-  const productsWithStock = useMemo(() => {
-    return allProductsWithInventory.filter((p) => p.totalQuantity > 0);
-  }, [allProductsWithInventory]);
 
   const normalizedInventory: NormalizedInventory[] = useMemo(() => {
     return inventory.map(normalizeInventory);
   }, [inventory]);
 
-  const normalizedProducts: NormalizedInventory[] = useMemo(() => {
-    return productsWithStock.map(createNormalizedInventory);
-  }, [productsWithStock]);
-
   const availableCategories = useMemo(() => {
     const categoryMap = new Map<string, Category>();
-    const items = action === "subtract" ? inventory : productsWithStock;
-    items.forEach((item) => {
-      const category =
-        "item" in item ? item.item.category : item.product.category;
-      if (category) {
-        categoryMap.set(category.id, category);
+    inventory.forEach((item) => {
+      if (item.item.category) {
+        categoryMap.set(item.item.category.id, item.item.category);
       }
     });
     return Array.from(categoryMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, [action, inventory, productsWithStock]);
+  }, [inventory]);
 
-  // Get child categories (categories with a parentId) from inventory or products
   const availableChildCategories = useMemo(() => {
     const childCategoryMap = new Map<string, Category>();
-    const items = action === "subtract" ? inventory : productsWithStock;
-    items.forEach((item) => {
-      const category =
-        "item" in item ? item.item.category : item.product.category;
-      if (category?.parentId) {
-        childCategoryMap.set(category.id, category);
+    inventory.forEach((item) => {
+      if (item.item.category?.parentId) {
+        childCategoryMap.set(item.item.category.id, item.item.category);
       }
     });
     return Array.from(childCategoryMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, [action, inventory, productsWithStock]);
+  }, [inventory]);
 
   const selectedInventory = useMemo(() => {
     return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
   }, [inventory, selectedInventoryId]);
 
-  const selectedProduct = useMemo(() => {
-    return (
-      productsWithStock.find((p) => p.product.id === selectedProductId) ?? null
-    );
-  }, [productsWithStock, selectedProductId]);
-
-  const existingInventoryForProduct = useMemo(() => {
-    if (!selectedProductId || action !== "add") return null;
-    return inventory.find((inv) => inv.item.id === selectedProductId) ?? null;
-  }, [inventory, selectedProductId, action]);
-
   const hasValidLocation = Boolean(location.locationId);
   const isAdjusting = adjustMutation.isPending;
+  const isSavingInventory =
+    createInventoryMutation.isPending || updateInventoryMutation.isPending;
 
-  const hasSelectedProduct =
-    action === "subtract"
-      ? Boolean(selectedInventory)
-      : Boolean(selectedProduct);
-
-  const currentQtyAtLocation =
-    action === "subtract"
-      ? (selectedInventory?.quantity ?? 0)
-      : (existingInventoryForProduct?.quantity ?? 0);
-
-  const selectedProductName =
-    action === "subtract"
-      ? selectedInventory?.item.name
-      : selectedProduct?.product.name;
+  const hasSelectedProduct = Boolean(selectedInventory);
+  const currentQtyAtLocation = selectedInventory?.quantity ?? 0;
+  const sourceListCount = inventory.length;
 
   const newQty =
     action === "subtract"
@@ -207,18 +180,9 @@ export function AdjustStockDialog({
     newQty >= 0 &&
     !isAdjusting;
 
-  const sourceListCount =
-    action === "subtract" ? inventory.length : productsWithStock.length;
-
   const selectedNormalizedItem: NormalizedInventory | null = useMemo(() => {
-    if (action === "subtract" && selectedInventory) {
-      return normalizeInventory(selectedInventory);
-    }
-    if (action === "add" && selectedProduct) {
-      return createNormalizedInventory(selectedProduct);
-    }
-    return null;
-  }, [action, selectedInventory, selectedProduct]);
+    return selectedInventory ? normalizeInventory(selectedInventory) : null;
+  }, [selectedInventory]);
 
   function handleQuantityChange(value: string) {
     const parsed = parseQuantityInput(value);
@@ -267,7 +231,6 @@ export function AdjustStockDialog({
 
   function handleClearSelection() {
     setSelectedInventoryId(null);
-    setSelectedProductId(null);
     setQuantity(1);
     setQuantityWarning(null);
   }
@@ -284,14 +247,9 @@ export function AdjustStockDialog({
   }
 
   function handleProductSelect(id: string, itemQuantity: number) {
-    if (action === "subtract") {
-      setSelectedInventoryId(id);
-      if (quantity > itemQuantity) {
-        setQuantity(Math.max(1, itemQuantity));
-      }
-    } else {
-      setSelectedProductId(id);
-      setQuantity(1);
+    setSelectedInventoryId(id);
+    if (action === "subtract" && quantity > itemQuantity) {
+      setQuantity(Math.max(1, itemQuantity));
     }
     setQuantityWarning(null);
   }
@@ -303,7 +261,7 @@ export function AdjustStockDialog({
       return;
     }
 
-    if (!location.locationType || !location.locationId) {
+    if (!location.locationType || !location.locationId || !selectedInventory) {
       toast({
         title: "Missing selection",
         description: "Select a location and product.",
@@ -311,68 +269,24 @@ export function AdjustStockDialog({
       return;
     }
 
+    const quantityChange = action === "subtract" ? -quantity : quantity;
+
+    if (action === "subtract" && quantity > currentQtyAtLocation) {
+      toast({
+        title: "Invalid quantity",
+        description: "Cannot subtract more than available stock.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      if (action === "subtract") {
-        if (!selectedInventory) {
-          toast({
-            title: "Missing selection",
-            description: "Select a product.",
-          });
-          return;
-        }
-
-        if (quantity > currentQtyAtLocation) {
-          toast({
-            title: "Invalid quantity",
-            description: "Cannot subtract more than available stock.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        await adjustMutation.mutateAsync({
-          locationType: location.locationType,
-          inventoryId: selectedInventory.id,
-          payload: {
-            quantityChange: -quantity,
-            reason,
-            actorId,
-          },
-          productId: selectedInventory.item.id,
-        });
-      } else {
-        if (!selectedProduct) {
-          toast({
-            title: "Missing selection",
-            description: "Select a product.",
-          });
-          return;
-        }
-
-        let inventoryId: string;
-
-        if (existingInventoryForProduct) {
-          inventoryId = existingInventoryForProduct.id;
-        } else {
-          const newInventory = await createInventory(
-            location.locationType,
-            location.locationId,
-            { itemId: selectedProduct.product.id, quantity: 0 },
-          );
-          inventoryId = newInventory.id;
-        }
-
-        await adjustMutation.mutateAsync({
-          locationType: location.locationType,
-          inventoryId,
-          payload: {
-            quantityChange: quantity,
-            reason,
-            actorId,
-          },
-          productId: selectedProduct.product.id,
-        });
-      }
+      await adjustMutation.mutateAsync({
+        locationType: location.locationType,
+        inventoryId: selectedInventory.id,
+        payload: { quantityChange, reason, actorId },
+        productId: selectedInventory.item.id,
+      });
 
       await queryClient.invalidateQueries({
         queryKey: [
@@ -390,6 +304,24 @@ export function AdjustStockDialog({
     }
   }
 
+  async function handleAddNewInventory(
+    payload: InventoryRequest,
+    isUpdate: boolean,
+    inventoryId?: string
+  ) {
+    try {
+      if (isUpdate && inventoryId) {
+        await updateInventoryMutation.mutateAsync({ inventoryId, payload });
+      } else {
+        await createInventoryMutation.mutateAsync(payload);
+      }
+      toast({ title: "Inventory added successfully" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save inventory";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  }
+
   const locationLabel = location.locationType
     ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
     : "";
@@ -397,7 +329,7 @@ export function AdjustStockDialog({
   const listTitle =
     action === "subtract"
       ? `Products at ${locationLabel}`
-      : `Select product to add to ${locationLabel}`;
+      : `Select product at ${locationLabel} to add stock`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -474,35 +406,24 @@ export function AdjustStockDialog({
                 availableCategories={availableCategories}
                 availableChildCategories={availableChildCategories}
                 disabled={isAdjusting}
-                showFilters={sourceListCount > 0}
+                showFilters={sourceListCount > 0 || action === "add"}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
                 onChildCategoryChange={setChildCategoryFilters}
                 onClearFilters={handleClearFilters}
+                onAddClick={action === "add" ? () => setAddInventoryDialogOpen(true) : undefined}
               />
 
               <ProductList
-                items={
-                  action === "subtract"
-                    ? normalizedInventory
-                    : normalizedProducts
-                }
-                selectedId={
-                  action === "subtract"
-                    ? selectedInventoryId
-                    : selectedProductId
-                }
+                items={normalizedInventory}
+                selectedId={selectedInventoryId}
                 onSelect={handleProductSelect}
-                isLoading={
-                  action === "subtract"
-                    ? inventoryQuery.isLoading
-                    : productInventoryQuery.isLoading
-                }
+                isLoading={inventoryQuery.isLoading}
                 disabled={isAdjusting}
                 emptyMessage={
                   action === "subtract"
                     ? "No inventory at this location"
-                    : "No products with stock available"
+                    : "No inventory at this location. Click 'Add New' above to add one."
                 }
                 noResultsMessage="No products found"
                 searchQuery={searchQuery}
@@ -566,6 +487,18 @@ export function AdjustStockDialog({
             </Button>
           </DialogFooter>
         </div>
+
+        {location.locationType && location.locationId && (
+          <AddInventoryDialog
+            open={addInventoryDialogOpen}
+            onOpenChange={setAddInventoryDialogOpen}
+            locationType={location.locationType}
+            locationId={location.locationId}
+            existingInventory={inventory}
+            isSaving={isSavingInventory}
+            onSubmit={handleAddNewInventory}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

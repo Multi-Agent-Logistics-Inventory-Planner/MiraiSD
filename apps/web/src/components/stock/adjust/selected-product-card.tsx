@@ -75,33 +75,36 @@ export function SelectedProductCard({
       </div>
 
       {/* Product card */}
-      <div className="flex items-center gap-4 bg-muted/50 rounded-xl p-3 mb-8">
-        {/* Product image */}
-        {hasImage ? (
-          <div className="relative h-14 w-14 rounded-lg overflow-hidden shrink-0">
-            <Image
-              src={safeImageUrl}
-              alt={item.name}
-              fill
-              sizes="56px"
-              className="object-cover"
-              onError={() => setImageError(true)}
-            />
-          </div>
-        ) : (
-          <div className="h-14 w-14 rounded-lg bg-muted shrink-0 flex items-center justify-center">
-            <ImageOff className="h-5 w-5 text-muted-foreground" />
-          </div>
-        )}
-
-        {/* Product name and category */}
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{item.name}</p>
-          {item.category && (
-            <Badge variant="secondary" className="mt-1 text-xs font-normal">
-              {item.category.name}
-            </Badge>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-muted/50 rounded-xl p-3">
+        {/* Product info row: image + name/category */}
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+          {/* Product image */}
+          {hasImage ? (
+            <div className="relative h-14 w-14 rounded-lg overflow-hidden shrink-0">
+              <Image
+                src={safeImageUrl}
+                alt={item.name}
+                fill
+                sizes="56px"
+                className="object-cover"
+                onError={() => setImageError(true)}
+              />
+            </div>
+          ) : (
+            <div className="h-14 w-14 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+              <ImageOff className="h-5 w-5 text-muted-foreground" />
+            </div>
           )}
+
+          {/* Product name and category */}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{item.name}</p>
+            {item.category && (
+              <Badge variant="outline" className="mt-1 text-xs font-normal">
+                {item.category.name}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Quantity controls */}

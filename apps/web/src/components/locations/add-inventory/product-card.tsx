@@ -4,35 +4,31 @@ import { useState } from "react";
 import Image from "next/image";
 import { Check, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { InventoryItem } from "@/types/api";
+import type { Product } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
-interface InventoryLike {
-  id: string;
-  item: InventoryItem;
-  quantity: number;
-}
-
-interface ProductSelectCardProps {
-  inventory: InventoryLike;
+interface ProductCardProps {
+  product: Product;
+  existingQuantity?: number;
   selected: boolean;
   onSelect: () => void;
   disabled?: boolean;
 }
 
-export function ProductSelectCard({
-  inventory,
+export function ProductCard({
+  product,
+  existingQuantity,
   selected,
   onSelect,
   disabled = false,
-}: ProductSelectCardProps) {
+}: ProductCardProps) {
   const [imageError, setImageError] = useState(false);
-  const item = inventory.item;
 
-  const safeImageUrl = getSafeImageUrl(item.imageUrl);
+  const safeImageUrl = getSafeImageUrl(product.imageUrl);
   const hasImage = safeImageUrl && !imageError;
-  const categoryLabel = item.category.name;
+  const categoryLabel = product.category.name;
+  const hasExisting = existingQuantity !== undefined && existingQuantity > 0;
 
   return (
     <button
@@ -52,7 +48,7 @@ export function ProductSelectCard({
         {hasImage ? (
           <Image
             src={safeImageUrl}
-            alt={item.name}
+            alt={product.name}
             fill
             sizes="(max-width: 640px) 48px, 64px"
             className="object-cover"
@@ -71,7 +67,7 @@ export function ProductSelectCard({
       </div>
 
       <div className="w-0 flex-1 overflow-hidden">
-        <p className="font-medium text-xs sm:text-base truncate">{item.name}</p>
+        <p className="font-medium text-xs sm:text-base truncate">{product.name}</p>
         <div className="flex flex-wrap gap-1 mt-1">
           <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
             {categoryLabel}
@@ -80,12 +76,20 @@ export function ProductSelectCard({
       </div>
 
       <div className="flex flex-col items-end gap-0.5 shrink-0 pl-2">
-        <span className="text-sm sm:text-base font-semibold tabular-nums">
-          {inventory.quantity}
-        </span>
-        <span className="text-[10px] sm:text-xs text-muted-foreground">
-          in stock
-        </span>
+        {hasExisting ? (
+          <>
+            <span className="text-sm sm:text-base font-semibold tabular-nums">
+              {existingQuantity}
+            </span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">
+              in stock
+            </span>
+          </>
+        ) : (
+          <Badge variant="secondary" className="text-[10px] sm:text-xs">
+            New
+          </Badge>
+        )}
       </div>
     </button>
   );
