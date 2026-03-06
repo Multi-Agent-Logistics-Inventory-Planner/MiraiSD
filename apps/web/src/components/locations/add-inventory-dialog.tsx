@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
+import { ProductList, SelectedProduct } from "./add-inventory";
 import { getProducts } from "@/lib/api/products";
-import type { Product, LocationType, InventoryRequest, Inventory } from "@/types/api";
+import type { Product, LocationType, InventoryRequest, Inventory, Category } from "@/types/api";
 
 interface AddInventoryDialogProps {
   open: boolean;
@@ -41,7 +44,11 @@ export function AddInventoryDialog({
   const [productId, setProductId] = useState<string>("");
   const [qty, setQty] = useState<string>("1");
   const [qtyError, setQtyError] = useState<string | null>(null);
-  const [comboOpen, setComboOpen] = useState(false);
+
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
 
   const selected: Product | undefined = useMemo(
     () => products.find((p) => p.id === productId),
@@ -53,6 +60,70 @@ export function AddInventoryDialog({
     () => existingInventory.find((inv) => inv.item.id === productId),
     [existingInventory, productId]
   );
+
+  // Compute available categories from products
+  const { availableCategories, availableChildCategories } = useMemo(() => {
+    const categoryMap = new Map<string, Category>();
+    const childCategoryMap = new Map<string, Category>();
+
+    for (const product of products) {
+      const category = product.category;
+      if (category.parentId) {
+        // This is a child category
+        childCategoryMap.set(category.id, category);
+      } else {
+        // This is a root category
+        categoryMap.set(category.id, category);
+      }
+    }
+
+    // Also add parent categories of child categories
+    for (const product of products) {
+      const category = product.category;
+      if (category.parentId) {
+        // Find and add parent category if not already present
+        const parentProduct = products.find(
+          (p) => p.category.id === category.parentId && !p.category.parentId
+        );
+        if (parentProduct) {
+          categoryMap.set(parentProduct.category.id, parentProduct.category);
+        }
+      }
+    }
+
+    // Filter child categories based on selected parent category
+    const filteredChildCategories = categoryFilters.length > 0
+      ? Array.from(childCategoryMap.values()).filter(
+          (c) => c.parentId && categoryFilters.includes(c.parentId)
+        )
+      : [];
+
+    return {
+      availableCategories: Array.from(categoryMap.values()).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      ),
+      availableChildCategories: filteredChildCategories.sort((a, b) =>
+        a.name.localeCompare(b.name)
+      ),
+    };
+  }, [products, categoryFilters]);
+
+  // Filtered product count for header
+  const filteredCount = useMemo(() => {
+    return products.filter((product) => {
+      const category = product.category;
+      const matchesCategory =
+        categoryFilters.length === 0 ||
+        categoryFilters.includes(category.id) ||
+        (category.parentId && categoryFilters.includes(category.parentId));
+      const matchesChildCategory =
+        childCategoryFilters.length === 0 ||
+        (category.parentId && childCategoryFilters.includes(category.id));
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSearch = !query || product.name.toLowerCase().includes(query);
+      return matchesCategory && matchesChildCategory && matchesSearch;
+    }).length;
+  }, [products, searchQuery, categoryFilters, childCategoryFilters]);
 
   // When selecting a product that exists, pre-fill with current quantity
   useEffect(() => {
@@ -69,8 +140,27 @@ export function AddInventoryDialog({
       setProductId("");
       setQty("1");
       setQtyError(null);
+      setSearchQuery("");
+      setCategoryFilters([]);
+      setChildCategoryFilters([]);
     }
   }, [open]);
+
+  function handleClearFilters() {
+    setCategoryFilters([]);
+    setChildCategoryFilters([]);
+  }
+
+  function handleClearSelection() {
+    setProductId("");
+    setQty("1");
+    setQtyError(null);
+  }
+
+  function handleQuantityChange(value: string) {
+    setQty(value);
+    setQtyError(null);
+  }
 
   async function handleSubmit() {
     const quantity = Number(qty);
@@ -87,116 +177,78 @@ export function AddInventoryDialog({
     onOpenChange(false);
   }
 
+  const isLoading = productsQuery.isLoading;
+  const hasSelection = Boolean(selected);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{existingItem ? "Update Inventory" : "Add Inventory"}</DialogTitle>
+      <DialogContent className="sm:max-w-2xl h-[85dvh] max-h-[85dvh] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 p-6 pb-0">
+          <DialogTitle>
+            {existingItem ? "Update Inventory" : "Add Inventory"}
+          </DialogTitle>
           <DialogDescription>
             {existingItem
               ? "Update the quantity for this product in this location."
-              : "Add a product and quantity to this location."
-            }
+              : "Select a product and enter the quantity to add to this location."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid gap-2">
-            <Label>Product</Label>
-            <Popover open={comboOpen} onOpenChange={setComboOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  className="justify-between"
-                  disabled={productsQuery.isLoading}
-                >
-                  {selected ? `${selected.name}${selected.sku ? ` (${selected.sku})` : ""}` : "Select product..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[360px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search products..." />
-                  <CommandList>
-                    <CommandEmpty>No products found</CommandEmpty>
-                    <CommandGroup>
-                      {products.map((p) => {
-                        const existingInv = existingInventory.find((inv) => inv.item.id === p.id);
-                        return (
-                          <CommandItem
-                            key={p.id}
-                            value={`${p.name}${p.sku ? ` ${p.sku}` : ""}`}
-                            onSelect={() => {
-                              setProductId(p.id);
-                              setComboOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                productId === p.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex flex-col flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">{p.name}</span>
-                                {existingInv && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {existingInv.quantity} in stock
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="text-xs text-muted-foreground">{p.sku}</span>
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {productsQuery.isError ? (
-              <p className="text-xs text-destructive">
-                Failed to load products.
-              </p>
-            ) : null}
-          </div>
-
-          {existingItem && (
-            <div className="rounded-md bg-muted p-3 text-sm">
-              <p className="text-muted-foreground">
-                This product already exists in this location with{" "}
-                <span className="font-medium text-foreground">{existingItem.quantity}</span> units.
-                Enter the new total quantity below.
-              </p>
+        <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
+          {productsQuery.isError ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-destructive">Failed to load products.</p>
             </div>
-          )}
-
-          <div className="grid gap-2">
-            <Label htmlFor="qty">
-              {existingItem ? "New Quantity" : "Quantity"}
-            </Label>
-            <Input
-              id="qty"
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) => {
-                setQty(e.target.value);
-                setQtyError(null);
-              }}
-              aria-invalid={!!qtyError}
+          ) : !hasSelection ? (
+            <>
+              <ProductFilterHeader
+                title="Select a product"
+                itemCount={filteredCount}
+                searchQuery={searchQuery}
+                categoryFilters={categoryFilters}
+                childCategoryFilters={childCategoryFilters}
+                availableCategories={availableCategories}
+                availableChildCategories={availableChildCategories}
+                disabled={isLoading || Boolean(isSaving)}
+                showFilters={products.length > 0}
+                onSearchChange={setSearchQuery}
+                onCategoryChange={setCategoryFilters}
+                onChildCategoryChange={setChildCategoryFilters}
+                onClearFilters={handleClearFilters}
+              />
+              <ProductList
+                products={products}
+                existingInventory={existingInventory}
+                selectedId={productId}
+                onSelect={setProductId}
+                isLoading={isLoading}
+                disabled={Boolean(isSaving)}
+                searchQuery={searchQuery}
+                categoryFilters={categoryFilters}
+                childCategoryFilters={childCategoryFilters}
+                availableCategories={availableCategories}
+                availableChildCategories={availableChildCategories}
+              />
+            </>
+          ) : selected ? (
+            <SelectedProduct
+              product={selected}
+              existingInventory={existingItem}
+              quantity={qty}
+              quantityError={qtyError}
+              onQuantityChange={handleQuantityChange}
+              onClearSelection={handleClearSelection}
+              disabled={Boolean(isSaving)}
             />
-            {qtyError && (
-              <p className="text-xs text-destructive">{qtyError}</p>
-            )}
-          </div>
+          ) : null}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="shrink-0 border-t p-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button
