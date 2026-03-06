@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { Category } from "@/types/api";
 
 export interface ProductFiltersState {
@@ -47,6 +48,7 @@ export function ProductFilters({
   onAddClick,
 }: ProductFiltersProps) {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const rootCategories = categories.filter((c) => !c.parentId);
   const selectedCategory = rootCategories.find((c) => c.id === state.selectedCategoryId) ?? null;
@@ -91,6 +93,7 @@ export function ProductFilters({
             <div className="grid grid-cols-1 gap-3">
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Category</Label>
+                <div className="flex items-center gap-1.5">
                 <Select
                   value={state.selectedCategoryId ?? "__all__"}
                   onValueChange={(v) => {
@@ -113,10 +116,22 @@ export function ProductFilters({
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => setManageCategoriesOpen(true)}
+                  title="Edit categories"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                </div>
               </div>
 
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Subcategory</Label>
+                <div className="flex items-center gap-1.5">
                 <Select
                   value={state.selectedSubcategoryId ?? "__all__"}
                   onValueChange={(v) => {
@@ -139,6 +154,17 @@ export function ProductFilters({
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => setManageCategoriesOpen(true)}
+                  title="Edit subcategories"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                </div>
               </div>
 
               {hasActiveFilters && (
@@ -174,6 +200,11 @@ export function ProductFilters({
           </Can>
         )}
       </div>
+
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onOpenChange={setManageCategoriesOpen}
+      />
     </div>
   );
 }
