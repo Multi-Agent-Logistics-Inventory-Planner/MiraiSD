@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { useAuth } from "@/hooks/use-auth";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import {
   useCategories,
@@ -78,6 +79,7 @@ export function ProductForm({
   initialProduct,
 }: ProductFormProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
@@ -267,10 +269,11 @@ export function ProductForm({
         ) {
           setIsAddingStock(true);
           try {
+            const actorId = user?.personId || user?.id;
             await createInventory(
               initialStockLocation.locationType,
               initialStockLocation.locationId,
-              { itemId: newProduct.id, quantity: initialStockQty },
+              { itemId: newProduct.id, quantity: initialStockQty, actorId },
             );
             toast({ title: "Initial stock added" });
           } catch (stockErr: unknown) {

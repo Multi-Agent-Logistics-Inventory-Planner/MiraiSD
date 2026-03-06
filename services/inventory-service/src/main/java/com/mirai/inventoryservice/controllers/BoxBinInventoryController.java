@@ -49,7 +49,8 @@ public class BoxBinInventoryController {
         BoxBinInventory inventory = boxBinInventoryService.addInventory(
                 boxBinId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(boxBinInventoryMapper.toResponseDTO(inventory));
     }

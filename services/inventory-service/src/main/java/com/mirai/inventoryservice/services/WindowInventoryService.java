@@ -33,7 +33,7 @@ public class WindowInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public WindowInventory addInventory(UUID windowId, UUID productId, Integer quantity) {
+    public WindowInventory addInventory(UUID windowId, UUID productId, Integer quantity, UUID actorId) {
         windowService.getWindowById(windowId); // Validate window exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class WindowInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.WINDOW, windowId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return windowInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new WindowInventoryNotFoundException("Failed to create inventory"));

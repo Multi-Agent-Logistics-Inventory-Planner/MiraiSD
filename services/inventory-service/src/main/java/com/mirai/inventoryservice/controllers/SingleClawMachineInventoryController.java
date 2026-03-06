@@ -51,7 +51,8 @@ public class SingleClawMachineInventoryController {
         SingleClawMachineInventory inventory = singleClawMachineInventoryService.addInventory(
                 singleClawMachineId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(singleClawMachineInventoryMapper.toResponseDTO(inventory));
     }

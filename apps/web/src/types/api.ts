@@ -361,6 +361,7 @@ export type Inventory =
 export interface InventoryRequest {
   itemId: string;
   quantity: number;
+  actorId?: string;
 }
 
 // Shipment types

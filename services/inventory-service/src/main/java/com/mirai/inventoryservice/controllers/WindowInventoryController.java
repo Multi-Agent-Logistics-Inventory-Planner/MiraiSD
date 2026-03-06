@@ -49,7 +49,8 @@ public class WindowInventoryController {
         WindowInventory inventory = windowInventoryService.addInventory(
                 windowId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(windowInventoryMapper.toResponseDTO(inventory));
     }
