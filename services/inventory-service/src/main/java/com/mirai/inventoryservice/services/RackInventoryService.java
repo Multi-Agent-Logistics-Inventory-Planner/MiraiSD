@@ -33,7 +33,7 @@ public class RackInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public RackInventory addInventory(UUID rackId, UUID productId, Integer quantity) {
+    public RackInventory addInventory(UUID rackId, UUID productId, Integer quantity, UUID actorId) {
         rackService.getRackById(rackId); // Validate rack exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class RackInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.RACK, rackId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return rackInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new RackInventoryNotFoundException("Failed to create inventory"));

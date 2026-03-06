@@ -51,7 +51,8 @@ public class FourCornerMachineInventoryController {
         FourCornerMachineInventory inventory = fourCornerMachineInventoryService.addInventory(
                 fourCornerMachineId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(fourCornerMachineInventoryMapper.toResponseDTO(inventory));
     }

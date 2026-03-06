@@ -30,7 +30,7 @@ public class NotAssignedInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public NotAssignedInventory addInventory(UUID productId, Integer quantity) {
+    public NotAssignedInventory addInventory(UUID productId, Integer quantity, UUID actorId) {
         Product product = productService.getProductById(productId);
 
         // Check if entry already exists - if so, adjust existing quantity
@@ -40,6 +40,7 @@ public class NotAssignedInventoryService {
             AdjustStockRequestDTO adjustRequest = AdjustStockRequestDTO.builder()
                     .quantityChange(quantity)
                     .reason(StockMovementReason.RESTOCK)
+                    .actorId(actorId)
                     .build();
             stockMovementService.adjustInventory(LocationType.NOT_ASSIGNED, inv.getId(), adjustRequest);
             return notAssignedInventoryRepository.findById(inv.getId())
@@ -49,7 +50,7 @@ public class NotAssignedInventoryService {
         // Create new inventory with tracking
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.NOT_ASSIGNED, null, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return notAssignedInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new NotAssignedInventoryNotFoundException("Failed to create inventory"));
