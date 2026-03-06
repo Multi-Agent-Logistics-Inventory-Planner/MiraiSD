@@ -9,6 +9,15 @@ export function useCategories() {
     queryKey: ["categories"],
     queryFn: getCategories,
     staleTime: 5 * 60 * 1000, // Categories change infrequently
+    select: (data) =>
+      [...data]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((c) => ({
+          ...c,
+          children: c.children
+            ? [...c.children].sort((a, b) => a.name.localeCompare(b.name))
+            : c.children,
+        })),
   });
 }
 

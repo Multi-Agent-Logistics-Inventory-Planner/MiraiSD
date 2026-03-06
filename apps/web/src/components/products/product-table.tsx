@@ -31,9 +31,6 @@ function TableSkeleton() {
               <Skeleton className="h-4 w-40" />
             </div>
           </TableCell>
-          <TableCell>
-            <Skeleton className="h-6 w-16 rounded-full" />
-          </TableCell>
           <TableCell className="hidden sm:table-cell">
             <Skeleton className="h-4 w-24" />
           </TableCell>
@@ -61,7 +58,6 @@ export function ProductTable({
     <Table className="border-none">
       <DataTableHeader>
         <TableHead className="text-left rounded-l-lg">Product</TableHead>
-        <TableHead>Status</TableHead>
         <TableHead className="hidden sm:table-cell">Category</TableHead>
         <TableHead>Stock</TableHead>
         <TableHead className="hidden sm:table-cell">Unit Price</TableHead>
@@ -111,17 +107,6 @@ export function ProductTable({
                   )}
                   <span className="font-medium">{row.product.name}</span>
                 </div>
-              </TableCell>
-              <TableCell>
-                <span
-                  className={`inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ${
-                    row.product.isActive
-                      ? "bg-[#20d760] text-black"
-                      : "bg-[#e50815] text-white"
-                  }`}
-                >
-                  {row.product.isActive ? "Active" : "Inactive"}
-                </span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 {row.product.category.name}

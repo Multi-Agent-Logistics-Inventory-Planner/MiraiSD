@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Minus, Plus, Settings2 } from "lucide-react";
+import { Loader2, Minus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,6 @@ import { createInventory } from "@/lib/api/inventory";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
-import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 
@@ -85,8 +84,6 @@ export function ProductForm({
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
-  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
-
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
@@ -95,7 +92,8 @@ export function ProductForm({
   const [initialStockEnabled, setInitialStockEnabled] = useState(false);
   const [initialStockLocation, setInitialStockLocation] =
     useState<LocationSelection>(EMPTY_LOCATION);
-  const [initialStockQty, setInitialStockQty] = useState(1);
+  const [initialStockQty, setInitialStockQty] = useState<number | "">("");
+  const [initialStockQtyError, setInitialStockQtyError] = useState("");
   const [isAddingStock, setIsAddingStock] = useState(false);
 
   const childCategories = useChildCategories(rootCategoryId);
@@ -170,7 +168,8 @@ export function ProductForm({
     // Always reset initial stock fields when dialog opens/closes
     setInitialStockEnabled(false);
     setInitialStockLocation(EMPTY_LOCATION);
-    setInitialStockQty(1);
+    setInitialStockQty("");
+    setInitialStockQtyError("");
   }, [open, initialProduct, form, resetImage]);
 
   // Update categoryId based on subcategory selection
@@ -239,9 +238,14 @@ export function ProductForm({
         toast({ title: "Product created" });
 
         // Optionally add initial stock after product creation
+        if (initialStockEnabled && initialStockQty === "") {
+          setInitialStockQtyError("Quantity is required");
+          return;
+        }
+
         if (
           initialStockEnabled &&
-          initialStockQty > 0 &&
+          initialStockQty !== "" && initialStockQty > 0 &&
           initialStockLocation.locationType &&
           initialStockLocation.locationId
         ) {
@@ -338,7 +342,7 @@ export function ProductForm({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label>Category</Label>
                   <div className="flex gap-2">
@@ -369,15 +373,6 @@ export function ProductForm({
                       title="Add new category"
                     >
                       <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setManageCategoriesOpen(true)}
-                      title="Manage categories"
-                    >
-                      <Settings2 className="h-4 w-4" />
                     </Button>
                   </div>
                   {form.formState.errors.categoryId?.message ? (
@@ -484,9 +479,9 @@ export function ProductForm({
                             variant="outline"
                             size="icon"
                             className="h-9 w-9 shrink-0"
-                            disabled={initialStockQty <= 1 || isSaving}
+                            disabled={initialStockQty === "" || initialStockQty <= 1 || isSaving}
                             onClick={() =>
-                              setInitialStockQty((q) => Math.max(1, q - 1))
+                              setInitialStockQty((q) => (q === "" ? 1 : Math.max(1, q - 1)))
                             }
                           >
                             <Minus className="h-4 w-4" />
@@ -497,23 +492,40 @@ export function ProductForm({
                             min={1}
                             className="text-center"
                             value={initialStockQty}
+                            placeholder="0"
                             onChange={(e) => {
-                              const v = parseInt(e.target.value, 10);
-                              if (!isNaN(v) && v >= 1) setInitialStockQty(v);
+                              const raw = e.target.value;
+                              if (raw === "") {
+                                setInitialStockQty("");
+                                setInitialStockQtyError("Quantity is required");
+                              } else {
+                                const v = parseInt(raw, 10);
+                                if (!isNaN(v) && v >= 1) {
+                                  setInitialStockQty(v);
+                                  setInitialStockQtyError("");
+                                }
+                              }
                             }}
                             disabled={isSaving}
                           />
+
                           <Button
                             type="button"
                             variant="outline"
                             size="icon"
                             className="h-9 w-9 shrink-0"
                             disabled={isSaving}
-                            onClick={() => setInitialStockQty((q) => q + 1)}
+                            onClick={() => {
+                              setInitialStockQty((q) => (q === "" ? 1 : q + 1));
+                              setInitialStockQtyError("");
+                            }}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
+                        {initialStockQtyError && (
+                          <p className="text-xs text-destructive">{initialStockQtyError}</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -553,10 +565,6 @@ export function ProductForm({
         onSubcategoryCreated={handleSubcategoryCreated}
       />
 
-      <ManageCategoriesDialog
-        open={manageCategoriesOpen}
-        onOpenChange={setManageCategoriesOpen}
-      />
     </>
   );
 }
