@@ -21,6 +21,8 @@ public class ShipmentItemResponseDTO {
     private Integer orderedQuantity;
     private Integer receivedQuantity;
     private Integer damagedQuantity;
+    private Integer displayQuantity;
+    private Integer shopQuantity;
     private BigDecimal unitCost;
     private LocationType destinationLocationType;
     private UUID destinationLocationId;

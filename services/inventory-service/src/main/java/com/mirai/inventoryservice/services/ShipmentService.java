@@ -326,30 +326,39 @@ public class ShipmentService {
                     .mapToInt(ReceiveShipmentRequestDTO.DestinationAllocationDTO::getQuantity)
                     .sum();
 
-            // Get damaged quantity (items that won't be added to inventory)
+            // Get quantities that won't be added to inventory
             int damagedQuantity = receipt.getDamagedQuantity() != null ? receipt.getDamagedQuantity() : 0;
+            int displayQuantity = receipt.getDisplayQuantity() != null ? receipt.getDisplayQuantity() : 0;
+            int shopQuantity = receipt.getShopQuantity() != null ? receipt.getShopQuantity() : 0;
 
             int currentReceivedQuantity = shipmentItem.getReceivedQuantity();
             int currentDamagedQuantity = shipmentItem.getDamagedQuantity();
+            int currentDisplayQuantity = shipmentItem.getDisplayQuantity();
+            int currentShopQuantity = shipmentItem.getShopQuantity();
             int newReceivedQuantity = currentReceivedQuantity + quantityToReceive;
             int newDamagedQuantity = currentDamagedQuantity + damagedQuantity;
+            int newDisplayQuantity = currentDisplayQuantity + displayQuantity;
+            int newShopQuantity = currentShopQuantity + shopQuantity;
 
-            // Validate that we're not receiving/damaging more than ordered
-            int totalAccountedFor = newReceivedQuantity + newDamagedQuantity;
+            // Validate that we're not receiving more than ordered
+            int totalAccountedFor = newReceivedQuantity + newDamagedQuantity + newDisplayQuantity + newShopQuantity;
             if (totalAccountedFor > shipmentItem.getOrderedQuantity()) {
                 throw new IllegalArgumentException(
                     String.format("Cannot process %d items for shipment item %s. " +
-                            "Already received: %d, Already damaged: %d, Ordered: %d, " +
-                            "Attempting to receive: %d, Attempting to mark damaged: %d",
-                            quantityToReceive + damagedQuantity, receipt.getShipmentItemId(),
-                            currentReceivedQuantity, currentDamagedQuantity, shipmentItem.getOrderedQuantity(),
-                            quantityToReceive, damagedQuantity));
+                            "Already received: %d, Already damaged: %d, Already display: %d, Already shop: %d, Ordered: %d, " +
+                            "Attempting to receive: %d, Attempting to mark damaged: %d, display: %d, shop: %d",
+                            quantityToReceive + damagedQuantity + displayQuantity + shopQuantity, receipt.getShipmentItemId(),
+                            currentReceivedQuantity, currentDamagedQuantity, currentDisplayQuantity, currentShopQuantity,
+                            shipmentItem.getOrderedQuantity(),
+                            quantityToReceive, damagedQuantity, displayQuantity, shopQuantity));
             }
 
-            // Accumulate received quantity (only good items)
+            // Accumulate received quantity (only good items added to inventory)
             shipmentItem.setReceivedQuantity(newReceivedQuantity);
-            // Accumulate damaged quantity (tracked but not added to inventory)
+            // Accumulate quantities tracked but not added to inventory
             shipmentItem.setDamagedQuantity(newDamagedQuantity);
+            shipmentItem.setDisplayQuantity(newDisplayQuantity);
+            shipmentItem.setShopQuantity(newShopQuantity);
 
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
@@ -393,9 +402,10 @@ public class ShipmentService {
             }
         }
 
-        // Check if all items are fully accounted for (received + damaged = ordered)
+        // Check if all items are fully accounted for (received + damaged + display + shop = ordered)
         boolean allItemsFullyReceived = shipment.getItems().stream()
-                .allMatch(item -> (item.getReceivedQuantity() + item.getDamagedQuantity()) >= item.getOrderedQuantity());
+                .allMatch(item -> (item.getReceivedQuantity() + item.getDamagedQuantity() +
+                        item.getDisplayQuantity() + item.getShopQuantity()) >= item.getOrderedQuantity());
 
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {

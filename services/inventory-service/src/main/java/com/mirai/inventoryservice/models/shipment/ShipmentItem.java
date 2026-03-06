@@ -56,6 +56,18 @@ public class ShipmentItem {
     @Builder.Default
     private Integer damagedQuantity = 0;
 
+    @NotNull
+    @Min(0)
+    @Column(name = "display_quantity", nullable = false)
+    @Builder.Default
+    private Integer displayQuantity = 0;
+
+    @NotNull
+    @Min(0)
+    @Column(name = "shop_quantity", nullable = false)
+    @Builder.Default
+    private Integer shopQuantity = 0;
+
     @Column(name = "unit_cost")
     private BigDecimal unitCost;
 

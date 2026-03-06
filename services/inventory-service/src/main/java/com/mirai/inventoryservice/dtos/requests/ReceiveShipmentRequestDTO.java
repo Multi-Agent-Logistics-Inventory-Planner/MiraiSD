@@ -55,6 +55,14 @@ public class ReceiveShipmentRequestDTO {
         @Min(value = 0, message = "Damaged quantity must be non-negative")
         private Integer damagedQuantity;
 
+        // Display quantity - items for display use (not added to inventory)
+        @Min(value = 0, message = "Display quantity must be non-negative")
+        private Integer displayQuantity;
+
+        // Shop quantity - items for shop use (not added to inventory)
+        @Min(value = 0, message = "Shop quantity must be non-negative")
+        private Integer shopQuantity;
+
         // Legacy fields for backward compatibility
         @Min(value = 0, message = "Received quantity must be non-negative")
         private Integer receivedQuantity;
