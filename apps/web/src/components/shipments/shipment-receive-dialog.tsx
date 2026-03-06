@@ -89,6 +89,14 @@ interface DamagedQuantities {
   [itemId: string]: number;
 }
 
+interface DisplayQuantities {
+  [itemId: string]: number;
+}
+
+interface ShopQuantities {
+  [itemId: string]: number;
+}
+
 interface ShipmentReceiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -201,18 +209,23 @@ export function ShipmentReceiveDialog({
   const [deliveryDate, setDeliveryDate] = useState<string>("");
   const [itemAllocations, setItemAllocations] = useState<ItemAllocations>({});
   const [damagedQuantities, setDamagedQuantities] = useState<DamagedQuantities>({});
+  const [displayQuantities, setDisplayQuantities] = useState<DisplayQuantities>({});
+  const [shopQuantities, setShopQuantities] = useState<ShopQuantities>({});
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open && shipment) {
       setDeliveryDate(format(new Date(), "yyyy-MM-dd"));
 
-      // Initialize each item with one default allocation and zero damaged
+      // Initialize each item with one default allocation and zero for non-inventory quantities
       const initialAllocations: ItemAllocations = {};
       const initialDamaged: DamagedQuantities = {};
+      const initialDisplay: DisplayQuantities = {};
+      const initialShop: ShopQuantities = {};
       shipment.items.forEach((item) => {
-        // Remaining = ordered - received - already damaged
-        const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
+        // Remaining = ordered - received - already accounted for (damaged, display, shop)
+        const remaining = item.orderedQuantity - item.receivedQuantity -
+          (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
         initialAllocations[item.id] = [
           {
             id: crypto.randomUUID(),
@@ -222,9 +235,13 @@ export function ShipmentReceiveDialog({
           },
         ];
         initialDamaged[item.id] = 0;
+        initialDisplay[item.id] = 0;
+        initialShop[item.id] = 0;
       });
       setItemAllocations(initialAllocations);
       setDamagedQuantities(initialDamaged);
+      setDisplayQuantities(initialDisplay);
+      setShopQuantities(initialShop);
     }
   }, [open, shipment]);
 
@@ -283,16 +300,42 @@ export function ShipmentReceiveDialog({
     }));
   };
 
+  const getDisplayQuantity = (itemId: string) => {
+    return displayQuantities[itemId] || 0;
+  };
+
+  const setDisplayQuantity = (itemId: string, quantity: number) => {
+    setDisplayQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(0, quantity),
+    }));
+  };
+
+  const getShopQuantity = (itemId: string) => {
+    return shopQuantities[itemId] || 0;
+  };
+
+  const setShopQuantity = (itemId: string, quantity: number) => {
+    setShopQuantities((prev) => ({
+      ...prev,
+      [itemId]: Math.max(0, quantity),
+    }));
+  };
+
   const hasAnyToReceive = shipment.items.some(
-    (item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0
+    (item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0 ||
+      getDisplayQuantity(item.id) > 0 || getShopQuantity(item.id) > 0
   );
 
   const hasValidationErrors = shipment.items.some((item) => {
-    // Remaining = ordered - already received - already damaged
-    const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
+    // Remaining = ordered - already received - already accounted for
+    const remaining = item.orderedQuantity - item.receivedQuantity -
+      (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
     const allocated = getTotalAllocated(item.id);
     const damaged = getDamagedQuantity(item.id);
-    return (allocated + damaged) > remaining;
+    const display = getDisplayQuantity(item.id);
+    const shop = getShopQuantity(item.id);
+    return (allocated + damaged + display + shop) > remaining;
   });
 
   async function handleSubmit() {
@@ -305,7 +348,8 @@ export function ShipmentReceiveDialog({
     }
 
     const itemReceipts: ShipmentItemReceipt[] = shipment.items
-      .filter((item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0)
+      .filter((item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0 ||
+        getDisplayQuantity(item.id) > 0 || getShopQuantity(item.id) > 0)
       .map((item) => {
         const allocations: DestinationAllocation[] = (
           itemAllocations[item.id] || []
@@ -321,11 +365,15 @@ export function ShipmentReceiveDialog({
           }));
 
         const damaged = getDamagedQuantity(item.id);
+        const display = getDisplayQuantity(item.id);
+        const shop = getShopQuantity(item.id);
 
         return {
           shipmentItemId: item.id,
           allocations: allocations.length > 0 ? allocations : undefined,
           damagedQuantity: damaged > 0 ? damaged : undefined,
+          displayQuantity: display > 0 ? display : undefined,
+          shopQuantity: shop > 0 ? shop : undefined,
         };
       });
 
@@ -404,12 +452,16 @@ export function ShipmentReceiveDialog({
 
           <div className="space-y-4">
             {shipment.items.map((item) => {
-              // Remaining = ordered - received - already damaged
-              const remaining = item.orderedQuantity - item.receivedQuantity - (item.damagedQuantity || 0);
+              // Remaining = ordered - received - already accounted for
+              const remaining = item.orderedQuantity - item.receivedQuantity -
+                (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
               const isComplete = remaining <= 0;
               const allocated = getTotalAllocated(item.id);
               const damaged = getDamagedQuantity(item.id);
-              const isOverAllocated = (allocated + damaged) > remaining;
+              const display = getDisplayQuantity(item.id);
+              const shop = getShopQuantity(item.id);
+              const totalNonInventory = damaged + display + shop;
+              const isOverAllocated = (allocated + totalNonInventory) > remaining;
               const allocations = itemAllocations[item.id] || [];
 
               return (
@@ -438,6 +490,16 @@ export function ShipmentReceiveDialog({
                           Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span>
                         </div>
                       )}
+                      {(item.displayQuantity || 0) > 0 && (
+                        <div>
+                          Display: <span className="font-medium text-blue-600">{item.displayQuantity}</span>
+                        </div>
+                      )}
+                      {(item.shopQuantity || 0) > 0 && (
+                        <div>
+                          Shop: <span className="font-medium text-green-600">{item.shopQuantity}</span>
+                        </div>
+                      )}
                       <div>
                         Remaining:{" "}
                         <span className="font-medium text-primary">
@@ -456,8 +518,11 @@ export function ShipmentReceiveDialog({
                             isOverAllocated ? "text-destructive font-medium" : ""
                           }
                         >
-                          (Good: {allocated}{damaged > 0 ? `, Damaged: ${damaged}` : ""}
-                          {isOverAllocated && ` — exceeds remaining by ${allocated + damaged - remaining}`})
+                          (Good: {allocated}
+                          {damaged > 0 && <>, <span className="text-amber-600">Damaged: {damaged}</span></>}
+                          {display > 0 && <>, <span className="text-blue-600">Display: {display}</span></>}
+                          {shop > 0 && <>, <span className="text-green-600">Shop: {shop}</span></>}
+                          {isOverAllocated && ` — exceeds remaining by ${allocated + totalNonInventory - remaining}`})
                         </span>
                       </div>
 
@@ -489,10 +554,10 @@ export function ShipmentReceiveDialog({
                         Add destination
                       </Button>
 
-                      <div className="mt-3 pt-3 border-t">
+                      <div className="mt-3 pt-3 border-t space-y-2">
                         <div className="flex items-center gap-3">
-                          <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                            Damaged items:
+                          <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                            Damaged:
                           </Label>
                           <Input
                             id={`damaged-${item.id}`}
@@ -509,6 +574,50 @@ export function ShipmentReceiveDialog({
                           {getDamagedQuantity(item.id) > 0 && (
                             <span className="text-xs text-amber-600">
                               Won&apos;t be added to inventory
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor={`display-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                            Display:
+                          </Label>
+                          <Input
+                            id={`display-${item.id}`}
+                            type="number"
+                            min={0}
+                            max={remaining}
+                            value={getDisplayQuantity(item.id)}
+                            onChange={(e) => {
+                              const num = parseInt(e.target.value, 10);
+                              setDisplayQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                            }}
+                            className="w-20 h-8 text-xs text-right"
+                          />
+                          {getDisplayQuantity(item.id) > 0 && (
+                            <span className="text-xs text-blue-600">
+                              For display use
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor={`shop-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
+                            Shop:
+                          </Label>
+                          <Input
+                            id={`shop-${item.id}`}
+                            type="number"
+                            min={0}
+                            max={remaining}
+                            value={getShopQuantity(item.id)}
+                            onChange={(e) => {
+                              const num = parseInt(e.target.value, 10);
+                              setShopQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                            }}
+                            className="w-20 h-8 text-xs text-right"
+                          />
+                          {getShopQuantity(item.id) > 0 && (
+                            <span className="text-xs text-green-600">
+                              For shop use
                             </span>
                           )}
                         </div>

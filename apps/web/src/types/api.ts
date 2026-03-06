@@ -379,6 +379,8 @@ export interface ShipmentItem {
   orderedQuantity: number;
   receivedQuantity: number;
   damagedQuantity: number;
+  displayQuantity: number;
+  shopQuantity: number;
   unitCost?: number;
   destinationLocationType?: LocationType;
   destinationLocationId?: string;
@@ -438,8 +440,10 @@ export interface ShipmentItemReceipt {
   shipmentItemId: string;
   // New: multi-destination allocations
   allocations?: DestinationAllocation[];
-  // Damaged items (not added to inventory)
+  // Items not added to inventory
   damagedQuantity?: number;
+  displayQuantity?: number;
+  shopQuantity?: number;
   // Legacy fields for backward compatibility
   receivedQuantity?: number;
   destinationLocationType?: LocationType;
