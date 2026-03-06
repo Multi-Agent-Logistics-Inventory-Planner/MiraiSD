@@ -51,15 +51,15 @@ public class AuditLogService {
             String productSummary,
             String notes
     ) {
+        User user = null;
         String actorName = null;
         if (actorId != null) {
-            actorName = userRepository.findById(actorId)
-                    .map(User::getFullName)
-                    .orElse(null);
+            user = userRepository.findById(actorId).orElse(null);
+            actorName = user != null ? user.getFullName() : null;
         }
 
         AuditLog auditLog = AuditLog.builder()
-                .actorId(actorId)
+                .user(user)
                 .actorName(actorName)
                 .reason(reason)
                 .primaryFromLocationId(primaryFromLocationId)
