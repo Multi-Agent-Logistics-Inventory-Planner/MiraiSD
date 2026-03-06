@@ -118,7 +118,7 @@ export default function LocationsPage() {
         <LocationTabs value={locationType} onValueChange={handleLocationTypeChange} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-sm flex-1">
+          <div className="w-full sm:max-w-sm sm:flex-1">
             <Input
               placeholder={
                 isNotAssigned

@@ -7,7 +7,7 @@ import type { LocationWithCounts } from "@/types/api";
 
 // Column counts are all divisors of 12: full pages always produce complete rows.
 // Empty grid cells on partial last pages have no styling so they're invisible whitespace.
-const GRID = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 p-4";
+const GRID = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3";
 
 interface LocationTableProps {
   items: LocationWithCounts[];
@@ -59,7 +59,7 @@ export function LocationTable({
           key={item.id}
           type="button"
           className={cn(
-            "group relative cursor-pointer rounded-xl border bg-card p-4 text-left transition-all",
+            "group relative min-w-0 cursor-pointer rounded-xl border bg-card p-3 sm:p-4 text-left transition-all",
             "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             item.totalQuantity === 0 && "opacity-55"
@@ -75,7 +75,7 @@ export function LocationTable({
           />
 
           {/* Location code */}
-          <p className="font-mono text-sm font-semibold tracking-wide leading-tight pr-4">
+          <p className="font-mono text-base sm:text-sm font-bold tracking-wide leading-tight pr-4 truncate">
             {item.locationCode}
           </p>
 
