@@ -36,11 +36,12 @@ import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import type { Product, ProductRequest, Category } from "@/types/api";
+import { LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 
-const EMPTY_LOCATION: LocationSelection = {
-  locationType: null,
-  locationId: null,
+const NOT_ASSIGNED_LOCATION: LocationSelection = {
+  locationType: LocationType.NOT_ASSIGNED,
+  locationId: "__not_assigned__",
   locationCode: "",
 };
 
@@ -91,7 +92,8 @@ export function ProductForm({
   // Initial stock state (create mode only)
   const [initialStockEnabled, setInitialStockEnabled] = useState(false);
   const [initialStockLocation, setInitialStockLocation] =
-    useState<LocationSelection>(EMPTY_LOCATION);
+    useState<LocationSelection>(NOT_ASSIGNED_LOCATION);
+  const [locationError, setLocationError] = useState("");
   const [initialStockQty, setInitialStockQty] = useState<number | "">("");
   const [initialStockQtyError, setInitialStockQtyError] = useState("");
   const [isAddingStock, setIsAddingStock] = useState(false);
@@ -167,9 +169,10 @@ export function ProductForm({
 
     // Always reset initial stock fields when dialog opens/closes
     setInitialStockEnabled(false);
-    setInitialStockLocation(EMPTY_LOCATION);
+    setInitialStockLocation(NOT_ASSIGNED_LOCATION);
     setInitialStockQty("");
     setInitialStockQtyError("");
+    setLocationError("");
   }, [open, initialProduct, form, resetImage]);
 
   // Update categoryId based on subcategory selection
@@ -240,6 +243,11 @@ export function ProductForm({
         // Optionally add initial stock after product creation
         if (initialStockEnabled && initialStockQty === "") {
           setInitialStockQtyError("Quantity is required");
+          return;
+        }
+
+        if (initialStockEnabled && (!initialStockLocation.locationType || !initialStockLocation.locationId)) {
+          setLocationError("Location is required");
           return;
         }
 
@@ -420,7 +428,7 @@ export function ProductForm({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="sku">SKU</Label>
+                  <Label htmlFor="sku">SKU <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input
                     id="sku"
                     placeholder="SKU-XXX"
@@ -434,7 +442,7 @@ export function ProductForm({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="unitCost">Unit Cost ($)</Label>
+                  <Label htmlFor="unitCost">Unit Cost ($) <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input
                     id="unitCost"
                     type="number"
@@ -466,9 +474,15 @@ export function ProductForm({
                         <LocationSelector
                           label=""
                           value={initialStockLocation}
-                          onChange={setInitialStockLocation}
+                          onChange={(v) => {
+                            setInitialStockLocation(v);
+                            setLocationError("");
+                          }}
                           disabled={isSaving}
                         />
+                        {locationError && (
+                          <p className="text-xs text-destructive">{locationError}</p>
+                        )}
                       </div>
 
                       <div className="grid gap-2">
