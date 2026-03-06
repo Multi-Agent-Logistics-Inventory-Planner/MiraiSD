@@ -353,9 +353,9 @@ export function TransferStockDialog({
                   {getNoResultsMessage(searchQuery, categoryFilters, childCategoryFilters, availableCategories, availableChildCategories)}
                 </div>
               ) : (
-                <div className="flex-1 min-h-0">
-                  <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-                    <div className="pb-2 pr-3">
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea className="h-full w-full">
+                    <div className="w-full overflow-hidden pb-2 pr-3">
                       {filteredInventory.map((inv) => (
                         <ProductTransferCard
                           key={inv.id}

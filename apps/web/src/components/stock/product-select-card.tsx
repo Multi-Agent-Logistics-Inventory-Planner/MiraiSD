@@ -4,12 +4,18 @@ import { useState } from "react";
 import Image from "next/image";
 import { Check, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Inventory } from "@/types/api";
+import type { InventoryItem } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
+interface InventoryLike {
+  id: string;
+  item: InventoryItem;
+  quantity: number;
+}
+
 interface ProductSelectCardProps {
-  inventory: Inventory;
+  inventory: InventoryLike;
   selected: boolean;
   onSelect: () => void;
   disabled?: boolean;
@@ -34,7 +40,7 @@ export function ProductSelectCard({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-2 sm:gap-4 py-3 sm:py-4 sm:px-3 border-b last:border-b-0 cursor-pointer",
+        "overflow-hidden min-w-0 w-full flex items-center gap-2 sm:gap-4 py-3 sm:py-4 sm:px-3 border-b last:border-b-0 cursor-pointer",
         "transition-colors text-left",
         selected
           ? "bg-primary/5 border-l-2 border-l-primary pl-2"
@@ -42,7 +48,7 @@ export function ProductSelectCard({
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
-      <div className="relative h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+      <div className="relative h-12 w-12 sm:h-16 sm:w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
         {hasImage ? (
           <Image
             src={safeImageUrl}
@@ -64,17 +70,17 @@ export function ProductSelectCard({
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="w-0 flex-1 overflow-hidden">
         <p className="font-medium text-xs sm:text-base truncate">{item.name}</p>
         <div className="flex flex-wrap gap-1 mt-1">
-          <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
+          <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
             {categoryLabel}
           </Badge>
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-1 shrink-0">
-        <span className="text-sm font-semibold tabular-nums">
+      <div className="flex flex-col items-end gap-0.5 shrink-0 pl-2">
+        <span className="text-sm sm:text-base font-semibold tabular-nums">
           {inventory.quantity}
         </span>
         <span className="text-[10px] sm:text-xs text-muted-foreground">
