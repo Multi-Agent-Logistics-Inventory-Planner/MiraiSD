@@ -245,7 +245,7 @@ export function ProductForm({
 
         if (
           initialStockEnabled &&
-          initialStockQty > 0 &&
+          initialStockQty !== "" && initialStockQty > 0 &&
           initialStockLocation.locationType &&
           initialStockLocation.locationId
         ) {
