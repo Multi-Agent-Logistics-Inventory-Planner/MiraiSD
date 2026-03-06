@@ -83,8 +83,8 @@ export function LocationTable({
           <div className="mt-3 grid grid-cols-2 gap-x-2">
             <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Items</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-wide text-right">Units</span>
-            <span className="text-sm font-semibold tabular-nums">{item.inventoryRecords}</span>
-            <span className="text-sm font-semibold tabular-nums text-right">{item.totalQuantity}</span>
+            <span className="text-sm font-semibold tabular-nums text-muted-foreground">{item.inventoryRecords}</span>
+            <span className="text-sm font-semibold tabular-nums text-right text-muted-foreground">{item.totalQuantity}</span>
           </div>
         </button>
       ))}
