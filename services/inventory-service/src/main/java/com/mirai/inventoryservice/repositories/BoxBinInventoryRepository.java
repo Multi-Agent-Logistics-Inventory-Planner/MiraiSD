@@ -23,5 +23,7 @@ public interface BoxBinInventoryRepository extends JpaRepository<BoxBinInventory
 
     @Query("SELECT SUM(i.quantity) FROM BoxBinInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

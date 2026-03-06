@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, ImageOff, Plus, Pencil } from "lucide-react";
+import { ArrowLeft, ImageOff, Plus, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/table";
 import { ProductForm } from "@/components/products/product-form";
 import { PrizeForm } from "@/components/products/prize-form";
+import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
 import {
   useProductWithChildren,
   useProduct,
 } from "@/hooks/queries/use-products";
+import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { cn } from "@/lib/utils";
 import type { ProductSummary } from "@/types/api";
 
@@ -67,9 +69,12 @@ export default function ProductDetailPage() {
   const [addPrizeOpen, setAddPrizeOpen] = useState(false);
   const [editParentOpen, setEditParentOpen] = useState(false);
   const [editingPrizeId, setEditingPrizeId] = useState<string | null>(null);
+  const [deleteParentOpen, setDeleteParentOpen] = useState(false);
+  const [deletePrizeId, setDeletePrizeId] = useState<string | null>(null);
 
   const { data: editingPrizeProduct, isLoading: editingPrizeLoading } =
     useProduct(editingPrizeId);
+  const deleteProductMutation = useDeleteProductMutation();
 
   if (isLoading) {
     return (
@@ -173,6 +178,28 @@ export default function ProductDetailPage() {
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
               </Button>
+              <DeleteProductDialog
+                open={deleteParentOpen}
+                onOpenChange={setDeleteParentOpen}
+                productName={product.name}
+                cascadeMessage={
+                  children.length > 0
+                    ? ` and all ${children.length} prize(s)`
+                    : undefined
+                }
+                isPending={deleteProductMutation.isPending}
+                onDelete={() => {
+                  deleteProductMutation.mutate(
+                    { id: product.id },
+                    {
+                      onSuccess: () => {
+                        setDeleteParentOpen(false);
+                        router.push("/products");
+                      },
+                    }
+                  );
+                }}
+              />
             </div>
             <p className="text-sm text-muted-foreground">
               Total Stock: <span className="font-medium text-foreground">{totalStock}</span>
@@ -209,7 +236,7 @@ export default function ProductDetailPage() {
                 <TableHead>SKU</TableHead>
                 <TableHead className="text-center w-24">Status</TableHead>
                 <TableHead className="text-right w-20 rounded-r-lg">Stock</TableHead>
-                <TableHead className="w-10 rounded-r-lg"></TableHead>
+                <TableHead className="w-20 rounded-r-lg"></TableHead>
               </DataTableHeader>
               <TableBody>
                 {children.map((prize) => (
@@ -253,8 +280,53 @@ export default function ProductDetailPage() {
                     <TableCell className="text-right tabular-nums">
                       {prize.quantity}
                     </TableCell>
-                    <TableCell className="w-10">
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    <TableCell
+                      className="w-20"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingPrizeId(prize.id);
+                          }}
+                          title="Edit prize"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletePrizeId(prize.id);
+                          }}
+                          title="Delete prize"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <DeleteProductDialog
+                          open={deletePrizeId === prize.id}
+                          onOpenChange={(open) =>
+                            !open && setDeletePrizeId(null)
+                          }
+                          productName={prize.name}
+                          isPending={deleteProductMutation.isPending}
+                          renderTrigger={false}
+                          onDelete={() => {
+                            deleteProductMutation.mutate(
+                              { id: prize.id },
+                              {
+                                onSuccess: () => setDeletePrizeId(null),
+                              }
+                            );
+                          }}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

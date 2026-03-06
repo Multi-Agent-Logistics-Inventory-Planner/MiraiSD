@@ -23,5 +23,7 @@ public interface WindowInventoryRepository extends JpaRepository<WindowInventory
 
     @Query("SELECT SUM(i.quantity) FROM WindowInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

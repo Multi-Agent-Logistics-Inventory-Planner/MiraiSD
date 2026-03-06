@@ -4,6 +4,8 @@ import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.services.InventoryAggregateService;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -22,16 +24,22 @@ public class ProductService {
     private final CategoryService categoryService;
     private final StockMovementService stockMovementService;
     private final SupabaseBroadcastService broadcastService;
+    private final InventoryAggregateService inventoryAggregateService;
+    private final StockMovementRepository stockMovementRepository;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryService categoryService,
             @Lazy StockMovementService stockMovementService,
-            SupabaseBroadcastService broadcastService) {
+            SupabaseBroadcastService broadcastService,
+            InventoryAggregateService inventoryAggregateService,
+            StockMovementRepository stockMovementRepository) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
         this.broadcastService = broadcastService;
+        this.inventoryAggregateService = inventoryAggregateService;
+        this.stockMovementRepository = stockMovementRepository;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
@@ -205,13 +213,21 @@ public class ProductService {
     public void deleteProduct(UUID id) {
         Product product = getProductById(id);
 
-        // Validate: cannot delete parent with children
+        // If parent has children, delete children first (cascade), then parent
         long childCount = productRepository.countChildrenByParentId(id);
         if (childCount > 0) {
-            throw new IllegalArgumentException(
-                    "Cannot delete product with children. " + childCount + " child product(s) exist. Delete children first.");
+            List<Product> children = productRepository.findByParentIdWithCategories(id);
+            for (Product child : children) {
+                inventoryAggregateService.deleteAllInventoryForProduct(child.getId());
+                stockMovementRepository.deleteByItem_Id(child.getId());
+                productRepository.delete(child);
+                broadcastService.broadcastProductUpdated(List.of(child.getId().toString()));
+            }
         }
 
+        // Delete parent's (or single product's) inventory and stock movements before deleting the product
+        inventoryAggregateService.deleteAllInventoryForProduct(id);
+        stockMovementRepository.deleteByItem_Id(id);
         productRepository.delete(product);
         broadcastService.broadcastProductUpdated(List.of(id.toString()));
     }

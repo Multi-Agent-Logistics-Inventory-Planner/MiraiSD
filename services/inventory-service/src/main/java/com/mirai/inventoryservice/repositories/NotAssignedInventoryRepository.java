@@ -18,4 +18,6 @@ public interface NotAssignedInventoryRepository extends JpaRepository<NotAssigne
 
     @Query("SELECT SUM(i.quantity) FROM NotAssignedInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }

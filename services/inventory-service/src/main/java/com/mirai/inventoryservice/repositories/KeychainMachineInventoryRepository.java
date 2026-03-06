@@ -23,5 +23,7 @@ public interface KeychainMachineInventoryRepository extends JpaRepository<Keycha
 
     @Query("SELECT SUM(i.quantity) FROM KeychainMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

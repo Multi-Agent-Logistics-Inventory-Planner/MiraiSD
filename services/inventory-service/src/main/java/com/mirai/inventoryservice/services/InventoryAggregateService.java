@@ -27,7 +27,6 @@ import org.springframework.beans.factory.DisposableBean;
  * inventory by product.
  */
 @Service
-@Transactional(readOnly = true)
 public class InventoryAggregateService implements DisposableBean {
 
     private final ProductRepository productRepository;
@@ -161,6 +160,24 @@ public class InventoryAggregateService implements DisposableBean {
         allEntries.sort((a, b) -> a.getLocationLabel().compareToIgnoreCase(b.getLocationLabel()));
 
         return allEntries;
+    }
+
+    /**
+     * Delete all inventory records for a product across all location types.
+     * Required before deleting a product to avoid FK constraint violations.
+     */
+    @Transactional
+    public void deleteAllInventoryForProduct(UUID productId) {
+        boxBinInventoryRepository.deleteByItem_Id(productId);
+        rackInventoryRepository.deleteByItem_Id(productId);
+        cabinetInventoryRepository.deleteByItem_Id(productId);
+        singleClawMachineInventoryRepository.deleteByItem_Id(productId);
+        doubleClawMachineInventoryRepository.deleteByItem_Id(productId);
+        keychainMachineInventoryRepository.deleteByItem_Id(productId);
+        fourCornerMachineInventoryRepository.deleteByItem_Id(productId);
+        pusherMachineInventoryRepository.deleteByItem_Id(productId);
+        windowInventoryRepository.deleteByItem_Id(productId);
+        notAssignedInventoryRepository.deleteByItem_Id(productId);
     }
 
     private List<ProductInventoryEntryDTO> mapBoxBinInventory(List<BoxBinInventory> inventories) {

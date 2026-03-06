@@ -23,4 +23,6 @@ public interface PusherMachineInventoryRepository extends JpaRepository<PusherMa
 
     @Query("SELECT SUM(i.quantity) FROM PusherMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }

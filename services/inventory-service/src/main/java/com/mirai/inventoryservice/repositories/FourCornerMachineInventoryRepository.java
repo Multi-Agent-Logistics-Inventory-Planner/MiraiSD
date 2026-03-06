@@ -23,4 +23,6 @@ public interface FourCornerMachineInventoryRepository extends JpaRepository<Four
 
     @Query("SELECT SUM(i.quantity) FROM FourCornerMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }

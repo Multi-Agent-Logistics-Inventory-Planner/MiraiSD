@@ -58,5 +58,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // Find stock movements by metadata source (used for dev seed cleanup)
     @Query(value = "SELECT * FROM stock_movements WHERE metadata->>'source' = :source", nativeQuery = true)
     List<StockMovement> findByMetadataSource(@Param("source") String source);
+
+    void deleteByItem_Id(UUID productId);
 }
 
