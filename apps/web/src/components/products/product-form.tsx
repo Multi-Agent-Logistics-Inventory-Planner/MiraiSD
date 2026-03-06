@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Minus, Plus } from "lucide-react";
+import { Loader2, Minus, Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
   Select,
@@ -26,7 +27,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
-import { useCategories, useChildCategories } from "@/hooks/queries/use-categories";
+import {
+  useCategories,
+  useChildCategories,
+} from "@/hooks/queries/use-categories";
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
@@ -35,6 +39,7 @@ import { createInventory } from "@/lib/api/inventory";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
+import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import { LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
@@ -54,11 +59,7 @@ const schema = z.object({
   targetStockLevel: z.coerce.number().int().min(0).optional(),
   leadTimeDays: z.coerce.number().int().min(0).optional(),
   unitCost: z.coerce.number().min(0).optional(),
-  imageUrl: z
-    .string()
-    .url("Must be a valid URL")
-    .optional()
-    .or(z.literal("")),
+  imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
 });
@@ -85,6 +86,7 @@ export function ProductForm({
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
@@ -230,7 +232,8 @@ export function ProductForm({
             if (isUploadError(deleteResult)) {
               toast({
                 title: "Note",
-                description: "Old image cleanup failed. Storage may need manual cleanup.",
+                description:
+                  "Old image cleanup failed. Storage may need manual cleanup.",
                 variant: "default",
               });
             }
@@ -246,14 +249,19 @@ export function ProductForm({
           return;
         }
 
-        if (initialStockEnabled && (!initialStockLocation.locationType || !initialStockLocation.locationId)) {
+        if (
+          initialStockEnabled &&
+          (!initialStockLocation.locationType ||
+            !initialStockLocation.locationId)
+        ) {
           setLocationError("Location is required");
           return;
         }
 
         if (
           initialStockEnabled &&
-          initialStockQty !== "" && initialStockQty > 0 &&
+          initialStockQty !== "" &&
+          initialStockQty > 0 &&
           initialStockLocation.locationType &&
           initialStockLocation.locationId
         ) {
@@ -262,7 +270,7 @@ export function ProductForm({
             await createInventory(
               initialStockLocation.locationType,
               initialStockLocation.locationId,
-              { itemId: newProduct.id, quantity: initialStockQty }
+              { itemId: newProduct.id, quantity: initialStockQty },
             );
             toast({ title: "Initial stock added" });
           } catch (stockErr: unknown) {
@@ -342,7 +350,12 @@ export function ProductForm({
               </div>
 
               <div className="grid gap-2 pb-6">
-                <Label htmlFor="description">Description (optional)</Label>
+                <Label htmlFor="description">
+                  Description{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
                 <Input
                   id="description"
                   placeholder="Short description"
@@ -352,7 +365,17 @@ export function ProductForm({
 
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Category</Label>
+                  <div className="flex items-center gap-2">
+                    <Label>Category</Label>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      onClick={() => setManageCategoriesOpen(true)}
+                      title="Manage categories"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <Select
                       value={rootCategoryId}
@@ -363,7 +386,11 @@ export function ProductForm({
                       disabled={categoriesLoading}
                     >
                       <SelectTrigger className="flex-1">
-                        <SelectValue placeholder={categoriesLoading ? "Loading..." : "Select"} />
+                        <SelectValue
+                          placeholder={
+                            categoriesLoading ? "Loading..." : "Select"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {categories?.map((c) => (
@@ -401,7 +428,9 @@ export function ProductForm({
                       disabled={!hasChildCategories}
                     >
                       <SelectTrigger className="flex-1">
-                        <SelectValue placeholder={hasChildCategories ? "Select" : "N/A"} />
+                        <SelectValue
+                          placeholder={hasChildCategories ? "Select" : "N/A"}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
@@ -428,7 +457,12 @@ export function ProductForm({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="sku">SKU <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Label htmlFor="sku">
+                    SKU{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </Label>
                   <Input
                     id="sku"
                     placeholder="SKU-XXX"
@@ -442,7 +476,12 @@ export function ProductForm({
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="unitCost">Unit Cost ($) <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Label htmlFor="unitCost">
+                    Unit Cost{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </Label>
                   <Input
                     id="unitCost"
                     type="number"
@@ -457,14 +496,16 @@ export function ProductForm({
               {!initialProduct && (
                 <div className="border rounded-lg p-4 space-y-4">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-input accent-primary"
+                    <Checkbox
                       checked={initialStockEnabled}
-                      onChange={(e) => setInitialStockEnabled(e.target.checked)}
+                      onCheckedChange={(checked) =>
+                        setInitialStockEnabled(checked === true)
+                      }
                       disabled={isSaving}
                     />
-                    <span className="text-sm font-medium">Add initial stock</span>
+                    <span className="text-sm font-medium">
+                      Add initial stock
+                    </span>
                   </label>
 
                   {initialStockEnabled && (
@@ -481,7 +522,9 @@ export function ProductForm({
                           disabled={isSaving}
                         />
                         {locationError && (
-                          <p className="text-xs text-destructive">{locationError}</p>
+                          <p className="text-xs text-destructive">
+                            {locationError}
+                          </p>
                         )}
                       </div>
 
@@ -493,9 +536,15 @@ export function ProductForm({
                             variant="outline"
                             size="icon"
                             className="h-9 w-9 shrink-0"
-                            disabled={initialStockQty === "" || initialStockQty <= 1 || isSaving}
+                            disabled={
+                              initialStockQty === "" ||
+                              initialStockQty <= 1 ||
+                              isSaving
+                            }
                             onClick={() =>
-                              setInitialStockQty((q) => (q === "" ? 1 : Math.max(1, q - 1)))
+                              setInitialStockQty((q) =>
+                                q === "" ? 1 : Math.max(1, q - 1),
+                              )
                             }
                           >
                             <Minus className="h-4 w-4" />
@@ -538,7 +587,9 @@ export function ProductForm({
                           </Button>
                         </div>
                         {initialStockQtyError && (
-                          <p className="text-xs text-destructive">{initialStockQtyError}</p>
+                          <p className="text-xs text-destructive">
+                            {initialStockQtyError}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -555,7 +606,11 @@ export function ProductForm({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
+              >
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
@@ -579,6 +634,10 @@ export function ProductForm({
         onSubcategoryCreated={handleSubcategoryCreated}
       />
 
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onOpenChange={setManageCategoriesOpen}
+      />
     </>
   );
 }
