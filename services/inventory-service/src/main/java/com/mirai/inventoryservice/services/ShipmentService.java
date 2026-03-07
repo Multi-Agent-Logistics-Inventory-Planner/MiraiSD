@@ -346,7 +346,7 @@ public class ShipmentService {
 
             // Calculate total quantity from allocations (good items to add to inventory)
             int quantityToReceive = allocations.stream()
-                    .mapToInt(ReceiveShipmentRequestDTO.DestinationAllocationDTO::getQuantity)
+                    .mapToInt(a -> a.getQuantity() != null ? a.getQuantity() : 0)
                     .sum();
 
             // Get quantities that won't be added to inventory
@@ -385,7 +385,8 @@ public class ShipmentService {
 
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
-                if (allocation.getQuantity() <= 0) {
+                Integer allocQty = allocation.getQuantity();
+                if (allocQty == null || allocQty <= 0) {
                     continue;
                 }
 
@@ -397,7 +398,7 @@ public class ShipmentService {
                         .shipmentItem(shipmentItem)
                         .locationType(locationType != null ? locationType : LocationType.NOT_ASSIGNED)
                         .locationId(locationId)
-                        .quantity(allocation.getQuantity())
+                        .quantity(allocQty)
                         .build();
                 shipmentItem.getAllocations().add(allocationRecord);
 
@@ -407,7 +408,7 @@ public class ShipmentService {
                     // Add to NotAssignedInventory
                     addToNotAssignedInventory(
                             shipmentItem.getItem(),
-                            allocation.getQuantity(),
+                            allocQty,
                             validatedActorId,
                             shipment.getShipmentNumber(),
                             shipment.getId()
@@ -418,7 +419,7 @@ public class ShipmentService {
                             locationType,
                             locationId,
                             shipmentItem.getItem(),
-                            allocation.getQuantity(),
+                            allocQty,
                             validatedActorId
                     );
                 }
@@ -427,8 +428,14 @@ public class ShipmentService {
 
         // Check if all items are fully accounted for (received + damaged + display + shop = ordered)
         boolean allItemsFullyReceived = shipment.getItems().stream()
-                .allMatch(item -> (item.getReceivedQuantity() + item.getDamagedQuantity() +
-                        item.getDisplayQuantity() + item.getShopQuantity()) >= item.getOrderedQuantity());
+                .allMatch(item -> {
+                    int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+                    int damaged = item.getDamagedQuantity() != null ? item.getDamagedQuantity() : 0;
+                    int display = item.getDisplayQuantity() != null ? item.getDisplayQuantity() : 0;
+                    int shop = item.getShopQuantity() != null ? item.getShopQuantity() : 0;
+                    int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
+                    return (received + damaged + display + shop) >= ordered;
+                });
 
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {

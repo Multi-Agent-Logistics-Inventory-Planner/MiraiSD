@@ -253,6 +253,13 @@ public class ProductService {
     }
 
     /**
+     * Get root products that have at least one child (Kuji parents only)
+     */
+    public List<Product> getRootKujiProducts() {
+        return productRepository.findRootKujiProductsWithCategories();
+    }
+
+    /**
      * Get children of a parent product
      */
     public List<Product> getChildProducts(UUID parentId) {

@@ -59,6 +59,10 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent IS NULL AND p.isActive = true ORDER BY p.name")
     List<Product> findRootProductsWithCategoriesActive();
 
+    /** Root products that have at least one child (Kuji parents) */
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent IS NULL AND EXISTS (SELECT 1 FROM Product ch WHERE ch.parent.id = p.id) ORDER BY p.name")
+    List<Product> findRootKujiProductsWithCategories();
+
     // Find children of a parent product
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent.id = :parentId ORDER BY p.sku")
     List<Product> findByParentIdWithCategories(@Param("parentId") UUID parentId);

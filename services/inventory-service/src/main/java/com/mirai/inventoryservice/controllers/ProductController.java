@@ -31,11 +31,14 @@ public class ProductController {
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly,
-            @RequestParam(required = false, defaultValue = "false") Boolean rootOnly) {
+            @RequestParam(required = false, defaultValue = "false") Boolean rootOnly,
+            @RequestParam(required = false, defaultValue = "false") Boolean kujiOnly) {
         List<Product> products;
 
         if (search != null && !search.isBlank()) {
             products = productService.searchProducts(search);
+        } else if (rootOnly && Boolean.TRUE.equals(kujiOnly)) {
+            products = productService.getRootKujiProducts();
         } else if (rootOnly && activeOnly) {
             products = productService.getActiveRootProducts();
         } else if (rootOnly) {
