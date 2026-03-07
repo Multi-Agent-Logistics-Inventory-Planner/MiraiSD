@@ -124,8 +124,9 @@ class SupabaseRepo:
             self._engine = create_engine(
                 _build_connection_url(),
                 pool_pre_ping=True,
-                pool_size=1,
-                max_overflow=2,
+                pool_size=10,
+                max_overflow=20,
+                pool_timeout=30,  # Fail after 30s instead of hanging indefinitely
             )
 
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:

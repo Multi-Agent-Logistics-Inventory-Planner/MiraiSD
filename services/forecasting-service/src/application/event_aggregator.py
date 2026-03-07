@@ -22,6 +22,12 @@ class BatchResult:
     trigger_reason: str | None = None
 
 
+# Maximum events to hold before forcing a flush (memory safety)
+MAX_EVENTS_LIMIT = 1000
+# Maximum unique items to track (memory safety)
+MAX_ITEMS_TRACKED = 500
+
+
 @dataclass
 class EventAggregator:
     """Aggregates events with per-item debouncing and batch triggering.
@@ -29,11 +35,14 @@ class EventAggregator:
     Batching strategy:
     - Per-item debounce: Ignore rapid duplicate item events within ITEM_DEBOUNCE_SECONDS
     - Batch triggers: Fire when BATCH_WINDOW_SECONDS elapsed OR BATCH_SIZE_TRIGGER events accumulated
+    - Memory safety: Force batch ready when MAX_EVENTS_LIMIT or MAX_ITEMS_TRACKED exceeded
     """
 
     batch_window_seconds: float = field(default_factory=lambda: config.BATCH_WINDOW_SECONDS)
     batch_size_trigger: int = field(default_factory=lambda: config.BATCH_SIZE_TRIGGER)
     item_debounce_seconds: float = field(default_factory=lambda: config.ITEM_DEBOUNCE_SECONDS)
+    max_events_limit: int = field(default=MAX_EVENTS_LIMIT)
+    max_items_tracked: int = field(default=MAX_ITEMS_TRACKED)
 
     # Internal state
     _events: list[NormalizedEvent] = field(default_factory=list)
@@ -93,6 +102,7 @@ class EventAggregator:
         Batch triggers:
         1. Time window elapsed (BATCH_WINDOW_SECONDS since first event)
         2. Event count threshold reached (BATCH_SIZE_TRIGGER events)
+        3. Memory safety limits exceeded (MAX_EVENTS_LIMIT or MAX_ITEMS_TRACKED)
         """
         if not self._events:
             return BatchResult(ready=False, item_ids=set(), event_count=0)
@@ -100,6 +110,34 @@ class EventAggregator:
         now = time.monotonic()
         event_count = len(self._events)
         item_ids = {e.item_id for e in self._events}
+        items_tracked = len(self._item_last_seen)
+
+        # Check memory safety limits first (prevent unbounded growth)
+        if event_count >= self.max_events_limit:
+            logger.warning(
+                "Batch ready: memory limit (%d events hit max %d)",
+                event_count,
+                self.max_events_limit,
+            )
+            return BatchResult(
+                ready=True,
+                item_ids=item_ids,
+                event_count=event_count,
+                trigger_reason="memory_limit",
+            )
+
+        if items_tracked >= self.max_items_tracked:
+            logger.warning(
+                "Batch ready: item limit (%d items hit max %d)",
+                items_tracked,
+                self.max_items_tracked,
+            )
+            return BatchResult(
+                ready=True,
+                item_ids=item_ids,
+                event_count=event_count,
+                trigger_reason="item_limit",
+            )
 
         # Check size trigger
         if event_count >= self.batch_size_trigger:

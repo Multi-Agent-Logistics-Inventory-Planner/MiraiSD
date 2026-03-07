@@ -263,21 +263,40 @@ class MessagingWorker:
         self._review_processor.process_review(event)
 
     def _poll_undelivered_notifications(self) -> None:
-        """Poll for and deliver pending notifications to Slack."""
+        """Poll for and deliver pending notifications to Slack.
+
+        Optimized to release DB connections before making HTTP calls to Slack,
+        preventing connection pool exhaustion during slow Slack responses.
+        """
         # Atomically claim notifications to prevent double-sends
+        # DB connection is released after this call returns
         notifications = self._repo.claim_undelivered_notifications(limit=10)
+
+        if not notifications:
+            return
+
+        # Process notifications: send to Slack first (no DB connection held),
+        # then batch update the database
+        delivered_ids: list[str] = []
+        failed_ids: list[str] = []
 
         for notif in notifications:
             try:
                 success = self._slack_notifier.send_notification(notif)
                 if success:
-                    self._repo.mark_as_delivered(notif["id"])
+                    delivered_ids.append(notif["id"])
                 else:
-                    # Release claim so it can be retried
-                    self._repo.release_claim(notif["id"])
+                    failed_ids.append(notif["id"])
             except Exception as e:
                 logger.exception("Failed to deliver notification %s: %s", notif["id"], e)
-                self._repo.release_claim(notif["id"])
+                failed_ids.append(notif["id"])
+
+        # Now update database in batch (single connection usage)
+        for notif_id in delivered_ids:
+            self._repo.mark_as_delivered(notif_id)
+
+        for notif_id in failed_ids:
+            self._repo.release_claim(notif_id)
 
     def _process_event(self, event: NormalizedEvent) -> None:
         """Process a single inventory change event.
