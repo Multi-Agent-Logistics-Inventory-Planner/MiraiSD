@@ -59,47 +59,40 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "ORDER BY s.createdAt DESC")
     List<Shipment> findByStatusWithAssociationsList(@Param("status") ShipmentStatus status);
 
-    // Paginated queries with JOIN FETCH to avoid N+1
-    @Query(value = "SELECT DISTINCT s FROM Shipment s " +
+    // Paginated queries - fetch users eagerly, items loaded via @BatchSize(50)
+    // NOTE: Do NOT use JOIN FETCH on collections (items) with pagination - causes in-memory pagination
+    @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "LEFT JOIN FETCH s.items si " +
-            "LEFT JOIN FETCH si.item " +
             "ORDER BY s.createdAt DESC",
-            countQuery = "SELECT COUNT(DISTINCT s) FROM Shipment s")
+            countQuery = "SELECT COUNT(s) FROM Shipment s")
     Page<Shipment> findAllWithAssociations(Pageable pageable);
 
-    @Query(value = "SELECT DISTINCT s FROM Shipment s " +
+    @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "LEFT JOIN FETCH s.items si " +
-            "LEFT JOIN FETCH si.item " +
             "WHERE s.status = :status " +
             "ORDER BY s.createdAt DESC",
-            countQuery = "SELECT COUNT(DISTINCT s) FROM Shipment s WHERE s.status = :status")
+            countQuery = "SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
     Page<Shipment> findByStatusWithAssociations(@Param("status") ShipmentStatus status, Pageable pageable);
 
     // Paginated query with optional status filter (no search)
-    @Query(value = "SELECT DISTINCT s FROM Shipment s " +
+    @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "LEFT JOIN FETCH s.items si " +
-            "LEFT JOIN FETCH si.item " +
             "WHERE (:status IS NULL OR s.status = :status) " +
             "ORDER BY s.createdAt DESC",
-            countQuery = "SELECT COUNT(DISTINCT s) FROM Shipment s WHERE (:status IS NULL OR s.status = :status)")
+            countQuery = "SELECT COUNT(s) FROM Shipment s WHERE (:status IS NULL OR s.status = :status)")
     Page<Shipment> findByStatusPaged(@Param("status") ShipmentStatus status, Pageable pageable);
 
     // Paginated query with status and search filters
-    @Query(value = "SELECT DISTINCT s FROM Shipment s " +
+    @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "LEFT JOIN FETCH s.items si " +
-            "LEFT JOIN FETCH si.item " +
             "WHERE (:status IS NULL OR s.status = :status) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
             "ORDER BY s.createdAt DESC",
-            countQuery = "SELECT COUNT(DISTINCT s) FROM Shipment s " +
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE (:status IS NULL OR s.status = :status) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findByStatusAndSearch(@Param("status") ShipmentStatus status, @Param("searchPattern") String searchPattern, Pageable pageable);

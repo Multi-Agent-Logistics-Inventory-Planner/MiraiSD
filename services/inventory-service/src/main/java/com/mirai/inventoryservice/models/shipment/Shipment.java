@@ -70,6 +70,7 @@ public class Shipment {
     private User receivedBy;
 
     @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<ShipmentItem> items = new ArrayList<>();
 
