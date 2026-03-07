@@ -74,7 +74,7 @@ export default function LocationsPage() {
     return filteredLocations.slice(start, start + PAGE_SIZE);
   }, [filteredLocations, locationPage]);
 
-  // Filter not-assigned items based on search (by SKU or product name)
+  // Filter not-assigned items based on search (data already filtered to root products by hook)
   const filteredNotAssigned = useMemo(() => {
     const q = search.trim().toLowerCase();
     const data = notAssignedQuery.data ?? [];
@@ -116,7 +116,6 @@ export default function LocationsPage() {
       </div>
       <div className="space-y-3">
         <LocationTabs value={locationType} onValueChange={handleLocationTypeChange} />
-
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full sm:max-w-sm sm:flex-1">
             <Input

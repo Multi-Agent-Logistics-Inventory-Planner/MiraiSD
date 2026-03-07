@@ -14,6 +14,7 @@ import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
 import com.mirai.inventoryservice.exceptions.SingleClawMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.WindowNotFoundException;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -75,6 +76,7 @@ public class ShipmentService {
     private final WindowRepository windowRepository;
     private final NotificationService notificationService;
     private final StockMovementService stockMovementService;
+    private final AuditLogService auditLogService;
     private final SupabaseBroadcastService broadcastService;
 
     public ShipmentService(
@@ -106,6 +108,7 @@ public class ShipmentService {
             WindowRepository windowRepository,
             NotificationService notificationService,
             StockMovementService stockMovementService,
+            AuditLogService auditLogService,
             SupabaseBroadcastService broadcastService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
@@ -135,6 +138,7 @@ public class ShipmentService {
         this.windowRepository = windowRepository;
         this.notificationService = notificationService;
         this.stockMovementService = stockMovementService;
+        this.auditLogService = auditLogService;
         this.broadcastService = broadcastService;
     }
 
@@ -346,7 +350,7 @@ public class ShipmentService {
 
             // Calculate total quantity from allocations (good items to add to inventory)
             int quantityToReceive = allocations.stream()
-                    .mapToInt(ReceiveShipmentRequestDTO.DestinationAllocationDTO::getQuantity)
+                    .mapToInt(a -> a.getQuantity() != null ? a.getQuantity() : 0)
                     .sum();
 
             // Get quantities that won't be added to inventory
@@ -385,7 +389,8 @@ public class ShipmentService {
 
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
-                if (allocation.getQuantity() <= 0) {
+                Integer allocQty = allocation.getQuantity();
+                if (allocQty == null || allocQty <= 0) {
                     continue;
                 }
 
@@ -397,7 +402,7 @@ public class ShipmentService {
                         .shipmentItem(shipmentItem)
                         .locationType(locationType != null ? locationType : LocationType.NOT_ASSIGNED)
                         .locationId(locationId)
-                        .quantity(allocation.getQuantity())
+                        .quantity(allocQty)
                         .build();
                 shipmentItem.getAllocations().add(allocationRecord);
 
@@ -407,7 +412,7 @@ public class ShipmentService {
                     // Add to NotAssignedInventory
                     addToNotAssignedInventory(
                             shipmentItem.getItem(),
-                            allocation.getQuantity(),
+                            allocQty,
                             validatedActorId,
                             shipment.getShipmentNumber(),
                             shipment.getId()
@@ -418,7 +423,7 @@ public class ShipmentService {
                             locationType,
                             locationId,
                             shipmentItem.getItem(),
-                            allocation.getQuantity(),
+                            allocQty,
                             validatedActorId
                     );
                 }
@@ -427,8 +432,14 @@ public class ShipmentService {
 
         // Check if all items are fully accounted for (received + damaged + display + shop = ordered)
         boolean allItemsFullyReceived = shipment.getItems().stream()
-                .allMatch(item -> (item.getReceivedQuantity() + item.getDamagedQuantity() +
-                        item.getDisplayQuantity() + item.getShopQuantity()) >= item.getOrderedQuantity());
+                .allMatch(item -> {
+                    int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+                    int damaged = item.getDamagedQuantity() != null ? item.getDamagedQuantity() : 0;
+                    int display = item.getDisplayQuantity() != null ? item.getDisplayQuantity() : 0;
+                    int shop = item.getShopQuantity() != null ? item.getShopQuantity() : 0;
+                    int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
+                    return (received + damaged + display + shop) >= ordered;
+                });
 
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {
@@ -458,26 +469,43 @@ public class ShipmentService {
 
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId) {
         Object inventory = findOrCreateInventory(locationType, locationId, product);
-        int currentQuantity = getInventoryQuantity(inventory);
-        setInventoryQuantity(inventory, currentQuantity + quantity);
+        int previousQuantity = getInventoryQuantity(inventory);
+        setInventoryQuantity(inventory, previousQuantity + quantity);
         UUID inventoryId = saveInventoryAndGetId(locationType, inventory);
+        int currentQuantity = previousQuantity + quantity;
+
+        String toLocationCode = stockMovementService.resolveLocationCode(locationId, locationType);
+        AuditLog auditLog = auditLogService.createAuditLog(
+                validatedActorId,
+                StockMovementReason.SHIPMENT_RECEIPT,
+                null,
+                null,
+                locationId,
+                toLocationCode,
+                1,
+                quantity,
+                product.getName(),
+                null
+        );
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", inventoryId.toString());
         metadata.put("shipment_receipt", true);
 
         StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(product)
                 .locationType(locationType)
                 .toLocationId(locationId)
+                .previousQuantity(previousQuantity)
+                .currentQuantity(currentQuantity)
                 .quantityChange(quantity)
-                .reason(StockMovementReason.RESTOCK)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT)
                 .actorId(validatedActorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
                 .build();
 
-        // Trigger auto-creates event_outbox entry
         stockMovementRepository.save(movement);
     }
 
@@ -491,25 +519,42 @@ public class ShipmentService {
                     return inv;
                 });
 
-        inventory.setQuantity(inventory.getQuantity() + quantity);
+        int previousQuantity = inventory.getQuantity();
+        inventory.setQuantity(previousQuantity + quantity);
         NotAssignedInventory saved = notAssignedInventoryRepository.save(inventory);
+        int currentQuantity = saved.getQuantity();
+
+        AuditLog auditLog = auditLogService.createAuditLog(
+                validatedActorId,
+                StockMovementReason.SHIPMENT_RECEIPT,
+                null,
+                null,
+                null,
+                "Not assigned",
+                1,
+                quantity,
+                product.getName(),
+                null
+        );
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
 
         StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
                 .item(product)
                 .locationType(LocationType.NOT_ASSIGNED)
                 .toLocationId(null)  // No location for NOT_ASSIGNED
+                .previousQuantity(previousQuantity)
+                .currentQuantity(currentQuantity)
                 .quantityChange(quantity)
-                .reason(StockMovementReason.RESTOCK)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT)
                 .actorId(validatedActorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
                 .build();
 
-        // Trigger auto-creates event_outbox entry
         stockMovementRepository.save(movement);
 
         // Create notification for unassigned items

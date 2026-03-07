@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocations } from "@/hooks/queries/use-locations";
 import type {
   Shipment,
+  ShipmentItem,
   ShipmentItemReceipt,
   DestinationAllocation,
   StorageLocation,
@@ -95,6 +97,11 @@ interface DisplayQuantities {
 
 interface ShopQuantities {
   [itemId: string]: number;
+}
+
+/** Prize items in a Kuji block use parent's receive location; we only store quantity per prize. */
+interface PrizeReceivedQuantities {
+  [shipmentItemId: string]: number;
 }
 
 interface ShipmentReceiveDialogProps {
@@ -211,29 +218,34 @@ export function ShipmentReceiveDialog({
   const [damagedQuantities, setDamagedQuantities] = useState<DamagedQuantities>({});
   const [displayQuantities, setDisplayQuantities] = useState<DisplayQuantities>({});
   const [shopQuantities, setShopQuantities] = useState<ShopQuantities>({});
+  const [prizeReceivedQuantities, setPrizeReceivedQuantities] = useState<PrizeReceivedQuantities>({});
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open && shipment) {
       setDeliveryDate(format(new Date(), "yyyy-MM-dd"));
 
-      // Initialize each item with one default allocation and zero for non-inventory quantities
       const initialAllocations: ItemAllocations = {};
       const initialDamaged: DamagedQuantities = {};
       const initialDisplay: DisplayQuantities = {};
       const initialShop: ShopQuantities = {};
+      const initialPrizeQtys: PrizeReceivedQuantities = {};
       shipment.items.forEach((item) => {
-        // Remaining = ordered - received - already accounted for (damaged, display, shop)
         const remaining = item.orderedQuantity - item.receivedQuantity -
           (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
-        initialAllocations[item.id] = [
-          {
-            id: crypto.randomUUID(),
-            locationType: LocationType.NOT_ASSIGNED,
-            locationId: "",
-            quantity: remaining > 0 ? remaining : 0,
-          },
-        ];
+        const isPrize = !!item.item.parentId;
+        if (isPrize) {
+          initialPrizeQtys[item.id] = remaining > 0 ? remaining : 0;
+        } else {
+          initialAllocations[item.id] = [
+            {
+              id: crypto.randomUUID(),
+              locationType: LocationType.NOT_ASSIGNED,
+              locationId: "",
+              quantity: remaining > 0 ? remaining : 0,
+            },
+          ];
+        }
         initialDamaged[item.id] = 0;
         initialDisplay[item.id] = 0;
         initialShop[item.id] = 0;
@@ -242,6 +254,7 @@ export function ShipmentReceiveDialog({
       setDamagedQuantities(initialDamaged);
       setDisplayQuantities(initialDisplay);
       setShopQuantities(initialShop);
+      setPrizeReceivedQuantities(initialPrizeQtys);
     }
   }, [open, shipment]);
 
@@ -289,6 +302,19 @@ export function ShipmentReceiveDialog({
     );
   };
 
+  /** For prizes we use prizeReceivedQuantities (same location as parent); for roots use itemAllocations. */
+  const getEffectiveTotalAllocated = (item: ShipmentItem) => {
+    if (item.item.parentId) return prizeReceivedQuantities[item.id] ?? 0;
+    return getTotalAllocated(item.id);
+  };
+
+  const setPrizeReceivedQuantity = (shipmentItemId: string, quantity: number) => {
+    setPrizeReceivedQuantities((prev) => ({
+      ...prev,
+      [shipmentItemId]: Math.max(0, quantity),
+    }));
+  };
+
   const getDamagedQuantity = (itemId: string) => {
     return damagedQuantities[itemId] || 0;
   };
@@ -323,15 +349,14 @@ export function ShipmentReceiveDialog({
   };
 
   const hasAnyToReceive = shipment.items.some(
-    (item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0 ||
+    (item) => getEffectiveTotalAllocated(item) > 0 || getDamagedQuantity(item.id) > 0 ||
       getDisplayQuantity(item.id) > 0 || getShopQuantity(item.id) > 0
   );
 
   const hasValidationErrors = shipment.items.some((item) => {
-    // Remaining = ordered - already received - already accounted for
     const remaining = item.orderedQuantity - item.receivedQuantity -
       (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
-    const allocated = getTotalAllocated(item.id);
+    const allocated = getEffectiveTotalAllocated(item);
     const damaged = getDamagedQuantity(item.id);
     const display = getDisplayQuantity(item.id);
     const shop = getShopQuantity(item.id);
@@ -348,25 +373,50 @@ export function ShipmentReceiveDialog({
     }
 
     const itemReceipts: ShipmentItemReceipt[] = shipment.items
-      .filter((item) => getTotalAllocated(item.id) > 0 || getDamagedQuantity(item.id) > 0 ||
+      .filter((item) => getEffectiveTotalAllocated(item) > 0 || getDamagedQuantity(item.id) > 0 ||
         getDisplayQuantity(item.id) > 0 || getShopQuantity(item.id) > 0)
       .map((item) => {
-        const allocations: DestinationAllocation[] = (
-          itemAllocations[item.id] || []
-        )
-          .filter((a) => a.quantity > 0)
-          .map((a) => ({
-            locationType: a.locationType,
-            locationId:
-              a.locationType === LocationType.NOT_ASSIGNED
-                ? undefined
-                : a.locationId || undefined,
-            quantity: a.quantity,
-          }));
-
         const damaged = getDamagedQuantity(item.id);
         const display = getDisplayQuantity(item.id);
         const shop = getShopQuantity(item.id);
+        let allocations: DestinationAllocation[];
+
+        if (item.item.parentId) {
+          // Prize: use parent shipment item's location(s) with this prize's quantity (itemAllocations is keyed by shipment item id)
+          const parentShipmentItem = shipment.items.find((i) => i.item.id === item.item.parentId);
+          const parentAllocations = (parentShipmentItem ? (itemAllocations[parentShipmentItem.id] || []) : []).filter((a) => a.quantity > 0);
+          const prizeQty = prizeReceivedQuantities[item.id] ?? 0;
+          if (prizeQty <= 0) {
+            allocations = [];
+          } else if (parentAllocations.length === 0) {
+            // No parent in shipment or parent has no allocations - default to NOT_ASSIGNED
+            allocations = [
+              {
+                locationType: LocationType.NOT_ASSIGNED,
+                locationId: undefined,
+                quantity: prizeQty,
+              },
+            ];
+          } else {
+            // Same location(s) as parent; for single-destination we use prize qty; if multiple we put all prize qty in first (or split - here we use first only for simplicity)
+            const first = parentAllocations[0];
+            allocations = [
+              {
+                locationType: first.locationType,
+                locationId: first.locationType === LocationType.NOT_ASSIGNED ? undefined : first.locationId || undefined,
+                quantity: prizeQty,
+              },
+            ];
+          }
+        } else {
+          allocations = (itemAllocations[item.id] || [])
+            .filter((a) => a.quantity > 0)
+            .map((a) => ({
+              locationType: a.locationType,
+              locationId: a.locationType === LocationType.NOT_ASSIGNED ? undefined : a.locationId || undefined,
+              quantity: a.quantity,
+            }));
+        }
 
         return {
           shipmentItemId: item.id,
@@ -452,10 +502,125 @@ export function ShipmentReceiveDialog({
 
           <div className="space-y-4">
             {shipment.items.map((item) => {
-              // Remaining = ordered - received - already accounted for
               const remaining = item.orderedQuantity - item.receivedQuantity -
                 (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
               const isComplete = remaining <= 0;
+              const isPrize = !!item.item.parentId;
+
+              if (isPrize) {
+                // Prize: own block, quantity to receive only (no location selector; uses parent's location on submit)
+                const prizeQty = prizeReceivedQuantities[item.id] ?? 0;
+                const prizeLabel = (item.item as { letter?: string | null }).letter
+                  ? `Prize ${(item.item as { letter?: string | null }).letter}`
+                  : item.item.name;
+                const damaged = getDamagedQuantity(item.id);
+                const display = getDisplayQuantity(item.id);
+                const shop = getShopQuantity(item.id);
+                const isOver = (prizeQty + damaged + display + shop) > remaining;
+                const prizeImageUrl = item.item?.imageUrl;
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-lg border p-4 ${isComplete ? "opacity-50" : ""}`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                      <div className="flex items-start gap-3">
+                        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                          {prizeImageUrl ? (
+                            <Image
+                              src={prizeImageUrl}
+                              alt={prizeLabel}
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{prizeLabel}</div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            {item.item.sku}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div>Ordered: <span className="font-medium">{item.orderedQuantity}</span></div>
+                        <div>Received: <span className="font-medium">{item.receivedQuantity}</span></div>
+                        <div>Remaining: <span className="font-medium text-primary">{remaining}</span></div>
+                      </div>
+                    </div>
+                    {!isComplete && (
+                      <>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Quantity to receive (uses parent Kuji&apos;s receive location)
+                          {isOver && (
+                            <span className="text-destructive font-medium ml-1">
+                              — exceeds remaining by {prizeQty + damaged + display + shop - remaining}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">Quantity:</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={remaining}
+                            value={prizeQty}
+                            onChange={(e) => {
+                              const num = parseInt(e.target.value, 10);
+                              setPrizeReceivedQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                            }}
+                            className="w-20 h-8 text-xs text-right"
+                          />
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Label className="text-xs text-muted-foreground w-16">Damaged:</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={remaining}
+                              value={getDamagedQuantity(item.id)}
+                              onChange={(e) => {
+                                const num = parseInt(e.target.value, 10);
+                                setDamagedQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                              }}
+                              className="w-16 h-8 text-xs text-right"
+                            />
+                            <Label className="text-xs text-muted-foreground w-16">Display:</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={remaining}
+                              value={getDisplayQuantity(item.id)}
+                              onChange={(e) => {
+                                const num = parseInt(e.target.value, 10);
+                                setDisplayQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                              }}
+                              className="w-16 h-8 text-xs text-right"
+                            />
+                            <Label className="text-xs text-muted-foreground w-16">Shop:</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={remaining}
+                              value={getShopQuantity(item.id)}
+                              onChange={(e) => {
+                                const num = parseInt(e.target.value, 10);
+                                setShopQuantity(item.id, Number.isNaN(num) ? 0 : num);
+                              }}
+                              className="w-16 h-8 text-xs text-right"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+
+              // Root item (parent Kuji or standalone): full allocation UI with location selector(s)
               const allocated = getTotalAllocated(item.id);
               const damaged = getDamagedQuantity(item.id);
               const display = getDisplayQuantity(item.id);
@@ -463,49 +628,48 @@ export function ShipmentReceiveDialog({
               const totalNonInventory = damaged + display + shop;
               const isOverAllocated = (allocated + totalNonInventory) > remaining;
               const allocations = itemAllocations[item.id] || [];
+              const itemImageUrl = item.item?.imageUrl;
 
               return (
                 <div
                   key={item.id}
-                  className={`rounded-lg border p-4 ${
-                    isComplete ? "opacity-50" : ""
-                  }`}
+                  className={`rounded-lg border p-4 ${isComplete ? "opacity-50" : ""}`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                    <div>
-                      <div className="font-medium">{item.item.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        {item.item.sku}
+                    <div className="flex items-start gap-3">
+                      <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                        {itemImageUrl ? (
+                          <Image
+                            src={itemImageUrl}
+                            alt={item.item.name}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium">{item.item.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {item.item.sku}
+                        </div>
                       </div>
                     </div>
                     <div className="text-right text-sm">
-                      <div>
-                        Ordered: <span className="font-medium">{item.orderedQuantity}</span>
-                      </div>
-                      <div>
-                        Received: <span className="font-medium">{item.receivedQuantity}</span>
-                      </div>
+                      <div>Ordered: <span className="font-medium">{item.orderedQuantity}</span></div>
+                      <div>Received: <span className="font-medium">{item.receivedQuantity}</span></div>
                       {(item.damagedQuantity || 0) > 0 && (
-                        <div>
-                          Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span>
-                        </div>
+                        <div>Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span></div>
                       )}
                       {(item.displayQuantity || 0) > 0 && (
-                        <div>
-                          Display: <span className="font-medium text-blue-600">{item.displayQuantity}</span>
-                        </div>
+                        <div>Display: <span className="font-medium text-blue-600">{item.displayQuantity}</span></div>
                       )}
                       {(item.shopQuantity || 0) > 0 && (
-                        <div>
-                          Shop: <span className="font-medium text-green-600">{item.shopQuantity}</span>
-                        </div>
+                        <div>Shop: <span className="font-medium text-green-600">{item.shopQuantity}</span></div>
                       )}
-                      <div>
-                        Remaining:{" "}
-                        <span className="font-medium text-primary">
-                          {remaining}
-                        </span>
-                      </div>
+                      <div>Remaining: <span className="font-medium text-primary">{remaining}</span></div>
                     </div>
                   </div>
 
@@ -513,11 +677,7 @@ export function ShipmentReceiveDialog({
                     <>
                       <div className="text-xs text-muted-foreground mb-2">
                         Allocations{" "}
-                        <span
-                          className={
-                            isOverAllocated ? "text-destructive font-medium" : ""
-                          }
-                        >
+                        <span className={isOverAllocated ? "text-destructive font-medium" : ""}>
                           (Good: {allocated}
                           {damaged > 0 && <>, <span className="text-amber-600">Damaged: {damaged}</span></>}
                           {display > 0 && <>, <span className="text-blue-600">Display: {display}</span></>}
@@ -525,24 +685,18 @@ export function ShipmentReceiveDialog({
                           {isOverAllocated && ` — exceeds remaining by ${allocated + totalNonInventory - remaining}`})
                         </span>
                       </div>
-
                       <div className="space-y-1 pl-2 border-l-2 border-muted">
                         {allocations.map((allocation) => (
                           <AllocationRow
                             key={allocation.id}
                             allocation={allocation}
                             maxQuantity={remaining}
-                            onUpdate={(updates) =>
-                              updateAllocation(item.id, allocation.id, updates)
-                            }
-                            onRemove={() =>
-                              removeAllocation(item.id, allocation.id)
-                            }
+                            onUpdate={(updates) => updateAllocation(item.id, allocation.id, updates)}
+                            onRemove={() => removeAllocation(item.id, allocation.id)}
                             canRemove={allocations.length > 1}
                           />
                         ))}
                       </div>
-
                       <Button
                         type="button"
                         variant="ghost"
@@ -553,12 +707,9 @@ export function ShipmentReceiveDialog({
                         <Plus className="h-3 w-3 mr-1" />
                         Add destination
                       </Button>
-
                       <div className="mt-3 pt-3 border-t space-y-2">
                         <div className="flex items-center gap-3">
-                          <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                            Damaged:
-                          </Label>
+                          <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Damaged:</Label>
                           <Input
                             id={`damaged-${item.id}`}
                             type="number"
@@ -572,15 +723,11 @@ export function ShipmentReceiveDialog({
                             className="w-20 h-8 text-xs text-right"
                           />
                           {getDamagedQuantity(item.id) > 0 && (
-                            <span className="text-xs text-amber-600">
-                              Won&apos;t be added to inventory
-                            </span>
+                            <span className="text-xs text-amber-600">Won&apos;t be added to inventory</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <Label htmlFor={`display-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                            Display:
-                          </Label>
+                          <Label htmlFor={`display-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Display:</Label>
                           <Input
                             id={`display-${item.id}`}
                             type="number"
@@ -594,15 +741,11 @@ export function ShipmentReceiveDialog({
                             className="w-20 h-8 text-xs text-right"
                           />
                           {getDisplayQuantity(item.id) > 0 && (
-                            <span className="text-xs text-blue-600">
-                              For display use
-                            </span>
+                            <span className="text-xs text-blue-600">For display use</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <Label htmlFor={`shop-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">
-                            Shop:
-                          </Label>
+                          <Label htmlFor={`shop-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Shop:</Label>
                           <Input
                             id={`shop-${item.id}`}
                             type="number"
@@ -616,9 +759,7 @@ export function ShipmentReceiveDialog({
                             className="w-20 h-8 text-xs text-right"
                           />
                           {getShopQuantity(item.id) > 0 && (
-                            <span className="text-xs text-green-600">
-                              For shop use
-                            </span>
+                            <span className="text-xs text-green-600">For shop use</span>
                           )}
                         </div>
                       </div>

@@ -23,5 +23,7 @@ public interface CabinetInventoryRepository extends JpaRepository<CabinetInvento
 
     @Query("SELECT SUM(i.quantity) FROM CabinetInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

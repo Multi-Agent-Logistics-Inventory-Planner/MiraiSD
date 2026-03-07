@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
   [StockMovementReason.RESTOCK]: "Restock",
+  [StockMovementReason.SHIPMENT_RECEIPT]: "Shipment",
   [StockMovementReason.SALE]: "Sale",
   [StockMovementReason.DAMAGE]: "Damage",
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
@@ -36,6 +37,7 @@ function getReasonStyle(reason: StockMovementReason): string {
   switch (reason) {
     case StockMovementReason.RESTOCK:
     case StockMovementReason.INITIAL_STOCK:
+    case StockMovementReason.SHIPMENT_RECEIPT:
       return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400";
     case StockMovementReason.TRANSFER:
       return "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400";

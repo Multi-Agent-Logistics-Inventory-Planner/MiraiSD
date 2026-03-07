@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.dtos.requests;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,8 +19,15 @@ import java.util.UUID;
 public class ProductRequestDTO {
     private String sku;
 
-    @NotNull(message = "Category is required")
+    /** Required for root products. Optional for prizes (inherits from parent). */
     private UUID categoryId;
+
+    // Optional parent ID for creating child products (e.g., Kuji prizes)
+    private UUID parentId;
+
+    /** Prize letter for Kuji children (e.g., A, B, C). Max 2 chars. */
+    @Size(max = 2)
+    private String letter;
 
     @NotBlank(message = "Name is required")
     private String name;

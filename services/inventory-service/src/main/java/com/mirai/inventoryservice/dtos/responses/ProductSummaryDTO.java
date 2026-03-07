@@ -17,4 +17,9 @@ public class ProductSummaryDTO {
     private String name;
     private CategoryResponseDTO category;
     private String imageUrl;
+    private Boolean isActive;
+    private Integer quantity;
+    private UUID parentId;
+    private String letter;
+    private Boolean hasChildren;
 }

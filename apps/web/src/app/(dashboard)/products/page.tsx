@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ProductHeader,
@@ -23,7 +24,9 @@ import { useCategories } from "@/hooks/queries/use-categories";
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
-  const list = useProductInventory();
+  const router = useRouter();
+  // Show only root products (no parent) by default
+  const list = useProductInventory(true);
   const { data: categories } = useCategories();
 
   const [filters, setFilters] = useState<ProductFiltersState>(
@@ -77,7 +80,29 @@ export default function ProductsPage() {
     setPage(0);
   };
 
+  // Helper to check if a product is in the Kuji category
+  const isKujiProduct = (row: ProductWithInventory) => {
+    const catName = row.product.category.name.toLowerCase();
+    const catSlug = row.product.category.slug?.toLowerCase();
+    // Check if it's the Kuji category or a child of Kuji
+    if (catName === "kuji" || catSlug === "kuji") return true;
+    // Check parent category
+    const parentCat = categories?.find((c) =>
+      c.children.some((child) => child.id === row.product.category.id)
+    );
+    if (parentCat?.name.toLowerCase() === "kuji" || parentCat?.slug?.toLowerCase() === "kuji") {
+      return true;
+    }
+    return false;
+  };
+
   const handleSelect = (row: ProductWithInventory) => {
+    // Navigate to detail page for Kuji products (to manage prizes)
+    if (row.product.hasChildren || isKujiProduct(row)) {
+      router.push(`/products/${row.product.id}`);
+      return;
+    }
+    // Open modal for regular products
     setSelected(row);
     setDetailOpen(true);
   };

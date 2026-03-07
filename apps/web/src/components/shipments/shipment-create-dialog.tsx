@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueries } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon,
   Check,
@@ -36,19 +37,19 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
+import { getProductChildren } from "@/lib/api/products";
 import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { ProductForm } from "@/components/products/product-form";
 import {
   ShipmentStatus,
   type Product,
   type ShipmentItemRequest,
+  type ProductSummary,
 } from "@/types/api";
 
 const itemSchema = z.object({
@@ -58,8 +59,10 @@ const itemSchema = z.object({
   orderedQuantity: z.coerce
     .number()
     .int()
-    .min(1, "Quantity must be at least 1"),
+    .min(0, "Quantity must be 0 or more"),
   unitCost: z.coerce.number().min(0).optional(),
+  /** When Kuji is selected: quantity per prize (prizeId -> quantity) */
+  prizeQuantities: z.record(z.string(), z.coerce.number().int().min(0)).optional(),
 });
 
 const schema = z.object({
@@ -87,14 +90,12 @@ export function ShipmentCreateDialog({
   const { toast } = useToast();
   const { user } = useAuth();
   const createMutation = useCreateShipmentMutation();
-  const productsQuery = useProducts();
+  const productsQuery = useProducts({ rootOnly: true });
   const products = productsQuery.data ?? [];
 
-  const [productFormOpen, setProductFormOpen] = useState(false);
   const [comboOpenIndex, setComboOpenIndex] = useState<number | null>(null);
-  // Track which item index triggered "Create New Product" and previous product count
-  const pendingProductSelectIndex = useRef<number | null>(null);
-  const previousProductCount = useRef<number>(0);
+  // Track selected product IDs in state to ensure re-renders when products are selected
+  const [selectedProductIds, setSelectedProductIds] = useState<Record<number, string>>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -113,6 +114,7 @@ export function ShipmentCreateDialog({
           productSku: "",
           orderedQuantity: 1,
           unitCost: undefined,
+          prizeQuantities: undefined,
         },
       ],
     },
@@ -121,6 +123,23 @@ export function ShipmentCreateDialog({
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
+  });
+
+  const items = form.watch("items");
+  // Derive kuji IDs from state for immediate reactivity
+  const selectedKujiIds = Object.values(selectedProductIds).filter((id): id is string => !!id);
+  const childrenQueries = useQueries({
+    queries: selectedKujiIds.map((id) => ({
+      queryKey: ["products", id, "children"],
+      queryFn: () => getProductChildren(id),
+    })),
+  });
+  // Compute children map directly - no useMemo needed for this simple derivation
+  // This ensures reactivity when queries complete
+  const childrenByProductId: Record<string, ProductSummary[]> = {};
+  selectedKujiIds.forEach((id, i) => {
+    const data = childrenQueries[i]?.data;
+    if (data?.length) childrenByProductId[id] = data;
   });
 
   // Reset form when dialog opens
@@ -141,36 +160,37 @@ export function ShipmentCreateDialog({
             productSku: "",
             orderedQuantity: 1,
             unitCost: undefined,
+            prizeQuantities: undefined,
           },
         ],
       });
-      pendingProductSelectIndex.current = null;
+      // Reset selected product IDs state
+      setSelectedProductIds({});
     }
   }, [open, form]);
 
-  // Auto-select newly created product
+  // When children load for a Kuji, init prizeQuantities for that item row
   useEffect(() => {
-    const itemIndex = pendingProductSelectIndex.current;
-    if (
-      itemIndex !== null &&
-      !productFormOpen &&
-      products.length > previousProductCount.current
-    ) {
-      // Find the newest product (most recently created)
-      const newestProduct = products.reduce((newest, current) => {
-        if (!newest) return current;
-        return new Date(current.createdAt) > new Date(newest.createdAt)
-          ? current
-          : newest;
-      }, products[0]);
-
-      if (newestProduct) {
-        handleSelectProduct(itemIndex, newestProduct);
+    items?.forEach((item, index) => {
+      const pid = item.productId;
+      if (!pid) return;
+      const children = childrenByProductId[pid];
+      if (!children?.length) return;
+      const current = item.prizeQuantities ?? {};
+      const next: Record<string, number> = {};
+      children.forEach((c) => {
+        next[c.id] = current[c.id] ?? 0;
+      });
+      if (
+        children.some((c) => current[c.id] === undefined) ||
+        Object.keys(next).length !== Object.keys(current).length
+      ) {
+        form.setValue(`items.${index}.prizeQuantities`, next, {
+          shouldValidate: false,
+        });
       }
-      pendingProductSelectIndex.current = null;
-    }
-    previousProductCount.current = products.length;
-  }, [products, productFormOpen]);
+    });
+  }, [childrenByProductId, form, items]);
 
   function generateShipmentNumber() {
     const date = new Date();
@@ -187,18 +207,42 @@ export function ShipmentCreateDialog({
     form.setValue(`items.${index}.productId`, product.id);
     form.setValue(`items.${index}.productName`, product.name);
     form.setValue(`items.${index}.productSku`, product.sku ?? "");
+    form.setValue(`items.${index}.prizeQuantities`, undefined);
     if (product.unitCost) {
       form.setValue(`items.${index}.unitCost`, product.unitCost);
     }
+    // Update state to trigger re-render and fetch children
+    setSelectedProductIds((prev) => ({ ...prev, [index]: product.id }));
     setComboOpenIndex(null);
   }
 
   async function onSubmit(values: FormValues) {
-    const items: ShipmentItemRequest[] = values.items.map((item) => ({
-      itemId: item.productId,
-      orderedQuantity: item.orderedQuantity,
-      unitCost: item.unitCost,
-    }));
+    const items: ShipmentItemRequest[] = [];
+    for (const item of values.items) {
+      if (!item.productId) continue;
+      const parentQty = item.orderedQuantity ?? 0;
+      if (parentQty > 0) {
+        items.push({
+          itemId: item.productId,
+          orderedQuantity: parentQty,
+          unitCost: item.unitCost,
+        });
+      }
+      const prizeQuantities = item.prizeQuantities ?? {};
+      for (const [prizeId, qty] of Object.entries(prizeQuantities)) {
+        if (qty > 0) {
+          items.push({
+            itemId: prizeId,
+            orderedQuantity: qty,
+            unitCost: undefined,
+          });
+        }
+      }
+    }
+    if (items.length === 0) {
+      toast({ title: "Error", description: "Add at least one item with quantity." });
+      return;
+    }
 
     try {
       await createMutation.mutateAsync({
@@ -391,46 +435,24 @@ export function ShipmentCreateDialog({
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <Label>Items</Label>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newIndex = fields.length;
-                        append({
-                          productId: "",
-                          productName: "",
-                          productSku: "",
-                          orderedQuantity: 1,
-                          unitCost: undefined,
-                        });
-                        pendingProductSelectIndex.current = newIndex;
-                        previousProductCount.current = products.length;
-                        setProductFormOpen(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Create Product
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        append({
-                          productId: "",
-                          productName: "",
-                          productSku: "",
-                          orderedQuantity: 1,
-                          unitCost: undefined,
-                        })
-                      }
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Item
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      append({
+                        productId: "",
+                        productName: "",
+                        productSku: "",
+                        orderedQuantity: 1,
+                        unitCost: undefined,
+                        prizeQuantities: undefined,
+                      })
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
                 </div>
 
                 {form.formState.errors.items?.message && (
@@ -535,10 +557,14 @@ export function ShipmentCreateDialog({
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="grid gap-2">
-                              <Label className="text-xs">Quantity</Label>
+                              <Label className="text-xs">
+                                {childrenByProductId[selectedProductId]?.length
+                                  ? "Total Kuji (sets)"
+                                  : "Quantity"}
+                              </Label>
                               <Input
                                 type="number"
-                                min={1}
+                                min={0}
                                 {...form.register(
                                   `items.${index}.orderedQuantity`,
                                 )}
@@ -564,6 +590,42 @@ export function ShipmentCreateDialog({
                               />
                             </div>
                           </div>
+
+                          {childrenByProductId[selectedProductId]?.length ? (
+                            <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+                              <Label className="text-xs">
+                                Prize quantities (incoming per prize)
+                              </Label>
+                              <div className="grid gap-2">
+                                {childrenByProductId[
+                                  selectedProductId
+                                ]?.map((prize) => (
+                                  <div
+                                    key={prize.id}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="text-sm font-medium w-8">
+                                      {prize.letter ?? prize.name.slice(0, 1)}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground flex-1 truncate">
+                                      {prize.name}
+                                    </span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      className="w-20"
+                                      {...form.register(
+                                        `items.${index}.prizeQuantities.${prize.id}`,
+                                        { setValueAs: (v) =>
+                                          Math.max(0, parseInt(String(v), 10) || 0),
+                                        }
+                                      )}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
 
                         {fields.length > 1 && (
@@ -612,12 +674,6 @@ export function ShipmentCreateDialog({
           </form>
         </DialogContent>
       </Dialog>
-
-      <ProductForm
-        open={productFormOpen}
-        onOpenChange={setProductFormOpen}
-        initialProduct={null}
-      />
     </>
   );
 }
