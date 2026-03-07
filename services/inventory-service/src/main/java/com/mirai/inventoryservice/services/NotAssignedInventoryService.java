@@ -63,7 +63,7 @@ public class NotAssignedInventoryService {
     }
 
     public List<NotAssignedInventory> listInventory() {
-        return notAssignedInventoryRepository.findAll();
+        return notAssignedInventoryRepository.findAllWithProduct();
     }
 
     public List<NotAssignedInventory> findByProduct(UUID productId) {

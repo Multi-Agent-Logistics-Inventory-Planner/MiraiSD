@@ -40,6 +40,25 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "WHERE s.id = :id")
     Optional<Shipment> findByIdWithAssociations(@Param("id") UUID id);
 
+    // Non-paginated list with JOIN FETCH to avoid N+1 (for legacy API calls)
+    @Query("SELECT DISTINCT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "LEFT JOIN FETCH s.items si " +
+            "LEFT JOIN FETCH si.item " +
+            "ORDER BY s.createdAt DESC")
+    List<Shipment> findAllWithAssociationsList();
+
+    // Non-paginated list by status with JOIN FETCH
+    @Query("SELECT DISTINCT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "LEFT JOIN FETCH s.items si " +
+            "LEFT JOIN FETCH si.item " +
+            "WHERE s.status = :status " +
+            "ORDER BY s.createdAt DESC")
+    List<Shipment> findByStatusWithAssociationsList(@Param("status") ShipmentStatus status);
+
     // Paginated queries with JOIN FETCH to avoid N+1
     @Query(value = "SELECT DISTINCT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +

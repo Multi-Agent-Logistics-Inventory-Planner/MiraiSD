@@ -203,11 +203,11 @@ public class ShipmentService {
     }
 
     public List<Shipment> listShipments() {
-        return shipmentRepository.findAll();
+        return shipmentRepository.findAllWithAssociationsList();
     }
 
     public List<Shipment> listShipmentsByStatus(ShipmentStatus status) {
-        return shipmentRepository.findByStatusOrderByCreatedAtDesc(status);
+        return shipmentRepository.findByStatusWithAssociationsList(status);
     }
 
     public Page<Shipment> listShipmentsPaged(ShipmentStatus status, String search, Pageable pageable) {

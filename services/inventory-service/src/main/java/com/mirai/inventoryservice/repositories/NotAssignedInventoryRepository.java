@@ -16,6 +16,14 @@ public interface NotAssignedInventoryRepository extends JpaRepository<NotAssigne
 
     Optional<NotAssignedInventory> findByItem_Id(UUID productId);
 
+    // Optimized query with JOIN FETCH to avoid N+1 on Product
+    @Query("SELECT n FROM NotAssignedInventory n " +
+            "LEFT JOIN FETCH n.item i " +
+            "LEFT JOIN FETCH i.category c " +
+            "LEFT JOIN FETCH c.parent " +
+            "ORDER BY i.name")
+    List<NotAssignedInventory> findAllWithProduct();
+
     @Query("SELECT SUM(i.quantity) FROM NotAssignedInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
 
