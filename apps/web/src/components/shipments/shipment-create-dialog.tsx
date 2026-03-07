@@ -42,6 +42,7 @@ import { cn, prizeLetterDisplay } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
+import { ProductForm } from "@/components/products/product-form";
 import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -96,6 +97,7 @@ export function ShipmentCreateDialog({
   const [comboOpenIndex, setComboOpenIndex] = useState<number | null>(null);
   // Track selected product IDs in state to ensure re-renders when products are selected
   const [selectedProductIds, setSelectedProductIds] = useState<Record<number, string>>({});
+  const [addProductOpen, setAddProductOpen] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -281,6 +283,26 @@ export function ShipmentCreateDialog({
 
   return (
     <>
+      <ProductForm
+        open={addProductOpen}
+        onOpenChange={setAddProductOpen}
+        onProductCreated={(product) => {
+          // Add the new product as a line item in the shipment
+          append({
+            productId: product.id,
+            productName: product.name,
+            productSku: product.sku ?? "",
+            orderedQuantity: 1,
+            unitCost: product.unitCost ?? undefined,
+            prizeQuantities: undefined,
+          });
+          // Track for children query
+          setSelectedProductIds((prev) => ({
+            ...prev,
+            [fields.length]: product.id,
+          }));
+        }}
+      />
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
           <DialogHeader className="p-4 sm:p-6">
@@ -435,24 +457,35 @@ export function ShipmentCreateDialog({
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <Label>Items</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      append({
-                        productId: "",
-                        productName: "",
-                        productSku: "",
-                        orderedQuantity: 1,
-                        unitCost: undefined,
-                        prizeQuantities: undefined,
-                      })
-                    }
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddProductOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Product
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        append({
+                          productId: "",
+                          productName: "",
+                          productSku: "",
+                          orderedQuantity: 1,
+                          unitCost: undefined,
+                          prizeQuantities: undefined,
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Item
+                    </Button>
+                  </div>
                 </div>
 
                 {form.formState.errors.items?.message && (

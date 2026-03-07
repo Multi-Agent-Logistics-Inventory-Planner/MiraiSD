@@ -77,6 +77,8 @@ interface ProductFormProps {
   parentId?: string | null;
   /** Parent product name for display */
   parentName?: string | null;
+  /** Callback when a new product is created */
+  onProductCreated?: (product: Product) => void;
 }
 
 export function ProductForm({
@@ -85,6 +87,7 @@ export function ProductForm({
   initialProduct,
   parentId,
   parentName,
+  onProductCreated,
 }: ProductFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -256,6 +259,7 @@ export function ProductForm({
       } else {
         const newProduct = await createMutation.mutateAsync(payload);
         toast({ title: "Product created" });
+        onProductCreated?.(newProduct);
 
         // Optionally add initial stock after product creation
         if (initialStockEnabled && initialStockQty === "") {
