@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .. import config
 
@@ -17,6 +19,29 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 INITIAL_BACKOFF_SECONDS = 2
 BACKOFF_MULTIPLIER = 2
+
+# Reusable session with connection pooling
+_session: requests.Session | None = None
+
+
+def _get_session() -> requests.Session:
+    """Get or create a reusable requests session with connection pooling."""
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        # Configure retry strategy for transient errors
+        retry_strategy = Retry(
+            total=2,
+            backoff_factor=1,
+            status_forcelist=[502, 503, 504],
+        )
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=2,
+            pool_maxsize=2,
+        )
+        _session.mount("https://", adapter)
+    return _session
 
 
 @dataclass
@@ -121,11 +146,13 @@ class ApifyClient:
             "personalData": True,
         }
 
-        response = requests.post(
+        # Use shared session for connection reuse, 2-minute timeout (was 5 min)
+        session = _get_session()
+        response = session.post(
             run_url,
             json=payload,
             headers=headers,
-            timeout=300,
+            timeout=120,
         )
         response.raise_for_status()
         items = response.json()

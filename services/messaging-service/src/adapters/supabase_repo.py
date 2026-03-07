@@ -122,8 +122,9 @@ class SupabaseRepo:
             self._engine = create_engine(
                 _build_connection_url(),
                 pool_pre_ping=True,
-                pool_size=1,
-                max_overflow=2,
+                pool_size=10,
+                max_overflow=20,
+                pool_timeout=30,  # Fail after 30s instead of hanging indefinitely
             )
 
     def get_product_with_inventory(self, product_id: str) -> Product | None:
@@ -135,23 +136,14 @@ class SupabaseRepo:
         Returns:
             Product with current inventory quantity, or None if not found
         """
+        # Use the database function for efficient inventory calculation
         query = """
             SELECT
                 p.id,
                 p.name,
                 p.sku,
                 COALESCE(p.reorder_point, 0) AS reorder_point,
-                COALESCE(
-                    (SELECT COALESCE(SUM(quantity), 0) FROM rack_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM box_bin_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM cabinet_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM keychain_machine_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM single_claw_machine_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM double_claw_machine_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM four_corner_machine_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM pusher_machine_inventory WHERE item_id = p.id) +
-                    (SELECT COALESCE(SUM(quantity), 0) FROM not_assigned_inventory WHERE item_id = p.id)
-                , 0) AS current_quantity
+                calculate_total_inventory(p.id) AS current_quantity
             FROM products p
             WHERE p.id = :product_id
         """
