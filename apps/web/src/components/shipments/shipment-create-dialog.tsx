@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -94,6 +94,8 @@ export function ShipmentCreateDialog({
   const products = productsQuery.data ?? [];
 
   const [comboOpenIndex, setComboOpenIndex] = useState<number | null>(null);
+  // Track selected product IDs in state to ensure re-renders when products are selected
+  const [selectedProductIds, setSelectedProductIds] = useState<Record<number, string>>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -124,27 +126,21 @@ export function ShipmentCreateDialog({
   });
 
   const items = form.watch("items");
-  const selectedKujiIds = useMemo(
-    () =>
-      (items ?? [])
-        .map((i) => i.productId)
-        .filter((id): id is string => !!id),
-    [items]
-  );
+  // Derive kuji IDs from state for immediate reactivity
+  const selectedKujiIds = Object.values(selectedProductIds).filter((id): id is string => !!id);
   const childrenQueries = useQueries({
     queries: selectedKujiIds.map((id) => ({
       queryKey: ["products", id, "children"],
       queryFn: () => getProductChildren(id),
     })),
   });
-  const childrenByProductId = useMemo(() => {
-    const map: Record<string, ProductSummary[]> = {};
-    selectedKujiIds.forEach((id, i) => {
-      const data = childrenQueries[i]?.data;
-      if (data?.length) map[id] = data;
-    });
-    return map;
-  }, [selectedKujiIds, childrenQueries]);
+  // Compute children map directly - no useMemo needed for this simple derivation
+  // This ensures reactivity when queries complete
+  const childrenByProductId: Record<string, ProductSummary[]> = {};
+  selectedKujiIds.forEach((id, i) => {
+    const data = childrenQueries[i]?.data;
+    if (data?.length) childrenByProductId[id] = data;
+  });
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -168,6 +164,8 @@ export function ShipmentCreateDialog({
           },
         ],
       });
+      // Reset selected product IDs state
+      setSelectedProductIds({});
     }
   }, [open, form]);
 
@@ -213,6 +211,8 @@ export function ShipmentCreateDialog({
     if (product.unitCost) {
       form.setValue(`items.${index}.unitCost`, product.unitCost);
     }
+    // Update state to trigger re-render and fetch children
+    setSelectedProductIds((prev) => ({ ...prev, [index]: product.id }));
     setComboOpenIndex(null);
   }
 
