@@ -12,3 +12,11 @@ export function cn(...inputs: ClassValue[]) {
 export function naturalSortCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 }
+
+/** Display form of prize letter: "Last Prize" (or truncated "La") → "LP", otherwise the letter as-is. */
+export function prizeLetterDisplay(letter: string | null | undefined): string {
+  if (letter == null || letter === "") return "";
+  const normalized = letter.trim().toLowerCase();
+  if (normalized === "last prize" || normalized === "la") return "LP";
+  return letter;
+}

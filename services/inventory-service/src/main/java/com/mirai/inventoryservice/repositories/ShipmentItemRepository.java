@@ -12,4 +12,6 @@ public interface ShipmentItemRepository extends JpaRepository<ShipmentItem, UUID
     List<ShipmentItem> findByShipment_Id(UUID shipmentId);
 
     List<ShipmentItem> findByItem_Id(UUID productId);
+
+    long countByItem_Id(UUID productId);
 }

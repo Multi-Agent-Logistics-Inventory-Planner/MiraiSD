@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, prizeLetterDisplay } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -510,8 +510,9 @@ export function ShipmentReceiveDialog({
               if (isPrize) {
                 // Prize: own block, quantity to receive only (no location selector; uses parent's location on submit)
                 const prizeQty = prizeReceivedQuantities[item.id] ?? 0;
-                const prizeLabel = (item.item as { letter?: string | null }).letter
-                  ? `Prize ${(item.item as { letter?: string | null }).letter}`
+                const letter = (item.item as { letter?: string | null }).letter;
+                const prizeLabel = letter
+                  ? `Prize ${prizeLetterDisplay(letter)}`
                   : item.item.name;
                 const damaged = getDamagedQuantity(item.id);
                 const display = getDisplayQuantity(item.id);

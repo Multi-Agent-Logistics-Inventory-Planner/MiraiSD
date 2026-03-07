@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
+import { prizeLetterDisplay } from "@/lib/utils";
 import { getTracking, type TrackingLookupResponse } from "@/lib/api/tracking";
 
 interface ShipmentDetailSheetProps {
@@ -233,8 +234,9 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
           <p className="text-xs font-medium text-muted-foreground">Prizes</p>
           {prizeItems.map((prize) => {
             const lineTotal = prize.unitCost ? prize.orderedQuantity * prize.unitCost : undefined;
-            const prizeLabel = (prize.item as { letter?: string | null }).letter
-              ? `Prize ${(prize.item as { letter?: string | null }).letter}`
+            const letter = (prize.item as { letter?: string | null }).letter;
+            const prizeLabel = letter
+              ? `Prize ${prizeLetterDisplay(letter)}`
               : prize.item.name;
             return (
               <div key={prize.id} className="flex items-center gap-2 py-1">

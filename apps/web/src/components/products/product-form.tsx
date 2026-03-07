@@ -54,7 +54,7 @@ const NOT_ASSIGNED_LOCATION: LocationSelection = {
 
 const schema = z.object({
   sku: z.string().optional(),
-  letter: z.string().max(2).optional(),
+  letter: z.string().max(50).optional(),
   name: z.string().min(1, "Name is required"),
   categoryId: z.string().min(1, "Category is required"),
   description: z.string().optional(),
@@ -221,7 +221,7 @@ export function ProductForm({
 
     const payload: ProductRequest = {
       sku: values.sku?.trim() || undefined,
-      letter: values.letter?.trim() ? values.letter.trim().slice(0, 2) : undefined,
+      letter: values.letter?.trim() ? values.letter.trim().slice(0, 50) : undefined,
       name: values.name.trim(),
       categoryId: values.categoryId, // This is either rootCategoryId or subcategoryId
       parentId: parentId || undefined, // Include parent ID if creating a child product
@@ -388,16 +388,13 @@ export function ProductForm({
 
               {(initialProduct?.parentId || parentId) && (
                 <div className="grid gap-2">
-                  <Label htmlFor="letter">Letter</Label>
+                  <Label htmlFor="letter">Letter or label</Label>
                   <Input
                     id="letter"
-                    placeholder="A"
-                    maxLength={2}
-                    className="w-16 font-mono uppercase"
-                    {...form.register("letter", {
-                      setValueAs: (v) =>
-                        typeof v === "string" ? v.toUpperCase() : v,
-                    })}
+                    placeholder="A or Last Prize"
+                    maxLength={50}
+                    className="font-mono"
+                    {...form.register("letter")}
                   />
                   {form.formState.errors.letter?.message ? (
                     <p className="text-xs text-destructive">

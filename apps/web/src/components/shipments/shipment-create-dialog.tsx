@@ -38,7 +38,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
+import { cn, prizeLetterDisplay } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
@@ -604,8 +604,8 @@ export function ShipmentCreateDialog({
                                     key={prize.id}
                                     className="flex items-center gap-2"
                                   >
-                                    <span className="text-sm font-medium w-8">
-                                      {prize.letter ?? prize.name.slice(0, 1)}
+                                    <span className="text-sm font-medium min-w-0 truncate max-w-[6rem]" title={prize.letter ?? prize.name}>
+                                      {prizeLetterDisplay(prize.letter) || prize.name.slice(0, 1)}
                                     </span>
                                     <span className="text-sm text-muted-foreground flex-1 truncate">
                                       {prize.name}

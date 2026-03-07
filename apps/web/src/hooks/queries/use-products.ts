@@ -8,6 +8,7 @@ import {
   getProductById,
   type GetProductsOptions,
 } from "@/lib/api/products";
+import { ApiClientError } from "@/lib/api/client";
 
 export function useProducts(
   rootOnlyOrOptions: boolean | GetProductsOptions = false
@@ -27,6 +28,8 @@ export function useProductWithChildren(productId: string | null) {
     queryKey: ["products", productId, "with-children"],
     queryFn: () => getProductWithChildren(productId!),
     enabled: !!productId,
+    retry: (_, error) =>
+      !(error instanceof ApiClientError && error.status === 404),
   });
 }
 

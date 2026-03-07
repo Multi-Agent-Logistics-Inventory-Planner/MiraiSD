@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCreateProductMutation } from "@/hooks/mutations/use-product-mutations";
 
 const schema = z.object({
-  letter: z.string().min(1, "Letter is required").max(2, "Max 2 characters"),
+  letter: z.string().min(1, "Letter or label is required").max(50, "Max 50 characters"),
   name: z.string().min(1, "Name is required"),
   quantity: z
     .union([z.string(), z.number()])
@@ -74,7 +74,7 @@ export function PrizeForm({
     const payload = {
       parentId,
       categoryId: parentCategoryId,
-      letter: values.letter.trim().slice(0, 2),
+      letter: values.letter.trim().slice(0, 50),
       name: values.name.trim(),
       initialStock: hasInitialStock ? quantity : undefined,
     };
@@ -106,15 +106,13 @@ export function PrizeForm({
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="letter">Letter</Label>
+            <Label htmlFor="letter">Letter or label</Label>
             <Input
               id="letter"
-              placeholder="A"
-              maxLength={2}
-              className="w-16 font-mono uppercase"
-              {...form.register("letter", {
-                setValueAs: (v) => (typeof v === "string" ? v.toUpperCase() : v),
-              })}
+              placeholder="A or Last Prize"
+              maxLength={50}
+              className="font-mono"
+              {...form.register("letter")}
             />
             {form.formState.errors.letter?.message && (
               <p className="text-xs text-destructive">
