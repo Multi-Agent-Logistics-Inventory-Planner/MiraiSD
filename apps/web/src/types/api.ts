@@ -399,6 +399,7 @@ export interface ShipmentItemAllocation {
   id: string;
   locationType: LocationType;
   locationId?: string;
+  locationCode?: string;
   quantity: number;
   receivedAt: string;
 }

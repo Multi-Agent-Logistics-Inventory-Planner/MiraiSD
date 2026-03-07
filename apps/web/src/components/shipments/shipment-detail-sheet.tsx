@@ -68,10 +68,13 @@ function getLocationLabel(locationType?: LocationType): string {
 }
 
 function AllocationDisplay({ allocation }: { allocation: ShipmentItemAllocation }) {
+  // Use locationCode from API if available, otherwise fall back to location type label
+  const displayLabel = allocation.locationCode || getLocationLabel(allocation.locationType);
+
   return (
     <div className="flex items-center gap-2 py-0.5">
       <Badge variant="outline" className="text-xs font-normal">
-        {getLocationLabel(allocation.locationType)}
+        {displayLabel}
       </Badge>
       <span className="text-xs text-muted-foreground">
         x{allocation.quantity}

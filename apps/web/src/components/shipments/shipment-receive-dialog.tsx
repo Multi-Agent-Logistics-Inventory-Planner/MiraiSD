@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -516,6 +517,7 @@ export function ShipmentReceiveDialog({
                 const display = getDisplayQuantity(item.id);
                 const shop = getShopQuantity(item.id);
                 const isOver = (prizeQty + damaged + display + shop) > remaining;
+                const prizeImageUrl = item.item?.imageUrl;
 
                 return (
                   <div
@@ -523,10 +525,25 @@ export function ShipmentReceiveDialog({
                     className={`rounded-lg border p-4 ${isComplete ? "opacity-50" : ""}`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                      <div>
-                        <div className="font-medium">{prizeLabel}</div>
-                        <div className="text-xs text-muted-foreground font-mono">
-                          {item.item.sku}
+                      <div className="flex items-start gap-3">
+                        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                          {prizeImageUrl ? (
+                            <Image
+                              src={prizeImageUrl}
+                              alt={prizeLabel}
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{prizeLabel}</div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            {item.item.sku}
+                          </div>
                         </div>
                       </div>
                       <div className="text-right text-sm">
@@ -611,6 +628,7 @@ export function ShipmentReceiveDialog({
               const totalNonInventory = damaged + display + shop;
               const isOverAllocated = (allocated + totalNonInventory) > remaining;
               const allocations = itemAllocations[item.id] || [];
+              const itemImageUrl = item.item?.imageUrl;
 
               return (
                 <div
@@ -618,10 +636,25 @@ export function ShipmentReceiveDialog({
                   className={`rounded-lg border p-4 ${isComplete ? "opacity-50" : ""}`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
-                    <div>
-                      <div className="font-medium">{item.item.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        {item.item.sku}
+                    <div className="flex items-start gap-3">
+                      <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+                        {itemImageUrl ? (
+                          <Image
+                            src={itemImageUrl}
+                            alt={item.item.name}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium">{item.item.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {item.item.sku}
+                        </div>
                       </div>
                     </div>
                     <div className="text-right text-sm">
