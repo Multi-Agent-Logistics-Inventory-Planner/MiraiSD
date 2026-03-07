@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { Plus, ArrowUpDown, RefreshCw } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,7 +139,7 @@ export default function LocationsPage() {
                 onClick={() => setAdjustOpen(true)}
                 className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
               >
-                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                <ArrowUpDown className="mr-2 h-4 w-4" />
                 Adjust
               </Button>
               <Button

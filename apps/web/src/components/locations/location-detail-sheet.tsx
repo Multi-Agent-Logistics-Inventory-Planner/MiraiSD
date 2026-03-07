@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Monitor,
   ArrowLeftRight,
-  SlidersHorizontal,
+  ArrowUpDown,
   RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -331,7 +331,7 @@ export function LocationDetailSheet({
       {location && (
         <div className="shrink-0 flex items-center gap-2 py-4">
           <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <ArrowUpDown className="mr-2 h-4 w-4" />
             Adjust
           </Button>
           <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
