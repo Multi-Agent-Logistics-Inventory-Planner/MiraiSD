@@ -3,12 +3,26 @@ import { Product, ProductRequest, ProductSummary } from "@/types/api";
 
 const BASE_PATH = "/api/products";
 
+export interface GetProductsOptions {
+  rootOnly?: boolean;
+  kujiOnly?: boolean;
+}
+
 /**
- * Get all products (optionally filter to root only)
+ * Get all products (optionally filter to root only, or Kuji parents only)
  */
-export async function getProducts(rootOnly = false): Promise<Product[]> {
-  const params = rootOnly ? "?rootOnly=true" : "";
-  return apiGet<Product[]>(`${BASE_PATH}${params}`);
+export async function getProducts(
+  rootOnlyOrOptions: boolean | GetProductsOptions = false
+): Promise<Product[]> {
+  const opts: GetProductsOptions =
+    typeof rootOnlyOrOptions === "boolean"
+      ? { rootOnly: rootOnlyOrOptions }
+      : rootOnlyOrOptions ?? {};
+  const params = new URLSearchParams();
+  if (opts.rootOnly) params.set("rootOnly", "true");
+  if (opts.kujiOnly) params.set("kujiOnly", "true");
+  const qs = params.toString();
+  return apiGet<Product[]>(`${BASE_PATH}${qs ? `?${qs}` : ""}`);
 }
 
 /**

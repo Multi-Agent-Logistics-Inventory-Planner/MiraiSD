@@ -54,13 +54,13 @@ export function PrizeForm({
     defaultValues: {
       letter: "",
       name: "",
-      quantity: "",
+      quantity: null,
     },
   });
 
   useEffect(() => {
     if (!open) {
-      form.reset({ letter: "", name: "", quantity: "" });
+      form.reset({ letter: "", name: "", quantity: null });
     }
   }, [open, form]);
 

@@ -310,6 +310,8 @@ export interface InventoryItem {
   imageUrl?: string;
   /** Set for child/prize products; null for root products. Used to hide prizes from storage. */
   parentId?: string | null;
+  /** Prize letter (e.g. "A") when item is a child/prize. */
+  letter?: string | null;
 }
 
 // Base Inventory type

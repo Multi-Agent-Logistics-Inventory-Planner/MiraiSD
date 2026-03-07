@@ -6,12 +6,19 @@ import {
   getProductWithChildren,
   getProductChildren,
   getProductById,
+  type GetProductsOptions,
 } from "@/lib/api/products";
 
-export function useProducts(rootOnly = false) {
+export function useProducts(
+  rootOnlyOrOptions: boolean | GetProductsOptions = false
+) {
+  const opts: GetProductsOptions =
+    typeof rootOnlyOrOptions === "boolean"
+      ? { rootOnly: rootOnlyOrOptions }
+      : rootOnlyOrOptions ?? {};
   return useQuery({
-    queryKey: ["products", { rootOnly }],
-    queryFn: () => getProducts(rootOnly),
+    queryKey: ["products", opts],
+    queryFn: () => getProducts(opts),
   });
 }
 

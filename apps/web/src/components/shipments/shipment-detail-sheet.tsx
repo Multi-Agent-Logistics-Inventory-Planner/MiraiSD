@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
 import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2, Pencil, Check, X } from "lucide-react";
@@ -80,6 +80,12 @@ function AllocationDisplay({ allocation }: { allocation: ShipmentItemAllocation 
   );
 }
 
+/** One block in item details: either a Kuji (parent + prizes) or a standalone item. */
+interface DetailBlock {
+  parentItem: ShipmentItem;
+  prizeItems: ShipmentItem[];
+}
+
 function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
   const allocations = item.allocations ?? [];
   const hasAllocations = allocations.length > 0;
@@ -153,6 +159,107 @@ function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
   );
 }
 
+function KujiBlockSection({ block }: { block: DetailBlock }) {
+  const { parentItem, prizeItems } = block;
+  const imageUrl = parentItem.item?.imageUrl;
+
+  return (
+    <div className="py-3 border-b last:border-b-0">
+      {/* Parent row (Kuji set) */}
+      <div className="flex items-center gap-3">
+        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={parentItem.item?.name || "Kuji"}
+              fill
+              sizes="40px"
+              className="object-cover"
+            />
+          ) : (
+            <Package className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm">{parentItem.item.name}</p>
+          {parentItem.item.sku && <p className="text-xs text-muted-foreground font-mono">{parentItem.item.sku}</p>}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
+            <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentItem.receivedQuantity} received</span>
+          </div>
+        </div>
+        <div className="hidden sm:block text-right text-sm shrink-0">
+          <p>{parentItem.orderedQuantity} ordered</p>
+          <p className="text-xs text-muted-foreground">{parentItem.receivedQuantity} received</p>
+          {(parentItem.damagedQuantity ?? 0) > 0 && (
+            <p className="text-xs text-amber-600">{parentItem.damagedQuantity} damaged</p>
+          )}
+          {(parentItem.displayQuantity ?? 0) > 0 && (
+            <p className="text-xs text-blue-600">{parentItem.displayQuantity} display</p>
+          )}
+          {(parentItem.shopQuantity ?? 0) > 0 && (
+            <p className="text-xs text-green-600">{parentItem.shopQuantity} shop</p>
+          )}
+        </div>
+        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
+          {parentItem.unitCost ? (
+            <>
+              <p>{formatCurrency(parentItem.unitCost)}</p>
+              <p className="text-xs text-muted-foreground">each</p>
+            </>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
+          {parentItem.unitCost ? formatCurrency(parentItem.orderedQuantity * parentItem.unitCost) : "-"}
+        </div>
+      </div>
+      {(parentItem.allocations ?? []).length > 0 && (
+        <div className="mt-2 flex items-start gap-2 ml-12">
+          <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {(parentItem.allocations ?? []).map((allocation) => (
+              <AllocationDisplay key={allocation.id} allocation={allocation} />
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Prizes (same section, indented) */}
+      {prizeItems.length > 0 && (
+        <div className="mt-2 pl-4 border-l-2 border-muted space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Prizes</p>
+          {prizeItems.map((prize) => {
+            const lineTotal = prize.unitCost ? prize.orderedQuantity * prize.unitCost : undefined;
+            const prizeLabel = (prize.item as { letter?: string | null }).letter
+              ? `Prize ${(prize.item as { letter?: string | null }).letter}`
+              : prize.item.name;
+            return (
+              <div key={prize.id} className="flex items-center gap-2 py-1">
+                <span className="text-sm min-w-[80px]">{prizeLabel}</span>
+                <span className="text-xs text-muted-foreground">
+                  {prize.orderedQuantity} ordered · {prize.receivedQuantity} received
+                </span>
+                {(prize.damagedQuantity ?? 0) > 0 && (
+                  <span className="text-xs text-amber-600">{prize.damagedQuantity} damaged</span>
+                )}
+                {(prize.displayQuantity ?? 0) > 0 && (
+                  <span className="text-xs text-blue-600">{prize.displayQuantity} display</span>
+                )}
+                {(prize.shopQuantity ?? 0) > 0 && (
+                  <span className="text-xs text-green-600">{prize.shopQuantity} shop</span>
+                )}
+                {lineTotal != null && (
+                  <span className="text-xs font-medium ml-auto">{formatCurrency(lineTotal)}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ShipmentDetailSheet({
   open,
   onOpenChange,
@@ -212,6 +319,24 @@ export function ShipmentDetailSheet({
 
     fetchTracking();
   }, [shipment?.trackingId]);
+
+  // Group items into blocks (must run unconditionally to satisfy Rules of Hooks)
+  const detailBlocks = useMemo((): DetailBlock[] => {
+    if (!shipment?.items) return [];
+    const roots = shipment.items.filter((i) => !i.item.parentId);
+    const prizesByParentId: Record<string, ShipmentItem[]> = {};
+    shipment.items.forEach((i) => {
+      const pid = i.item.parentId;
+      if (pid) {
+        if (!prizesByParentId[pid]) prizesByParentId[pid] = [];
+        prizesByParentId[pid].push(i);
+      }
+    });
+    return roots.map((parentItem) => ({
+      parentItem,
+      prizeItems: prizesByParentId[parentItem.item.id] ?? [],
+    }));
+  }, [shipment?.items]);
 
   if (!shipment) {
     return null;
@@ -289,7 +414,7 @@ export function ShipmentDetailSheet({
               </div>
             </div>
 
-            {/* Items List */}
+            {/* Items List (grouped: Kuji block or standalone) */}
             <div className="px-4">
               {shipment.items.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
@@ -297,9 +422,13 @@ export function ShipmentDetailSheet({
                   <p>No items in this shipment</p>
                 </div>
               ) : (
-                shipment.items.map((item, index) => (
-                  <ItemRow key={item.id} item={item} index={index} />
-                ))
+                detailBlocks.map((block) =>
+                  block.prizeItems.length > 0 ? (
+                    <KujiBlockSection key={block.parentItem.id} block={block} />
+                  ) : (
+                    <ItemRow key={block.parentItem.id} item={block.parentItem} index={0} />
+                  )
+                )
               )}
             </div>
 
@@ -308,7 +437,7 @@ export function ShipmentDetailSheet({
               <div className="px-4 py-3 border-t bg-muted/20">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">
-                    {totalReceived} / {totalOrdered} items received
+                    {totalReceived} / {totalOrdered} units received
                   </span>
                   {itemsTotal > 0 && (
                     <div className="text-right">
