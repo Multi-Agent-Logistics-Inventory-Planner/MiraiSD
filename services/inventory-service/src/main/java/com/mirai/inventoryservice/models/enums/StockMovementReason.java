@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.models.enums;
 public enum StockMovementReason {
     INITIAL_STOCK,
     RESTOCK,
+    SHIPMENT_RECEIPT,
     SALE,
     DAMAGE,
     ADJUSTMENT,

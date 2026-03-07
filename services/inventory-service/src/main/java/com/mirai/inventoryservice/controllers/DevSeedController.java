@@ -956,7 +956,7 @@ public class DevSeedController {
 
                 int quantityChange = switch (reason) {
                     case SALE, DAMAGE, REMOVED -> -qty;
-                    case RESTOCK, RETURN, INITIAL_STOCK -> qty;
+                    case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT -> qty;
                     case TRANSFER, ADJUSTMENT -> random.nextBoolean() ? qty : -qty;
                     case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> 0;
                 };
