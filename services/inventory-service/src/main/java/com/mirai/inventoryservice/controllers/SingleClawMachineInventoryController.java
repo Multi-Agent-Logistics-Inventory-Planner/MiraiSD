@@ -52,7 +52,8 @@ public class SingleClawMachineInventoryController {
                 singleClawMachineId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(singleClawMachineInventoryMapper.toResponseDTO(inventory));
     }

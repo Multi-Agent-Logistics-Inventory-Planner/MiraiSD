@@ -50,7 +50,8 @@ public class BoxBinInventoryController {
                 boxBinId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(boxBinInventoryMapper.toResponseDTO(inventory));
     }

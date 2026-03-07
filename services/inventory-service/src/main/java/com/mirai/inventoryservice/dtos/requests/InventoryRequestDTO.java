@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.requests;
 
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -22,5 +23,12 @@ public class InventoryRequestDTO {
     private Integer quantity;
 
     private UUID actorId;
+
+    /**
+     * Optional reason for creating inventory.
+     * Defaults to INITIAL_STOCK if not provided.
+     * Use RESTOCK when adding inventory via the adjust dialog.
+     */
+    private StockMovementReason reason;
 }
 

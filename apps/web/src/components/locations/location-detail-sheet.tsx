@@ -15,6 +15,8 @@ import {
   ChevronRight,
   Monitor,
   ArrowLeftRight,
+  ArrowUpDown,
+  RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,7 +58,6 @@ import { LocationType } from "@/types/api";
 import type {
   StorageLocation,
   Inventory,
-  InventoryRequest,
   BoxBin,
   Rack,
   Cabinet,
@@ -71,11 +72,8 @@ import type {
 } from "@/types/api";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import {
-  useCreateInventoryMutation,
-  useUpdateInventoryMutation,
   useDeleteLocationMutation,
 } from "@/hooks/mutations/use-location-mutations";
-import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
 import { Can } from "@/components/rbac/can";
 import { Permission } from "@/lib/rbac/permissions";
 import {
@@ -88,9 +86,12 @@ import {
   useSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
+import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
+import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { type LocationSelection } from "@/types/transfer";
 
 const MACHINE_LOCATION_TYPES: LocationType[] = [
   LocationType.SINGLE_CLAW_MACHINE,
@@ -160,9 +161,20 @@ export function LocationDetailSheet({
   const isMachine = MACHINE_LOCATION_TYPES.includes(locationType);
 
   const inventoryQuery = useLocationInventory(locationType, locationId);
-  const createInventory = useCreateInventoryMutation(locationType, locationId ?? "");
-  const updateInventory = useUpdateInventoryMutation(locationType, locationId ?? "");
   const deleteLocation = useDeleteLocationMutation(locationType);
+
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  const currentLocationSelection: LocationSelection | null = useMemo(() => {
+    if (!location || !locationId) return null;
+    const locationCode = getLocationCode(locationType, location);
+    return {
+      locationType,
+      locationId,
+      locationCode,
+    };
+  }, [location, locationId, locationType]);
 
   // Machine display queries (only active for machine types)
   const { data: activeDisplaysForMachine = [] } = useActiveDisplaysForMachine(
@@ -191,7 +203,6 @@ export function LocationDetailSheet({
   const clearDisplayMutation = useClearDisplayByIdMutation();
   const swapDisplayMutation = useSwapDisplayMutation();
 
-  const [addOpen, setAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
@@ -217,14 +228,6 @@ export function LocationDetailSheet({
   const totalQty = useMemo(() => {
     return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
   }, [inventory]);
-
-  async function handleAddInventory(payload: InventoryRequest, isUpdate: boolean, inventoryId?: string) {
-    if (isUpdate && inventoryId) {
-      await updateInventory.mutateAsync({ inventoryId, payload });
-    } else {
-      await createInventory.mutateAsync(payload);
-    }
-  }
 
   // Available products not already on display
   const activeProductIds = activeDisplaysForMachine.map((d) => d.productId);
@@ -327,9 +330,13 @@ export function LocationDetailSheet({
     <>
       {location && (
         <div className="shrink-0 flex items-center gap-2 py-4">
-          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Inventory
+          <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            Adjust
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Transfer
           </Button>
           <Can permission={Permission.STORAGE_UPDATE}>
             <Button variant="outline" size="sm" onClick={() => onEdit(location)}>
@@ -800,17 +807,16 @@ export function LocationDetailSheet({
         </DialogContent>
       </Dialog>
 
-      {locationId ? (
-        <AddInventoryDialog
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          locationType={locationType}
-          locationId={locationId}
-          existingInventory={inventory}
-          isSaving={createInventory.isPending || updateInventory.isPending}
-          onSubmit={handleAddInventory}
-        />
-      ) : null}
+      <AdjustStockDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        initialLocation={currentLocationSelection}
+      />
+      <TransferStockDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        initialSourceLocation={currentLocationSelection}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

@@ -52,7 +52,8 @@ public class KeychainMachineInventoryController {
                 keychainMachineId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(keychainMachineInventoryMapper.toResponseDTO(inventory));
     }

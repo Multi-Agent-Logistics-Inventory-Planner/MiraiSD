@@ -93,7 +93,7 @@ class FourCornerMachineInventoryServiceTest {
             when(fourCornerMachineInventoryRepository.save(any(FourCornerMachineInventory.class)))
                     .thenReturn(testInventory);
 
-            FourCornerMachineInventory result = fourCornerMachineInventoryService.addInventory(machineId, productId, 10, null);
+            FourCornerMachineInventory result = fourCornerMachineInventoryService.addInventory(machineId, productId, 10, null, null);
 
             assertNotNull(result);
             assertEquals(10, result.getQuantity());
@@ -109,7 +109,7 @@ class FourCornerMachineInventoryServiceTest {
                     .thenReturn(Optional.of(testInventory));
 
             assertThrows(InvalidInventoryOperationException.class, () ->
-                    fourCornerMachineInventoryService.addInventory(machineId, productId, 10, null));
+                    fourCornerMachineInventoryService.addInventory(machineId, productId, 10, null, null));
 
             verify(fourCornerMachineInventoryRepository, never()).save(any());
         }
