@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -53,7 +54,9 @@ public class ProductController {
             products = productService.getAllProducts();
         }
 
-        return ResponseEntity.ok(productMapper.toResponseDTOList(products));
+        // Batch fetch parent IDs to avoid N+1 when computing hasChildren
+        Set<UUID> parentIds = productService.getParentProductIds();
+        return ResponseEntity.ok(productMapper.toResponseDTOList(products, parentIds));
     }
 
     @GetMapping("/{id}")
