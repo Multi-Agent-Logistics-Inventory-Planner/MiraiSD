@@ -54,7 +54,8 @@ public class NotAssignedInventoryController {
         NotAssignedInventory inventory = notAssignedInventoryService.addInventory(
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(notAssignedInventoryMapper.toResponseDTO(inventory));
     }

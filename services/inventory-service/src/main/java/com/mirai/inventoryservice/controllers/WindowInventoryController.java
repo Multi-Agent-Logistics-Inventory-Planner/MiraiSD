@@ -50,7 +50,8 @@ public class WindowInventoryController {
                 windowId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(windowInventoryMapper.toResponseDTO(inventory));
     }

@@ -93,7 +93,7 @@ class PusherMachineInventoryServiceTest {
             when(pusherMachineInventoryRepository.save(any(PusherMachineInventory.class)))
                     .thenReturn(testInventory);
 
-            PusherMachineInventory result = pusherMachineInventoryService.addInventory(machineId, productId, 10, null);
+            PusherMachineInventory result = pusherMachineInventoryService.addInventory(machineId, productId, 10, null, null);
 
             assertNotNull(result);
             assertEquals(10, result.getQuantity());
@@ -109,7 +109,7 @@ class PusherMachineInventoryServiceTest {
                     .thenReturn(Optional.of(testInventory));
 
             assertThrows(InvalidInventoryOperationException.class, () ->
-                    pusherMachineInventoryService.addInventory(machineId, productId, 10, null));
+                    pusherMachineInventoryService.addInventory(machineId, productId, 10, null, null));
 
             verify(pusherMachineInventoryRepository, never()).save(any());
         }
