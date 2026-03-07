@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { REASON_LABELS } from "@/components/audit-log/audit-log-filters";
 import { StockMovementReason } from "@/types/api";
 
 export type MovementReasonFilter = StockMovementReason | "all";
@@ -104,7 +105,7 @@ export function MovementFilters({
             <SelectItem value="all">All reasons</SelectItem>
             {Object.values(StockMovementReason).map((reason) => (
               <SelectItem key={reason} value={reason}>
-                {reason}
+                {REASON_LABELS[reason] ?? reason}
               </SelectItem>
             ))}
           </SelectContent>

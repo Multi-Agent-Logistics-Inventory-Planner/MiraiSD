@@ -17,6 +17,7 @@ function mapReasonToEventType(reason: StockMovementReason): ActivityEventType {
       return "sale";
     case StockMovementReason.RESTOCK:
     case StockMovementReason.INITIAL_STOCK:
+    case StockMovementReason.SHIPMENT_RECEIPT:
     case StockMovementReason.RETURN:
       return "restock";
     case StockMovementReason.TRANSFER:
@@ -41,6 +42,8 @@ function formatMovementTitle(
       return `Sold ${qtyStr} of ${itemName}`;
     case StockMovementReason.RESTOCK:
       return `Restocked ${qtyStr} of ${itemName}`;
+    case StockMovementReason.SHIPMENT_RECEIPT:
+      return `Received shipment: ${qtyStr} of ${itemName}`;
     case StockMovementReason.INITIAL_STOCK:
       return `Added initial stock: ${qtyStr} of ${itemName}`;
     case StockMovementReason.RETURN:

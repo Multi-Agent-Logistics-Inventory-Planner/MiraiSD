@@ -47,6 +47,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
 export enum StockMovementReason {
   INITIAL_STOCK = "INITIAL_STOCK",
   RESTOCK = "RESTOCK",
+  SHIPMENT_RECEIPT = "SHIPMENT_RECEIPT",
   SALE = "SALE",
   DAMAGE = "DAMAGE",
   ADJUSTMENT = "ADJUSTMENT",
