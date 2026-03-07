@@ -74,6 +74,7 @@ public class AuditLog {
     private OffsetDateTime createdAt;
 
     @OneToMany(mappedBy = "auditLog", fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<StockMovement> movements = new ArrayList<>();
 }

@@ -19,6 +19,7 @@ import java.util.UUID;
 @Table(name = "categories", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"parent_id", "slug"})
 })
+@org.hibernate.annotations.BatchSize(size = 50)
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,6 +39,7 @@ public class Category {
     private UUID parentId;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     @ToString.Exclude
     private List<Category> children = new ArrayList<>();

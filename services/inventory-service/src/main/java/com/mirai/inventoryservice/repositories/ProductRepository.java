@@ -16,28 +16,28 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     boolean existsBySku(String sku);
 
-    // Optimized queries with JOIN FETCH to avoid N+1
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent")
+    // Optimized queries with JOIN FETCH to avoid N+1 (includes parent for child products)
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent")
     List<Product> findAllWithCategories();
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.isActive = true")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.isActive = true")
     List<Product> findByIsActiveTrueWithCategories();
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.category.id = :categoryId")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.category.id = :categoryId")
     List<Product> findByCategoryIdWithCategories(@Param("categoryId") UUID categoryId);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.category.id = :categoryId AND p.isActive = true")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.category.id = :categoryId AND p.isActive = true")
     List<Product> findByCategoryIdAndIsActiveTrueWithCategories(@Param("categoryId") UUID categoryId);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.isActive = true AND " +
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.isActive = true AND " +
             "(LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Product> searchWithCategories(@Param("query") String query);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.id = :id")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.id = :id")
     Optional<Product> findByIdWithCategories(@Param("id") UUID id);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.sku = :sku")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.sku = :sku")
     Optional<Product> findBySkuWithCategories(@Param("sku") String sku);
 
     // Keep original methods for cases where categories aren't needed
@@ -85,4 +85,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     // Sum children quantities for aggregation
     @Query("SELECT COALESCE(SUM(p.quantity), 0) FROM Product p WHERE p.parent.id = :parentId")
     Integer sumChildrenQuantities(@Param("parentId") UUID parentId);
+
+    // Batch query: get all product IDs that have at least one child (for hasChildren computation)
+    @Query("SELECT DISTINCT p.parent.id FROM Product p WHERE p.parent IS NOT NULL")
+    List<UUID> findAllParentIds();
 }

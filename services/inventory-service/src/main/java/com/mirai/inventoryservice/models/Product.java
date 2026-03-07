@@ -19,6 +19,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "products")
+@org.hibernate.annotations.BatchSize(size = 50)
 @Data
 @Builder
 @NoArgsConstructor
@@ -50,6 +51,7 @@ public class Product {
     private String letter;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     @ToString.Exclude
     private List<Product> children = new ArrayList<>();
