@@ -51,7 +51,8 @@ public class DoubleClawMachineInventoryController {
         DoubleClawMachineInventory inventory = doubleClawMachineInventoryService.addInventory(
                 doubleClawMachineId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(doubleClawMachineInventoryMapper.toResponseDTO(inventory));
     }

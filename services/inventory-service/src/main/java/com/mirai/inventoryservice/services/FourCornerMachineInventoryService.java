@@ -33,7 +33,7 @@ public class FourCornerMachineInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public FourCornerMachineInventory addInventory(UUID fourCornerMachineId, UUID productId, Integer quantity) {
+    public FourCornerMachineInventory addInventory(UUID fourCornerMachineId, UUID productId, Integer quantity, UUID actorId) {
         fourCornerMachineService.getFourCornerMachineById(fourCornerMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class FourCornerMachineInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.FOUR_CORNER_MACHINE, fourCornerMachineId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return fourCornerMachineInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("Failed to create inventory"));

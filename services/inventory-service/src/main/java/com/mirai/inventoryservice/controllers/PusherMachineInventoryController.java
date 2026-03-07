@@ -51,7 +51,8 @@ public class PusherMachineInventoryController {
         PusherMachineInventory inventory = pusherMachineInventoryService.addInventory(
                 pusherMachineId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(pusherMachineInventoryMapper.toResponseDTO(inventory));
     }

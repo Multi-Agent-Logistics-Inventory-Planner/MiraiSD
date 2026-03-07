@@ -23,5 +23,7 @@ public interface SingleClawMachineInventoryRepository extends JpaRepository<Sing
 
     @Query("SELECT SUM(i.quantity) FROM SingleClawMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

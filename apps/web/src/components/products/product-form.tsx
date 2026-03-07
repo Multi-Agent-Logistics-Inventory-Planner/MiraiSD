@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { useAuth } from "@/hooks/use-auth";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import {
   useCategories,
@@ -52,6 +54,7 @@ const NOT_ASSIGNED_LOCATION: LocationSelection = {
 
 const schema = z.object({
   sku: z.string().optional(),
+  letter: z.string().max(2).optional(),
   name: z.string().min(1, "Name is required"),
   categoryId: z.string().min(1, "Category is required"),
   description: z.string().optional(),
@@ -70,14 +73,22 @@ interface ProductFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialProduct?: Product | null;
+  /** Parent product ID for creating child products (e.g., Kuji prizes) */
+  parentId?: string | null;
+  /** Parent product name for display */
+  parentName?: string | null;
 }
 
 export function ProductForm({
   open,
   onOpenChange,
   initialProduct,
+  parentId,
+  parentName,
 }: ProductFormProps) {
+  const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
@@ -132,6 +143,7 @@ export function ProductForm({
         setSubcategoryId(cat.id);
         form.reset({
           sku: initialProduct.sku ?? "",
+          letter: initialProduct.letter ?? "",
           name: initialProduct.name,
           categoryId: cat.id, // The actual category is the subcategory
           description: initialProduct.description ?? "",
@@ -209,8 +221,10 @@ export function ProductForm({
 
     const payload: ProductRequest = {
       sku: values.sku?.trim() || undefined,
+      letter: values.letter?.trim() ? values.letter.trim().slice(0, 2) : undefined,
       name: values.name.trim(),
       categoryId: values.categoryId, // This is either rootCategoryId or subcategoryId
+      parentId: parentId || undefined, // Include parent ID if creating a child product
       description: values.description || undefined,
       reorderPoint: values.reorderPoint,
       targetStockLevel: values.targetStockLevel,
@@ -267,10 +281,11 @@ export function ProductForm({
         ) {
           setIsAddingStock(true);
           try {
+            const actorId = user?.personId || user?.id;
             await createInventory(
               initialStockLocation.locationType,
               initialStockLocation.locationId,
-              { itemId: newProduct.id, quantity: initialStockQty },
+              { itemId: newProduct.id, quantity: initialStockQty, actorId },
             );
             toast({ title: "Initial stock added" });
           } catch (stockErr: unknown) {
@@ -286,6 +301,24 @@ export function ProductForm({
           } finally {
             setIsAddingStock(false);
           }
+        }
+
+        // Check if this is a Kuji product - redirect to detail page to add prizes
+        const selectedCategory = categories?.find((c) => c.id === rootCategoryId);
+        const selectedSubcategory = subcategoryId
+          ? childCategories.find((c) => c.id === subcategoryId)
+          : null;
+        const isKuji =
+          selectedCategory?.name.toLowerCase() === "kuji" ||
+          selectedCategory?.slug?.toLowerCase() === "kuji" ||
+          selectedSubcategory?.name.toLowerCase() === "kuji" ||
+          selectedSubcategory?.slug?.toLowerCase() === "kuji";
+
+        if (isKuji && !parentId) {
+          // Redirect to detail page so user can add prizes
+          onOpenChange(false);
+          router.push(`/products/${newProduct.id}`);
+          return;
         }
       }
       onOpenChange(false);
@@ -313,7 +346,11 @@ export function ProductForm({
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col gap-0 p-0">
           <DialogHeader className="p-6">
             <DialogTitle>
-              {initialProduct ? "Edit Product" : "Add Product"}
+              {initialProduct
+                ? "Edit Product"
+                : parentName
+                  ? `Add Prize to ${parentName}`
+                  : "Add Product"}
             </DialogTitle>
           </DialogHeader>
 
@@ -348,6 +385,27 @@ export function ProductForm({
                   </p>
                 ) : null}
               </div>
+
+              {(initialProduct?.parentId || parentId) && (
+                <div className="grid gap-2">
+                  <Label htmlFor="letter">Letter</Label>
+                  <Input
+                    id="letter"
+                    placeholder="A"
+                    maxLength={2}
+                    className="w-16 font-mono uppercase"
+                    {...form.register("letter", {
+                      setValueAs: (v) =>
+                        typeof v === "string" ? v.toUpperCase() : v,
+                    })}
+                  />
+                  {form.formState.errors.letter?.message ? (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.letter.message}
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
               <div className="grid gap-2 pb-6">
                 <Label htmlFor="description">

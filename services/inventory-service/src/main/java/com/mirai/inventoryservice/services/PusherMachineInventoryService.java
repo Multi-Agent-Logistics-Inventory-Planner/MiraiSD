@@ -33,7 +33,7 @@ public class PusherMachineInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public PusherMachineInventory addInventory(UUID pusherMachineId, UUID productId, Integer quantity) {
+    public PusherMachineInventory addInventory(UUID pusherMachineId, UUID productId, Integer quantity, UUID actorId) {
         pusherMachineService.getPusherMachineById(pusherMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class PusherMachineInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.PUSHER_MACHINE, pusherMachineId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return pusherMachineInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new PusherMachineInventoryNotFoundException("Failed to create inventory"));

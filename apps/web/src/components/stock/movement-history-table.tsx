@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { StockMovement } from "@/types/api";
+import { REASON_LABELS } from "@/components/audit-log/audit-log-filters";
 
 interface MovementHistoryTableProps {
   movements: StockMovement[];
@@ -163,7 +164,7 @@ export function MovementHistoryTable({
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {movement.reason}
+                      {REASON_LABELS[movement.reason] ?? movement.reason}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs">

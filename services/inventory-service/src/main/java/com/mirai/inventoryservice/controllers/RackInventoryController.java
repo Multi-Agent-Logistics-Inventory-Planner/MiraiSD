@@ -49,7 +49,8 @@ public class RackInventoryController {
         RackInventory inventory = rackInventoryService.addInventory(
                 rackId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(rackInventoryMapper.toResponseDTO(inventory));
     }

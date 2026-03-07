@@ -23,5 +23,7 @@ public interface RackInventoryRepository extends JpaRepository<RackInventory, UU
 
     @Query("SELECT SUM(i.quantity) FROM RackInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

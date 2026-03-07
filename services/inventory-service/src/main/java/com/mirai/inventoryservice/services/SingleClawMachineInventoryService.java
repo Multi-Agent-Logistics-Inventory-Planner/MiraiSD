@@ -33,7 +33,7 @@ public class SingleClawMachineInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public SingleClawMachineInventory addInventory(UUID singleClawMachineId, UUID productId, Integer quantity) {
+    public SingleClawMachineInventory addInventory(UUID singleClawMachineId, UUID productId, Integer quantity, UUID actorId) {
         singleClawMachineService.getSingleClawMachineById(singleClawMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class SingleClawMachineInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.SINGLE_CLAW_MACHINE, singleClawMachineId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return singleClawMachineInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new SingleClawMachineInventoryNotFoundException("Failed to create inventory"));

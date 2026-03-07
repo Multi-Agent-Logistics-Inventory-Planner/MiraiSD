@@ -212,10 +212,11 @@ export function LocationDetailSheet({
 
   const code = location ? getLocationCode(locationType, location) : "";
 
+  const inventory = (inventoryQuery.data ?? []) as Inventory[];
+
   const totalQty = useMemo(() => {
-    const inv = (inventoryQuery.data ?? []) as Inventory[];
-    return inv.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
-  }, [inventoryQuery.data]);
+    return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+  }, [inventory]);
 
   async function handleAddInventory(payload: InventoryRequest, isUpdate: boolean, inventoryId?: string) {
     if (isUpdate && inventoryId) {
@@ -368,8 +369,8 @@ export function LocationDetailSheet({
                   <Skeleton className="h-5 w-8" />
                 </div>
               ))
-            ) : (inventoryQuery.data as Inventory[] | undefined)?.length ? (
-              (inventoryQuery.data as Inventory[]).map((inv) => (
+            ) : inventory.length ? (
+              inventory.map((inv) => (
                 <div key={inv.id} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
                   <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                     {inv.item.imageUrl ? (
@@ -805,7 +806,7 @@ export function LocationDetailSheet({
           onOpenChange={setAddOpen}
           locationType={locationType}
           locationId={locationId}
-          existingInventory={(inventoryQuery.data as Inventory[]) ?? []}
+          existingInventory={inventory}
           isSaving={createInventory.isPending || updateInventory.isPending}
           onSubmit={handleAddInventory}
         />

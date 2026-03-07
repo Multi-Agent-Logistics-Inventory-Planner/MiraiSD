@@ -33,7 +33,7 @@ public class DoubleClawMachineInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public DoubleClawMachineInventory addInventory(UUID doubleClawMachineId, UUID productId, Integer quantity) {
+    public DoubleClawMachineInventory addInventory(UUID doubleClawMachineId, UUID productId, Integer quantity, UUID actorId) {
         doubleClawMachineService.getDoubleClawMachineById(doubleClawMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class DoubleClawMachineInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.DOUBLE_CLAW_MACHINE, doubleClawMachineId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return doubleClawMachineInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new DoubleClawMachineInventoryNotFoundException("Failed to create inventory"));

@@ -33,7 +33,7 @@ public class CabinetInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public CabinetInventory addInventory(UUID cabinetId, UUID productId, Integer quantity) {
+    public CabinetInventory addInventory(UUID cabinetId, UUID productId, Integer quantity, UUID actorId) {
         cabinetService.getCabinetById(cabinetId); // Validate cabinet exists
         Product product = productService.getProductById(productId);
 
@@ -46,7 +46,7 @@ public class CabinetInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.CABINET, cabinetId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, null, null);
+                StockMovementReason.INITIAL_STOCK, actorId, null);
 
         return cabinetInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new CabinetInventoryNotFoundException("Failed to create inventory"));

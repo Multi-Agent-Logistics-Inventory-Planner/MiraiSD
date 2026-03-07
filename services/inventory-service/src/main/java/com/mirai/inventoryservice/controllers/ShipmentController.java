@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.mappers.ShipmentMapper;
+import com.mirai.inventoryservice.dtos.mappers.ShipmentMapperDecorator;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
@@ -9,6 +10,7 @@ import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.services.ShipmentService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -24,10 +26,13 @@ import java.util.UUID;
 public class ShipmentController {
     private final ShipmentService shipmentService;
     private final ShipmentMapper shipmentMapper;
+    private final ShipmentMapperDecorator shipmentMapperDecorator;
 
-    public ShipmentController(ShipmentService shipmentService, ShipmentMapper shipmentMapper) {
+    public ShipmentController(ShipmentService shipmentService, ShipmentMapper shipmentMapper,
+                              ShipmentMapperDecorator shipmentMapperDecorator) {
         this.shipmentService = shipmentService;
         this.shipmentMapper = shipmentMapper;
+        this.shipmentMapperDecorator = shipmentMapperDecorator;
     }
 
     @PostMapping
@@ -35,7 +40,7 @@ public class ShipmentController {
     public ResponseEntity<ShipmentResponseDTO> createShipment(@Valid @RequestBody ShipmentRequestDTO requestDTO) {
         Shipment shipment = shipmentService.createShipment(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(shipmentMapper.toResponseDTO(shipment));
+                .body(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 
     @GetMapping
@@ -48,26 +53,27 @@ public class ShipmentController {
         if (page != null && size != null) {
             Pageable pageable = PageRequest.of(page, size);
             Page<Shipment> shipmentPage = shipmentService.listShipmentsPaged(status, search, pageable);
-            Page<ShipmentResponseDTO> dtoPage = shipmentPage.map(shipmentMapper::toResponseDTO);
+            List<ShipmentResponseDTO> dtos = shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipmentPage.getContent());
+            Page<ShipmentResponseDTO> dtoPage = new PageImpl<>(dtos, pageable, shipmentPage.getTotalElements());
             return ResponseEntity.ok(dtoPage);
         }
         // Legacy: return list without pagination
         List<Shipment> shipments = status != null
                 ? shipmentService.listShipmentsByStatus(status)
                 : shipmentService.listShipments();
-        return ResponseEntity.ok(shipmentMapper.toResponseDTOList(shipments));
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ShipmentResponseDTO> getShipmentById(@PathVariable UUID id) {
         Shipment shipment = shipmentService.getShipmentById(id);
-        return ResponseEntity.ok(shipmentMapper.toResponseDTO(shipment));
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 
     @GetMapping("/by-product/{productId}")
     public ResponseEntity<List<ShipmentResponseDTO>> getShipmentsByProduct(@PathVariable UUID productId) {
         List<Shipment> shipments = shipmentService.getShipmentsContainingProduct(productId);
-        return ResponseEntity.ok(shipmentMapper.toResponseDTOList(shipments));
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments));
     }
 
     @PutMapping("/{id}")
@@ -76,7 +82,7 @@ public class ShipmentController {
             @PathVariable UUID id,
             @Valid @RequestBody ShipmentRequestDTO requestDTO) {
         Shipment shipment = shipmentService.updateShipment(id, requestDTO);
-        return ResponseEntity.ok(shipmentMapper.toResponseDTO(shipment));
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 
     @DeleteMapping("/{id}")
@@ -92,6 +98,6 @@ public class ShipmentController {
             @PathVariable UUID id,
             @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO) {
         Shipment shipment = shipmentService.receiveShipment(id, requestDTO);
-        return ResponseEntity.ok(shipmentMapper.toResponseDTO(shipment));
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 }

@@ -18,63 +18,58 @@ interface DeleteProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   productName: string;
-  totalQuantity: number;
+  /** Shown in confirmation; e.g. "and all 3 prizes" for Kuji parent */
+  cascadeMessage?: string;
   isPending: boolean;
   onDelete: () => void;
+  /** When false, no trigger button is rendered (for programmatic open) */
+  renderTrigger?: boolean;
 }
 
 export function DeleteProductDialog({
   open,
   onOpenChange,
   productName,
-  totalQuantity,
+  cascadeMessage,
   isPending,
   onDelete,
+  renderTrigger = true,
 }: DeleteProductDialogProps) {
-  const hasInventory = totalQuantity > 0;
-
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogTrigger asChild>
-        <Button size="sm" variant="destructive">
-          <Trash2 className="h-4 w-4 sm:mr-1" />
-          <span className="hidden sm:inline">Delete</span>
-          <span className="sr-only sm:hidden">Delete</span>
-        </Button>
-      </AlertDialogTrigger>
+      {renderTrigger && (
+        <AlertDialogTrigger asChild>
+          <Button size="sm" variant="destructive">
+            <Trash2 className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Delete</span>
+            <span className="sr-only sm:hidden">Delete</span>
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {hasInventory ? "Cannot Delete Product" : "Delete Product"}
-          </AlertDialogTitle>
+          <AlertDialogTitle>Delete Product</AlertDialogTitle>
           <AlertDialogDescription>
-            {hasInventory ? (
+            Are you sure you want to delete{" "}
+            <span className="font-semibold">{productName}</span>
+            {cascadeMessage && (
               <>
-                This product cannot be deleted because it still has{" "}
-                <span className="font-semibold">{totalQuantity}</span> units in
-                storage locations. Please remove all inventory from storage
-                locations before deleting this product.
-              </>
-            ) : (
-              <>
-                Are you sure you want to delete{" "}
-                <span className="font-semibold">{productName}</span>? This
-                action cannot be undone.
+                {" "}
+                <span className="font-semibold">{cascadeMessage}</span>
               </>
             )}
+            ? This action cannot be undone. All inventory will be removed.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          {!hasInventory && (
-            <AlertDialogAction
-              onClick={onDelete}
-              disabled={isPending}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          )}
+          <AlertDialogAction
+            onClick={onDelete}
+            disabled={isPending}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {isPending ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

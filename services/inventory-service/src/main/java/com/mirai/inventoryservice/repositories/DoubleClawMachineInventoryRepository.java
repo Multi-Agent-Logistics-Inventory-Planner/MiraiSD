@@ -23,5 +23,7 @@ public interface DoubleClawMachineInventoryRepository extends JpaRepository<Doub
 
     @Query("SELECT SUM(i.quantity) FROM DoubleClawMachineInventory i WHERE i.item.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
+
+    void deleteByItem_Id(UUID productId);
 }
 

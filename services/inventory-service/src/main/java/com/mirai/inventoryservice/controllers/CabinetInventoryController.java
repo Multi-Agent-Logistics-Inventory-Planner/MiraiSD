@@ -49,7 +49,8 @@ public class CabinetInventoryController {
         CabinetInventory inventory = cabinetInventoryService.addInventory(
                 cabinetId,
                 requestDTO.getItemId(),
-                requestDTO.getQuantity());
+                requestDTO.getQuantity(),
+                requestDTO.getActorId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(cabinetInventoryMapper.toResponseDTO(inventory));
     }

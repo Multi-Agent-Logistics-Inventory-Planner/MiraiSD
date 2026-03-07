@@ -47,6 +47,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
 export enum StockMovementReason {
   INITIAL_STOCK = "INITIAL_STOCK",
   RESTOCK = "RESTOCK",
+  SHIPMENT_RECEIPT = "SHIPMENT_RECEIPT",
   SALE = "SALE",
   DAMAGE = "DAMAGE",
   ADJUSTMENT = "ADJUSTMENT",
@@ -113,10 +114,32 @@ export interface AuthValidationResponse {
 
 // Product types
 
+export interface ProductSummary {
+  id: string;
+  sku?: string | null;
+  name: string;
+  letter?: string | null;
+  category: Category;
+  imageUrl?: string;
+  isActive: boolean;
+  quantity: number;
+  parentId?: string | null;
+  hasChildren?: boolean;
+}
+
 export interface Product {
   id: string;
   sku?: string | null;
+  letter?: string | null;
   category: Category;
+  // Parent-child relationship fields
+  parentId?: string | null;
+  parentName?: string | null;
+  parentSku?: string | null;
+  children?: ProductSummary[];
+  totalChildStock?: number;
+  hasChildren?: boolean;
+  // Core fields
   name: string;
   description?: string;
   reorderPoint?: number;
@@ -133,9 +156,12 @@ export interface Product {
 
 export interface ProductRequest {
   sku?: string;
-  categoryId: string;
+  categoryId?: string;
+  parentId?: string;
+  letter?: string;
   name: string;
   description?: string;
+  initialStock?: number;
   reorderPoint?: number;
   targetStockLevel?: number;
   leadTimeDays?: number;
@@ -283,6 +309,10 @@ export interface InventoryItem {
   name: string;
   category: Category;
   imageUrl?: string;
+  /** Set for child/prize products; null for root products. Used to hide prizes from storage. */
+  parentId?: string | null;
+  /** Prize letter (e.g. "A") when item is a child/prize. */
+  letter?: string | null;
 }
 
 // Base Inventory type
@@ -361,6 +391,7 @@ export type Inventory =
 export interface InventoryRequest {
   itemId: string;
   quantity: number;
+  actorId?: string;
 }
 
 // Shipment types
@@ -369,6 +400,7 @@ export interface ShipmentItemAllocation {
   id: string;
   locationType: LocationType;
   locationId?: string;
+  locationCode?: string;
   quantity: number;
   receivedAt: string;
 }

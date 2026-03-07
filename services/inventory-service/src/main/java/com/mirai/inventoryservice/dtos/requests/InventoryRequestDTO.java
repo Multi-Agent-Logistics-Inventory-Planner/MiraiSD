@@ -20,5 +20,7 @@ public class InventoryRequestDTO {
     @NotNull(message = "Quantity is required")
     @Min(value = 0, message = "Quantity must be at least 0")
     private Integer quantity;
+
+    private UUID actorId;
 }
 

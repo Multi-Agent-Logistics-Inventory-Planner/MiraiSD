@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,6 +18,16 @@ public class ProductResponseDTO {
     private UUID id;
     private String sku;
     private CategoryResponseDTO category;
+
+    // Parent-child relationship fields
+    private UUID parentId;
+    private String parentName;
+    private String letter;
+    private String parentSku;
+    private List<ProductSummaryDTO> children;
+    private Integer totalChildStock;
+    private Boolean hasChildren;
+
     private String name;
     private String description;
     private Integer reorderPoint;

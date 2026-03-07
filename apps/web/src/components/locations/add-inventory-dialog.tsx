@@ -35,8 +35,8 @@ export function AddInventoryDialog({
   onSubmit,
 }: AddInventoryDialogProps) {
   const productsQuery = useQuery({
-    queryKey: ["products"],
-    queryFn: getProducts,
+    queryKey: ["products", { rootOnly: true }],
+    queryFn: () => getProducts(true),
   });
 
   const products = productsQuery.data ?? [];

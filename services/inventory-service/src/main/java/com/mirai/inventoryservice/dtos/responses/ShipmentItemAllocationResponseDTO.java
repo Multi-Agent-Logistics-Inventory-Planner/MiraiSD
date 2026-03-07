@@ -17,6 +17,7 @@ public class ShipmentItemAllocationResponseDTO {
     private UUID id;
     private LocationType locationType;
     private UUID locationId;
+    private String locationCode;
     private Integer quantity;
     private OffsetDateTime receivedAt;
 }

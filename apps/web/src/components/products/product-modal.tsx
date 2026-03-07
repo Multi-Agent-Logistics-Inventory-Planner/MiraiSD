@@ -190,7 +190,11 @@ export function ProductModal({
                   open={deleteDialogOpen}
                   onOpenChange={setDeleteDialogOpen}
                   productName={p.name}
-                  totalQuantity={totalQuantity}
+                  cascadeMessage={
+                    p.hasChildren && (p.children?.length ?? 0) > 0
+                      ? ` and all ${p.children!.length} prize(s)`
+                      : undefined
+                  }
                   isPending={deleteProduct.isPending}
                   onDelete={handleDelete}
                 />
@@ -231,7 +235,11 @@ export function ProductModal({
               open={deleteDialogOpen}
               onOpenChange={setDeleteDialogOpen}
               productName={p.name}
-              totalQuantity={totalQuantity}
+              cascadeMessage={
+                p.hasChildren && (p.children?.length ?? 0) > 0
+                  ? ` and all ${p.children!.length} prize(s)`
+                  : undefined
+              }
               isPending={deleteProduct.isPending}
               onDelete={handleDelete}
             />

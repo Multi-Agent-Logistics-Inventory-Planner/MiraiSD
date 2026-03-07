@@ -28,6 +28,7 @@ export type ReasonFilter = StockMovementReason | "all";
 export const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
   [StockMovementReason.RESTOCK]: "Restock",
+  [StockMovementReason.SHIPMENT_RECEIPT]: "Shipment",
   [StockMovementReason.SALE]: "Sale",
   [StockMovementReason.DAMAGE]: "Damage",
   [StockMovementReason.ADJUSTMENT]: "Adjustment",

@@ -104,7 +104,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
   const displayStatus = getShipmentDisplayStatus(shipment);
   const statusInfo = getStatusText(shipment);
 
-  // Calculate totals
+  // Calculate totals (units = sum of all quantities)
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
     0,
@@ -114,7 +114,9 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
     0,
   );
 
-  const itemCount = shipment.items.length;
+  // Show only parent/root items for count and thumbnails (Kuji = 1 block, not parent + prizes)
+  const rootItems = shipment.items.filter((item) => !item.item.parentId);
+  const itemCount = rootItems.length;
 
   // Calculate total cost
   const totalCost =
@@ -171,9 +173,9 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
         </div>
       </div>
 
-      {/* Product Images Row */}
+      {/* Product Images Row (only parent/root items; prizes are under parent Kuji) */}
       <div className="flex items-start gap-3 mb-4 overflow-x-auto pb-1">
-        {shipment.items.map((item) => (
+        {rootItems.map((item) => (
           <ProductThumbnail key={item.id} item={item} />
         ))}
       </div>
