@@ -64,7 +64,10 @@ export function DeleteProductDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            onClick={onDelete}
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete();
+            }}
             disabled={isPending}
             className="bg-red-600 text-white hover:bg-red-700"
           >

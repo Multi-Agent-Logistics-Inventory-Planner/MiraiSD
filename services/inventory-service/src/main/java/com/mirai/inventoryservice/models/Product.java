@@ -46,8 +46,8 @@ public class Product {
     @Column(name = "parent_id", insertable = false, updatable = false)
     private UUID parentId;
 
-    /** Prize letter for Kuji children (e.g., A, B, C). Null for non-prize products. */
-    @Column(length = 2)
+    /** Prize letter or label for Kuji children (e.g., A, B, C, Last Prize). Null for non-prize products. */
+    @Column(length = 50)
     private String letter;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

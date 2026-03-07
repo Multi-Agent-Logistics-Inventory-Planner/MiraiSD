@@ -33,7 +33,7 @@ public class BoxBinInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public BoxBinInventory addInventory(UUID boxBinId, UUID productId, Integer quantity, UUID actorId) {
+    public BoxBinInventory addInventory(UUID boxBinId, UUID productId, Integer quantity, UUID actorId, StockMovementReason reason) {
         boxBinService.getBoxBinById(boxBinId); // Validate box bin exists
         Product product = productService.getProductById(productId);
 
@@ -44,9 +44,12 @@ public class BoxBinInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this box bin");
         }
 
+        // Default to INITIAL_STOCK if no reason provided
+        StockMovementReason effectiveReason = reason != null ? reason : StockMovementReason.INITIAL_STOCK;
+
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.BOX_BIN, boxBinId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, actorId, null);
+                effectiveReason, actorId, null);
 
         return boxBinInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new BoxBinInventoryNotFoundException("Failed to create inventory"));

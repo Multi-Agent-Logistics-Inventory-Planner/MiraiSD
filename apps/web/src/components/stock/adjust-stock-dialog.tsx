@@ -45,6 +45,8 @@ import {
 interface AdjustStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided, pre-selects this location when the dialog opens (e.g. from location detail or NA page). */
+  initialLocation?: LocationSelection | null;
 }
 
 const EMPTY_LOCATION: LocationSelection = {
@@ -56,6 +58,7 @@ const EMPTY_LOCATION: LocationSelection = {
 export function AdjustStockDialog({
   open,
   onOpenChange,
+  initialLocation: initialLocationProp,
 }: AdjustStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -102,8 +105,14 @@ export function AdjustStockDialog({
       setChildCategoryFilters([]);
       setQuantityWarning(null);
       setReason(DEFAULT_REASON_BY_ACTION["subtract"]);
+    } else if (initialLocationProp && initialLocationProp.locationType != null) {
+      setLocation({
+        locationType: initialLocationProp.locationType,
+        locationId: initialLocationProp.locationId ?? null,
+        locationCode: initialLocationProp.locationCode ?? "",
+      });
     }
-  }, [open]);
+  }, [open, initialLocationProp]);
 
   useEffect(() => {
     if (location.locationId) {
@@ -309,11 +318,20 @@ export function AdjustStockDialog({
     isUpdate: boolean,
     inventoryId?: string
   ) {
+    const actorId = user?.personId || user?.id;
+
+    // Add RESTOCK reason and actorId for audit tracking when adding inventory via adjust dialog
+    const enrichedPayload: InventoryRequest = {
+      ...payload,
+      actorId,
+      reason: StockMovementReason.RESTOCK,
+    };
+
     try {
       if (isUpdate && inventoryId) {
-        await updateInventoryMutation.mutateAsync({ inventoryId, payload });
+        await updateInventoryMutation.mutateAsync({ inventoryId, payload: enrichedPayload });
       } else {
-        await createInventoryMutation.mutateAsync(payload);
+        await createInventoryMutation.mutateAsync(enrichedPayload);
       }
       toast({ title: "Inventory added successfully" });
     } catch (err) {

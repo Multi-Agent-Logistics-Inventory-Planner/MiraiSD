@@ -50,7 +50,8 @@ public class CabinetInventoryController {
                 cabinetId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(cabinetInventoryMapper.toResponseDTO(inventory));
     }

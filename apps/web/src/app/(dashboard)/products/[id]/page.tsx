@@ -24,7 +24,8 @@ import {
   useProduct,
 } from "@/hooks/queries/use-products";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
-import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { cn, prizeLetterDisplay } from "@/lib/utils";
 import type { ProductSummary } from "@/types/api";
 
 function getProductStatusColor(isActive: boolean) {
@@ -75,6 +76,7 @@ export default function ProductDetailPage() {
   const { data: editingPrizeProduct, isLoading: editingPrizeLoading } =
     useProduct(editingPrizeId);
   const deleteProductMutation = useDeleteProductMutation();
+  const { toast } = useToast();
 
   if (isLoading) {
     return (
@@ -247,7 +249,7 @@ export default function ProductDetailPage() {
                     title="Click to edit prize"
                   >
                     <TableCell className="py-2 w-12 font-mono font-medium">
-                      {prize.letter ?? "-"}
+                      {prizeLetterDisplay(prize.letter) || "-"}
                     </TableCell>
                     <TableCell className="py-2">
                       <div className="flex items-center gap-3">
@@ -319,9 +321,16 @@ export default function ProductDetailPage() {
                           renderTrigger={false}
                           onDelete={() => {
                             deleteProductMutation.mutate(
-                              { id: prize.id },
+                              { id: prize.id, parentId: product.id },
                               {
                                 onSuccess: () => setDeletePrizeId(null),
+                                onError: (err) => {
+                                  toast({
+                                    title: "Cannot delete prize",
+                                    description: err?.message ?? "This prize may be used in one or more shipments.",
+                                    variant: "destructive",
+                                  });
+                                },
                               }
                             );
                           }}

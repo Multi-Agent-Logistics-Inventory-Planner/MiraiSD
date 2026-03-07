@@ -33,7 +33,7 @@ public class KeychainMachineInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public KeychainMachineInventory addInventory(UUID keychainMachineId, UUID productId, Integer quantity, UUID actorId) {
+    public KeychainMachineInventory addInventory(UUID keychainMachineId, UUID productId, Integer quantity, UUID actorId, StockMovementReason reason) {
         keychainMachineService.getKeychainMachineById(keychainMachineId); // Validate machine exists
         Product product = productService.getProductById(productId);
 
@@ -44,9 +44,12 @@ public class KeychainMachineInventoryService {
                     "Inventory for product " + product.getSku() + " already exists in this machine");
         }
 
+        // Default to INITIAL_STOCK if no reason provided
+        StockMovementReason effectiveReason = reason != null ? reason : StockMovementReason.INITIAL_STOCK;
+
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.KEYCHAIN_MACHINE, keychainMachineId, product, quantity,
-                StockMovementReason.INITIAL_STOCK, actorId, null);
+                effectiveReason, actorId, null);
 
         return keychainMachineInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new KeychainMachineInventoryNotFoundException("Failed to create inventory"));

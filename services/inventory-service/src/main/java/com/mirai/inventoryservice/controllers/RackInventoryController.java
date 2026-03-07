@@ -50,7 +50,8 @@ public class RackInventoryController {
                 rackId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId());
+                requestDTO.getActorId(),
+                requestDTO.getReason());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(rackInventoryMapper.toResponseDTO(inventory));
     }

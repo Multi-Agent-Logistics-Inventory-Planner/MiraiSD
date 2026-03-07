@@ -1,17 +1,24 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
+import com.mirai.inventoryservice.exceptions.ProductInUseException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.services.InventoryAggregateService;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ProductRepository;
-import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -22,12 +29,16 @@ import java.util.UUID;
 @Service
 @Transactional
 public class ProductService {
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
+
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
     private final StockMovementService stockMovementService;
     private final SupabaseBroadcastService broadcastService;
     private final InventoryAggregateService inventoryAggregateService;
     private final StockMovementRepository stockMovementRepository;
+    private final ShipmentItemRepository shipmentItemRepository;
+    private final MachineDisplayRepository machineDisplayRepository;
 
     public ProductService(
             ProductRepository productRepository,
@@ -35,13 +46,17 @@ public class ProductService {
             @Lazy StockMovementService stockMovementService,
             SupabaseBroadcastService broadcastService,
             InventoryAggregateService inventoryAggregateService,
-            StockMovementRepository stockMovementRepository) {
+            StockMovementRepository stockMovementRepository,
+            ShipmentItemRepository shipmentItemRepository,
+            MachineDisplayRepository machineDisplayRepository) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
         this.broadcastService = broadcastService;
         this.inventoryAggregateService = inventoryAggregateService;
         this.stockMovementRepository = stockMovementRepository;
+        this.shipmentItemRepository = shipmentItemRepository;
+        this.machineDisplayRepository = machineDisplayRepository;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
@@ -78,7 +93,7 @@ public class ProductService {
 
         Product product = Product.builder()
                 .sku(sku)
-                .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(2, letter.trim().length())) : null)
+                .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(50, letter.trim().length())) : null)
                 .category(category)
                 .parent(parent)
                 .name(name)
@@ -178,7 +193,7 @@ public class ProductService {
         if (sku != null) product.setSku(sku);
         if (letter != null) {
             String trimmed = letter.trim();
-            product.setLetter(trimmed.isEmpty() ? null : trimmed.substring(0, Math.min(2, trimmed.length())));
+            product.setLetter(trimmed.isEmpty() ? null : trimmed.substring(0, Math.min(50, trimmed.length())));
         }
         if (categoryId != null) {
             Category newCategory = categoryService.getCategoryById(categoryId);
@@ -213,25 +228,74 @@ public class ProductService {
     }
 
     public void deleteProduct(UUID id) {
+        log.info("[DELETE] Starting deleteProduct for id={}", id);
         Product product = getProductById(id);
+        log.info("[DELETE] Found product: name='{}', parentId={}", product.getName(), product.getParentId());
+
+        // Block delete if this product is used in any shipment (FK constraint would fail otherwise)
+        long shipmentCount = shipmentItemRepository.countByItem_Id(id);
+        log.info("[DELETE] Shipment item count for product: {}", shipmentCount);
+        if (shipmentCount > 0) {
+            log.warn("[DELETE] Cannot delete - product is used in shipments");
+            throw new ProductInUseException(
+                    "Cannot delete: this product is used in one or more shipments. Remove it from those shipments first.");
+        }
+
+        // Collect all product IDs to broadcast after commit
+        List<String> deletedProductIds = new java.util.ArrayList<>();
+        deletedProductIds.add(id.toString());
 
         // If parent has children, delete children first (cascade), then parent
         long childCount = productRepository.countChildrenByParentId(id);
+        log.info("[DELETE] Child count: {}", childCount);
         if (childCount > 0) {
             List<Product> children = productRepository.findByParentIdWithCategories(id);
             for (Product child : children) {
+                if (shipmentItemRepository.countByItem_Id(child.getId()) > 0) {
+                    throw new ProductInUseException(
+                            "Cannot delete: prize \"" + child.getName() + "\" is used in one or more shipments. Remove it from those shipments first.");
+                }
+            }
+            for (Product child : children) {
+                log.info("[DELETE] Deleting child: id={}, name='{}'", child.getId(), child.getName());
+                machineDisplayRepository.deleteByProduct_Id(child.getId());
                 inventoryAggregateService.deleteAllInventoryForProduct(child.getId());
                 stockMovementRepository.deleteByItem_Id(child.getId());
                 productRepository.delete(child);
-                broadcastService.broadcastProductUpdated(List.of(child.getId().toString()));
+                deletedProductIds.add(child.getId().toString());
             }
         }
 
-        // Delete parent's (or single product's) inventory and stock movements before deleting the product
+        // Delete machine displays, then parent's (or single product's) inventory and stock movements before deleting the product
+        log.info("[DELETE] Deleting machine displays for product id={}", id);
+        machineDisplayRepository.deleteByProduct_Id(id);
+        log.info("[DELETE] Deleting inventory for product id={}", id);
         inventoryAggregateService.deleteAllInventoryForProduct(id);
+        log.info("[DELETE] Deleting stock movements for product id={}", id);
         stockMovementRepository.deleteByItem_Id(id);
+
+        // If this is a child product, remove it from parent's children collection
+        // to prevent CascadeType.PERSIST from re-saving it
+        if (product.getParent() != null) {
+            log.info("[DELETE] Removing child from parent's children collection");
+            product.getParent().getChildren().remove(product);
+            product.setParent(null);
+        }
+
+        log.info("[DELETE] Deleting product entity id={}", id);
         productRepository.delete(product);
-        broadcastService.broadcastProductUpdated(List.of(id.toString()));
+        log.info("[DELETE] Product entity deleted, registering afterCommit callback");
+
+        // Defer broadcast until after transaction commits to avoid race condition
+        // where clients refetch before the delete is committed
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("[DELETE] Transaction committed, broadcasting product_updated for ids={}", deletedProductIds);
+                broadcastService.broadcastProductUpdated(deletedProductIds);
+            }
+        });
+        log.info("[DELETE] deleteProduct method complete, waiting for transaction commit");
     }
 
     public boolean existsBySku(String sku) {

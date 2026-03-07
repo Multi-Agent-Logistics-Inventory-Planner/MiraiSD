@@ -30,16 +30,18 @@ public class NotAssignedInventoryService {
         this.stockMovementService = stockMovementService;
     }
 
-    public NotAssignedInventory addInventory(UUID productId, Integer quantity, UUID actorId) {
+    public NotAssignedInventory addInventory(UUID productId, Integer quantity, UUID actorId, StockMovementReason reason) {
         Product product = productService.getProductById(productId);
 
         // Check if entry already exists - if so, adjust existing quantity
         Optional<NotAssignedInventory> existing = notAssignedInventoryRepository.findByItem_Id(productId);
         if (existing.isPresent()) {
             NotAssignedInventory inv = existing.get();
+            // Use provided reason or default to RESTOCK for adjustments
+            StockMovementReason adjustReason = reason != null ? reason : StockMovementReason.RESTOCK;
             AdjustStockRequestDTO adjustRequest = AdjustStockRequestDTO.builder()
                     .quantityChange(quantity)
-                    .reason(StockMovementReason.RESTOCK)
+                    .reason(adjustReason)
                     .actorId(actorId)
                     .build();
             stockMovementService.adjustInventory(LocationType.NOT_ASSIGNED, inv.getId(), adjustRequest);
@@ -47,10 +49,13 @@ public class NotAssignedInventoryService {
                     .orElseThrow(() -> new NotAssignedInventoryNotFoundException("Inventory not found after adjustment"));
         }
 
+        // Default to INITIAL_STOCK if no reason provided
+        StockMovementReason effectiveReason = reason != null ? reason : StockMovementReason.INITIAL_STOCK;
+
         // Create new inventory with tracking
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 LocationType.NOT_ASSIGNED, null, product, quantity,
-                StockMovementReason.INITIAL_STOCK, actorId, null);
+                effectiveReason, actorId, null);
 
         return notAssignedInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new NotAssignedInventoryNotFoundException("Failed to create inventory"));
