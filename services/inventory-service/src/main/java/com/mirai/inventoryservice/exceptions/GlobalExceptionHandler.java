@@ -70,7 +70,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             DuplicateSkuException.class,
             DuplicateLocationCodeException.class,
-            DuplicateCategoryException.class
+            DuplicateCategoryException.class,
+            ProductInUseException.class
     })
     public ResponseEntity<ErrorResponse> handleConflictException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()

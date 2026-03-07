@@ -101,4 +101,9 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
      */
     @Query("SELECT md.locationType, COUNT(md) FROM MachineDisplay md WHERE md.endedAt IS NULL GROUP BY md.locationType")
     List<Object[]> countActiveDisplaysByLocationType();
+
+    /**
+     * Delete all display records for a product (e.g. when deleting the product).
+     */
+    void deleteByProduct_Id(UUID productId);
 }

@@ -25,8 +25,8 @@ public class ProductRequestDTO {
     // Optional parent ID for creating child products (e.g., Kuji prizes)
     private UUID parentId;
 
-    /** Prize letter for Kuji children (e.g., A, B, C). Max 2 chars. */
-    @Size(max = 2)
+    /** Prize letter or label for Kuji children (e.g., A, B, C, Last Prize). Max 50 chars. */
+    @Size(max = 50)
     private String letter;
 
     @NotBlank(message = "Name is required")

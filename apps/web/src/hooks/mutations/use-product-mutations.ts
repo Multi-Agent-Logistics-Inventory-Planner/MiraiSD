@@ -36,10 +36,44 @@ export function useUpdateProductMutation() {
 
 export function useDeleteProductMutation() {
   const qc = useQueryClient();
-  return useMutation<void, Error, { id: string }>({
+  return useMutation<void, Error, { id: string; parentId?: string }>({
     mutationFn: ({ id }) => deleteProduct(id),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["products"] });
+    onSuccess: async (_, { id, parentId }) => {
+      try {
+        // Remove deleted product's queries so we don't refetch and get 404
+        qc.removeQueries({ queryKey: ["products", id, "with-children"] });
+        qc.removeQueries({ queryKey: ["products", id] });
+
+        // Optimistically update parent's with-children so the list updates immediately
+        if (parentId) {
+          const parentKey = ["products", parentId, "with-children"] as const;
+          const prev = qc.getQueryData<Product>(parentKey);
+          if (prev?.children) {
+            const nextChildren = prev.children.filter((c) => c.id !== id);
+            const totalChildStock = nextChildren.reduce(
+              (sum, c) => sum + (c.quantity ?? 0),
+              0
+            );
+            qc.setQueryData<Product>(parentKey, {
+              ...prev,
+              children: nextChildren,
+              totalChildStock,
+            });
+          }
+        }
+
+        await qc.invalidateQueries({ queryKey: ["products"] });
+        if (parentId) {
+          await qc.invalidateQueries({
+            queryKey: ["products", parentId, "with-children"],
+          });
+          await qc.invalidateQueries({
+            queryKey: ["products", parentId, "children"],
+          });
+        }
+      } catch {
+        // Don't let cache updates block success; dialog still closes via mutate() onSuccess
+      }
     },
   });
 }
