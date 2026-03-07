@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 interface TransferStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided, pre-selects source location when the dialog opens (e.g. from location detail or NA page). */
+  initialSourceLocation?: LocationSelection | null;
 }
 
 const EMPTY_LOCATION: LocationSelection = {
@@ -41,6 +43,7 @@ const EMPTY_LOCATION: LocationSelection = {
 export function TransferStockDialog({
   open,
   onOpenChange,
+  initialSourceLocation: initialSourceLocationProp,
 }: TransferStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -76,8 +79,14 @@ export function TransferStockDialog({
       setSearchQuery("");
       setCategoryFilters([]);
       setChildCategoryFilters([]);
+    } else if (initialSourceLocationProp && initialSourceLocationProp.locationType != null) {
+      setSourceLocation({
+        locationType: initialSourceLocationProp.locationType,
+        locationId: initialSourceLocationProp.locationId ?? null,
+        locationCode: initialSourceLocationProp.locationCode ?? "",
+      });
     }
-  }, [open]);
+  }, [open, initialSourceLocationProp]);
 
   useEffect(() => {
     if (sourceLocation.locationId) {

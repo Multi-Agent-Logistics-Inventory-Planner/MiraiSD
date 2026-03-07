@@ -392,6 +392,12 @@ export interface InventoryRequest {
   itemId: string;
   quantity: number;
   actorId?: string;
+  /**
+   * Optional reason for creating inventory.
+   * Use "RESTOCK" when adding inventory via the adjust dialog.
+   * Defaults to "INITIAL_STOCK" if not provided.
+   */
+  reason?: StockMovementReason;
 }
 
 // Shipment types

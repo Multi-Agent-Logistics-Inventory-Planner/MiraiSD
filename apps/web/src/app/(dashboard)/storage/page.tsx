@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, SlidersHorizontal, RefreshCw } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import { LocationDetailSheet } from "@/components/locations/location-detail-shee
 import { LocationForm } from "@/components/locations/location-form";
 import { NotAssignedTable } from "@/components/locations/not-assigned-table";
 import { StoragePagination } from "@/components/locations/storage-pagination";
+import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
+import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useLocationsWithCounts } from "@/hooks/queries/use-locations-with-counts";
 import { useNotAssignedInventory } from "@/hooks/queries/use-not-assigned-inventory";
 import {
@@ -51,6 +53,8 @@ export default function LocationsPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StorageLocation | null>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const createMutation = useCreateLocationMutation(locationType);
   const updateMutation = useUpdateLocationMutation(locationType);
@@ -128,7 +132,26 @@ export default function LocationsPage() {
               onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
-          {!isNotAssigned && (
+          {isNotAssigned ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setAdjustOpen(true)}
+                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
+              >
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                Adjust
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setTransferOpen(true)}
+                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Transfer
+              </Button>
+            </div>
+          ) : (
             <Can permission={Permission.STORAGE_CREATE}>
               <Button
                 onClick={() => {
@@ -176,6 +199,24 @@ export default function LocationsPage() {
             </>
           )}
 
+          <AdjustStockDialog
+            open={adjustOpen}
+            onOpenChange={setAdjustOpen}
+            initialLocation={{
+              locationType: LocationType.NOT_ASSIGNED,
+              locationId: "__not_assigned__",
+              locationCode: "",
+            }}
+          />
+          <TransferStockDialog
+            open={transferOpen}
+            onOpenChange={setTransferOpen}
+            initialSourceLocation={{
+              locationType: LocationType.NOT_ASSIGNED,
+              locationId: "__not_assigned__",
+              locationCode: "",
+            }}
+          />
         </>
       ) : (
         <>
