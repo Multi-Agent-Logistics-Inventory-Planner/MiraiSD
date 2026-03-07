@@ -20,6 +20,26 @@ logger = logging.getLogger(__name__)
 # Module-level scheduler instance
 _scheduler: BackgroundScheduler | None = None
 
+# Shared instances to avoid creating new connection pools per job
+_shared_repo: SupabaseRepo | None = None
+_shared_slack: SlackNotifier | None = None
+
+
+def _get_shared_repo() -> SupabaseRepo:
+    """Get or create shared SupabaseRepo instance."""
+    global _shared_repo
+    if _shared_repo is None:
+        _shared_repo = SupabaseRepo()
+    return _shared_repo
+
+
+def _get_shared_slack() -> SlackNotifier:
+    """Get or create shared SlackNotifier instance."""
+    global _shared_slack
+    if _shared_slack is None:
+        _shared_slack = SlackNotifier()
+    return _shared_slack
+
 
 def daily_review_fetch_job() -> None:
     """Run daily to fetch reviews from Apify and publish to Kafka.
@@ -44,8 +64,8 @@ def daily_review_summary_job() -> None:
     logger.info("Starting daily review summary job")
 
     try:
-        repo = SupabaseRepo()
-        slack = SlackNotifier()
+        repo = _get_shared_repo()
+        slack = _get_shared_slack()
 
         today = date.today()
         counts = repo.get_daily_counts(today)
@@ -61,8 +81,8 @@ def monthly_review_summary_job() -> None:
     logger.info("Starting monthly review summary job")
 
     try:
-        repo = SupabaseRepo()
-        slack = SlackNotifier()
+        repo = _get_shared_repo()
+        slack = _get_shared_slack()
 
         # Get previous month
         today = date.today()
