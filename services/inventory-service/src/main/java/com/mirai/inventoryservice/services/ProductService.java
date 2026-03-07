@@ -14,7 +14,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -301,5 +303,12 @@ public class ProductService {
      */
     public long countChildren(UUID parentId) {
         return productRepository.countChildrenByParentId(parentId);
+    }
+
+    /**
+     * Get set of all product IDs that have children (for efficient hasChildren computation)
+     */
+    public Set<UUID> getParentProductIds() {
+        return new HashSet<>(productRepository.findAllParentIds());
     }
 }
