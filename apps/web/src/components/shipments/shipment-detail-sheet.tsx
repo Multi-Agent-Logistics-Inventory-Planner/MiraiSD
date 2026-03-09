@@ -22,7 +22,7 @@ import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
-import { getTracking, type TrackingLookupResponse } from "@/lib/api/tracking";
+import { useTracking } from "@/hooks/queries/use-tracking";
 
 interface ShipmentDetailSheetProps {
   open: boolean;
@@ -322,9 +322,6 @@ export function ShipmentDetailSheet({
   onEditClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
-  const [tracking, setTracking] = useState<TrackingLookupResponse | null>(null);
-  const [trackingLoading, setTrackingLoading] = useState(false);
-  const [trackingError, setTrackingError] = useState<string | null>(null);
   const [trackingExpanded, setTrackingExpanded] = useState(false);
   const [infoExpanded, setInfoExpanded] = useState(false);
   const [isEditingTracking, setIsEditingTracking] = useState(false);
@@ -348,31 +345,13 @@ export function ShipmentDetailSheet({
     setIsEditingTracking(false);
     setTrackingInput("");
   }, [shipment?.id, open]);
-
-  useEffect(() => {
-    if (!shipment?.trackingId) {
-      setTracking(null);
-      setTrackingError(null);
-      return;
-    }
-
-    async function fetchTracking() {
-      setTrackingLoading(true);
-      setTrackingError(null);
-      try {
-        const result = await getTracking(shipment!.trackingId!);
-        setTracking(result);
-      } catch (err) {
-        setTrackingError(
-          err instanceof Error ? err.message : "Failed to load tracking"
-        );
-      } finally {
-        setTrackingLoading(false);
-      }
-    }
-
-    fetchTracking();
-  }, [shipment?.trackingId]);
+  const {
+    data: tracking,
+    isLoading: trackingLoading,
+    error: trackingErrorObj,
+  } = useTracking(trackingExpanded ? (shipment?.trackingId ?? null) : null);
+  const trackingError =
+    trackingErrorObj instanceof Error ? trackingErrorObj.message : null;
 
   // Group items into blocks (must run unconditionally to satisfy Rules of Hooks)
   const detailBlocks = useMemo((): DetailBlock[] => {
