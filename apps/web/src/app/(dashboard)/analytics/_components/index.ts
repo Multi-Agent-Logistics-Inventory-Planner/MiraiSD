@@ -1,3 +1,7 @@
 export { AnalyticsTabs } from "./analytics-tabs"
 export { TabLegacy } from "./tab-legacy"
 export { TabPlaceholder } from "./tab-placeholder"
+export { TabOverview } from "./tab-overview"
+export { TabStockout } from "./tab-stockout"
+export { TabCategories } from "./tab-categories"
+export { TabTopSellers } from "./tab-top-sellers"

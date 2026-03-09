@@ -10,11 +10,19 @@ import {
 } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAllForecasts } from "@/hooks/queries/use-forecasts"
-import { useSalesSummary } from "@/hooks/queries/use-analytics"
+import { useSalesSummary, usePerformanceMetrics, useInventoryByCategory } from "@/hooks/queries/use-analytics"
 import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
 import { AnalyticsTab } from "@/types/analytics"
-import { AnalyticsTabs, TabLegacy, TabPlaceholder } from "./_components"
+import {
+  AnalyticsTabs,
+  TabLegacy,
+  TabPlaceholder,
+  TabOverview,
+  TabStockout,
+  TabCategories,
+  TabTopSellers,
+} from "./_components"
 
 const ADMIN_ONLY_TABS = new Set([AnalyticsTab.TOP_SELLERS])
 
@@ -50,23 +58,53 @@ function AnalyticsContent() {
   } = useAllForecasts()
 
   const { data: salesData, isLoading: isLoadingSales } = useSalesSummary()
+  const { data: performanceData, isLoading: isLoadingPerformance } = usePerformanceMetrics()
+  const { data: categoryData, isLoading: isLoadingCategory } = useInventoryByCategory()
+
+  const forecasts = allForecastsData ?? []
 
   const renderTabContent = () => {
     switch (currentTab) {
       case AnalyticsTab.OVERVIEW:
-        return <TabPlaceholder title="Overview" icon={LayoutDashboard} />
+        return (
+          <TabOverview
+            isAdmin={isAdmin}
+            forecasts={forecasts}
+            isLoadingForecasts={isLoadingForecasts}
+            performanceData={performanceData}
+            isLoadingPerformance={isLoadingPerformance}
+            salesData={salesData}
+            isLoadingSales={isLoadingSales}
+          />
+        )
       case AnalyticsTab.PREDICTIONS:
-        return <TabPlaceholder title="Stockout Predictions" icon={TrendingDown} />
+        return (
+          <TabStockout
+            forecasts={forecasts}
+            isLoadingForecasts={isLoadingForecasts}
+            isForecastError={isForecastError}
+          />
+        )
       case AnalyticsTab.CATEGORIES:
-        return <TabPlaceholder title="Categories" icon={PieChart} />
+        return (
+          <TabCategories
+            categoryData={categoryData}
+            isLoadingCategory={isLoadingCategory}
+          />
+        )
       case AnalyticsTab.TOP_SELLERS:
-        return <TabPlaceholder title="Top Sellers" icon={Trophy} />
+        return (
+          <TabTopSellers
+            forecasts={forecasts}
+            isLoadingForecasts={isLoadingForecasts}
+          />
+        )
       case AnalyticsTab.LEGACY:
       default:
         return (
           <TabLegacy
             isAdmin={isAdmin}
-            forecasts={allForecastsData ?? []}
+            forecasts={forecasts}
             isLoadingForecasts={isLoadingForecasts}
             isForecastError={isForecastError}
             salesData={salesData}

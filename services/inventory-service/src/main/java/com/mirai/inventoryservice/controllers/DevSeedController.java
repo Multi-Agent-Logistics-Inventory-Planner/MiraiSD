@@ -552,7 +552,7 @@ public class DevSeedController {
                 .via(List.of("DASHBOARD"))
                 .metadata(Map.of(
                     "seed_generated", true,
-                    "product_sku", product.getSku()
+                    "product_sku", product.getSku() != null ? product.getSku() : "N/A"
                 ))
                 .createdAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(random.nextInt(14)))
                 .deliveredAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(random.nextInt(14)))

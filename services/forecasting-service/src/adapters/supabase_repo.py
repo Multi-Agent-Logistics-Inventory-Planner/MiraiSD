@@ -135,18 +135,19 @@ class SupabaseRepo:
         """
         query = """
             SELECT
-                id::text AS item_id,
-                name,
-                category,
-                lead_time_days,
-                COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
-            FROM products
-            WHERE is_active = true
+                p.id::text AS item_id,
+                p.name,
+                COALESCE(c.name, 'Uncategorized') AS category,
+                p.lead_time_days,
+                COALESCE(p.reorder_point / NULLIF(p.target_stock_level / NULLIF(p.lead_time_days, 0), 0), 7)::int AS safety_stock_days
+            FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id
+            WHERE p.is_active = true
         """
         params: dict = {}
 
         if item_ids:
-            query += " AND id = ANY(:item_ids)"
+            query += " AND p.id = ANY(:item_ids)"
             params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
 
         with self._engine.connect() as conn:
@@ -190,7 +191,7 @@ class SupabaseRepo:
         union_parts = []
         if item_ids:
             # Push WHERE clause into each UNION branch for early filtering
-            params["item_ids"] = [str(iid) for iid in item_ids]
+            params["item_ids"] = [uuid.UUID(iid) if isinstance(iid, str) else iid for iid in item_ids]
             for table, _ in inventory_tables:
                 union_parts.append(
                     f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids)"

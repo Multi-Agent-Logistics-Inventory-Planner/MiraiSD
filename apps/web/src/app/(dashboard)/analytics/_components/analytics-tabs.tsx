@@ -27,7 +27,9 @@ const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
     icon: Trophy,
     adminOnly: true,
   },
-  { value: AnalyticsTab.LEGACY, label: "component dump", icon: Angry },
+  ...(process.env.NODE_ENV === "development"
+    ? [{ value: AnalyticsTab.LEGACY, label: "component dump", icon: Angry } as TabConfig<AnalyticsTab>]
+    : []),
 ];
 
 interface AnalyticsTabsProps {
