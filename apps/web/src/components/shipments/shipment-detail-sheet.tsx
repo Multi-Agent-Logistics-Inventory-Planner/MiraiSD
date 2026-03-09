@@ -30,6 +30,7 @@ interface ShipmentDetailSheetProps {
   shipment: Shipment | null;
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
+  onEditClick?: () => void;
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
@@ -271,6 +272,7 @@ export function ShipmentDetailSheet({
   shipment,
   onReceiveClick,
   onDeleteClick,
+  onEditClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
   const [tracking, setTracking] = useState<TrackingLookupResponse | null>(null);
@@ -350,6 +352,8 @@ export function ShipmentDetailSheet({
   const canReceive =
     shipment.status === "PENDING" || shipment.status === "IN_TRANSIT";
   const canDelete = shipment.status !== "DELIVERED";
+  const canEdit =
+    shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
 
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
@@ -390,6 +394,14 @@ export function ShipmentDetailSheet({
                 <Button onClick={onReceiveClick} size="sm">
                   <PackageCheck className="h-4 w-4 mr-2" />
                   Receive Items
+                </Button>
+              )}
+            </Can>
+            <Can permission={Permission.SHIPMENTS_UPDATE}>
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={onEditClick}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
                 </Button>
               )}
             </Can>
