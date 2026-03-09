@@ -84,10 +84,10 @@ services:
     environment:
       # JVM memory limits optimized for 512M container on 2GB droplet
       # - Heap: 192m max (reduced to leave room for metaspace)
-      # - MaxMetaspaceSize: 128m (Spring Boot + Kafka + Hibernate needs this)
+      # - MaxMetaspaceSize: 256m (increased to avoid OkHttp / Resend metaspace OOM)
       # - ReservedCodeCacheSize: 32m (caps JIT compiler memory)
       # - UseContainerSupport: respect container memory limits
-      - JAVA_OPTS=-Xmx192m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m
+      - JAVA_OPTS=-Xmx192m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=32m
     deploy:
       resources:
         limits:
