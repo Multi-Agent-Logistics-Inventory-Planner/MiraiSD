@@ -26,7 +26,6 @@ import { useAllForecasts } from "@/hooks/queries/use-forecasts";
 import { useProducts } from "@/hooks/queries/use-products";
 import { ActionRequiredPanel } from "@/components/dashboard/action-required-panel";
 import { RiskDistributionDonut } from "@/components/dashboard/risk-distribution-donut";
-import { DemandVelocityCard } from "@/components/dashboard/demand-velocity-card";
 import { UnifiedActivityFeed } from "@/components/dashboard/unified-activity-feed";
 import { FilterableStockList } from "@/components/dashboard/filterable-stock-list";
 import { SupplyChainStatusCard } from "@/components/dashboard/supply-chain-status-card";
@@ -225,24 +224,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Demand Velocity + Activity Feed */}
-        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-5">
-          <div className="lg:col-span-2">
-            <DemandVelocityCard
-              items={metricsQuery.data?.demandVelocity ?? []}
-              isLoading={metricsQuery.isLoading}
-            />
-          </div>
-          <div className="lg:col-span-3">
-            <UnifiedActivityFeed
-              events={activityFeed.events}
-              isLoading={activityFeed.isLoading}
-              hasMore={activityFeed.hasMore}
-              onLoadMore={activityFeed.loadMore}
-              onFilterChange={handleActivityFilterChange}
-            />
-          </div>
-          </div>
+        {/* Activity Feed */}
+        <UnifiedActivityFeed
+          events={activityFeed.events}
+          isLoading={activityFeed.isLoading}
+          hasMore={activityFeed.hasMore}
+          onLoadMore={activityFeed.loadMore}
+          onFilterChange={handleActivityFilterChange}
+        />
         </div>
       </div>
     </ErrorBoundary>

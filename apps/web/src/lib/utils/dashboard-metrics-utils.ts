@@ -6,11 +6,10 @@
  */
 
 import { LOCATION_TYPE_LABELS } from "@/types/api";
-import type { Shipment, LocationWithCounts, AuditLogEntry } from "@/types/api";
+import type { Shipment, LocationWithCounts } from "@/types/api";
 import type {
   RiskDistributionSegment,
   HealthIndicator,
-  DemandVelocityItem,
   RiskBand,
   TrendData,
   ShipmentPipelineData,
@@ -163,125 +162,6 @@ export function computeHealthIndicators(
       status: getStatus(metrics.turnoverRate, 5, false),
     },
   ];
-}
-
-interface SparklineResult {
-  sparklineData: number[];
-  changePercent: number;
-  changeDirection: "increase" | "decrease";
-}
-
-/**
- * Computes sparkline data and week-over-week change from audit log entries.
- */
-export function computeSparklineFromAuditLog(
-  auditLogs: AuditLogEntry[],
-  itemId: string
-): SparklineResult {
-  const itemLogs = auditLogs.filter((log) => log.itemId === itemId);
-
-  if (itemLogs.length === 0) {
-    return {
-      sparklineData: [0, 0, 0, 0, 0, 0, 0],
-      changePercent: 0,
-      changeDirection: "increase",
-    };
-  }
-
-  const now = new Date();
-  const dailyData: number[] = [];
-
-  // Current week (last 7 days)
-  for (let i = 6; i >= 0; i--) {
-    const dayStart = new Date(now);
-    dayStart.setDate(dayStart.getDate() - i);
-    dayStart.setHours(0, 0, 0, 0);
-
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
-
-    const dayLogs = itemLogs.filter((log) => {
-      const logDate = new Date(log.at);
-      return logDate >= dayStart && logDate < dayEnd;
-    });
-
-    const dayTotal = dayLogs.reduce((sum, log) => sum + Math.abs(log.quantityChange), 0);
-    dailyData.push(dayTotal);
-  }
-
-  const currentWeek = dailyData.reduce((sum, v) => sum + v, 0);
-
-  // Previous week (days 7-13 ago)
-  const prevWeekData: number[] = [];
-  for (let i = 13; i >= 7; i--) {
-    const dayStart = new Date(now);
-    dayStart.setDate(dayStart.getDate() - i);
-    dayStart.setHours(0, 0, 0, 0);
-
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
-
-    const dayLogs = itemLogs.filter((log) => {
-      const logDate = new Date(log.at);
-      return logDate >= dayStart && logDate < dayEnd;
-    });
-
-    const dayTotal = dayLogs.reduce((sum, log) => sum + Math.abs(log.quantityChange), 0);
-    prevWeekData.push(dayTotal);
-  }
-
-  const previousWeek = prevWeekData.reduce((sum, v) => sum + v, 0);
-
-  let changePercent = 0;
-  let changeDirection: "increase" | "decrease" = "increase";
-
-  if (previousWeek > 0) {
-    changePercent = Math.round(((currentWeek - previousWeek) / previousWeek) * 100);
-    changeDirection = changePercent >= 0 ? "increase" : "decrease";
-    changePercent = Math.abs(changePercent);
-  }
-
-  return {
-    sparklineData: dailyData,
-    changePercent,
-    changeDirection,
-  };
-}
-
-interface ForecastForVelocity {
-  itemId: string;
-  itemName: string;
-  itemSku?: string | null;
-  avgDailyDelta: number;
-}
-
-/**
- * Computes demand velocity (top movers) from forecast data and audit logs.
- */
-export function computeDemandVelocity(
-  forecasts: ForecastForVelocity[],
-  auditLogs: AuditLogEntry[]
-): DemandVelocityItem[] {
-  const sorted = [...forecasts]
-    .filter((f) => f.avgDailyDelta !== 0)
-    .sort((a, b) => Math.abs(b.avgDailyDelta) - Math.abs(a.avgDailyDelta))
-    .slice(0, 5);
-
-  return sorted.map((f) => {
-    const currentDelta = Math.abs(f.avgDailyDelta);
-    const sparkline = computeSparklineFromAuditLog(auditLogs, f.itemId);
-
-    return {
-      itemId: f.itemId,
-      itemName: f.itemName,
-      itemSku: f.itemSku,
-      currentDelta,
-      previousDelta: currentDelta,
-      changePercent: sparkline.changePercent,
-      changeDirection: sparkline.changeDirection,
-      sparklineData: sparkline.sparklineData,
-    };
-  });
 }
 
 /**

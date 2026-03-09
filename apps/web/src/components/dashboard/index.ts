@@ -1,5 +1,4 @@
 export { ActionRequiredPanel } from "./action-required-panel";
-export { DemandVelocityCard } from "./demand-velocity-card";
 export { FilterableStockList } from "./filterable-stock-list";
 export { QuickStatsBar } from "./quick-stats-bar";
 export { RiskDistributionDonut } from "./risk-distribution-donut";

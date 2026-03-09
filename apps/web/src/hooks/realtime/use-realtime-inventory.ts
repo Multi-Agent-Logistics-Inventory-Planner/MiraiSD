@@ -1,7 +1,9 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useSupabaseRealtime, type RealtimePayload } from "./use-supabase-realtime";
+import { getProductById } from "@/lib/api/products";
+import type { Product } from "@/types/api";
 
 interface StockMovementRow {
   id: number;
@@ -10,6 +12,39 @@ interface StockMovementRow {
   quantity_change: number;
   reason: string;
   at: string;
+}
+
+/**
+ * Surgical product update: fetch single product and update cache.
+ * Avoids full products list refetch.
+ */
+function surgicalProductUpdate(queryClient: QueryClient, itemId: string) {
+  // Invalidate specific product queries
+  queryClient.invalidateQueries({ queryKey: ["products", itemId] });
+  queryClient.invalidateQueries({ queryKey: ["products", itemId, "with-children"] });
+  queryClient.invalidateQueries({ queryKey: ["products", itemId, "children"] });
+
+  // Fetch single product and update all list caches
+  getProductById(itemId)
+    .then((updatedProduct: Product) => {
+      queryClient.setQueriesData<Product[]>(
+        { queryKey: ["products"] },
+        (oldData) => {
+          if (!oldData || !Array.isArray(oldData)) return oldData;
+          const index = oldData.findIndex((p) => p.id === itemId);
+          if (index === -1) return oldData;
+          return [
+            ...oldData.slice(0, index),
+            updatedProduct,
+            ...oldData.slice(index + 1),
+          ];
+        }
+      );
+    })
+    .catch(() => {
+      // Fallback: if single fetch fails, invalidate all
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    });
 }
 
 /**
@@ -46,8 +81,8 @@ export function useRealtimeInventory(enabled = true) {
         queryKey: ["productInventoryEntries", item_id],
       });
 
-      // 4. Refresh products (quantity is now denormalized on the product row)
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      // 4. Surgical product update (avoid full list refetch)
+      surgicalProductUpdate(queryClient, item_id);
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
       // 5. Invalidate not-assigned inventory (items may have been assigned)
@@ -75,9 +110,7 @@ export function useRealtimeProductInventory(itemId: string, enabled = true) {
       queryClient.invalidateQueries({
         queryKey: ["productInventoryEntries", itemId],
       });
-      queryClient.invalidateQueries({
-        queryKey: ["products"],
-      });
+      surgicalProductUpdate(queryClient, itemId);
       queryClient.invalidateQueries({
         queryKey: ["movementHistory", itemId],
       });

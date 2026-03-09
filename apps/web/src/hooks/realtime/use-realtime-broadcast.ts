@@ -3,7 +3,9 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getProductById } from "@/lib/api/products";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { Product } from "@/types/api";
 
 /**
  * Event types that can be broadcast from the backend
@@ -128,6 +130,47 @@ export function useRealtimeBroadcast(enabled = true) {
                 queryKey: ["locationsWithCounts"],
                 exact: true,
               });
+            } else if (queryKey[0] === "products") {
+              // Surgical product update when itemId or single id available
+              const itemId = data.itemId ?? (data.ids?.length === 1 ? data.ids[0] : null);
+              if (itemId) {
+                // Invalidate specific product queries (single product, not lists)
+                queryClient.invalidateQueries({
+                  queryKey: ["products", itemId],
+                });
+                queryClient.invalidateQueries({
+                  queryKey: ["products", itemId, "with-children"],
+                });
+                queryClient.invalidateQueries({
+                  queryKey: ["products", itemId, "children"],
+                });
+                // Fetch single product and update all list caches (avoid full refetch)
+                getProductById(itemId)
+                  .then((updatedProduct: Product) => {
+                    // Update all products list queries that contain this product
+                    queryClient.setQueriesData<Product[]>(
+                      { queryKey: ["products"] },
+                      (oldData) => {
+                        if (!oldData || !Array.isArray(oldData)) return oldData;
+                        const index = oldData.findIndex((p) => p.id === itemId);
+                        if (index === -1) return oldData;
+                        // Return new array with updated product
+                        return [
+                          ...oldData.slice(0, index),
+                          updatedProduct,
+                          ...oldData.slice(index + 1),
+                        ];
+                      }
+                    );
+                  })
+                  .catch(() => {
+                    // Fallback: if single fetch fails, invalidate all
+                    queryClient.invalidateQueries({ queryKey: ["products"] });
+                  });
+              } else {
+                // Batch operation - no specific itemId, invalidate all
+                queryClient.invalidateQueries({ queryKey });
+              }
             } else {
               queryClient.invalidateQueries({ queryKey });
             }

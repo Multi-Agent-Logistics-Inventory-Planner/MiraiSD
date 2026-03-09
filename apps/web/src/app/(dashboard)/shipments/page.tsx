@@ -110,6 +110,7 @@ export default function ShipmentsPage() {
         id: selectedShipment.id,
         payload: {
           shipmentNumber: selectedShipment.shipmentNumber,
+          status: selectedShipment.status,
           orderDate: selectedShipment.orderDate,
           trackingId,
           items: selectedShipment.items.map((item) => ({
