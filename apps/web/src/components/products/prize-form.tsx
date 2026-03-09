@@ -122,7 +122,7 @@ export function PrizeForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="quantity">Quantity</Label>
+              <Label htmlFor="quantity">Pieces</Label>
               <Input
                 id="quantity"
                 type="number"

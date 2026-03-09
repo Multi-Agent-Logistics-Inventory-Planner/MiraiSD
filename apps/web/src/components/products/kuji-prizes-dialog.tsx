@@ -111,7 +111,7 @@ export function KujiPrizesDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-24">Letter</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Pieces</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
