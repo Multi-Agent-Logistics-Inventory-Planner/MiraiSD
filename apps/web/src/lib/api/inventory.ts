@@ -701,7 +701,7 @@ export async function getInventoryEntriesByItemId(
       quantity: inv.quantity ?? 0,
       locationType: LocationType.NOT_ASSIGNED,
       locationId: "",
-      locationCode: "-",
+      locationCode: "NA",
       locationLabel: "Not Assigned",
     });
   }
