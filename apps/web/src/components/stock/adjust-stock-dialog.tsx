@@ -454,21 +454,23 @@ export function AdjustStockDialog({
           ) : hasValidLocation &&
             hasSelectedProduct &&
             selectedNormalizedItem ? (
-            <SelectedProductCard
-              inventory={selectedNormalizedItem}
-              existingQuantityAtLocation={currentQtyAtLocation}
-              action={action}
-              quantity={quantity}
-              reason={reason}
-              quantityWarning={quantityWarning}
-              locationLabel={locationLabel}
-              disabled={isAdjusting}
-              onClearSelection={handleClearSelection}
-              onQuantityChange={handleQuantityChange}
-              onReasonChange={setReason}
-              onIncrement={handleIncrement}
-              onDecrement={handleDecrement}
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto mt-4">
+              <SelectedProductCard
+                inventory={selectedNormalizedItem}
+                existingQuantityAtLocation={currentQtyAtLocation}
+                action={action}
+                quantity={quantity}
+                reason={reason}
+                quantityWarning={quantityWarning}
+                locationLabel={locationLabel}
+                disabled={isAdjusting}
+                onClearSelection={handleClearSelection}
+                onQuantityChange={handleQuantityChange}
+                onReasonChange={setReason}
+                onIncrement={handleIncrement}
+                onDecrement={handleDecrement}
+              />
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
               Select a location to see available products
