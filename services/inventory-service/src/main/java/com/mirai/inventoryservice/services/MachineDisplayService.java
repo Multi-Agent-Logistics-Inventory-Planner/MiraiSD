@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
@@ -269,6 +270,187 @@ public class MachineDisplayService {
                 productSummary,
                 null
         );
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+    }
+
+    /**
+     * Batch display swap operation that handles both swap modes in a single transaction:
+     * 1. Swap with products - remove displays and add new products
+     * 2. Swap with another machine - trade displays between two machines
+     * Creates a single audit log entry with all changes.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> batchSwapDisplay(BatchDisplaySwapRequestDTO request) {
+        OffsetDateTime now = OffsetDateTime.now();
+        List<String> removedProducts = new ArrayList<>();
+        List<String> addedProducts = new ArrayList<>();
+        String sourceMachineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        String targetMachineCode = null;
+
+        // Mode 1: Swap with products (remove displays, add new products)
+        if (request.getDisplayIdsToRemove() != null && !request.getDisplayIdsToRemove().isEmpty()) {
+            for (UUID displayId : request.getDisplayIdsToRemove()) {
+                MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
+                        .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+
+                if (display.getEndedAt() != null) {
+                    throw new IllegalArgumentException("Display is already ended: " + displayId);
+                }
+
+                removedProducts.add(display.getProduct().getName());
+                display.setEndedAt(now);
+                machineDisplayRepository.save(display);
+            }
+        }
+
+        if (request.getProductIdsToAdd() != null && !request.getProductIdsToAdd().isEmpty()) {
+            // Get existing active displays for this machine
+            List<MachineDisplay> existingDisplays = machineDisplayRepository
+                    .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+            Set<UUID> existingProductIds = existingDisplays.stream()
+                    .map(d -> d.getProduct().getId())
+                    .collect(Collectors.toSet());
+
+            // Filter out already displayed products
+            List<UUID> newProductIds = request.getProductIdsToAdd().stream()
+                    .distinct()
+                    .filter(id -> !existingProductIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!newProductIds.isEmpty()) {
+                Map<UUID, Product> productsById = productRepository.findAllById(newProductIds).stream()
+                        .collect(Collectors.toMap(Product::getId, p -> p));
+
+                for (UUID productId : newProductIds) {
+                    Product product = productsById.get(productId);
+                    if (product == null) {
+                        throw new IllegalArgumentException("Product not found: " + productId);
+                    }
+
+                    MachineDisplay newDisplay = MachineDisplay.builder()
+                            .locationType(request.getLocationType())
+                            .machineId(request.getMachineId())
+                            .product(product)
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .build();
+                    machineDisplayRepository.save(newDisplay);
+                    addedProducts.add(product.getName());
+                }
+            }
+        }
+
+        // Mode 2: Machine-to-machine swap
+        if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
+            targetMachineCode = resolveLocationCode(request.getTargetMachineId(), request.getTargetLocationType());
+
+            // Move displays FROM target machine TO current machine
+            if (request.getDisplayIdsFromTarget() != null && !request.getDisplayIdsFromTarget().isEmpty()) {
+                // Get existing active displays for current machine
+                List<MachineDisplay> existingDisplays = machineDisplayRepository
+                        .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+                Set<UUID> existingProductIds = existingDisplays.stream()
+                        .map(d -> d.getProduct().getId())
+                        .collect(Collectors.toSet());
+
+                for (UUID displayId : request.getDisplayIdsFromTarget()) {
+                    MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
+                            .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+
+                    if (display.getEndedAt() != null) {
+                        throw new IllegalArgumentException("Display is already ended: " + displayId);
+                    }
+
+                    // Skip if product is already displayed on current machine
+                    if (existingProductIds.contains(display.getProduct().getId())) {
+                        continue;
+                    }
+
+                    // End the display on target machine
+                    display.setEndedAt(now);
+                    machineDisplayRepository.save(display);
+
+                    // Create new display on current machine
+                    MachineDisplay newDisplay = MachineDisplay.builder()
+                            .locationType(request.getLocationType())
+                            .machineId(request.getMachineId())
+                            .product(display.getProduct())
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .build();
+                    machineDisplayRepository.save(newDisplay);
+                    addedProducts.add(display.getProduct().getName());
+                    existingProductIds.add(display.getProduct().getId());
+                }
+            }
+
+            // Move displays FROM current machine TO target machine
+            if (request.getDisplayIdsToTarget() != null && !request.getDisplayIdsToTarget().isEmpty()) {
+                // Get existing active displays for target machine
+                List<MachineDisplay> targetDisplays = machineDisplayRepository
+                        .findActiveByLocationTypeAndMachineId(request.getTargetLocationType(), request.getTargetMachineId());
+                Set<UUID> targetProductIds = targetDisplays.stream()
+                        .map(d -> d.getProduct().getId())
+                        .collect(Collectors.toSet());
+
+                for (UUID displayId : request.getDisplayIdsToTarget()) {
+                    MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
+                            .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+
+                    if (display.getEndedAt() != null) {
+                        throw new IllegalArgumentException("Display is already ended: " + displayId);
+                    }
+
+                    // Skip if product is already displayed on target machine
+                    if (targetProductIds.contains(display.getProduct().getId())) {
+                        continue;
+                    }
+
+                    // End the display on current machine
+                    display.setEndedAt(now);
+                    machineDisplayRepository.save(display);
+                    removedProducts.add(display.getProduct().getName());
+
+                    // Create new display on target machine
+                    MachineDisplay newDisplay = MachineDisplay.builder()
+                            .locationType(request.getTargetLocationType())
+                            .machineId(request.getTargetMachineId())
+                            .product(display.getProduct())
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .build();
+                    machineDisplayRepository.save(newDisplay);
+                    targetProductIds.add(display.getProduct().getId());
+                }
+            }
+        }
+
+        // Create single audit log entry for the entire swap operation
+        if (!removedProducts.isEmpty() || !addedProducts.isEmpty()) {
+            StringBuilder productSummary = new StringBuilder();
+            if (!removedProducts.isEmpty()) {
+                productSummary.append("Removed: ").append(buildProductSummary(removedProducts));
+            }
+            if (!addedProducts.isEmpty()) {
+                if (productSummary.length() > 0) {
+                    productSummary.append(" | ");
+                }
+                productSummary.append("Added: ").append(buildProductSummary(addedProducts));
+            }
+
+            int totalChanges = removedProducts.size() + addedProducts.size();
+            auditLogService.createAuditLog(
+                    request.getActorId(),
+                    StockMovementReason.DISPLAY_SWAP,
+                    request.getMachineId(), sourceMachineCode,
+                    request.getTargetMachineId() != null ? request.getTargetMachineId() : request.getMachineId(),
+                    request.getTargetMachineId() != null ? targetMachineCode : sourceMachineCode,
+                    totalChanges, 0,
+                    productSummary.toString(),
+                    null
+            );
+        }
 
         return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
     }

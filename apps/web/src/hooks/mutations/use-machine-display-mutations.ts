@@ -5,7 +5,9 @@ import {
   clearMachineDisplay,
   clearDisplayById,
   swapMachineDisplay,
+  batchSwapDisplay,
   type SwapMachineDisplayRequest,
+  type BatchDisplaySwapRequest,
 } from "@/lib/api/machine-displays";
 import { SetMachineDisplayRequest, SetMachineDisplayBatchRequest, MachineDisplay, LocationType } from "@/types/api";
 
@@ -80,6 +82,24 @@ export function useSwapDisplayMutation() {
 
   return useMutation<MachineDisplay[], Error, SwapMachineDisplayRequest>({
     mutationFn: swapMachineDisplay,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
+    },
+  });
+}
+
+/**
+ * Mutation for batch display swap operations.
+ * Handles both swap modes in a single transaction:
+ * 1. Swap with products - remove displays and add new products
+ * 2. Swap with another machine - trade displays between two machines
+ * Creates a single DISPLAY_SWAP audit log entry with all changes.
+ */
+export function useBatchSwapDisplayMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<MachineDisplay[], Error, BatchDisplaySwapRequest>({
+    mutationFn: batchSwapDisplay,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
     },

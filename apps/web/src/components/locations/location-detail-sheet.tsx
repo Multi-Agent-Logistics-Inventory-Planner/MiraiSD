@@ -68,6 +68,7 @@ import {
 import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
+  useBatchSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
@@ -186,6 +187,7 @@ export function LocationDetailSheet({
 
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
+  const batchSwapMutation = useBatchSwapDisplayMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
@@ -243,41 +245,16 @@ export function LocationDetailSheet({
 
     setIsTransferring(true);
     try {
-      // Step 1: Clear items being sent from current machine
-      for (const item of itemsToSend) {
-        await clearDisplayMutation.mutateAsync({
-          displayId: item.id,
-          actorId: user?.personId,
-        });
-      }
-
-      // Step 2: Clear items being received from target machine
-      for (const item of itemsToReceive) {
-        await clearDisplayMutation.mutateAsync({
-          displayId: item.id,
-          actorId: user?.personId,
-        });
-      }
-
-      // Step 3: Add sent items to target machine
-      if (itemsToSend.length > 0) {
-        await setDisplayBatchMutation.mutateAsync({
-          locationType,
-          machineId: targetMachineId,
-          productIds: itemsToSend.map((item) => item.productId),
-          actorId: user?.personId,
-        } as SetMachineDisplayBatchRequest);
-      }
-
-      // Step 4: Add received items to current machine
-      if (itemsToReceive.length > 0) {
-        await setDisplayBatchMutation.mutateAsync({
-          locationType,
-          machineId: locationId,
-          productIds: itemsToReceive.map((item) => item.productId),
-          actorId: user?.personId,
-        } as SetMachineDisplayBatchRequest);
-      }
+      // Use the batch swap endpoint for a single transaction and single audit log
+      await batchSwapMutation.mutateAsync({
+        locationType,
+        machineId: locationId,
+        targetLocationType: locationType,
+        targetMachineId,
+        displayIdsToTarget: itemsToSend.map((item) => item.id),
+        displayIdsFromTarget: itemsToReceive.map((item) => item.id),
+        actorId: user?.personId,
+      });
 
       const sentCount = itemsToSend.length;
       const receivedCount = itemsToReceive.length;
@@ -298,7 +275,7 @@ export function LocationDetailSheet({
     } catch {
       toast({
         title: "Error",
-        description: "Failed to transfer displays. Some changes may have been applied.",
+        description: "Failed to transfer displays.",
         variant: "destructive",
       });
     } finally {
@@ -341,23 +318,14 @@ export function LocationDetailSheet({
 
     setIsTransferring(true);
     try {
-      // Step 1: Clear items being removed
-      for (const item of itemsToRemove) {
-        await clearDisplayMutation.mutateAsync({
-          displayId: item.id,
-          actorId: user?.personId,
-        });
-      }
-
-      // Step 2: Add new products to display
-      if (productsToAdd.length > 0) {
-        await setDisplayBatchMutation.mutateAsync({
-          locationType,
-          machineId: locationId,
-          productIds: productsToAdd,
-          actorId: user?.personId,
-        } as SetMachineDisplayBatchRequest);
-      }
+      // Use the batch swap endpoint for a single transaction and single audit log
+      await batchSwapMutation.mutateAsync({
+        locationType,
+        machineId: locationId,
+        displayIdsToRemove: itemsToRemove.map((item) => item.id),
+        productIdsToAdd: productsToAdd,
+        actorId: user?.personId,
+      });
 
       const removedCount = itemsToRemove.length;
       const addedCount = productsToAdd.length;
@@ -378,7 +346,7 @@ export function LocationDetailSheet({
     } catch {
       toast({
         title: "Error",
-        description: "Failed to swap display. Some changes may have been applied.",
+        description: "Failed to swap display.",
         variant: "destructive",
       });
     } finally {

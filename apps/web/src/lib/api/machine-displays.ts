@@ -16,6 +16,29 @@ export interface SwapMachineDisplayRequest {
 }
 
 /**
+ * Batch display swap request - supports both swap modes:
+ * 1. Swap with products - remove displays and add new products
+ * 2. Swap with another machine - trade displays between two machines
+ */
+export interface BatchDisplaySwapRequest {
+  locationType: LocationType;
+  machineId: string;
+  /** Display IDs to remove from the current machine */
+  displayIdsToRemove?: string[];
+  /** Product IDs to add to the current machine */
+  productIdsToAdd?: string[];
+  /** For machine-to-machine swap: the target machine's location type */
+  targetLocationType?: LocationType;
+  /** For machine-to-machine swap: the target machine's ID */
+  targetMachineId?: string;
+  /** For machine-to-machine swap: display IDs to move FROM target machine TO current machine */
+  displayIdsFromTarget?: string[];
+  /** For machine-to-machine swap: display IDs to move FROM current machine TO target machine */
+  displayIdsToTarget?: string[];
+  actorId?: string;
+}
+
+/**
  * Get all active machine displays
  */
 export async function getActiveDisplays(): Promise<MachineDisplay[]> {
@@ -172,6 +195,21 @@ export async function swapMachineDisplay(
 ): Promise<MachineDisplay[]> {
   return apiPost<MachineDisplay[], SwapMachineDisplayRequest>(
     "/api/machine-displays/swap",
+    data
+  );
+}
+
+/**
+ * Batch display swap operation that handles both swap modes in a single transaction:
+ * 1. Swap with products - remove displays and add new products
+ * 2. Swap with another machine - trade displays between two machines
+ * Creates a single audit log entry with all changes.
+ */
+export async function batchSwapDisplay(
+  data: BatchDisplaySwapRequest
+): Promise<MachineDisplay[]> {
+  return apiPost<MachineDisplay[], BatchDisplaySwapRequest>(
+    "/api/machine-displays/batch-swap",
     data
   );
 }
