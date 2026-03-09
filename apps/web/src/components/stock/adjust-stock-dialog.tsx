@@ -168,6 +168,19 @@ export function AdjustStockDialog({
     return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
   }, [inventory, selectedInventoryId]);
 
+  // Handle product removal when quantity reaches 0 (e.g., after subtracting all stock)
+  useEffect(() => {
+    if (selectedInventoryId && inventory.length > 0) {
+      const stillExists = inventory.some((inv) => inv.id === selectedInventoryId);
+      if (!stillExists) {
+        // Product was removed (quantity reached 0), clear selection
+        setSelectedInventoryId(null);
+        setQuantity(1);
+        setQuantityWarning(null);
+      }
+    }
+  }, [inventory, selectedInventoryId]);
+
   const hasValidLocation = Boolean(location.locationId);
   const isAdjusting = adjustMutation.isPending;
   const isSavingInventory =
@@ -306,7 +319,10 @@ export function AdjustStockDialog({
       });
 
       toast({ title: "Stock adjusted" });
-      onOpenChange(false);
+      // Reset to product list view, keep location selected
+      setSelectedInventoryId(null);
+      setQuantity(1);
+      setQuantityWarning(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Adjustment failed";
       toast({ title: "Adjustment failed", description: message });

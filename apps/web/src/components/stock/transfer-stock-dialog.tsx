@@ -269,7 +269,8 @@ export function TransferStockDialog({
         title: "Transfer complete",
         description: `Successfully transferred ${transfers.length} item(s).`,
       });
-      onOpenChange(false);
+      // Reset transfer quantities only, keep locations selected
+      setTransferQuantities({});
     } catch (err) {
       const message = err instanceof Error ? err.message : "Transfer failed";
       toast({ title: "Transfer failed", description: message });
