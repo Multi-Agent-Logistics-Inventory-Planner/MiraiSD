@@ -15,7 +15,6 @@ import { useProducts } from "./use-products";
 import { getPerformanceMetrics } from "@/lib/api/analytics";
 import { getShipments } from "@/lib/api/shipments";
 import { getLocationsWithCounts } from "@/lib/api/locations";
-import { getAuditLog } from "@/lib/api/stock-movements";
 import { ShipmentStatus, NotificationSeverity } from "@/types/api";
 import type { Product } from "@/types/api";
 import type {
@@ -28,7 +27,6 @@ import type {
 import {
   computeRiskDistribution,
   computeHealthIndicators,
-  computeDemandVelocity,
   computeShipmentPipeline,
   computeLocationUtilization,
 } from "@/lib/utils/dashboard-metrics-utils";
@@ -73,23 +71,6 @@ export function useDashboardMetrics() {
     staleTime: 60 * 1000,
   });
 
-  const auditLogQuery = useQuery({
-    queryKey: ["audit-log", "dashboard-14d"],
-    queryFn: async () => {
-      const now = new Date();
-      const twoWeeksAgo = new Date(now);
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-
-      const result = await getAuditLog(
-        { fromDate: twoWeeksAgo.toISOString().split("T")[0] },
-        0,
-        500
-      );
-      return result.content;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
   // Store metrics for future trend calculations
   useEffect(() => {
     if (performanceMetricsQuery.data) {
@@ -107,8 +88,7 @@ export function useDashboardMetrics() {
     performanceMetricsQuery.isLoading ||
     pendingShipmentsQuery.isLoading ||
     inTransitShipmentsQuery.isLoading ||
-    locationsQuery.isLoading ||
-    auditLogQuery.isLoading;
+    locationsQuery.isLoading;
 
   // First error from any query
   const error =
@@ -120,8 +100,7 @@ export function useDashboardMetrics() {
     performanceMetricsQuery.error ??
     pendingShipmentsQuery.error ??
     inTransitShipmentsQuery.error ??
-    locationsQuery.error ??
-    auditLogQuery.error;
+    locationsQuery.error;
 
   // Compute aggregated dashboard metrics
   const data: DashboardMetrics | null = useMemo(() => {
@@ -134,7 +113,6 @@ export function useDashboardMetrics() {
     const pendingShipments = pendingShipmentsQuery.data;
     const inTransitShipments = inTransitShipmentsQuery.data;
     const locations = locationsQuery.data;
-    const auditLogs = auditLogQuery.data;
 
     // Require minimum data to render
     if (!allForecasts || !products) {
@@ -179,7 +157,6 @@ export function useDashboardMetrics() {
     // Compute derived metrics using utility functions
     const riskDistribution = computeRiskDistribution(allForecasts);
     const healthIndicators = computeHealthIndicators(performanceMetrics ?? null, previousMetrics);
-    const demandVelocity = computeDemandVelocity(allForecasts, auditLogs ?? []);
 
     // Compute stock value
     const stockValue = products.reduce((sum, p) => {
@@ -222,7 +199,6 @@ export function useDashboardMetrics() {
       },
       riskDistribution,
       healthIndicators,
-      demandVelocity,
       quickStats,
       shipmentPipeline,
       locationUtilization,
@@ -237,7 +213,6 @@ export function useDashboardMetrics() {
     pendingShipmentsQuery.data,
     inTransitShipmentsQuery.data,
     locationsQuery.data,
-    auditLogQuery.data,
     previousMetrics,
   ]);
 
