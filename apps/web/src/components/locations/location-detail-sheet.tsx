@@ -68,9 +68,7 @@ import {
 import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
-  useSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
-import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -188,7 +186,6 @@ export function LocationDetailSheet({
 
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
-  const swapDisplayMutation = useSwapDisplayMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
@@ -197,8 +194,6 @@ export function LocationDetailSheet({
   const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
-  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
-  const [productToSwap, setProductToSwap] = useState<MachineDisplay | null>(null);
 
   // Reset state when dialog opens / location changes
   useEffect(() => {
@@ -338,35 +333,56 @@ export function LocationDetailSheet({
     setProductToClear(null);
   }
 
-  function handleSwapClick(item: MachineDisplay) {
-    setProductToSwap(item);
-    setSwapDialogOpen(true);
-  }
-
-  async function handleSwap(outgoingDisplayId: string, incomingProductId: string) {
+  async function handleSwapWithProducts(
+    itemsToRemove: MachineDisplay[],
+    productsToAdd: string[]
+  ) {
     if (!locationId) return;
-    const incoming = products.find((p) => p.id === incomingProductId);
-    const outgoing = activeDisplaysForMachine.find((d) => d.id === outgoingDisplayId);
+
+    setIsTransferring(true);
     try {
-      await swapDisplayMutation.mutateAsync({
-        outgoingDisplayId,
-        incomingProductId,
-        locationType,
-        machineId: locationId,
-        actorId: user?.personId,
-      });
+      // Step 1: Clear items being removed
+      for (const item of itemsToRemove) {
+        await clearDisplayMutation.mutateAsync({
+          displayId: item.id,
+          actorId: user?.personId,
+        });
+      }
+
+      // Step 2: Add new products to display
+      if (productsToAdd.length > 0) {
+        await setDisplayBatchMutation.mutateAsync({
+          locationType,
+          machineId: locationId,
+          productIds: productsToAdd,
+          actorId: user?.personId,
+        } as SetMachineDisplayBatchRequest);
+      }
+
+      const removedCount = itemsToRemove.length;
+      const addedCount = productsToAdd.length;
+      let description = "";
+      if (removedCount > 0 && addedCount > 0) {
+        description = `Removed ${removedCount} and added ${addedCount} product(s).`;
+      } else if (removedCount > 0) {
+        description = `Removed ${removedCount} product(s) from display.`;
+      } else {
+        description = `Added ${addedCount} product(s) to display.`;
+      }
+
       toast({
-        title: "Display swapped",
-        description: `"${outgoing?.productName}" replaced with "${incoming?.name}".`,
+        title: "Swap complete",
+        description,
       });
-      setSwapDialogOpen(false);
-      setProductToSwap(null);
+      setTransferDisplayDialogOpen(false);
     } catch {
       toast({
         title: "Error",
-        description: "Failed to swap display.",
+        description: "Failed to swap display. Some changes may have been applied.",
         variant: "destructive",
       });
+    } finally {
+      setIsTransferring(false);
     }
   }
 
@@ -548,15 +564,6 @@ export function LocationDetailSheet({
                           Stale
                         </Badge>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                        onClick={() => handleSwapClick(item)}
-                        title="Swap product"
-                      >
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -811,20 +818,6 @@ export function LocationDetailSheet({
         </AlertDialogContent>
       </AlertDialog>
 
-      <SwapDisplayDialog
-        open={swapDialogOpen}
-        onOpenChange={(next) => {
-          setSwapDialogOpen(next);
-          if (!next) setProductToSwap(null);
-        }}
-        outgoingDisplay={productToSwap}
-        products={products}
-        activeDisplaysForMachine={activeDisplaysForMachine}
-        actorId={user?.personId}
-        onSwap={handleSwap}
-        isSubmitting={swapDisplayMutation.isPending}
-      />
-
       <AddDisplayDialog
         open={addDisplayDialogOpen}
         onOpenChange={setAddDisplayDialogOpen}
@@ -841,7 +834,8 @@ export function LocationDetailSheet({
         currentMachineCode={code}
         currentDisplays={activeDisplaysForMachine}
         actorId={user?.personId}
-        onTransfer={handleTransferDisplays}
+        onTransferWithMachine={handleTransferDisplays}
+        onSwapWithProducts={handleSwapWithProducts}
         isSubmitting={isTransferring}
       />
     </>

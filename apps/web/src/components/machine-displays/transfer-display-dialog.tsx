@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Check, ChevronRight, Loader2, Monitor } from "lucide-react";
+import Image from "next/image";
+import {
+  ArrowLeftRight,
+  Check,
+  ChevronRight,
+  ImageOff,
+  Loader2,
+  Monitor,
+  Package,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { getSafeImageUrl } from "@/lib/utils/validation";
 import {
   LocationType,
   MachineDisplay,
@@ -25,12 +35,18 @@ import {
   KeychainMachine,
   FourCornerMachine,
   PusherMachine,
+  Product,
 } from "@/types/api";
+import { useQuery } from "@tanstack/react-query";
 import { useLocationsOnly } from "@/hooks/queries/use-locations";
 import {
   useActiveDisplaysForMachine,
   useActiveDisplaysByType,
 } from "@/hooks/queries/use-machine-displays";
+import { getProducts } from "@/lib/api/products";
+
+type SwapMode = "machine" | "products";
+type Step = "select-mode" | "select-machine" | "select-items" | "select-products";
 
 interface TransferDisplayDialogProps {
   open: boolean;
@@ -40,15 +56,17 @@ interface TransferDisplayDialogProps {
   currentMachineCode: string;
   currentDisplays: MachineDisplay[];
   actorId?: string;
-  onTransfer: (
+  onTransferWithMachine: (
     itemsToSend: MachineDisplay[],
     itemsToReceive: MachineDisplay[],
     targetMachineId: string
   ) => Promise<void>;
+  onSwapWithProducts: (
+    itemsToRemove: MachineDisplay[],
+    productsToAdd: string[]
+  ) => Promise<void>;
   isSubmitting?: boolean;
 }
-
-type Step = "select-machine" | "select-items";
 
 function getMachineCode(locationType: LocationType, loc: StorageLocation): string {
   switch (locationType) {
@@ -116,6 +134,69 @@ function DisplayItem({ display, selected, onToggle, disabled, direction }: Displ
   );
 }
 
+interface ProductItemProps {
+  product: Product;
+  selected: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}
+
+function ProductItem({ product, selected, onToggle, disabled }: ProductItemProps) {
+  const [imageError, setImageError] = useState(false);
+  const safeImageUrl = getSafeImageUrl(product.imageUrl);
+  const hasImage = safeImageUrl && !imageError;
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      className={cn(
+        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left",
+        selected
+          ? "bg-green-50 border-green-300 dark:bg-green-950/30 dark:border-green-700"
+          : "bg-background hover:bg-muted/50 border-border",
+        disabled && "opacity-50 cursor-not-allowed"
+      )}
+    >
+      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted">
+        {hasImage ? (
+          <Image
+            src={safeImageUrl}
+            alt={product.name}
+            fill
+            sizes="40px"
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <ImageOff className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{product.name}</p>
+        <Badge variant="outline" className="text-[10px] mt-0.5">
+          {product.category.name}
+        </Badge>
+      </div>
+
+      <div
+        className={cn(
+          "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+          selected
+            ? "bg-green-500 border-green-500"
+            : "border-muted-foreground/30"
+        )}
+      >
+        {selected && <Check className="h-3 w-3 text-white" />}
+      </div>
+    </button>
+  );
+}
+
 interface MachineCardProps {
   machine: StorageLocation;
   locationType: LocationType;
@@ -166,6 +247,32 @@ function MachineCard({
   );
 }
 
+interface ModeCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}
+
+function ModeCard({ icon, title, description, onClick }: ModeCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-4 p-4 rounded-lg border bg-background hover:bg-muted/50 border-border transition-colors text-left"
+    >
+      <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+    </button>
+  );
+}
+
 export function TransferDisplayDialog({
   open,
   onOpenChange,
@@ -173,14 +280,23 @@ export function TransferDisplayDialog({
   currentMachineId,
   currentMachineCode,
   currentDisplays,
-  onTransfer,
+  onTransferWithMachine,
+  onSwapWithProducts,
   isSubmitting = false,
 }: TransferDisplayDialogProps) {
-  const [step, setStep] = useState<Step>("select-machine");
+  const [step, setStep] = useState<Step>("select-mode");
+  const [mode, setMode] = useState<SwapMode | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null);
   const [itemsToSend, setItemsToSend] = useState<Set<string>>(new Set());
   const [itemsToReceive, setItemsToReceive] = useState<Set<string>>(new Set());
+  const [productsToAdd, setProductsToAdd] = useState<Set<string>>(new Set());
+
+  // Fetch products (rootOnly to exclude child products/prizes)
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", { rootOnly: true }],
+    queryFn: () => getProducts(true),
+  });
 
   // Fetch all machines of the same type
   const { data: machines = [], isLoading: isMachinesLoading } = useLocationsOnly(locationType);
@@ -202,7 +318,6 @@ export function TransferDisplayDialog({
       const count = map.get(display.machineId) ?? 0;
       map.set(display.machineId, count + 1);
     }
-    // Also include current machine's displays
     map.set(currentMachineId, currentDisplays.length);
     return map;
   }, [allDisplaysByType, currentMachineId, currentDisplays.length]);
@@ -218,6 +333,20 @@ export function TransferDisplayDialog({
       });
   }, [machines, currentMachineId, searchQuery, locationType]);
 
+  // Products not already on the current machine's display
+  const currentDisplayProductIds = useMemo(() => {
+    return new Set(currentDisplays.map((d) => d.productId));
+  }, [currentDisplays]);
+
+  const availableProducts = useMemo(() => {
+    return products
+      .filter((p) => !currentDisplayProductIds.has(p.id))
+      .filter((p) => {
+        if (!searchQuery.trim()) return true;
+        return p.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+      });
+  }, [products, currentDisplayProductIds, searchQuery]);
+
   const selectedMachine = machines.find((m) => m.id === selectedMachineId);
   const selectedMachineCode = selectedMachine
     ? getMachineCode(locationType, selectedMachine)
@@ -226,13 +355,24 @@ export function TransferDisplayDialog({
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
-      setStep("select-machine");
+      setStep("select-mode");
+      setMode(null);
       setSearchQuery("");
       setSelectedMachineId(null);
       setItemsToSend(new Set());
       setItemsToReceive(new Set());
+      setProductsToAdd(new Set());
     }
   }, [open]);
+
+  function handleModeSelect(selectedMode: SwapMode) {
+    setMode(selectedMode);
+    if (selectedMode === "machine") {
+      setStep("select-machine");
+    } else {
+      setStep("select-products");
+    }
+  }
 
   function handleMachineSelect(machineId: string) {
     setSelectedMachineId(machineId);
@@ -240,10 +380,16 @@ export function TransferDisplayDialog({
   }
 
   function handleBack() {
-    setStep("select-machine");
-    setSelectedMachineId(null);
-    setItemsToSend(new Set());
-    setItemsToReceive(new Set());
+    if (step === "select-machine" || step === "select-products") {
+      setStep("select-mode");
+      setMode(null);
+      setSearchQuery("");
+    } else if (step === "select-items") {
+      setStep("select-machine");
+      setSelectedMachineId(null);
+      setItemsToSend(new Set());
+      setItemsToReceive(new Set());
+    }
   }
 
   function toggleItemToSend(displayId: string) {
@@ -270,36 +416,96 @@ export function TransferDisplayDialog({
     });
   }
 
-  async function handleTransfer() {
-    if (!selectedMachineId) return;
-
-    const sending = currentDisplays.filter((d) => itemsToSend.has(d.id));
-    const receiving = targetDisplays.filter((d) => itemsToReceive.has(d.id));
-
-    if (sending.length === 0 && receiving.length === 0) return;
-
-    await onTransfer(sending, receiving, selectedMachineId);
+  function toggleProductToAdd(productId: string) {
+    setProductsToAdd((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
   }
 
-  const hasSelections = itemsToSend.size > 0 || itemsToReceive.size > 0;
-  const canTransfer = hasSelections && !isSubmitting;
+  async function handleTransfer() {
+    if (mode === "machine" && selectedMachineId) {
+      const sending = currentDisplays.filter((d) => itemsToSend.has(d.id));
+      const receiving = targetDisplays.filter((d) => itemsToReceive.has(d.id));
+      if (sending.length === 0 && receiving.length === 0) return;
+      await onTransferWithMachine(sending, receiving, selectedMachineId);
+    } else if (mode === "products") {
+      const removing = currentDisplays.filter((d) => itemsToSend.has(d.id));
+      const adding = Array.from(productsToAdd);
+      if (removing.length === 0 && adding.length === 0) return;
+      await onSwapWithProducts(removing, adding);
+    }
+  }
+
+  const hasSelectionsForMachine = itemsToSend.size > 0 || itemsToReceive.size > 0;
+  const hasSelectionsForProducts = itemsToSend.size > 0 || productsToAdd.size > 0;
+  const canTransfer =
+    !isSubmitting &&
+    ((mode === "machine" && hasSelectionsForMachine) ||
+      (mode === "products" && hasSelectionsForProducts));
+
+  function getTitle() {
+    switch (step) {
+      case "select-mode":
+        return "Swap Display";
+      case "select-machine":
+        return "Select Machine";
+      case "select-items":
+        return "Select Items to Transfer";
+      case "select-products":
+        return "Swap with Products";
+      default:
+        return "Swap Display";
+    }
+  }
+
+  function getDescription() {
+    switch (step) {
+      case "select-mode":
+        return "Choose how you want to swap display items.";
+      case "select-machine":
+        return "Select another machine to transfer display items with.";
+      case "select-items":
+        return `Trade display items between ${currentMachineCode} and ${selectedMachineCode}.`;
+      case "select-products":
+        return "Remove items from display and/or add new products.";
+      default:
+        return "";
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl h-[85dvh] max-h-[85dvh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 p-6 pb-0">
-          <DialogTitle>
-            {step === "select-machine" ? "Transfer Display" : "Select Items to Transfer"}
-          </DialogTitle>
-          <DialogDescription>
-            {step === "select-machine"
-              ? "Select another machine to transfer display items with."
-              : `Trade display items between ${currentMachineCode} and ${selectedMachineCode}.`}
-          </DialogDescription>
+          <DialogTitle>{getTitle()}</DialogTitle>
+          <DialogDescription>{getDescription()}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
-          {step === "select-machine" ? (
+          {step === "select-mode" && (
+            <div className="space-y-3">
+              <ModeCard
+                icon={<Monitor className="h-6 w-6 text-muted-foreground" />}
+                title="Swap with another machine"
+                description="Trade display items between two machines"
+                onClick={() => handleModeSelect("machine")}
+              />
+              <ModeCard
+                icon={<Package className="h-6 w-6 text-muted-foreground" />}
+                title="Swap with products"
+                description="Replace display items with products from inventory"
+                onClick={() => handleModeSelect("products")}
+              />
+            </div>
+          )}
+
+          {step === "select-machine" && (
             <>
               <div className="shrink-0 mb-3">
                 <Label className="text-xs text-muted-foreground mb-2 block">
@@ -341,15 +547,17 @@ export function TransferDisplayDialog({
                 </ScrollArea>
               )}
             </>
-          ) : (
+          )}
+
+          {step === "select-items" && (
             <>
-              {/* Two-column layout for item selection */}
+              {/* Two-column layout for machine-to-machine transfer */}
               <div className="flex-1 min-h-0 grid grid-cols-2 gap-4">
                 {/* Left column: Current machine items to send */}
-                <div className="flex flex-col min-h-0">
+                <div className="flex flex-col min-h-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
-                      From {currentMachineCode}
+                      From {currentMachineCode} ({currentDisplays.length})
                     </Label>
                     <p className="text-xs text-orange-600 dark:text-orange-400">
                       {itemsToSend.size > 0
@@ -363,35 +571,30 @@ export function TransferDisplayDialog({
                       No items on display
                     </div>
                   ) : (
-                    <ScrollArea className="flex-1">
-                      <div className="space-y-2 pr-2 pb-2">
-                        {currentDisplays.map((display) => (
-                          <DisplayItem
-                            key={display.id}
-                            display={display}
-                            selected={itemsToSend.has(display.id)}
-                            onToggle={() => toggleItemToSend(display.id)}
-                            direction="send"
-                            disabled={isSubmitting}
-                          />
-                        ))}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+                        <div className="space-y-2 pr-3 pb-2">
+                          {currentDisplays.map((display) => (
+                            <DisplayItem
+                              key={display.id}
+                              display={display}
+                              selected={itemsToSend.has(display.id)}
+                              onToggle={() => toggleItemToSend(display.id)}
+                              direction="send"
+                              disabled={isSubmitting}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   )}
                 </div>
 
-                {/* Center arrow */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:flex">
-                  <div className="bg-background p-2 rounded-full border">
-                    <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </div>
-
                 {/* Right column: Target machine items to receive */}
-                <div className="flex flex-col min-h-0">
+                <div className="flex flex-col min-h-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
-                      From {selectedMachineCode}
+                      From {selectedMachineCode} ({targetDisplays.length})
                     </Label>
                     <p className="text-xs text-green-600 dark:text-green-400">
                       {itemsToReceive.size > 0
@@ -409,26 +612,28 @@ export function TransferDisplayDialog({
                       No items on display
                     </div>
                   ) : (
-                    <ScrollArea className="flex-1">
-                      <div className="space-y-2 pr-2 pb-2">
-                        {targetDisplays.map((display) => (
-                          <DisplayItem
-                            key={display.id}
-                            display={display}
-                            selected={itemsToReceive.has(display.id)}
-                            onToggle={() => toggleItemToReceive(display.id)}
-                            direction="receive"
-                            disabled={isSubmitting}
-                          />
-                        ))}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+                        <div className="space-y-2 pr-3 pb-2">
+                          {targetDisplays.map((display) => (
+                            <DisplayItem
+                              key={display.id}
+                              display={display}
+                              selected={itemsToReceive.has(display.id)}
+                              onToggle={() => toggleItemToReceive(display.id)}
+                              direction="receive"
+                              disabled={isSubmitting}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Summary */}
-              {hasSelections && (
+              {/* Summary for machine transfer */}
+              {hasSelectionsForMachine && (
                 <div className="shrink-0 mt-3 pt-3 border-t">
                   <div className="flex items-center gap-4 text-sm">
                     {itemsToSend.size > 0 && (
@@ -465,10 +670,133 @@ export function TransferDisplayDialog({
               )}
             </>
           )}
+
+          {step === "select-products" && (
+            <>
+              {/* Two-column layout for product swap */}
+              <div className="flex-1 min-h-0 grid grid-cols-2 gap-4">
+                {/* Left column: Current display items to remove */}
+                <div className="flex flex-col min-h-0 overflow-hidden">
+                  <div className="shrink-0 mb-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Current Display ({currentDisplays.length})
+                    </Label>
+                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                      {itemsToSend.size > 0
+                        ? `Removing ${itemsToSend.size} item${itemsToSend.size !== 1 ? "s" : ""}`
+                        : "Select items to remove"}
+                    </p>
+                  </div>
+
+                  {currentDisplays.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                      No items on display
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+                        <div className="space-y-2 pr-3 pb-2">
+                          {currentDisplays.map((display) => (
+                            <DisplayItem
+                              key={display.id}
+                              display={display}
+                              selected={itemsToSend.has(display.id)}
+                              onToggle={() => toggleItemToSend(display.id)}
+                              direction="send"
+                              disabled={isSubmitting}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right column: Products to add */}
+                <div className="flex flex-col min-h-0 overflow-hidden">
+                  <div className="shrink-0 mb-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Select products to add ({availableProducts.length})
+                    </Label>
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      {productsToAdd.size > 0
+                        ? `Adding ${productsToAdd.size} product${productsToAdd.size !== 1 ? "s" : ""}`
+                        : "Select products to add"}
+                    </p>
+                  </div>
+
+                  <Input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-9 mb-2 shrink-0"
+                  />
+
+                  {availableProducts.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                      {searchQuery
+                        ? "No products match your search"
+                        : "No products available"}
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+                        <div className="space-y-2 pr-3 pb-2">
+                          {availableProducts.map((product) => (
+                            <ProductItem
+                              key={product.id}
+                              product={product}
+                              selected={productsToAdd.has(product.id)}
+                              onToggle={() => toggleProductToAdd(product.id)}
+                              disabled={isSubmitting}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary for product swap */}
+              {hasSelectionsForProducts && (
+                <div className="shrink-0 mt-3 pt-3 border-t">
+                  <div className="flex items-center gap-4 text-sm">
+                    {itemsToSend.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
+                        >
+                          {itemsToSend.size}
+                        </Badge>
+                        <span className="text-muted-foreground">removing</span>
+                      </div>
+                    )}
+                    {itemsToSend.size > 0 && productsToAdd.size > 0 && (
+                      <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    {productsToAdd.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                        >
+                          {productsToAdd.size}
+                        </Badge>
+                        <span className="text-muted-foreground">adding</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <DialogFooter className="shrink-0 border-t p-6">
-          {step === "select-items" && (
+          {step !== "select-mode" && (
             <Button
               type="button"
               variant="ghost"
@@ -487,15 +815,17 @@ export function TransferDisplayDialog({
           >
             Cancel
           </Button>
-          {step === "select-items" && (
+          {(step === "select-items" || step === "select-products") && (
             <Button type="button" onClick={handleTransfer} disabled={!canTransfer}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Transferring...
+                  {mode === "machine" ? "Transferring..." : "Swapping..."}
                 </>
-              ) : (
+              ) : mode === "machine" ? (
                 "Transfer"
+              ) : (
+                "Swap"
               )}
             </Button>
           )}
