@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +41,7 @@ import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
+import { KujiPrizesDialog } from "./kuji-prizes-dialog";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import { LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
@@ -89,7 +89,6 @@ export function ProductForm({
   parentName,
   onProductCreated,
 }: ProductFormProps) {
-  const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
   const createMutation = useCreateProductMutation();
@@ -101,6 +100,9 @@ export function ProductForm({
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+  // Kuji prizes dialog state
+  const [kujiPrizesOpen, setKujiPrizesOpen] = useState(false);
+  const [newKujiProduct, setNewKujiProduct] = useState<{ id: string; name: string; categoryId: string } | null>(null);
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
@@ -307,7 +309,7 @@ export function ProductForm({
           }
         }
 
-        // Check if this is a Kuji product - redirect to detail page to add prizes
+        // Check if this is a Kuji product - open prizes dialog to add prizes
         const selectedCategory = categories?.find((c) => c.id === rootCategoryId);
         const selectedSubcategory = subcategoryId
           ? childCategories.find((c) => c.id === subcategoryId)
@@ -319,9 +321,14 @@ export function ProductForm({
           selectedSubcategory?.slug?.toLowerCase() === "kuji";
 
         if (isKuji && !parentId) {
-          // Redirect to detail page so user can add prizes
+          // Open prizes dialog so user can add prizes without leaving the page
+          setNewKujiProduct({
+            id: newProduct.id,
+            name: newProduct.name,
+            categoryId: values.categoryId,
+          });
           onOpenChange(false);
-          router.push(`/products/${newProduct.id}`);
+          setKujiPrizesOpen(true);
           return;
         }
       }
@@ -697,6 +704,19 @@ export function ProductForm({
         open={manageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
       />
+
+      {newKujiProduct && (
+        <KujiPrizesDialog
+          open={kujiPrizesOpen}
+          onOpenChange={(open) => {
+            setKujiPrizesOpen(open);
+            if (!open) setNewKujiProduct(null);
+          }}
+          productId={newKujiProduct.id}
+          productName={newKujiProduct.name}
+          categoryId={newKujiProduct.categoryId}
+        />
+      )}
     </>
   );
 }

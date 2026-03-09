@@ -38,7 +38,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn, prizeLetterDisplay } from "@/lib/utils";
+import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
@@ -708,9 +708,9 @@ export function ShipmentCreateDialog({
                                 Prize quantities (incoming per prize)
                               </Label>
                               <div className="grid gap-2">
-                                {childrenByProductId[
+                                {sortPrizes(childrenByProductId[
                                   selectedProductId
-                                ]?.map((prize) => (
+                                ] ?? []).map((prize) => (
                                   <div
                                     key={prize.id}
                                     className="flex items-center gap-2"

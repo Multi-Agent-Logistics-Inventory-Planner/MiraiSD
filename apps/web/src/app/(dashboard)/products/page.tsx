@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ProductHeader,
@@ -15,7 +14,6 @@ import {
   DEFAULT_PRODUCT_SORT,
   buildParentNameMap,
   buildKujiCategoryIds,
-  isKujiProduct,
   compareProducts,
 } from "@/components/products";
 import type { ProductSort } from "@/components/products";
@@ -30,7 +28,6 @@ import { useCategories } from "@/hooks/queries/use-categories";
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
-  const router = useRouter();
   // Show only root products (no parent) by default
   const list = useProductInventory(true);
   const { data: categories } = useCategories();
@@ -109,10 +106,6 @@ export default function ProductsPage() {
   };
 
   const handleSelect = (row: ProductWithInventory) => {
-    if (isKujiProduct(row, kujiCategoryIds)) {
-      router.push(`/products/${row.product.id}`);
-      return;
-    }
     setSelected(row);
     setDetailOpen(true);
   };

@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
-import { prizeLetterDisplay } from "@/lib/utils";
+import { prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { getTracking, type TrackingLookupResponse } from "@/lib/api/tracking";
 
 interface ShipmentDetailSheetProps {
@@ -91,7 +91,7 @@ interface DetailBlock {
   prizeItems: ShipmentItem[];
 }
 
-function ItemRow({ item, index }: { item: ShipmentItem; index: number }) {
+function ItemRow({ item }: { item: ShipmentItem }) {
   const allocations = item.allocations ?? [];
   const hasAllocations = allocations.length > 0;
   const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
@@ -339,10 +339,21 @@ export function ShipmentDetailSheet({
         prizesByParentId[pid].push(i);
       }
     });
-    return roots.map((parentItem) => ({
-      parentItem,
-      prizeItems: prizesByParentId[parentItem.item.id] ?? [],
-    }));
+    return roots.map((parentItem) => {
+      // Sort prizes: LP first, then A, B, C, etc.
+      const unsortedPrizes = prizesByParentId[parentItem.item.id] ?? [];
+      const sortedPrizes = sortPrizes(
+        unsortedPrizes.map((p) => ({ ...p, letter: p.item.letter }))
+      ).map((p) => {
+        // Remove the temporary letter property we added for sorting
+        const { letter: _, ...rest } = p;
+        return rest as ShipmentItem;
+      });
+      return {
+        parentItem,
+        prizeItems: sortedPrizes,
+      };
+    });
   }, [shipment?.items]);
 
   if (!shipment) {
@@ -443,7 +454,7 @@ export function ShipmentDetailSheet({
                   block.prizeItems.length > 0 ? (
                     <KujiBlockSection key={block.parentItem.id} block={block} />
                   ) : (
-                    <ItemRow key={block.parentItem.id} item={block.parentItem} index={0} />
+                    <ItemRow key={block.parentItem.id} item={block.parentItem} />
                   )
                 )
               )}
