@@ -8,8 +8,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Check,
-  X,
   History,
   ChevronLeft,
   ChevronRight,
@@ -40,19 +38,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { LocationType } from "@/types/api";
 import type {
@@ -86,6 +71,7 @@ import {
   useSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
+import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
@@ -205,8 +191,7 @@ export function LocationDetailSheet({
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
-  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [addDisplayDialogOpen, setAddDisplayDialogOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
@@ -217,7 +202,6 @@ export function LocationDetailSheet({
     if (open) {
       setActiveTab("products");
       setHistoryPage(0);
-      setSelectedProductIds([]);
     }
   }, [open, locationId]);
 
@@ -229,33 +213,20 @@ export function LocationDetailSheet({
     return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
   }, [inventory]);
 
-  // Available products not already on display
-  const activeProductIds = activeDisplaysForMachine.map((d) => d.productId);
-  const availableProducts = products.filter((p) => !activeProductIds.includes(p.id));
-
-  const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id));
-
-  function handleProductSelect(productId: string) {
-    setSelectedProductIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
-  }
-
-  async function handleAddDisplayProducts() {
-    if (!locationId || selectedProductIds.length === 0) return;
+  async function handleAddDisplayProducts(productIds: string[]) {
+    if (!locationId || productIds.length === 0) return;
     try {
       await setDisplayBatchMutation.mutateAsync({
         locationType,
         machineId: locationId,
-        productIds: selectedProductIds,
+        productIds,
         actorId: user?.personId,
       } as SetMachineDisplayBatchRequest);
       toast({
         title: "Display updated",
-        description: `${selectedProductIds.length} product(s) added to display.`,
+        description: `${productIds.length} product(s) added to display.`,
       });
-      setSelectedProductIds([]);
-      setProductPopoverOpen(false);
+      setAddDisplayDialogOpen(false);
     } catch {
       toast({
         title: "Error",
@@ -433,69 +404,10 @@ export function LocationDetailSheet({
           Set up a display to start tracking products on this machine.
         </p>
       </div>
-      <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Display
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0" align="center">
-          <Command>
-            <CommandInput placeholder="Search products..." />
-            <CommandList>
-              <CommandEmpty>No products available</CommandEmpty>
-              <CommandGroup>
-                {availableProducts.map((product) => (
-                  <CommandItem
-                    key={product.id}
-                    value={`${product.name} ${product.sku}`}
-                    onSelect={() => handleProductSelect(product.id)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedProductIds.includes(product.id) ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <div className="flex flex-col">
-                      <span>{product.name}</span>
-                      <span className="text-xs text-muted-foreground">{product.sku}</span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-          {selectedProductIds.length > 0 && (
-            <div className="p-2 border-t">
-              <div className="flex flex-wrap gap-1 mb-2">
-                {selectedProducts.map((p) => (
-                  <Badge key={p.id} variant="secondary" className="text-xs">
-                    {p.name}
-                    <button
-                      onClick={() => handleProductSelect(p.id)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={handleAddDisplayProducts}
-                disabled={setDisplayBatchMutation.isPending}
-              >
-                {setDisplayBatchMutation.isPending
-                  ? "Adding..."
-                  : `Add ${selectedProductIds.length} Product(s)`}
-              </Button>
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
+      <Button size="sm" onClick={() => setAddDisplayDialogOpen(true)}>
+        <Plus className="h-4 w-4 mr-1" />
+        Add Display
+      </Button>
     </div>
   );
 
@@ -503,69 +415,10 @@ export function LocationDetailSheet({
     <>
       <div className="shrink-0 flex items-center justify-between py-4">
         <p className="text-sm font-medium">Current Products</p>
-        <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Product
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0" align="end">
-            <Command>
-              <CommandInput placeholder="Search products..." />
-              <CommandList>
-                <CommandEmpty>No products available</CommandEmpty>
-                <CommandGroup>
-                  {availableProducts.map((product) => (
-                    <CommandItem
-                      key={product.id}
-                      value={`${product.name} ${product.sku}`}
-                      onSelect={() => handleProductSelect(product.id)}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedProductIds.includes(product.id) ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <div className="flex flex-col">
-                        <span>{product.name}</span>
-                        <span className="text-xs text-muted-foreground">{product.sku}</span>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-            {selectedProductIds.length > 0 && (
-              <div className="p-2 border-t">
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {selectedProducts.map((p) => (
-                    <Badge key={p.id} variant="secondary" className="text-xs">
-                      {p.name}
-                      <button
-                        onClick={() => handleProductSelect(p.id)}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={handleAddDisplayProducts}
-                  disabled={setDisplayBatchMutation.isPending}
-                >
-                  {setDisplayBatchMutation.isPending
-                    ? "Adding..."
-                    : `Add ${selectedProductIds.length} Product(s)`}
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
+        <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Product
+        </Button>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -889,6 +742,14 @@ export function LocationDetailSheet({
         actorId={user?.personId}
         onSwap={handleSwap}
         isSubmitting={swapDisplayMutation.isPending}
+      />
+
+      <AddDisplayDialog
+        open={addDisplayDialogOpen}
+        onOpenChange={setAddDisplayDialogOpen}
+        activeDisplays={activeDisplaysForMachine}
+        isSaving={setDisplayBatchMutation.isPending}
+        onSubmit={handleAddDisplayProducts}
       />
     </>
   );
