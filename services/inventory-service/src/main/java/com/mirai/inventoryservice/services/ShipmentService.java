@@ -530,7 +530,7 @@ public class ShipmentService {
                 null,
                 null,
                 null,
-                "Not assigned",
+                "NA",
                 1,
                 quantity,
                 product.getName(),

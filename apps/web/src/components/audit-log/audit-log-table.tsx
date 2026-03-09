@@ -64,11 +64,9 @@ function formatLocation(entry: AuditLog): string {
     return `${from} → ${to}`;
   }
   if (DISPLAY_REASONS.has(entry.reason)) {
-    const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? fallback;
+    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? "NA";
   }
-  const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? fallback;
+  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? "NA";
 }
 
 function QuantityChange({ change }: { change: number }) {
@@ -95,8 +93,7 @@ function movementLocationLabel(
       ? (primaryFrom ?? "NA")
       : (primaryTo ?? "NA");
   }
-  const fallback = reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-  return movement.toLocationCode ?? movement.fromLocationCode ?? fallback;
+  return movement.toLocationCode ?? movement.fromLocationCode ?? "NA";
 }
 
 function ActionPill({ reason }: { reason: StockMovementReason }) {
@@ -137,7 +134,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
         <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{detail.productSummary ?? "—"}</span>
           <span>·</span>
-          <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "—"}</span>
+          <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "NA"}</span>
         </div>
       ) : (
       <div className="space-y-1">
