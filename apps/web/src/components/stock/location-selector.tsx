@@ -246,26 +246,28 @@ export function LocationSelector({
                 aria-expanded={codePopoverOpen}
                 aria-label={`${label || "Location"} code`}
                 disabled={disabled || !value.locationType || locationsQuery.isLoading}
-                className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 justify-between font-normal dark:bg-input dark:border-[#41413d]"
+                className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 justify-between font-normal overflow-hidden dark:bg-input dark:border-[#41413d]"
               >
-                {locationsQuery.isLoading
-                  ? "..."
-                  : value.locationId
-                    ? (availableLocations.find((loc) => loc.id === value.locationId)?.code ?? "...")
-                    : "Code"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <span className="truncate">
+                  {locationsQuery.isLoading
+                    ? "..."
+                    : value.locationId
+                      ? (availableLocations.find((loc) => loc.id === value.locationId)?.numericCode ?? "...")
+                      : ""}
+                </span>
+                <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[120px] p-0" align="start">
               <Command filter={filterLocationCode}>
-                <CommandInput placeholder="Search..." />
-                <CommandList>
+                <CommandInput placeholder="Search..." inputMode="numeric" pattern="[0-9]*" />
+                <CommandList className="max-h-[50vh]">
                   <CommandEmpty>No locations</CommandEmpty>
                   <CommandGroup>
                     {availableLocations.map((loc) => (
                       <CommandItem
                         key={loc.id}
-                        value={loc.code}
+                        value={loc.numericCode}
                         onSelect={() => {
                           handleLocationChange(loc.id);
                           setCodePopoverOpen(false);
@@ -277,7 +279,7 @@ export function LocationSelector({
                             value.locationId === loc.id ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {loc.code}
+                        {loc.numericCode}
                       </CommandItem>
                     ))}
                   </CommandGroup>
