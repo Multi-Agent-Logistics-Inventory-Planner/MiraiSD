@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { Package, PackageCheck, Trash2, MapPin, Truck, Loader2, Pencil, Check, X } from "lucide-react";
+import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
-import { prizeLetterDisplay, sortPrizes } from "@/lib/utils";
+import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { getTracking, type TrackingLookupResponse } from "@/lib/api/tracking";
 
 interface ShipmentDetailSheetProps {
@@ -69,14 +69,40 @@ function getLocationLabel(locationType?: LocationType): string {
   return LOCATION_TYPE_LABELS[locationType] ?? locationType;
 }
 
-function AllocationDisplay({ allocation }: { allocation: ShipmentItemAllocation }) {
-  // Use locationCode from API if available, otherwise fall back to location type label
-  const displayLabel = allocation.locationCode || getLocationLabel(allocation.locationType);
+interface ConsolidatedAllocation {
+  key: string;
+  displayLabel: string;
+  quantity: number;
+}
 
+/** Consolidate allocations with the same location into a single entry */
+function consolidateAllocations(allocations: ShipmentItemAllocation[]): ConsolidatedAllocation[] {
+  const map = new Map<string, ConsolidatedAllocation>();
+
+  for (const allocation of allocations) {
+    const displayLabel = allocation.locationCode || getLocationLabel(allocation.locationType);
+    const key = `${allocation.locationType}-${allocation.locationId || "none"}`;
+
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += allocation.quantity;
+    } else {
+      map.set(key, {
+        key,
+        displayLabel,
+        quantity: allocation.quantity,
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function AllocationDisplay({ allocation }: { allocation: ConsolidatedAllocation }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <Badge variant="outline" className="text-xs font-normal">
-        {displayLabel}
+        {allocation.displayLabel}
       </Badge>
       <span className="text-xs text-muted-foreground">
         x{allocation.quantity}
@@ -92,13 +118,19 @@ interface DetailBlock {
 }
 
 function ItemRow({ item }: { item: ShipmentItem }) {
-  const allocations = item.allocations ?? [];
+  const rawAllocations = item.allocations ?? [];
+  const allocations = consolidateAllocations(rawAllocations);
   const hasAllocations = allocations.length > 0;
   const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
   const imageUrl = item.item?.imageUrl;
+  const totalAccounted = item.receivedQuantity + (item.damagedQuantity ?? 0) + (item.displayQuantity ?? 0) + (item.shopQuantity ?? 0);
+  const hasUnreceived = totalAccounted < item.orderedQuantity;
 
   return (
-    <div className="py-3 border-b last:border-b-0">
+    <div className={cn(
+      "py-3 border-b last:border-b-0",
+      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+    )}>
       <div className="flex items-center gap-3">
         {/* Product Image */}
         <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
@@ -117,6 +149,13 @@ function ItemRow({ item }: { item: ShipmentItem }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
           {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
+          {hasAllocations && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {allocations.map((allocation) => (
+                <AllocationDisplay key={allocation.key} allocation={allocation} />
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
             <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
             {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
@@ -150,16 +189,6 @@ function ItemRow({ item }: { item: ShipmentItem }) {
           {lineTotal ? formatCurrency(lineTotal) : "-"}
         </div>
       </div>
-      {hasAllocations && (
-        <div className="mt-2 flex items-start gap-2">
-          <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
-          <div className="flex flex-wrap gap-1">
-            {allocations.map((allocation) => (
-              <AllocationDisplay key={allocation.id} allocation={allocation} />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -167,9 +196,25 @@ function ItemRow({ item }: { item: ShipmentItem }) {
 function KujiBlockSection({ block }: { block: DetailBlock }) {
   const { parentItem, prizeItems } = block;
   const imageUrl = parentItem.item?.imageUrl;
+  const rawParentAllocations = parentItem.allocations ?? [];
+  const parentAllocations = consolidateAllocations(rawParentAllocations);
+  const hasParentAllocations = parentAllocations.length > 0;
+  const parentTotalAccounted = parentItem.receivedQuantity + (parentItem.damagedQuantity ?? 0) + (parentItem.displayQuantity ?? 0) + (parentItem.shopQuantity ?? 0);
+  const parentHasUnreceived = parentTotalAccounted < parentItem.orderedQuantity;
+
+  // Check if any prize has unreceived items
+  const anyPrizeUnreceived = prizeItems.some((prize) => {
+    const totalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+    return totalAccounted < prize.orderedQuantity;
+  });
+
+  const hasUnreceived = parentHasUnreceived || anyPrizeUnreceived;
 
   return (
-    <div className="py-3 border-b last:border-b-0">
+    <div className={cn(
+      "py-3 border-b last:border-b-0",
+      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+    )}>
       {/* Parent row (Kuji set) */}
       <div className="flex items-center gap-3">
         <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
@@ -188,6 +233,13 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{parentItem.item.name}</p>
           {parentItem.item.sku && <p className="text-xs text-muted-foreground font-mono">{parentItem.item.sku}</p>}
+          {hasParentAllocations && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {parentAllocations.map((allocation) => (
+                <AllocationDisplay key={allocation.key} allocation={allocation} />
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
             <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentItem.receivedQuantity} received</span>
           </div>
@@ -219,16 +271,6 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
           {parentItem.unitCost ? formatCurrency(parentItem.orderedQuantity * parentItem.unitCost) : "-"}
         </div>
       </div>
-      {(parentItem.allocations ?? []).length > 0 && (
-        <div className="mt-2 flex items-start gap-2 ml-12">
-          <MapPin className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
-          <div className="flex flex-wrap gap-1">
-            {(parentItem.allocations ?? []).map((allocation) => (
-              <AllocationDisplay key={allocation.id} allocation={allocation} />
-            ))}
-          </div>
-        </div>
-      )}
       {/* Prizes (same section, indented) */}
       {prizeItems.length > 0 && (
         <div className="mt-2 pl-4 border-l-2 border-muted space-y-2">
@@ -237,11 +279,16 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             const lineTotal = prize.unitCost ? prize.orderedQuantity * prize.unitCost : undefined;
             const letter = (prize.item as { letter?: string | null }).letter;
             const prizeLabel = letter
-              ? `Prize ${prizeLetterDisplay(letter)}`
+              ? prizeLetterDisplay(letter)
               : prize.item.name;
+            const prizeTotalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+            const prizeHasUnreceived = prizeTotalAccounted < prize.orderedQuantity;
             return (
-              <div key={prize.id} className="flex items-center gap-2 py-1">
-                <span className="text-sm min-w-[80px]">{prizeLabel}</span>
+              <div key={prize.id} className={cn(
+                "flex items-center gap-2 py-1 px-2 -mx-2 rounded",
+                prizeHasUnreceived && "bg-amber-100/50 dark:bg-amber-900/20"
+              )}>
+                <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded min-w-[40px] text-center">{prizeLabel}</span>
                 <span className="text-xs text-muted-foreground">
                   {prize.orderedQuantity} ordered · {prize.receivedQuantity} received
                 </span>
