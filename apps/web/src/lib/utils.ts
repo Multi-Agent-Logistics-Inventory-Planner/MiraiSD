@@ -20,3 +20,27 @@ export function prizeLetterDisplay(letter: string | null | undefined): string {
   if (normalized === "last prize" || normalized === "la") return "LP";
   return letter;
 }
+
+/**
+ * Sort prizes in order: LP first, then A, B, C, etc.
+ * Items without a letter are sorted to the end.
+ */
+export function sortPrizes<T extends { letter?: string | null }>(prizes: T[]): T[] {
+  return [...prizes].sort((a, b) => {
+    const letterA = prizeLetterDisplay(a.letter);
+    const letterB = prizeLetterDisplay(b.letter);
+
+    // Empty letters go to end
+    if (!letterA && !letterB) return 0;
+    if (!letterA) return 1;
+    if (!letterB) return -1;
+
+    // LP (Last Prize) always comes first
+    if (letterA === "LP" && letterB !== "LP") return -1;
+    if (letterB === "LP" && letterA !== "LP") return 1;
+    if (letterA === "LP" && letterB === "LP") return 0;
+
+    // Alphabetical order for other letters
+    return letterA.localeCompare(letterB, undefined, { numeric: true, sensitivity: "base" });
+  });
+}

@@ -9,6 +9,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   Pencil,
+  Trophy,
 } from "lucide-react";
 import {
   Dialog,
@@ -28,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
+import { KujiPrizesDialog } from "./kuji-prizes-dialog";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
@@ -66,6 +68,7 @@ export function ProductModal({
   const { isAdmin } = usePermissions();
   const deleteProduct = useDeleteProductMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [prizesDialogOpen, setPrizesDialogOpen] = useState(false);
 
   if (!product) {
     return null;
@@ -85,6 +88,9 @@ export function ProductModal({
 
   const { product: p, totalQuantity } = product;
 
+  // Check if this is a Kuji product (has children or is in Kuji category)
+  const isKuji = p.hasChildren || p.category.name.toLowerCase() === "kuji" || p.category.slug?.toLowerCase() === "kuji";
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("en-US", {
@@ -98,6 +104,7 @@ export function ProductModal({
     value != null ? `$${value.toFixed(2)}` : "-";
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-hidden px-4! sm:px-6! dark:bg-background">
         <DialogHeader className="text-left min-w-0 overflow-hidden">
@@ -159,6 +166,16 @@ export function ProductModal({
             </div>
 
             <div className="hidden sm:flex items-center gap-2 pt-2">
+              {isKuji && isAdmin && (
+                <Button
+                  size="sm"
+                  className="bg-black text-white hover:bg-black/90"
+                  onClick={() => setPrizesDialogOpen(true)}
+                >
+                  <Trophy className="h-4 w-4 mr-1" />
+                  Prizes
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="bg-black text-white hover:bg-black/90"
@@ -204,6 +221,16 @@ export function ProductModal({
         </div>
 
         <div className="flex sm:hidden justify-center gap-1.5 mt-2">
+          {isKuji && isAdmin && (
+            <Button
+              size="sm"
+              className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+              onClick={() => setPrizesDialogOpen(true)}
+            >
+              <Trophy className="h-3.5 w-3.5 mr-1" />
+              Prizes
+            </Button>
+          )}
           <Button
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
@@ -422,5 +449,16 @@ export function ProductModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {isKuji && (
+      <KujiPrizesDialog
+        open={prizesDialogOpen}
+        onOpenChange={setPrizesDialogOpen}
+        productId={p.id}
+        productName={p.name}
+        categoryId={p.category.id}
+      />
+    )}
+    </>
   );
 }

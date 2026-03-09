@@ -14,5 +14,6 @@ export { ProductPagination } from "./product-pagination";
 export { ProductModal } from "./product-modal";
 export { ProductForm } from "./product-form";
 export { PrizeForm } from "./prize-form";
+export { KujiPrizesDialog } from "./kuji-prizes-dialog";
 export { DeleteProductDialog } from "./delete-product-dialog";
 export { ManageCategoriesDialog } from "./manage-categories-dialog";

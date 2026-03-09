@@ -1,7 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -11,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { useLocations } from "@/hooks/queries/use-locations";
 import { LocationType, type StorageLocation } from "@/types/api";
-import { naturalSortCompare } from "@/lib/utils";
+import { cn, naturalSortCompare } from "@/lib/utils";
 import {
   CODE_TO_LOCATION_TYPE,
   LOCATION_TYPE_OPTIONS,
@@ -22,6 +37,22 @@ const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
 
 /** Virtual ID used for "Not Assigned" selection */
 const NOT_ASSIGNED_ID = "__not_assigned__";
+
+/**
+ * Custom filter for location code search.
+ * Matches full code (e.g., "B14") or just the numeric part (e.g., "14").
+ */
+function filterLocationCode(value: string, search: string): number {
+  const normalizedSearch = search.toLowerCase().trim();
+  const normalizedValue = value.toLowerCase();
+
+  if (normalizedValue.includes(normalizedSearch)) return 1;
+
+  const numericPart = value.replace(/^[A-Z]+/i, "");
+  if (numericPart.includes(normalizedSearch)) return 1;
+
+  return 0;
+}
 
 interface LocationSelectorProps {
   label: string;
@@ -81,6 +112,7 @@ export function LocationSelector({
   excludeLocation,
   endContent,
 }: LocationSelectorProps) {
+  const [codePopoverOpen, setCodePopoverOpen] = useState(false);
   const isNotAssigned = value.locationType === LocationType.NOT_ASSIGNED;
 
   const selectedTypeCode =
@@ -204,33 +236,57 @@ export function LocationSelector({
             ))}
           </SelectContent>
         </Select>
-        {/* Show location dropdown for regular types, hide for NOT_ASSIGNED */}
+        {/* Show location combobox for regular types, hide for NOT_ASSIGNED */}
         {!isNotAssigned && (
-          <Select
-            value={value.locationId ?? ""}
-            onValueChange={handleLocationChange}
-            disabled={disabled || !value.locationType || locationsQuery.isLoading}
-          >
-            <SelectTrigger
-              className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 bg-background"
-              aria-label={`${label || "Location"} code`}
-            >
-              <SelectValue placeholder={locationsQuery.isLoading ? "..." : "Code"} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableLocations.length === 0 ? (
-                <SelectItem value="__none__" disabled>
-                  No locations
-                </SelectItem>
-              ) : (
-                availableLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id}>
-                    {loc.code}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+          <Popover open={codePopoverOpen} onOpenChange={setCodePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={codePopoverOpen}
+                aria-label={`${label || "Location"} code`}
+                disabled={disabled || !value.locationType || locationsQuery.isLoading}
+                className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 justify-between font-normal overflow-hidden dark:bg-input dark:border-[#41413d]"
+              >
+                <span className="truncate">
+                  {locationsQuery.isLoading
+                    ? "..."
+                    : value.locationId
+                      ? (availableLocations.find((loc) => loc.id === value.locationId)?.numericCode ?? "...")
+                      : ""}
+                </span>
+                <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[120px] p-0" align="start" container={null}>
+              <Command filter={filterLocationCode}>
+                <CommandInput placeholder="Search..." inputMode="numeric" pattern="[0-9]*" />
+                <CommandList>
+                  <CommandEmpty>No locations</CommandEmpty>
+                  <CommandGroup>
+                    {availableLocations.map((loc) => (
+                      <CommandItem
+                        key={loc.id}
+                        value={loc.numericCode}
+                        onSelect={() => {
+                          handleLocationChange(loc.id);
+                          setCodePopoverOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value.locationId === loc.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {loc.numericCode}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         )}
         {endContent}
       </div>
