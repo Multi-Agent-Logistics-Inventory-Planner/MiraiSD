@@ -137,18 +137,6 @@ export interface PerformanceMetricsWithTrends {
   turnoverRateTrend: TrendData | null;
 }
 
-// Demand velocity item (top movers)
-export interface DemandVelocityItem {
-  itemId: string;
-  itemName: string;
-  itemSku?: string | null;
-  currentDelta: number;
-  previousDelta: number;
-  changePercent: number;
-  changeDirection: "increase" | "decrease";
-  sparklineData: number[];
-}
-
 // Unified activity feed event types
 export type ActivityEventType = "alert" | "restock" | "sale" | "shipment" | "adjustment" | "transfer";
 
@@ -237,7 +225,6 @@ export interface DashboardMetrics {
   };
   riskDistribution: RiskDistributionSegment[];
   healthIndicators: HealthIndicator[];
-  demandVelocity: DemandVelocityItem[];
   quickStats: QuickStats;
   shipmentPipeline: ShipmentPipelineData | null;
   locationUtilization: LocationUtilizationData | null;
