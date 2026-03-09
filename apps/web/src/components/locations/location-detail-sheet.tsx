@@ -72,6 +72,7 @@ import {
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
+import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
@@ -192,6 +193,8 @@ export function LocationDetailSheet({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [addDisplayDialogOpen, setAddDisplayDialogOpen] = useState(false);
+  const [transferDisplayDialogOpen, setTransferDisplayDialogOpen] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
@@ -233,6 +236,78 @@ export function LocationDetailSheet({
         description: "Failed to update display.",
         variant: "destructive",
       });
+    }
+  }
+
+  async function handleTransferDisplays(
+    itemsToSend: MachineDisplay[],
+    itemsToReceive: MachineDisplay[],
+    targetMachineId: string
+  ) {
+    if (!locationId) return;
+
+    setIsTransferring(true);
+    try {
+      // Step 1: Clear items being sent from current machine
+      for (const item of itemsToSend) {
+        await clearDisplayMutation.mutateAsync({
+          displayId: item.id,
+          actorId: user?.personId,
+        });
+      }
+
+      // Step 2: Clear items being received from target machine
+      for (const item of itemsToReceive) {
+        await clearDisplayMutation.mutateAsync({
+          displayId: item.id,
+          actorId: user?.personId,
+        });
+      }
+
+      // Step 3: Add sent items to target machine
+      if (itemsToSend.length > 0) {
+        await setDisplayBatchMutation.mutateAsync({
+          locationType,
+          machineId: targetMachineId,
+          productIds: itemsToSend.map((item) => item.productId),
+          actorId: user?.personId,
+        } as SetMachineDisplayBatchRequest);
+      }
+
+      // Step 4: Add received items to current machine
+      if (itemsToReceive.length > 0) {
+        await setDisplayBatchMutation.mutateAsync({
+          locationType,
+          machineId: locationId,
+          productIds: itemsToReceive.map((item) => item.productId),
+          actorId: user?.personId,
+        } as SetMachineDisplayBatchRequest);
+      }
+
+      const sentCount = itemsToSend.length;
+      const receivedCount = itemsToReceive.length;
+      let description = "";
+      if (sentCount > 0 && receivedCount > 0) {
+        description = `Sent ${sentCount} and received ${receivedCount} product(s).`;
+      } else if (sentCount > 0) {
+        description = `Sent ${sentCount} product(s).`;
+      } else {
+        description = `Received ${receivedCount} product(s).`;
+      }
+
+      toast({
+        title: "Transfer complete",
+        description,
+      });
+      setTransferDisplayDialogOpen(false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to transfer displays. Some changes may have been applied.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTransferring(false);
     }
   }
 
@@ -415,10 +490,16 @@ export function LocationDetailSheet({
     <>
       <div className="shrink-0 flex items-center justify-between py-4">
         <p className="text-sm font-medium">Current Products</p>
-        <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Product
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setTransferDisplayDialogOpen(true)}>
+            <ArrowLeftRight className="h-4 w-4 mr-1" />
+            Machine Swap
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -750,6 +831,18 @@ export function LocationDetailSheet({
         activeDisplays={activeDisplaysForMachine}
         isSaving={setDisplayBatchMutation.isPending}
         onSubmit={handleAddDisplayProducts}
+      />
+
+      <TransferDisplayDialog
+        open={transferDisplayDialogOpen}
+        onOpenChange={setTransferDisplayDialogOpen}
+        locationType={locationType}
+        currentMachineId={locationId ?? ""}
+        currentMachineCode={code}
+        currentDisplays={activeDisplaysForMachine}
+        actorId={user?.personId}
+        onTransfer={handleTransferDisplays}
+        isSubmitting={isTransferring}
       />
     </>
   );
