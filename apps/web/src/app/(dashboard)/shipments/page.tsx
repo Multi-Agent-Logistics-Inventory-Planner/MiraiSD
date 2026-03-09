@@ -98,6 +98,11 @@ export default function ShipmentsPage() {
     setDeleteDialogOpen(true);
   }
 
+  function handleEditClick() {
+    setDetailSheetOpen(false);
+    setCreateDialogOpen(true);
+  }
+
   async function handleTrackingUpdate(trackingId: string) {
     if (!selectedShipment) return;
     try {
@@ -160,7 +165,10 @@ export default function ShipmentsPage() {
           <ShipmentFilters
             search={searchQuery}
             onSearchChange={handleSearchChange}
-            onAddClick={() => setCreateDialogOpen(true)}
+            onAddClick={() => {
+              setSelectedShipment(null);
+              setCreateDialogOpen(true);
+            }}
           />
         </div>
       </Tabs>
@@ -195,7 +203,11 @@ export default function ShipmentsPage() {
       {/* Dialogs and Sheets */}
       <ShipmentCreateDialog
         open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) setSelectedShipment(null);
+        }}
+        initialShipment={selectedShipment}
       />
 
       <ShipmentDetailSheet
@@ -204,6 +216,7 @@ export default function ShipmentsPage() {
         shipment={selectedShipment}
         onReceiveClick={handleReceiveClick}
         onDeleteClick={handleDeleteClick}
+        onEditClick={handleEditClick}
         onTrackingUpdate={handleTrackingUpdate}
       />
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ProductHeader,
@@ -12,7 +11,12 @@ import {
   ProductModal,
   ProductForm,
   DEFAULT_PRODUCT_FILTERS,
+  DEFAULT_PRODUCT_SORT,
+  buildParentNameMap,
+  buildKujiCategoryIds,
+  compareProducts,
 } from "@/components/products";
+import type { ProductSort } from "@/components/products";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import {
@@ -24,7 +28,6 @@ import { useCategories } from "@/hooks/queries/use-categories";
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
-  const router = useRouter();
   // Show only root products (no parent) by default
   const list = useProductInventory(true);
   const { data: categories } = useCategories();
@@ -32,6 +35,7 @@ export default function ProductsPage() {
   const [filters, setFilters] = useState<ProductFiltersState>(
     DEFAULT_PRODUCT_FILTERS,
   );
+  const [sort, setSort] = useState<ProductSort>(DEFAULT_PRODUCT_SORT);
   const [page, setPage] = useState(0);
 
   const [detailOpen, setDetailOpen] = useState(false);
@@ -70,39 +74,38 @@ export default function ProductsPage() {
     });
   }, [items, filters, categories]);
 
+  const parentNameMap = useMemo(
+    () => buildParentNameMap(categories ?? []),
+    [categories],
+  );
+
+  const kujiCategoryIds = useMemo(
+    () => buildKujiCategoryIds(categories ?? []),
+    [categories],
+  );
+
+  const sortedItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) =>
+      compareProducts(a, b, sort, parentNameMap),
+    );
+  }, [filteredItems, sort, parentNameMap]);
+
   const paginatedItems = useMemo(() => {
     const start = page * PAGE_SIZE;
-    return filteredItems.slice(start, start + PAGE_SIZE);
-  }, [filteredItems, page]);
+    return sortedItems.slice(start, start + PAGE_SIZE);
+  }, [sortedItems, page]);
 
   const handleFiltersChange = (next: ProductFiltersState) => {
     setFilters(next);
     setPage(0);
   };
 
-  // Helper to check if a product is in the Kuji category
-  const isKujiProduct = (row: ProductWithInventory) => {
-    const catName = row.product.category.name.toLowerCase();
-    const catSlug = row.product.category.slug?.toLowerCase();
-    // Check if it's the Kuji category or a child of Kuji
-    if (catName === "kuji" || catSlug === "kuji") return true;
-    // Check parent category
-    const parentCat = categories?.find((c) =>
-      c.children.some((child) => child.id === row.product.category.id)
-    );
-    if (parentCat?.name.toLowerCase() === "kuji" || parentCat?.slug?.toLowerCase() === "kuji") {
-      return true;
-    }
-    return false;
+  const handleSortChange = (next: ProductSort) => {
+    setSort(next);
+    setPage(0);
   };
 
   const handleSelect = (row: ProductWithInventory) => {
-    // Navigate to detail page for Kuji products (to manage prizes)
-    if (row.product.hasChildren || isKujiProduct(row)) {
-      router.push(`/products/${row.product.id}`);
-      return;
-    }
-    // Open modal for regular products
     setSelected(row);
     setDetailOpen(true);
   };
@@ -137,6 +140,10 @@ export default function ProductsPage() {
               items={paginatedItems}
               isLoading={list.isLoading}
               onSelect={handleSelect}
+              parentNameMap={parentNameMap}
+              kujiCategoryIds={kujiCategoryIds}
+              sort={sort}
+              onSortChange={handleSortChange}
             />
           </CardContent>
         </Card>

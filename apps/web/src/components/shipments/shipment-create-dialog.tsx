@@ -38,17 +38,18 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn, prizeLetterDisplay } from "@/lib/utils";
+import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
 import { ProductForm } from "@/components/products/product-form";
-import { useCreateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
+import { useCreateShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
   ShipmentStatus,
   type Product,
+  type Shipment,
   type ShipmentItemRequest,
   type ProductSummary,
 } from "@/types/api";
@@ -82,17 +83,22 @@ type FormValues = z.infer<typeof schema>;
 interface ShipmentCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialShipment?: Shipment | null;
 }
 
 export function ShipmentCreateDialog({
   open,
   onOpenChange,
+  initialShipment,
 }: ShipmentCreateDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const createMutation = useCreateShipmentMutation();
+  const updateMutation = useUpdateShipmentMutation();
   const productsQuery = useProducts({ rootOnly: true });
   const products = productsQuery.data ?? [];
+
+  const isEditMode = !!initialShipment;
 
   const [comboOpenIndex, setComboOpenIndex] = useState<number | null>(null);
   // Track selected product IDs in state to ensure re-renders when products are selected
@@ -147,29 +153,87 @@ export function ShipmentCreateDialog({
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      form.reset({
-        shipmentNumber: generateShipmentNumber(),
-        supplierName: "",
-        orderDate: format(new Date(), "yyyy-MM-dd"),
-        expectedDeliveryDate: "",
-        trackingId: "",
-        totalCost: undefined,
-        notes: "",
-        items: [
-          {
-            productId: "",
-            productName: "",
-            productSku: "",
-            orderedQuantity: 1,
-            unitCost: undefined,
-            prizeQuantities: undefined,
-          },
-        ],
-      });
-      // Reset selected product IDs state
-      setSelectedProductIds({});
+      if (initialShipment) {
+        // Edit mode: populate from existing shipment
+        // Group items by parent: root items and prizes
+        const rootItems = initialShipment.items.filter((i) => !i.item.parentId);
+        const prizesByParentId: Record<string, typeof initialShipment.items> = {};
+        initialShipment.items.forEach((i) => {
+          const pid = i.item.parentId;
+          if (pid) {
+            if (!prizesByParentId[pid]) prizesByParentId[pid] = [];
+            prizesByParentId[pid].push(i);
+          }
+        });
+
+        const formItems = rootItems.map((item) => {
+          const prizes = prizesByParentId[item.item.id] ?? [];
+          const prizeQuantities: Record<string, number> = {};
+          prizes.forEach((p) => {
+            prizeQuantities[p.item.id] = p.orderedQuantity;
+          });
+          return {
+            productId: item.item.id,
+            productName: item.item.name,
+            productSku: item.item.sku ?? "",
+            orderedQuantity: item.orderedQuantity,
+            unitCost: item.unitCost,
+            prizeQuantities: Object.keys(prizeQuantities).length > 0 ? prizeQuantities : undefined,
+          };
+        });
+
+        // Initialize selected product IDs for children queries
+        const productIds: Record<number, string> = {};
+        rootItems.forEach((item, index) => {
+          productIds[index] = item.item.id;
+        });
+        setSelectedProductIds(productIds);
+
+        form.reset({
+          shipmentNumber: initialShipment.shipmentNumber,
+          supplierName: initialShipment.supplierName ?? "",
+          orderDate: initialShipment.orderDate,
+          expectedDeliveryDate: initialShipment.expectedDeliveryDate ?? "",
+          trackingId: initialShipment.trackingId ?? "",
+          totalCost: initialShipment.totalCost,
+          notes: initialShipment.notes ?? "",
+          items: formItems.length > 0 ? formItems : [
+            {
+              productId: "",
+              productName: "",
+              productSku: "",
+              orderedQuantity: 1,
+              unitCost: undefined,
+              prizeQuantities: undefined,
+            },
+          ],
+        });
+      } else {
+        // Create mode: fresh form
+        form.reset({
+          shipmentNumber: generateShipmentNumber(),
+          supplierName: "",
+          orderDate: format(new Date(), "yyyy-MM-dd"),
+          expectedDeliveryDate: "",
+          trackingId: "",
+          totalCost: undefined,
+          notes: "",
+          items: [
+            {
+              productId: "",
+              productName: "",
+              productSku: "",
+              orderedQuantity: 1,
+              unitCost: undefined,
+              prizeQuantities: undefined,
+            },
+          ],
+        });
+        // Reset selected product IDs state
+        setSelectedProductIds({});
+      }
     }
-  }, [open, form]);
+  }, [open, form, initialShipment]);
 
   // When children load for a Kuji, init prizeQuantities for that item row
   useEffect(() => {
@@ -247,10 +311,10 @@ export function ShipmentCreateDialog({
     }
 
     try {
-      await createMutation.mutateAsync({
+      const payload = {
         shipmentNumber: values.shipmentNumber,
         supplierName: values.supplierName || undefined,
-        status: ShipmentStatus.PENDING,
+        status: initialShipment?.status ?? ShipmentStatus.PENDING,
         orderDate: values.orderDate,
         expectedDeliveryDate: values.expectedDeliveryDate || undefined,
         trackingId: values.trackingId || undefined,
@@ -258,17 +322,27 @@ export function ShipmentCreateDialog({
         notes: values.notes || undefined,
         createdBy: user?.personId,
         items,
-      });
-      toast({ title: "Shipment created successfully" });
+      };
+
+      if (isEditMode && initialShipment) {
+        await updateMutation.mutateAsync({
+          id: initialShipment.id,
+          payload,
+        });
+        toast({ title: "Shipment updated successfully" });
+      } else {
+        await createMutation.mutateAsync(payload);
+        toast({ title: "Shipment created successfully" });
+      }
       onOpenChange(false);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to create shipment";
+        err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} shipment`;
       toast({ title: "Error", description: message });
     }
   }
 
-  const isSaving = createMutation.isPending;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
   const orderDateValue = form.watch("orderDate");
   const expectedDeliveryDateValue = form.watch("expectedDeliveryDate");
 
@@ -306,9 +380,11 @@ export function ShipmentCreateDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
           <DialogHeader className="p-4 sm:p-6">
-            <DialogTitle>Create New Shipment</DialogTitle>
+            <DialogTitle>{isEditMode ? "Edit Shipment" : "Create New Shipment"}</DialogTitle>
             <DialogDescription>
-              Add a new inbound shipment to track incoming inventory.
+              {isEditMode
+                ? "Update the shipment details below."
+                : "Add a new inbound shipment to track incoming inventory."}
             </DialogDescription>
           </DialogHeader>
 
@@ -323,6 +399,8 @@ export function ShipmentCreateDialog({
                   <Label htmlFor="shipmentNumber">Shipment Number</Label>
                   <Input
                     id="shipmentNumber"
+                    readOnly={isEditMode}
+                    className={isEditMode ? "bg-muted" : undefined}
                     {...form.register("shipmentNumber")}
                   />
                   {form.formState.errors.shipmentNumber?.message && (
@@ -630,9 +708,9 @@ export function ShipmentCreateDialog({
                                 Prize quantities (incoming per prize)
                               </Label>
                               <div className="grid gap-2">
-                                {childrenByProductId[
+                                {sortPrizes(childrenByProductId[
                                   selectedProductId
-                                ]?.map((prize) => (
+                                ] ?? []).map((prize) => (
                                   <div
                                     key={prize.id}
                                     className="flex items-center gap-2"
@@ -701,7 +779,7 @@ export function ShipmentCreateDialog({
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Create Shipment
+                {isEditMode ? "Update Shipment" : "Create Shipment"}
               </Button>
             </DialogFooter>
           </form>
