@@ -124,7 +124,6 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
   if (!detail) return null;
 
   const isDisplayOperation = DISPLAY_REASONS.has(detail.reason);
-  const isDisplaySwap = detail.reason === StockMovementReason.DISPLAY_SWAP;
 
   return (
     <div className="px-4 md:px-12 pb-4 pt-1">
@@ -133,13 +132,13 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
         <p className="text-sm text-muted-foreground mb-3 italic">"{detail.notes}"</p>
       )}
 
-      {/* Display Swap - show movements with from/to and action indicators */}
-      {isDisplaySwap && detail.movements.length > 0 ? (
+      {/* Display operations - show movements with from/to and action indicators */}
+      {isDisplayOperation && detail.movements.length > 0 ? (
         <div className="space-y-1">
           {/* Sub-header */}
           <div className="grid grid-cols-[1fr_10rem_4rem] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
             <span>Product</span>
-            <span className="text-center">Change</span>
+            <span className="text-center">Location</span>
             <span className="text-center">Action</span>
           </div>
 
@@ -173,7 +172,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
                   </div>
                 </div>
 
-                {/* Change (from → to) */}
+                {/* Location (from → to for transfers, single location for add/remove) */}
                 <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
                   {isRemoved && (
                     <span className="tabular-nums">{movement.fromLocationCode}</span>
@@ -213,7 +212,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
           })}
         </div>
       ) : isDisplayOperation ? (
-        /* Other display operations (SET, REMOVED) - simple view */
+        /* Fallback for display operations without movements (legacy data) */
         <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{detail.productSummary ?? "—"}</span>
           <span>·</span>

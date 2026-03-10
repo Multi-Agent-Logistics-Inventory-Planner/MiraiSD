@@ -74,18 +74,19 @@ public class MachineDisplayService {
             throw new IllegalArgumentException("Product is already displayed on this machine");
         }
 
+        OffsetDateTime now = OffsetDateTime.now();
         MachineDisplay newDisplay = MachineDisplay.builder()
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
                 .product(product)
-                .startedAt(OffsetDateTime.now())
+                .startedAt(now)
                 .actorId(request.getActorId())
                 .build();
 
         MachineDisplay saved = machineDisplayRepository.save(newDisplay);
 
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
-        auditLogService.createAuditLog(
+        AuditLog auditLog = auditLogService.createAuditLog(
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SET,
                 null, null,
@@ -94,6 +95,22 @@ public class MachineDisplayService {
                 product.getName(),
                 null
         );
+
+        // Create StockMovement entry for the display set
+        StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(product)
+                .locationType(request.getLocationType())
+                .fromLocationId(null)
+                .toLocationId(request.getMachineId())
+                .previousQuantity(0)
+                .currentQuantity(0)
+                .quantityChange(0)
+                .reason(StockMovementReason.DISPLAY_SET)
+                .actorId(request.getActorId())
+                .at(now)
+                .build();
+        stockMovementRepository.save(movement);
 
         return saved;
     }
@@ -156,7 +173,7 @@ public class MachineDisplayService {
         List<String> productNames = newProductIds.stream()
                 .map(id -> productsById.get(id).getName())
                 .collect(Collectors.toList());
-        auditLogService.createAuditLog(
+        AuditLog auditLog = auditLogService.createAuditLog(
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SET,
                 null, null,
@@ -165,6 +182,24 @@ public class MachineDisplayService {
                 buildProductSummary(productNames),
                 null
         );
+
+        // Create StockMovement entries for each product added
+        for (UUID productId : newProductIds) {
+            StockMovement movement = StockMovement.builder()
+                    .auditLog(auditLog)
+                    .item(productsById.get(productId))
+                    .locationType(request.getLocationType())
+                    .fromLocationId(null)
+                    .toLocationId(request.getMachineId())
+                    .previousQuantity(0)
+                    .currentQuantity(0)
+                    .quantityChange(0)
+                    .reason(StockMovementReason.DISPLAY_SET)
+                    .actorId(request.getActorId())
+                    .at(now)
+                    .build();
+            stockMovementRepository.save(movement);
+        }
 
         return saved;
     }
@@ -189,7 +224,7 @@ public class MachineDisplayService {
         List<String> productNames = existingDisplays.stream()
                 .map(d -> d.getProduct().getName())
                 .collect(Collectors.toList());
-        auditLogService.createAuditLog(
+        AuditLog auditLog = auditLogService.createAuditLog(
                 actorId,
                 StockMovementReason.DISPLAY_REMOVED,
                 machineId, machineCode,
@@ -198,6 +233,24 @@ public class MachineDisplayService {
                 buildProductSummary(productNames),
                 null
         );
+
+        // Create StockMovement entries for each product removed
+        for (MachineDisplay display : existingDisplays) {
+            StockMovement movement = StockMovement.builder()
+                    .auditLog(auditLog)
+                    .item(display.getProduct())
+                    .locationType(locationType)
+                    .fromLocationId(machineId)
+                    .toLocationId(null)
+                    .previousQuantity(0)
+                    .currentQuantity(0)
+                    .quantityChange(0)
+                    .reason(StockMovementReason.DISPLAY_REMOVED)
+                    .actorId(actorId)
+                    .at(now)
+                    .build();
+            stockMovementRepository.save(movement);
+        }
     }
 
     /**
@@ -212,11 +265,12 @@ public class MachineDisplayService {
             throw new IllegalArgumentException("Display is already ended");
         }
 
-        display.setEndedAt(OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        display.setEndedAt(now);
         machineDisplayRepository.save(display);
 
         String machineCode = resolveLocationCode(display.getMachineId(), display.getLocationType());
-        auditLogService.createAuditLog(
+        AuditLog auditLog = auditLogService.createAuditLog(
                 actorId,
                 StockMovementReason.DISPLAY_REMOVED,
                 display.getMachineId(), machineCode,
@@ -225,6 +279,22 @@ public class MachineDisplayService {
                 display.getProduct().getName(),
                 null
         );
+
+        // Create StockMovement entry for the display removed
+        StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(display.getProduct())
+                .locationType(display.getLocationType())
+                .fromLocationId(display.getMachineId())
+                .toLocationId(null)
+                .previousQuantity(0)
+                .currentQuantity(0)
+                .quantityChange(0)
+                .reason(StockMovementReason.DISPLAY_REMOVED)
+                .actorId(actorId)
+                .at(now)
+                .build();
+        stockMovementRepository.save(movement);
     }
 
     /**
