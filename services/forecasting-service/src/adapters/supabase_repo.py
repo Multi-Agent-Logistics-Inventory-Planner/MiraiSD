@@ -132,13 +132,12 @@ class SupabaseRepo:
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:
         """Load products (items) from database.
 
-        Returns DataFrame with columns: item_id, name, category, lead_time_days, safety_stock_days
+        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days
         """
         query = """
             SELECT
                 id::text AS item_id,
                 name,
-                category,
                 lead_time_days,
                 COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
             FROM products
@@ -155,7 +154,7 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "category", "lead_time_days", "safety_stock_days"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days"]
             )
 
         df["item_id"] = df["item_id"].astype(str)

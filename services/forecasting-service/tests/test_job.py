@@ -40,7 +40,6 @@ def test_run_batch_writes_db_aligned_output(tmp_path: Path, monkeypatch):
             {
                 "item_id": "A",
                 "name": "Item A",
-                "category": "Cat",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -49,7 +48,6 @@ def test_run_batch_writes_db_aligned_output(tmp_path: Path, monkeypatch):
             {
                 "item_id": "B",
                 "name": "Item B",
-                "category": "Cat",
                 "lead_time_days": 5,
                 "safety_stock_days": 0,
                 # omit optional columns to test defaults
@@ -126,7 +124,6 @@ def test_workflow_event_to_prediction(tmp_path: Path, monkeypatch):
             {
                 "item_id": "TEST-001",
                 "name": "Test Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -258,7 +255,6 @@ def test_stock_below_rop_triggers_order_date(tmp_path: Path, monkeypatch):
             {
                 "item_id": "LOW-STOCK",
                 "name": "Low Stock Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -341,7 +337,6 @@ def test_forecast_changes_with_different_date_ranges(tmp_path: Path, monkeypatch
             {
                 "item_id": "VOLATILE",
                 "name": "Volatile Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -429,7 +424,6 @@ def test_multiple_forecast_methods_comparison(tmp_path: Path, monkeypatch):
             {
                 "item_id": "METHOD-TEST",
                 "name": "Method Test Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -507,7 +501,6 @@ def test_high_demand_scenario(tmp_path: Path, monkeypatch):
             {
                 "item_id": "HIGH-DEMAND",
                 "name": "High Demand Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -595,7 +588,6 @@ def test_main_uses_logging_not_print(tmp_path: Path, monkeypatch):
             {
                 "item_id": "MAIN-TEST",
                 "name": "Main Test Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,
@@ -650,7 +642,6 @@ def test_main_no_print_statement(tmp_path: Path, monkeypatch, capsys):
             {
                 "item_id": "NO-PRINT-TEST",
                 "name": "No Print Test Item",
-                "category": "Test",
                 "lead_time_days": 7,
                 "safety_stock_days": 0,
                 "service_level": 0.95,

@@ -11,7 +11,6 @@ from . import config
 REQUIRED_ITEM_COLUMNS: Iterable[str] = (
     "item_id",
     "name",
-    "category",
     "lead_time_days",
     "safety_stock_days",
 )
@@ -62,7 +61,6 @@ def load_items() -> pd.DataFrame:
     df = df.copy()
     df["item_id"] = df["item_id"].astype(str)
     df["name"] = df["name"].astype(str)
-    df["category"] = df["category"].astype(str)
     # Enforce integer types; raise on bad values
     df["lead_time_days"] = pd.to_numeric(df["lead_time_days"], errors="raise").astype(int)
     df["safety_stock_days"] = pd.to_numeric(df["safety_stock_days"], errors="raise").astype(int)
