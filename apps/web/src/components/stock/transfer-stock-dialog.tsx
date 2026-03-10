@@ -26,12 +26,16 @@ import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
 import { ProductFilterHeader, getNoResultsMessage } from "./adjust";
 import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
 import { cn } from "@/lib/utils";
+import { ProductLocationSelector } from "./product-location-selector";
+import type { PreselectedProductInfo } from "./adjust-stock-dialog";
 
 interface TransferStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When provided, pre-selects source location when the dialog opens (e.g. from location detail or NA page). */
   initialSourceLocation?: LocationSelection | null;
+  /** When provided, shows only locations where this product exists in the "From" selector and highlights the product. */
+  preselectedProduct?: PreselectedProductInfo | null;
 }
 
 const EMPTY_LOCATION: LocationSelection = {
@@ -44,9 +48,13 @@ export function TransferStockDialog({
   open,
   onOpenChange,
   initialSourceLocation: initialSourceLocationProp,
+  preselectedProduct,
 }: TransferStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Product-filtered mode: when a product is preselected, we show only its locations in "From"
+  const isProductFilteredMode = Boolean(preselectedProduct);
 
   const [sourceLocation, setSourceLocation] =
     useState<LocationSelection>(EMPTY_LOCATION);
@@ -93,6 +101,26 @@ export function TransferStockDialog({
       setTransferQuantities({});
     }
   }, [sourceLocation.locationId]);
+
+  // Auto-set transfer quantity for preselected product when source inventory loads
+  useEffect(() => {
+    if (
+      isProductFilteredMode &&
+      preselectedProduct &&
+      sourceLocation.locationId &&
+      sourceInventoryQuery.data &&
+      sourceInventoryQuery.data.length > 0
+    ) {
+      // Find the inventory entry for the preselected product
+      const matchingInventory = sourceInventoryQuery.data.find(
+        (inv) => inv.item.id === preselectedProduct.product.id
+      );
+      if (matchingInventory && !transferQuantities[matchingInventory.id]) {
+        // Pre-set quantity to 1 for the preselected product
+        setTransferQuantities({ [matchingInventory.id]: 1 });
+      }
+    }
+  }, [isProductFilteredMode, preselectedProduct, sourceLocation.locationId, sourceInventoryQuery.data, transferQuantities]);
 
   const sourceInventory = sourceInventoryQuery.data ?? [];
   const destinationInventory = destinationInventoryQuery.data ?? [];
@@ -287,18 +315,34 @@ export function TransferStockDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl h-[95dvh] max-h-[95dvh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 p-6 pb-0">
-          <DialogTitle>Transfer Stock</DialogTitle>
+          <DialogTitle>
+            {isProductFilteredMode && preselectedProduct
+              ? `Transfer Stock: ${preselectedProduct.product.name}`
+              : "Transfer Stock"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
           {/* Location selectors */}
           <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] grid grid-cols-2 gap-4 sm:gap-16 py-4 px-4 rounded-xl mt-4">
-            <LocationSelector
-              label="From"
-              value={sourceLocation}
-              onChange={setSourceLocation}
-              disabled={isTransferring}
-            />
+            <div className="space-y-2">
+              <Label>From</Label>
+              {isProductFilteredMode && preselectedProduct ? (
+                <ProductLocationSelector
+                  inventoryEntries={preselectedProduct.inventoryEntries}
+                  value={sourceLocation}
+                  onChange={setSourceLocation}
+                  disabled={isTransferring}
+                />
+              ) : (
+                <LocationSelector
+                  label=""
+                  value={sourceLocation}
+                  onChange={setSourceLocation}
+                  disabled={isTransferring}
+                />
+              )}
+            </div>
             <LocationSelector
               label="To"
               labelSuffix={

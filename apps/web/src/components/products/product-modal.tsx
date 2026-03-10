@@ -51,7 +51,8 @@ interface ProductModalProps {
   product: ProductWithInventory | null;
   /** Called when Adjust button is clicked, with product info and inventory entries */
   onAdjustClick?: (preselectedProduct: PreselectedProductInfo) => void;
-  onTransferClick?: () => void;
+  /** Called when Transfer button is clicked, with product info and inventory entries */
+  onTransferClick?: (preselectedProduct: PreselectedProductInfo) => void;
   onEditClick?: () => void;
 }
 
@@ -197,7 +198,14 @@ export function ProductModal({
               <Button
                 size="sm"
                 className="bg-black text-white hover:bg-black/90"
-                onClick={() => onTransferClick?.()}
+                onClick={() => {
+                  if (locations && locations.length > 0) {
+                    onTransferClick?.({
+                      product: p,
+                      inventoryEntries: locations,
+                    });
+                  }
+                }}
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Transfer
@@ -259,7 +267,14 @@ export function ProductModal({
           <Button
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
-            onClick={() => onTransferClick?.()}
+            onClick={() => {
+              if (locations && locations.length > 0) {
+                onTransferClick?.({
+                  product: p,
+                  inventoryEntries: locations,
+                });
+              }
+            }}
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1" />
             Transfer
