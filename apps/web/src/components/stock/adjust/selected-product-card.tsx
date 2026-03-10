@@ -59,7 +59,7 @@ export function SelectedProductCard({
   const currentStock = action === "subtract" ? existingQuantityAtLocation : inventory.quantity;
 
   return (
-    <div className="shrink-0 mt-4 space-y-4">
+    <div className="space-y-4">
       {/* Header with title and X button */}
       <div className="flex items-center justify-between mt-5">
         <Label className="text-sm text-muted-foreground">Selected Product</Label>

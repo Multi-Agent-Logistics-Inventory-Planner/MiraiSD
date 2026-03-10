@@ -132,13 +132,12 @@ class SupabaseRepo:
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:
         """Load products (items) from database.
 
-        Returns DataFrame with columns: item_id, name, category, lead_time_days, safety_stock_days
+        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days
         """
         query = """
             SELECT
                 id::text AS item_id,
                 name,
-                category,
                 lead_time_days,
                 COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
             FROM products
@@ -155,7 +154,7 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "category", "lead_time_days", "safety_stock_days"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days"]
             )
 
         df["item_id"] = df["item_id"].astype(str)
@@ -182,6 +181,7 @@ class SupabaseRepo:
             ("keychain_machine_inventory", "keychain_machine_id"),
             ("pusher_machine_inventory", "pusher_machine_id"),
             ("four_corner_machine_inventory", "four_corner_machine_id"),
+            ("window_inventory", "window_id"),
             ("not_assigned_inventory", "item_id"),
         ]
 
@@ -191,7 +191,7 @@ class SupabaseRepo:
         union_parts = []
         if item_ids:
             # Push WHERE clause into each UNION branch for early filtering
-            params["item_ids"] = [str(iid) for iid in item_ids]
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
             for table, _ in inventory_tables:
                 union_parts.append(
                     f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids)"

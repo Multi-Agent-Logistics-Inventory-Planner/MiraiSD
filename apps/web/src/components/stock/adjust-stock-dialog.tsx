@@ -28,7 +28,7 @@ import {
   useUpdateInventoryMutation,
 } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
-import type { InventoryRequest } from "@/types/api";
+import type { InventoryRequest, ProductInventoryEntry, Product } from "@/types/api";
 import { parseQuantityInput } from "@/lib/utils/validation";
 import { LocationSelector } from "./location-selector";
 import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
@@ -41,12 +41,23 @@ import {
   type NormalizedInventory,
   normalizeInventory,
 } from "./adjust";
+import { ProductLocationSelector } from "./product-location-selector";
+
+/**
+ * Minimal product info needed for the preselected product mode.
+ */
+export interface PreselectedProductInfo {
+  product: Pick<Product, "id" | "name" | "sku" | "imageUrl" | "category">;
+  inventoryEntries: ProductInventoryEntry[];
+}
 
 interface AdjustStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When provided, pre-selects this location when the dialog opens (e.g. from location detail or NA page). */
   initialLocation?: LocationSelection | null;
+  /** When provided, shows only locations where this product exists and pre-selects the product. */
+  preselectedProduct?: PreselectedProductInfo | null;
 }
 
 const EMPTY_LOCATION: LocationSelection = {
@@ -59,10 +70,14 @@ export function AdjustStockDialog({
   open,
   onOpenChange,
   initialLocation: initialLocationProp,
+  preselectedProduct,
 }: AdjustStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Product-filtered mode: when a product is preselected, we show only its locations
+  const isProductFilteredMode = Boolean(preselectedProduct);
 
   const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
@@ -112,6 +127,7 @@ export function AdjustStockDialog({
         locationCode: initialLocationProp.locationCode ?? "",
       });
     }
+    // Note: preselectedProduct mode doesn't auto-select location - user picks from filtered list
   }, [open, initialLocationProp]);
 
   useEffect(() => {
@@ -167,6 +183,38 @@ export function AdjustStockDialog({
   const selectedInventory = useMemo(() => {
     return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
   }, [inventory, selectedInventoryId]);
+
+  // Handle product removal when quantity reaches 0 (e.g., after subtracting all stock)
+  useEffect(() => {
+    if (selectedInventoryId && inventory.length > 0) {
+      const stillExists = inventory.some((inv) => inv.id === selectedInventoryId);
+      if (!stillExists) {
+        // Product was removed (quantity reached 0), clear selection
+        setSelectedInventoryId(null);
+        setQuantity(1);
+        setQuantityWarning(null);
+      }
+    }
+  }, [inventory, selectedInventoryId]);
+
+  // Auto-select the preselected product when location inventory loads
+  useEffect(() => {
+    if (
+      isProductFilteredMode &&
+      preselectedProduct &&
+      location.locationId &&
+      inventory.length > 0 &&
+      !selectedInventoryId
+    ) {
+      // Find the inventory entry for the preselected product at this location
+      const matchingInventory = inventory.find(
+        (inv) => inv.item.id === preselectedProduct.product.id
+      );
+      if (matchingInventory) {
+        setSelectedInventoryId(matchingInventory.id);
+      }
+    }
+  }, [isProductFilteredMode, preselectedProduct, location.locationId, inventory, selectedInventoryId]);
 
   const hasValidLocation = Boolean(location.locationId);
   const isAdjusting = adjustMutation.isPending;
@@ -306,7 +354,10 @@ export function AdjustStockDialog({
       });
 
       toast({ title: "Stock adjusted" });
-      onOpenChange(false);
+      // Reset to product list view, keep location selected
+      setSelectedInventoryId(null);
+      setQuantity(1);
+      setQuantityWarning(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Adjustment failed";
       toast({ title: "Adjustment failed", description: message });
@@ -353,7 +404,11 @@ export function AdjustStockDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl h-[95dvh] max-h-[95dvh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 p-6 pb-0">
-          <DialogTitle>Adjust Stock</DialogTitle>
+          <DialogTitle>
+            {isProductFilteredMode && preselectedProduct
+              ? `Adjust Stock: ${preselectedProduct.product.name}`
+              : "Adjust Stock"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
@@ -374,12 +429,21 @@ export function AdjustStockDialog({
                     />
                   )}
               </div>
-              <LocationSelector
-                label=""
-                value={location}
-                onChange={setLocation}
-                disabled={isAdjusting}
-              />
+              {isProductFilteredMode && preselectedProduct ? (
+                <ProductLocationSelector
+                  inventoryEntries={preselectedProduct.inventoryEntries}
+                  value={location}
+                  onChange={setLocation}
+                  disabled={isAdjusting}
+                />
+              ) : (
+                <LocationSelector
+                  label=""
+                  value={location}
+                  onChange={setLocation}
+                  disabled={isAdjusting}
+                />
+              )}
             </div>
             {/* Action section */}
             <div className="shrink-0 space-y-2">
@@ -413,7 +477,7 @@ export function AdjustStockDialog({
           </div>
 
           {/* Products section */}
-          {hasValidLocation && !hasSelectedProduct ? (
+          {hasValidLocation && !hasSelectedProduct && !isProductFilteredMode ? (
             <div className="flex-1 min-h-0 flex flex-col mt-4">
               <ProductFilterHeader
                 title={listTitle}
@@ -454,24 +518,32 @@ export function AdjustStockDialog({
           ) : hasValidLocation &&
             hasSelectedProduct &&
             selectedNormalizedItem ? (
-            <SelectedProductCard
-              inventory={selectedNormalizedItem}
-              existingQuantityAtLocation={currentQtyAtLocation}
-              action={action}
-              quantity={quantity}
-              reason={reason}
-              quantityWarning={quantityWarning}
-              locationLabel={locationLabel}
-              disabled={isAdjusting}
-              onClearSelection={handleClearSelection}
-              onQuantityChange={handleQuantityChange}
-              onReasonChange={setReason}
-              onIncrement={handleIncrement}
-              onDecrement={handleDecrement}
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto mt-4">
+              <SelectedProductCard
+                inventory={selectedNormalizedItem}
+                existingQuantityAtLocation={currentQtyAtLocation}
+                action={action}
+                quantity={quantity}
+                reason={reason}
+                quantityWarning={quantityWarning}
+                locationLabel={locationLabel}
+                disabled={isAdjusting}
+                onClearSelection={handleClearSelection}
+                onQuantityChange={handleQuantityChange}
+                onReasonChange={setReason}
+                onIncrement={handleIncrement}
+                onDecrement={handleDecrement}
+              />
+            </div>
+          ) : hasValidLocation && isProductFilteredMode && inventoryQuery.isLoading ? (
+            <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
-              Select a location to see available products
+              {isProductFilteredMode
+                ? "Select a location to adjust stock"
+                : "Select a location to see available products"}
             </div>
           )}
         </div>
