@@ -181,6 +181,7 @@ class SupabaseRepo:
             ("keychain_machine_inventory", "keychain_machine_id"),
             ("pusher_machine_inventory", "pusher_machine_id"),
             ("four_corner_machine_inventory", "four_corner_machine_id"),
+            ("window_inventory", "window_id"),
             ("not_assigned_inventory", "item_id"),
         ]
 
