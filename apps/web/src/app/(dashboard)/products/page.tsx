@@ -17,7 +17,10 @@ import {
   compareProducts,
 } from "@/components/products";
 import type { ProductSort } from "@/components/products";
-import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
+import {
+  AdjustStockDialog,
+  type PreselectedProductInfo,
+} from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import {
   useProductInventory,
@@ -45,6 +48,8 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState<ProductWithInventory | null>(null);
 
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustPreselectedProduct, setAdjustPreselectedProduct] =
+    useState<PreselectedProductInfo | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
 
   const items = list.data ?? [];
@@ -161,7 +166,10 @@ export default function ProductsPage() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         product={selected}
-        onAdjustClick={() => setAdjustOpen(true)}
+        onAdjustClick={(preselectedProduct) => {
+          setAdjustPreselectedProduct(preselectedProduct);
+          setAdjustOpen(true);
+        }}
         onTransferClick={() => setTransferOpen(true)}
         onEditClick={() => {
           if (selected) {
@@ -179,7 +187,13 @@ export default function ProductsPage() {
 
       <AdjustStockDialog
         open={adjustOpen}
-        onOpenChange={setAdjustOpen}
+        onOpenChange={(open) => {
+          setAdjustOpen(open);
+          if (!open) {
+            setAdjustPreselectedProduct(null);
+          }
+        }}
+        preselectedProduct={adjustPreselectedProduct}
       />
 
       <TransferStockDialog

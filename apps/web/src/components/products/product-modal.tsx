@@ -40,14 +40,17 @@ import {
   LOCATION_TYPE_LABELS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
+  type ProductInventoryEntry,
 } from "@/types/api";
 import { Card, CardContent } from "../ui/card";
+import type { PreselectedProductInfo } from "@/components/stock/adjust-stock-dialog";
 
 interface ProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: ProductWithInventory | null;
-  onAdjustClick?: () => void;
+  /** Called when Adjust button is clicked, with product info and inventory entries */
+  onAdjustClick?: (preselectedProduct: PreselectedProductInfo) => void;
   onTransferClick?: () => void;
   onEditClick?: () => void;
 }
@@ -179,7 +182,14 @@ export function ProductModal({
               <Button
                 size="sm"
                 className="bg-black text-white hover:bg-black/90"
-                onClick={() => onAdjustClick?.()}
+                onClick={() => {
+                  if (locations && locations.length > 0) {
+                    onAdjustClick?.({
+                      product: p,
+                      inventoryEntries: locations,
+                    });
+                  }
+                }}
               >
                 <ArrowUpDown className="h-4 w-4 mr-1" />
                 Adjust
@@ -234,7 +244,14 @@ export function ProductModal({
           <Button
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
-            onClick={() => onAdjustClick?.()}
+            onClick={() => {
+              if (locations && locations.length > 0) {
+                onAdjustClick?.({
+                  product: p,
+                  inventoryEntries: locations,
+                });
+              }
+            }}
           >
             <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
             Adjust
