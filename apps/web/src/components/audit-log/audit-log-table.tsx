@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, ArrowRight, Minus, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AuditLog,
@@ -64,11 +64,9 @@ function formatLocation(entry: AuditLog): string {
     return `${from} → ${to}`;
   }
   if (DISPLAY_REASONS.has(entry.reason)) {
-    const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? fallback;
+    return entry.primaryFromLocationCode ?? entry.primaryToLocationCode ?? "NA";
   }
-  const fallback = entry.reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? fallback;
+  return entry.primaryToLocationCode ?? entry.primaryFromLocationCode ?? "NA";
 }
 
 function QuantityChange({ change }: { change: number }) {
@@ -95,8 +93,7 @@ function movementLocationLabel(
       ? (primaryFrom ?? "NA")
       : (primaryTo ?? "NA");
   }
-  const fallback = reason === StockMovementReason.INITIAL_STOCK ? "NA" : "—";
-  return movement.toLocationCode ?? movement.fromLocationCode ?? fallback;
+  return movement.toLocationCode ?? movement.fromLocationCode ?? "NA";
 }
 
 function ActionPill({ reason }: { reason: StockMovementReason }) {
@@ -130,16 +127,99 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
 
   return (
     <div className="px-4 md:px-12 pb-4 pt-1">
+      {/* Show notes if present */}
       {detail.notes && (
         <p className="text-sm text-muted-foreground mb-3 italic">"{detail.notes}"</p>
       )}
-      {isDisplayOperation ? (
+
+      {/* Display operations - show movements with from/to and action indicators */}
+      {isDisplayOperation && detail.movements.length > 0 ? (
+        <div className="space-y-1">
+          {/* Sub-header */}
+          <div className="grid grid-cols-[1fr_10rem_4rem] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <span>Product</span>
+            <span className="text-center">Location</span>
+            <span className="text-center">Action</span>
+          </div>
+
+          {detail.movements.map((movement) => {
+            const isRemoved = movement.fromLocationCode && !movement.toLocationCode;
+            const isAdded = !movement.fromLocationCode && movement.toLocationCode;
+            const isTransfer = movement.fromLocationCode && movement.toLocationCode;
+
+            return (
+              <div
+                key={movement.id}
+                className="grid grid-cols-[1fr_10rem_4rem] gap-x-4 md:gap-x-8 px-3 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                {/* Product */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {movement.itemImageUrl ? (
+                    <img
+                      src={movement.itemImageUrl}
+                      alt={movement.itemName}
+                      className="h-8 w-8 rounded-md object-cover shrink-0 border border-border/50"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-md bg-muted shrink-0 flex items-center justify-center border border-border/50">
+                      <span className="text-[10px] font-medium text-muted-foreground select-none">
+                        {movement.itemName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-tight truncate">{movement.itemName}</p>
+                  </div>
+                </div>
+
+                {/* Location (from → to for transfers, single location for add/remove) */}
+                <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                  {isRemoved && (
+                    <span className="tabular-nums">{movement.fromLocationCode}</span>
+                  )}
+                  {isAdded && (
+                    <span className="tabular-nums">{movement.toLocationCode}</span>
+                  )}
+                  {isTransfer && (
+                    <>
+                      <span className="tabular-nums">{movement.fromLocationCode}</span>
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                      <span className="tabular-nums">{movement.toLocationCode}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Action indicator */}
+                <div className="flex items-center justify-center">
+                  {isRemoved && (
+                    <span className="inline-flex items-center gap-1 text-red-500 font-medium text-sm">
+                      <Minus className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                  {isAdded && (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 font-medium text-sm">
+                      <Plus className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                  {isTransfer && (
+                    <span className="inline-flex items-center gap-1 text-blue-500 font-medium text-sm">
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : isDisplayOperation ? (
+        /* Fallback for display operations without movements (legacy data) */
         <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{detail.productSummary ?? "—"}</span>
           <span>·</span>
-          <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "—"}</span>
+          <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "NA"}</span>
         </div>
       ) : (
+      /* Stock movements (transfers, adjustments, etc.) */
       <div className="space-y-1">
         {/* Sub-header */}
         <div className="grid grid-cols-[1fr_7rem_5rem] gap-x-4 md:gap-x-8 px-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">

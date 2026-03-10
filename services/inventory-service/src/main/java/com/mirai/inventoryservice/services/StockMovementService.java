@@ -837,7 +837,10 @@ public class StockMovementService {
      * Calls the database function resolve_location_code() for consistency.
      */
     public String resolveLocationCode(UUID locationId, LocationType locationType) {
-        if (locationId == null) return null;
+        // NOT_ASSIGNED locations have no locationId, but should return "NA"
+        if (locationId == null) {
+            return locationType == LocationType.NOT_ASSIGNED ? "NA" : null;
+        }
 
         Object result = entityManager.createNativeQuery("SELECT resolve_location_code(:locationId, :locationType)")
                 .setParameter("locationId", locationId)

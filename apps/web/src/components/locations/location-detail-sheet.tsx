@@ -8,8 +8,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Check,
-  X,
   History,
   ChevronLeft,
   ChevronRight,
@@ -40,19 +38,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { LocationType } from "@/types/api";
 import type {
@@ -83,9 +68,10 @@ import {
 import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
-  useSwapDisplayMutation,
+  useBatchSwapDisplayMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
-import { SwapDisplayDialog } from "@/components/machine-displays/swap-display-dialog";
+import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
+import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
@@ -201,23 +187,21 @@ export function LocationDetailSheet({
 
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
-  const swapDisplayMutation = useSwapDisplayMutation();
+  const batchSwapMutation = useBatchSwapDisplayMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
-  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [addDisplayDialogOpen, setAddDisplayDialogOpen] = useState(false);
+  const [transferDisplayDialogOpen, setTransferDisplayDialogOpen] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
-  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
-  const [productToSwap, setProductToSwap] = useState<MachineDisplay | null>(null);
 
   // Reset state when dialog opens / location changes
   useEffect(() => {
     if (open) {
       setActiveTab("products");
       setHistoryPage(0);
-      setSelectedProductIds([]);
     }
   }, [open, locationId]);
 
@@ -229,39 +213,73 @@ export function LocationDetailSheet({
     return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
   }, [inventory]);
 
-  // Available products not already on display
-  const activeProductIds = activeDisplaysForMachine.map((d) => d.productId);
-  const availableProducts = products.filter((p) => !activeProductIds.includes(p.id));
-
-  const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id));
-
-  function handleProductSelect(productId: string) {
-    setSelectedProductIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
-  }
-
-  async function handleAddDisplayProducts() {
-    if (!locationId || selectedProductIds.length === 0) return;
+  async function handleAddDisplayProducts(productIds: string[]) {
+    if (!locationId || productIds.length === 0) return;
     try {
       await setDisplayBatchMutation.mutateAsync({
         locationType,
         machineId: locationId,
-        productIds: selectedProductIds,
+        productIds,
         actorId: user?.personId,
       } as SetMachineDisplayBatchRequest);
       toast({
         title: "Display updated",
-        description: `${selectedProductIds.length} product(s) added to display.`,
+        description: `${productIds.length} product(s) added to display.`,
       });
-      setSelectedProductIds([]);
-      setProductPopoverOpen(false);
+      setAddDisplayDialogOpen(false);
     } catch {
       toast({
         title: "Error",
         description: "Failed to update display.",
         variant: "destructive",
       });
+    }
+  }
+
+  async function handleTransferDisplays(
+    itemsToSend: MachineDisplay[],
+    itemsToReceive: MachineDisplay[],
+    targetMachineId: string
+  ) {
+    if (!locationId) return;
+
+    setIsTransferring(true);
+    try {
+      // Use the batch swap endpoint for a single transaction and single audit log
+      await batchSwapMutation.mutateAsync({
+        locationType,
+        machineId: locationId,
+        targetLocationType: locationType,
+        targetMachineId,
+        displayIdsToTarget: itemsToSend.map((item) => item.id),
+        displayIdsFromTarget: itemsToReceive.map((item) => item.id),
+        actorId: user?.personId,
+      });
+
+      const sentCount = itemsToSend.length;
+      const receivedCount = itemsToReceive.length;
+      let description = "";
+      if (sentCount > 0 && receivedCount > 0) {
+        description = `Sent ${sentCount} and received ${receivedCount} product(s).`;
+      } else if (sentCount > 0) {
+        description = `Sent ${sentCount} product(s).`;
+      } else {
+        description = `Received ${receivedCount} product(s).`;
+      }
+
+      toast({
+        title: "Transfer complete",
+        description,
+      });
+      setTransferDisplayDialogOpen(false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to transfer displays.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTransferring(false);
     }
   }
 
@@ -292,35 +310,47 @@ export function LocationDetailSheet({
     setProductToClear(null);
   }
 
-  function handleSwapClick(item: MachineDisplay) {
-    setProductToSwap(item);
-    setSwapDialogOpen(true);
-  }
-
-  async function handleSwap(outgoingDisplayId: string, incomingProductId: string) {
+  async function handleSwapWithProducts(
+    itemsToRemove: MachineDisplay[],
+    productsToAdd: string[]
+  ) {
     if (!locationId) return;
-    const incoming = products.find((p) => p.id === incomingProductId);
-    const outgoing = activeDisplaysForMachine.find((d) => d.id === outgoingDisplayId);
+
+    setIsTransferring(true);
     try {
-      await swapDisplayMutation.mutateAsync({
-        outgoingDisplayId,
-        incomingProductId,
+      // Use the batch swap endpoint for a single transaction and single audit log
+      await batchSwapMutation.mutateAsync({
         locationType,
         machineId: locationId,
+        displayIdsToRemove: itemsToRemove.map((item) => item.id),
+        productIdsToAdd: productsToAdd,
         actorId: user?.personId,
       });
+
+      const removedCount = itemsToRemove.length;
+      const addedCount = productsToAdd.length;
+      let description = "";
+      if (removedCount > 0 && addedCount > 0) {
+        description = `Removed ${removedCount} and added ${addedCount} product(s).`;
+      } else if (removedCount > 0) {
+        description = `Removed ${removedCount} product(s) from display.`;
+      } else {
+        description = `Added ${addedCount} product(s) to display.`;
+      }
+
       toast({
-        title: "Display swapped",
-        description: `"${outgoing?.productName}" replaced with "${incoming?.name}".`,
+        title: "Swap complete",
+        description,
       });
-      setSwapDialogOpen(false);
-      setProductToSwap(null);
+      setTransferDisplayDialogOpen(false);
     } catch {
       toast({
         title: "Error",
         description: "Failed to swap display.",
         variant: "destructive",
       });
+    } finally {
+      setIsTransferring(false);
     }
   }
 
@@ -433,69 +463,10 @@ export function LocationDetailSheet({
           Set up a display to start tracking products on this machine.
         </p>
       </div>
-      <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Display
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0" align="center">
-          <Command>
-            <CommandInput placeholder="Search products..." />
-            <CommandList>
-              <CommandEmpty>No products available</CommandEmpty>
-              <CommandGroup>
-                {availableProducts.map((product) => (
-                  <CommandItem
-                    key={product.id}
-                    value={`${product.name} ${product.sku}`}
-                    onSelect={() => handleProductSelect(product.id)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedProductIds.includes(product.id) ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <div className="flex flex-col">
-                      <span>{product.name}</span>
-                      <span className="text-xs text-muted-foreground">{product.sku}</span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-          {selectedProductIds.length > 0 && (
-            <div className="p-2 border-t">
-              <div className="flex flex-wrap gap-1 mb-2">
-                {selectedProducts.map((p) => (
-                  <Badge key={p.id} variant="secondary" className="text-xs">
-                    {p.name}
-                    <button
-                      onClick={() => handleProductSelect(p.id)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={handleAddDisplayProducts}
-                disabled={setDisplayBatchMutation.isPending}
-              >
-                {setDisplayBatchMutation.isPending
-                  ? "Adding..."
-                  : `Add ${selectedProductIds.length} Product(s)`}
-              </Button>
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
+      <Button size="sm" onClick={() => setAddDisplayDialogOpen(true)}>
+        <Plus className="h-4 w-4 mr-1" />
+        Add Display
+      </Button>
     </div>
   );
 
@@ -503,69 +474,16 @@ export function LocationDetailSheet({
     <>
       <div className="shrink-0 flex items-center justify-between py-4">
         <p className="text-sm font-medium">Current Products</p>
-        <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Product
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0" align="end">
-            <Command>
-              <CommandInput placeholder="Search products..." />
-              <CommandList>
-                <CommandEmpty>No products available</CommandEmpty>
-                <CommandGroup>
-                  {availableProducts.map((product) => (
-                    <CommandItem
-                      key={product.id}
-                      value={`${product.name} ${product.sku}`}
-                      onSelect={() => handleProductSelect(product.id)}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedProductIds.includes(product.id) ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <div className="flex flex-col">
-                        <span>{product.name}</span>
-                        <span className="text-xs text-muted-foreground">{product.sku}</span>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-            {selectedProductIds.length > 0 && (
-              <div className="p-2 border-t">
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {selectedProducts.map((p) => (
-                    <Badge key={p.id} variant="secondary" className="text-xs">
-                      {p.name}
-                      <button
-                        onClick={() => handleProductSelect(p.id)}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={handleAddDisplayProducts}
-                  disabled={setDisplayBatchMutation.isPending}
-                >
-                  {setDisplayBatchMutation.isPending
-                    ? "Adding..."
-                    : `Add ${selectedProductIds.length} Product(s)`}
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Product
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setTransferDisplayDialogOpen(true)}>
+            <ArrowLeftRight className="h-4 w-4 mr-1" />
+            Machine Swap
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0">
@@ -614,15 +532,6 @@ export function LocationDetailSheet({
                           Stale
                         </Badge>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                        onClick={() => handleSwapClick(item)}
-                        title="Swap product"
-                      >
-                        <ArrowLeftRight className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -877,18 +786,25 @@ export function LocationDetailSheet({
         </AlertDialogContent>
       </AlertDialog>
 
-      <SwapDisplayDialog
-        open={swapDialogOpen}
-        onOpenChange={(next) => {
-          setSwapDialogOpen(next);
-          if (!next) setProductToSwap(null);
-        }}
-        outgoingDisplay={productToSwap}
-        products={products}
-        activeDisplaysForMachine={activeDisplaysForMachine}
+      <AddDisplayDialog
+        open={addDisplayDialogOpen}
+        onOpenChange={setAddDisplayDialogOpen}
+        activeDisplays={activeDisplaysForMachine}
+        isSaving={setDisplayBatchMutation.isPending}
+        onSubmit={handleAddDisplayProducts}
+      />
+
+      <TransferDisplayDialog
+        open={transferDisplayDialogOpen}
+        onOpenChange={setTransferDisplayDialogOpen}
+        locationType={locationType}
+        currentMachineId={locationId ?? ""}
+        currentMachineCode={code}
+        currentDisplays={activeDisplaysForMachine}
         actorId={user?.personId}
-        onSwap={handleSwap}
-        isSubmitting={swapDisplayMutation.isPending}
+        onTransferWithMachine={handleTransferDisplays}
+        onSwapWithProducts={handleSwapWithProducts}
+        isSubmitting={isTransferring}
       />
     </>
   );

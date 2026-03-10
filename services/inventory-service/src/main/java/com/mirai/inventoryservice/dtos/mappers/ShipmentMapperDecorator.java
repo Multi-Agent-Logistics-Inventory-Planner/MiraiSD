@@ -180,7 +180,7 @@ public class ShipmentMapperDecorator {
             if (item.getAllocations() != null) {
                 for (ShipmentItemAllocationResponseDTO allocation : item.getAllocations()) {
                     if (allocation.getLocationType() == LocationType.NOT_ASSIGNED) {
-                        allocation.setLocationCode("Not Assigned");
+                        allocation.setLocationCode("NA");
                     } else if (allocation.getLocationId() != null) {
                         Map<UUID, String> codes = locationCodes.get(allocation.getLocationType());
                         if (codes != null) {

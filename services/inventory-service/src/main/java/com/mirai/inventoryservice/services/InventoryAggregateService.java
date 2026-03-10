@@ -312,7 +312,7 @@ public class InventoryAggregateService implements DisposableBean {
                         .inventoryId(inv.getId())
                         .locationType(LocationType.NOT_ASSIGNED.name())
                         .locationId(null)
-                        .locationCode("-")
+                        .locationCode("NA")
                         .locationLabel("Not Assigned")
                         .quantity(inv.getQuantity())
                         .updatedAt(inv.getUpdatedAt())
