@@ -183,23 +183,23 @@ public class MachineDisplayService {
                 null
         );
 
-        // Create StockMovement entries for each product added
-        for (UUID productId : newProductIds) {
-            StockMovement movement = StockMovement.builder()
-                    .auditLog(auditLog)
-                    .item(productsById.get(productId))
-                    .locationType(request.getLocationType())
-                    .fromLocationId(null)
-                    .toLocationId(request.getMachineId())
-                    .previousQuantity(0)
-                    .currentQuantity(0)
-                    .quantityChange(0)
-                    .reason(StockMovementReason.DISPLAY_SET)
-                    .actorId(request.getActorId())
-                    .at(now)
-                    .build();
-            stockMovementRepository.save(movement);
-        }
+        // Create StockMovement entries for each product added (batch insert)
+        List<StockMovement> movements = newProductIds.stream()
+                .map(productId -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(productsById.get(productId))
+                        .locationType(request.getLocationType())
+                        .fromLocationId(null)
+                        .toLocationId(request.getMachineId())
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_SET)
+                        .actorId(request.getActorId())
+                        .at(now)
+                        .build())
+                .collect(Collectors.toList());
+        stockMovementRepository.saveAll(movements);
 
         return saved;
     }
@@ -234,23 +234,23 @@ public class MachineDisplayService {
                 null
         );
 
-        // Create StockMovement entries for each product removed
-        for (MachineDisplay display : existingDisplays) {
-            StockMovement movement = StockMovement.builder()
-                    .auditLog(auditLog)
-                    .item(display.getProduct())
-                    .locationType(locationType)
-                    .fromLocationId(machineId)
-                    .toLocationId(null)
-                    .previousQuantity(0)
-                    .currentQuantity(0)
-                    .quantityChange(0)
-                    .reason(StockMovementReason.DISPLAY_REMOVED)
-                    .actorId(actorId)
-                    .at(now)
-                    .build();
-            stockMovementRepository.save(movement);
-        }
+        // Create StockMovement entries for each product removed (batch insert)
+        List<StockMovement> movements = existingDisplays.stream()
+                .map(display -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(display.getProduct())
+                        .locationType(locationType)
+                        .fromLocationId(machineId)
+                        .toLocationId(null)
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_REMOVED)
+                        .actorId(actorId)
+                        .at(now)
+                        .build())
+                .collect(Collectors.toList());
+        stockMovementRepository.saveAll(movements);
     }
 
     /**
@@ -561,23 +561,23 @@ public class MachineDisplayService {
                     null
             );
 
-            // Create StockMovement entries for each display change (with quantityChange=0)
-            for (DisplayChange change : displayChanges) {
-                StockMovement movement = StockMovement.builder()
-                        .auditLog(auditLog)
-                        .item(change.product())
-                        .locationType(change.locationType())
-                        .fromLocationId(change.fromMachineId())
-                        .toLocationId(change.toMachineId())
-                        .previousQuantity(0)
-                        .currentQuantity(0)
-                        .quantityChange(0)  // Display changes don't affect quantity
-                        .reason(StockMovementReason.DISPLAY_SWAP)
-                        .actorId(request.getActorId())
-                        .at(now)
-                        .build();
-                stockMovementRepository.save(movement);
-            }
+            // Create StockMovement entries for each display change (batch insert)
+            List<StockMovement> movements = displayChanges.stream()
+                    .map(change -> StockMovement.builder()
+                            .auditLog(auditLog)
+                            .item(change.product())
+                            .locationType(change.locationType())
+                            .fromLocationId(change.fromMachineId())
+                            .toLocationId(change.toMachineId())
+                            .previousQuantity(0)
+                            .currentQuantity(0)
+                            .quantityChange(0)  // Display changes don't affect quantity
+                            .reason(StockMovementReason.DISPLAY_SWAP)
+                            .actorId(request.getActorId())
+                            .at(now)
+                            .build())
+                    .collect(Collectors.toList());
+            stockMovementRepository.saveAll(movements);
         }
 
         return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
