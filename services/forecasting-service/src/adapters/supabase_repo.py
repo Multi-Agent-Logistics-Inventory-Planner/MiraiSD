@@ -190,10 +190,11 @@ class SupabaseRepo:
         union_parts = []
         if item_ids:
             # Push WHERE clause into each UNION branch for early filtering
+            # Cast to uuid[] for PostgreSQL type compatibility
             params["item_ids"] = [str(iid) for iid in item_ids]
             for table, _ in inventory_tables:
                 union_parts.append(
-                    f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids)"
+                    f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids::uuid[])"
                 )
         else:
             # No filter - simple select from each table
