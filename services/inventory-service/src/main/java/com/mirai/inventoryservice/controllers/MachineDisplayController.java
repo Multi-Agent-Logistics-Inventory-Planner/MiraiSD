@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.controllers;
 
+import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
@@ -62,6 +63,19 @@ public class MachineDisplayController {
     public ResponseEntity<List<MachineDisplayDTO>> swapDisplay(
             @Valid @RequestBody SwapMachineDisplayRequestDTO request) {
         List<MachineDisplayDTO> updatedDisplays = machineDisplayService.swapDisplay(request);
+        return ResponseEntity.ok(updatedDisplays);
+    }
+
+    /**
+     * Batch display swap operation that handles both swap modes:
+     * 1. Swap with products - remove displays and add new products
+     * 2. Swap with another machine - trade displays between two machines
+     * Creates a single audit log entry with all changes.
+     */
+    @PostMapping("/batch-swap")
+    public ResponseEntity<List<MachineDisplayDTO>> batchSwapDisplay(
+            @Valid @RequestBody BatchDisplaySwapRequestDTO request) {
+        List<MachineDisplayDTO> updatedDisplays = machineDisplayService.batchSwapDisplay(request);
         return ResponseEntity.ok(updatedDisplays);
     }
 
