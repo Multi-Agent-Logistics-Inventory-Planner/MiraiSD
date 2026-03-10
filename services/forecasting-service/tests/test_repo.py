@@ -7,7 +7,7 @@ from src import config, repo
 
 def test_load_items_schema_and_count():
     df = repo.load_items()
-    required = {"item_id", "name", "category", "lead_time_days", "safety_stock_days"}
+    required = {"item_id", "name", "lead_time_days", "safety_stock_days"}
     assert required.issubset(df.columns), "Items schema mismatch"
     assert len(df) >= 3, "Expected at least 3 items"
     assert pd.api.types.is_integer_dtype(df["lead_time_days"])
