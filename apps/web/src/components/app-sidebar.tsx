@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Star,
   ChevronsUpDown,
+  HeartCrack,
 } from "lucide-react";
 
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -180,6 +181,23 @@ function SettingsLink() {
   );
 }
 
+function YixinLink() {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <DropdownMenuItem asChild>
+      <Link
+        href="/yixin"
+        className="cursor-pointer"
+        onClick={() => setOpenMobile(false)}
+      >
+        <HeartCrack className="h-4 w-4" />
+        <span>Yixin</span>
+      </Link>
+    </DropdownMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
@@ -313,6 +331,7 @@ export function AppSidebar() {
               className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
             >
               <SettingsLink />
+              <YixinLink />
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                 <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
