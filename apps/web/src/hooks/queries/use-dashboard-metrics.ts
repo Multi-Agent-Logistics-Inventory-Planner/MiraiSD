@@ -129,14 +129,14 @@ export function useDashboardMetrics() {
     const actionRequiredItems: ActionRequiredItem[] = (atRiskForecasts ?? []).map((f) => {
       const product = productMap.get(f.itemId);
       const leadTimeDays = product?.leadTimeDays ?? null;
-      const isLeadTimeExceeded = leadTimeDays !== null && f.daysToStockout < leadTimeDays;
+      const isLeadTimeExceeded = leadTimeDays !== null && f.daysToStockout !== null && f.daysToStockout < leadTimeDays;
 
       return {
         itemId: f.itemId,
         itemName: f.itemName,
         itemSku: f.itemSku,
         imageUrl: product?.imageUrl ?? null,
-        daysToStockout: f.daysToStockout,
+        daysToStockout: f.daysToStockout ?? 0,
         currentStock: f.currentStock,
         dailyDemand: Math.abs(f.avgDailyDelta),
         suggestedReorderQty: f.suggestedReorderQty,

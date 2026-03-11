@@ -50,12 +50,14 @@ interface PredictionsTableProps {
   isError: boolean
 }
 
-function getDaysToStockoutBadgeClass(days: number): string {
+function getDaysToStockoutBadgeClass(days: number | null): string {
+  if (days === null) return "bg-green-100 text-green-700 border-green-200"
   if (days <= 3) return "bg-red-100 text-red-700 border-red-200"
   if (days <= 7) return "bg-amber-100 text-amber-700 border-amber-200"
   if (days <= 14) return "bg-yellow-100 text-yellow-700 border-yellow-200"
   return "bg-green-100 text-green-700 border-green-200"
 }
+
 
 function sanitizeCSVField(value: string): string {
   const escaped = value.replace(/"/g, '""')
@@ -110,13 +112,14 @@ function filterAndSortData(
 
   if (riskFilter !== "all") {
     filtered = filtered.filter((item) => {
+      const days = item.daysToStockout
       switch (riskFilter) {
         case "critical":
-          return item.daysToStockout <= 3
+          return days !== null && days <= 3
         case "warning":
-          return item.daysToStockout > 3 && item.daysToStockout <= 7
+          return days !== null && days > 3 && days <= 7
         case "safe":
-          return item.daysToStockout > 7
+          return days === null || days > 7
         default:
           return true
       }
@@ -145,8 +148,8 @@ function filterAndSortData(
         bVal = b.avgDailyDelta
         break
       case "daysToStockout":
-        aVal = a.daysToStockout
-        bVal = b.daysToStockout
+        aVal = a.daysToStockout ?? Infinity
+        bVal = b.daysToStockout ?? Infinity
         break
       case "suggestedReorderQty":
         aVal = a.suggestedReorderQty
@@ -234,8 +237,8 @@ export function PredictionsTable({
       sanitizeCSVField(item.itemSku ?? ""),
       sanitizeCSVField(item.itemName),
       item.currentStock,
-      item.avgDailyDelta.toFixed(2),
-      item.daysToStockout,
+      Math.abs(item.avgDailyDelta).toFixed(2),
+      item.daysToStockout === null ? "N/A" : Math.round(item.daysToStockout),
       item.suggestedReorderQty,
       item.suggestedOrderDate
         ? format(new Date(item.suggestedOrderDate), "yyyy-MM-dd")
@@ -372,7 +375,9 @@ export function PredictionsTable({
                             variant="outline"
                             className={getDaysToStockoutBadgeClass(prediction.daysToStockout)}
                           >
-                            {prediction.daysToStockout} days
+                            {prediction.daysToStockout === null
+                              ? "N/A"
+                              : `${Math.round(prediction.daysToStockout)} days`}
                           </Badge>
                         </TableCell>
                         <TableCell>{prediction.suggestedReorderQty} units</TableCell>

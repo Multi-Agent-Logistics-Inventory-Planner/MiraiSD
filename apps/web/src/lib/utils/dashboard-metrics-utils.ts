@@ -24,7 +24,7 @@ const RISK_BAND_ORDER: RiskBand[] = ["critical", "warning", "healthy", "safe", "
  * Computes the distribution of items across risk bands based on days to stockout.
  */
 export function computeRiskDistribution(
-  forecasts: { daysToStockout: number }[]
+  forecasts: { daysToStockout: number | null }[]
 ): RiskDistributionSegment[] {
   const counts: Record<RiskBand, number> = {
     critical: 0,
@@ -195,7 +195,7 @@ export function computeShipmentPipeline(
 
   const nextDelivery =
     shipmentsWithDates.length > 0
-      ? shipmentsWithDates.sort(
+      ? [...shipmentsWithDates].sort(
           (a, b) =>
             new Date(a.expectedDeliveryDate).getTime() -
             new Date(b.expectedDeliveryDate).getTime()
