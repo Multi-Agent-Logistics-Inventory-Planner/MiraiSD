@@ -17,11 +17,13 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
   [StockMovementReason.RESTOCK]: "Restock",
   [StockMovementReason.SHIPMENT_RECEIPT]: "Shipment",
+  [StockMovementReason.SHIPMENT_RECEIPT_REVERSED]: "Shipment Reversal",
   [StockMovementReason.SALE]: "Sale",
   [StockMovementReason.DAMAGE]: "Damage",
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
   [StockMovementReason.RETURN]: "Return",
   [StockMovementReason.TRANSFER]: "Transfer",
+  [StockMovementReason.REMOVED]: "Removed",
   [StockMovementReason.DISPLAY_SET]: "Display Set",
   [StockMovementReason.DISPLAY_REMOVED]: "Display Removed",
   [StockMovementReason.DISPLAY_SWAP]: "Display Swap",
@@ -44,6 +46,7 @@ function getReasonStyle(reason: StockMovementReason): string {
     case StockMovementReason.SALE:
       return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
     case StockMovementReason.DAMAGE:
+    case StockMovementReason.SHIPMENT_RECEIPT_REVERSED:
       return "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400";
     case StockMovementReason.RETURN:
       return "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400";

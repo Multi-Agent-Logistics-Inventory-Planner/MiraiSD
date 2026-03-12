@@ -91,16 +91,21 @@ interface DisplayItemProps {
   onToggle: () => void;
   disabled?: boolean;
   direction: "send" | "receive";
+  imageUrl?: string | null;
 }
 
-function DisplayItem({ display, selected, onToggle, disabled, direction }: DisplayItemProps) {
+function DisplayItem({ display, selected, onToggle, disabled, direction, imageUrl }: DisplayItemProps) {
+  const [imageError, setImageError] = useState(false);
+  const safeImageUrl = getSafeImageUrl(imageUrl);
+  const hasImage = safeImageUrl && !imageError;
+
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left",
+        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left overflow-hidden",
         selected
           ? direction === "send"
             ? "bg-orange-50 border-orange-300 dark:bg-orange-950/30 dark:border-orange-700"
@@ -109,13 +114,26 @@ function DisplayItem({ display, selected, onToggle, disabled, direction }: Displ
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
-      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-        <Monitor className="h-4 w-4 text-muted-foreground" />
+      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted">
+        {hasImage ? (
+          <Image
+            src={safeImageUrl}
+            alt={display.productName}
+            fill
+            sizes="40px"
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <ImageOff className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 w-0">
         <p className="text-sm font-medium truncate">{display.productName}</p>
-        <p className="text-xs text-muted-foreground">{display.productSku}</p>
+        <p className="text-xs text-muted-foreground truncate">{display.productSku}</p>
       </div>
 
       <div
@@ -152,7 +170,7 @@ function ProductItem({ product, selected, onToggle, disabled }: ProductItemProps
       onClick={onToggle}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left",
+        "w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left overflow-hidden",
         selected
           ? "bg-green-50 border-green-300 dark:bg-green-950/30 dark:border-green-700"
           : "bg-background hover:bg-muted/50 border-border",
@@ -176,7 +194,7 @@ function ProductItem({ product, selected, onToggle, disabled }: ProductItemProps
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 w-0">
         <p className="text-sm font-medium truncate">{product.name}</p>
         <Badge variant="outline" className="text-[10px] mt-0.5">
           {product.category.name}
@@ -222,16 +240,16 @@ function MachineCard({
       onClick={onSelect}
       disabled={disabled}
       className={cn(
-        "w-full flex items-center gap-3 p-4 rounded-lg border transition-colors text-left",
+        "w-full flex items-center gap-3 p-4 rounded-lg border transition-colors text-left overflow-hidden",
         selected
           ? "bg-primary/5 border-primary"
           : "bg-background hover:bg-muted/50 border-border",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
-      <div className="flex-1 min-w-0">
-        <p className="font-medium">{code}</p>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex-1 w-0">
+        <p className="font-medium truncate">{code}</p>
+        <p className="text-sm text-muted-foreground truncate">
           {displayCount} product{displayCount !== 1 ? "s" : ""} on display
         </p>
       </div>
@@ -346,6 +364,15 @@ export function TransferDisplayDialog({
         return p.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
       });
   }, [products, currentDisplayProductIds, searchQuery]);
+
+  // Map product IDs to image URLs for display items
+  const productImageMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const product of products) {
+      map.set(product.id, product.imageUrl ?? null);
+    }
+    return map;
+  }, [products]);
 
   const selectedMachine = machines.find((m) => m.id === selectedMachineId);
   const selectedMachineCode = selectedMachine
@@ -506,7 +533,7 @@ export function TransferDisplayDialog({
           )}
 
           {step === "select-machine" && (
-            <>
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
               <div className="shrink-0 mb-3">
                 <Label className="text-xs text-muted-foreground mb-2 block">
                   Select a machine ({availableMachines.length})
@@ -531,30 +558,32 @@ export function TransferDisplayDialog({
                     : "No other machines available"}
                 </div>
               ) : (
-                <ScrollArea className="flex-1">
-                  <div className="space-y-2 pr-3 pb-2">
-                    {availableMachines.map((machine) => (
-                      <MachineCard
-                        key={machine.id}
-                        machine={machine}
-                        locationType={locationType}
-                        selected={selectedMachineId === machine.id}
-                        onSelect={() => handleMachineSelect(machine.id)}
-                        displayCount={displayCountByMachine.get(machine.id) ?? 0}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-2 pr-3 pb-2">
+                      {availableMachines.map((machine) => (
+                        <MachineCard
+                          key={machine.id}
+                          machine={machine}
+                          locationType={locationType}
+                          selected={selectedMachineId === machine.id}
+                          onSelect={() => handleMachineSelect(machine.id)}
+                          displayCount={displayCountByMachine.get(machine.id) ?? 0}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
               )}
-            </>
+            </div>
           )}
 
           {step === "select-items" && (
             <>
               {/* Two-column layout for machine-to-machine transfer */}
-              <div className="flex-1 min-h-0 grid grid-cols-2 gap-4">
+              <div className="flex-1 min-h-0 grid grid-cols-2 gap-4 overflow-hidden">
                 {/* Left column: Current machine items to send */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-col min-h-0 min-w-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
                       From {currentMachineCode} ({currentDisplays.length})
@@ -582,6 +611,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToSend(display.id)}
                               direction="send"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
@@ -591,7 +621,7 @@ export function TransferDisplayDialog({
                 </div>
 
                 {/* Right column: Target machine items to receive */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-col min-h-0 min-w-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
                       From {selectedMachineCode} ({targetDisplays.length})
@@ -623,6 +653,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToReceive(display.id)}
                               direction="receive"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
@@ -674,9 +705,9 @@ export function TransferDisplayDialog({
           {step === "select-products" && (
             <>
               {/* Two-column layout for product swap */}
-              <div className="flex-1 min-h-0 grid grid-cols-2 gap-4">
+              <div className="flex-1 min-h-0 grid grid-cols-2 gap-4 overflow-hidden">
                 {/* Left column: Current display items to remove */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-col min-h-0 min-w-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
                       Current Display ({currentDisplays.length})
@@ -704,6 +735,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToSend(display.id)}
                               direction="send"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
@@ -713,7 +745,7 @@ export function TransferDisplayDialog({
                 </div>
 
                 {/* Right column: Products to add */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-col min-h-0 min-w-0 overflow-hidden">
                   <div className="shrink-0 mb-2">
                     <Label className="text-xs text-muted-foreground">
                       Select products to add ({availableProducts.length})
