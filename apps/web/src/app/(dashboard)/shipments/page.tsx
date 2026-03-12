@@ -23,7 +23,7 @@ import {
   ShipmentPagination,
 } from "@/components/shipments";
 import { useShipments } from "@/hooks/queries/use-shipments";
-import { useDeleteShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
+import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
 import {
@@ -38,6 +38,7 @@ export default function ShipmentsPage() {
   const { toast } = useToast();
   const deleteMutation = useDeleteShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
+  const undoReceiveMutation = useUndoReceiveShipmentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
@@ -48,6 +49,7 @@ export default function ShipmentsPage() {
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [undoDialogOpen, setUndoDialogOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null
   );
@@ -101,6 +103,29 @@ export default function ShipmentsPage() {
   function handleEditClick() {
     setDetailSheetOpen(false);
     setCreateDialogOpen(true);
+  }
+
+  function handleUndoReceiveClick() {
+    setDetailSheetOpen(false);
+    setUndoDialogOpen(true);
+  }
+
+  async function handleConfirmUndoReceive() {
+    if (!selectedShipment) return;
+
+    try {
+      await undoReceiveMutation.mutateAsync({ id: selectedShipment.id });
+      toast({
+        title: "Shipment receipt reversed",
+        description: "Inventory has been restored to pre-receipt state.",
+      });
+      setUndoDialogOpen(false);
+      setSelectedShipment(null);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to undo shipment receipt";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
   }
 
   async function handleTrackingUpdate(trackingId: string) {
@@ -218,6 +243,7 @@ export default function ShipmentsPage() {
         onReceiveClick={handleReceiveClick}
         onDeleteClick={handleDeleteClick}
         onEditClick={handleEditClick}
+        onUndoReceiveClick={handleUndoReceiveClick}
         onTrackingUpdate={handleTrackingUpdate}
       />
 
@@ -249,6 +275,39 @@ export default function ShipmentsPage() {
               disabled={deleteMutation.isPending}
             >
               Delete Shipment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Undo Receipt Confirmation Dialog */}
+      <AlertDialog open={undoDialogOpen} onOpenChange={setUndoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Undo shipment receipt?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  This will reverse all inventory additions from shipment{" "}
+                  <span className="font-medium font-mono">
+                    {selectedShipment?.shipmentNumber}
+                  </span>
+                  . The shipment will return to PENDING status and can be received again or deleted.
+                </p>
+                <p className="text-amber-600 font-medium">
+                  Warning: If items from this shipment have been sold or transferred, the undo will fail.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={handleConfirmUndoReceive}
+              disabled={undoReceiveMutation.isPending}
+            >
+              {undoReceiveMutation.isPending ? "Reversing..." : "Undo Receipt"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

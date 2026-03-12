@@ -6,6 +6,7 @@ import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
 import com.mirai.inventoryservice.exceptions.BoxBinNotFoundException;
 import com.mirai.inventoryservice.exceptions.CabinetNotFoundException;
 import com.mirai.inventoryservice.exceptions.DoubleClawMachineNotFoundException;
+import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.exceptions.KeychainMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
@@ -467,6 +468,73 @@ public class ShipmentService {
         return savedShipment;
     }
 
+    /**
+     * Undo a received shipment: reverse all stock additions and reset shipment to PENDING.
+     *
+     * @param shipmentId The shipment to undo
+     * @return The updated shipment
+     * @throws InvalidShipmentStatusException if shipment is not DELIVERED
+     * @throws InsufficientInventoryException if inventory has been depleted below reversal amount
+     */
+    public Shipment undoReceiveShipment(UUID shipmentId) {
+        Shipment shipment = getShipmentById(shipmentId);
+
+        // Validate status - can only undo DELIVERED shipments
+        if (shipment.getStatus() != ShipmentStatus.DELIVERED) {
+            throw new InvalidShipmentStatusException(
+                    "Can only undo receipt of delivered shipments. Current status: " + shipment.getStatus()
+            );
+        }
+
+        Set<UUID> affectedProductIds = new java.util.HashSet<>();
+
+        // Process each shipment item
+        for (ShipmentItem shipmentItem : shipment.getItems()) {
+            Product product = shipmentItem.getItem();
+            affectedProductIds.add(product.getId());
+
+            // Reverse each allocation
+            for (ShipmentItemAllocation allocation : shipmentItem.getAllocations()) {
+                LocationType locationType = allocation.getLocationType();
+                UUID locationId = allocation.getLocationId();
+                int quantity = allocation.getQuantity();
+
+                // Find and reduce the inventory
+                if (locationType == LocationType.NOT_ASSIGNED || locationId == null) {
+                    removeFromNotAssignedInventory(product, quantity);
+                } else {
+                    removeFromInventory(locationType, locationId, product, quantity);
+                }
+            }
+
+            // Clear allocations (orphanRemoval will delete them)
+            shipmentItem.getAllocations().clear();
+
+            // Reset quantities
+            shipmentItem.setReceivedQuantity(0);
+            shipmentItem.setDamagedQuantity(0);
+            shipmentItem.setDisplayQuantity(0);
+            shipmentItem.setShopQuantity(0);
+        }
+
+        // Reset shipment fields
+        shipment.setStatus(ShipmentStatus.PENDING);
+        shipment.setActualDeliveryDate(null);
+        shipment.setReceivedBy(null);
+
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Sync product totals
+        stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+
+        // Broadcast updates
+        broadcastService.broadcastShipmentUpdated();
+        broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
+
+        return savedShipment;
+    }
+
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId) {
         Object inventory = findOrCreateInventory(locationType, locationId, product);
         int previousQuantity = getInventoryQuantity(inventory);
@@ -713,5 +781,183 @@ public class ShipmentService {
             case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory).getId();
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
         };
+    }
+
+    /**
+     * Find existing inventory for a product at a specific location.
+     * Unlike findOrCreateInventory, this returns null if not found.
+     */
+    private Object findInventory(LocationType locationType, UUID locationId, Product product) {
+        return switch (locationType) {
+            case BOX_BIN -> boxBinInventoryRepository
+                    .findByBoxBin_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository
+                    .findBySingleClawMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository
+                    .findByDoubleClawMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository
+                    .findByKeychainMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case CABINET -> cabinetInventoryRepository
+                    .findByCabinet_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case RACK -> rackInventoryRepository
+                    .findByRack_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository
+                    .findByFourCornerMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository
+                    .findByPusherMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case WINDOW -> windowInventoryRepository
+                    .findByWindow_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case NOT_ASSIGNED -> throw new IllegalArgumentException("Use removeFromNotAssignedInventory for NOT_ASSIGNED");
+        };
+    }
+
+    /**
+     * Remove quantity from inventory at a specific location (for undo operations).
+     * Creates stock movement and audit log for the reversal.
+     */
+    private void removeFromInventory(LocationType locationType, UUID locationId, Product product, int quantity) {
+        Object inventory = findInventory(locationType, locationId, product);
+        if (inventory == null) {
+            throw new InsufficientInventoryException(
+                    String.format("Cannot undo receipt: no inventory found for '%s' at location. " +
+                            "The inventory record may have been deleted.", product.getName())
+            );
+        }
+
+        int currentQuantity = getInventoryQuantity(inventory);
+        if (currentQuantity < quantity) {
+            throw new InsufficientInventoryException(
+                    String.format("Cannot undo receipt for '%s': only %d units available at location, " +
+                            "but %d were originally received. Items may have been sold or transferred.",
+                            product.getName(), currentQuantity, quantity)
+            );
+        }
+
+        int newQuantity = currentQuantity - quantity;
+        String locationCode = stockMovementService.resolveLocationCode(locationId, locationType);
+
+        // Create audit log for reversal
+        AuditLog auditLog = auditLogService.createAuditLog(
+                null,  // No specific actor for system reversal
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
+                locationId,
+                locationCode,
+                null,
+                null,
+                1,
+                quantity,
+                product.getName(),
+                "Shipment receipt reversed"
+        );
+
+        // Create stock movement record
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("shipment_receipt_reversal", true);
+
+        StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(product)
+                .locationType(locationType)
+                .fromLocationId(locationId)
+                .previousQuantity(currentQuantity)
+                .currentQuantity(newQuantity)
+                .quantityChange(-quantity)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
+                .actorId(null)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        stockMovementRepository.save(movement);
+
+        // Update or delete inventory
+        if (newQuantity == 0) {
+            deleteInventory(locationType, inventory);
+        } else {
+            setInventoryQuantity(inventory, newQuantity);
+            saveInventoryAndGetId(locationType, inventory);
+        }
+    }
+
+    /**
+     * Remove quantity from not-assigned inventory (for undo operations).
+     */
+    private void removeFromNotAssignedInventory(Product product, int quantity) {
+        NotAssignedInventory inventory = notAssignedInventoryRepository
+                .findByItem_Id(product.getId())
+                .orElseThrow(() -> new InsufficientInventoryException(
+                        String.format("Cannot undo receipt: no unassigned inventory for '%s'. " +
+                                "Items may have been assigned to locations.", product.getName())
+                ));
+
+        int currentQuantity = inventory.getQuantity();
+        if (currentQuantity < quantity) {
+            throw new InsufficientInventoryException(
+                    String.format("Cannot undo receipt for '%s': only %d units in unassigned inventory, " +
+                            "but %d were originally received. Items may have been assigned to locations.",
+                            product.getName(), currentQuantity, quantity)
+            );
+        }
+
+        int newQuantity = currentQuantity - quantity;
+
+        // Create audit log
+        AuditLog auditLog = auditLogService.createAuditLog(
+                null,
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
+                null,
+                "NA",
+                null,
+                null,
+                1,
+                quantity,
+                product.getName(),
+                "Shipment receipt reversed"
+        );
+
+        // Create stock movement
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("shipment_receipt_reversal", true);
+
+        StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(product)
+                .locationType(LocationType.NOT_ASSIGNED)
+                .fromLocationId(null)
+                .previousQuantity(currentQuantity)
+                .currentQuantity(newQuantity)
+                .quantityChange(-quantity)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
+                .actorId(null)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        stockMovementRepository.save(movement);
+
+        if (newQuantity == 0) {
+            notAssignedInventoryRepository.delete(inventory);
+        } else {
+            inventory.setQuantity(newQuantity);
+            notAssignedInventoryRepository.save(inventory);
+        }
+    }
+
+    /**
+     * Delete an inventory record when quantity reaches 0.
+     */
+    private void deleteInventory(LocationType locationType, Object inventory) {
+        switch (locationType) {
+            case BOX_BIN -> boxBinInventoryRepository.delete((BoxBinInventory) inventory);
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.delete((KeychainMachineInventory) inventory);
+            case CABINET -> cabinetInventoryRepository.delete((CabinetInventory) inventory);
+            case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
+            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
+            case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
+            case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
+            case NOT_ASSIGNED -> throw new IllegalArgumentException("Use notAssignedInventoryRepository.delete directly");
+        }
     }
 }

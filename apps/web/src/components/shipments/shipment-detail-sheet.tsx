@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X } from "lucide-react";
+import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X, Undo2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ interface ShipmentDetailSheetProps {
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
   onEditClick?: () => void;
+  onUndoReceiveClick?: () => void;
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
@@ -320,6 +321,7 @@ export function ShipmentDetailSheet({
   onReceiveClick,
   onDeleteClick,
   onEditClick,
+  onUndoReceiveClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
   const [trackingExpanded, setTrackingExpanded] = useState(false);
@@ -391,6 +393,7 @@ export function ShipmentDetailSheet({
   const canDelete = shipment.status !== "DELIVERED";
   const canEdit =
     shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
+  const canUndo = shipment.status === "DELIVERED";
 
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
@@ -439,6 +442,14 @@ export function ShipmentDetailSheet({
                 <Button variant="outline" size="sm" onClick={onEditClick}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
+                </Button>
+              )}
+            </Can>
+            <Can permission={Permission.SHIPMENTS_RECEIVE}>
+              {canUndo && (
+                <Button variant="outline" size="sm" onClick={onUndoReceiveClick}>
+                  <Undo2 className="h-4 w-4 mr-2" />
+                  Undo Receipt
                 </Button>
               )}
             </Can>
