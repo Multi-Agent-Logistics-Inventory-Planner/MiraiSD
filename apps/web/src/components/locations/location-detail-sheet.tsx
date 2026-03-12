@@ -481,7 +481,7 @@ export function LocationDetailSheet({
           </Button>
           <Button size="sm" variant="outline" onClick={() => setTransferDisplayDialogOpen(true)}>
             <ArrowLeftRight className="h-4 w-4 mr-1" />
-            Machine Swap
+            Transfer
           </Button>
         </div>
       </div>
@@ -693,7 +693,7 @@ export function LocationDetailSheet({
                     Products
                   </TabsTrigger>
                   <TabsTrigger value="display" className="flex-1">
-                    {!hasDisplay ? "+ Add Display" : "Display"}
+                    {!hasDisplay ? "+ Add Display" : "Machine Swap"}
                   </TabsTrigger>
                   <TabsTrigger value="history" className="flex-1">
                     History
