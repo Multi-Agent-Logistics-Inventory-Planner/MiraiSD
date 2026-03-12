@@ -91,9 +91,14 @@ interface DisplayItemProps {
   onToggle: () => void;
   disabled?: boolean;
   direction: "send" | "receive";
+  imageUrl?: string | null;
 }
 
-function DisplayItem({ display, selected, onToggle, disabled, direction }: DisplayItemProps) {
+function DisplayItem({ display, selected, onToggle, disabled, direction, imageUrl }: DisplayItemProps) {
+  const [imageError, setImageError] = useState(false);
+  const safeImageUrl = getSafeImageUrl(imageUrl);
+  const hasImage = safeImageUrl && !imageError;
+
   return (
     <button
       type="button"
@@ -109,8 +114,21 @@ function DisplayItem({ display, selected, onToggle, disabled, direction }: Displ
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
-      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-        <Monitor className="h-4 w-4 text-muted-foreground" />
+      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted">
+        {hasImage ? (
+          <Image
+            src={safeImageUrl}
+            alt={display.productName}
+            fill
+            sizes="40px"
+            className="object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <ImageOff className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
       </div>
 
       <div className="flex-1 w-0">
@@ -346,6 +364,15 @@ export function TransferDisplayDialog({
         return p.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
       });
   }, [products, currentDisplayProductIds, searchQuery]);
+
+  // Map product IDs to image URLs for display items
+  const productImageMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const product of products) {
+      map.set(product.id, product.imageUrl ?? null);
+    }
+    return map;
+  }, [products]);
 
   const selectedMachine = machines.find((m) => m.id === selectedMachineId);
   const selectedMachineCode = selectedMachine
@@ -584,6 +611,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToSend(display.id)}
                               direction="send"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
@@ -625,6 +653,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToReceive(display.id)}
                               direction="receive"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
@@ -706,6 +735,7 @@ export function TransferDisplayDialog({
                               onToggle={() => toggleItemToSend(display.id)}
                               direction="send"
                               disabled={isSubmitting}
+                              imageUrl={productImageMap.get(display.productId)}
                             />
                           ))}
                         </div>
