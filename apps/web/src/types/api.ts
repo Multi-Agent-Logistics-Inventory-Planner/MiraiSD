@@ -48,11 +48,13 @@ export enum StockMovementReason {
   INITIAL_STOCK = "INITIAL_STOCK",
   RESTOCK = "RESTOCK",
   SHIPMENT_RECEIPT = "SHIPMENT_RECEIPT",
+  SHIPMENT_RECEIPT_REVERSED = "SHIPMENT_RECEIPT_REVERSED",
   SALE = "SALE",
   DAMAGE = "DAMAGE",
   ADJUSTMENT = "ADJUSTMENT",
   RETURN = "RETURN",
   TRANSFER = "TRANSFER",
+  REMOVED = "REMOVED",
   DISPLAY_SET = "DISPLAY_SET",
   DISPLAY_REMOVED = "DISPLAY_REMOVED",
   DISPLAY_SWAP = "DISPLAY_SWAP",
@@ -620,9 +622,9 @@ export interface ForecastPrediction {
   currentStock: number;
   horizonDays: number;
   avgDailyDelta: number;
-  daysToStockout: number;
+  daysToStockout: number | null;
   suggestedReorderQty: number;
-  suggestedOrderDate: string;
+  suggestedOrderDate: string | null;
   unitCost?: number;
   confidence: number;
   computedAt: string;

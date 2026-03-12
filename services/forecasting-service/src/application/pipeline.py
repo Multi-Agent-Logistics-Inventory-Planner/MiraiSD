@@ -121,7 +121,7 @@ class ForecastingPipeline:
             logger.warning("No features built, skipping forecast")
             return 0
 
-        estimates_df = fc.estimate_mu_sigma(features_df, method="dow_weighted")
+        estimates_df = fc.estimate_mu_sigma(features_df, method="ma14")
         logger.debug("Estimated demand for %d items", len(estimates_df))
 
         # Step 5b: Compute backtest MAPE
@@ -425,19 +425,12 @@ class ForecastingPipeline:
 
             features_list.append(feat_dict)
 
-        # Compute order dates (vectorized where possible)
+        # Compute order dates using extracted policy function
         order_dates = []
         for i in range(len(merged)):
             d_out = float(days_out.iloc[i])
             lt = float(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else float(lead_time)
-
-            if d_out < float("inf") and d_out > lt:
-                order_date = (now + timedelta(days=int(d_out - lt))).date()
-            elif d_out <= lt:
-                order_date = now.date()
-            else:
-                order_date = None
-            order_dates.append(order_date)
+            order_dates.append(policy.compute_order_date(d_out, lt, now))
 
         # Convert days_to_stockout: replace inf with None
         days_to_stockout_values = [

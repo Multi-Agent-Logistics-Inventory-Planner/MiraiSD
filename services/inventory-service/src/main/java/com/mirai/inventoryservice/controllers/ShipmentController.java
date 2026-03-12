@@ -100,4 +100,11 @@ public class ShipmentController {
         Shipment shipment = shipmentService.receiveShipment(id, requestDTO);
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
+
+    @PostMapping("/{id}/undo-receive")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ShipmentResponseDTO> undoReceiveShipment(@PathVariable UUID id) {
+        Shipment shipment = shipmentService.undoReceiveShipment(id);
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+    }
 }

@@ -89,6 +89,13 @@ export async function receiveShipment(
 }
 
 /**
+ * Undo receiving a shipment - reverses inventory changes and resets status to PENDING
+ */
+export async function undoReceiveShipment(id: string): Promise<Shipment> {
+  return apiPost<Shipment, undefined>(`${BASE_PATH}/${id}/undo-receive`, undefined);
+}
+
+/**
  * Get all shipments containing a specific product
  */
 export async function getShipmentsByProduct(productId: string): Promise<Shipment[]> {

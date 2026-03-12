@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date, datetime, timedelta
 from statistics import NormalDist
 from typing import Optional, Union
 
@@ -219,3 +220,22 @@ def suggest_order_vectorized(
 
     # Apply ceiling and clip to 0, then convert to int
     return np.ceil(needed).clip(lower=0).astype(int)
+
+
+def compute_order_date(
+    days_to_stockout: float,
+    lead_time: float,
+    now: datetime,
+) -> date | None:
+    """Compute suggested order date based on days to stockout and lead time.
+
+    Returns:
+        None if days_to_stockout is infinite (no urgency).
+        today if days_to_stockout <= lead_time (order immediately).
+        A future date otherwise: now + int(days_to_stockout - lead_time) days.
+    """
+    if days_to_stockout >= float("inf"):
+        return None
+    if days_to_stockout <= lead_time:
+        return now.date()
+    return (now + timedelta(days=int(days_to_stockout - lead_time))).date()

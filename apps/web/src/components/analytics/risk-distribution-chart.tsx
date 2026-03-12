@@ -44,7 +44,9 @@ function categorizeByRisk(forecasts: ForecastPrediction[]): RiskSegment[] {
 
   forecasts.forEach((forecast) => {
     const days = forecast.daysToStockout
-    if (days <= 3) {
+    if (days === null) {
+      counts.safe++
+    } else if (days <= 3) {
       counts.critical++
     } else if (days <= 7) {
       counts.warning++

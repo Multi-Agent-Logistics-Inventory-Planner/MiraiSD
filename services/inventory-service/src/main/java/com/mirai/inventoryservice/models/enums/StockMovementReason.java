@@ -4,6 +4,7 @@ public enum StockMovementReason {
     INITIAL_STOCK,
     RESTOCK,
     SHIPMENT_RECEIPT,
+    SHIPMENT_RECEIPT_REVERSED,
     SALE,
     DAMAGE,
     ADJUSTMENT,

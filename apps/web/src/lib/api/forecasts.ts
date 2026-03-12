@@ -25,6 +25,13 @@ export async function getForecastByItem(itemId: string): Promise<ForecastPredict
 }
 
 export async function getAllForecasts(): Promise<ForecastPrediction[]> {
-  const response = await getForecasts({ page: 1, limit: 100 })
-  return response.content
+  const first = await getForecasts({ page: 1, limit: 100 })
+  if (first.totalPages <= 1) return first.content
+
+  const rest = await Promise.all(
+    Array.from({ length: first.totalPages - 1 }, (_, i) =>
+      getForecasts({ page: i + 2, limit: 100 })
+    )
+  )
+  return [first, ...rest].flatMap((r) => r.content)
 }
