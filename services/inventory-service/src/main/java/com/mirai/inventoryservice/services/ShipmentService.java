@@ -734,6 +734,7 @@ public class ShipmentService {
                         inv.setQuantity(0);
                         return inv;
                     });
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot create inventory for NOT_ASSIGNED location type");
         };
     }
@@ -779,6 +780,7 @@ public class ShipmentService {
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory).getId();
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory).getId();
             case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory).getId();
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
         };
     }
@@ -807,6 +809,7 @@ public class ShipmentService {
                     .findByPusherMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
             case WINDOW -> windowInventoryRepository
                     .findByWindow_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Use removeFromNotAssignedInventory for NOT_ASSIGNED");
         };
     }
@@ -957,6 +960,7 @@ public class ShipmentService {
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
             case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Use notAssignedInventoryRepository.delete directly");
         }
     }

@@ -48,6 +48,8 @@ class AuditLogMapperTest {
     @Mock
     private FourCornerMachineRepository fourCornerMachineRepository;
     @Mock
+    private GachaponRepository gachaponRepository;
+    @Mock
     private PusherMachineRepository pusherMachineRepository;
 
     private AuditLogMapper auditLogMapper;
@@ -63,6 +65,7 @@ class AuditLogMapperTest {
                 cabinetRepository,
                 rackRepository,
                 fourCornerMachineRepository,
+                gachaponRepository,
                 pusherMachineRepository
         );
     }
