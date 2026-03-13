@@ -20,26 +20,28 @@ export interface CategoryRequest {
 
 export enum LocationType {
   BOX_BIN = "BOX_BIN",
-  SINGLE_CLAW_MACHINE = "SINGLE_CLAW_MACHINE",
-  DOUBLE_CLAW_MACHINE = "DOUBLE_CLAW_MACHINE",
-  KEYCHAIN_MACHINE = "KEYCHAIN_MACHINE",
   CABINET = "CABINET",
-  RACK = "RACK",
+  DOUBLE_CLAW_MACHINE = "DOUBLE_CLAW_MACHINE",
   FOUR_CORNER_MACHINE = "FOUR_CORNER_MACHINE",
+  GACHAPON = "GACHAPON",
+  KEYCHAIN_MACHINE = "KEYCHAIN_MACHINE",
   PUSHER_MACHINE = "PUSHER_MACHINE",
+  RACK = "RACK",
+  SINGLE_CLAW_MACHINE = "SINGLE_CLAW_MACHINE",
   WINDOW = "WINDOW",
   NOT_ASSIGNED = "NOT_ASSIGNED",
 }
 
 export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.BOX_BIN]: "Box Bin",
-  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
-  [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
-  [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
   [LocationType.CABINET]: "Cabinet",
-  [LocationType.RACK]: "Rack",
+  [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
   [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
+  [LocationType.GACHAPON]: "Gachapon",
+  [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
   [LocationType.PUSHER_MACHINE]: "Pusher",
+  [LocationType.RACK]: "Rack",
+  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.WINDOW]: "Window",
   [LocationType.NOT_ASSIGNED]: "Not Assigned",
 };
@@ -255,16 +257,21 @@ export interface Window extends BaseLocation {
   windowCode: string;
 }
 
+export interface Gachapon extends BaseLocation {
+  gachaponCode: string;
+}
+
 // Union type for all locations
 export type StorageLocation =
   | BoxBin
-  | Rack
   | Cabinet
-  | SingleClawMachine
   | DoubleClawMachine
-  | KeychainMachine
   | FourCornerMachine
+  | Gachapon
+  | KeychainMachine
   | PusherMachine
+  | Rack
+  | SingleClawMachine
   | Window;
 
 // Location request types
@@ -302,6 +309,10 @@ export interface PusherMachineRequest {
 
 export interface WindowRequest {
   windowCode: string;
+}
+
+export interface GachaponRequest {
+  gachaponCode: string;
 }
 
 // Inventory item embedded in response (simplified product)
@@ -724,13 +735,14 @@ export interface ApiError {
 // Helper type for location code patterns
 export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.BOX_BIN]: /^B\d+$/,
-  [LocationType.RACK]: /^R\d+$/,
   [LocationType.CABINET]: /^C\d+$/,
-  [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.DOUBLE_CLAW_MACHINE]: /^D\d+$/,
-  [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
   [LocationType.FOUR_CORNER_MACHINE]: /^M\d+$/,
+  [LocationType.GACHAPON]: /^G\d+$/,
+  [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
   [LocationType.PUSHER_MACHINE]: /^P\d+$/,
+  [LocationType.RACK]: /^R\d+$/,
+  [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.WINDOW]: /^W\d+$/,
   [LocationType.NOT_ASSIGNED]: /^$/,  // No pattern for NOT_ASSIGNED
 };
@@ -738,16 +750,23 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
 // Helper type for location endpoints
 export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
   [LocationType.BOX_BIN]: "box-bins",
-  [LocationType.RACK]: "racks",
   [LocationType.CABINET]: "cabinets",
-  [LocationType.SINGLE_CLAW_MACHINE]: "single-claw-machines",
   [LocationType.DOUBLE_CLAW_MACHINE]: "double-claw-machines",
-  [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
   [LocationType.FOUR_CORNER_MACHINE]: "four-corner-machines",
+  [LocationType.GACHAPON]: "gachapons",
+  [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
   [LocationType.PUSHER_MACHINE]: "pusher-machines",
+  [LocationType.RACK]: "racks",
+  [LocationType.SINGLE_CLAW_MACHINE]: "single-claw-machines",
   [LocationType.WINDOW]: "windows",
   [LocationType.NOT_ASSIGNED]: "not-assigned",
 };
+
+// Location types that only support machine display (no inventory storage)
+export const DISPLAY_ONLY_LOCATION_TYPES: LocationType[] = [
+  LocationType.GACHAPON,
+  LocationType.KEYCHAIN_MACHINE,
+];
 
 // Review types
 
