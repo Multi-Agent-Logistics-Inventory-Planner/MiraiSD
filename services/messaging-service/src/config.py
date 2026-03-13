@@ -54,4 +54,5 @@ GOOGLE_PLACE_URL = os.getenv("GOOGLE_PLACE_URL", "")
 REVIEW_SLACK_CHANNEL = os.getenv("REVIEW_SLACK_CHANNEL", "#piggly-review")
 REVIEW_FETCH_HOUR = int(os.getenv("REVIEW_FETCH_HOUR", "6"))
 REVIEW_MAX_REVIEWS = int(os.getenv("REVIEW_MAX_REVIEWS", "25"))
+REVIEW_TIMEZONE = os.getenv("REVIEW_TIMEZONE", "America/Chicago")
 

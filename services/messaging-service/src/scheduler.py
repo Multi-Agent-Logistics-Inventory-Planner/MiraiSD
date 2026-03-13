@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -42,24 +43,30 @@ def _get_shared_slack() -> SlackNotifier:
 
 
 def daily_review_fetch_job() -> None:
-    """Run daily to fetch reviews from Apify and publish to Kafka.
+    """Run daily to fetch yesterday's reviews from Apify and publish to Kafka.
 
     This job runs at the hour specified by REVIEW_FETCH_HOUR config.
+    Fetches the previous day's reviews since the full day is complete.
     """
     logger.info("Starting daily review fetch job")
 
     try:
+        # Get yesterday's date in the configured timezone
+        tz = ZoneInfo(config.REVIEW_TIMEZONE)
+        yesterday = date.today() - timedelta(days=1)
+
         fetcher = ReviewFetcher()
-        count = fetcher.fetch_and_publish_daily()
-        logger.info("Daily review fetch completed: %d reviews published", count)
+        count = fetcher.fetch_and_publish_daily(target_date=yesterday)
+        logger.info("Daily review fetch completed: %d reviews published for %s", count, yesterday)
     except Exception as e:
         logger.exception("Daily review fetch job failed: %s", e)
 
 
 def daily_review_summary_job() -> None:
-    """Run daily after fetch to send Slack summary of today's reviews.
+    """Run daily after fetch to send Slack summary of yesterday's reviews.
 
     This runs 30 minutes after fetch to allow time for Kafka processing.
+    Summarizes the previous day's reviews (matching what was just fetched).
     """
     logger.info("Starting daily review summary job")
 
@@ -67,11 +74,11 @@ def daily_review_summary_job() -> None:
         repo = _get_shared_repo()
         slack = _get_shared_slack()
 
-        today = date.today()
-        counts = repo.get_daily_counts(today)
+        yesterday = date.today() - timedelta(days=1)
+        counts = repo.get_daily_counts(yesterday)
 
-        slack.send_daily_review_summary(counts, today)
-        logger.info("Daily review summary sent: %d employees mentioned", len(counts))
+        slack.send_daily_review_summary(counts, yesterday)
+        logger.info("Daily review summary sent for %s: %d employees mentioned", yesterday, len(counts))
     except Exception as e:
         logger.exception("Daily review summary job failed: %s", e)
 
@@ -113,37 +120,38 @@ def start_scheduler() -> BackgroundScheduler:
     _scheduler = BackgroundScheduler()
 
     fetch_hour = config.REVIEW_FETCH_HOUR
+    tz = ZoneInfo(config.REVIEW_TIMEZONE)
 
-    # Daily fetch job - runs at configured hour
+    # Daily fetch job - runs at configured hour in configured timezone
     _scheduler.add_job(
         daily_review_fetch_job,
-        CronTrigger(hour=fetch_hour, minute=0),
+        CronTrigger(hour=fetch_hour, minute=0, timezone=tz),
         id="daily_review_fetch",
         replace_existing=True,
         name="Daily Review Fetch",
     )
-    logger.info("Scheduled daily review fetch at %02d:00", fetch_hour)
+    logger.info("Scheduled daily review fetch at %02d:00 %s", fetch_hour, config.REVIEW_TIMEZONE)
 
     # Daily summary job - runs 30 minutes after fetch
     summary_minute = 30
     _scheduler.add_job(
         daily_review_summary_job,
-        CronTrigger(hour=fetch_hour, minute=summary_minute),
+        CronTrigger(hour=fetch_hour, minute=summary_minute, timezone=tz),
         id="daily_review_summary",
         replace_existing=True,
         name="Daily Review Summary",
     )
-    logger.info("Scheduled daily review summary at %02d:%02d", fetch_hour, summary_minute)
+    logger.info("Scheduled daily review summary at %02d:%02d %s", fetch_hour, summary_minute, config.REVIEW_TIMEZONE)
 
     # Monthly summary job - 1st of month at 8 AM
     _scheduler.add_job(
         monthly_review_summary_job,
-        CronTrigger(day=1, hour=8, minute=0),
+        CronTrigger(day=1, hour=8, minute=0, timezone=tz),
         id="monthly_review_summary",
         replace_existing=True,
         name="Monthly Review Summary",
     )
-    logger.info("Scheduled monthly review summary on 1st at 08:00")
+    logger.info("Scheduled monthly review summary on 1st at 08:00 %s", config.REVIEW_TIMEZONE)
 
     _scheduler.start()
     logger.info("Review scheduler started with %d jobs", len(_scheduler.get_jobs()))
