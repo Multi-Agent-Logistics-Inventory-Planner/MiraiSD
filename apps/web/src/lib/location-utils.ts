@@ -9,13 +9,14 @@ import {
  */
 const LOCATION_CODE_KEYS: Record<LocationType, string | null> = {
   [LocationType.BOX_BIN]: "boxBinCode",
-  [LocationType.RACK]: "rackCode",
   [LocationType.CABINET]: "cabinetCode",
-  [LocationType.SINGLE_CLAW_MACHINE]: "singleClawMachineCode",
   [LocationType.DOUBLE_CLAW_MACHINE]: "doubleClawMachineCode",
-  [LocationType.KEYCHAIN_MACHINE]: "keychainMachineCode",
   [LocationType.FOUR_CORNER_MACHINE]: "fourCornerMachineCode",
+  [LocationType.GACHAPON]: "gachaponCode",
+  [LocationType.KEYCHAIN_MACHINE]: "keychainMachineCode",
   [LocationType.PUSHER_MACHINE]: "pusherMachineCode",
+  [LocationType.RACK]: "rackCode",
+  [LocationType.SINGLE_CLAW_MACHINE]: "singleClawMachineCode",
   [LocationType.WINDOW]: "windowCode",
   [LocationType.NOT_ASSIGNED]: null,
 };

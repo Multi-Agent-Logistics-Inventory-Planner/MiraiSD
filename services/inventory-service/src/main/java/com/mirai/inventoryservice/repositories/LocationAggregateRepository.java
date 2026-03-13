@@ -32,26 +32,29 @@ public class LocationAggregateRepository {
             SELECT id, 'BOX_BIN' as location_type, box_bin_code as location_code, created_at, updated_at
             FROM box_bins
             UNION ALL
-            SELECT id, 'RACK' as location_type, rack_code as location_code, created_at, updated_at
-            FROM racks
-            UNION ALL
             SELECT id, 'CABINET' as location_type, cabinet_code as location_code, created_at, updated_at
             FROM cabinets
-            UNION ALL
-            SELECT id, 'SINGLE_CLAW_MACHINE' as location_type, single_claw_machine_code as location_code, created_at, updated_at
-            FROM single_claw_machines
             UNION ALL
             SELECT id, 'DOUBLE_CLAW_MACHINE' as location_type, double_claw_machine_code as location_code, created_at, updated_at
             FROM double_claw_machines
             UNION ALL
-            SELECT id, 'KEYCHAIN_MACHINE' as location_type, keychain_machine_code as location_code, created_at, updated_at
-            FROM keychain_machines
-            UNION ALL
             SELECT id, 'FOUR_CORNER_MACHINE' as location_type, four_corner_machine_code as location_code, created_at, updated_at
             FROM four_corner_machines
             UNION ALL
+            SELECT id, 'GACHAPON' as location_type, gachapon_code as location_code, created_at, updated_at
+            FROM gachapons
+            UNION ALL
+            SELECT id, 'KEYCHAIN_MACHINE' as location_type, keychain_machine_code as location_code, created_at, updated_at
+            FROM keychain_machines
+            UNION ALL
             SELECT id, 'PUSHER_MACHINE' as location_type, pusher_machine_code as location_code, created_at, updated_at
             FROM pusher_machines
+            UNION ALL
+            SELECT id, 'RACK' as location_type, rack_code as location_code, created_at, updated_at
+            FROM racks
+            UNION ALL
+            SELECT id, 'SINGLE_CLAW_MACHINE' as location_type, single_claw_machine_code as location_code, created_at, updated_at
+            FROM single_claw_machines
             UNION ALL
             SELECT id, 'WINDOW' as location_type, window_code as location_code, created_at, updated_at
             FROM windows
@@ -109,26 +112,29 @@ public class LocationAggregateRepository {
             SELECT id, 'BOX_BIN' as location_type, box_bin_code as location_code, created_at, updated_at
             FROM box_bins WHERE 'BOX_BIN' = :locationType
             UNION ALL
-            SELECT id, 'RACK' as location_type, rack_code as location_code, created_at, updated_at
-            FROM racks WHERE 'RACK' = :locationType
-            UNION ALL
             SELECT id, 'CABINET' as location_type, cabinet_code as location_code, created_at, updated_at
             FROM cabinets WHERE 'CABINET' = :locationType
-            UNION ALL
-            SELECT id, 'SINGLE_CLAW_MACHINE' as location_type, single_claw_machine_code as location_code, created_at, updated_at
-            FROM single_claw_machines WHERE 'SINGLE_CLAW_MACHINE' = :locationType
             UNION ALL
             SELECT id, 'DOUBLE_CLAW_MACHINE' as location_type, double_claw_machine_code as location_code, created_at, updated_at
             FROM double_claw_machines WHERE 'DOUBLE_CLAW_MACHINE' = :locationType
             UNION ALL
-            SELECT id, 'KEYCHAIN_MACHINE' as location_type, keychain_machine_code as location_code, created_at, updated_at
-            FROM keychain_machines WHERE 'KEYCHAIN_MACHINE' = :locationType
-            UNION ALL
             SELECT id, 'FOUR_CORNER_MACHINE' as location_type, four_corner_machine_code as location_code, created_at, updated_at
             FROM four_corner_machines WHERE 'FOUR_CORNER_MACHINE' = :locationType
             UNION ALL
+            SELECT id, 'GACHAPON' as location_type, gachapon_code as location_code, created_at, updated_at
+            FROM gachapons WHERE 'GACHAPON' = :locationType
+            UNION ALL
+            SELECT id, 'KEYCHAIN_MACHINE' as location_type, keychain_machine_code as location_code, created_at, updated_at
+            FROM keychain_machines WHERE 'KEYCHAIN_MACHINE' = :locationType
+            UNION ALL
             SELECT id, 'PUSHER_MACHINE' as location_type, pusher_machine_code as location_code, created_at, updated_at
             FROM pusher_machines WHERE 'PUSHER_MACHINE' = :locationType
+            UNION ALL
+            SELECT id, 'RACK' as location_type, rack_code as location_code, created_at, updated_at
+            FROM racks WHERE 'RACK' = :locationType
+            UNION ALL
+            SELECT id, 'SINGLE_CLAW_MACHINE' as location_type, single_claw_machine_code as location_code, created_at, updated_at
+            FROM single_claw_machines WHERE 'SINGLE_CLAW_MACHINE' = :locationType
             UNION ALL
             SELECT id, 'WINDOW' as location_type, window_code as location_code, created_at, updated_at
             FROM windows WHERE 'WINDOW' = :locationType

@@ -1,15 +1,16 @@
 "use client";
 
 import {
-  Box,
-  Layers,
   Archive,
-  Gamepad2,
-  Gamepad,
-  Key,
-  LayoutGrid,
+  Box,
   ChevronsRight,
   CircleHelp,
+  Disc3,
+  Gamepad,
+  Gamepad2,
+  Key,
+  Layers,
+  LayoutGrid,
   PanelsTopLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,6 +22,7 @@ const LOCATION_TABS: Array<{ type: LocationType; label: string; icon: LucideIcon
   { type: LocationType.CABINET,             label: "Cabinets",     icon: Archive },
   { type: LocationType.DOUBLE_CLAW_MACHINE, label: "Double Claw",  icon: Gamepad },
   { type: LocationType.FOUR_CORNER_MACHINE, label: "Four Corner",  icon: LayoutGrid },
+  { type: LocationType.GACHAPON,            label: "Gachapon",     icon: Disc3 },
   { type: LocationType.KEYCHAIN_MACHINE,    label: "Keychain",     icon: Key },
   { type: LocationType.PUSHER_MACHINE,      label: "Pusher",       icon: ChevronsRight },
   { type: LocationType.RACK,                label: "Racks",        icon: Layers },

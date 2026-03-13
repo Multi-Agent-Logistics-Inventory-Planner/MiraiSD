@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { LocationType } from "@/types/api";
+import { LocationType, DISPLAY_ONLY_LOCATION_TYPES } from "@/types/api";
 import type {
   StorageLocation,
   Inventory,
@@ -52,6 +52,7 @@ import type {
   FourCornerMachine,
   PusherMachine,
   Window as WindowLocation,
+  Gachapon,
   MachineDisplay,
   SetMachineDisplayBatchRequest,
 } from "@/types/api";
@@ -80,11 +81,12 @@ import { useToast } from "@/hooks/use-toast";
 import { type LocationSelection } from "@/types/transfer";
 
 const MACHINE_LOCATION_TYPES: LocationType[] = [
-  LocationType.SINGLE_CLAW_MACHINE,
   LocationType.DOUBLE_CLAW_MACHINE,
-  LocationType.KEYCHAIN_MACHINE,
   LocationType.FOUR_CORNER_MACHINE,
+  LocationType.GACHAPON,
+  LocationType.KEYCHAIN_MACHINE,
   LocationType.PUSHER_MACHINE,
+  LocationType.SINGLE_CLAW_MACHINE,
 ];
 
 const HISTORY_PAGE_SIZE = 5;
@@ -93,20 +95,22 @@ function getLocationCode(locationType: LocationType, loc: StorageLocation): stri
   switch (locationType) {
     case "BOX_BIN":
       return (loc as BoxBin).boxBinCode;
-    case "RACK":
-      return (loc as Rack).rackCode;
     case "CABINET":
       return (loc as Cabinet).cabinetCode;
-    case "SINGLE_CLAW_MACHINE":
-      return (loc as SingleClawMachine).singleClawMachineCode;
     case "DOUBLE_CLAW_MACHINE":
       return (loc as DoubleClawMachine).doubleClawMachineCode;
-    case "KEYCHAIN_MACHINE":
-      return (loc as KeychainMachine).keychainMachineCode;
     case "FOUR_CORNER_MACHINE":
       return (loc as FourCornerMachine).fourCornerMachineCode;
+    case "GACHAPON":
+      return (loc as Gachapon).gachaponCode;
+    case "KEYCHAIN_MACHINE":
+      return (loc as KeychainMachine).keychainMachineCode;
     case "PUSHER_MACHINE":
       return (loc as PusherMachine).pusherMachineCode;
+    case "RACK":
+      return (loc as Rack).rackCode;
+    case "SINGLE_CLAW_MACHINE":
+      return (loc as SingleClawMachine).singleClawMachineCode;
     case "WINDOW":
       return (loc as WindowLocation).windowCode;
     default:
@@ -145,6 +149,7 @@ export function LocationDetailSheet({
 
   const locationId = location?.id;
   const isMachine = MACHINE_LOCATION_TYPES.includes(locationType);
+  const isDisplayOnly = DISPLAY_ONLY_LOCATION_TYPES.includes(locationType);
 
   const inventoryQuery = useLocationInventory(locationType, locationId);
   const deleteLocation = useDeleteLocationMutation(locationType);
@@ -200,10 +205,11 @@ export function LocationDetailSheet({
   // Reset state when dialog opens / location changes
   useEffect(() => {
     if (open) {
-      setActiveTab("products");
+      // Display-only locations default to display tab (no products tab)
+      setActiveTab(isDisplayOnly ? "display" : "products");
       setHistoryPage(0);
     }
-  }, [open, locationId]);
+  }, [open, locationId, isDisplayOnly]);
 
   const code = location ? getLocationCode(locationType, location) : "";
 
@@ -689,9 +695,11 @@ export function LocationDetailSheet({
             {isMachine ? (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
                 <TabsList className="w-full shrink-0 mt-4">
-                  <TabsTrigger value="products" className="flex-1">
-                    Products
-                  </TabsTrigger>
+                  {!isDisplayOnly && (
+                    <TabsTrigger value="products" className="flex-1">
+                      Products
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="display" className="flex-1">
                     {!hasDisplay ? "+ Add Display" : "Machine Swap"}
                   </TabsTrigger>
@@ -699,9 +707,11 @@ export function LocationDetailSheet({
                     History
                   </TabsTrigger>
                 </TabsList>
-                <TabsContent value="products" className="flex flex-col flex-1 min-h-0 mt-0">
-                  {productsTabContent}
-                </TabsContent>
+                {!isDisplayOnly && (
+                  <TabsContent value="products" className="flex flex-col flex-1 min-h-0 mt-0">
+                    {productsTabContent}
+                  </TabsContent>
+                )}
                 <TabsContent value="display" className="flex flex-col flex-1 min-h-0 mt-0">
                   {displayTabContent}
                 </TabsContent>

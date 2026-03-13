@@ -24,6 +24,7 @@ public class AuditLogMapper {
     private final CabinetRepository cabinetRepository;
     private final RackRepository rackRepository;
     private final FourCornerMachineRepository fourCornerMachineRepository;
+    private final GachaponRepository gachaponRepository;
     private final PusherMachineRepository pusherMachineRepository;
 
     public AuditLogMapper(
@@ -35,6 +36,7 @@ public class AuditLogMapper {
             CabinetRepository cabinetRepository,
             RackRepository rackRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
+            GachaponRepository gachaponRepository,
             PusherMachineRepository pusherMachineRepository) {
         this.userRepository = userRepository;
         this.boxBinRepository = boxBinRepository;
@@ -44,6 +46,7 @@ public class AuditLogMapper {
         this.cabinetRepository = cabinetRepository;
         this.rackRepository = rackRepository;
         this.fourCornerMachineRepository = fourCornerMachineRepository;
+        this.gachaponRepository = gachaponRepository;
         this.pusherMachineRepository = pusherMachineRepository;
     }
 
@@ -229,6 +232,8 @@ public class AuditLogMapper {
                     .collect(Collectors.toMap(Rack::getId, Rack::getRackCode));
             case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(FourCornerMachine::getId, FourCornerMachine::getFourCornerMachineCode));
+            case GACHAPON -> gachaponRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(Gachapon::getId, Gachapon::getGachaponCode));
             case PUSHER_MACHINE -> pusherMachineRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(PusherMachine::getId, PusherMachine::getPusherMachineCode));
             case WINDOW, NOT_ASSIGNED -> new HashMap<>(); // No location codes for NOT_ASSIGNED or WINDOW (no audit display)
