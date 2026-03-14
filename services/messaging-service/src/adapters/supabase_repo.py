@@ -520,7 +520,7 @@ class SupabaseRepo:
                 :id, :external_id, :user_id, :review_date,
                 :review_text, :rating, :reviewer_name
             )
-            ON CONFLICT (external_id) DO NOTHING
+            ON CONFLICT (external_id, review_date) DO NOTHING
             RETURNING id
         """)
 
@@ -539,7 +539,7 @@ class SupabaseRepo:
                 conn.commit()
 
                 if row is None:
-                    logger.debug("Duplicate review skipped: %s", external_id)
+                    logger.debug("Duplicate review skipped: %s on %s", external_id, review_date)
                     return None
 
                 return str(review_id)
