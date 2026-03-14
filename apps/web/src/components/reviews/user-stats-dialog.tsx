@@ -120,9 +120,16 @@ export function UserStatsDialog({
     if (!userId) return;
     setIsLoadingReviews(true);
     try {
+      // Calculate first and last day of selected month
+      const fromDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
+      const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
+      const toDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
       const data = await getUserReviews(userId, {
         page: reviewPage,
         size: REVIEWS_PER_PAGE,
+        fromDate,
+        toDate,
       });
       setReviews(data);
     } catch (error) {
@@ -130,7 +137,7 @@ export function UserStatsDialog({
     } finally {
       setIsLoadingReviews(false);
     }
-  }, [userId, reviewPage]);
+  }, [userId, reviewPage, selectedYear, selectedMonth]);
 
   useEffect(() => {
     if (open && userId) {
@@ -187,7 +194,7 @@ export function UserStatsDialog({
 
         {/* Reviews Section */}
         <div className="mt-6">
-          <h3 className="text-sm font-medium mb-3">Recent Reviews</h3>
+          <h3 className="text-sm font-medium mb-3">Reviews in {monthName}</h3>
 
           {isLoadingReviews ? (
             <div className="space-y-2">

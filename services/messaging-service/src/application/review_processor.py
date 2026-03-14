@@ -70,6 +70,8 @@ class ReviewProcessor:
     def extract_employee(self, review_text: str) -> str | None:
         """Extract employee name from review text.
 
+        Returns the first employee mentioned (by position in text).
+
         Args:
             review_text: Review text to search.
 
@@ -82,14 +84,19 @@ class ReviewProcessor:
         if not review_text:
             return None
 
-        text_lower = review_text.lower()
-
-        # Check each pattern
+        # Find all matches with their positions
+        matches: list[tuple[int, str]] = []
         for variant, pattern in self._patterns.items():
-            if pattern.search(review_text):
-                return self._name_map[variant]
+            match = pattern.search(review_text)
+            if match:
+                matches.append((match.start(), self._name_map[variant]))
 
-        return None
+        if not matches:
+            return None
+
+        # Return the employee whose name appears first in the text
+        matches.sort(key=lambda x: x[0])
+        return matches[0][1]
 
     def process_review(self, event: ReviewEvent) -> bool:
         """Process a single review event.
