@@ -31,6 +31,7 @@ public class ShipmentMapperDecorator {
     private final DoubleClawMachineRepository doubleClawMachineRepository;
     private final KeychainMachineRepository keychainMachineRepository;
     private final FourCornerMachineRepository fourCornerMachineRepository;
+    private final GachaponRepository gachaponRepository;
     private final PusherMachineRepository pusherMachineRepository;
     private final WindowRepository windowRepository;
 
@@ -44,6 +45,7 @@ public class ShipmentMapperDecorator {
             DoubleClawMachineRepository doubleClawMachineRepository,
             KeychainMachineRepository keychainMachineRepository,
             FourCornerMachineRepository fourCornerMachineRepository,
+            GachaponRepository gachaponRepository,
             PusherMachineRepository pusherMachineRepository,
             WindowRepository windowRepository) {
         this.delegate = delegate;
@@ -54,6 +56,7 @@ public class ShipmentMapperDecorator {
         this.doubleClawMachineRepository = doubleClawMachineRepository;
         this.keychainMachineRepository = keychainMachineRepository;
         this.fourCornerMachineRepository = fourCornerMachineRepository;
+        this.gachaponRepository = gachaponRepository;
         this.pusherMachineRepository = pusherMachineRepository;
         this.windowRepository = windowRepository;
     }
@@ -166,6 +169,8 @@ public class ShipmentMapperDecorator {
                     .collect(Collectors.toMap(KeychainMachine::getId, KeychainMachine::getKeychainMachineCode));
             case FOUR_CORNER_MACHINE -> fourCornerMachineRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(FourCornerMachine::getId, FourCornerMachine::getFourCornerMachineCode));
+            case GACHAPON -> gachaponRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(Gachapon::getId, Gachapon::getGachaponCode));
             case PUSHER_MACHINE -> pusherMachineRepository.findAllById(ids).stream()
                     .collect(Collectors.toMap(PusherMachine::getId, PusherMachine::getPusherMachineCode));
             case WINDOW -> windowRepository.findAllById(ids).stream()

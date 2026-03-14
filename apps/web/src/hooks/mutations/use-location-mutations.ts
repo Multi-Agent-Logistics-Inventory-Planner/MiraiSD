@@ -11,27 +11,30 @@ import {
   createBoxBin,
   updateBoxBin,
   deleteBoxBin,
-  createRack,
-  updateRack,
-  deleteRack,
   createCabinet,
   updateCabinet,
   deleteCabinet,
-  createSingleClawMachine,
-  updateSingleClawMachine,
-  deleteSingleClawMachine,
   createDoubleClawMachine,
   updateDoubleClawMachine,
   deleteDoubleClawMachine,
-  createKeychainMachine,
-  updateKeychainMachine,
-  deleteKeychainMachine,
   createFourCornerMachine,
   updateFourCornerMachine,
   deleteFourCornerMachine,
+  createGachapon,
+  updateGachapon,
+  deleteGachapon,
+  createKeychainMachine,
+  updateKeychainMachine,
+  deleteKeychainMachine,
   createPusherMachine,
   updatePusherMachine,
   deletePusherMachine,
+  createRack,
+  updateRack,
+  deleteRack,
+  createSingleClawMachine,
+  updateSingleClawMachine,
+  deleteSingleClawMachine,
   createWindow,
   updateWindow,
   deleteWindow,
@@ -96,20 +99,22 @@ export function useCreateLocationMutation(locationType: LocationType) {
       switch (locationType) {
         case "BOX_BIN":
           return createBoxBin(payload as any);
-        case "RACK":
-          return createRack(payload as any);
         case "CABINET":
           return createCabinet(payload as any);
-        case "SINGLE_CLAW_MACHINE":
-          return createSingleClawMachine(payload as any);
         case "DOUBLE_CLAW_MACHINE":
           return createDoubleClawMachine(payload as any);
-        case "KEYCHAIN_MACHINE":
-          return createKeychainMachine(payload as any);
         case "FOUR_CORNER_MACHINE":
           return createFourCornerMachine(payload as any);
+        case "GACHAPON":
+          return createGachapon(payload as any);
+        case "KEYCHAIN_MACHINE":
+          return createKeychainMachine(payload as any);
         case "PUSHER_MACHINE":
           return createPusherMachine(payload as any);
+        case "RACK":
+          return createRack(payload as any);
+        case "SINGLE_CLAW_MACHINE":
+          return createSingleClawMachine(payload as any);
         case "WINDOW":
           return createWindow(payload as any);
         default:
@@ -130,20 +135,22 @@ export function useUpdateLocationMutation(locationType: LocationType) {
       switch (locationType) {
         case "BOX_BIN":
           return updateBoxBin(id, payload as any);
-        case "RACK":
-          return updateRack(id, payload as any);
         case "CABINET":
           return updateCabinet(id, payload as any);
-        case "SINGLE_CLAW_MACHINE":
-          return updateSingleClawMachine(id, payload as any);
         case "DOUBLE_CLAW_MACHINE":
           return updateDoubleClawMachine(id, payload as any);
-        case "KEYCHAIN_MACHINE":
-          return updateKeychainMachine(id, payload as any);
         case "FOUR_CORNER_MACHINE":
           return updateFourCornerMachine(id, payload as any);
+        case "GACHAPON":
+          return updateGachapon(id, payload as any);
+        case "KEYCHAIN_MACHINE":
+          return updateKeychainMachine(id, payload as any);
         case "PUSHER_MACHINE":
           return updatePusherMachine(id, payload as any);
+        case "RACK":
+          return updateRack(id, payload as any);
+        case "SINGLE_CLAW_MACHINE":
+          return updateSingleClawMachine(id, payload as any);
         case "WINDOW":
           return updateWindow(id, payload as any);
         default:
@@ -164,20 +171,22 @@ export function useDeleteLocationMutation(locationType: LocationType) {
       switch (locationType) {
         case "BOX_BIN":
           return deleteBoxBin(id);
-        case "RACK":
-          return deleteRack(id);
         case "CABINET":
           return deleteCabinet(id);
-        case "SINGLE_CLAW_MACHINE":
-          return deleteSingleClawMachine(id);
         case "DOUBLE_CLAW_MACHINE":
           return deleteDoubleClawMachine(id);
-        case "KEYCHAIN_MACHINE":
-          return deleteKeychainMachine(id);
         case "FOUR_CORNER_MACHINE":
           return deleteFourCornerMachine(id);
+        case "GACHAPON":
+          return deleteGachapon(id);
+        case "KEYCHAIN_MACHINE":
+          return deleteKeychainMachine(id);
         case "PUSHER_MACHINE":
           return deletePusherMachine(id);
+        case "RACK":
+          return deleteRack(id);
+        case "SINGLE_CLAW_MACHINE":
+          return deleteSingleClawMachine(id);
         case "WINDOW":
           return deleteWindow(id);
         default:

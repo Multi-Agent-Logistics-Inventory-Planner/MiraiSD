@@ -3,22 +3,24 @@ import {
   LocationType,
   LOCATION_ENDPOINTS,
   BoxBin,
-  Rack,
   Cabinet,
-  SingleClawMachine,
   DoubleClawMachine,
-  KeychainMachine,
   FourCornerMachine,
+  Gachapon,
+  KeychainMachine,
   PusherMachine,
+  Rack,
+  SingleClawMachine,
   Window,
   BoxBinRequest,
-  RackRequest,
   CabinetRequest,
-  SingleClawMachineRequest,
   DoubleClawMachineRequest,
-  KeychainMachineRequest,
   FourCornerMachineRequest,
+  GachaponRequest,
+  KeychainMachineRequest,
   PusherMachineRequest,
+  RackRequest,
+  SingleClawMachineRequest,
   WindowRequest,
   LocationWithCounts,
 } from "@/types/api";
@@ -269,6 +271,37 @@ export async function deleteFourCornerMachine(id: string): Promise<void> {
   return apiDelete<void>(`${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`);
 }
 
+// Gachapon API
+
+export async function getGachapons(): Promise<Gachapon[]> {
+  return apiGet<Gachapon[]>(getBasePath(LocationType.GACHAPON));
+}
+
+export async function getGachaponById(id: string): Promise<Gachapon> {
+  return apiGet<Gachapon>(`${getBasePath(LocationType.GACHAPON)}/${id}`);
+}
+
+export async function createGachapon(data: GachaponRequest): Promise<Gachapon> {
+  return apiPost<Gachapon, GachaponRequest>(
+    getBasePath(LocationType.GACHAPON),
+    data
+  );
+}
+
+export async function updateGachapon(
+  id: string,
+  data: GachaponRequest
+): Promise<Gachapon> {
+  return apiPut<Gachapon, GachaponRequest>(
+    `${getBasePath(LocationType.GACHAPON)}/${id}`,
+    data
+  );
+}
+
+export async function deleteGachapon(id: string): Promise<void> {
+  return apiDelete<void>(`${getBasePath(LocationType.GACHAPON)}/${id}`);
+}
+
 // PusherMachine API
 
 export async function getPusherMachines(): Promise<PusherMachine[]> {
@@ -339,32 +372,35 @@ export async function getLocationsByType(
   locationType: LocationType
 ): Promise<
   | BoxBin[]
-  | Rack[]
   | Cabinet[]
-  | SingleClawMachine[]
   | DoubleClawMachine[]
-  | KeychainMachine[]
   | FourCornerMachine[]
+  | Gachapon[]
+  | KeychainMachine[]
   | PusherMachine[]
+  | Rack[]
+  | SingleClawMachine[]
   | Window[]
 > {
   switch (locationType) {
     case LocationType.BOX_BIN:
       return getBoxBins();
-    case LocationType.RACK:
-      return getRacks();
     case LocationType.CABINET:
       return getCabinets();
-    case LocationType.SINGLE_CLAW_MACHINE:
-      return getSingleClawMachines();
     case LocationType.DOUBLE_CLAW_MACHINE:
       return getDoubleClawMachines();
-    case LocationType.KEYCHAIN_MACHINE:
-      return getKeychainMachines();
     case LocationType.FOUR_CORNER_MACHINE:
       return getFourCornerMachines();
+    case LocationType.GACHAPON:
+      return getGachapons();
+    case LocationType.KEYCHAIN_MACHINE:
+      return getKeychainMachines();
     case LocationType.PUSHER_MACHINE:
       return getPusherMachines();
+    case LocationType.RACK:
+      return getRacks();
+    case LocationType.SINGLE_CLAW_MACHINE:
+      return getSingleClawMachines();
     case LocationType.WINDOW:
       return getWindows();
     default:

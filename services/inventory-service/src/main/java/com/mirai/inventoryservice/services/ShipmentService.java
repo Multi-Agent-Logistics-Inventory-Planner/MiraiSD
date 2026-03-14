@@ -254,6 +254,82 @@ public class ShipmentService {
             shipment.setTrackingId(requestDTO.getTrackingId());
         }
 
+        // Handle items update
+        if (requestDTO.getItems() != null && !requestDTO.getItems().isEmpty()) {
+            // Cannot modify items on a delivered shipment
+            if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
+                throw new InvalidShipmentStatusException("Cannot modify items on a delivered shipment");
+            }
+
+            // Batch fetch all products upfront
+            Set<UUID> productIds = requestDTO.getItems().stream()
+                    .map(ShipmentItemRequestDTO::getItemId)
+                    .collect(Collectors.toSet());
+            Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
+                    .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+            // Separate existing items into received (must preserve) and unreceived (can replace)
+            Map<UUID, ShipmentItem> receivedItemsByProductId = new HashMap<>();
+            List<ShipmentItem> unreceivedItems = new ArrayList<>();
+
+            for (ShipmentItem existingItem : shipment.getItems()) {
+                boolean hasBeenReceived = existingItem.getReceivedQuantity() > 0
+                        || existingItem.getDamagedQuantity() > 0
+                        || existingItem.getDisplayQuantity() > 0
+                        || existingItem.getShopQuantity() > 0;
+
+                if (hasBeenReceived) {
+                    receivedItemsByProductId.put(existingItem.getItem().getId(), existingItem);
+                } else {
+                    unreceivedItems.add(existingItem);
+                }
+            }
+
+            // Remove only unreceived items (orphanRemoval will delete them)
+            shipment.getItems().removeAll(unreceivedItems);
+
+            // Track which products are already in the shipment (received items)
+            Set<UUID> existingProductIds = receivedItemsByProductId.keySet();
+
+            // Add new items from the request
+            for (ShipmentItemRequestDTO itemDTO : requestDTO.getItems()) {
+                UUID productId = itemDTO.getItemId();
+
+                // Skip if this product was already received - it's preserved
+                if (existingProductIds.contains(productId)) {
+                    // Optionally update orderedQuantity if the new value is >= total received
+                    ShipmentItem receivedItem = receivedItemsByProductId.get(productId);
+                    int totalReceived = receivedItem.getReceivedQuantity()
+                            + receivedItem.getDamagedQuantity()
+                            + receivedItem.getDisplayQuantity()
+                            + receivedItem.getShopQuantity();
+
+                    if (itemDTO.getOrderedQuantity() >= totalReceived) {
+                        receivedItem.setOrderedQuantity(itemDTO.getOrderedQuantity());
+                    }
+                    continue;
+                }
+
+                Product product = productMap.get(productId);
+                if (product == null) {
+                    throw new ProductNotFoundException("Product not found with id: " + productId);
+                }
+
+                ShipmentItem item = ShipmentItem.builder()
+                        .shipment(shipment)
+                        .item(product)
+                        .orderedQuantity(itemDTO.getOrderedQuantity())
+                        .receivedQuantity(0)
+                        .unitCost(itemDTO.getUnitCost())
+                        .destinationLocationType(itemDTO.getDestinationLocationType())
+                        .destinationLocationId(itemDTO.getDestinationLocationId())
+                        .notes(itemDTO.getNotes())
+                        .build();
+
+                shipment.getItems().add(item);
+            }
+        }
+
         Shipment savedShipment = shipmentRepository.save(shipment);
 
         // Broadcast real-time update to connected clients
@@ -734,6 +810,7 @@ public class ShipmentService {
                         inv.setQuantity(0);
                         return inv;
                     });
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot create inventory for NOT_ASSIGNED location type");
         };
     }
@@ -779,6 +856,7 @@ public class ShipmentService {
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory).getId();
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory).getId();
             case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory).getId();
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Cannot save inventory for NOT_ASSIGNED location type");
         };
     }
@@ -807,6 +885,7 @@ public class ShipmentService {
                     .findByPusherMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
             case WINDOW -> windowInventoryRepository
                     .findByWindow_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Use removeFromNotAssignedInventory for NOT_ASSIGNED");
         };
     }
@@ -957,6 +1036,7 @@ public class ShipmentService {
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
             case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
+            case GACHAPON -> throw new IllegalArgumentException("Gachapon is display-only and does not support inventory");
             case NOT_ASSIGNED -> throw new IllegalArgumentException("Use notAssignedInventoryRepository.delete directly");
         }
     }

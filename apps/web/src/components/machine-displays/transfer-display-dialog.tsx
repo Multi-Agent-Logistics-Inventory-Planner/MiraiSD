@@ -34,6 +34,7 @@ import {
   DoubleClawMachine,
   KeychainMachine,
   FourCornerMachine,
+  Gachapon,
   PusherMachine,
   Product,
 } from "@/types/api";
@@ -78,6 +79,8 @@ function getMachineCode(locationType: LocationType, loc: StorageLocation): strin
       return (loc as KeychainMachine).keychainMachineCode;
     case LocationType.FOUR_CORNER_MACHINE:
       return (loc as FourCornerMachine).fourCornerMachineCode;
+    case LocationType.GACHAPON:
+      return (loc as Gachapon).gachaponCode;
     case LocationType.PUSHER_MACHINE:
       return (loc as PusherMachine).pusherMachineCode;
     default:

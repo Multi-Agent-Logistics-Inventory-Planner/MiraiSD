@@ -603,20 +603,21 @@ public class StockMovementService {
         return switch (locationType) {
             case BOX_BIN -> boxBinInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new BoxBinInventoryNotFoundException("BoxBin inventory not found: " + inventoryId));
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new SingleClawMachineInventoryNotFoundException("SingleClawMachine inventory not found: " + inventoryId));
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new DoubleClawMachineInventoryNotFoundException("DoubleClawMachine inventory not found: " + inventoryId));
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new KeychainMachineInventoryNotFoundException("KeychainMachine inventory not found: " + inventoryId));
             case CABINET -> cabinetInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new CabinetInventoryNotFoundException("Cabinet inventory not found: " + inventoryId));
-            case RACK -> rackInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new RackInventoryNotFoundException("Rack inventory not found: " + inventoryId));
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new DoubleClawMachineInventoryNotFoundException("DoubleClawMachine inventory not found: " + inventoryId));
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("FourCornerMachine inventory not found: " + inventoryId));
+            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new KeychainMachineInventoryNotFoundException("KeychainMachine inventory not found: " + inventoryId));
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new PusherMachineInventoryNotFoundException("PusherMachine inventory not found: " + inventoryId));
+            case RACK -> rackInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new RackInventoryNotFoundException("Rack inventory not found: " + inventoryId));
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.findById(inventoryId)
+                    .orElseThrow(() -> new SingleClawMachineInventoryNotFoundException("SingleClawMachine inventory not found: " + inventoryId));
             case WINDOW -> windowInventoryRepository.findById(inventoryId)
                     .orElseThrow(() -> new WindowInventoryNotFoundException("Window inventory not found: " + inventoryId));
             case NOT_ASSIGNED -> notAssignedInventoryRepository.findById(inventoryId)
@@ -659,13 +660,14 @@ public class StockMovementService {
     private void saveInventory(LocationType locationType, Object inventory) {
         switch (locationType) {
             case BOX_BIN -> boxBinInventoryRepository.save((BoxBinInventory) inventory);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.save((SingleClawMachineInventory) inventory);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.save((DoubleClawMachineInventory) inventory);
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory);
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory);
-            case RACK -> rackInventoryRepository.save((RackInventory) inventory);
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.save((DoubleClawMachineInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
+            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
+            case RACK -> rackInventoryRepository.save((RackInventory) inventory);
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.save((SingleClawMachineInventory) inventory);
             case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory);
             case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
         }
@@ -674,13 +676,14 @@ public class StockMovementService {
     private void deleteInventory(LocationType locationType, Object inventory) {
         switch (locationType) {
             case BOX_BIN -> boxBinInventoryRepository.delete((BoxBinInventory) inventory);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.delete((KeychainMachineInventory) inventory);
             case CABINET -> cabinetInventoryRepository.delete((CabinetInventory) inventory);
-            case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
+            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
+            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
+            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.delete((KeychainMachineInventory) inventory);
             case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
+            case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
+            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
             case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
             case NOT_ASSIGNED -> notAssignedInventoryRepository.delete((NotAssignedInventory) inventory);
         }
@@ -689,13 +692,14 @@ public class StockMovementService {
     private UUID getLocationId(Object inventory, LocationType locationType) {
         return switch (locationType) {
             case BOX_BIN -> ((BoxBinInventory) inventory).getBoxBin().getId();
-            case SINGLE_CLAW_MACHINE -> ((SingleClawMachineInventory) inventory).getSingleClawMachine().getId();
-            case DOUBLE_CLAW_MACHINE -> ((DoubleClawMachineInventory) inventory).getDoubleClawMachine().getId();
-            case KEYCHAIN_MACHINE -> ((KeychainMachineInventory) inventory).getKeychainMachine().getId();
             case CABINET -> ((CabinetInventory) inventory).getCabinet().getId();
-            case RACK -> ((RackInventory) inventory).getRack().getId();
+            case DOUBLE_CLAW_MACHINE -> ((DoubleClawMachineInventory) inventory).getDoubleClawMachine().getId();
             case FOUR_CORNER_MACHINE -> ((FourCornerMachineInventory) inventory).getFourCornerMachine().getId();
+            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
+            case KEYCHAIN_MACHINE -> ((KeychainMachineInventory) inventory).getKeychainMachine().getId();
             case PUSHER_MACHINE -> ((PusherMachineInventory) inventory).getPusherMachine().getId();
+            case RACK -> ((RackInventory) inventory).getRack().getId();
+            case SINGLE_CLAW_MACHINE -> ((SingleClawMachineInventory) inventory).getSingleClawMachine().getId();
             case WINDOW -> ((WindowInventory) inventory).getWindow().getId();
             case NOT_ASSIGNED -> null;  // No location for NOT_ASSIGNED
         };
@@ -732,14 +736,14 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield boxBinInventoryRepository.save(inv);
             }
-            case SINGLE_CLAW_MACHINE -> {
-                SingleClawMachine machine = singleClawMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new SingleClawMachineNotFoundException("SingleClawMachine not found: " + locationId));
-                SingleClawMachineInventory inv = new SingleClawMachineInventory();
-                inv.setSingleClawMachine(machine);
+            case CABINET -> {
+                Cabinet cabinet = cabinetRepository.findById(locationId)
+                        .orElseThrow(() -> new CabinetNotFoundException("Cabinet not found: " + locationId));
+                CabinetInventory inv = new CabinetInventory();
+                inv.setCabinet(cabinet);
                 inv.setItem(product);
                 inv.setQuantity(quantity);
-                yield singleClawMachineInventoryRepository.save(inv);
+                yield cabinetInventoryRepository.save(inv);
             }
             case DOUBLE_CLAW_MACHINE -> {
                 DoubleClawMachine machine = doubleClawMachineRepository.findById(locationId)
@@ -750,6 +754,16 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield doubleClawMachineInventoryRepository.save(inv);
             }
+            case FOUR_CORNER_MACHINE -> {
+                FourCornerMachine machine = fourCornerMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new FourCornerMachineNotFoundException("FourCornerMachine not found: " + locationId));
+                FourCornerMachineInventory inv = new FourCornerMachineInventory();
+                inv.setFourCornerMachine(machine);
+                inv.setItem(product);
+                inv.setQuantity(quantity);
+                yield fourCornerMachineInventoryRepository.save(inv);
+            }
+            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
             case KEYCHAIN_MACHINE -> {
                 KeychainMachine machine = keychainMachineRepository.findById(locationId)
                         .orElseThrow(() -> new KeychainMachineNotFoundException("KeychainMachine not found: " + locationId));
@@ -759,14 +773,14 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield keychainMachineInventoryRepository.save(inv);
             }
-            case CABINET -> {
-                Cabinet cabinet = cabinetRepository.findById(locationId)
-                        .orElseThrow(() -> new CabinetNotFoundException("Cabinet not found: " + locationId));
-                CabinetInventory inv = new CabinetInventory();
-                inv.setCabinet(cabinet);
+            case PUSHER_MACHINE -> {
+                PusherMachine machine = pusherMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new PusherMachineNotFoundException("PusherMachine not found: " + locationId));
+                PusherMachineInventory inv = new PusherMachineInventory();
+                inv.setPusherMachine(machine);
                 inv.setItem(product);
                 inv.setQuantity(quantity);
-                yield cabinetInventoryRepository.save(inv);
+                yield pusherMachineInventoryRepository.save(inv);
             }
             case RACK -> {
                 Rack rack = rackRepository.findById(locationId)
@@ -777,23 +791,14 @@ public class StockMovementService {
                 inv.setQuantity(quantity);
                 yield rackInventoryRepository.save(inv);
             }
-            case FOUR_CORNER_MACHINE -> {
-                FourCornerMachine machine = fourCornerMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new FourCornerMachineNotFoundException("FourCornerMachine not found: " + locationId));
-                FourCornerMachineInventory inv = new FourCornerMachineInventory();
-                inv.setFourCornerMachine(machine);
+            case SINGLE_CLAW_MACHINE -> {
+                SingleClawMachine machine = singleClawMachineRepository.findById(locationId)
+                        .orElseThrow(() -> new SingleClawMachineNotFoundException("SingleClawMachine not found: " + locationId));
+                SingleClawMachineInventory inv = new SingleClawMachineInventory();
+                inv.setSingleClawMachine(machine);
                 inv.setItem(product);
                 inv.setQuantity(quantity);
-                yield fourCornerMachineInventoryRepository.save(inv);
-            }
-            case PUSHER_MACHINE -> {
-                PusherMachine machine = pusherMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new PusherMachineNotFoundException("PusherMachine not found: " + locationId));
-                PusherMachineInventory inv = new PusherMachineInventory();
-                inv.setPusherMachine(machine);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield pusherMachineInventoryRepository.save(inv);
+                yield singleClawMachineInventoryRepository.save(inv);
             }
             case WINDOW -> {
                 Window window = windowRepository.findById(locationId)

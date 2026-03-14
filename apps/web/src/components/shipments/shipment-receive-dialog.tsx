@@ -40,40 +40,49 @@ import type {
   DestinationAllocation,
   StorageLocation,
   BoxBin,
-  Rack,
   Cabinet,
-  SingleClawMachine,
   DoubleClawMachine,
+  FourCornerMachine,
+  Gachapon,
   KeychainMachine,
+  PusherMachine,
+  Rack,
+  SingleClawMachine,
   Window,
 } from "@/types/api";
 import { LocationType } from "@/types/api";
 
 function getLocationCode(location: StorageLocation): string {
   if ("boxBinCode" in location) return (location as BoxBin).boxBinCode;
-  if ("rackCode" in location) return (location as Rack).rackCode;
   if ("cabinetCode" in location) return (location as Cabinet).cabinetCode;
-  if ("singleClawMachineCode" in location)
-    return (location as SingleClawMachine).singleClawMachineCode;
   if ("doubleClawMachineCode" in location)
     return (location as DoubleClawMachine).doubleClawMachineCode;
+  if ("fourCornerMachineCode" in location)
+    return (location as FourCornerMachine).fourCornerMachineCode;
+  if ("gachaponCode" in location) return (location as Gachapon).gachaponCode;
   if ("keychainMachineCode" in location)
     return (location as KeychainMachine).keychainMachineCode;
+  if ("pusherMachineCode" in location)
+    return (location as PusherMachine).pusherMachineCode;
+  if ("rackCode" in location) return (location as Rack).rackCode;
+  if ("singleClawMachineCode" in location)
+    return (location as SingleClawMachine).singleClawMachineCode;
   if ("windowCode" in location) return (location as Window).windowCode;
   return "";
 }
 
 const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
-  [LocationType.NOT_ASSIGNED]: "Not Assigned",
   [LocationType.BOX_BIN]: "Box/Bin",
-  [LocationType.RACK]: "Rack",
   [LocationType.CABINET]: "Cabinet",
-  [LocationType.WINDOW]: "Window",
-  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.DOUBLE_CLAW_MACHINE]: "Double Claw",
-  [LocationType.KEYCHAIN_MACHINE]: "Keychain",
   [LocationType.FOUR_CORNER_MACHINE]: "Four Corner",
+  [LocationType.GACHAPON]: "Gachapon",
+  [LocationType.KEYCHAIN_MACHINE]: "Keychain",
   [LocationType.PUSHER_MACHINE]: "Pusher",
+  [LocationType.RACK]: "Rack",
+  [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
+  [LocationType.WINDOW]: "Window",
+  [LocationType.NOT_ASSIGNED]: "Not Assigned",
 };
 
 interface ItemAllocation {

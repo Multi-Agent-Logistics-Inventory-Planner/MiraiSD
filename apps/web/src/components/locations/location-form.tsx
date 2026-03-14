@@ -15,20 +15,22 @@ function getCodeField(locationType: LocationType): string {
   switch (locationType) {
     case "BOX_BIN":
       return "boxBinCode";
-    case "RACK":
-      return "rackCode";
     case "CABINET":
       return "cabinetCode";
-    case "SINGLE_CLAW_MACHINE":
-      return "singleClawMachineCode";
     case "DOUBLE_CLAW_MACHINE":
       return "doubleClawMachineCode";
-    case "KEYCHAIN_MACHINE":
-      return "keychainMachineCode";
     case "FOUR_CORNER_MACHINE":
       return "fourCornerMachineCode";
+    case "GACHAPON":
+      return "gachaponCode";
+    case "KEYCHAIN_MACHINE":
+      return "keychainMachineCode";
     case "PUSHER_MACHINE":
       return "pusherMachineCode";
+    case "RACK":
+      return "rackCode";
+    case "SINGLE_CLAW_MACHINE":
+      return "singleClawMachineCode";
     case "WINDOW":
       return "windowCode";
     default:

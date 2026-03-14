@@ -2,13 +2,14 @@ package com.mirai.inventoryservice.models.enums;
 
 public enum LocationType {
     BOX_BIN,
-    SINGLE_CLAW_MACHINE,
-    DOUBLE_CLAW_MACHINE,
-    KEYCHAIN_MACHINE,
     CABINET,
-    RACK,
+    DOUBLE_CLAW_MACHINE,
     FOUR_CORNER_MACHINE,
+    GACHAPON,
+    KEYCHAIN_MACHINE,
     PUSHER_MACHINE,
+    RACK,
+    SINGLE_CLAW_MACHINE,
     WINDOW,
     NOT_ASSIGNED
 }
