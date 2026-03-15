@@ -781,19 +781,48 @@ export function LocationDetailSheet({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
-          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
             <DialogTitle className="flex items-center gap-3">
               <span className="text-xl font-semibold">{code || "Location"}</span>
             </DialogTitle>
-            <DialogDescription>
-              {locationType} • {totalQty} total units
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <DialogDescription className="mt-0">
+                {locationType} • {isDisplayOnly ? `${activeDisplaysForMachine.length} products` : `${totalQty} total units`}
+              </DialogDescription>
+              {/* Edit/Delete icons for display-only types */}
+              {isDisplayOnly && location && (
+                <div className="flex items-center gap-1">
+                  <Can permission={Permission.STORAGE_UPDATE}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onEdit(location)}
+                      title="Edit location"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Can>
+                  <Can permission={Permission.STORAGE_DELETE}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteOpen(true)}
+                      title="Delete location"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </Can>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
             {isMachine ? (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-                <TabsList className="w-full shrink-0 mt-4">
+                <TabsList className="w-full shrink-0">
                   {!isDisplayOnly && (
                     <TabsTrigger value="products" className="flex-1">
                       Products
@@ -840,10 +869,31 @@ export function LocationDetailSheet({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {totalQty > 0 ? "Cannot Delete Location" : "Delete location?"}
+              {isDisplayOnly
+                ? activeDisplaysForMachine.length > 0
+                  ? "Cannot Delete Location"
+                  : "Delete location?"
+                : totalQty > 0
+                  ? "Cannot Delete Location"
+                  : "Delete location?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {totalQty > 0 ? (
+              {isDisplayOnly ? (
+                activeDisplaysForMachine.length > 0 ? (
+                  <>
+                    This location cannot be deleted because it still has{" "}
+                    <span className="font-semibold">{activeDisplaysForMachine.length}</span> active
+                    display(s). Please remove all products from the display before
+                    deleting it.
+                  </>
+                ) : (
+                  <>
+                    This will permanently delete{" "}
+                    <span className="font-medium">{code}</span>. This action
+                    cannot be undone.
+                  </>
+                )
+              ) : totalQty > 0 ? (
                 <>
                   This location cannot be deleted because it still has{" "}
                   <span className="font-semibold">{totalQty}</span> units in
@@ -861,7 +911,7 @@ export function LocationDetailSheet({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            {totalQty === 0 && (
+            {(isDisplayOnly ? activeDisplaysForMachine.length === 0 : totalQty === 0) && (
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={async () => {
