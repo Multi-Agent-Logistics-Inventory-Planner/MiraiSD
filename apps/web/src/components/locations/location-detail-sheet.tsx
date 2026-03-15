@@ -535,7 +535,7 @@ export function LocationDetailSheet({
 
   const displayTabContent = !hasDisplay ? addDisplayEmptyState : (
     <>
-      <div className="shrink-0 flex items-center justify-between py-4">
+      <div className="shrink-0 flex items-center justify-between py-4 min-h-[52px]">
         <p className="text-sm font-medium">Current Products</p>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
@@ -639,16 +639,10 @@ export function LocationDetailSheet({
     </div>
   ) : (
     <>
-      <div className="shrink-0 flex items-center justify-between py-4">
-        <h3 className="text-sm font-medium flex items-center gap-2">
-          <History className="h-4 w-4" />
-          Display History
-          {totalHistoryElements > 0 && (
-            <span className="text-muted-foreground font-normal">
-              ({totalHistoryElements})
-            </span>
-          )}
-        </h3>
+      <div className="shrink-0 flex items-center justify-between py-4 min-h-[52px]">
+        <p className="text-sm font-medium">
+          Display History{totalHistoryElements > 0 && ` (${totalHistoryElements})`}
+        </p>
         {totalHistoryPages > 1 && (
           <div className="flex items-center gap-1">
             <Button
@@ -676,9 +670,9 @@ export function LocationDetailSheet({
         )}
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-          <div className="pb-6 pr-3">
+          <div className="pb-6 pr-3 overflow-x-hidden">
             {isHistoryLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
@@ -704,9 +698,9 @@ export function LocationDetailSheet({
                     <div
                       key={item.id}
                       className={cn(
-                        "flex items-center gap-2 sm:gap-4 py-3 sm:py-4",
+                        "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 min-w-0 overflow-hidden",
                         isActive
-                          ? "bg-green-50 dark:bg-green-950/30 rounded-lg px-2 sm:px-3 my-1 border border-green-200 dark:border-green-800"
+                          ? "bg-green-50 dark:bg-green-950/30 rounded-lg px-2 sm:px-3 my-1 ring-1 ring-inset ring-green-200 dark:ring-green-800"
                           : "border-b last:border-b-0"
                       )}
                     >
@@ -725,9 +719,9 @@ export function LocationDetailSheet({
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 w-0">
                       <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
                         {format(new Date(item.startedAt), "MMM d")} –{" "}
                         {item.endedAt
                           ? format(new Date(item.endedAt), "MMM d, yyyy")
