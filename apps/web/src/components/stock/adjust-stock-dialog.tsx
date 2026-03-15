@@ -442,6 +442,7 @@ export function AdjustStockDialog({
                   value={location}
                   onChange={setLocation}
                   disabled={isAdjusting}
+                  excludeDisplayOnly
                 />
               )}
             </div>
