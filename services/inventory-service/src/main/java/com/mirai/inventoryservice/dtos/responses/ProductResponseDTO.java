@@ -23,6 +23,7 @@ public class ProductResponseDTO {
     private UUID parentId;
     private String parentName;
     private String letter;
+    private Integer templateQuantity;
     private String parentSku;
     private List<ProductSummaryDTO> children;
     private Integer totalChildStock;

@@ -60,7 +60,7 @@ public class ProductService {
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
-                                 String letter, String name, String description, Integer reorderPoint,
+                                 String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
                                  Integer initialStock) {
@@ -94,6 +94,7 @@ public class ProductService {
         Product product = Product.builder()
                 .sku(sku)
                 .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(50, letter.trim().length())) : null)
+                .templateQuantity(templateQuantity)
                 .category(category)
                 .parent(parent)
                 .name(name)
@@ -159,7 +160,7 @@ public class ProductService {
     }
 
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
-                                 String letter, String name, String description, Integer reorderPoint,
+                                 String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
                                  Boolean clearParent) {
@@ -195,6 +196,7 @@ public class ProductService {
             String trimmed = letter.trim();
             product.setLetter(trimmed.isEmpty() ? null : trimmed.substring(0, Math.min(50, trimmed.length())));
         }
+        if (templateQuantity != null) product.setTemplateQuantity(templateQuantity);
         if (categoryId != null) {
             Category newCategory = categoryService.getCategoryById(categoryId);
             product.setCategory(newCategory);

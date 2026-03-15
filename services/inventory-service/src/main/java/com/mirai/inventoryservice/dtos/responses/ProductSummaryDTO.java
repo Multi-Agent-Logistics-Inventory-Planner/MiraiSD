@@ -21,5 +21,6 @@ public class ProductSummaryDTO {
     private Integer quantity;
     private UUID parentId;
     private String letter;
+    private Integer templateQuantity;
     private Boolean hasChildren;
 }
