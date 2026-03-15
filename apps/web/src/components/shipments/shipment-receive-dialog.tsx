@@ -246,18 +246,16 @@ export function ShipmentReceiveDialog({
       const initialShop: ShopQuantities = {};
       const initialPrizeQtys: PrizeReceivedQuantities = {};
       shipment.items.forEach((item) => {
-        const remaining = item.orderedQuantity - item.receivedQuantity -
-          (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
         const isPrize = !!item.item.parentId;
         if (isPrize) {
-          initialPrizeQtys[item.id] = remaining > 0 ? remaining : 0;
+          initialPrizeQtys[item.id] = 0;
         } else {
           initialAllocations[item.id] = [
             {
               id: crypto.randomUUID(),
               locationType: LocationType.NOT_ASSIGNED,
               locationId: "",
-              quantity: remaining > 0 ? remaining : 0,
+              quantity: 0,
             },
           ];
         }
