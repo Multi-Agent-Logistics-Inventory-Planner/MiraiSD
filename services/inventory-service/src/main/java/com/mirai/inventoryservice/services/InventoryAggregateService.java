@@ -35,7 +35,6 @@ public class InventoryAggregateService implements DisposableBean {
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
-    private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
     private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
     private final WindowInventoryRepository windowInventoryRepository;
@@ -50,7 +49,6 @@ public class InventoryAggregateService implements DisposableBean {
             CabinetInventoryRepository cabinetInventoryRepository,
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
-            KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
             PusherMachineInventoryRepository pusherMachineInventoryRepository,
             WindowInventoryRepository windowInventoryRepository,
@@ -61,7 +59,6 @@ public class InventoryAggregateService implements DisposableBean {
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
-        this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
         this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
         this.windowInventoryRepository = windowInventoryRepository;
@@ -125,9 +122,6 @@ public class InventoryAggregateService implements DisposableBean {
         CompletableFuture<List<ProductInventoryEntryDTO>> doubleClawFuture = CompletableFuture.supplyAsync(
                 () -> mapDoubleClawMachineInventory(doubleClawMachineInventoryRepository.findByItem_Id(productId)), executor);
 
-        CompletableFuture<List<ProductInventoryEntryDTO>> keychainFuture = CompletableFuture.supplyAsync(
-                () -> mapKeychainMachineInventory(keychainMachineInventoryRepository.findByItem_Id(productId)), executor);
-
         CompletableFuture<List<ProductInventoryEntryDTO>> fourCornerFuture = CompletableFuture.supplyAsync(
                 () -> mapFourCornerMachineInventory(fourCornerMachineInventoryRepository.findByItem_Id(productId)), executor);
 
@@ -142,7 +136,7 @@ public class InventoryAggregateService implements DisposableBean {
 
         CompletableFuture.allOf(
                 boxBinFuture, rackFuture, cabinetFuture, singleClawFuture,
-                doubleClawFuture, keychainFuture, fourCornerFuture, pusherFuture, windowFuture,
+                doubleClawFuture, fourCornerFuture, pusherFuture, windowFuture,
                 notAssignedFuture
         ).join();
 
@@ -151,7 +145,6 @@ public class InventoryAggregateService implements DisposableBean {
         allEntries.addAll(cabinetFuture.join());
         allEntries.addAll(singleClawFuture.join());
         allEntries.addAll(doubleClawFuture.join());
-        allEntries.addAll(keychainFuture.join());
         allEntries.addAll(fourCornerFuture.join());
         allEntries.addAll(pusherFuture.join());
         allEntries.addAll(windowFuture.join());
@@ -173,7 +166,6 @@ public class InventoryAggregateService implements DisposableBean {
         cabinetInventoryRepository.deleteByItem_Id(productId);
         singleClawMachineInventoryRepository.deleteByItem_Id(productId);
         doubleClawMachineInventoryRepository.deleteByItem_Id(productId);
-        keychainMachineInventoryRepository.deleteByItem_Id(productId);
         fourCornerMachineInventoryRepository.deleteByItem_Id(productId);
         pusherMachineInventoryRepository.deleteByItem_Id(productId);
         windowInventoryRepository.deleteByItem_Id(productId);
@@ -244,20 +236,6 @@ public class InventoryAggregateService implements DisposableBean {
                         .locationId(inv.getDoubleClawMachine().getId())
                         .locationCode(inv.getDoubleClawMachine().getDoubleClawMachineCode())
                         .locationLabel("Double Claw " + inv.getDoubleClawMachine().getDoubleClawMachineCode())
-                        .quantity(inv.getQuantity())
-                        .updatedAt(inv.getUpdatedAt())
-                        .build())
-                .toList();
-    }
-
-    private List<ProductInventoryEntryDTO> mapKeychainMachineInventory(List<KeychainMachineInventory> inventories) {
-        return inventories.stream()
-                .map(inv -> ProductInventoryEntryDTO.builder()
-                        .inventoryId(inv.getId())
-                        .locationType(LocationType.KEYCHAIN_MACHINE.name())
-                        .locationId(inv.getKeychainMachine().getId())
-                        .locationCode(inv.getKeychainMachine().getKeychainMachineCode())
-                        .locationLabel("Keychain Machine " + inv.getKeychainMachine().getKeychainMachineCode())
                         .quantity(inv.getQuantity())
                         .updatedAt(inv.getUpdatedAt())
                         .build())

@@ -33,8 +33,6 @@ public class InventoryTotalsRepository {
             UNION ALL
             SELECT item_id, quantity, updated_at FROM double_claw_machine_inventory
             UNION ALL
-            SELECT item_id, quantity, updated_at FROM keychain_machine_inventory
-            UNION ALL
             SELECT item_id, quantity, updated_at FROM four_corner_machine_inventory
             UNION ALL
             SELECT item_id, quantity, updated_at FROM pusher_machine_inventory
@@ -95,7 +93,6 @@ public class InventoryTotalsRepository {
             UNION ALL SELECT item_id, quantity FROM cabinet_inventory
             UNION ALL SELECT item_id, quantity FROM single_claw_machine_inventory
             UNION ALL SELECT item_id, quantity FROM double_claw_machine_inventory
-            UNION ALL SELECT item_id, quantity FROM keychain_machine_inventory
             UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
             UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
             UNION ALL SELECT item_id, quantity FROM window_inventory

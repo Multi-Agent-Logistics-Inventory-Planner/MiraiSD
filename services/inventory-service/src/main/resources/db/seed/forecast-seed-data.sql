@@ -58,7 +58,6 @@ BEGIN
                 UNION ALL SELECT item_id, quantity FROM cabinet_inventory
                 UNION ALL SELECT item_id, quantity FROM single_claw_machine_inventory
                 UNION ALL SELECT item_id, quantity FROM double_claw_machine_inventory
-                UNION ALL SELECT item_id, quantity FROM keychain_machine_inventory
                 UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
                 UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
                 UNION ALL SELECT item_id, quantity FROM not_assigned_inventory

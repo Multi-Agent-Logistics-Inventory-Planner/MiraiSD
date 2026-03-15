@@ -55,9 +55,6 @@ import {
   createDoubleClawMachineInventory,
   updateDoubleClawMachineInventory,
   deleteDoubleClawMachineInventory,
-  createKeychainMachineInventory,
-  updateKeychainMachineInventory,
-  deleteKeychainMachineInventory,
   createFourCornerMachineInventory,
   updateFourCornerMachineInventory,
   deleteFourCornerMachineInventory,
@@ -216,7 +213,7 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
         case "DOUBLE_CLAW_MACHINE":
           return (await createDoubleClawMachineInventory(locationId, payload)) as any;
         case "KEYCHAIN_MACHINE":
-          return (await createKeychainMachineInventory(locationId, payload)) as any;
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return (await createFourCornerMachineInventory(locationId, payload)) as any;
         case "PUSHER_MACHINE":
@@ -253,7 +250,7 @@ export function useUpdateInventoryMutation(
         case "DOUBLE_CLAW_MACHINE":
           return (await updateDoubleClawMachineInventory(locationId, inventoryId, payload)) as any;
         case "KEYCHAIN_MACHINE":
-          return (await updateKeychainMachineInventory(locationId, inventoryId, payload)) as any;
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return (await updateFourCornerMachineInventory(locationId, inventoryId, payload)) as any;
         case "PUSHER_MACHINE":
@@ -290,7 +287,7 @@ export function useDeleteInventoryMutation(
         case "DOUBLE_CLAW_MACHINE":
           return deleteDoubleClawMachineInventory(locationId, inventoryId);
         case "KEYCHAIN_MACHINE":
-          return deleteKeychainMachineInventory(locationId, inventoryId);
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return deleteFourCornerMachineInventory(locationId, inventoryId);
         case "PUSHER_MACHINE":

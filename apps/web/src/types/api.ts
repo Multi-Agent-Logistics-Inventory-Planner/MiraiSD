@@ -368,11 +368,6 @@ export interface DoubleClawMachineInventory extends BaseInventory {
   doubleClawMachineCode: string;
 }
 
-export interface KeychainMachineInventory extends BaseInventory {
-  keychainMachineId: string;
-  keychainMachineCode: string;
-}
-
 export interface FourCornerMachineInventory extends BaseInventory {
   fourCornerMachineId: string;
   fourCornerMachineCode: string;
@@ -399,7 +394,6 @@ export type Inventory =
   | CabinetInventory
   | SingleClawMachineInventory
   | DoubleClawMachineInventory
-  | KeychainMachineInventory
   | FourCornerMachineInventory
   | PusherMachineInventory
   | WindowInventory

@@ -7,7 +7,6 @@ import {
   CabinetInventory,
   SingleClawMachineInventory,
   DoubleClawMachineInventory,
-  KeychainMachineInventory,
   FourCornerMachineInventory,
   PusherMachineInventory,
   WindowInventory,
@@ -266,55 +265,6 @@ export async function deleteDoubleClawMachineInventory(
   );
 }
 
-// KeychainMachine Inventory
-
-export async function getKeychainMachineInventory(
-  machineId: string
-): Promise<KeychainMachineInventory[]> {
-  return apiGet<KeychainMachineInventory[]>(
-    getInventoryPath(LocationType.KEYCHAIN_MACHINE, machineId)
-  );
-}
-
-export async function getKeychainMachineInventoryItem(
-  machineId: string,
-  inventoryId: string
-): Promise<KeychainMachineInventory> {
-  return apiGet<KeychainMachineInventory>(
-    `${getInventoryPath(LocationType.KEYCHAIN_MACHINE, machineId)}/${inventoryId}`
-  );
-}
-
-export async function createKeychainMachineInventory(
-  machineId: string,
-  data: InventoryRequest
-): Promise<KeychainMachineInventory> {
-  return apiPost<KeychainMachineInventory, InventoryRequest>(
-    getInventoryPath(LocationType.KEYCHAIN_MACHINE, machineId),
-    data
-  );
-}
-
-export async function updateKeychainMachineInventory(
-  machineId: string,
-  inventoryId: string,
-  data: InventoryRequest
-): Promise<KeychainMachineInventory> {
-  return apiPut<KeychainMachineInventory, InventoryRequest>(
-    `${getInventoryPath(LocationType.KEYCHAIN_MACHINE, machineId)}/${inventoryId}`,
-    data
-  );
-}
-
-export async function deleteKeychainMachineInventory(
-  machineId: string,
-  inventoryId: string
-): Promise<void> {
-  return apiDelete<void>(
-    `${getInventoryPath(LocationType.KEYCHAIN_MACHINE, machineId)}/${inventoryId}`
-  );
-}
-
 // FourCornerMachine Inventory
 
 export async function getFourCornerMachineInventory(
@@ -518,7 +468,7 @@ export async function getInventoryByLocation(
     case LocationType.DOUBLE_CLAW_MACHINE:
       return getDoubleClawMachineInventory(locationId);
     case LocationType.KEYCHAIN_MACHINE:
-      return getKeychainMachineInventory(locationId);
+      throw new Error("Keychain Machine is display-only and does not support inventory");
     case LocationType.FOUR_CORNER_MACHINE:
       return getFourCornerMachineInventory(locationId);
     case LocationType.PUSHER_MACHINE:
@@ -551,7 +501,7 @@ export async function createInventory(
     case LocationType.DOUBLE_CLAW_MACHINE:
       return createDoubleClawMachineInventory(locationId, data);
     case LocationType.KEYCHAIN_MACHINE:
-      return createKeychainMachineInventory(locationId, data);
+      throw new Error("Keychain Machine is display-only and does not support inventory");
     case LocationType.FOUR_CORNER_MACHINE:
       return createFourCornerMachineInventory(locationId, data);
     case LocationType.PUSHER_MACHINE:
@@ -606,10 +556,10 @@ const ALL_LOCATION_TYPES: LocationType[] = [
   LocationType.CABINET,
   LocationType.SINGLE_CLAW_MACHINE,
   LocationType.DOUBLE_CLAW_MACHINE,
-  LocationType.KEYCHAIN_MACHINE,
   LocationType.FOUR_CORNER_MACHINE,
   LocationType.PUSHER_MACHINE,
   LocationType.WINDOW,
+  // NOTE: KEYCHAIN_MACHINE and GACHAPON are display-only and do not support inventory
 ];
 
 function formatLocationType(locationType: LocationType): string {
@@ -650,13 +600,8 @@ function getLocationDetails(
         locationCode: inv.doubleClawMachineCode,
       };
     }
-    case LocationType.KEYCHAIN_MACHINE: {
-      const inv = inventory as KeychainMachineInventory;
-      return {
-        locationId: inv.keychainMachineId,
-        locationCode: inv.keychainMachineCode,
-      };
-    }
+    case LocationType.KEYCHAIN_MACHINE:
+      throw new Error("Keychain Machine is display-only and does not support inventory");
     case LocationType.FOUR_CORNER_MACHINE: {
       const inv = inventory as FourCornerMachineInventory;
       return {

@@ -22,8 +22,6 @@ BEGIN
         UNION ALL
         SELECT quantity AS qty FROM four_corner_machine_inventory WHERE item_id = p_product_id
         UNION ALL
-        SELECT quantity AS qty FROM keychain_machine_inventory WHERE item_id = p_product_id
-        UNION ALL
         SELECT quantity AS qty FROM pusher_machine_inventory WHERE item_id = p_product_id
         UNION ALL
         SELECT quantity AS qty FROM window_inventory WHERE item_id = p_product_id

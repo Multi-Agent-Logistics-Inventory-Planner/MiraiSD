@@ -90,10 +90,6 @@ public class LocationAggregateRepository {
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM double_claw_machine_inventory GROUP BY double_claw_machine_id
             UNION ALL
-            SELECT keychain_machine_id as location_id, 'KEYCHAIN_MACHINE' as location_type,
-                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
-            FROM keychain_machine_inventory GROUP BY keychain_machine_id
-            UNION ALL
             SELECT four_corner_machine_id as location_id, 'FOUR_CORNER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM four_corner_machine_inventory GROUP BY four_corner_machine_id
@@ -186,10 +182,6 @@ public class LocationAggregateRepository {
             SELECT double_claw_machine_id as location_id, 'DOUBLE_CLAW_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM double_claw_machine_inventory WHERE 'DOUBLE_CLAW_MACHINE' = :locationType GROUP BY double_claw_machine_id
-            UNION ALL
-            SELECT keychain_machine_id as location_id, 'KEYCHAIN_MACHINE' as location_type,
-                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
-            FROM keychain_machine_inventory WHERE 'KEYCHAIN_MACHINE' = :locationType GROUP BY keychain_machine_id
             UNION ALL
             SELECT four_corner_machine_id as location_id, 'FOUR_CORNER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
