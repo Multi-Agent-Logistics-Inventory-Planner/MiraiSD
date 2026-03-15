@@ -63,6 +63,8 @@ const itemSchema = z.object({
     .int()
     .min(0, "Quantity must be 0 or more"),
   unitCost: z.coerce.number().min(0).optional(),
+  /** Number of kuji sets - used to auto-calculate prize quantities */
+  numberOfSets: z.coerce.number().int().min(0).optional(),
   /** When Kuji is selected: quantity per prize (prizeId -> quantity) */
   prizeQuantities: z.record(z.string(), z.coerce.number().int().min(0)).optional(),
 });
@@ -122,6 +124,7 @@ export function ShipmentCreateDialog({
           productSku: "",
           orderedQuantity: 1,
           unitCost: undefined,
+          numberOfSets: undefined,
           prizeQuantities: undefined,
         },
       ],
@@ -178,6 +181,7 @@ export function ShipmentCreateDialog({
             productSku: item.item.sku ?? "",
             orderedQuantity: item.orderedQuantity,
             unitCost: item.unitCost,
+            numberOfSets: undefined,
             prizeQuantities: Object.keys(prizeQuantities).length > 0 ? prizeQuantities : undefined,
           };
         });
@@ -225,6 +229,7 @@ export function ShipmentCreateDialog({
               productSku: "",
               orderedQuantity: 1,
               unitCost: undefined,
+              numberOfSets: undefined,
               prizeQuantities: undefined,
             },
           ],
@@ -273,6 +278,7 @@ export function ShipmentCreateDialog({
     form.setValue(`items.${index}.productId`, product.id);
     form.setValue(`items.${index}.productName`, product.name);
     form.setValue(`items.${index}.productSku`, product.sku ?? "");
+    form.setValue(`items.${index}.numberOfSets`, undefined);
     form.setValue(`items.${index}.prizeQuantities`, undefined);
     if (product.unitCost) {
       form.setValue(`items.${index}.unitCost`, product.unitCost);
@@ -368,6 +374,7 @@ export function ShipmentCreateDialog({
             productSku: product.sku ?? "",
             orderedQuantity: 1,
             unitCost: product.unitCost ?? undefined,
+            numberOfSets: undefined,
             prizeQuantities: undefined,
           });
           // Track for children query
@@ -556,6 +563,7 @@ export function ShipmentCreateDialog({
                           productSku: "",
                           orderedQuantity: 1,
                           unitCost: undefined,
+                          numberOfSets: undefined,
                           prizeQuantities: undefined,
                         })
                       }
@@ -704,8 +712,34 @@ export function ShipmentCreateDialog({
 
                           {childrenByProductId[selectedProductId]?.length ? (
                             <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+                              {/* Sets input for auto-calculation */}
+                              <div className="flex items-center gap-3 pb-2 border-b">
+                                <Label className="text-xs font-medium">Sets:</Label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  className="w-20 h-8"
+                                  placeholder="0"
+                                  {...form.register(`items.${index}.numberOfSets`)}
+                                  onChange={(e) => {
+                                    const sets = parseInt(e.target.value, 10) || 0;
+                                    form.setValue(`items.${index}.numberOfSets`, sets);
+                                    // Auto-calculate prize quantities
+                                    const children = childrenByProductId[selectedProductId] ?? [];
+                                    const newPrizeQtys: Record<string, number> = {};
+                                    children.forEach((prize) => {
+                                      const templateQty = prize.templateQuantity ?? 0;
+                                      newPrizeQtys[prize.id] = templateQty * sets;
+                                    });
+                                    form.setValue(`items.${index}.prizeQuantities`, newPrizeQtys);
+                                  }}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  (auto-fills prize quantities)
+                                </span>
+                              </div>
                               <Label className="text-xs">
-                                Prize quantities (incoming per prize)
+                                Prize quantities (editable)
                               </Label>
                               <div className="grid gap-2">
                                 {sortPrizes(childrenByProductId[
@@ -715,9 +749,14 @@ export function ShipmentCreateDialog({
                                     key={prize.id}
                                     className="flex items-center gap-2"
                                   >
-                                    <span className="text-sm font-medium min-w-0 truncate max-w-[6rem]" title={prize.letter ?? prize.name}>
+                                    <span className="text-sm font-medium min-w-0 truncate max-w-[4rem]" title={prize.letter ?? prize.name}>
                                       {prizeLetterDisplay(prize.letter) || prize.name.slice(0, 1)}
                                     </span>
+                                    {prize.templateQuantity && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({prize.templateQuantity}/set)
+                                      </span>
+                                    )}
                                     <span className="text-sm text-muted-foreground flex-1 truncate">
                                       {prize.name}
                                     </span>
