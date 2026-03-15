@@ -241,6 +241,7 @@ export default function LocationsPage() {
                   setDetailOpen(true);
                 }}
                 pageSize={PAGE_SIZE}
+                locationType={locationType}
               />
 
               <StoragePagination

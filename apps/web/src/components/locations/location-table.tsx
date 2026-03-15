@@ -3,6 +3,7 @@
 import { MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { DISPLAY_ONLY_LOCATION_TYPES, LocationType } from "@/types/api";
 import type { LocationWithCounts } from "@/types/api";
 
 // Column counts are all divisors of 12: full pages always produce complete rows.
@@ -14,6 +15,7 @@ interface LocationTableProps {
   isLoading: boolean;
   onRowClick: (item: LocationWithCounts) => void;
   pageSize?: number;
+  locationType?: LocationType;
 }
 
 export function LocationTable({
@@ -21,7 +23,9 @@ export function LocationTable({
   isLoading,
   onRowClick,
   pageSize = 12,
+  locationType,
 }: LocationTableProps) {
+  const isDisplayOnly = locationType && DISPLAY_ONLY_LOCATION_TYPES.includes(locationType);
   if (isLoading) {
     return (
       <div className={GRID}>
@@ -54,40 +58,57 @@ export function LocationTable({
 
   return (
     <div className={GRID}>
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={cn(
-            "group relative min-w-0 cursor-pointer rounded-xl border bg-card p-3 sm:p-4 text-left transition-all",
-            "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            item.totalQuantity === 0 && "opacity-55"
-          )}
-          onClick={() => onRowClick(item)}
-        >
-          {/* Occupancy status dot */}
-          <span
+      {items.map((item) => {
+        const hasContent = isDisplayOnly ? item.hasActiveDisplay : item.totalQuantity > 0;
+        return (
+          <button
+            key={item.id}
+            type="button"
             className={cn(
-              "absolute top-3 right-3 h-2 w-2 rounded-full transition-colors",
-              item.totalQuantity > 0 ? "bg-emerald-500" : "bg-muted-foreground/25"
+              "group relative min-w-0 cursor-pointer rounded-xl border bg-card p-3 sm:p-4 text-left transition-all",
+              "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              !hasContent && "opacity-55"
             )}
-          />
+            onClick={() => onRowClick(item)}
+          >
+            {/* Status dots */}
+            <div className="absolute top-3 right-3 flex items-center gap-1">
+              {/* Blue display indicator dot */}
+              {item.hasActiveDisplay && (
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+              )}
+              {/* Green/gray occupancy status dot */}
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full transition-colors",
+                  hasContent ? "bg-emerald-500" : "bg-muted-foreground/25"
+                )}
+              />
+            </div>
 
-          {/* Location code */}
-          <p className="font-mono text-base sm:text-sm font-bold tracking-wide leading-tight pr-4 truncate">
-            {item.locationCode}
-          </p>
+            {/* Location code */}
+            <p className="font-mono text-base sm:text-sm font-bold tracking-wide leading-tight pr-8 truncate">
+              {item.locationCode}
+            </p>
 
-          {/* Stats */}
-          <div className="mt-3 grid grid-cols-2 gap-x-2">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Items</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide text-right">Units</span>
-            <span className="text-sm font-semibold tabular-nums text-muted-foreground">{item.inventoryRecords}</span>
-            <span className="text-sm font-semibold tabular-nums text-right text-muted-foreground">{item.totalQuantity}</span>
-          </div>
-        </button>
-      ))}
+            {/* Stats */}
+            {isDisplayOnly ? (
+              <div className="mt-3 text-center">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Products</span>
+                <p className="text-sm font-semibold tabular-nums text-muted-foreground">{item.activeDisplayCount}</p>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-x-2">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Items</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide text-right">Units</span>
+                <span className="text-sm font-semibold tabular-nums text-muted-foreground">{item.inventoryRecords}</span>
+                <span className="text-sm font-semibold tabular-nums text-right text-muted-foreground">{item.totalQuantity}</span>
+              </div>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

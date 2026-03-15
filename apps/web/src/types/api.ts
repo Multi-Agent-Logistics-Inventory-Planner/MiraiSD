@@ -821,6 +821,8 @@ export interface LocationWithCounts {
   locationCode: string;
   inventoryRecords: number;
   totalQuantity: number;
+  activeDisplayCount: number;
+  hasActiveDisplay: boolean;
   createdAt: string;
   updatedAt: string;
 }
