@@ -64,6 +64,7 @@ import {
   createWindowInventory,
   updateWindowInventory,
   deleteWindowInventory,
+  createNotAssignedInventory,
 } from "@/lib/api/inventory";
 
 type LocationPayload = Record<string, string>;
@@ -80,6 +81,15 @@ function invalidateLocationInventory(
   locationType: LocationType,
   locationId: string
 ) {
+  // NOT_ASSIGNED uses different query keys
+  if (locationType === "NOT_ASSIGNED") {
+    return Promise.all([
+      qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
+      qc.invalidateQueries({ queryKey: ["products"] }),
+      qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
+    ]);
+  }
+
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locationInventory", locationType, locationId] }),
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
@@ -220,6 +230,8 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
           return (await createPusherMachineInventory(locationId, payload)) as any;
         case "WINDOW":
           return (await createWindowInventory(locationId, payload)) as any;
+        case "NOT_ASSIGNED":
+          return (await createNotAssignedInventory(payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
