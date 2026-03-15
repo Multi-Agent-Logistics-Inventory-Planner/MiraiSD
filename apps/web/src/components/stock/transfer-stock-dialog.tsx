@@ -340,6 +340,7 @@ export function TransferStockDialog({
                   value={sourceLocation}
                   onChange={setSourceLocation}
                   disabled={isTransferring}
+                  excludeDisplayOnly
                 />
               )}
             </div>
@@ -366,6 +367,7 @@ export function TransferStockDialog({
                     }
                   : undefined
               }
+              excludeDisplayOnly
             />
           </div>
 

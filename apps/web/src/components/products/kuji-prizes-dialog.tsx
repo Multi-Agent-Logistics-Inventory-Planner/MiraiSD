@@ -111,6 +111,7 @@ export function KujiPrizesDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-24">Letter</TableHead>
+                    <TableHead className="text-right w-20">Qty/Set</TableHead>
                     <TableHead className="text-right">Pieces</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
@@ -120,6 +121,9 @@ export function KujiPrizesDialog({
                     <TableRow key={prize.id}>
                       <TableCell className="font-mono font-medium">
                         {prizeLetterDisplay(prize.letter) || "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {prize.templateQuantity ?? "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         {prize.quantity?.toLocaleString() ?? 0}

@@ -123,6 +123,7 @@ export interface ProductSummary {
   sku?: string | null;
   name: string;
   letter?: string | null;
+  templateQuantity?: number | null;
   category: Category;
   imageUrl?: string;
   isActive: boolean;
@@ -135,6 +136,7 @@ export interface Product {
   id: string;
   sku?: string | null;
   letter?: string | null;
+  templateQuantity?: number | null;
   category: Category;
   // Parent-child relationship fields
   parentId?: string | null;
@@ -163,6 +165,7 @@ export interface ProductRequest {
   categoryId?: string;
   parentId?: string;
   letter?: string;
+  templateQuantity?: number;
   name: string;
   description?: string;
   initialStock?: number;
@@ -326,6 +329,8 @@ export interface InventoryItem {
   parentId?: string | null;
   /** Prize letter (e.g. "A") when item is a child/prize. */
   letter?: string | null;
+  /** Quantity per kuji set for prize products. */
+  templateQuantity?: number | null;
 }
 
 // Base Inventory type
@@ -363,11 +368,6 @@ export interface DoubleClawMachineInventory extends BaseInventory {
   doubleClawMachineCode: string;
 }
 
-export interface KeychainMachineInventory extends BaseInventory {
-  keychainMachineId: string;
-  keychainMachineCode: string;
-}
-
 export interface FourCornerMachineInventory extends BaseInventory {
   fourCornerMachineId: string;
   fourCornerMachineCode: string;
@@ -394,7 +394,6 @@ export type Inventory =
   | CabinetInventory
   | SingleClawMachineInventory
   | DoubleClawMachineInventory
-  | KeychainMachineInventory
   | FourCornerMachineInventory
   | PusherMachineInventory
   | WindowInventory
@@ -816,6 +815,8 @@ export interface LocationWithCounts {
   locationCode: string;
   inventoryRecords: number;
   totalQuantity: number;
+  activeDisplayCount: number;
+  hasActiveDisplay: boolean;
   createdAt: string;
   updatedAt: string;
 }

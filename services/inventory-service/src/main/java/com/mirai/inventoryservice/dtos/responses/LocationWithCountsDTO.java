@@ -22,6 +22,8 @@ public class LocationWithCountsDTO {
     private String locationCode;
     private int inventoryRecords;
     private int totalQuantity;
+    private int activeDisplayCount;
+    private boolean hasActiveDisplay;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

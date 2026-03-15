@@ -56,8 +56,6 @@ const MONTHS_SHORT = [
   "Dec",
 ];
 
-const ITEMS_PER_PAGE = 10;
-
 function TableSkeleton() {
   return (
     <>
@@ -164,64 +162,6 @@ function LeaderboardTable({
   );
 }
 
-function LeaderboardPagination({
-  page,
-  pageSize,
-  totalItems,
-  isLoading,
-  onPageChange,
-}: {
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  isLoading: boolean;
-  onPageChange: (page: number) => void;
-}) {
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const isFirst = page === 1;
-  const isLast = page >= totalPages;
-
-  const startItem = (page - 1) * pageSize + 1;
-  const endItem = Math.min(startItem + pageSize - 1, totalItems);
-
-  if (isLoading || totalItems === 0 || totalPages <= 1) {
-    return null;
-  }
-
-  return (
-    <div className="flex items-center justify-between px-2 pb-4 gap-2">
-      <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
-        Showing {startItem}-{endItem} of {totalItems}
-      </p>
-      <div className="flex items-center gap-1 sm:gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onPageChange(page - 1)}
-          disabled={isFirst}
-          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline sm:ml-1">Previous</span>
-        </Button>
-        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap px-1 sm:px-2">
-          Page {page} of {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onPageChange(page + 1)}
-          disabled={isLast}
-          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3"
-        >
-          <span className="hidden sm:inline sm:mr-1">Next</span>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function ReviewsPage() {
   const { isAdmin } = usePermissions();
   const currentDate = new Date();
@@ -231,7 +171,6 @@ export default function ReviewsPage() {
   );
   const [summaries, setSummaries] = useState<ReviewSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
@@ -252,7 +191,6 @@ export default function ReviewsPage() {
     try {
       const data = await getReviewSummaries(selectedYear, selectedMonth);
       setSummaries(data);
-      setCurrentPage(1);
     } catch (error) {
       // Error handled silently
     } finally {
@@ -279,9 +217,6 @@ export default function ReviewsPage() {
     if (pickerYear === currentDate.getFullYear() && month > currentDate.getMonth() + 1) return true;
     return false;
   }, [pickerYear, currentDate]);
-
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedSummaries = summaries.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
@@ -366,22 +301,13 @@ export default function ReviewsPage() {
       <Card className="py-0">
         <CardContent className="p-0">
           <LeaderboardTable
-            summaries={paginatedSummaries}
+            summaries={summaries}
             isLoading={isLoading}
-            startIndex={startIndex}
+            startIndex={0}
             onUserClick={handleUserClick}
           />
         </CardContent>
       </Card>
-
-      {/* Pagination */}
-      <LeaderboardPagination
-        page={currentPage}
-        pageSize={ITEMS_PER_PAGE}
-        totalItems={summaries.length}
-        isLoading={isLoading}
-        onPageChange={setCurrentPage}
-      />
 
       {/* Manage Employees Dialog */}
       <ManageEmployeesDialog

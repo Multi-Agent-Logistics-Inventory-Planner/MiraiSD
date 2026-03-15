@@ -113,6 +113,11 @@ interface PrizeReceivedQuantities {
   [shipmentItemId: string]: number;
 }
 
+/** Track number of sets received per kuji parent (for auto-calculating prize quantities) */
+interface SetsReceived {
+  [parentShipmentItemId: string]: number;
+}
+
 interface ShipmentReceiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -228,6 +233,7 @@ export function ShipmentReceiveDialog({
   const [displayQuantities, setDisplayQuantities] = useState<DisplayQuantities>({});
   const [shopQuantities, setShopQuantities] = useState<ShopQuantities>({});
   const [prizeReceivedQuantities, setPrizeReceivedQuantities] = useState<PrizeReceivedQuantities>({});
+  const [setsReceived, setSetsReceived] = useState<SetsReceived>({});
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -240,18 +246,16 @@ export function ShipmentReceiveDialog({
       const initialShop: ShopQuantities = {};
       const initialPrizeQtys: PrizeReceivedQuantities = {};
       shipment.items.forEach((item) => {
-        const remaining = item.orderedQuantity - item.receivedQuantity -
-          (item.damagedQuantity || 0) - (item.displayQuantity || 0) - (item.shopQuantity || 0);
         const isPrize = !!item.item.parentId;
         if (isPrize) {
-          initialPrizeQtys[item.id] = remaining > 0 ? remaining : 0;
+          initialPrizeQtys[item.id] = 0;
         } else {
           initialAllocations[item.id] = [
             {
               id: crypto.randomUUID(),
               locationType: LocationType.NOT_ASSIGNED,
               locationId: "",
-              quantity: remaining > 0 ? remaining : 0,
+              quantity: 0,
             },
           ];
         }
@@ -264,6 +268,7 @@ export function ShipmentReceiveDialog({
       setDisplayQuantities(initialDisplay);
       setShopQuantities(initialShop);
       setPrizeReceivedQuantities(initialPrizeQtys);
+      setSetsReceived({});
     }
   }, [open, shipment]);
 
@@ -689,8 +694,37 @@ export function ShipmentReceiveDialog({
                     {/* Child prizes section */}
                     {hasChildren && (
                       <div className="mt-4 pt-4 border-t">
-                        <div className="text-xs font-medium text-muted-foreground mb-3">
-                          Prizes for {item.item.name}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Prizes for {item.item.name}
+                          </div>
+                          {/* Sets input for auto-calculation */}
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Sets:</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={setsReceived[item.id] ?? ""}
+                              onChange={(e) => {
+                                const sets = parseInt(e.target.value, 10) || 0;
+                                setSetsReceived((prev) => ({ ...prev, [item.id]: sets }));
+                                // Auto-calculate prize quantities based on templateQuantity
+                                childPrizes.forEach((prize) => {
+                                  // Access templateQuantity from the item property
+                                  const prizeItem = prize.item as { templateQuantity?: number | null };
+                                  const templateQty = prizeItem.templateQuantity ?? 0;
+                                  const calculatedQty = templateQty * sets;
+                                  const prizeRemaining = prize.orderedQuantity - prize.receivedQuantity -
+                                    (prize.damagedQuantity || 0) - (prize.displayQuantity || 0) - (prize.shopQuantity || 0);
+                                  // Cap at remaining quantity
+                                  setPrizeReceivedQuantity(prize.id, Math.min(calculatedQty, prizeRemaining));
+                                });
+                              }}
+                              className="w-16 h-7 text-xs"
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-muted-foreground">(auto-fills)</span>
+                          </div>
                         </div>
                         <div className="space-y-3 pl-4 border-l-2 border-primary/20">
                           {childPrizes.map((prize) => {
@@ -704,6 +738,8 @@ export function ShipmentReceiveDialog({
                             const prizeIsOver = (prizeQty + prizeDamaged + prizeDisplay + prizeShop) > prizeRemaining;
                             const letter = prize.letter;
                             const prizeLabel = letter ? prizeLetterDisplay(letter) : "?";
+                            const prizeItem = prize.item as { templateQuantity?: number | null };
+                            const templateQty = prizeItem.templateQuantity;
 
                             return (
                               <div
@@ -711,10 +747,15 @@ export function ShipmentReceiveDialog({
                                 className={`py-2 ${prizeIsComplete ? "opacity-50" : ""}`}
                               >
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded">
                                       {prizeLabel}
                                     </span>
+                                    {templateQty && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({templateQty}/set)
+                                      </span>
+                                    )}
                                     <span className="text-xs text-muted-foreground">
                                       {prize.orderedQuantity} ordered, {prize.receivedQuantity} received
                                     </span>

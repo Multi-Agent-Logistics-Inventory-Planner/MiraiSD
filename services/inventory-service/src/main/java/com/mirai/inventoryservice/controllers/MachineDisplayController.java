@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
@@ -76,6 +77,17 @@ public class MachineDisplayController {
     public ResponseEntity<List<MachineDisplayDTO>> batchSwapDisplay(
             @Valid @RequestBody BatchDisplaySwapRequestDTO request) {
         List<MachineDisplayDTO> updatedDisplays = machineDisplayService.batchSwapDisplay(request);
+        return ResponseEntity.ok(updatedDisplays);
+    }
+
+    /**
+     * Renew display records - ends current displays and creates new ones with fresh startedAt.
+     * Used when restocking the same product to reset tracking.
+     */
+    @PostMapping("/renew")
+    public ResponseEntity<List<MachineDisplayDTO>> renewDisplays(
+            @Valid @RequestBody RenewDisplayRequestDTO request) {
+        List<MachineDisplayDTO> updatedDisplays = machineDisplayService.renewDisplays(request);
         return ResponseEntity.ok(updatedDisplays);
     }
 
@@ -199,5 +211,15 @@ public class MachineDisplayController {
     public ResponseEntity<List<MachineDisplayDTO>> getProductHistory(
             @PathVariable UUID productId) {
         return ResponseEntity.ok(machineDisplayService.getProductHistory(productId));
+    }
+
+    /**
+     * Delete a display history record (Admin only)
+     */
+    @DeleteMapping("/history/{displayId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteDisplayHistory(@PathVariable UUID displayId) {
+        machineDisplayService.deleteDisplayHistory(displayId);
+        return ResponseEntity.noContent().build();
     }
 }

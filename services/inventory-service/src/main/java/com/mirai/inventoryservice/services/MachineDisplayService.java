@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
@@ -584,6 +585,79 @@ public class MachineDisplayService {
     }
 
     /**
+     * Renew display records - ends current displays and creates new ones with fresh startedAt.
+     * Used when restocking the same product to reset tracking.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> renewDisplays(RenewDisplayRequestDTO request) {
+        if (request.getDisplayIds() == null || request.getDisplayIds().isEmpty()) {
+            return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<MachineDisplay> renewedDisplays = new ArrayList<>();
+        List<String> productNames = new ArrayList<>();
+
+        for (UUID displayId : request.getDisplayIds()) {
+            MachineDisplay existing = machineDisplayRepository.findByIdWithProduct(displayId)
+                    .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+
+            if (existing.getEndedAt() != null) {
+                throw new IllegalArgumentException("Display is already ended: " + displayId);
+            }
+
+            Product product = existing.getProduct();
+            productNames.add(product.getName());
+
+            // End the existing display
+            existing.setEndedAt(now);
+            machineDisplayRepository.save(existing);
+
+            // Create a new display with fresh startedAt
+            MachineDisplay newDisplay = MachineDisplay.builder()
+                    .locationType(request.getLocationType())
+                    .machineId(request.getMachineId())
+                    .product(product)
+                    .startedAt(now)
+                    .actorId(request.getActorId())
+                    .build();
+            renewedDisplays.add(machineDisplayRepository.save(newDisplay));
+        }
+
+        // Create audit log
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SWAP, // Reuse DISPLAY_SWAP for renewal
+                request.getMachineId(), machineCode,
+                request.getMachineId(), machineCode,
+                productNames.size(), 0,
+                "Renewed: " + buildProductSummary(productNames),
+                null
+        );
+
+        // Create StockMovement entries for each renewed display
+        List<StockMovement> movements = renewedDisplays.stream()
+                .map(display -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(display.getProduct())
+                        .locationType(request.getLocationType())
+                        .fromLocationId(request.getMachineId())
+                        .toLocationId(request.getMachineId())
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_SWAP)
+                        .actorId(request.getActorId())
+                        .at(now)
+                        .build())
+                .collect(Collectors.toList());
+        stockMovementRepository.saveAll(movements);
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+    }
+
+    /**
      * Get all active displays for a specific machine
      */
     public List<MachineDisplayDTO> getActiveDisplaysForMachine(LocationType locationType, UUID machineId) {
@@ -678,6 +752,17 @@ public class MachineDisplayService {
     public List<MachineDisplayDTO> getProductHistory(UUID productId) {
         List<MachineDisplay> displays = machineDisplayRepository.findByProduct_IdOrderByStartedAtDesc(productId);
         return toDTOList(displays);
+    }
+
+    /**
+     * Delete a display history record (permanently removes from database)
+     */
+    @Transactional
+    public void deleteDisplayHistory(UUID displayId) {
+        MachineDisplay display = machineDisplayRepository.findById(displayId)
+                .orElseThrow(() -> new IllegalArgumentException("Display history not found: " + displayId));
+
+        machineDisplayRepository.delete(display);
     }
 
     // ========= Helper Methods =========

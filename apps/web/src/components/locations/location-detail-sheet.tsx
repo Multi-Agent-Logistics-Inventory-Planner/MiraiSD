@@ -70,14 +70,18 @@ import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
   useBatchSwapDisplayMutation,
+  useRenewDisplayMutation,
+  useDeleteDisplayHistoryMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
+import { RenewDisplayDialog } from "@/components/machine-displays/renew-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { type LocationSelection } from "@/types/transfer";
 
 const MACHINE_LOCATION_TYPES: LocationType[] = [
@@ -146,6 +150,7 @@ export function LocationDetailSheet({
 }: LocationDetailSheetProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin } = usePermissions();
 
   const locationId = location?.id;
   const isMachine = MACHINE_LOCATION_TYPES.includes(locationType);
@@ -180,7 +185,7 @@ export function LocationDetailSheet({
     HISTORY_PAGE_SIZE
   );
 
-  const historyItems = historyData?.content?.filter((item) => item.endedAt) ?? [];
+  const historyItems = historyData?.content ?? [];
   const totalHistoryPages = historyData?.totalPages ?? 0;
   const totalHistoryElements = historyData?.totalElements ?? 0;
 
@@ -193,14 +198,19 @@ export function LocationDetailSheet({
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
   const batchSwapMutation = useBatchSwapDisplayMutation();
+  const renewDisplayMutation = useRenewDisplayMutation();
+  const deleteHistoryMutation = useDeleteDisplayHistoryMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [addDisplayDialogOpen, setAddDisplayDialogOpen] = useState(false);
   const [transferDisplayDialogOpen, setTransferDisplayDialogOpen] = useState(false);
+  const [renewDisplayDialogOpen, setRenewDisplayDialogOpen] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
+  const [historyDeleteDialogOpen, setHistoryDeleteDialogOpen] = useState(false);
+  const [historyToDelete, setHistoryToDelete] = useState<MachineDisplay | null>(null);
 
   // Reset state when dialog opens / location changes
   useEffect(() => {
@@ -360,23 +370,70 @@ export function LocationDetailSheet({
     }
   }
 
+  async function handleRenewDisplays(displayIds: string[]) {
+    if (!locationId || displayIds.length === 0) return;
+    try {
+      await renewDisplayMutation.mutateAsync({
+        locationType,
+        machineId: locationId,
+        displayIds,
+        actorId: user?.personId,
+      });
+      toast({
+        title: "Displays renewed",
+        description: `${displayIds.length} display(s) have been renewed.`,
+      });
+      setRenewDisplayDialogOpen(false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to renew displays.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function handleDeleteHistoryClick(item: MachineDisplay) {
+    setHistoryToDelete(item);
+    setHistoryDeleteDialogOpen(true);
+  }
+
+  async function handleConfirmDeleteHistory() {
+    if (!historyToDelete) return;
+    try {
+      await deleteHistoryMutation.mutateAsync(historyToDelete.id);
+      toast({
+        title: "History deleted",
+        description: `History record for "${historyToDelete.productName}" has been deleted.`,
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete history record.",
+        variant: "destructive",
+      });
+    }
+    setHistoryDeleteDialogOpen(false);
+    setHistoryToDelete(null);
+  }
+
   // ── Products tab content ──────────────────────────────────────────────────
 
   const productsTabContent = (
     <>
       {location && (
-        <div className="shrink-0 flex items-center gap-2 py-4">
-          <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
-            <ArrowUpDown className="mr-2 h-4 w-4" />
+        <div className="shrink-0 flex items-center gap-1 sm:gap-2 py-4">
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setAdjustOpen(true)}>
+            <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Adjust
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setTransferOpen(true)}>
+            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Transfer
           </Button>
           <Can permission={Permission.STORAGE_UPDATE}>
-            <Button variant="outline" size="sm" onClick={() => onEdit(location)}>
-              <Pencil className="mr-2 h-4 w-4" />
+            <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => onEdit(location)}>
+              <Pencil className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Edit
             </Button>
           </Can>
@@ -384,10 +441,10 @@ export function LocationDetailSheet({
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive"
+              className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm text-destructive"
               onClick={() => setDeleteOpen(true)}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Delete
             </Button>
           </Can>
@@ -478,7 +535,7 @@ export function LocationDetailSheet({
 
   const displayTabContent = !hasDisplay ? addDisplayEmptyState : (
     <>
-      <div className="shrink-0 flex items-center justify-between py-4">
+      <div className="shrink-0 flex items-center justify-between py-4 min-h-[52px]">
         <p className="text-sm font-medium">Current Products</p>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
@@ -488,6 +545,10 @@ export function LocationDetailSheet({
           <Button size="sm" variant="outline" onClick={() => setTransferDisplayDialogOpen(true)}>
             <ArrowLeftRight className="h-4 w-4 mr-1" />
             Transfer
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setRenewDisplayDialogOpen(true)}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Renew
           </Button>
         </div>
       </div>
@@ -578,16 +639,10 @@ export function LocationDetailSheet({
     </div>
   ) : (
     <>
-      <div className="shrink-0 flex items-center justify-between py-4">
-        <h3 className="text-sm font-medium flex items-center gap-2">
-          <History className="h-4 w-4" />
-          Display History
-          {totalHistoryElements > 0 && (
-            <span className="text-muted-foreground font-normal">
-              ({totalHistoryElements})
-            </span>
-          )}
-        </h3>
+      <div className="shrink-0 flex items-center justify-between py-4 min-h-[52px]">
+        <p className="text-sm font-medium">
+          Display History{totalHistoryElements > 0 && ` (${totalHistoryElements})`}
+        </p>
         {totalHistoryPages > 1 && (
           <div className="flex items-center gap-1">
             <Button
@@ -615,9 +670,9 @@ export function LocationDetailSheet({
         )}
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-          <div className="pb-6 pr-3">
+          <div className="pb-6 pr-3 overflow-x-hidden">
             {isHistoryLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
@@ -634,13 +689,21 @@ export function LocationDetailSheet({
                 No display history yet
               </div>
             ) : (
-              historyItems.map((item) => {
-                const product = products.find((p) => p.id === item.productId);
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0"
-                  >
+              (() => {
+                const activeItems = historyItems.filter((item) => !item.endedAt);
+                const pastItems = historyItems.filter((item) => item.endedAt);
+                const renderItem = (item: MachineDisplay, isActive: boolean) => {
+                  const product = products.find((p) => p.id === item.productId);
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 min-w-0 overflow-hidden",
+                        isActive
+                          ? "bg-green-50 dark:bg-green-950/30 rounded-lg px-2 sm:px-3 my-1 ring-1 ring-inset ring-green-200 dark:ring-green-800"
+                          : "border-b last:border-b-0"
+                      )}
+                    >
                     <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                       {product?.imageUrl ? (
                         <Image
@@ -656,19 +719,49 @@ export function LocationDetailSheet({
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 w-0">
                       <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
                         {format(new Date(item.startedAt), "MMM d")} –{" "}
-                        {format(new Date(item.endedAt!), "MMM d, yyyy")}
+                        {item.endedAt
+                          ? format(new Date(item.endedAt), "MMM d, yyyy")
+                          : "Present"}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0 ml-2">
-                      {formatDuration(item.startedAt, item.endedAt)}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!item.endedAt && (
+                        <Badge variant="default" className="text-xs bg-green-600">
+                          Active
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {formatDuration(item.startedAt, item.endedAt)}
+                      </Badge>
+                      {isAdmin && item.endedAt && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteHistoryClick(item)}
+                          title="Delete history"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
+                  );
+                };
+                return (
+                  <>
+                    {activeItems.map((item) => renderItem(item, true))}
+                    {activeItems.length > 0 && pastItems.length > 0 && (
+                      <div className="border-b my-3" />
+                    )}
+                    {pastItems.map((item) => renderItem(item, false))}
+                  </>
                 );
-              })
+              })()
             )}
           </div>
         </ScrollArea>
@@ -682,19 +775,48 @@ export function LocationDetailSheet({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden p-0">
-          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
             <DialogTitle className="flex items-center gap-3">
               <span className="text-xl font-semibold">{code || "Location"}</span>
             </DialogTitle>
-            <DialogDescription>
-              {locationType} • {totalQty} total units
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <DialogDescription className="mt-0">
+                {locationType} • {isDisplayOnly ? `${activeDisplaysForMachine.length} products` : `${totalQty} total units`}
+              </DialogDescription>
+              {/* Edit/Delete icons for display-only types */}
+              {isDisplayOnly && location && (
+                <div className="flex items-center gap-1">
+                  <Can permission={Permission.STORAGE_UPDATE}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => onEdit(location)}
+                      title="Edit location"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Can>
+                  <Can permission={Permission.STORAGE_DELETE}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteOpen(true)}
+                      title="Delete location"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </Can>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
             {isMachine ? (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-                <TabsList className="w-full shrink-0 mt-4">
+                <TabsList className="w-full shrink-0">
                   {!isDisplayOnly && (
                     <TabsTrigger value="products" className="flex-1">
                       Products
@@ -741,10 +863,31 @@ export function LocationDetailSheet({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {totalQty > 0 ? "Cannot Delete Location" : "Delete location?"}
+              {isDisplayOnly
+                ? activeDisplaysForMachine.length > 0
+                  ? "Cannot Delete Location"
+                  : "Delete location?"
+                : totalQty > 0
+                  ? "Cannot Delete Location"
+                  : "Delete location?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {totalQty > 0 ? (
+              {isDisplayOnly ? (
+                activeDisplaysForMachine.length > 0 ? (
+                  <>
+                    This location cannot be deleted because it still has{" "}
+                    <span className="font-semibold">{activeDisplaysForMachine.length}</span> active
+                    display(s). Please remove all products from the display before
+                    deleting it.
+                  </>
+                ) : (
+                  <>
+                    This will permanently delete{" "}
+                    <span className="font-medium">{code}</span>. This action
+                    cannot be undone.
+                  </>
+                )
+              ) : totalQty > 0 ? (
                 <>
                   This location cannot be deleted because it still has{" "}
                   <span className="font-semibold">{totalQty}</span> units in
@@ -762,7 +905,7 @@ export function LocationDetailSheet({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            {totalQty === 0 && (
+            {(isDisplayOnly ? activeDisplaysForMachine.length === 0 : totalQty === 0) && (
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={async () => {
@@ -796,6 +939,29 @@ export function LocationDetailSheet({
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={historyDeleteDialogOpen} onOpenChange={setHistoryDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete History Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this history record for{" "}
+              <span className="font-medium">&quot;{historyToDelete?.productName}&quot;</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteHistory}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteHistoryMutation.isPending}
+            >
+              {deleteHistoryMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AddDisplayDialog
         open={addDisplayDialogOpen}
         onOpenChange={setAddDisplayDialogOpen}
@@ -815,6 +981,15 @@ export function LocationDetailSheet({
         onTransferWithMachine={handleTransferDisplays}
         onSwapWithProducts={handleSwapWithProducts}
         isSubmitting={isTransferring}
+      />
+
+      <RenewDisplayDialog
+        open={renewDisplayDialogOpen}
+        onOpenChange={setRenewDisplayDialogOpen}
+        currentDisplays={activeDisplaysForMachine}
+        products={products}
+        isSaving={renewDisplayMutation.isPending}
+        onSubmit={handleRenewDisplays}
       />
     </>
   );

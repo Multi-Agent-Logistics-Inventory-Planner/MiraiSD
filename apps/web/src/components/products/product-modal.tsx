@@ -43,6 +43,7 @@ import {
   type ProductInventoryEntry,
 } from "@/types/api";
 import { Card, CardContent } from "../ui/card";
+import { useToast } from "@/hooks/use-toast";
 import type { PreselectedProductInfo } from "@/components/stock/adjust-stock-dialog";
 
 interface ProductModalProps {
@@ -64,6 +65,7 @@ export function ProductModal({
   onTransferClick,
   onEditClick,
 }: ProductModalProps) {
+  const { toast } = useToast();
   const { data: inventoryData, isLoading: locationsLoading } =
     useProductInventoryEntries(product?.product.id);
   const locations = inventoryData?.entries;
@@ -73,6 +75,8 @@ export function ProductModal({
   const deleteProduct = useDeleteProductMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [prizesDialogOpen, setPrizesDialogOpen] = useState(false);
+
+  const hasInventory = locations && locations.length > 0;
 
   if (!product) {
     return null;
@@ -184,12 +188,10 @@ export function ProductModal({
                 size="sm"
                 className="bg-black text-white hover:bg-black/90"
                 onClick={() => {
-                  if (locations && locations.length > 0) {
-                    onAdjustClick?.({
-                      product: p,
-                      inventoryEntries: locations,
-                    });
-                  }
+                  onAdjustClick?.({
+                    product: p,
+                    inventoryEntries: locations ?? [],
+                  });
                 }}
               >
                 <ArrowUpDown className="h-4 w-4 mr-1" />
@@ -199,10 +201,15 @@ export function ProductModal({
                 size="sm"
                 className="bg-black text-white hover:bg-black/90"
                 onClick={() => {
-                  if (locations && locations.length > 0) {
+                  if (hasInventory) {
                     onTransferClick?.({
                       product: p,
                       inventoryEntries: locations,
+                    });
+                  } else {
+                    toast({
+                      title: "No inventory to transfer",
+                      description: "This product has no quantities at any location to transfer.",
                     });
                   }
                 }}
@@ -253,12 +260,10 @@ export function ProductModal({
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
             onClick={() => {
-              if (locations && locations.length > 0) {
-                onAdjustClick?.({
-                  product: p,
-                  inventoryEntries: locations,
-                });
-              }
+              onAdjustClick?.({
+                product: p,
+                inventoryEntries: locations ?? [],
+              });
             }}
           >
             <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
@@ -268,10 +273,15 @@ export function ProductModal({
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
             onClick={() => {
-              if (locations && locations.length > 0) {
+              if (hasInventory) {
                 onTransferClick?.({
                   product: p,
                   inventoryEntries: locations,
+                });
+              } else {
+                toast({
+                  title: "No inventory to transfer",
+                  description: "This product has no quantities at any location to transfer.",
                 });
               }
             }}

@@ -49,13 +49,17 @@ export function ProductLocationSelector({
   // Build the selected value string for the Select component
   const selectedValue = value.locationId ?? "";
 
-  function handleValueChange(locationId: string) {
-    const entry = inventoryEntries.find((e) => e.locationId === locationId);
+  function handleValueChange(selectedValue: string) {
+    // Find entry by locationId or inventoryId (for NOT_ASSIGNED which has no locationId)
+    const entry = inventoryEntries.find(
+      (e) => e.locationId === selectedValue || e.inventoryId === selectedValue
+    );
     if (!entry) return;
 
     onChange({
       locationType: entry.locationType as LocationType,
-      locationId: entry.locationId,
+      // For NOT_ASSIGNED, use inventoryId as locationId since there's no actual location
+      locationId: entry.locationId || entry.inventoryId,
       locationCode: entry.locationCode,
     });
   }
@@ -73,7 +77,10 @@ export function ProductLocationSelector({
   // Format the trigger display text
   function formatTriggerLabel(): string {
     if (!value.locationId) return "";
-    const entry = inventoryEntries.find((e) => e.locationId === value.locationId);
+    // Find entry by locationId or inventoryId (for NOT_ASSIGNED)
+    const entry = inventoryEntries.find(
+      (e) => e.locationId === value.locationId || e.inventoryId === value.locationId
+    );
     if (!entry) return "";
     const typeCode = LOCATION_TYPE_CODES[entry.locationType as LocationType] ?? "";
     return entry.locationType === "NOT_ASSIGNED"

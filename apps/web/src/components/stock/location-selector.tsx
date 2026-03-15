@@ -33,6 +33,9 @@ import {
   type LocationSelection,
 } from "@/types/transfer";
 
+/** Location type codes that are display-only (no inventory) */
+const DISPLAY_ONLY_CODES = ["G", "K"];
+
 const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
 
 /** Virtual ID used for "Not Assigned" selection */
@@ -63,6 +66,8 @@ interface LocationSelectorProps {
   excludeLocation?: { locationType: LocationType; locationId: string };
   /** Content to render after the code input*/
   endContent?: React.ReactNode;
+  /** Exclude display-only location types (Gachapon, Keychain) that don't support inventory */
+  excludeDisplayOnly?: boolean;
 }
 
 function getLocationCode(
@@ -113,9 +118,18 @@ export function LocationSelector({
   disabled = false,
   excludeLocation,
   endContent,
+  excludeDisplayOnly = false,
 }: LocationSelectorProps) {
   const [codePopoverOpen, setCodePopoverOpen] = useState(false);
   const isNotAssigned = value.locationType === LocationType.NOT_ASSIGNED;
+
+  // Filter out display-only types if requested
+  const filteredLocationTypeOptions = useMemo(() => {
+    if (!excludeDisplayOnly) return LOCATION_TYPE_OPTIONS;
+    return LOCATION_TYPE_OPTIONS.filter(
+      (opt) => !DISPLAY_ONLY_CODES.includes(opt.code)
+    );
+  }, [excludeDisplayOnly]);
 
   const selectedTypeCode =
     value.locationType
@@ -217,7 +231,7 @@ export function LocationSelector({
                   {/* Desktop: show code and label */}
                   <span className="hidden sm:inline">
                     {selectedTypeCode} -{" "}
-                    {LOCATION_TYPE_OPTIONS.find((opt) => opt.code === selectedTypeCode)?.label}
+                    {filteredLocationTypeOptions.find((opt) => opt.code === selectedTypeCode)?.label}
                   </span>
                 </>
               ) : (
@@ -231,7 +245,7 @@ export function LocationSelector({
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {LOCATION_TYPE_OPTIONS.map((opt) => (
+            {filteredLocationTypeOptions.map((opt) => (
               <SelectItem key={opt.code} value={opt.code}>
                 {opt.code} - {opt.label}
               </SelectItem>
