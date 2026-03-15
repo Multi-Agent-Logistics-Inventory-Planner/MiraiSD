@@ -680,6 +680,17 @@ public class MachineDisplayService {
         return toDTOList(displays);
     }
 
+    /**
+     * Delete a display history record (permanently removes from database)
+     */
+    @Transactional
+    public void deleteDisplayHistory(UUID displayId) {
+        MachineDisplay display = machineDisplayRepository.findById(displayId)
+                .orElseThrow(() -> new IllegalArgumentException("Display history not found: " + displayId));
+
+        machineDisplayRepository.delete(display);
+    }
+
     // ========= Helper Methods =========
 
     private MachineDisplayDTO toDTO(MachineDisplay display) {

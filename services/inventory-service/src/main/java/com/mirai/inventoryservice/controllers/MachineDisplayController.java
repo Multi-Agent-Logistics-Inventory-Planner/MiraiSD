@@ -200,4 +200,14 @@ public class MachineDisplayController {
             @PathVariable UUID productId) {
         return ResponseEntity.ok(machineDisplayService.getProductHistory(productId));
     }
+
+    /**
+     * Delete a display history record (Admin only)
+     */
+    @DeleteMapping("/history/{displayId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteDisplayHistory(@PathVariable UUID displayId) {
+        machineDisplayService.deleteDisplayHistory(displayId);
+        return ResponseEntity.noContent().build();
+    }
 }

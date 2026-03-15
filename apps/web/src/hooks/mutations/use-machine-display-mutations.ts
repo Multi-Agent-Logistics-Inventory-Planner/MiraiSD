@@ -6,6 +6,7 @@ import {
   clearDisplayById,
   swapMachineDisplay,
   batchSwapDisplay,
+  deleteDisplayHistory,
   type SwapMachineDisplayRequest,
   type BatchDisplaySwapRequest,
 } from "@/lib/api/machine-displays";
@@ -100,6 +101,20 @@ export function useBatchSwapDisplayMutation() {
 
   return useMutation<MachineDisplay[], Error, BatchDisplaySwapRequest>({
     mutationFn: batchSwapDisplay,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
+    },
+  });
+}
+
+/**
+ * Mutation to delete a display history record (Admin only)
+ */
+export function useDeleteDisplayHistoryMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: deleteDisplayHistory,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
     },

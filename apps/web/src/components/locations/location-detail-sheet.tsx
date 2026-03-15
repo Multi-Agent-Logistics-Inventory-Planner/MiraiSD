@@ -70,6 +70,7 @@ import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
   useBatchSwapDisplayMutation,
+  useDeleteDisplayHistoryMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
@@ -78,6 +79,7 @@ import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { type LocationSelection } from "@/types/transfer";
 
 const MACHINE_LOCATION_TYPES: LocationType[] = [
@@ -146,6 +148,7 @@ export function LocationDetailSheet({
 }: LocationDetailSheetProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin } = usePermissions();
 
   const locationId = location?.id;
   const isMachine = MACHINE_LOCATION_TYPES.includes(locationType);
@@ -193,6 +196,7 @@ export function LocationDetailSheet({
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
   const batchSwapMutation = useBatchSwapDisplayMutation();
+  const deleteHistoryMutation = useDeleteDisplayHistoryMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
@@ -201,6 +205,8 @@ export function LocationDetailSheet({
   const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
+  const [historyDeleteDialogOpen, setHistoryDeleteDialogOpen] = useState(false);
+  const [historyToDelete, setHistoryToDelete] = useState<MachineDisplay | null>(null);
 
   // Reset state when dialog opens / location changes
   useEffect(() => {
@@ -358,6 +364,30 @@ export function LocationDetailSheet({
     } finally {
       setIsTransferring(false);
     }
+  }
+
+  function handleDeleteHistoryClick(item: MachineDisplay) {
+    setHistoryToDelete(item);
+    setHistoryDeleteDialogOpen(true);
+  }
+
+  async function handleConfirmDeleteHistory() {
+    if (!historyToDelete) return;
+    try {
+      await deleteHistoryMutation.mutateAsync(historyToDelete.id);
+      toast({
+        title: "History deleted",
+        description: `History record for "${historyToDelete.productName}" has been deleted.`,
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to delete history record.",
+        variant: "destructive",
+      });
+    }
+    setHistoryDeleteDialogOpen(false);
+    setHistoryToDelete(null);
   }
 
   // ── Products tab content ──────────────────────────────────────────────────
@@ -663,9 +693,22 @@ export function LocationDetailSheet({
                         {format(new Date(item.endedAt!), "MMM d, yyyy")}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0 ml-2">
-                      {formatDuration(item.startedAt, item.endedAt)}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-xs">
+                        {formatDuration(item.startedAt, item.endedAt)}
+                      </Badge>
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteHistoryClick(item)}
+                          title="Delete history"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -791,6 +834,29 @@ export function LocationDetailSheet({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmClear}>
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={historyDeleteDialogOpen} onOpenChange={setHistoryDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete History Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this history record for{" "}
+              <span className="font-medium">&quot;{historyToDelete?.productName}&quot;</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteHistory}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteHistoryMutation.isPending}
+            >
+              {deleteHistoryMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

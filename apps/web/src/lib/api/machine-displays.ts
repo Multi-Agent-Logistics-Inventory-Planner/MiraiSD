@@ -225,3 +225,10 @@ export async function getActiveDisplaysForMachine(
     `/api/machine-displays/${locationType}/${machineId}/active`
   );
 }
+
+/**
+ * Delete a display history record (Admin only)
+ */
+export async function deleteDisplayHistory(displayId: string): Promise<void> {
+  return apiDelete<void>(`/api/machine-displays/history/${displayId}`);
+}
