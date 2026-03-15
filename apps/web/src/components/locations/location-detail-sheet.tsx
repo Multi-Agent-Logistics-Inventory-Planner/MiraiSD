@@ -365,18 +365,18 @@ export function LocationDetailSheet({
   const productsTabContent = (
     <>
       {location && (
-        <div className="shrink-0 flex items-center gap-2 py-4">
-          <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
-            <ArrowUpDown className="mr-2 h-4 w-4" />
+        <div className="shrink-0 flex items-center gap-1 sm:gap-2 py-4">
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setAdjustOpen(true)}>
+            <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Adjust
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setTransferOpen(true)}>
+            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Transfer
           </Button>
           <Can permission={Permission.STORAGE_UPDATE}>
-            <Button variant="outline" size="sm" onClick={() => onEdit(location)}>
-              <Pencil className="mr-2 h-4 w-4" />
+            <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => onEdit(location)}>
+              <Pencil className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Edit
             </Button>
           </Can>
@@ -384,10 +384,10 @@ export function LocationDetailSheet({
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive"
+              className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm text-destructive"
               onClick={() => setDeleteOpen(true)}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Delete
             </Button>
           </Can>
