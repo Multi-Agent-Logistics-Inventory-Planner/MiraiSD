@@ -16,6 +16,18 @@ export interface SwapMachineDisplayRequest {
 }
 
 /**
+ * Renew display request - ends current displays and creates new ones
+ * with fresh startedAt timestamps for the same products.
+ * Used when restocking the same product to reset tracking.
+ */
+export interface RenewDisplayRequest {
+  locationType: LocationType;
+  machineId: string;
+  displayIds: string[];
+  actorId?: string;
+}
+
+/**
  * Batch display swap request - supports both swap modes:
  * 1. Swap with products - remove displays and add new products
  * 2. Swap with another machine - trade displays between two machines
@@ -210,6 +222,20 @@ export async function batchSwapDisplay(
 ): Promise<MachineDisplay[]> {
   return apiPost<MachineDisplay[], BatchDisplaySwapRequest>(
     "/api/machine-displays/batch-swap",
+    data
+  );
+}
+
+/**
+ * Renew display records - ends current displays and creates new ones
+ * with fresh startedAt timestamps for the same products.
+ * Used when restocking the same product to reset tracking.
+ */
+export async function renewDisplays(
+  data: RenewDisplayRequest
+): Promise<MachineDisplay[]> {
+  return apiPost<MachineDisplay[], RenewDisplayRequest>(
+    "/api/machine-displays/renew",
     data
   );
 }

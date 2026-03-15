@@ -70,10 +70,12 @@ import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
   useBatchSwapDisplayMutation,
+  useRenewDisplayMutation,
   useDeleteDisplayHistoryMutation,
 } from "@/hooks/mutations/use-machine-display-mutations";
 import { AddDisplayDialog } from "@/components/machine-displays/add-display-dialog";
 import { TransferDisplayDialog } from "@/components/machine-displays/transfer-display-dialog";
+import { RenewDisplayDialog } from "@/components/machine-displays/renew-display-dialog";
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
@@ -183,7 +185,7 @@ export function LocationDetailSheet({
     HISTORY_PAGE_SIZE
   );
 
-  const historyItems = historyData?.content?.filter((item) => item.endedAt) ?? [];
+  const historyItems = historyData?.content ?? [];
   const totalHistoryPages = historyData?.totalPages ?? 0;
   const totalHistoryElements = historyData?.totalElements ?? 0;
 
@@ -196,12 +198,14 @@ export function LocationDetailSheet({
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
   const batchSwapMutation = useBatchSwapDisplayMutation();
+  const renewDisplayMutation = useRenewDisplayMutation();
   const deleteHistoryMutation = useDeleteDisplayHistoryMutation();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [addDisplayDialogOpen, setAddDisplayDialogOpen] = useState(false);
   const [transferDisplayDialogOpen, setTransferDisplayDialogOpen] = useState(false);
+  const [renewDisplayDialogOpen, setRenewDisplayDialogOpen] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
@@ -366,6 +370,29 @@ export function LocationDetailSheet({
     }
   }
 
+  async function handleRenewDisplays(displayIds: string[]) {
+    if (!locationId || displayIds.length === 0) return;
+    try {
+      await renewDisplayMutation.mutateAsync({
+        locationType,
+        machineId: locationId,
+        displayIds,
+        actorId: user?.personId,
+      });
+      toast({
+        title: "Displays renewed",
+        description: `${displayIds.length} display(s) have been renewed.`,
+      });
+      setRenewDisplayDialogOpen(false);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to renew displays.",
+        variant: "destructive",
+      });
+    }
+  }
+
   function handleDeleteHistoryClick(item: MachineDisplay) {
     setHistoryToDelete(item);
     setHistoryDeleteDialogOpen(true);
@@ -519,6 +546,10 @@ export function LocationDetailSheet({
             <ArrowLeftRight className="h-4 w-4 mr-1" />
             Transfer
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setRenewDisplayDialogOpen(true)}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Renew
+          </Button>
         </div>
       </div>
 
@@ -664,13 +695,21 @@ export function LocationDetailSheet({
                 No display history yet
               </div>
             ) : (
-              historyItems.map((item) => {
-                const product = products.find((p) => p.id === item.productId);
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0"
-                  >
+              (() => {
+                const activeItems = historyItems.filter((item) => !item.endedAt);
+                const pastItems = historyItems.filter((item) => item.endedAt);
+                const renderItem = (item: MachineDisplay, isActive: boolean) => {
+                  const product = products.find((p) => p.id === item.productId);
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "flex items-center gap-2 sm:gap-4 py-3 sm:py-4",
+                        isActive
+                          ? "bg-green-50 dark:bg-green-950/30 rounded-lg px-2 sm:px-3 my-1 border border-green-200 dark:border-green-800"
+                          : "border-b last:border-b-0"
+                      )}
+                    >
                     <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                       {product?.imageUrl ? (
                         <Image
@@ -690,14 +729,21 @@ export function LocationDetailSheet({
                       <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
                       <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                         {format(new Date(item.startedAt), "MMM d")} –{" "}
-                        {format(new Date(item.endedAt!), "MMM d, yyyy")}
+                        {item.endedAt
+                          ? format(new Date(item.endedAt), "MMM d, yyyy")
+                          : "Present"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {!item.endedAt && (
+                        <Badge variant="default" className="text-xs bg-green-600">
+                          Active
+                        </Badge>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {formatDuration(item.startedAt, item.endedAt)}
                       </Badge>
-                      {isAdmin && (
+                      {isAdmin && item.endedAt && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -710,8 +756,18 @@ export function LocationDetailSheet({
                       )}
                     </div>
                   </div>
+                  );
+                };
+                return (
+                  <>
+                    {activeItems.map((item) => renderItem(item, true))}
+                    {activeItems.length > 0 && pastItems.length > 0 && (
+                      <div className="border-b my-3" />
+                    )}
+                    {pastItems.map((item) => renderItem(item, false))}
+                  </>
                 );
-              })
+              })()
             )}
           </div>
         </ScrollArea>
@@ -881,6 +937,15 @@ export function LocationDetailSheet({
         onTransferWithMachine={handleTransferDisplays}
         onSwapWithProducts={handleSwapWithProducts}
         isSubmitting={isTransferring}
+      />
+
+      <RenewDisplayDialog
+        open={renewDisplayDialogOpen}
+        onOpenChange={setRenewDisplayDialogOpen}
+        currentDisplays={activeDisplaysForMachine}
+        products={products}
+        isSaving={renewDisplayMutation.isPending}
+        onSubmit={handleRenewDisplays}
       />
     </>
   );
