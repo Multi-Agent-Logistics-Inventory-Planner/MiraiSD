@@ -391,6 +391,53 @@ export function AdjustStockDialog({
     }
   }
 
+  // Handler for adding preselected product directly to location (without opening AddInventoryDialog)
+  async function handleAddPreselectedProduct() {
+    if (!preselectedProduct || !location.locationType || !location.locationId) {
+      return;
+    }
+
+    const actorId = user?.personId || user?.id;
+    if (!actorId) {
+      toast({ title: "Missing user", description: "Please sign in again." });
+      return;
+    }
+
+    if (quantity < 1) {
+      toast({ title: "Invalid quantity", description: "Quantity must be at least 1." });
+      return;
+    }
+
+    const payload: InventoryRequest = {
+      itemId: preselectedProduct.product.id,
+      quantity,
+      actorId,
+      reason: StockMovementReason.RESTOCK,
+    };
+
+    try {
+      await createInventoryMutation.mutateAsync(payload);
+
+      await queryClient.invalidateQueries({
+        queryKey: [
+          "locationInventory",
+          location.locationType,
+          location.locationId,
+        ],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["productInventoryEntries", preselectedProduct.product.id],
+      });
+
+      toast({ title: "Product added to location" });
+      setQuantity(1);
+      onOpenChange(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to add product";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    }
+  }
+
   const locationLabel = location.locationType
     ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
     : "";
@@ -429,7 +476,7 @@ export function AdjustStockDialog({
                     />
                   )}
               </div>
-              {isProductFilteredMode && preselectedProduct ? (
+              {isProductFilteredMode && preselectedProduct && preselectedProduct.inventoryEntries.length > 0 ? (
                 <ProductLocationSelector
                   inventoryEntries={preselectedProduct.inventoryEntries}
                   value={location}
@@ -442,6 +489,7 @@ export function AdjustStockDialog({
                   value={location}
                   onChange={setLocation}
                   disabled={isAdjusting}
+                  excludeDisplayOnly
                 />
               )}
             </div>
@@ -477,7 +525,74 @@ export function AdjustStockDialog({
           </div>
 
           {/* Products section */}
-          {hasValidLocation && !hasSelectedProduct && !isProductFilteredMode ? (
+          {/* Product-filtered mode with no existing inventory - show add form */}
+          {hasValidLocation &&
+            isProductFilteredMode &&
+            preselectedProduct &&
+            preselectedProduct.inventoryEntries.length === 0 &&
+            !inventoryQuery.isLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center rounded-md border border-dashed p-6 text-center mt-4 gap-4">
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">
+                  {preselectedProduct.product.name}
+                </p>
+                <p>This product doesn&apos;t exist at this location yet.</p>
+              </div>
+              {action === "add" ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Quantity:</Label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleDecrement}
+                        disabled={quantity <= 1 || isSavingInventory}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={quantity}
+                        onChange={(e) => handleQuantityChange(e.target.value)}
+                        className="h-8 w-16 text-center border rounded-md text-sm"
+                        disabled={isSavingInventory}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleIncrement}
+                        disabled={isSavingInventory}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleAddPreselectedProduct}
+                    disabled={isSavingInventory || quantity < 1}
+                    className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+                  >
+                    {isSavingInventory ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    Add to Location
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Switch to &quot;Add&quot; mode to add this product to the location.
+                </p>
+              )}
+            </div>
+          ) : hasValidLocation && !hasSelectedProduct && !isProductFilteredMode ? (
             <div className="flex-1 min-h-0 flex flex-col mt-4">
               <ProductFilterHeader
                 title={listTitle}

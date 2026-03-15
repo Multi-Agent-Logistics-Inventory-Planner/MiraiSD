@@ -133,11 +133,11 @@ export default function LocationsPage() {
             />
           </div>
           {isNotAssigned ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="outline"
                 onClick={() => setAdjustOpen(true)}
-                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
+                className="flex-1 sm:flex-none text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
               >
                 <ArrowUpDown className="mr-2 h-4 w-4" />
                 Adjust
@@ -145,7 +145,7 @@ export default function LocationsPage() {
               <Button
                 variant="outline"
                 onClick={() => setTransferOpen(true)}
-                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
+                className="flex-1 sm:flex-none text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground border-0"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Transfer
@@ -241,6 +241,7 @@ export default function LocationsPage() {
                   setDetailOpen(true);
                 }}
                 pageSize={PAGE_SIZE}
+                locationType={locationType}
               />
 
               <StoragePagination

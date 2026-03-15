@@ -24,10 +24,20 @@ public class LocationAggregateRepository {
             l.id,
             l.location_type,
             l.location_code,
-            COALESCE(i.inventory_records, 0) as inventory_records,
-            COALESCE(i.total_quantity, 0) as total_quantity,
+            CASE
+                WHEN l.location_type IN ('GACHAPON', 'KEYCHAIN_MACHINE')
+                THEN COALESCE(d.active_display_count, 0)
+                ELSE COALESCE(i.inventory_records, 0)
+            END as inventory_records,
+            CASE
+                WHEN l.location_type IN ('GACHAPON', 'KEYCHAIN_MACHINE')
+                THEN COALESCE(d.active_display_count, 0)
+                ELSE COALESCE(i.total_quantity, 0)
+            END as total_quantity,
             l.created_at,
-            l.updated_at
+            l.updated_at,
+            COALESCE(d.active_display_count, 0) as active_display_count,
+            COALESCE(d.active_display_count, 0) > 0 as has_active_display
         FROM (
             SELECT id, 'BOX_BIN' as location_type, box_bin_code as location_code, created_at, updated_at
             FROM box_bins
@@ -80,10 +90,6 @@ public class LocationAggregateRepository {
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM double_claw_machine_inventory GROUP BY double_claw_machine_id
             UNION ALL
-            SELECT keychain_machine_id as location_id, 'KEYCHAIN_MACHINE' as location_type,
-                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
-            FROM keychain_machine_inventory GROUP BY keychain_machine_id
-            UNION ALL
             SELECT four_corner_machine_id as location_id, 'FOUR_CORNER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM four_corner_machine_inventory GROUP BY four_corner_machine_id
@@ -96,6 +102,13 @@ public class LocationAggregateRepository {
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM window_inventory GROUP BY window_id
         ) i ON l.id = i.location_id AND l.location_type = i.location_type
+        LEFT JOIN (
+            SELECT machine_id as location_id, location_type,
+                   COUNT(*) as active_display_count
+            FROM machine_display
+            WHERE ended_at IS NULL
+            GROUP BY machine_id, location_type
+        ) d ON l.id = d.location_id AND l.location_type = d.location_type
         ORDER BY l.location_type, l.location_code
         """;
 
@@ -104,10 +117,20 @@ public class LocationAggregateRepository {
             l.id,
             l.location_type,
             l.location_code,
-            COALESCE(i.inventory_records, 0) as inventory_records,
-            COALESCE(i.total_quantity, 0) as total_quantity,
+            CASE
+                WHEN l.location_type IN ('GACHAPON', 'KEYCHAIN_MACHINE')
+                THEN COALESCE(d.active_display_count, 0)
+                ELSE COALESCE(i.inventory_records, 0)
+            END as inventory_records,
+            CASE
+                WHEN l.location_type IN ('GACHAPON', 'KEYCHAIN_MACHINE')
+                THEN COALESCE(d.active_display_count, 0)
+                ELSE COALESCE(i.total_quantity, 0)
+            END as total_quantity,
             l.created_at,
-            l.updated_at
+            l.updated_at,
+            COALESCE(d.active_display_count, 0) as active_display_count,
+            COALESCE(d.active_display_count, 0) > 0 as has_active_display
         FROM (
             SELECT id, 'BOX_BIN' as location_type, box_bin_code as location_code, created_at, updated_at
             FROM box_bins WHERE 'BOX_BIN' = :locationType
@@ -160,10 +183,6 @@ public class LocationAggregateRepository {
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM double_claw_machine_inventory WHERE 'DOUBLE_CLAW_MACHINE' = :locationType GROUP BY double_claw_machine_id
             UNION ALL
-            SELECT keychain_machine_id as location_id, 'KEYCHAIN_MACHINE' as location_type,
-                   COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
-            FROM keychain_machine_inventory WHERE 'KEYCHAIN_MACHINE' = :locationType GROUP BY keychain_machine_id
-            UNION ALL
             SELECT four_corner_machine_id as location_id, 'FOUR_CORNER_MACHINE' as location_type,
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM four_corner_machine_inventory WHERE 'FOUR_CORNER_MACHINE' = :locationType GROUP BY four_corner_machine_id
@@ -176,6 +195,13 @@ public class LocationAggregateRepository {
                    COUNT(*) as inventory_records, COALESCE(SUM(quantity), 0) as total_quantity
             FROM window_inventory WHERE 'WINDOW' = :locationType GROUP BY window_id
         ) i ON l.id = i.location_id AND l.location_type = i.location_type
+        LEFT JOIN (
+            SELECT machine_id as location_id, location_type,
+                   COUNT(*) as active_display_count
+            FROM machine_display
+            WHERE ended_at IS NULL
+            GROUP BY machine_id, location_type
+        ) d ON l.id = d.location_id AND l.location_type = d.location_type
         ORDER BY l.location_code
         """;
 
@@ -214,6 +240,8 @@ public class LocationAggregateRepository {
                         .totalQuantity(((Number) row[4]).intValue())
                         .createdAt(TimestampUtils.toOffsetDateTime(row[5]))
                         .updatedAt(TimestampUtils.toOffsetDateTime(row[6]))
+                        .activeDisplayCount(((Number) row[7]).intValue())
+                        .hasActiveDisplay((Boolean) row[8])
                         .build())
                 .toList();
     }

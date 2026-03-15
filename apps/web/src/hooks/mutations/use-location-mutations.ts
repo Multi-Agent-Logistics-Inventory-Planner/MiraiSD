@@ -55,9 +55,6 @@ import {
   createDoubleClawMachineInventory,
   updateDoubleClawMachineInventory,
   deleteDoubleClawMachineInventory,
-  createKeychainMachineInventory,
-  updateKeychainMachineInventory,
-  deleteKeychainMachineInventory,
   createFourCornerMachineInventory,
   updateFourCornerMachineInventory,
   deleteFourCornerMachineInventory,
@@ -67,6 +64,7 @@ import {
   createWindowInventory,
   updateWindowInventory,
   deleteWindowInventory,
+  createNotAssignedInventory,
 } from "@/lib/api/inventory";
 
 type LocationPayload = Record<string, string>;
@@ -83,6 +81,15 @@ function invalidateLocationInventory(
   locationType: LocationType,
   locationId: string
 ) {
+  // NOT_ASSIGNED uses different query keys
+  if (locationType === "NOT_ASSIGNED") {
+    return Promise.all([
+      qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
+      qc.invalidateQueries({ queryKey: ["products"] }),
+      qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
+    ]);
+  }
+
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locationInventory", locationType, locationId] }),
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
@@ -216,13 +223,15 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
         case "DOUBLE_CLAW_MACHINE":
           return (await createDoubleClawMachineInventory(locationId, payload)) as any;
         case "KEYCHAIN_MACHINE":
-          return (await createKeychainMachineInventory(locationId, payload)) as any;
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return (await createFourCornerMachineInventory(locationId, payload)) as any;
         case "PUSHER_MACHINE":
           return (await createPusherMachineInventory(locationId, payload)) as any;
         case "WINDOW":
           return (await createWindowInventory(locationId, payload)) as any;
+        case "NOT_ASSIGNED":
+          return (await createNotAssignedInventory(payload)) as any;
         default:
           throw new Error(`Unsupported location type: ${locationType}`);
       }
@@ -253,7 +262,7 @@ export function useUpdateInventoryMutation(
         case "DOUBLE_CLAW_MACHINE":
           return (await updateDoubleClawMachineInventory(locationId, inventoryId, payload)) as any;
         case "KEYCHAIN_MACHINE":
-          return (await updateKeychainMachineInventory(locationId, inventoryId, payload)) as any;
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return (await updateFourCornerMachineInventory(locationId, inventoryId, payload)) as any;
         case "PUSHER_MACHINE":
@@ -290,7 +299,7 @@ export function useDeleteInventoryMutation(
         case "DOUBLE_CLAW_MACHINE":
           return deleteDoubleClawMachineInventory(locationId, inventoryId);
         case "KEYCHAIN_MACHINE":
-          return deleteKeychainMachineInventory(locationId, inventoryId);
+          throw new Error("Keychain Machine is display-only and does not support inventory");
         case "FOUR_CORNER_MACHINE":
           return deleteFourCornerMachineInventory(locationId, inventoryId);
         case "PUSHER_MACHINE":

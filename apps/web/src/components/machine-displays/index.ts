@@ -5,6 +5,4 @@ export {
 } from "./machine-display-filters";
 export type { MachineDisplayFiltersState } from "./machine-display-filters";
 export { SetDisplayDialog } from "./set-display-dialog";
-export { MachineDisplayHistorySheet } from "./machine-display-history-sheet";
-export { MachineDisplayDetailModal } from "./machine-display-detail-modal";
 export { SwapDisplayDialog } from "./swap-display-dialog";

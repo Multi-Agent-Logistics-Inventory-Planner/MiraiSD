@@ -178,7 +178,6 @@ class SupabaseRepo:
             ("cabinet_inventory", "cabinet_id"),
             ("single_claw_machine_inventory", "single_claw_machine_id"),
             ("double_claw_machine_inventory", "double_claw_machine_id"),
-            ("keychain_machine_inventory", "keychain_machine_id"),
             ("pusher_machine_inventory", "pusher_machine_id"),
             ("four_corner_machine_inventory", "four_corner_machine_id"),
             ("window_inventory", "window_id"),

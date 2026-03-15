@@ -6,8 +6,11 @@ import {
   clearDisplayById,
   swapMachineDisplay,
   batchSwapDisplay,
+  renewDisplays,
+  deleteDisplayHistory,
   type SwapMachineDisplayRequest,
   type BatchDisplaySwapRequest,
+  type RenewDisplayRequest,
 } from "@/lib/api/machine-displays";
 import { SetMachineDisplayRequest, SetMachineDisplayBatchRequest, MachineDisplay, LocationType } from "@/types/api";
 
@@ -100,6 +103,36 @@ export function useBatchSwapDisplayMutation() {
 
   return useMutation<MachineDisplay[], Error, BatchDisplaySwapRequest>({
     mutationFn: batchSwapDisplay,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
+    },
+  });
+}
+
+/**
+ * Mutation to renew display records - ends current displays and creates new ones
+ * with fresh startedAt timestamps for the same products.
+ * Used when restocking the same product to reset tracking.
+ */
+export function useRenewDisplayMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<MachineDisplay[], Error, RenewDisplayRequest>({
+    mutationFn: renewDisplays,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
+    },
+  });
+}
+
+/**
+ * Mutation to delete a display history record (Admin only)
+ */
+export function useDeleteDisplayHistoryMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: deleteDisplayHistory,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
     },

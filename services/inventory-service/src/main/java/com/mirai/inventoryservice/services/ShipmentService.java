@@ -8,7 +8,6 @@ import com.mirai.inventoryservice.exceptions.CabinetNotFoundException;
 import com.mirai.inventoryservice.exceptions.DoubleClawMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
-import com.mirai.inventoryservice.exceptions.KeychainMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.exceptions.RackNotFoundException;
 import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
@@ -59,7 +58,6 @@ public class ShipmentService {
     private final BoxBinInventoryRepository boxBinInventoryRepository;
     private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
     private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
-    private final KeychainMachineInventoryRepository keychainMachineInventoryRepository;
     private final CabinetInventoryRepository cabinetInventoryRepository;
     private final RackInventoryRepository rackInventoryRepository;
     private final BoxBinRepository boxBinRepository;
@@ -91,7 +89,6 @@ public class ShipmentService {
             BoxBinInventoryRepository boxBinInventoryRepository,
             SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
             DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
-            KeychainMachineInventoryRepository keychainMachineInventoryRepository,
             CabinetInventoryRepository cabinetInventoryRepository,
             RackInventoryRepository rackInventoryRepository,
             BoxBinRepository boxBinRepository,
@@ -121,7 +118,6 @@ public class ShipmentService {
         this.boxBinInventoryRepository = boxBinInventoryRepository;
         this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
         this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
-        this.keychainMachineInventoryRepository = keychainMachineInventoryRepository;
         this.cabinetInventoryRepository = cabinetInventoryRepository;
         this.rackInventoryRepository = rackInventoryRepository;
         this.boxBinRepository = boxBinRepository;
@@ -750,16 +746,7 @@ public class ShipmentService {
                         inv.setQuantity(0);
                         return inv;
                     });
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository
-                    .findByKeychainMachine_IdAndItem_Id(locationId, product.getId())
-                    .orElseGet(() -> {
-                        KeychainMachineInventory inv = new KeychainMachineInventory();
-                        inv.setKeychainMachine(keychainMachineRepository.findById(locationId)
-                                .orElseThrow(() -> new KeychainMachineNotFoundException("KeychainMachine not found with id: " + locationId)));
-                        inv.setItem(product);
-                        inv.setQuantity(0);
-                        return inv;
-                    });
+            case KEYCHAIN_MACHINE -> throw new IllegalArgumentException("Keychain Machine is display-only and does not support inventory");
             case CABINET -> cabinetInventoryRepository
                     .findByCabinet_IdAndItem_Id(locationId, product.getId())
                     .orElseGet(() -> {
@@ -820,7 +807,6 @@ public class ShipmentService {
             case BoxBinInventory bbi -> bbi.getQuantity();
             case SingleClawMachineInventory scmi -> scmi.getQuantity();
             case DoubleClawMachineInventory dcmi -> dcmi.getQuantity();
-            case KeychainMachineInventory kmi -> kmi.getQuantity();
             case CabinetInventory ci -> ci.getQuantity();
             case RackInventory ri -> ri.getQuantity();
             case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
@@ -835,7 +821,6 @@ public class ShipmentService {
             case BoxBinInventory bbi -> bbi.setQuantity(quantity);
             case SingleClawMachineInventory scmi -> scmi.setQuantity(quantity);
             case DoubleClawMachineInventory dcmi -> dcmi.setQuantity(quantity);
-            case KeychainMachineInventory kmi -> kmi.setQuantity(quantity);
             case CabinetInventory ci -> ci.setQuantity(quantity);
             case RackInventory ri -> ri.setQuantity(quantity);
             case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
@@ -850,7 +835,7 @@ public class ShipmentService {
             case BOX_BIN -> boxBinInventoryRepository.save((BoxBinInventory) inventory).getId();
             case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.save((SingleClawMachineInventory) inventory).getId();
             case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.save((DoubleClawMachineInventory) inventory).getId();
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.save((KeychainMachineInventory) inventory).getId();
+            case KEYCHAIN_MACHINE -> throw new IllegalArgumentException("Keychain Machine is display-only and does not support inventory");
             case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory).getId();
             case RACK -> rackInventoryRepository.save((RackInventory) inventory).getId();
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory).getId();
@@ -873,8 +858,7 @@ public class ShipmentService {
                     .findBySingleClawMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
             case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository
                     .findByDoubleClawMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository
-                    .findByKeychainMachine_IdAndItem_Id(locationId, product.getId()).orElse(null);
+            case KEYCHAIN_MACHINE -> throw new IllegalArgumentException("Keychain Machine is display-only and does not support inventory");
             case CABINET -> cabinetInventoryRepository
                     .findByCabinet_IdAndItem_Id(locationId, product.getId()).orElse(null);
             case RACK -> rackInventoryRepository
@@ -1030,7 +1014,7 @@ public class ShipmentService {
             case BOX_BIN -> boxBinInventoryRepository.delete((BoxBinInventory) inventory);
             case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
             case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
-            case KEYCHAIN_MACHINE -> keychainMachineInventoryRepository.delete((KeychainMachineInventory) inventory);
+            case KEYCHAIN_MACHINE -> throw new IllegalArgumentException("Keychain Machine is display-only and does not support inventory");
             case CABINET -> cabinetInventoryRepository.delete((CabinetInventory) inventory);
             case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
             case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);

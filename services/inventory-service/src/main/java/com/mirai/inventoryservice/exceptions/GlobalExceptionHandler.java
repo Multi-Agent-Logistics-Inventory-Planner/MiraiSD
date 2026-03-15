@@ -32,7 +32,6 @@ public class GlobalExceptionHandler {
             CabinetInventoryNotFoundException.class,
             DoubleClawMachineInventoryNotFoundException.class,
             FourCornerMachineInventoryNotFoundException.class,
-            KeychainMachineInventoryNotFoundException.class,
             PusherMachineInventoryNotFoundException.class,
             RackInventoryNotFoundException.class,
             SingleClawMachineInventoryNotFoundException.class,
