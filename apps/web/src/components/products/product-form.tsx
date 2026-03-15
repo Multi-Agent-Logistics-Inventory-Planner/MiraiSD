@@ -41,7 +41,7 @@ import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
-import { KujiPrizesDialog } from "./kuji-prizes-dialog";
+import { PrizeTableInline, type PendingPrize } from "./prize-table-inline";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import { LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
@@ -100,9 +100,9 @@ export function ProductForm({
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
-  // Kuji prizes dialog state
-  const [kujiPrizesOpen, setKujiPrizesOpen] = useState(false);
-  const [newKujiProduct, setNewKujiProduct] = useState<{ id: string; name: string; categoryId: string } | null>(null);
+  // Kuji detection and inline prizes state
+  const [isKujiCategory, setIsKujiCategory] = useState(false);
+  const [pendingPrizes, setPendingPrizes] = useState<PendingPrize[]>([]);
   // Track root category and subcategory separately for UI
   const [rootCategoryId, setRootCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
@@ -186,12 +186,13 @@ export function ProductForm({
       resetImage();
     }
 
-    // Always reset initial stock fields when dialog opens/closes
+    // Always reset initial stock fields and pending prizes when dialog opens/closes
     setInitialStockEnabled(false);
     setInitialStockLocation(NOT_ASSIGNED_LOCATION);
     setInitialStockQty("");
     setInitialStockQtyError("");
     setLocationError("");
+    setPendingPrizes([]);
   }, [open, initialProduct, form, resetImage]);
 
   // Update categoryId based on subcategory selection
@@ -202,6 +203,19 @@ export function ProductForm({
       form.setValue("categoryId", rootCategoryId, { shouldValidate: true });
     }
   }, [subcategoryId, rootCategoryId, form]);
+
+  // Detect Kuji category and reset prizes when category changes
+  useEffect(() => {
+    if (!categories) return;
+    const selectedCategory = categories.find((c) => c.id === rootCategoryId);
+    const isKuji =
+      selectedCategory?.name.toLowerCase() === "kuji" ||
+      selectedCategory?.slug?.toLowerCase() === "kuji";
+    setIsKujiCategory(isKuji);
+    if (!isKuji) {
+      setPendingPrizes([]);
+    }
+  }, [rootCategoryId, categories]);
 
   const isSaving =
     createMutation.isPending ||
@@ -309,27 +323,34 @@ export function ProductForm({
           }
         }
 
-        // Check if this is a Kuji product - open prizes dialog to add prizes
-        const selectedCategory = categories?.find((c) => c.id === rootCategoryId);
-        const selectedSubcategory = subcategoryId
-          ? childCategories.find((c) => c.id === subcategoryId)
-          : null;
-        const isKuji =
-          selectedCategory?.name.toLowerCase() === "kuji" ||
-          selectedCategory?.slug?.toLowerCase() === "kuji" ||
-          selectedSubcategory?.name.toLowerCase() === "kuji" ||
-          selectedSubcategory?.slug?.toLowerCase() === "kuji";
+        // Create pending prizes for Kuji products
+        if (isKujiCategory && pendingPrizes.length > 0 && !parentId) {
+          let prizesFailed = 0;
+          for (const prize of pendingPrizes) {
+            try {
+              await createMutation.mutateAsync({
+                parentId: newProduct.id,
+                categoryId: values.categoryId,
+                letter: prize.letter,
+                templateQuantity: prize.templateQuantity ?? undefined,
+                name: `Prize ${prize.letter}`,
+                initialStock: prize.quantity ?? undefined,
+              });
+            } catch (err) {
+              prizesFailed++;
+              console.error("Failed to create prize:", err);
+            }
+          }
 
-        if (isKuji && !parentId) {
-          // Open prizes dialog so user can add prizes without leaving the page
-          setNewKujiProduct({
-            id: newProduct.id,
-            name: newProduct.name,
-            categoryId: values.categoryId,
-          });
-          onOpenChange(false);
-          setKujiPrizesOpen(true);
-          return;
+          if (prizesFailed > 0) {
+            toast({
+              title: "Some prizes not added",
+              description: `${prizesFailed} prize(s) failed to create.`,
+              variant: "destructive",
+            });
+          } else {
+            toast({ title: `${pendingPrizes.length} prize(s) added` });
+          }
         }
       }
       onOpenChange(false);
@@ -483,42 +504,45 @@ export function ProductForm({
                   ) : null}
                 </div>
 
-                <div className="grid gap-2">
-                  <Label>Subcategory</Label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={subcategoryId}
-                      onValueChange={(v) =>
-                        setSubcategoryId(v === "__none__" ? "" : v)
-                      }
-                      disabled={!hasChildCategories}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue
-                          placeholder={hasChildCategories ? "Select" : "N/A"}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {childCategories.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setAddSubcategoryOpen(true)}
-                      disabled={!rootCategoryId}
-                      title="Add new subcategory"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                {/* Hide subcategory for Kuji products */}
+                {!isKujiCategory && (
+                  <div className="grid gap-2">
+                    <Label>Subcategory</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={subcategoryId}
+                        onValueChange={(v) =>
+                          setSubcategoryId(v === "__none__" ? "" : v)
+                        }
+                        disabled={!hasChildCategories}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue
+                            placeholder={hasChildCategories ? "Select" : "N/A"}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {childCategories.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setAddSubcategoryOpen(true)}
+                        disabled={!rootCategoryId}
+                        title="Add new subcategory"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -595,7 +619,7 @@ export function ProductForm({
                       </div>
 
                       <div className="grid gap-2">
-                        <Label htmlFor="initial-stock-qty">Quantity</Label>
+                        <Label htmlFor="initial-stock-qty">{isKujiCategory ? "Sets" : "Quantity"}</Label>
                         <div className="flex items-center gap-2">
                           <Button
                             type="button"
@@ -662,6 +686,33 @@ export function ProductForm({
                   )}
                 </div>
               )}
+
+              {/* Inline prizes section for Kuji - create mode only */}
+              {!initialProduct && isKujiCategory && (
+                <div className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Prizes</span>
+                    <span className="text-xs text-muted-foreground">
+                      {pendingPrizes.length} prize{pendingPrizes.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <PrizeTableInline
+                    prizes={pendingPrizes}
+                    onAddPrize={(prize) => {
+                      setPendingPrizes((prev) => [
+                        ...prev,
+                        { ...prize, tempId: crypto.randomUUID() },
+                      ]);
+                    }}
+                    onDeletePrize={(tempId) => {
+                      setPendingPrizes((prev) =>
+                        prev.filter((p) => p.tempId !== tempId)
+                      );
+                    }}
+                    disabled={isSaving}
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter className="px-6 py-4">
@@ -704,19 +755,6 @@ export function ProductForm({
         open={manageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
       />
-
-      {newKujiProduct && (
-        <KujiPrizesDialog
-          open={kujiPrizesOpen}
-          onOpenChange={(open) => {
-            setKujiPrizesOpen(open);
-            if (!open) setNewKujiProduct(null);
-          }}
-          productId={newKujiProduct.id}
-          productName={newKujiProduct.name}
-          categoryId={newKujiProduct.categoryId}
-        />
-      )}
     </>
   );
 }

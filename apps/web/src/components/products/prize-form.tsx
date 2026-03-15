@@ -20,6 +20,10 @@ import { useCreateProductMutation } from "@/hooks/mutations/use-product-mutation
 
 const schema = z.object({
   letter: z.string().min(1, "Letter is required").max(50, "Max 50 characters"),
+  templateQuantity: z
+    .union([z.string(), z.number()])
+    .transform((v) => (v === "" || v === undefined ? null : Number(v)))
+    .refine((v) => v === null || (Number.isInteger(v) && v >= 0), "Must be 0 or greater"),
   quantity: z
     .union([z.string(), z.number()])
     .transform((v) => (v === "" || v === undefined ? null : Number(v)))
@@ -52,13 +56,14 @@ export function PrizeForm({
     resolver: zodResolver(schema),
     defaultValues: {
       letter: "",
+      templateQuantity: null,
       quantity: null,
     },
   });
 
   useEffect(() => {
     if (!open) {
-      form.reset({ letter: "", quantity: null });
+      form.reset({ letter: "", templateQuantity: null, quantity: null });
     }
   }, [open, form]);
 
@@ -70,10 +75,16 @@ export function PrizeForm({
     const hasInitialStock = quantity != null && quantity > 0;
     const letter = values.letter.trim().slice(0, 50);
 
+    const templateQuantity =
+      values.templateQuantity !== null && values.templateQuantity !== undefined
+        ? Number(values.templateQuantity)
+        : undefined;
+
     const payload = {
       parentId,
       categoryId: parentCategoryId,
       letter,
+      templateQuantity,
       name: `Prize ${letter}`, // Auto-generate name from letter
       initialStock: hasInitialStock ? quantity : undefined,
     };
@@ -104,7 +115,7 @@ export function PrizeForm({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="letter">Letter</Label>
               <Input
@@ -117,6 +128,22 @@ export function PrizeForm({
               {form.formState.errors.letter?.message && (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.letter.message}
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="templateQuantity">Qty/Set</Label>
+              <Input
+                id="templateQuantity"
+                type="number"
+                min={0}
+                placeholder="e.g. 10"
+                {...form.register("templateQuantity")}
+              />
+              {form.formState.errors.templateQuantity?.message && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.templateQuantity.message}
                 </p>
               )}
             </div>

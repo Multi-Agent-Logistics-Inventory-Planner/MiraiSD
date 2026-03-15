@@ -50,6 +50,10 @@ public class Product {
     @Column(length = 50)
     private String letter;
 
+    /** Quantity per kuji set for prize products. Used to auto-calculate ordered/received quantities. */
+    @Column(name = "template_quantity")
+    private Integer templateQuantity;
+
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default

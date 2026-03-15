@@ -60,7 +60,7 @@ public class ProductService {
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
-                                 String letter, String name, String description, Integer reorderPoint,
+                                 String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
                                  Integer initialStock) {
@@ -94,6 +94,7 @@ public class ProductService {
         Product product = Product.builder()
                 .sku(sku)
                 .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(50, letter.trim().length())) : null)
+                .templateQuantity(templateQuantity)
                 .category(category)
                 .parent(parent)
                 .name(name)
@@ -112,17 +113,26 @@ public class ProductService {
         // Broadcast product creation so clients refresh product lists/details
         broadcastService.broadcastProductUpdated(List.of(savedProduct.getId().toString()));
 
-        // If initial stock provided, create tracked inventory in NotAssigned
+        // If initial stock provided, create inventory
+        // Only create tracked inventory (with audit log) for parent products
+        // Prize products (with parentId) skip audit logging
         if (initialStock != null && initialStock > 0) {
-            stockMovementService.createInventoryWithTracking(
-                    LocationType.NOT_ASSIGNED,
-                    null,
-                    savedProduct,
-                    initialStock,
-                    StockMovementReason.INITIAL_STOCK,
-                    null,
-                    "Initial stock on product creation"
-            );
+            if (parentId == null) {
+                // Parent product - create tracked inventory with audit log
+                stockMovementService.createInventoryWithTracking(
+                        LocationType.NOT_ASSIGNED,
+                        null,
+                        savedProduct,
+                        initialStock,
+                        StockMovementReason.INITIAL_STOCK,
+                        null,
+                        "Initial stock on product creation"
+                );
+            } else {
+                // Prize product - just set quantity without audit log
+                savedProduct.setQuantity(initialStock);
+                savedProduct = productRepository.save(savedProduct);
+            }
         }
 
         return savedProduct;
@@ -159,7 +169,7 @@ public class ProductService {
     }
 
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
-                                 String letter, String name, String description, Integer reorderPoint,
+                                 String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
                                  Boolean clearParent) {
@@ -195,6 +205,7 @@ public class ProductService {
             String trimmed = letter.trim();
             product.setLetter(trimmed.isEmpty() ? null : trimmed.substring(0, Math.min(50, trimmed.length())));
         }
+        if (templateQuantity != null) product.setTemplateQuantity(templateQuantity);
         if (categoryId != null) {
             Category newCategory = categoryService.getCategoryById(categoryId);
             product.setCategory(newCategory);
