@@ -60,6 +60,7 @@ export function LocationTable({
     <div className={GRID}>
       {items.map((item) => {
         const hasContent = isDisplayOnly ? item.hasActiveDisplay : item.totalQuantity > 0;
+        const isActive = hasContent || item.hasActiveDisplay;
         return (
           <button
             key={item.id}
@@ -68,14 +69,14 @@ export function LocationTable({
               "group relative min-w-0 cursor-pointer rounded-xl border bg-card p-3 sm:p-4 text-left transition-all",
               "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              !hasContent && "opacity-55"
+              !isActive && "opacity-55"
             )}
             onClick={() => onRowClick(item)}
           >
             {/* Status dots */}
             <div className="absolute top-3 right-3 flex items-center gap-1">
-              {/* Blue display indicator dot (for display-only locations with active display) */}
-              {isDisplayOnly && item.hasActiveDisplay && (
+              {/* Blue display indicator dot */}
+              {item.hasActiveDisplay && (
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
               )}
               {/* Green/gray occupancy status dot (hidden for display-only locations with active display) */}
