@@ -74,17 +74,19 @@ export function LocationTable({
           >
             {/* Status dots */}
             <div className="absolute top-3 right-3 flex items-center gap-1">
-              {/* Blue display indicator dot */}
-              {item.hasActiveDisplay && (
+              {/* Blue display indicator dot (for display-only locations with active display) */}
+              {isDisplayOnly && item.hasActiveDisplay && (
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
               )}
-              {/* Green/gray occupancy status dot */}
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full transition-colors",
-                  hasContent ? "bg-emerald-500" : "bg-muted-foreground/25"
-                )}
-              />
+              {/* Green/gray occupancy status dot (hidden for display-only locations with active display) */}
+              {!(isDisplayOnly && item.hasActiveDisplay) && (
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full transition-colors",
+                    hasContent ? "bg-emerald-500" : "bg-muted-foreground/25"
+                  )}
+                />
+              )}
             </div>
 
             {/* Location code */}
@@ -93,19 +95,21 @@ export function LocationTable({
             </p>
 
             {/* Stats */}
-            {isDisplayOnly ? (
-              <div className="mt-3 text-center">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Products</span>
-                <p className="text-sm font-semibold tabular-nums text-muted-foreground">{item.activeDisplayCount}</p>
-              </div>
-            ) : (
-              <div className="mt-3 grid grid-cols-2 gap-x-2">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Items</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wide text-right">Units</span>
-                <span className="text-sm font-semibold tabular-nums text-muted-foreground">{item.inventoryRecords}</span>
-                <span className="text-sm font-semibold tabular-nums text-right text-muted-foreground">{item.totalQuantity}</span>
-              </div>
-            )}
+            <div className="mt-3 grid grid-cols-2 gap-x-2">
+              {isDisplayOnly ? (
+                <>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wide col-span-2">Products</span>
+                  <span className="text-sm font-semibold tabular-nums text-muted-foreground col-span-2">{item.activeDisplayCount}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Items</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wide text-right">Units</span>
+                  <span className="text-sm font-semibold tabular-nums text-muted-foreground">{item.inventoryRecords}</span>
+                  <span className="text-sm font-semibold tabular-nums text-right text-muted-foreground">{item.totalQuantity}</span>
+                </>
+              )}
+            </div>
           </button>
         );
       })}
