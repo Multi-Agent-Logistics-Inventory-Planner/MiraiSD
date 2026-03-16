@@ -5,7 +5,7 @@ import {
   AlertTriangle,
   Info,
   Trash2,
-  CheckCircle,
+  Archive,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -71,8 +71,12 @@ function getTypeLabel(type: NotificationTypeEnum) {
       return "Expiry Warning";
     case NotificationTypeEnum.SYSTEM_ALERT:
       return "System Alert";
-    case NotificationTypeEnum.UNASSIGNED_ITEM:
-      return "Unassigned Item";
+    case NotificationTypeEnum.SHIPMENT_COMPLETED:
+      return "Shipment Completed";
+    case NotificationTypeEnum.SHIPMENT_DAMAGED:
+      return "Damaged Items";
+    case NotificationTypeEnum.DISPLAY_STALE:
+      return "Stale Display";
     default:
       return type;
   }
@@ -155,10 +159,10 @@ export function NotificationDetailDialog({
                 <p className="text-muted-foreground text-xs mb-1">Created</p>
                 <p className="font-medium">{formatDate(notification.createdAt)}</p>
               </div>
-              {notification.deliveredAt && (
+              {notification.readAt && (
                 <div>
                   <p className="text-muted-foreground text-xs mb-1">Read</p>
-                  <p className="font-medium">{formatDate(notification.deliveredAt)}</p>
+                  <p className="font-medium">{formatDate(notification.readAt)}</p>
                 </div>
               )}
               {notification.resolvedAt && (
@@ -171,7 +175,7 @@ export function NotificationDetailDialog({
                 <>
                   {notification.itemId && (
                     <div>
-                      <p className="text-muted-foreground text-xs mb-1">Item</p>
+                      <p className="text-muted-foreground text-xs mb-1">Product</p>
                       <p className="font-medium text-sm">
                         {notification.itemName ?? notification.itemId}
                       </p>
@@ -216,8 +220,8 @@ export function NotificationDetailDialog({
               </Button>
             ) : (
               <Button variant="outline" size="sm" onClick={handleResolve}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Resolve
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
               </Button>
             )}
             <Button variant="destructive" size="sm" onClick={handleDelete}>

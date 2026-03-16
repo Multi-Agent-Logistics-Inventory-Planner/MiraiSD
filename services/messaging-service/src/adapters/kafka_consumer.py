@@ -222,6 +222,7 @@ class KafkaEventConsumer:
                 # Product config
                 reorder_point=payload.reorder_point,
                 sku=payload.sku,
+                product_name=payload.product_name,
                 # Actor and reference
                 actor_id=payload.actor_id,
                 stock_movement_id=payload.stock_movement_id,

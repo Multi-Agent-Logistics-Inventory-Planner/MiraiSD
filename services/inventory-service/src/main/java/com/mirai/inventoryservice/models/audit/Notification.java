@@ -69,5 +69,8 @@ public class Notification {
 
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
+
+    @Column(name = "read_at")
+    private OffsetDateTime readAt;
 }
 

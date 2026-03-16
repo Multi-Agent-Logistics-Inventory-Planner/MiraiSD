@@ -336,8 +336,6 @@ class MessagingWorker:
 
         # Map alert type to notification type and severity
         type_map = {
-            AlertType.LOCATION_OUT_OF_STOCK: ("OUT_OF_STOCK", "CRITICAL"),
-            AlertType.LOCATION_LOW_STOCK: ("LOW_STOCK", "WARNING"),
             AlertType.TOTAL_OUT_OF_STOCK: ("OUT_OF_STOCK", "CRITICAL"),
             AlertType.TOTAL_LOW_STOCK: ("LOW_STOCK", "WARNING"),
         }
@@ -347,11 +345,7 @@ class MessagingWorker:
         message = self._build_alert_message(event, alert)
 
         # Build dedupe_key for idempotency
-        # Format: {alert_scope}:{item_id}:{location_code_if_applicable}
-        if alert.alert_type in (AlertType.LOCATION_OUT_OF_STOCK, AlertType.LOCATION_LOW_STOCK):
-            dedupe_key = f"{alert.alert_type.value}:{event.item_id}:{alert.location_code}"
-        else:
-            dedupe_key = f"{alert.alert_type.value}:{event.item_id}"
+        dedupe_key = f"{alert.alert_type.value}:{event.item_id}"
 
         # Build metadata for UI display
         metadata = {
@@ -404,27 +398,19 @@ class MessagingWorker:
         Returns:
             Message string for notification
         """
+        product_name = event.product_name or "Product"
         sku_suffix = f" (SKU: {event.sku})" if event.sku else ""
 
-        if alert.alert_type == AlertType.LOCATION_OUT_OF_STOCK:
-            return f"Out of stock at location {alert.location_code}{sku_suffix}"
-
-        if alert.alert_type == AlertType.LOCATION_LOW_STOCK:
-            return (
-                f"Low stock at {alert.location_code}: "
-                f"{alert.current_qty} units (below threshold of {alert.threshold}){sku_suffix}"
-            )
-
         if alert.alert_type == AlertType.TOTAL_OUT_OF_STOCK:
-            return f"Product is now completely out of stock{sku_suffix}"
+            return f"{product_name} is now out of stock{sku_suffix}"
 
         if alert.alert_type == AlertType.TOTAL_LOW_STOCK:
             return (
-                f"Total inventory low: "
-                f"{alert.current_qty} units (below reorder point of {alert.threshold}){sku_suffix}"
+                f"{product_name} inventory is low: "
+                f"{alert.current_qty} units remaining (reorder point: {alert.threshold}){sku_suffix}"
             )
 
-        return f"Stock alert: {alert.reason}{sku_suffix}"
+        return f"Stock alert for {product_name}: {alert.reason}{sku_suffix}"
 
 
 def main() -> None:
@@ -438,7 +424,6 @@ def main() -> None:
     logger.info("Consumer Group: %s", config.KAFKA_CONSUMER_GROUP)
     logger.info("Slack Enabled: %s", config.SLACK_ENABLED)
     logger.info("Notification Poll Interval: %.1fs", config.NOTIFICATION_POLL_INTERVAL)
-    logger.info("Location Low Stock Threshold: %d", config.LOCATION_LOW_STOCK_THRESHOLD)
     logger.info("Review Scheduler: %s", "enabled" if config.APIFY_API_TOKEN else "disabled")
     logger.info("=" * 60)
 

@@ -42,5 +42,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     // Count resolved notifications
     long countByResolvedAtIsNotNull();
+
+    // Count unread active notifications (not resolved AND not read by user)
+    long countByResolvedAtIsNullAndReadAtIsNull();
 }
 

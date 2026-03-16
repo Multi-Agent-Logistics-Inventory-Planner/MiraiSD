@@ -49,6 +49,15 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
+    /**
+     * Mark notification as read by user in UI (separate from Slack delivery).
+     */
+    public Notification markAsUserRead(UUID id) {
+        Notification notification = getNotificationById(id);
+        notification.setReadAt(OffsetDateTime.now());
+        return notificationRepository.save(notification);
+    }
+
     public void deleteNotification(UUID id) {
         Notification notification = getNotificationById(id);
         notificationRepository.delete(notification);
@@ -85,6 +94,10 @@ public class NotificationService {
 
     public long countResolved() {
         return notificationRepository.countByResolvedAtIsNotNull();
+    }
+
+    public long countUnread() {
+        return notificationRepository.countByResolvedAtIsNullAndReadAtIsNull();
     }
 
     public Notification createNotification(Notification notification) {
