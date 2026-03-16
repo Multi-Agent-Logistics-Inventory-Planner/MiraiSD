@@ -258,17 +258,6 @@ export function ShipmentCreateDialog({
     });
   }, [childrenByProductId, form, items]);
 
-  function generateShipmentNumber() {
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-    return `SHP-${year}${month}${day}-${random}`;
-  }
-
   function handleSelectProduct(index: number, product: Product) {
     form.setValue(`items.${index}.productId`, product.id);
     form.setValue(`items.${index}.productName`, product.name);
