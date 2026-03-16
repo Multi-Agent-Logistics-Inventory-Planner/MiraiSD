@@ -14,6 +14,7 @@ import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.enums.UserRole;
 import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
+import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.models.shipment.Shipment;
@@ -23,6 +24,7 @@ import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
 import com.mirai.inventoryservice.repositories.BoxBinRepository;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
+import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
@@ -88,6 +90,7 @@ public class DevSeedController {
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final ReviewDailyCountRepository reviewDailyCountRepository;
+    private final MachineDisplayRepository machineDisplayRepository;
 
     private final Random random = new Random();
 
@@ -533,9 +536,9 @@ public class DevSeedController {
                     message = String.format("Stock update: %s (%s) inventory adjusted", product.getName(), product.getSku());
                 }
                 default -> {
-                    type = NotificationType.UNASSIGNED_ITEM;
+                    type = NotificationType.DISPLAY_STALE;
                     severity = NotificationSeverity.WARNING;
-                    message = String.format("Unassigned: %s (%s) needs location", product.getName(), product.getSku());
+                    message = String.format("Stale display: %s (%s) has been on display for over 45 days", product.getName(), product.getSku());
                 }
             }
 
@@ -1030,6 +1033,62 @@ public class DevSeedController {
             "success", true,
             "stockMovementsDeleted", seedMovements.size(),
             "auditLogsDeleted", auditLogsDeleted
+        ));
+    }
+
+    /**
+     * Seed a stale display for testing the DISPLAY_STALE notification.
+     * Creates an active display that started 50 days ago (past the 45-day threshold).
+     */
+    @PostMapping("/seed/stale-display")
+    public ResponseEntity<Map<String, Object>> seedStaleDisplay(
+            @RequestParam(defaultValue = "50") @Min(1) @Max(365) int daysAgo) {
+
+        List<Product> products = productRepository.findAll();
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        // Pick a random product
+        Product product = products.get(random.nextInt(products.size()));
+
+        // Create a stale display
+        MachineDisplay staleDisplay = MachineDisplay.builder()
+            .locationType(LocationType.SINGLE_CLAW_MACHINE)
+            .machineId(UUID.randomUUID()) // Random machine ID
+            .product(product)
+            .startedAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(daysAgo))
+            .endedAt(null) // Still active
+            .build();
+
+        machineDisplayRepository.save(staleDisplay);
+
+        log.info("Seeded stale display: product={}, daysAgo={}", product.getName(), daysAgo);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "displayId", staleDisplay.getId().toString(),
+            "productName", product.getName(),
+            "productSku", product.getSku(),
+            "daysActive", daysAgo,
+            "startedAt", staleDisplay.getStartedAt().toString()
+        ));
+    }
+
+    @DeleteMapping("/seed/stale-displays")
+    public ResponseEntity<Map<String, Object>> clearStaleDisplays() {
+        OffsetDateTime threshold = OffsetDateTime.now(ZoneOffset.UTC).minusDays(45);
+        List<MachineDisplay> staleDisplays = machineDisplayRepository.findStaleDisplays(threshold);
+
+        machineDisplayRepository.deleteAll(staleDisplays);
+
+        log.info("Cleared {} stale displays", staleDisplays.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "deletedCount", staleDisplays.size()
         ));
     }
 }

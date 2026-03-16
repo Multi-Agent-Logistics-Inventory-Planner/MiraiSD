@@ -55,6 +55,7 @@ public class StockMovementService {
     private final WindowRepository windowRepository;
     private final EntityManager entityManager;
     private final SupabaseBroadcastService broadcastService;
+    private final EventOutboxService eventOutboxService;
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
@@ -80,7 +81,8 @@ public class StockMovementService {
             PusherMachineRepository pusherMachineRepository,
             WindowRepository windowRepository,
             EntityManager entityManager,
-            SupabaseBroadcastService broadcastService) {
+            SupabaseBroadcastService broadcastService,
+            @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
         this.stockMovementRepository = stockMovementRepository;
         this.auditLogRepository = auditLogRepository;
         this.productRepository = productRepository;
@@ -105,6 +107,7 @@ public class StockMovementService {
         this.windowRepository = windowRepository;
         this.entityManager = entityManager;
         this.broadcastService = broadcastService;
+        this.eventOutboxService = eventOutboxService;
     }
 
     /**
@@ -174,6 +177,7 @@ public class StockMovementService {
                 .build();
 
         StockMovement savedMovement = stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(savedMovement);
 
         // Update product active status based on total inventory
         boolean productChanged = updateProductActiveStatus(savedMovement.getItem());
@@ -362,8 +366,10 @@ public class StockMovementService {
                 .metadata(depositMetadata)
                 .build();
 
-        stockMovementRepository.save(withdrawal);
-        stockMovementRepository.save(deposit);
+        StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
+        StockMovement savedDeposit = stockMovementRepository.save(deposit);
+        eventOutboxService.createStockMovementEvent(savedWithdrawal);
+        eventOutboxService.createStockMovementEvent(savedDeposit);
 
         updateProductActiveStatus(getInventoryProduct(sourceInventory));
     }
@@ -444,7 +450,8 @@ public class StockMovementService {
                 .metadata(metadata)
                 .build();
 
-        stockMovementRepository.save(movement);
+        StockMovement savedMovement = stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(savedMovement);
 
         // Update product active status
         boolean productChanged = updateProductActiveStatus(product);
@@ -517,7 +524,8 @@ public class StockMovementService {
                 .metadata(metadata)
                 .build();
 
-        stockMovementRepository.save(movement);
+        StockMovement savedMovement = stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(savedMovement);
 
         // Update product active status
         boolean productChanged = updateProductActiveStatus(product);
