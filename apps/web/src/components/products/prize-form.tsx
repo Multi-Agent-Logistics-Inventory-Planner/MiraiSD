@@ -22,12 +22,12 @@ const schema = z.object({
   letter: z.string().min(1, "Letter is required").max(50, "Max 50 characters"),
   templateQuantity: z
     .union([z.string(), z.number()])
-    .transform((v) => (v === "" || v === undefined ? null : Number(v)))
-    .refine((v) => v === null || (Number.isInteger(v) && v >= 0), "Must be 0 or greater"),
+    .transform((v) => (v === "" || v === undefined ? 0 : Number(v)))
+    .refine((v) => Number.isInteger(v) && v >= 0, "Must be 0 or greater"),
   quantity: z
     .union([z.string(), z.number()])
-    .transform((v) => (v === "" || v === undefined ? null : Number(v)))
-    .refine((v) => v === null || (Number.isInteger(v) && v >= 0), "Must be 0 or greater"),
+    .transform((v) => (v === "" || v === undefined ? 0 : Number(v)))
+    .refine((v) => Number.isInteger(v) && v >= 0, "Must be 0 or greater"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -56,14 +56,14 @@ export function PrizeForm({
     resolver: zodResolver(schema),
     defaultValues: {
       letter: "",
-      templateQuantity: null,
-      quantity: null,
+      templateQuantity: 0,
+      quantity: 0,
     },
   });
 
   useEffect(() => {
     if (!open) {
-      form.reset({ letter: "", templateQuantity: null, quantity: null });
+      form.reset({ letter: "", templateQuantity: 0, quantity: 0 });
     }
   }, [open, form]);
 

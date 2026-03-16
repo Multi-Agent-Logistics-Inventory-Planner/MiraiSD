@@ -224,6 +224,18 @@ export function ProductForm({
     isAddingStock;
 
   async function onSubmit(values: FormValues) {
+    // Validate initial stock BEFORE creating product to avoid partial state
+    if (!initialProduct && initialStockEnabled) {
+      if (initialStockQty === "") {
+        setInitialStockQtyError("Quantity is required");
+        return;
+      }
+      if (!initialStockLocation.locationType || !initialStockLocation.locationId) {
+        setLocationError("Location is required");
+        return;
+      }
+    }
+
     // Upload image first if a new file was selected
     let imageUrl: string | undefined = values.imageUrl || undefined;
     const oldImageUrl = initialProduct?.imageUrl;
@@ -277,27 +289,11 @@ export function ProductForm({
         toast({ title: "Product created" });
         onProductCreated?.(newProduct);
 
-        // Optionally add initial stock after product creation
-        if (initialStockEnabled && initialStockQty === "") {
-          setInitialStockQtyError("Quantity is required");
-          return;
-        }
-
-        if (
-          initialStockEnabled &&
-          (!initialStockLocation.locationType ||
-            !initialStockLocation.locationId)
-        ) {
-          setLocationError("Location is required");
-          return;
-        }
-
+        // Add initial stock if enabled (validation already done at start of submit)
         if (
           initialStockEnabled &&
           initialStockQty !== "" &&
-          initialStockQty > 0 &&
-          initialStockLocation.locationType &&
-          initialStockLocation.locationId
+          initialStockQty > 0
         ) {
           setIsAddingStock(true);
           try {
@@ -324,21 +320,22 @@ export function ProductForm({
         }
 
         // Create pending prizes for Kuji products
-        if (isKujiCategory && pendingPrizes.length > 0 && !parentId) {
+        if (pendingPrizes.length > 0 && !parentId) {
           let prizesFailed = 0;
           for (const prize of pendingPrizes) {
             try {
-              await createMutation.mutateAsync({
+              const prizePayload = {
                 parentId: newProduct.id,
                 categoryId: values.categoryId,
                 letter: prize.letter,
-                templateQuantity: prize.templateQuantity ?? undefined,
+                templateQuantity: prize.templateQuantity,
                 name: `Prize ${prize.letter}`,
-                initialStock: prize.quantity ?? undefined,
-              });
+                initialStock: prize.quantity > 0 ? prize.quantity : undefined,
+              };
+              await createMutation.mutateAsync(prizePayload);
             } catch (err) {
               prizesFailed++;
-              console.error("Failed to create prize:", err);
+              console.error("Failed to create prize:", prize.letter, err);
             }
           }
 
