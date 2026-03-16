@@ -52,9 +52,9 @@ BEGIN
                 severity_val := 'INFO';
                 message_text := format('Stock level update: %s (%s) inventory has been adjusted', product_record.name, product_record.sku);
             ELSE
-                notification_type := 'UNASSIGNED_ITEM';
+                notification_type := 'DISPLAY_STALE';
                 severity_val := 'WARNING';
-                message_text := format('Unassigned inventory: %s (%s) needs location assignment', product_record.name, product_record.sku);
+                message_text := format('Stale display: %s (%s) has been on display for over 45 days', product_record.name, product_record.sku);
         END CASE;
 
         -- Some notifications are resolved, others are active
