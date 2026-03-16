@@ -5,6 +5,7 @@ import com.mirai.inventoryservice.exceptions.ProductInUseException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
@@ -39,6 +40,7 @@ public class ProductService {
     private final StockMovementRepository stockMovementRepository;
     private final ShipmentItemRepository shipmentItemRepository;
     private final MachineDisplayRepository machineDisplayRepository;
+    private final ForecastPredictionRepository forecastPredictionRepository;
 
     public ProductService(
             ProductRepository productRepository,
@@ -48,7 +50,8 @@ public class ProductService {
             InventoryAggregateService inventoryAggregateService,
             StockMovementRepository stockMovementRepository,
             ShipmentItemRepository shipmentItemRepository,
-            MachineDisplayRepository machineDisplayRepository) {
+            MachineDisplayRepository machineDisplayRepository,
+            ForecastPredictionRepository forecastPredictionRepository) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
@@ -57,6 +60,7 @@ public class ProductService {
         this.stockMovementRepository = stockMovementRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.machineDisplayRepository = machineDisplayRepository;
+        this.forecastPredictionRepository = forecastPredictionRepository;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
@@ -273,6 +277,7 @@ public class ProductService {
             }
             for (Product child : children) {
                 log.info("[DELETE] Deleting child: id={}, name='{}'", child.getId(), child.getName());
+                forecastPredictionRepository.deleteByItemId(child.getId());
                 machineDisplayRepository.deleteByProduct_Id(child.getId());
                 inventoryAggregateService.deleteAllInventoryForProduct(child.getId());
                 stockMovementRepository.deleteByItem_Id(child.getId());
@@ -281,7 +286,9 @@ public class ProductService {
             }
         }
 
-        // Delete machine displays, then parent's (or single product's) inventory and stock movements before deleting the product
+        // Delete forecast predictions, machine displays, then parent's (or single product's) inventory and stock movements before deleting the product
+        log.info("[DELETE] Deleting forecast predictions for product id={}", id);
+        forecastPredictionRepository.deleteByItemId(id);
         log.info("[DELETE] Deleting machine displays for product id={}", id);
         machineDisplayRepository.deleteByProduct_Id(id);
         log.info("[DELETE] Deleting inventory for product id={}", id);
