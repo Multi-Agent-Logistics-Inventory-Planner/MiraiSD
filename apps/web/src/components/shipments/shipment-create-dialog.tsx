@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon,
-  Check,
   ChevronsUpDown,
   Loader2,
   Plus,
@@ -30,19 +29,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
 import { ProductForm } from "@/components/products/product-form";
+import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import { useCreateShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -102,10 +94,13 @@ export function ShipmentCreateDialog({
 
   const isEditMode = !!initialShipment;
 
-  const [comboOpenIndex, setComboOpenIndex] = useState<number | null>(null);
+  const [productDialogIndex, setProductDialogIndex] = useState<number | null>(null);
   // Track selected product IDs in state to ensure re-renders when products are selected
   const [selectedProductIds, setSelectedProductIds] = useState<Record<number, string>>({});
   const [addProductOpen, setAddProductOpen] = useState(false);
+
+  // Get list of already selected product IDs to exclude from selection
+  const excludeProductIds = Object.values(selectedProductIds).filter(Boolean);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -285,7 +280,6 @@ export function ShipmentCreateDialog({
     }
     // Update state to trigger re-render and fetch children
     setSelectedProductIds((prev) => ({ ...prev, [index]: product.id }));
-    setComboOpenIndex(null);
   }
 
   async function onSubmit(values: FormValues) {
@@ -382,6 +376,19 @@ export function ShipmentCreateDialog({
             ...prev,
             [fields.length]: product.id,
           }));
+        }}
+      />
+      <SelectShipmentProductDialog
+        open={productDialogIndex !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setProductDialogIndex(null);
+        }}
+        excludeProductIds={excludeProductIds}
+        onSelect={(product) => {
+          if (productDialogIndex !== null) {
+            handleSelectProduct(productDialogIndex, product);
+            setProductDialogIndex(null);
+          }
         }}
       />
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -598,71 +605,20 @@ export function ShipmentCreateDialog({
                           {/* Product Selector */}
                           <div className="grid gap-2">
                             <Label className="text-xs">Product</Label>
-                            <Popover
-                              open={comboOpenIndex === index}
-                              onOpenChange={(isOpen) =>
-                                setComboOpenIndex(isOpen ? index : null)
-                              }
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="justify-between w-full"
+                              disabled={productsQuery.isLoading}
+                              onClick={() => setProductDialogIndex(index)}
                             >
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="justify-between w-full"
-                                  disabled={productsQuery.isLoading}
-                                >
-                                  {selectedProduct
-                                    ? selectedProduct.sku
-                                      ? `${selectedProduct.name} (${selectedProduct.sku})`
-                                      : selectedProduct.name
-                                    : "Select product..."}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-[calc(100vw-3rem)] sm:w-[400px] p-0"
-                                align="start"
-                              >
-                                <Command>
-                                  <CommandInput placeholder="Search products..." />
-                                  <CommandList>
-                                    <CommandEmpty>
-                                      No products found
-                                    </CommandEmpty>
-                                    <CommandGroup>
-                                      {products.map((p) => (
-                                        <CommandItem
-                                          key={p.id}
-                                          value={`${p.name} ${p.sku ?? ""}`.trim()}
-                                          onSelect={() =>
-                                            handleSelectProduct(index, p)
-                                          }
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              selectedProductId === p.id
-                                                ? "opacity-100"
-                                                : "opacity-0",
-                                            )}
-                                          />
-                                          <div className="flex flex-col">
-                                            <span className="text-sm">
-                                              {p.name}
-                                            </span>
-                                            {p.sku ? (
-                                              <span className="text-xs text-muted-foreground">
-                                                {p.sku}
-                                              </span>
-                                            ) : null}
-                                          </div>
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
+                              {selectedProduct
+                                ? selectedProduct.sku
+                                  ? `${selectedProduct.name} (${selectedProduct.sku})`
+                                  : selectedProduct.name
+                                : "Select product..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
                             {form.formState.errors.items?.[index]?.productId
                               ?.message && (
                               <p className="text-xs text-destructive">

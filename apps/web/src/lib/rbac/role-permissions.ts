@@ -20,9 +20,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
     Permission.INVENTORY_ADJUST,
     Permission.INVENTORY_TRANSFER,
 
-    // Shipments - view, update, and receive only (no create or delete)
+    // Shipments - view and receive only (no create, update, or delete)
     Permission.SHIPMENTS_VIEW,
-    Permission.SHIPMENTS_UPDATE,
     Permission.SHIPMENTS_RECEIVE,
 
     // Audit Log - view only
