@@ -17,8 +17,8 @@ import { prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 export interface PendingPrize {
   tempId: string;
   letter: string;
-  templateQuantity: number | null;
-  quantity: number | null;
+  templateQuantity: number;
+  quantity: number;
 }
 
 interface PrizeTableInlineProps {
@@ -67,8 +67,8 @@ export function PrizeTableInline({
 
     onAddPrize({
       letter: trimmedLetter,
-      templateQuantity: tq === "" ? null : parseInt(tq, 10),
-      quantity: qty === "" ? null : parseInt(qty, 10),
+      templateQuantity: tq === "" ? 0 : parseInt(tq, 10),
+      quantity: qty === "" ? 0 : parseInt(qty, 10),
     });
 
     // Reset form

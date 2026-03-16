@@ -172,7 +172,7 @@ public class ProductService {
                                  String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
-                                 Boolean clearParent) {
+                                 Boolean clearParent, Integer quantity) {
         Product product = getProductById(id);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
@@ -218,6 +218,10 @@ public class ProductService {
         if (unitCost != null) product.setUnitCost(unitCost);
         if (imageUrl != null) product.setImageUrl(imageUrl);
         if (notes != null) product.setNotes(notes);
+        // Allow direct quantity update only for prize products (products with a parent)
+        if (quantity != null && product.getParentId() != null) {
+            product.setQuantity(quantity);
+        }
 
         Product saved = productRepository.save(product);
         broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
