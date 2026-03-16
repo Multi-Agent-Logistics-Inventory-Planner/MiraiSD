@@ -293,7 +293,9 @@ export function ProductForm({
         if (
           initialStockEnabled &&
           initialStockQty !== "" &&
-          initialStockQty > 0
+          initialStockQty > 0 &&
+          initialStockLocation.locationType &&
+          initialStockLocation.locationId
         ) {
           setIsAddingStock(true);
           try {

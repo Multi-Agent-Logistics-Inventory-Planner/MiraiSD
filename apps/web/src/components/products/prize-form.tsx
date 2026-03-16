@@ -16,7 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useCreateProductMutation } from "@/hooks/mutations/use-product-mutations";
+import {
+  useCreateProductMutation,
+  useUpdateProductMutation,
+} from "@/hooks/mutations/use-product-mutations";
+import type { ProductSummary } from "@/types/api";
 
 const schema = z.object({
   letter: z.string().min(1, "Letter is required").max(50, "Max 50 characters"),
@@ -38,6 +42,8 @@ interface PrizeFormProps {
   parentId: string;
   parentName: string;
   parentCategoryId: string;
+  /** Prize to edit - if provided, form is in edit mode */
+  prize?: ProductSummary | null;
   onSuccess?: () => void;
 }
 
@@ -47,10 +53,14 @@ export function PrizeForm({
   parentId,
   parentName,
   parentCategoryId,
+  prize,
   onSuccess,
 }: PrizeFormProps) {
   const { toast } = useToast();
   const createMutation = useCreateProductMutation();
+  const updateMutation = useUpdateProductMutation();
+
+  const isEditing = !!prize;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -62,56 +72,75 @@ export function PrizeForm({
   });
 
   useEffect(() => {
-    if (!open) {
+    if (open && prize) {
+      // Edit mode - populate form with prize data
+      form.reset({
+        letter: prize.letter ?? "",
+        templateQuantity: prize.templateQuantity ?? 0,
+        quantity: prize.quantity ?? 0,
+      });
+    } else if (!open) {
+      // Reset form when dialog closes
       form.reset({ letter: "", templateQuantity: 0, quantity: 0 });
     }
-  }, [open, form]);
+  }, [open, prize, form]);
 
   async function onSubmit(values: FormValues) {
-    const quantity =
-      values.quantity !== null && values.quantity !== undefined
-        ? Number(values.quantity)
-        : undefined;
-    const hasInitialStock = quantity != null && quantity > 0;
+    const quantity = Number(values.quantity);
     const letter = values.letter.trim().slice(0, 50);
-
-    const templateQuantity =
-      values.templateQuantity !== null && values.templateQuantity !== undefined
-        ? Number(values.templateQuantity)
-        : undefined;
-
-    const payload = {
-      parentId,
-      categoryId: parentCategoryId,
-      letter,
-      templateQuantity,
-      name: `Prize ${letter}`, // Auto-generate name from letter
-      initialStock: hasInitialStock ? quantity : undefined,
-    };
+    const templateQuantity = Number(values.templateQuantity);
 
     try {
-      await createMutation.mutateAsync(payload);
-      toast({
-        title: "Prize added",
-        description: hasInitialStock
-          ? `Initial stock of ${quantity} added.`
-          : undefined,
-      });
+      if (isEditing && prize) {
+        // Update existing prize
+        await updateMutation.mutateAsync({
+          id: prize.id,
+          payload: {
+            letter,
+            templateQuantity,
+            quantity,
+            name: `Prize ${letter}`,
+          },
+        });
+        toast({ title: "Prize updated" });
+      } else {
+        // Create new prize
+        const hasInitialStock = quantity > 0;
+        const payload = {
+          parentId,
+          categoryId: parentCategoryId,
+          letter,
+          templateQuantity,
+          name: `Prize ${letter}`,
+          initialStock: hasInitialStock ? quantity : undefined,
+        };
+        await createMutation.mutateAsync(payload);
+        toast({
+          title: "Prize added",
+          description: hasInitialStock
+            ? `Initial stock of ${quantity} added.`
+            : undefined,
+        });
+      }
 
       onSuccess?.();
       onOpenChange(false);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
-      toast({ title: "Failed to add prize", description: message });
+      toast({ title: isEditing ? "Failed to update prize" : "Failed to add prize", description: message });
     }
   }
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Prize to {parentName}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? `Edit Prize ${prize?.letter ?? ""}` : `Add Prize to ${parentName}`}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -175,13 +204,13 @@ export function PrizeForm({
             </Button>
             <Button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={isPending}
               className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
             >
-              {createMutation.isPending ? (
+              {isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              Add Prize
+              {isEditing ? "Save" : "Add Prize"}
             </Button>
           </DialogFooter>
         </form>

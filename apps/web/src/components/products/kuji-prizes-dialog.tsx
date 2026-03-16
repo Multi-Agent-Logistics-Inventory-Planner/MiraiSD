@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import type { ProductSummary } from "@/types/api";
 import {
   Dialog,
   DialogContent,
@@ -55,16 +56,30 @@ export function KujiPrizesDialog({
   const deleteMutation = useDeleteProductMutation();
 
   const [prizeFormOpen, setPrizeFormOpen] = useState(false);
+  const [prizeToEdit, setPrizeToEdit] = useState<ProductSummary | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [prizeToDelete, setPrizeToDelete] = useState<{ id: string; letter: string } | null>(null);
 
   const prizes = product?.children ? sortPrizes(product.children) : [];
 
   function handleAddPrize() {
+    setPrizeToEdit(null);
     setPrizeFormOpen(true);
   }
 
-  function handlePrizeAdded() {
+  function handleEditPrize(prize: ProductSummary) {
+    setPrizeToEdit(prize);
+    setPrizeFormOpen(true);
+  }
+
+  function handlePrizeFormClose(open: boolean) {
+    setPrizeFormOpen(open);
+    if (!open) {
+      setPrizeToEdit(null);
+    }
+  }
+
+  function handlePrizeSuccess() {
     refetch();
   }
 
@@ -113,7 +128,7 @@ export function KujiPrizesDialog({
                     <TableHead className="w-24">Letter</TableHead>
                     <TableHead className="text-right w-20">Qty/Set</TableHead>
                     <TableHead className="text-right">Pieces</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -129,14 +144,24 @@ export function KujiPrizesDialog({
                         {prize.quantity?.toLocaleString() ?? 0}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleDeleteClick({ id: prize.id, letter: prize.letter })}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditPrize(prize)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleDeleteClick({ id: prize.id, letter: prize.letter })}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -166,11 +191,12 @@ export function KujiPrizesDialog({
 
       <PrizeForm
         open={prizeFormOpen}
-        onOpenChange={setPrizeFormOpen}
+        onOpenChange={handlePrizeFormClose}
         parentId={productId}
         parentName={productName}
         parentCategoryId={categoryId}
-        onSuccess={handlePrizeAdded}
+        prize={prizeToEdit}
+        onSuccess={handlePrizeSuccess}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

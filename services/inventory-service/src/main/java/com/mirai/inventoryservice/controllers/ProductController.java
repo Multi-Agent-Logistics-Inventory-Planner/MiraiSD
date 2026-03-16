@@ -114,7 +114,8 @@ public class ProductController {
                 requestDTO.getUnitCost(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
-                clearParent
+                clearParent,
+                requestDTO.getQuantity()
         );
         return ResponseEntity.ok(productMapper.toResponseDTO(product));
     }
