@@ -245,20 +245,20 @@ export function ProductModal({
           </div>
         </div>
 
-        <div className="flex sm:hidden justify-center gap-1.5 mt-2">
+        <div className="flex sm:hidden justify-center gap-1 mt-2">
           {isKuji && isAdmin && (
             <Button
               size="sm"
-              className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
               onClick={() => setPrizesDialogOpen(true)}
             >
-              <Trophy className="h-3.5 w-3.5 mr-1" />
+              <Trophy className="h-3 w-3 mr-0.5" />
               Prizes
             </Button>
           )}
           <Button
             size="sm"
-            className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
             onClick={() => {
               onAdjustClick?.({
                 product: p,
@@ -266,12 +266,12 @@ export function ProductModal({
               });
             }}
           >
-            <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
+            <ArrowUpDown className="h-3 w-3 mr-0.5" />
             Adjust
           </Button>
           <Button
             size="sm"
-            className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
             onClick={() => {
               if (hasInventory) {
                 onTransferClick?.({
@@ -286,16 +286,16 @@ export function ProductModal({
               }
             }}
           >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+            <RefreshCw className="h-3 w-3 mr-0.5" />
             Transfer
           </Button>
           {isAdmin && (
             <Button
               size="sm"
-              className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
               onClick={() => onEditClick?.()}
             >
-              <Pencil className="h-3.5 w-3.5 mr-1" />
+              <Pencil className="h-3 w-3 mr-0.5" />
               Edit
             </Button>
           )}
@@ -311,6 +311,7 @@ export function ProductModal({
               }
               isPending={deleteProduct.isPending}
               onDelete={handleDelete}
+              triggerClassName="h-7"
             />
           )}
         </div>
