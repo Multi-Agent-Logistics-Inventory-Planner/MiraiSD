@@ -85,3 +85,10 @@ export async function resolveNotification(id: string): Promise<Notification> {
 export async function unresolveNotification(id: string): Promise<Notification> {
   return apiPut<Notification>(`${BASE_PATH}/${id}/unresolve`);
 }
+
+/**
+ * Mark notification as read by user in UI (separate from Slack delivery)
+ */
+export async function markAsUserRead(id: string): Promise<Notification> {
+  return apiPut<Notification>(`${BASE_PATH}/${id}/mark-read`);
+}
