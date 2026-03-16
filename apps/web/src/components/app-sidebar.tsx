@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
+import { useNotificationCounts } from "@/hooks/queries/use-notifications";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
 import type { PermissionKey } from "@/lib/rbac";
@@ -135,7 +136,15 @@ function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
   return role === UserRole.ADMIN ? "default" : "secondary";
 }
 
-function NavItemLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavItemLink({
+  item,
+  pathname,
+  badge,
+}: {
+  item: NavItem;
+  pathname: string;
+  badge?: number;
+}) {
   const { setOpenMobile } = useSidebar();
 
   return (
@@ -143,7 +152,15 @@ function NavItemLink({ item, pathname }: { item: NavItem; pathname: string }) {
       <SidebarMenuButton asChild isActive={pathname === item.href}>
         <Link href={item.href} onClick={() => setOpenMobile(false)}>
           <item.icon className="h-4 w-4 dark:text-[#faf9f5]" />
-          <span>{item.title}</span>
+          <span className="flex-1">{item.title}</span>
+          {badge !== undefined && badge > 0 && (
+            <Badge
+              variant="destructive"
+              className="ml-auto h-5 min-w-5 px-1.5 text-xs font-medium"
+            >
+              {badge > 99 ? "99+" : badge}
+            </Badge>
+          )}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -202,6 +219,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
   const { can } = usePermissions();
+  const { data: notificationCounts } = useNotificationCounts();
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
@@ -289,6 +307,11 @@ export function AppSidebar() {
                     key={item.href}
                     item={item}
                     pathname={pathname}
+                    badge={
+                      item.href === "/notifications"
+                        ? notificationCounts?.unread
+                        : undefined
+                    }
                   />
                 ))}
               </SidebarMenu>
