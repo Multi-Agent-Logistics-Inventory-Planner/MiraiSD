@@ -32,6 +32,7 @@ import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -91,6 +92,7 @@ public class DevSeedController {
     private final ReviewRepository reviewRepository;
     private final ReviewDailyCountRepository reviewDailyCountRepository;
     private final MachineDisplayRepository machineDisplayRepository;
+    private final AnalyticsSeedService analyticsSeedService;
 
     private final Random random = new Random();
 
@@ -1090,5 +1092,68 @@ public class DevSeedController {
             "success", true,
             "deletedCount", staleDisplays.size()
         ));
+    }
+
+    /**
+     * Seed comprehensive analytics data including DOW patterns, daily rollups, and monthly rollups.
+     * This endpoint generates sales with realistic day-of-week patterns and pre-aggregates them
+     * into rollup tables for fast analytics queries.
+     *
+     * @param monthsBack Number of months of historical data to generate (default 6)
+     */
+    @PostMapping("/seed/analytics")
+    public ResponseEntity<Map<String, Object>> seedAnalytics(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        return ResponseEntity.ok(analyticsSeedService.seedAllAnalytics(monthsBack));
+    }
+
+    /**
+     * Seed sales data with realistic day-of-week patterns.
+     * Higher sales on weekends (Friday-Sunday) reflecting arcade traffic patterns.
+     */
+    @PostMapping("/seed/dow-patterns")
+    public ResponseEntity<Map<String, Object>> seedDowPatterns(
+            @RequestParam(defaultValue = "3") @Min(1) @Max(12) int monthsBack) {
+        int count = analyticsSeedService.seedDowPatternSales(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "salesCreated", count
+        ));
+    }
+
+    /**
+     * Seed daily rollups from existing stock movements.
+     * Aggregates sales, restocks, and damages by item and date.
+     */
+    @PostMapping("/seed/daily-rollups")
+    public ResponseEntity<Map<String, Object>> seedDailyRollups(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        int count = analyticsSeedService.seedDailyRollups(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "dailyRollupsCreated", count
+        ));
+    }
+
+    /**
+     * Seed monthly rollups from daily rollups.
+     * Aggregates daily data by category and month.
+     */
+    @PostMapping("/seed/monthly-rollups")
+    public ResponseEntity<Map<String, Object>> seedMonthlyRollups(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        int count = analyticsSeedService.seedMonthlyRollups(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "monthlyRollupsCreated", count
+        ));
+    }
+
+    /**
+     * Clear all analytics seed data including seeded sales and rollup tables.
+     */
+    @DeleteMapping("/seed/analytics")
+    public ResponseEntity<Map<String, Object>> clearAnalyticsSeedData() {
+        return ResponseEntity.ok(analyticsSeedService.clearAnalyticsSeedData());
     }
 }

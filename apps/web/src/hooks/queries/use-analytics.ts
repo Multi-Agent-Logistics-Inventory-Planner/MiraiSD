@@ -1,24 +1,19 @@
-
 import { useQuery } from "@tanstack/react-query"
-import { getInventoryByCategory, getPerformanceMetrics, getSalesSummary } from "@/lib/api/analytics"
-
-export function useInventoryByCategory() {
-  return useQuery({
-    queryKey: ['analytics', 'inventory-by-category'],
-    queryFn: getInventoryByCategory,
-  })
-}
+import { getPerformanceMetrics, getSalesSummary } from "@/lib/api/analytics"
+import { queryKeys } from "@/lib/query-keys"
 
 export function usePerformanceMetrics() {
   return useQuery({
-    queryKey: ['analytics', 'performance-metrics'],
+    queryKey: queryKeys.analytics.performanceMetrics(),
     queryFn: getPerformanceMetrics,
+    staleTime: 15 * 60 * 1000, // 15 minutes - less critical metrics
   })
 }
 
 export function useSalesSummary() {
   return useQuery({
-    queryKey: ['analytics', 'sales-summary'],
+    queryKey: queryKeys.analytics.salesSummary(),
     queryFn: getSalesSummary,
+    staleTime: 60 * 60 * 1000, // 60 minutes - pure historical data, very stable
   })
 }

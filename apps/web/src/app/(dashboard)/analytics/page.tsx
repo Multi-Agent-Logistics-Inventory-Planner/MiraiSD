@@ -2,21 +2,22 @@
 
 import { Suspense, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import {
-  LayoutDashboard,
-  TrendingDown,
-  PieChart,
-  Trophy,
-} from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAllForecasts } from "@/hooks/queries/use-forecasts"
 import { useSalesSummary } from "@/hooks/queries/use-analytics"
 import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
 import { AnalyticsTab } from "@/types/analytics"
-import { AnalyticsTabs, TabLegacy, TabPlaceholder } from "./_components"
+import {
+  AnalyticsTabs,
+  TabPredictions,
+  TabInsights,
+  TabDemandLeaders,
+  TabSettings,
+  TabLegacy,
+} from "./_components"
 
-const ADMIN_ONLY_TABS = new Set([AnalyticsTab.TOP_SELLERS])
+const ADMIN_ONLY_TABS = new Set([AnalyticsTab.DEMAND_LEADERS])
 
 function isValidTab(value: string | null): value is AnalyticsTab {
   return Object.values(AnalyticsTab).includes(value as AnalyticsTab)
@@ -30,12 +31,12 @@ function AnalyticsContent() {
   const { user } = useAuth()
   const isAdmin = user?.role === UserRole.ADMIN
 
-  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.OVERVIEW
+  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.PREDICTIONS
 
   // Redirect non-admins from admin-only tabs
   useEffect(() => {
     if (!isAdmin && ADMIN_ONLY_TABS.has(currentTab)) {
-      router.replace("/analytics?tab=overview")
+      router.replace("/analytics?tab=predictions")
     }
   }, [isAdmin, currentTab, router])
 
@@ -43,6 +44,7 @@ function AnalyticsContent() {
     router.push(`/analytics?tab=${tab}`)
   }
 
+  // Only fetch legacy data when on legacy tab
   const {
     data: allForecastsData,
     isLoading: isLoadingForecasts,
@@ -53,14 +55,14 @@ function AnalyticsContent() {
 
   const renderTabContent = () => {
     switch (currentTab) {
-      case AnalyticsTab.OVERVIEW:
-        return <TabPlaceholder title="Overview" icon={LayoutDashboard} />
       case AnalyticsTab.PREDICTIONS:
-        return <TabPlaceholder title="Stockout Predictions" icon={TrendingDown} />
-      case AnalyticsTab.CATEGORIES:
-        return <TabPlaceholder title="Categories" icon={PieChart} />
-      case AnalyticsTab.TOP_SELLERS:
-        return <TabPlaceholder title="Top Sellers" icon={Trophy} />
+        return <TabPredictions />
+      case AnalyticsTab.INSIGHTS:
+        return <TabInsights />
+      case AnalyticsTab.DEMAND_LEADERS:
+        return <TabDemandLeaders />
+      case AnalyticsTab.SETTINGS:
+        return <TabSettings />
       case AnalyticsTab.LEGACY:
       default:
         return (
