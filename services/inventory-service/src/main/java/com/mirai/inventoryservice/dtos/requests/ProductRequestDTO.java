@@ -56,4 +56,8 @@ public class ProductRequestDTO {
     private String notes;
 
     private Integer initialStock;
+
+    /** Direct quantity update for prize products. Only works for products with a parent. */
+    @Min(value = 0, message = "Quantity must be 0 or greater")
+    private Integer quantity;
 }

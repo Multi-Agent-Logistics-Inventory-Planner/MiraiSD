@@ -176,6 +176,8 @@ export interface ProductRequest {
   isActive?: boolean;
   imageUrl?: string;
   notes?: string;
+  /** Direct quantity update for prize products (products with a parent) */
+  quantity?: number;
 }
 
 // User types

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   ImageOff,
   MapPin,
+  Monitor,
   Package,
   ArrowUpDown,
   RefreshCw,
@@ -33,6 +34,7 @@ import { KujiPrizesDialog } from "./kuji-prizes-dialog";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
+import { useProductDisplayHistory } from "@/hooks/queries/use-machine-displays";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
@@ -43,6 +45,7 @@ import {
   type ProductInventoryEntry,
 } from "@/types/api";
 import { Card, CardContent } from "../ui/card";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { PreselectedProductInfo } from "@/components/stock/adjust-stock-dialog";
 
@@ -71,7 +74,14 @@ export function ProductModal({
   const locations = inventoryData?.entries;
   const { data: shipments, isLoading: shipmentsLoading } =
     useShipmentsByProduct(product?.product.id);
+  const { data: displayHistory, isLoading: displaysLoading } =
+    useProductDisplayHistory(product?.product.id);
   const { isAdmin } = usePermissions();
+
+  const activeDisplays = useMemo(() => {
+    if (!displayHistory) return [];
+    return displayHistory.filter((d) => d.endedAt === null);
+  }, [displayHistory]);
   const deleteProduct = useDeleteProductMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [prizesDialogOpen, setPrizesDialogOpen] = useState(false);
@@ -114,7 +124,7 @@ export function ProductModal({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-hidden px-4! sm:px-6! dark:bg-background">
+      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto px-4! sm:px-6! dark:bg-background">
         <DialogHeader className="text-left min-w-0 overflow-hidden">
           <DialogTitle className="text-lg sm:text-xl font-semibold flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
             <span className="min-w-0 truncate" title={p.name}>
@@ -245,20 +255,20 @@ export function ProductModal({
           </div>
         </div>
 
-        <div className="flex sm:hidden justify-center gap-1.5 mt-2">
+        <div className="flex sm:hidden justify-center gap-1 mt-2">
           {isKuji && isAdmin && (
             <Button
               size="sm"
-              className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
               onClick={() => setPrizesDialogOpen(true)}
             >
-              <Trophy className="h-3.5 w-3.5 mr-1" />
+              <Trophy className="h-3 w-3 mr-0.5" />
               Prizes
             </Button>
           )}
           <Button
             size="sm"
-            className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
             onClick={() => {
               onAdjustClick?.({
                 product: p,
@@ -266,12 +276,12 @@ export function ProductModal({
               });
             }}
           >
-            <ArrowUpDown className="h-3.5 w-3.5 mr-1" />
+            <ArrowUpDown className="h-3 w-3 mr-0.5" />
             Adjust
           </Button>
           <Button
             size="sm"
-            className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
             onClick={() => {
               if (hasInventory) {
                 onTransferClick?.({
@@ -286,16 +296,16 @@ export function ProductModal({
               }
             }}
           >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+            <RefreshCw className="h-3 w-3 mr-0.5" />
             Transfer
           </Button>
           {isAdmin && (
             <Button
               size="sm"
-              className="bg-black text-white hover:bg-black/90 h-8 px-2 text-xs"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
               onClick={() => onEditClick?.()}
             >
-              <Pencil className="h-3.5 w-3.5 mr-1" />
+              <Pencil className="h-3 w-3 mr-0.5" />
               Edit
             </Button>
           )}
@@ -311,6 +321,7 @@ export function ProductModal({
               }
               isPending={deleteProduct.isPending}
               onDelete={handleDelete}
+              triggerClassName="h-7"
             />
           )}
         </div>
@@ -355,11 +366,11 @@ export function ProductModal({
                       <TableRow>
                         <TableCell
                           colSpan={3}
-                          className="h-16 text-center text-muted-foreground"
+                          className="text-center text-muted-foreground py-3"
                         >
-                          <div className="flex flex-col items-center gap-1 py-6">
-                            <MapPin className="h-5 w-5 text-muted-foreground/50" />
-                            <span>No inventory at any location</span>
+                          <div className="flex items-center justify-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground/50" />
+                            <span className="text-sm">No inventory at any location</span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -383,6 +394,89 @@ export function ProductModal({
                           </TableRow>
                         );
                       })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Active Displays Section */}
+        <div className="mt-4 sm:mt-6 min-w-0">
+          <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
+            Active Displays{" "}
+            <span className="text-foreground">
+              ({activeDisplays.length})
+            </span>
+          </h3>
+          <div className="rounded-lg overflow-x-auto">
+            <Card className="p-2 border-none">
+              <CardContent className="p-0">
+                <Table>
+                  <DataTableHeader>
+                    <TableHead className="rounded-l-lg">Machine</TableHead>
+                    <TableHead className="hidden sm:table-cell">Type</TableHead>
+                    <TableHead className="text-right rounded-r-lg">
+                      Days
+                    </TableHead>
+                  </DataTableHeader>
+                  <TableBody>
+                    {displaysLoading ? (
+                      <>
+                        {Array.from({ length: 2 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-16" />
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <Skeleton className="h-4 w-20" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-4 w-8 ml-auto" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
+                    ) : activeDisplays.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-muted-foreground py-3"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <Monitor className="h-4 w-4 text-muted-foreground/50" />
+                            <span className="text-sm">Not displayed on any machines</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      activeDisplays.map((display) => (
+                        <TableRow
+                          key={display.id}
+                          className={cn(
+                            display.stale && "bg-amber-50 dark:bg-amber-950/20"
+                          )}
+                        >
+                          <TableCell className="font-mono rounded-l-lg">
+                            {display.machineCode}
+                            {display.stale && (
+                              <Badge
+                                variant="secondary"
+                                className="ml-2 text-amber-600 text-[10px]"
+                              >
+                                Stale
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">
+                            {LOCATION_TYPE_LABELS[display.locationType]}
+                          </TableCell>
+                          <TableCell className="text-right font-medium rounded-r-lg">
+                            {display.daysActive}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>
@@ -436,20 +530,20 @@ export function ProductModal({
                       <TableRow>
                         <TableCell
                           colSpan={3}
-                          className="h-16 text-center text-muted-foreground sm:hidden"
+                          className="text-center text-muted-foreground py-3 sm:hidden"
                         >
-                          <div className="flex flex-col items-center gap-1 py-6">
-                            <Package className="h-5 w-5 text-muted-foreground/50" />
-                            <span>No orders found</span>
+                          <div className="flex items-center justify-center gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground/50" />
+                            <span className="text-sm">No orders found</span>
                           </div>
                         </TableCell>
                         <TableCell
                           colSpan={4}
-                          className="hidden sm:table-cell h-16 text-center text-muted-foreground"
+                          className="hidden sm:table-cell text-center text-muted-foreground py-3"
                         >
-                          <div className="flex flex-col items-center gap-1 py-6">
-                            <Package className="h-5 w-5 text-muted-foreground/50" />
-                            <span>No orders found</span>
+                          <div className="flex items-center justify-center gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground/50" />
+                            <span className="text-sm">No orders found</span>
                           </div>
                         </TableCell>
                       </TableRow>

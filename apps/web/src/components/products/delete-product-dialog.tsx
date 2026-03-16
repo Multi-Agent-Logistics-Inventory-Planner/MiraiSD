@@ -24,6 +24,8 @@ interface DeleteProductDialogProps {
   onDelete: () => void;
   /** When false, no trigger button is rendered (for programmatic open) */
   renderTrigger?: boolean;
+  /** Custom className for the trigger button */
+  triggerClassName?: string;
 }
 
 export function DeleteProductDialog({
@@ -34,12 +36,13 @@ export function DeleteProductDialog({
   isPending,
   onDelete,
   renderTrigger = true,
+  triggerClassName,
 }: DeleteProductDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       {renderTrigger && (
         <AlertDialogTrigger asChild>
-          <Button size="sm" variant="destructive">
+          <Button size="sm" variant="destructive" className={triggerClassName}>
             <Trash2 className="h-4 w-4 sm:mr-1" />
             <span className="hidden sm:inline">Delete</span>
             <span className="sr-only sm:hidden">Delete</span>
