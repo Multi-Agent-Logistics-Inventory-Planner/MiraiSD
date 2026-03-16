@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   TeamTable,
   TeamFilters,
+  TeamPagination,
   InviteMemberDialog,
   EditMemberDialog,
   TeamMemberRow,
@@ -20,8 +21,25 @@ import {
 import { User, UserRole } from "@/types/api";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
+const PAGE_SIZE = 10;
+
+const ROLE_ORDER: Record<string, number> = {
+  admin: 0,
+  employee: 1,
+};
+
+function sortByRoleThenName(a: TeamMemberRow, b: TeamMemberRow): number {
+  const roleA = ROLE_ORDER[a.role.toLowerCase()] ?? 2;
+  const roleB = ROLE_ORDER[b.role.toLowerCase()] ?? 2;
+  if (roleA !== roleB) {
+    return roleA - roleB;
+  }
+  return a.fullName.localeCompare(b.fullName);
+}
+
 export default function TeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -34,12 +52,25 @@ export default function TeamPage() {
     queryClient.invalidateQueries({ queryKey: ["team-data"] });
   };
 
-  const filteredData = tableData.filter((row) => {
-    return (
-      row.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      row.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+  const filteredAndSortedData = useMemo(() => {
+    const filtered = tableData.filter((row) => {
+      return (
+        row.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        row.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    });
+    return [...filtered].sort(sortByRoleThenName);
+  }, [tableData, searchQuery]);
+
+  const paginatedData = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredAndSortedData.slice(start, start + PAGE_SIZE);
+  }, [filteredAndSortedData, page]);
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setPage(0);
+  };
 
   const handleResendInvite = async (email: string) => {
     try {
@@ -98,14 +129,14 @@ export default function TeamPage() {
 
       <TeamFilters
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         onInviteClick={() => setIsInviteDialogOpen(true)}
       />
 
       <Card className="p-2 border-none">
         <CardContent className="p-0">
           <TeamTable
-            data={filteredData}
+            data={paginatedData}
             isLoading={isLoading}
             onEdit={handleEditMember}
             onDelete={handleDelete}
@@ -113,6 +144,14 @@ export default function TeamPage() {
           />
         </CardContent>
       </Card>
+
+      <TeamPagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalItems={filteredAndSortedData.length}
+        isLoading={isLoading}
+        onPageChange={setPage}
+      />
 
       <InviteMemberDialog
         open={isInviteDialogOpen}
