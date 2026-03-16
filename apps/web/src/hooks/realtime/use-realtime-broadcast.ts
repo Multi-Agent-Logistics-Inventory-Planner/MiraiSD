@@ -51,6 +51,7 @@ const EVENT_QUERY_KEYS: Record<BroadcastEventType, string[][]> = {
   ],
   notification_created: [
     ["notifications"],
+    ["notifications", "counts"],
     ["activity-feed"],
   ],
   audit_log_created: [

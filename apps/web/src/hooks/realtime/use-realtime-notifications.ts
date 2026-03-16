@@ -45,8 +45,8 @@ export function useRealtimeNotifications(enabled = true) {
 
   return useSupabaseRealtime<NotificationRow>({
     table: "notifications",
-    event: "*",
-    queryKeys: [["notifications"], ["notifications", "counts"]],
+    event: "INSERT",  // Only listen to new notifications for toast
+    queryKeys: [],    // Don't invalidate queries here - broadcast handles it
     onReceive: handleReceive,
     enabled,
   });
@@ -58,12 +58,12 @@ function getNotificationTitle(type: string): string {
       return "Low Stock Alert";
     case "OUT_OF_STOCK":
       return "Out of Stock";
-    case "REORDER_SUGGESTION":
-      return "Reorder Suggestion";
-    case "EXPIRY_WARNING":
-      return "Expiry Warning";
-    case "SYSTEM_ALERT":
-      return "System Alert";
+    case "SHIPMENT_COMPLETED":
+      return "Shipment Completed";
+    case "SHIPMENT_DAMAGED":
+      return "Damaged Items";
+    case "DISPLAY_STALE":
+      return "Stale Display";
     default:
       return "Notification";
   }
