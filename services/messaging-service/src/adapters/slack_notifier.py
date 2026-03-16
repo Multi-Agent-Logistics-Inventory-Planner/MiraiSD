@@ -96,7 +96,7 @@ class SlackNotifier:
         """Send any notification type to Slack.
 
         Generic method for delivering notifications from the database,
-        including those created by Java (UNASSIGNED_ITEM, etc.).
+        including those created by Java (SHIPMENT_COMPLETED, etc.).
 
         Args:
             notification: Dict with type, severity, message, item_id, metadata
@@ -156,25 +156,27 @@ class SlackNotifier:
 
         # Header text by type
         header_map = {
-            "UNASSIGNED_ITEM": "Unassigned Item Alert",
             "LOW_STOCK": "Low Stock Alert",
             "OUT_OF_STOCK": "Out of Stock Alert",
             "REORDER_SUGGESTION": "Reorder Suggestion",
             "EXPIRY_WARNING": "Expiry Warning",
             "SYSTEM_ALERT": "System Alert",
+            "SHIPMENT_COMPLETED": "Shipment Completed",
+            "SHIPMENT_DAMAGED": "Damaged Items Reported",
+            "DISPLAY_STALE": "Stale Display Alert",
         }
         header = header_map.get(notif_type, f"{notif_type} Alert")
 
         # Build fields from metadata
         fields = []
-        if item_id:
-            fields.append({
-                "type": "mrkdwn",
-                "text": f"*Item ID:*\n`{item_id}`",
-            })
 
         # Add useful metadata fields
-        for key in ["product_name", "sku", "location_code", "quantity", "threshold"]:
+        display_keys = [
+            "product_name", "sku", "location_code", "quantity", "threshold",
+            "shipment_name", "items_count", "product_names", "damaged_quantity",
+            "days_active", "location_type",
+        ]
+        for key in display_keys:
             if key in metadata:
                 display_key = key.replace("_", " ").title()
                 fields.append({

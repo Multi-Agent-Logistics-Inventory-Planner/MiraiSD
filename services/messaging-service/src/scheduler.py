@@ -105,6 +105,37 @@ def monthly_review_summary_job() -> None:
         logger.exception("Monthly review summary job failed: %s", e)
 
 
+def daily_stale_display_check_job() -> None:
+    """Run daily to check for stale displays (>45 days) and create notifications."""
+    logger.info("Starting daily stale display check job")
+
+    try:
+        repo = _get_shared_repo()
+
+        # Get displays that have been active for more than 45 days
+        stale_displays = repo.get_stale_displays(threshold_days=45)
+
+        created_count = 0
+        for display in stale_displays:
+            notification_id = repo.create_stale_display_notification(
+                product_id=display["product_id"],
+                product_name=display["product_name"],
+                machine_id=display["machine_id"],
+                location_type=display["location_type"],
+                days_active=display["days_active"],
+            )
+            if notification_id:
+                created_count += 1
+
+        logger.info(
+            "Stale display check completed: %d displays checked, %d notifications created",
+            len(stale_displays),
+            created_count,
+        )
+    except Exception as e:
+        logger.exception("Stale display check job failed: %s", e)
+
+
 def start_scheduler() -> BackgroundScheduler:
     """Initialize and start the review scheduler.
 
@@ -153,6 +184,16 @@ def start_scheduler() -> BackgroundScheduler:
     )
     logger.info("Scheduled monthly review summary on 1st at 08:00 %s", config.REVIEW_TIMEZONE)
 
+    # Daily stale display check - runs at 9 AM
+    _scheduler.add_job(
+        daily_stale_display_check_job,
+        CronTrigger(hour=9, minute=0, timezone=tz),
+        id="daily_stale_display_check",
+        replace_existing=True,
+        name="Daily Stale Display Check",
+    )
+    logger.info("Scheduled daily stale display check at 09:00 %s", config.REVIEW_TIMEZONE)
+
     _scheduler.start()
     logger.info("Review scheduler started with %d jobs", len(_scheduler.get_jobs()))
 
@@ -190,3 +231,9 @@ def trigger_monthly_summary_now() -> None:
     """Manually trigger the monthly summary job (for testing/debugging)."""
     logger.info("Manually triggering monthly review summary")
     monthly_review_summary_job()
+
+
+def trigger_stale_display_check_now() -> None:
+    """Manually trigger the stale display check job (for testing/debugging)."""
+    logger.info("Manually triggering stale display check")
+    daily_stale_display_check_job()

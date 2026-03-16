@@ -60,8 +60,6 @@ function getNotificationTitle(type: string): string {
       return "Out of Stock";
     case "REORDER_SUGGESTION":
       return "Reorder Suggestion";
-    case "UNASSIGNED_ITEM":
-      return "Unassigned Item";
     case "EXPIRY_WARNING":
       return "Expiry Warning";
     case "SYSTEM_ALERT":

@@ -77,6 +77,7 @@ public class ShipmentService {
     private final StockMovementService stockMovementService;
     private final AuditLogService auditLogService;
     private final SupabaseBroadcastService broadcastService;
+    private final EventOutboxService eventOutboxService;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
@@ -107,7 +108,8 @@ public class ShipmentService {
             NotificationService notificationService,
             StockMovementService stockMovementService,
             AuditLogService auditLogService,
-            SupabaseBroadcastService broadcastService) {
+            SupabaseBroadcastService broadcastService,
+            EventOutboxService eventOutboxService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productRepository = productRepository;
@@ -137,6 +139,7 @@ public class ShipmentService {
         this.stockMovementService = stockMovementService;
         this.auditLogService = auditLogService;
         this.broadcastService = broadcastService;
+        this.eventOutboxService = eventOutboxService;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
@@ -460,6 +463,26 @@ public class ShipmentService {
             shipmentItem.setDisplayQuantity(newDisplayQuantity);
             shipmentItem.setShopQuantity(newShopQuantity);
 
+            // Create notification for damaged items
+            if (damagedQuantity > 0) {
+                Product product = shipmentItem.getItem();
+                Map<String, Object> damageMetadata = new HashMap<>();
+                damageMetadata.put("shipment_name", shipment.getShipmentNumber());
+                damageMetadata.put("product_name", product.getName());
+                damageMetadata.put("damaged_quantity", damagedQuantity);
+                damageMetadata.put("category", "shipment");
+
+                Notification damageNotif = Notification.builder()
+                        .type(NotificationType.SHIPMENT_DAMAGED)
+                        .severity(NotificationSeverity.WARNING)
+                        .message(damagedQuantity + " units of " + product.getName() + " reported damaged in shipment " + shipment.getShipmentNumber())
+                        .itemId(product.getId())
+                        .metadata(damageMetadata)
+                        .via(List.of("slack", "app"))
+                        .build();
+                notificationService.createNotification(damageNotif);
+            }
+
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
                 Integer allocQty = allocation.getQuantity();
@@ -517,6 +540,26 @@ public class ShipmentService {
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {
             shipment.setStatus(ShipmentStatus.DELIVERED);
+
+            // Create notification for shipment completion
+            List<String> productNames = shipment.getItems().stream()
+                    .map(item -> item.getItem().getName())
+                    .toList();
+
+            Map<String, Object> completionMetadata = new HashMap<>();
+            completionMetadata.put("shipment_name", shipment.getShipmentNumber());
+            completionMetadata.put("items_count", shipment.getItems().size());
+            completionMetadata.put("product_names", String.join(", ", productNames));
+            completionMetadata.put("category", "shipment");
+
+            Notification completionNotif = Notification.builder()
+                    .type(NotificationType.SHIPMENT_COMPLETED)
+                    .severity(NotificationSeverity.INFO)
+                    .message("Shipment " + shipment.getShipmentNumber() + " has been fully received")
+                    .metadata(completionMetadata)
+                    .via(List.of("slack", "app"))
+                    .build();
+            notificationService.createNotification(completionNotif);
         } else {
             shipment.setStatus(ShipmentStatus.PENDING);
         }
@@ -647,6 +690,7 @@ public class ShipmentService {
                 .build();
 
         stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(movement);
     }
 
     private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, String shipmentNumber, UUID shipmentId) {
@@ -696,22 +740,7 @@ public class ShipmentService {
                 .build();
 
         stockMovementRepository.save(movement);
-
-        // Create notification for unassigned items
-        Map<String, Object> notifMetadata = new HashMap<>();
-        notifMetadata.put("shipment_number", shipmentNumber);
-        notifMetadata.put("shipment_id", shipmentId.toString());
-        notifMetadata.put("product_sku", product.getSku());
-        notifMetadata.put("quantity", quantity);
-
-        Notification notification = Notification.builder()
-                .type(NotificationType.UNASSIGNED_ITEM)
-                .severity(NotificationSeverity.WARNING)
-                .message(quantity + " units of " + product.getName() + " received from shipment " + shipmentNumber + " need location assignment")
-                .itemId(product.getId())
-                .metadata(notifMetadata)
-                .build();
-        notificationService.createNotification(notification);
+        eventOutboxService.createStockMovementEvent(movement);
     }
 
     private Object findOrCreateInventory(LocationType locationType, UUID locationId, Product product) {
@@ -932,6 +961,7 @@ public class ShipmentService {
                 .build();
 
         stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(movement);
 
         // Update or delete inventory
         if (newQuantity == 0) {
@@ -997,6 +1027,7 @@ public class ShipmentService {
                 .build();
 
         stockMovementRepository.save(movement);
+        eventOutboxService.createStockMovementEvent(movement);
 
         if (newQuantity == 0) {
             notAssignedInventoryRepository.delete(inventory);
