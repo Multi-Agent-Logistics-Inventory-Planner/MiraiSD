@@ -15,14 +15,14 @@ import { AnalyticsTab } from "@/types/analytics";
 
 const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
   {
-    value: AnalyticsTab.PREDICTIONS,
-    label: "Predictions",
-    icon: TrendingDown,
-  },
-  {
     value: AnalyticsTab.INSIGHTS,
     label: "Insights",
     icon: Lightbulb,
+  },
+  {
+    value: AnalyticsTab.PREDICTIONS,
+    label: "Stockout Predictions",
+    icon: TrendingDown,
   },
   {
     value: AnalyticsTab.DEMAND_LEADERS,

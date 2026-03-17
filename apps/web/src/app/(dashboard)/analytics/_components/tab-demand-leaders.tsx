@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
   Activity,
   AlertCircle,
-  Award,
   BarChart3,
   Package,
   Target,
@@ -31,25 +30,14 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { PERIOD_OPTIONS } from "@/lib/constants/analytics"
+import { formatNumber } from "@/lib/utils/format"
 import { useDemandLeaders } from "@/hooks/queries/use-demand-leaders"
 import type {
-  CategoryRanking,
   DemandLeader,
   DemandLeadersPeriod,
   DemandSummary,
 } from "@/types/analytics"
-
-const PERIOD_OPTIONS: { value: DemandLeadersPeriod; label: string }[] = [
-  { value: "7d", label: "Last 7 Days" },
-  { value: "30d", label: "Last 30 Days" },
-  { value: "90d", label: "Last 90 Days" },
-  { value: "ytd", label: "Year to Date" },
-]
-
-function formatNumber(value: number | null, decimals: number = 1): string {
-  if (value === null || value === undefined) return 'N/A'
-  return value.toFixed(decimals)
-}
 
 function getAccuracyColor(accuracy: number | null): string {
   if (accuracy === null) return 'text-muted-foreground'
@@ -294,63 +282,6 @@ function DemandLeadersTable({
   )
 }
 
-function CategoryRankingCard({
-  rankings,
-  isLoading,
-}: {
-  rankings?: CategoryRanking[]
-  isLoading: boolean
-}) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-40" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-2 w-full" />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Category Rankings</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {rankings?.map((category) => (
-          <div key={category.categoryId} className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">#{category.rank}</span>
-                <span className="font-medium">{category.categoryName}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Activity className="h-3 w-3 text-muted-foreground" />
-                <span className="font-semibold">
-                  {formatNumber(category.totalDemandVelocity, 2)}
-                </span>
-              </div>
-            </div>
-            <Progress value={category.percentOfTotal} className="h-2" />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{category.periodDemand} units ({category.totalItems} items)</span>
-              <span>{formatNumber(category.percentOfTotal)}% of demand</span>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
 export function TabDemandLeaders() {
   const [period, setPeriod] = useState<DemandLeadersPeriod>("30d")
   const { data, isLoading, isError } = useDemandLeaders(period)
@@ -385,34 +316,24 @@ export function TabDemandLeaders() {
 
       <SummaryCards summary={data?.summary} isLoading={isLoading} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <Tabs defaultValue="velocity">
-                <TabsList>
-                  <TabsTrigger value="velocity">By Demand Velocity</TabsTrigger>
-                  <TabsTrigger value="stock">By Stock Velocity</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="velocity">
-                <TabsContent value="velocity" className="mt-0">
-                  <DemandLeadersTable leaders={data?.byDemandVelocity} isLoading={isLoading} metricType="velocity" />
-                </TabsContent>
-                <TabsContent value="stock" className="mt-0">
-                  <DemandLeadersTable leaders={data?.byStockVelocity} isLoading={isLoading} metricType="stock" />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <CategoryRankingCard rankings={data?.categoryRankings} isLoading={isLoading} />
-        </div>
-      </div>
+      <Card>
+        <Tabs defaultValue="velocity">
+          <CardHeader className="pb-2">
+            <TabsList>
+              <TabsTrigger value="velocity">By Demand Velocity</TabsTrigger>
+              <TabsTrigger value="stock">By Stock Velocity</TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          <CardContent>
+            <TabsContent value="velocity" className="mt-0">
+              <DemandLeadersTable leaders={data?.byDemandVelocity} isLoading={isLoading} metricType="velocity" />
+            </TabsContent>
+            <TabsContent value="stock" className="mt-0">
+              <DemandLeadersTable leaders={data?.byStockVelocity} isLoading={isLoading} metricType="stock" />
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
     </div>
   )
 }

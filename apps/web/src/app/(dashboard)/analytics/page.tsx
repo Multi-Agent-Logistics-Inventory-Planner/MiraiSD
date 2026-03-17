@@ -31,12 +31,12 @@ function AnalyticsContent() {
   const { user } = useAuth()
   const isAdmin = user?.role === UserRole.ADMIN
 
-  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.PREDICTIONS
+  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.INSIGHTS
 
   // Redirect non-admins from admin-only tabs
   useEffect(() => {
     if (!isAdmin && ADMIN_ONLY_TABS.has(currentTab)) {
-      router.replace("/analytics?tab=predictions")
+      router.replace("/analytics?tab=insights")
     }
   }, [isAdmin, currentTab, router])
 

@@ -1,41 +1,25 @@
 "use client";
 
 import {
-  Activity,
   AlertCircle,
   ArrowDown,
   ArrowRight,
   ArrowUp,
-  BarChart3,
   Calendar,
-  Target,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useInsights } from "@/hooks/queries/use-insights";
 import type {
-  CategoryPerformance,
   DayOfWeekPattern,
   Mover,
   MoverDirection,
 } from "@/types/analytics";
 import { LongestRunningDisplaysCard } from "./longest-running-displays-card";
-
-function formatNumber(value: number | null, decimals: number = 1): string {
-  if (value === null || value === undefined) return "N/A";
-  return value.toFixed(decimals);
-}
-
-function getAccuracyColor(accuracy: number | null): string {
-  if (accuracy === null) return "text-muted-foreground";
-  if (accuracy >= 80) return "text-green-600";
-  if (accuracy >= 60) return "text-yellow-600";
-  return "text-red-600";
-}
+import { CategoryDemandSection } from "./category-demand-section";
 
 function DayOfWeekChart({
   patterns,
@@ -44,17 +28,47 @@ function DayOfWeekChart({
   patterns?: DayOfWeekPattern[];
   isLoading: boolean;
 }) {
+  const skeletonHeights = [60, 75, 50, 80, 65, 90, 70];
+
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-40" />
+      <Card className="dark:border-0">
+        <CardHeader className="flex flex-row items-center justify-between pb-8">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-5 w-28" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Skeleton className="w-3 h-3 rounded" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Skeleton className="w-3 h-3 rounded" />
+              <Skeleton className="h-3 w-14" />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-2 h-40">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <Skeleton key={i} className="flex-1 h-20" />
+            {skeletonHeights.map((height, i) => (
+              <div
+                key={i}
+                className="flex-1 h-full flex flex-col items-center gap-1"
+              >
+                <div className="relative w-full flex-1 flex items-end justify-center">
+                  <Skeleton
+                    className="w-3/4 rounded-t"
+                    style={{ height: `${height}%` }}
+                  />
+                </div>
+                <Skeleton className="h-3 w-6" />
+                <Skeleton className="h-3 w-6" />
+              </div>
             ))}
+          </div>
+          <div className="flex justify-center mt-4">
+            <Skeleton className="h-3 w-64" />
           </div>
         </CardContent>
       </Card>
@@ -141,71 +155,6 @@ function DayOfWeekChart({
         <p className="text-xs text-muted-foreground mt-4 text-center">
           Actual sales vs forecast patterns (last 90 days)
         </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CategoryPerformanceList({
-  categories,
-  isLoading,
-}: {
-  categories?: CategoryPerformance[];
-  isLoading: boolean;
-}) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-40" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-2 w-full" />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-8">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" />
-          Category Performance
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {categories?.slice(0, 5).map((category) => (
-          <div key={category.categoryId} className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">{category.categoryName}</span>
-              <div className="flex items-center gap-2">
-                <Activity className="h-3 w-3 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  {formatNumber(category.avgDemandVelocity, 2)} units/day
-                </span>
-              </div>
-            </div>
-            <Progress value={category.demandShare} className="h-2" />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{category.unitsSold} units sold</span>
-              <div className="flex items-center gap-3">
-                <span>{formatNumber(category.demandShare)}% of demand</span>
-                <span
-                  className={getAccuracyColor(category.avgForecastAccuracy)}
-                >
-                  <Target className="inline h-3 w-3 mr-1" />
-                  {formatNumber(category.avgForecastAccuracy)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
       </CardContent>
     </Card>
   );
@@ -327,10 +276,7 @@ export function TabInsights() {
         />
       </div>
 
-      <CategoryPerformanceList
-        categories={data?.categoryPerformance}
-        isLoading={isLoading}
-      />
+      <CategoryDemandSection />
 
       <div className="grid gap-4 md:grid-cols-2">
         <MoversCard

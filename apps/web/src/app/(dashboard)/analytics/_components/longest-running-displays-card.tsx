@@ -83,23 +83,27 @@ function ProductImage({
 
 function LoadingSkeleton() {
   return (
-    <Card className="flex flex-col overflow-hidden h-[340px]">
-      <CardHeader className="shrink-0 pb-8">
+    <Card className="flex flex-col overflow-hidden h-[340px] dark:border-0">
+      <CardHeader className="shrink-0 pb-0">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-8 w-8" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-5 w-44" />
+          </div>
+          <Skeleton className="h-8 w-8 rounded-md" />
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 pt-0 overflow-hidden">
-        <div className="space-y-2 px-6">
-          {Array.from({ length: 3 }).map((_, i) => (
+      <CardContent className="flex-1 min-h-0 pt-6 px-6 overflow-hidden">
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 py-2">
               <Skeleton className="h-10 w-10 rounded-md shrink-0" />
-              <div className="flex-1 space-y-1">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-16" />
+              <div className="min-w-0 space-y-1 flex-1">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-3 w-14" />
               </div>
-              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-6 hidden sm:block" />
+              <Skeleton className="h-4 w-14" />
             </div>
           ))}
         </div>
