@@ -13,7 +13,7 @@ import { useAllForecasts, useAtRiskForecasts } from "./use-forecasts";
 import { useNotifications, useNotificationCounts } from "./use-notifications";
 import { useProducts } from "./use-products";
 import { getPerformanceMetrics } from "@/lib/api/analytics";
-import { getShipments } from "@/lib/api/shipments";
+import { getShipmentsPaged } from "@/lib/api/shipments";
 import { getLocationsWithCounts } from "@/lib/api/locations";
 import { ShipmentStatus, NotificationSeverity } from "@/types/api";
 import type { Product } from "@/types/api";
@@ -53,17 +53,26 @@ export function useDashboardMetrics() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const pendingShipmentsQuery = useQuery({
-    queryKey: ["shipments", "pending"],
-    queryFn: () => getShipments(ShipmentStatus.PENDING),
+  // Fetch all active shipments in a single query, then filter client-side
+  const activeShipmentsQuery = useQuery({
+    queryKey: ["shipments", "active"],
+    queryFn: async () => {
+      const response = await getShipmentsPaged({}, 0, 100);
+      return response.content;
+    },
     staleTime: 60 * 1000,
   });
 
-  const inTransitShipmentsQuery = useQuery({
-    queryKey: ["shipments", "in-transit"],
-    queryFn: () => getShipments(ShipmentStatus.IN_TRANSIT),
-    staleTime: 60 * 1000,
-  });
+  // Filter pending and in-transit from the single query result
+  const pendingShipments = useMemo(() =>
+    activeShipmentsQuery.data?.filter(s => s.status === ShipmentStatus.PENDING) ?? [],
+    [activeShipmentsQuery.data]
+  );
+
+  const inTransitShipments = useMemo(() =>
+    activeShipmentsQuery.data?.filter(s => s.status === ShipmentStatus.IN_TRANSIT) ?? [],
+    [activeShipmentsQuery.data]
+  );
 
   const locationsQuery = useQuery({
     queryKey: ["locations", "with-counts"],
@@ -86,8 +95,7 @@ export function useDashboardMetrics() {
     notificationsQuery.isLoading ||
     productsQuery.isLoading ||
     performanceMetricsQuery.isLoading ||
-    pendingShipmentsQuery.isLoading ||
-    inTransitShipmentsQuery.isLoading ||
+    activeShipmentsQuery.isLoading ||
     locationsQuery.isLoading;
 
   // First error from any query
@@ -98,8 +106,7 @@ export function useDashboardMetrics() {
     notificationsQuery.error ??
     productsQuery.error ??
     performanceMetricsQuery.error ??
-    pendingShipmentsQuery.error ??
-    inTransitShipmentsQuery.error ??
+    activeShipmentsQuery.error ??
     locationsQuery.error;
 
   // Compute aggregated dashboard metrics
@@ -110,8 +117,6 @@ export function useDashboardMetrics() {
     const notifications = notificationsQuery.data;
     const products = productsQuery.data;
     const performanceMetrics = performanceMetricsQuery.data;
-    const pendingShipments = pendingShipmentsQuery.data;
-    const inTransitShipments = inTransitShipmentsQuery.data;
     const locations = locationsQuery.data;
 
     // Require minimum data to render
@@ -210,8 +215,8 @@ export function useDashboardMetrics() {
     notificationsQuery.data,
     productsQuery.data,
     performanceMetricsQuery.data,
-    pendingShipmentsQuery.data,
-    inTransitShipmentsQuery.data,
+    pendingShipments,
+    inTransitShipments,
     locationsQuery.data,
     previousMetrics,
   ]);

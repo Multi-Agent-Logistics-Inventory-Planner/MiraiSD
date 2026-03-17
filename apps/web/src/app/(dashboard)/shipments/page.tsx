@@ -32,7 +32,7 @@ import {
   type ShipmentDisplayStatus,
 } from "@/lib/shipment-utils";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 5;
 
 export default function ShipmentsPage() {
   const { toast } = useToast();

@@ -27,7 +27,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
 
     List<Shipment> findByExpectedDeliveryDateBetweenOrderByExpectedDeliveryDateAsc(LocalDate startDate, LocalDate endDate);
 
-    @Query("SELECT DISTINCT s FROM Shipment s JOIN s.items i WHERE i.item.id = :productId ORDER BY s.orderDate DESC")
+    @Query("SELECT DISTINCT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "LEFT JOIN FETCH s.items si " +
+            "LEFT JOIN FETCH si.item " +
+            "WHERE si.item.id = :productId ORDER BY s.orderDate DESC")
     List<Shipment> findByItemsContainingProduct(@Param("productId") UUID productId);
 
     // Single shipment with JOIN FETCH to avoid N+1
