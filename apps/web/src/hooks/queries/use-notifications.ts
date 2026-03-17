@@ -10,6 +10,7 @@ import {
   deleteNotification,
   resolveNotification,
   unresolveNotification,
+  markAsUserRead,
 } from "@/lib/api/notifications";
 import { useToast } from "@/hooks/use-toast";
 import type { NotificationSearchParams } from "@/types/api";
@@ -128,6 +129,26 @@ export function useUnresolveNotification() {
     onError: (error) => {
       toast({
         title: "Failed to reopen notification",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useMarkAsUserRead() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: markAsUserRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast({ title: "Marked as read" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to mark as read",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });

@@ -81,6 +81,14 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}/mark-read")
+    public ResponseEntity<NotificationResponseDTO> markAsUserRead(@PathVariable UUID id) {
+        Notification notification = notificationService.markAsUserRead(id);
+        NotificationResponseDTO response = notificationMapper.toResponseDTO(notification);
+        populateItemName(response);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead() {
         notificationService.markAllAsRead();
@@ -135,7 +143,8 @@ public class NotificationController {
     public ResponseEntity<Map<String, Long>> getNotificationCounts() {
         Map<String, Long> counts = Map.of(
                 "active", notificationService.countActive(),
-                "resolved", notificationService.countResolved()
+                "resolved", notificationService.countResolved(),
+                "unread", notificationService.countUnread()
         );
         return ResponseEntity.ok(counts);
     }

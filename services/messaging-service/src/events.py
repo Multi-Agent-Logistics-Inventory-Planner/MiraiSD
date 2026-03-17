@@ -101,6 +101,7 @@ class EventPayload(BaseModel):
     reorder_point: int | None = Field(None, description="Product reorder threshold")
     sku: str | None = Field(None, description="Product SKU")
     product_id: str | None = Field(None, description="Product UUID (alias for item_id)")
+    product_name: str | None = Field(None, description="Product name")
 
     # Actor and reference
     actor_id: str | None = Field(None, description="User who triggered the change")
@@ -150,6 +151,7 @@ class NormalizedEvent:
     # Product config
     reorder_point: int | None = None
     sku: str | None = None
+    product_name: str | None = None
 
     # Actor and reference
     actor_id: str | None = None

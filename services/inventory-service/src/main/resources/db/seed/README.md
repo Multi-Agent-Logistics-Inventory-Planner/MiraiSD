@@ -62,7 +62,7 @@ Generated notification types:
 - `OUT_OF_STOCK` - Critical severity
 - `REORDER_SUGGESTION` - Info severity
 - `SYSTEM_ALERT` - Info and Warning severity
-- `UNASSIGNED_ITEM` - Warning severity
+- `DISPLAY_STALE` - Warning severity
 
 Approximately 1/3 of notifications are marked as resolved.
 

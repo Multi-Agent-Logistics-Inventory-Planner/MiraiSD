@@ -537,25 +537,25 @@ export function LocationDetailSheet({
     <>
       <div className="shrink-0 flex items-center justify-between py-4 min-h-[52px]">
         <p className="text-sm font-medium">Current Products</p>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setAddDisplayDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Product
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={() => setAddDisplayDialogOpen(true)}>
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Add Product</span>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setTransferDisplayDialogOpen(true)}>
-            <ArrowLeftRight className="h-4 w-4 mr-1" />
-            Transfer
+          <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={() => setTransferDisplayDialogOpen(true)}>
+            <ArrowLeftRight className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Transfer</span>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setRenewDisplayDialogOpen(true)}>
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Renew
+          <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3" onClick={() => setRenewDisplayDialogOpen(true)}>
+            <RefreshCw className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Renew</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
-          <div className="pb-6 pr-3">
+          <div className="pb-6 pr-3 overflow-hidden">
             {activeDisplaysForMachine.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
                 No products currently displayed
@@ -567,7 +567,7 @@ export function LocationDetailSheet({
                   <div
                     key={item.id}
                     className={cn(
-                      "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0",
+                      "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 min-w-0 overflow-hidden border-b last:border-b-0",
                       item.stale && "bg-amber-50 dark:bg-amber-950/20"
                     )}
                   >
@@ -586,12 +586,11 @@ export function LocationDetailSheet({
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 w-0">
                       <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        <span className="font-mono text-[10px] sm:text-xs text-muted-foreground">{item.productSku}</span>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground">· {item.daysActive} days</span>
-                      </div>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
+                        · {item.daysActive} days
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {item.stale && (
@@ -602,7 +601,7 @@ export function LocationDetailSheet({
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
                         onClick={() => handleClearClick(item)}
                         title="Remove product"
                       >

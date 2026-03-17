@@ -48,7 +48,11 @@ function ReviewCard({ review }: { review: Review }) {
   const isLong = review.reviewText && review.reviewText.length > 150;
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+    // Parse as local date to avoid timezone offset issues
+    // dateStr format: "YYYY-MM-DD"
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",

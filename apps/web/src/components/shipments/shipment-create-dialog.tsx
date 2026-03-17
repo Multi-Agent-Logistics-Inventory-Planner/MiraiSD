@@ -62,7 +62,7 @@ const itemSchema = z.object({
 });
 
 const schema = z.object({
-  shipmentNumber: z.string().min(1, "Shipment number is required"),
+  shipmentNumber: z.string().min(1, "Shipment Name is required"),
   supplierName: z.string().optional(),
   orderDate: z.string().min(1, "Order date is required"),
   expectedDeliveryDate: z.string().optional(),
@@ -210,7 +210,7 @@ export function ShipmentCreateDialog({
       } else {
         // Create mode: fresh form
         form.reset({
-          shipmentNumber: generateShipmentNumber(),
+          shipmentNumber: "",
           supplierName: "",
           orderDate: format(new Date(), "yyyy-MM-dd"),
           expectedDeliveryDate: "",
@@ -257,17 +257,6 @@ export function ShipmentCreateDialog({
       }
     });
   }, [childrenByProductId, form, items]);
-
-  function generateShipmentNumber() {
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-    return `SHP-${year}${month}${day}-${random}`;
-  }
 
   function handleSelectProduct(index: number, product: Product) {
     form.setValue(`items.${index}.productId`, product.id);
@@ -410,9 +399,10 @@ export function ShipmentCreateDialog({
               {/* Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="shipmentNumber">Shipment Number</Label>
+                  <Label htmlFor="shipmentNumber">Shipment Name</Label>
                   <Input
                     id="shipmentNumber"
+                    placeholder="Enter shipment name..."
                     readOnly={isEditMode}
                     className={isEditMode ? "bg-muted" : undefined}
                     {...form.register("shipmentNumber")}

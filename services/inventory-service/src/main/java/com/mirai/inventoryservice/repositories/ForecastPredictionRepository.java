@@ -46,5 +46,8 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             + "ORDER BY fp.days_to_stockout ASC",
             nativeQuery = true)
     List<ForecastPrediction> findLatestAtRisk(@Param("threshold") double threshold);
+
+    // Delete all predictions for a specific inventory item
+    void deleteByItemId(UUID itemId);
 }
 

@@ -4,18 +4,14 @@ import {
   Bell,
   AlertTriangle,
   Info,
-  Trash2,
+  Archive,
   CheckCircle,
   RotateCcw,
+  Package,
+  Truck,
+  Monitor,
+  Settings,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  DataTableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,70 +30,132 @@ interface NotificationsTableProps {
   onResolve: (id: string) => void;
   onUnresolve: (id: string) => void;
   onDelete: (id: string) => void;
+  onMarkAsRead?: (id: string) => void;
 }
+
+type NotificationCategory = "stock" | "shipment" | "display" | "system";
 
 function getSeverityIcon(severity: NotificationSeverity) {
   switch (severity) {
     case NotificationSeverity.CRITICAL:
-      return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      return (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-red-500/15">
+          <AlertTriangle className="h-5 w-5 text-red-500" />
+        </div>
+      );
     case NotificationSeverity.WARNING:
-      return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      return (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-amber-500/15">
+          <AlertTriangle className="h-5 w-5 text-amber-500" />
+        </div>
+      );
     case NotificationSeverity.INFO:
-      return <Info className="h-4 w-4 text-blue-500" />;
+      return (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-green-500/15">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+        </div>
+      );
     default:
-      return <Bell className="h-4 w-4" />;
+      return (
+        <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted">
+          <Bell className="h-5 w-5" />
+        </div>
+      );
   }
 }
 
-function getSeverityColor(severity: NotificationSeverity) {
+function getSeverityBadgeStyle(severity: NotificationSeverity) {
   switch (severity) {
     case NotificationSeverity.CRITICAL:
-      return "bg-red-100 text-red-700 border-red-200";
+      return "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30";
     case NotificationSeverity.WARNING:
-      return "bg-amber-100 text-amber-700 border-amber-200";
+      return "bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30";
     case NotificationSeverity.INFO:
-      return "bg-blue-100 text-blue-700 border-blue-200";
+      return "bg-muted/80 text-muted-foreground border-border hover:bg-muted";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-muted/80 text-muted-foreground border-border hover:bg-muted";
   }
 }
 
-function getTypeLabel(type: NotificationTypeEnum) {
+function getCategoryBadgeStyle(category: NotificationCategory) {
+  switch (category) {
+    case "stock":
+      return "bg-purple-500/25 text-purple-300 border-purple-500/40 hover:bg-purple-500/35";
+    case "shipment":
+      return "bg-cyan-500/25 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/35";
+    case "display":
+      return "bg-orange-500/25 text-orange-300 border-orange-500/40 hover:bg-orange-500/35";
+    case "system":
+      return "bg-emerald-500/25 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/35";
+    default:
+      return "bg-gray-500/25 text-gray-300 border-gray-500/40 hover:bg-gray-500/35";
+  }
+}
+
+function getTypeLabel(type: NotificationTypeEnum): string {
   switch (type) {
     case NotificationTypeEnum.OUT_OF_STOCK:
-      return "Stockout";
+      return "Out of Stock";
     case NotificationTypeEnum.LOW_STOCK:
       return "Low Stock";
     case NotificationTypeEnum.REORDER_SUGGESTION:
-      return "Reorder";
+      return "Reorder Suggestion";
     case NotificationTypeEnum.EXPIRY_WARNING:
-      return "Expiry";
+      return "Expiry Warning";
     case NotificationTypeEnum.SYSTEM_ALERT:
-      return "System";
-    case NotificationTypeEnum.UNASSIGNED_ITEM:
-      return "Unassigned";
+      return "System Alert";
+    case NotificationTypeEnum.SHIPMENT_COMPLETED:
+      return "Shipment Completed";
+    case NotificationTypeEnum.SHIPMENT_DAMAGED:
+      return "Damaged Items";
+    case NotificationTypeEnum.DISPLAY_STALE:
+      return "Stale Display";
     default:
       return type;
   }
 }
 
+function getCategoryFromType(type: NotificationTypeEnum): NotificationCategory {
+  switch (type) {
+    case NotificationTypeEnum.LOW_STOCK:
+    case NotificationTypeEnum.OUT_OF_STOCK:
+    case NotificationTypeEnum.REORDER_SUGGESTION:
+      return "stock";
+    case NotificationTypeEnum.SHIPMENT_COMPLETED:
+    case NotificationTypeEnum.SHIPMENT_DAMAGED:
+      return "shipment";
+    case NotificationTypeEnum.DISPLAY_STALE:
+      return "display";
+    case NotificationTypeEnum.EXPIRY_WARNING:
+    case NotificationTypeEnum.SYSTEM_ALERT:
+    default:
+      return "system";
+  }
+}
+
+function getCategoryLabel(category: NotificationCategory): string {
+  switch (category) {
+    case "stock":
+      return "Stock";
+    case "shipment":
+      return "Shipment";
+    case "display":
+      return "Display";
+    case "system":
+      return "System";
+  }
+}
+
 function formatTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+  const month = date.toLocaleString("en-US", { month: "short" });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${hour12}:${minutes}${ampm} - ${month} ${day}, ${year}`;
 }
 
 export function NotificationsTable({
@@ -108,56 +166,37 @@ export function NotificationsTable({
   onResolve,
   onUnresolve,
   onDelete,
+  onMarkAsRead,
 }: NotificationsTableProps) {
   if (isLoading) {
     return (
-      <>
-        {/* Mobile loading skeleton */}
-        <div className="sm:hidden divide-y">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-4 w-4" />
-                <Skeleton className="h-5 w-16" />
-                <Skeleton className="h-4 w-12" />
+      <div className="divide-y divide-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-6 w-40" />
               </div>
-              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-36" />
             </div>
-          ))}
-        </div>
-
-        {/* Desktop loading skeleton */}
-        <Table className="hidden sm:table">
-          <DataTableHeader>
-            <TableHead className="w-[50px] rounded-l-lg" />
-            <TableHead>Type</TableHead>
-            <TableHead className="w-full">Content</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead className="w-[100px] rounded-r-lg" />
-          </DataTableHeader>
-          <TableBody>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
-                <TableCell className="rounded-l-lg">
-                  <Skeleton className="h-4 w-4" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-5 w-16" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-full max-w-md" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-4 w-20" />
-                </TableCell>
-                <TableCell className="rounded-r-lg">
-                  <Skeleton className="h-8 w-16" />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </>
+            <div>
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+              <div className="flex gap-3">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-28" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -171,141 +210,106 @@ export function NotificationsTable({
   }
 
   return (
-    <>
-      {/* Mobile card layout */}
-      <div className="sm:hidden divide-y">
-        {notifications.map((notification) => (
+    <div className="divide-y divide-border">
+      {notifications.map((notification) => {
+        const category = getCategoryFromType(notification.type);
+        const isRead = !!notification.readAt;
+
+        return (
           <div
             key={notification.id}
-            className="p-4 cursor-pointer hover:bg-muted/50 active:bg-muted"
+            className={cn(
+              "p-6 cursor-pointer transition-colors hover:bg-muted/30",
+              !isRead && !isResolved && "bg-muted/10"
+            )}
             onClick={() => onRowClick(notification)}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
+            {/* Header row: Icon + Title on left, Timestamp on right */}
+            <div className="flex items-start justify-between gap-4 mb-2">
+              <div className="flex items-center gap-3">
                 {getSeverityIcon(notification.severity)}
+                <h3 className="text-lg font-semibold text-foreground">
+                  {getTypeLabel(notification.type)}
+                </h3>
+              </div>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {formatTimestamp(notification.createdAt)}
+              </span>
+            </div>
+
+            {/* Description */}
+            <p className="text-[15px] text-muted-foreground mb-4 leading-relaxed">
+              {notification.message}
+            </p>
+
+            {/* Footer: Tags on left, Actions on right */}
+            <div className="flex items-center justify-between">
+              {/* Tags */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-xs whitespace-nowrap",
-                    getSeverityColor(notification.severity)
+                    "text-xs font-medium rounded-full px-3 py-0.5",
+                    getSeverityBadgeStyle(notification.severity)
                   )}
                 >
-                  {getTypeLabel(notification.type)}
+                  {notification.severity === NotificationSeverity.INFO ? "Info" : notification.severity}
                 </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {formatTimestamp(notification.createdAt)}
-                </span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs font-medium rounded-full px-3 py-0.5",
+                    getCategoryBadgeStyle(category)
+                  )}
+                >
+                  {getCategoryLabel(category)}
+                </Badge>
               </div>
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+
+              {/* Action buttons */}
+              <div
+                className="flex items-center gap-3"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {isResolved ? (
                   <Button
                     variant="ghost"
-                    size="icon-sm"
+                    size="sm"
                     onClick={() => onUnresolve(notification.id)}
-                    title="Reopen notification"
+                    className="gap-2 text-muted-foreground hover:text-foreground"
                   >
                     <RotateCcw className="h-4 w-4" />
+                    Reopen
                   </Button>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => onResolve(notification.id)}
-                    title="Resolve notification"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onResolve(notification.id)}
+                      className="gap-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <Archive className="h-4 w-4" />
+                      Archive
+                    </Button>
+                    {onMarkAsRead && !isRead && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onMarkAsRead(notification.id)}
+                        className="gap-2 text-muted-foreground hover:text-foreground"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Mark as Read
+                      </Button>
+                    )}
+                  </>
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive"
-                  onClick={() => onDelete(notification.id)}
-                  title="Delete notification"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             </div>
-            <p className="text-sm mt-2 text-foreground">
-              {notification.message}
-            </p>
           </div>
-        ))}
-      </div>
-
-      {/* Desktop table layout */}
-      <Table className="hidden sm:table">
-        <DataTableHeader>
-          <TableHead className="w-[50px] rounded-l-lg" />
-          <TableHead>Type</TableHead>
-          <TableHead className="w-full">Content</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead className="w-[100px] rounded-r-lg" />
-        </DataTableHeader>
-        <TableBody>
-          {notifications.map((notification) => (
-            <TableRow
-              key={notification.id}
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => onRowClick(notification)}
-            >
-              <TableCell className="rounded-l-lg">{getSeverityIcon(notification.severity)}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs whitespace-nowrap",
-                    getSeverityColor(notification.severity)
-                  )}
-                >
-                  {getTypeLabel(notification.type)}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <p className="text-sm truncate max-w-md" title={notification.message}>
-                  {notification.message}
-                </p>
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                {formatTimestamp(notification.createdAt)}
-              </TableCell>
-              <TableCell className="rounded-r-lg">
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  {isResolved ? (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onUnresolve(notification.id)}
-                      title="Reopen notification"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onResolve(notification.id)}
-                      title="Resolve notification"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive"
-                    onClick={() => onDelete(notification.id)}
-                    title="Delete notification"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </>
+        );
+      })}
+    </div>
   );
 }

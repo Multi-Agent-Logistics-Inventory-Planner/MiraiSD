@@ -30,5 +30,6 @@ public class NotificationResponseDTO {
     private OffsetDateTime createdAt;
     private OffsetDateTime deliveredAt;
     private OffsetDateTime resolvedAt;
+    private OffsetDateTime readAt;
 }
 

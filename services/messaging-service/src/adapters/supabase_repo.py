@@ -644,3 +644,101 @@ class SupabaseRepo:
             logger.error("Failed to get monthly review totals: %s", e)
             return []
 
+    # -------------------------------------------------------------------------
+    # Display staleness methods
+    # -------------------------------------------------------------------------
+
+    def get_stale_displays(self, threshold_days: int = 45) -> list[dict]:
+        """Get active displays that have been displayed longer than threshold.
+
+        Args:
+            threshold_days: Number of days after which a display is considered stale.
+
+        Returns:
+            List of dicts with display and product info.
+        """
+        query = text("""
+            SELECT
+                md.id,
+                md.machine_id,
+                md.product_id,
+                md.location_type,
+                p.name as product_name,
+                p.sku as product_sku,
+                md.started_at,
+                EXTRACT(DAY FROM NOW() - md.started_at)::INTEGER as days_active
+            FROM machine_displays md
+            JOIN products p ON md.product_id = p.id
+            WHERE md.ended_at IS NULL
+              AND md.started_at < NOW() - MAKE_INTERVAL(days => :threshold_days)
+            ORDER BY md.started_at ASC
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query, {"threshold_days": threshold_days})
+                displays = []
+                for row in result.fetchall():
+                    displays.append({
+                        "id": str(row.id),
+                        "machine_id": str(row.machine_id),
+                        "product_id": str(row.product_id),
+                        "location_type": row.location_type,
+                        "product_name": row.product_name,
+                        "product_sku": row.product_sku,
+                        "started_at": row.started_at.isoformat() if row.started_at else None,
+                        "days_active": row.days_active,
+                    })
+                logger.info("Found %d stale displays (>%d days)", len(displays), threshold_days)
+                return displays
+        except Exception as e:
+            logger.error("Failed to get stale displays: %s", e)
+            return []
+
+    def create_stale_display_notification(
+        self,
+        product_id: str,
+        product_name: str,
+        machine_id: str,
+        location_type: str,
+        days_active: int,
+    ) -> str | None:
+        """Create a stale display notification with deduplication.
+
+        Uses dedupe_key to ensure only one notification per product/machine combo
+        per day.
+
+        Args:
+            product_id: UUID of the product.
+            product_name: Name of the product.
+            machine_id: UUID of the machine.
+            location_type: Type of location (e.g., SINGLE_CLAW, DOUBLE_CLAW).
+            days_active: Number of days the product has been displayed.
+
+        Returns:
+            Notification UUID if created, None if duplicate or error.
+        """
+        from datetime import date
+
+        # Dedupe key includes date to allow daily re-notification
+        dedupe_key = f"DISPLAY_STALE:{product_id}:{machine_id}:{date.today().isoformat()}"
+
+        metadata = {
+            "machine_id": machine_id,
+            "location_type": location_type,
+            "product_name": product_name,
+            "days_active": days_active,
+            "category": "display",
+        }
+
+        message = f"{product_name} has been on display for {days_active} days"
+
+        return self.create_notification(
+            notification_type="DISPLAY_STALE",
+            severity="WARNING",
+            message=message,
+            item_id=product_id,
+            metadata=metadata,
+            dedupe_key=dedupe_key,
+        )
+

@@ -54,6 +54,7 @@ public class EventOutboxService {
         // Build payload with resolved location codes for ML analytics
         Map<String, Object> payload = new HashMap<>();
         payload.put("product_id", movement.getItem().getId().toString());
+        payload.put("product_name", movement.getItem().getName());
         payload.put("sku", movement.getItem().getSku());
         payload.put("item_id", movement.getItem().getId().toString());
         payload.put("quantity_change",  movement.getQuantityChange());

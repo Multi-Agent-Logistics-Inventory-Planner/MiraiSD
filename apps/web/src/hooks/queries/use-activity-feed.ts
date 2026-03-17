@@ -3,7 +3,7 @@
 import { useMemo, useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAuditLog } from "@/lib/api/stock-movements";
-import { getShipments } from "@/lib/api/shipments";
+import { getShipmentsPaged } from "@/lib/api/shipments";
 import { getNotifications } from "@/lib/api/notifications";
 import { StockMovementReason } from "@/types/api";
 import type { ActivityFeedEvent, ActivityEventType } from "@/types/dashboard";
@@ -88,10 +88,13 @@ export function useActivityFeed(filters: ActivityFeedFilters = DEFAULT_FILTERS) 
     staleTime: 60 * 1000,
   });
 
-  // Fetch recent shipments
+  // Fetch recent shipments (limited to 50 for performance)
   const shipmentsQuery = useQuery({
     queryKey: ["activity-feed", "shipments"],
-    queryFn: () => getShipments(),
+    queryFn: async () => {
+      const response = await getShipmentsPaged({}, 0, 50);
+      return response.content;
+    },
     staleTime: 60 * 1000,
   });
 

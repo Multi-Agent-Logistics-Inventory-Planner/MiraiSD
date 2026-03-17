@@ -17,6 +17,7 @@ import {
   useResolveNotification,
   useUnresolveNotification,
   useDeleteNotification,
+  useMarkAsUserRead,
 } from "@/hooks/queries/use-notifications";
 import type { NotificationType, Notification } from "@/types/api";
 
@@ -47,6 +48,7 @@ export default function NotificationsPage() {
   const resolveMutation = useResolveNotification();
   const unresolveMutation = useUnresolveNotification();
   const deleteMutation = useDeleteNotification();
+  const markAsReadMutation = useMarkAsUserRead();
 
   const counts = countsQuery.data ?? { active: 0, resolved: 0 };
   const paginatedData = notificationsQuery.data;
@@ -83,11 +85,6 @@ export default function NotificationsPage() {
         <SidebarTrigger className="md:hidden" />
         <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
       </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {counts.active + counts.resolved} Notification{counts.active + counts.resolved !== 1 ? "s" : ""}
-          </p>
-        </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="flex flex-col gap-4">
@@ -128,19 +125,18 @@ export default function NotificationsPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="py-0">
-            <CardContent className="p-0">
-              <NotificationsTable
-                notifications={notifications}
-                isLoading={notificationsQuery.isLoading}
-                isResolved={activeTab === "resolved"}
-                onRowClick={handleRowClick}
-                onResolve={(id) => resolveMutation.mutate(id)}
-                onUnresolve={(id) => unresolveMutation.mutate(id)}
-                onDelete={(id) => deleteMutation.mutate(id)}
-              />
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border bg-card">
+            <NotificationsTable
+              notifications={notifications}
+              isLoading={notificationsQuery.isLoading}
+              isResolved={activeTab === "resolved"}
+              onRowClick={handleRowClick}
+              onResolve={(id) => resolveMutation.mutate(id)}
+              onUnresolve={(id) => unresolveMutation.mutate(id)}
+              onDelete={(id) => deleteMutation.mutate(id)}
+              onMarkAsRead={(id) => markAsReadMutation.mutate(id)}
+            />
+          </div>
         )}
 
         <NotificationPagination

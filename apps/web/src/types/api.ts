@@ -97,7 +97,9 @@ export enum NotificationType {
   REORDER_SUGGESTION = "REORDER_SUGGESTION",
   EXPIRY_WARNING = "EXPIRY_WARNING",
   SYSTEM_ALERT = "SYSTEM_ALERT",
-  UNASSIGNED_ITEM = "UNASSIGNED_ITEM",
+  SHIPMENT_COMPLETED = "SHIPMENT_COMPLETED",
+  SHIPMENT_DAMAGED = "SHIPMENT_DAMAGED",
+  DISPLAY_STALE = "DISPLAY_STALE",
 }
 
 export enum NotificationSeverity {
@@ -706,11 +708,13 @@ export interface Notification {
   createdAt: string;
   deliveredAt?: string;
   resolvedAt?: string;
+  readAt?: string;
 }
 
 export interface NotificationCounts {
   active: number;
   resolved: number;
+  unread: number;
 }
 
 export interface NotificationSearchParams {
