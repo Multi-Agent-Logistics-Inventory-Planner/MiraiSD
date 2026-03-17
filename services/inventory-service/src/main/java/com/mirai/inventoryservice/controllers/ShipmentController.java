@@ -46,13 +46,22 @@ public class ShipmentController {
     @GetMapping
     public ResponseEntity<?> listShipments(
             @RequestParam(required = false) ShipmentStatus status,
+            @RequestParam(required = false) String displayStatus,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         // If pagination params are provided, use paginated response
         if (page != null && size != null) {
             Pageable pageable = PageRequest.of(page, size);
-            Page<Shipment> shipmentPage = shipmentService.listShipmentsPaged(status, search, pageable);
+            Page<Shipment> shipmentPage;
+
+            // Use displayStatus if provided (ACTIVE, PARTIAL, COMPLETED), otherwise fall back to status
+            if (displayStatus != null && !displayStatus.isBlank()) {
+                shipmentPage = shipmentService.listShipmentsByDisplayStatus(displayStatus, search, pageable);
+            } else {
+                shipmentPage = shipmentService.listShipmentsPaged(status, search, pageable);
+            }
+
             List<ShipmentResponseDTO> dtos = shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipmentPage.getContent());
             Page<ShipmentResponseDTO> dtoPage = new PageImpl<>(dtos, pageable, shipmentPage.getTotalElements());
             return ResponseEntity.ok(dtoPage);
@@ -62,6 +71,11 @@ public class ShipmentController {
                 ? shipmentService.listShipmentsByStatus(status)
                 : shipmentService.listShipments();
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments));
+    }
+
+    @GetMapping("/display-status-counts")
+    public ResponseEntity<java.util.Map<String, Long>> getDisplayStatusCounts() {
+        return ResponseEntity.ok(shipmentService.getDisplayStatusCounts());
     }
 
     @GetMapping("/{id}")

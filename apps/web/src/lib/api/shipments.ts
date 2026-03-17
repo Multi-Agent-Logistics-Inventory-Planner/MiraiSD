@@ -9,8 +9,11 @@ import {
 
 const BASE_PATH = "/api/shipments";
 
+export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED";
+
 export interface ShipmentFilters {
   status?: ShipmentStatus;
+  displayStatus?: ShipmentDisplayStatus;
   search?: string;
 }
 
@@ -34,7 +37,9 @@ export async function getShipmentsPaged(
   params.append("page", page.toString());
   params.append("size", size.toString());
 
-  if (filters.status) {
+  if (filters.displayStatus) {
+    params.append("displayStatus", filters.displayStatus);
+  } else if (filters.status) {
     params.append("status", filters.status);
   }
   if (filters.search) {
@@ -42,6 +47,13 @@ export async function getShipmentsPaged(
   }
 
   return apiGet<PaginatedResponse<Shipment>>(`${BASE_PATH}?${params.toString()}`);
+}
+
+/**
+ * Get counts for each display status (ACTIVE, PARTIAL, COMPLETED)
+ */
+export async function getDisplayStatusCounts(): Promise<Record<ShipmentDisplayStatus, number>> {
+  return apiGet<Record<ShipmentDisplayStatus, number>>(`${BASE_PATH}/display-status-counts`);
 }
 
 /**

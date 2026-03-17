@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -22,15 +22,11 @@ import {
   ShipmentFilters,
   ShipmentPagination,
 } from "@/components/shipments";
-import { useShipments } from "@/hooks/queries/use-shipments";
+import { useShipments, useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
 import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
-import {
-  filterShipmentsByDisplayStatus,
-  getShipmentDisplayStatusCounts,
-  type ShipmentDisplayStatus,
-} from "@/lib/shipment-utils";
+import type { ShipmentDisplayStatus } from "@/lib/shipment-utils";
 
 const PAGE_SIZE = 5;
 
@@ -54,25 +50,20 @@ export default function ShipmentsPage() {
     null
   );
 
-  // Use server-side pagination with search filter
+  // Use server-side pagination with display status and search filter
   const shipmentsQuery = useShipments(
-    { search: searchQuery || undefined },
+    { displayStatus: activeTab, search: searchQuery || undefined },
     page,
     PAGE_SIZE
   );
 
+  // Get counts for each status tab (from server)
+  const statusCountsQuery = useShipmentDisplayStatusCounts();
+
   const shipments = shipmentsQuery.data?.content ?? [];
   const totalElements = shipmentsQuery.data?.totalElements ?? 0;
 
-  // Get counts for each status tab (from current page data)
-  const statusCounts = useMemo(() => {
-    return getShipmentDisplayStatusCounts(shipments);
-  }, [shipments]);
-
-  // Filter shipments by display status (client-side filtering on server-paginated data)
-  const filteredShipments = useMemo(() => {
-    return filterShipmentsByDisplayStatus(shipments, activeTab);
-  }, [shipments, activeTab]);
+  const statusCounts = statusCountsQuery.data ?? { ACTIVE: 0, PARTIAL: 0, COMPLETED: 0 };
 
   // Reset page when tab or search changes
   const handleTabChange = (value: string) => {
@@ -212,7 +203,7 @@ export default function ShipmentsPage() {
         </Card>
       ) : (
         <ShipmentsList
-          shipments={filteredShipments}
+          shipments={shipments}
           isLoading={shipmentsQuery.isLoading}
           onShipmentClick={handleRowClick}
         />
