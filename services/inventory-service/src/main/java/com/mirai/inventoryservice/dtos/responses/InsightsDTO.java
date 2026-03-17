@@ -9,29 +9,12 @@ import java.util.UUID;
  * Uses demand-based metrics instead of revenue-based metrics.
  */
 public record InsightsDTO(
-    List<CategoryPerformance> categoryPerformance,
     List<DayOfWeekPattern> dayOfWeekPatterns,
     List<Mover> topMovers,
     List<Mover> bottomMovers,
     PeriodSummary currentPeriod,
     PeriodSummary previousPeriod
 ) {
-    /**
-     * Category-level performance metrics using demand-based approach.
-     */
-    public record CategoryPerformance(
-        UUID categoryId,
-        String categoryName,
-        int totalItems,
-        int totalStock,
-        int unitsSold,
-        BigDecimal avgDemandVelocity,
-        BigDecimal totalDemand,
-        BigDecimal demandShare,
-        BigDecimal avgVolatility,
-        BigDecimal avgForecastAccuracy
-    ) {}
-
     /**
      * Day-of-week sales pattern with forecast comparison.
      * Index 0 = Sunday, 6 = Saturday (Postgres EXTRACT DOW convention).

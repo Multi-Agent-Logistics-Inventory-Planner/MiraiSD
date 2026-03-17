@@ -11,7 +11,6 @@ import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.CategoryRankin
 import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.DemandLeader;
 import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.DemandSummary;
 import com.mirai.inventoryservice.dtos.responses.InsightsDTO;
-import com.mirai.inventoryservice.dtos.responses.InsightsDTO.CategoryPerformance;
 import com.mirai.inventoryservice.dtos.responses.InsightsDTO.DayOfWeekPattern;
 import com.mirai.inventoryservice.dtos.responses.InsightsDTO.Mover;
 import com.mirai.inventoryservice.dtos.responses.InsightsDTO.MoverDirection;
@@ -424,8 +423,6 @@ public class AnalyticsService {
             featuresMap.put(fp.getItemId(), extractFeatures(fp));
         }
 
-        List<CategoryPerformance> categoryPerformance = computeCategoryPerformanceWithDemand(
-            rollups, currentPeriodStart, today, featuresMap);
         List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
         List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true);
         List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false);
@@ -433,110 +430,12 @@ public class AnalyticsService {
         PeriodSummary previousPeriod = computePeriodSummaryWithDemand(rollups, previousPeriodStart, currentPeriodStart.minusDays(1), "Previous 30 Days", featuresMap);
 
         return new InsightsDTO(
-            categoryPerformance,
             dowPatterns,
             topMovers,
             bottomMovers,
             currentPeriod,
             previousPeriod
         );
-    }
-
-    private List<CategoryPerformance> computeCategoryPerformanceWithDemand(
-            List<DailySalesRollup> rollups, LocalDate startDate, LocalDate endDate,
-            Map<UUID, ForecastFeatures> featuresMap) {
-
-        List<Product> products = productRepository.findAllWithCategories();
-        Map<UUID, Product> productMap = products.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
-        List<Category> categories = categoryRepository.findAll();
-
-        Map<UUID, Integer> unitsByCategory = new HashMap<>();
-        Map<UUID, BigDecimal> demandVelocityByCategory = new HashMap<>();
-        Map<UUID, BigDecimal> volatilityByCategory = new HashMap<>();
-        Map<UUID, BigDecimal> accuracyByCategory = new HashMap<>();
-        Map<UUID, Integer> itemCountByCategory = new HashMap<>();
-
-        // Aggregate rollup data
-        for (DailySalesRollup rollup : rollups) {
-            if (rollup.getRollupDate().isBefore(startDate)) continue;
-            Product product = productMap.get(rollup.getItemId());
-            if (product == null || product.getCategory() == null) continue;
-            UUID categoryId = product.getCategory().getId();
-
-            unitsByCategory.merge(categoryId, rollup.getUnitsSold(), Integer::sum);
-        }
-
-        // Aggregate demand metrics from forecasts
-        for (Product product : products) {
-            if (product.getCategory() == null) continue;
-            UUID categoryId = product.getCategory().getId();
-            ForecastFeatures features = featuresMap.get(product.getId());
-
-            if (features != null && features.muHat() != null) {
-                demandVelocityByCategory.merge(categoryId, features.muHat(), BigDecimal::add);
-                itemCountByCategory.merge(categoryId, 1, Integer::sum);
-
-                BigDecimal volatility = calculateDemandVolatility(features.muHat(), features.sigmaDHat());
-                if (volatility != null) {
-                    volatilityByCategory.merge(categoryId, volatility, BigDecimal::add);
-                }
-
-                BigDecimal accuracy = calculateForecastAccuracy(features.mape());
-                if (accuracy != null) {
-                    accuracyByCategory.merge(categoryId, accuracy, BigDecimal::add);
-                }
-            }
-        }
-
-        BigDecimal totalDemandVelocity = demandVelocityByCategory.values().stream()
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return categories.stream()
-            .map(cat -> {
-                UUID catId = cat.getId();
-                int units = unitsByCategory.getOrDefault(catId, 0);
-                BigDecimal demandVelocity = demandVelocityByCategory.getOrDefault(catId, BigDecimal.ZERO);
-                int itemCount = itemCountByCategory.getOrDefault(catId, 0);
-                int totalItems = (int) products.stream()
-                    .filter(p -> p.getCategory() != null && p.getCategory().getId().equals(catId))
-                    .count();
-                int totalStock = products.stream()
-                    .filter(p -> p.getCategory() != null && p.getCategory().getId().equals(catId))
-                    .mapToInt(p -> stockMap.getOrDefault(p.getId(), 0))
-                    .sum();
-
-                BigDecimal avgDemandVelocity = itemCount > 0
-                    ? demandVelocity.divide(BigDecimal.valueOf(itemCount), 2, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
-                BigDecimal demandShare = totalDemandVelocity.compareTo(BigDecimal.ZERO) > 0
-                    ? demandVelocity.multiply(BigDecimal.valueOf(100)).divide(totalDemandVelocity, 1, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
-                BigDecimal avgVolatility = itemCount > 0
-                    ? volatilityByCategory.getOrDefault(catId, BigDecimal.ZERO)
-                        .divide(BigDecimal.valueOf(itemCount), 2, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
-                BigDecimal avgAccuracy = itemCount > 0
-                    ? accuracyByCategory.getOrDefault(catId, BigDecimal.ZERO)
-                        .divide(BigDecimal.valueOf(itemCount), 1, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
-
-                return new CategoryPerformance(
-                    catId,
-                    cat.getName(),
-                    totalItems,
-                    totalStock,
-                    units,
-                    avgDemandVelocity,
-                    demandVelocity.setScale(2, RoundingMode.HALF_UP),
-                    demandShare,
-                    avgVolatility,
-                    avgAccuracy
-                );
-            })
-            .sorted(Comparator.comparing(CategoryPerformance::totalDemand).reversed())
-            .toList();
     }
 
     private List<DayOfWeekPattern> computeDowPatternsWithDemand(

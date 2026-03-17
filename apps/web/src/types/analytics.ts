@@ -46,19 +46,6 @@ export interface PredictionsData {
 }
 
 // Insights Types - Now with demand-based metrics
-export interface CategoryPerformance {
-  categoryId: string
-  categoryName: string
-  totalItems: number
-  totalStock: number
-  unitsSold: number
-  avgDemandVelocity: number
-  totalDemand: number
-  demandShare: number
-  avgVolatility: number
-  avgForecastAccuracy: number
-}
-
 export interface DayOfWeekPattern {
   dayOfWeek: number
   dayName: string
@@ -90,7 +77,6 @@ export interface PeriodSummary {
 }
 
 export interface InsightsData {
-  categoryPerformance: CategoryPerformance[]
   dayOfWeekPatterns: DayOfWeekPattern[]
   topMovers: Mover[]
   bottomMovers: Mover[]
