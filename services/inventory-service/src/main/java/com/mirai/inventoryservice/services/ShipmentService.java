@@ -218,6 +218,44 @@ public class ShipmentService {
         return shipmentRepository.findByStatusPaged(status, pageable);
     }
 
+    // Statuses considered "active" (not yet fully received)
+    private static final List<ShipmentStatus> PENDING_STATUSES = List.of(
+            ShipmentStatus.PENDING, ShipmentStatus.IN_TRANSIT
+    );
+
+    /**
+     * List shipments by display status with pagination.
+     * Display statuses are: ACTIVE (pending with no received items), PARTIAL (partially received),
+     * COMPLETED (fully delivered).
+     */
+    public Page<Shipment> listShipmentsByDisplayStatus(String displayStatus, String search, Pageable pageable) {
+        String searchPattern = (search != null && !search.isBlank()) ? "%" + search.toLowerCase() + "%" : null;
+
+        return switch (displayStatus) {
+            case "ACTIVE" -> searchPattern != null
+                    ? shipmentRepository.findActiveShipmentsWithSearch(PENDING_STATUSES, searchPattern, pageable)
+                    : shipmentRepository.findActiveShipments(PENDING_STATUSES, pageable);
+            case "PARTIAL" -> searchPattern != null
+                    ? shipmentRepository.findPartialShipmentsWithSearch(PENDING_STATUSES, searchPattern, pageable)
+                    : shipmentRepository.findPartialShipments(PENDING_STATUSES, pageable);
+            case "COMPLETED" -> searchPattern != null
+                    ? shipmentRepository.findCompletedShipmentsWithSearch(ShipmentStatus.DELIVERED, searchPattern, pageable)
+                    : shipmentRepository.findCompletedShipments(ShipmentStatus.DELIVERED, pageable);
+            default -> listShipmentsPaged(null, search, pageable);
+        };
+    }
+
+    /**
+     * Get counts for each display status (for tab indicators).
+     */
+    public Map<String, Long> getDisplayStatusCounts() {
+        Map<String, Long> counts = new HashMap<>();
+        counts.put("ACTIVE", shipmentRepository.countActiveShipments(PENDING_STATUSES));
+        counts.put("PARTIAL", shipmentRepository.countPartialShipments(PENDING_STATUSES));
+        counts.put("COMPLETED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERED));
+        return counts;
+    }
+
     public List<Shipment> getShipmentsContainingProduct(UUID productId) {
         return shipmentRepository.findByItemsContainingProduct(productId);
     }

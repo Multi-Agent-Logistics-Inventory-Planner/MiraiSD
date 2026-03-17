@@ -101,4 +101,89 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "WHERE (:status IS NULL OR s.status = :status) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findByStatusAndSearch(@Param("status") ShipmentStatus status, @Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // Display status queries - ACTIVE: PENDING/IN_TRANSIT with no received items
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status IN :statuses " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+    Page<Shipment> findActiveShipments(@Param("statuses") List<ShipmentStatus> statuses, Pageable pageable);
+
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status IN :statuses " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
+    Page<Shipment> findActiveShipmentsWithSearch(@Param("statuses") List<ShipmentStatus> statuses, @Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // Display status queries - PARTIAL: PENDING/IN_TRANSIT with some received items
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status IN :statuses " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+    Page<Shipment> findPartialShipments(@Param("statuses") List<ShipmentStatus> statuses, Pageable pageable);
+
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status IN :statuses " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
+    Page<Shipment> findPartialShipmentsWithSearch(@Param("statuses") List<ShipmentStatus> statuses, @Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // Display status queries - COMPLETED: DELIVERED status
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status = :status " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status = :status")
+    Page<Shipment> findCompletedShipments(@Param("status") ShipmentStatus status, Pageable pageable);
+
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status = :status " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
+            "ORDER BY s.createdAt DESC",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status = :status " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
+    Page<Shipment> findCompletedShipmentsWithSearch(@Param("status") ShipmentStatus status, @Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // Count queries for each display status
+    @Query("SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+    long countActiveShipments(@Param("statuses") List<ShipmentStatus> statuses);
+
+    @Query("SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+    long countPartialShipments(@Param("statuses") List<ShipmentStatus> statuses);
+
+    @Query("SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
+    long countCompletedShipments(@Param("status") ShipmentStatus status);
 }
