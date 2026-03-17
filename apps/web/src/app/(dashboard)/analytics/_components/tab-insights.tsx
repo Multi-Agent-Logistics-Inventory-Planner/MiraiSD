@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Activity,
@@ -11,129 +11,38 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
-import { useInsights } from "@/hooks/queries/use-insights"
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { useInsights } from "@/hooks/queries/use-insights";
 import type {
   CategoryPerformance,
   DayOfWeekPattern,
   Mover,
   MoverDirection,
-  PeriodSummary,
-} from "@/types/analytics"
+} from "@/types/analytics";
+import { LongestRunningDisplaysCard } from "./longest-running-displays-card";
 
 function formatNumber(value: number | null, decimals: number = 1): string {
-  if (value === null || value === undefined) return 'N/A'
-  return value.toFixed(decimals)
+  if (value === null || value === undefined) return "N/A";
+  return value.toFixed(decimals);
 }
 
 function getAccuracyColor(accuracy: number | null): string {
-  if (accuracy === null) return 'text-muted-foreground'
-  if (accuracy >= 80) return 'text-green-600'
-  if (accuracy >= 60) return 'text-yellow-600'
-  return 'text-red-600'
-}
-
-function PeriodComparisonCard({
-  current,
-  previous,
-  isLoading,
-}: {
-  current?: PeriodSummary
-  previous?: PeriodSummary
-  isLoading: boolean
-}) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-20 w-full" />
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const demandVelocityChange =
-    previous?.avgDemandVelocity && previous.avgDemandVelocity > 0
-      ? ((current?.avgDemandVelocity ?? 0) - previous.avgDemandVelocity) / previous.avgDemandVelocity * 100
-      : 0
-
-  const unitsChange =
-    previous?.totalUnits && previous.totalUnits > 0
-      ? ((current?.totalUnits ?? 0) - previous.totalUnits) / previous.totalUnits * 100
-      : 0
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Period Comparison</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground">{current?.periodLabel}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <Activity className="h-4 w-4 text-muted-foreground" />
-              <span className="text-2xl font-bold">
-                {formatNumber(current?.avgDemandVelocity ?? 0, 2)}
-              </span>
-              <span className="text-sm text-muted-foreground">units/day</span>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Target className={cn("h-4 w-4", getAccuracyColor(current?.avgForecastAccuracy ?? null))} />
-              <span className={cn("text-sm font-medium", getAccuracyColor(current?.avgForecastAccuracy ?? null))}>
-                {formatNumber(current?.avgForecastAccuracy ?? 0)}% accuracy
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">{current?.totalUnits ?? 0} units sold</p>
-          </div>
-          <div className="flex flex-col items-end">
-            <p className="text-xs text-muted-foreground">vs {previous?.periodLabel}</p>
-            <div className="flex items-center gap-1 mt-1">
-              {demandVelocityChange >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-red-500" />
-              )}
-              <span
-                className={cn(
-                  "text-lg font-semibold",
-                  demandVelocityChange >= 0 ? "text-green-600" : "text-red-600"
-                )}
-              >
-                {demandVelocityChange >= 0 ? "+" : ""}
-                {demandVelocityChange.toFixed(1)}%
-              </span>
-            </div>
-            <span className="text-xs text-muted-foreground">demand velocity</span>
-            <span
-              className={cn(
-                "text-sm mt-2",
-                unitsChange >= 0 ? "text-green-600" : "text-red-600"
-              )}
-            >
-              {unitsChange >= 0 ? "+" : ""}
-              {unitsChange.toFixed(1)}% units
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  if (accuracy === null) return "text-muted-foreground";
+  if (accuracy >= 80) return "text-green-600";
+  if (accuracy >= 60) return "text-yellow-600";
+  return "text-red-600";
 }
 
 function DayOfWeekChart({
   patterns,
   isLoading,
 }: {
-  patterns?: DayOfWeekPattern[]
-  isLoading: boolean
+  patterns?: DayOfWeekPattern[];
+  isLoading: boolean;
 }) {
   if (isLoading) {
     return (
@@ -149,18 +58,20 @@ function DayOfWeekChart({
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const maxUnits = Math.max(...(patterns?.map((p) => p.totalUnits) ?? [1]))
-  const maxMultiplier = Math.max(...(patterns?.map((p) => p.avgDemandMultiplier) ?? [1]))
+  const maxUnits = Math.max(...(patterns?.map((p) => p.totalUnits) ?? [1]));
+  const maxMultiplier = Math.max(
+    ...(patterns?.map((p) => p.avgDemandMultiplier) ?? [1]),
+  );
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          Day of Week Patterns
+    <Card className="dark:border-0">
+      <CardHeader className="flex flex-row items-center justify-between pb-8">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          Daily Patterns
         </CardTitle>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
@@ -168,7 +79,7 @@ function DayOfWeekChart({
             <span>Actual</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 border-2 border-amber-500 rounded" />
+            <div className="w-3 h-3 border-2 border-[#0b66c2] dark:border-[#7c3aed] rounded" />
             <span>Forecast</span>
           </div>
         </div>
@@ -176,12 +87,19 @@ function DayOfWeekChart({
       <CardContent>
         <div className="flex items-end gap-2 h-40">
           {patterns?.map((pattern) => {
-            const actualHeight = (pattern.totalUnits / maxUnits) * 100
-            const forecastHeight = (pattern.avgDemandMultiplier / maxMultiplier) * 100
-            const deviation = pattern.totalUnits > 0 && pattern.avgDemandMultiplier > 0
-              ? Math.abs((pattern.percentOfWeeklyTotal / 100 * 7) - pattern.avgDemandMultiplier) / pattern.avgDemandMultiplier * 100
-              : 0
-            const hasDeviation = deviation > 20
+            const actualHeight = (pattern.totalUnits / maxUnits) * 100;
+            const forecastHeight =
+              (pattern.avgDemandMultiplier / maxMultiplier) * 100;
+            const deviation =
+              pattern.totalUnits > 0 && pattern.avgDemandMultiplier > 0
+                ? (Math.abs(
+                    (pattern.percentOfWeeklyTotal / 100) * 7 -
+                      pattern.avgDemandMultiplier,
+                  ) /
+                    pattern.avgDemandMultiplier) *
+                  100
+                : 0;
+            const hasDeviation = deviation > 20;
 
             return (
               <div
@@ -192,7 +110,9 @@ function DayOfWeekChart({
                   <div
                     className={cn(
                       "w-3/4 rounded-t transition-all",
-                      hasDeviation ? "bg-amber-500/80" : "bg-primary/80"
+                      hasDeviation
+                        ? "bg-[#0b66c2]/80 dark:bg-[#7c3aed]/80"
+                        : "bg-primary/80",
                     )}
                     style={{
                       height: `${actualHeight}%`,
@@ -201,19 +121,21 @@ function DayOfWeekChart({
                     title={`Actual: ${pattern.totalUnits} units`}
                   />
                   <div
-                    className="absolute w-full h-1 border-t-2 border-dashed border-amber-500/70"
+                    className="absolute w-full h-1 border-t-2 border-dashed border-[#0b66c2]/70 dark:border-[#7c3aed]/70"
                     style={{
                       bottom: `${forecastHeight}%`,
                     }}
                     title={`Forecast multiplier: ${pattern.avgDemandMultiplier.toFixed(2)}x`}
                   />
                 </div>
-                <span className="text-xs font-medium">{pattern.dayName.slice(0, 3)}</span>
+                <span className="text-xs font-medium">
+                  {pattern.dayName.slice(0, 3)}
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {pattern.percentOfWeeklyTotal.toFixed(0)}%
                 </span>
               </div>
-            )
+            );
           })}
         </div>
         <p className="text-xs text-muted-foreground mt-4 text-center">
@@ -221,15 +143,15 @@ function DayOfWeekChart({
         </p>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function CategoryPerformanceList({
   categories,
   isLoading,
 }: {
-  categories?: CategoryPerformance[]
-  isLoading: boolean
+  categories?: CategoryPerformance[];
+  isLoading: boolean;
 }) {
   if (isLoading) {
     return (
@@ -246,12 +168,12 @@ function CategoryPerformanceList({
           ))}
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between pb-8">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <BarChart3 className="h-4 w-4" />
           Category Performance
@@ -274,7 +196,9 @@ function CategoryPerformanceList({
               <span>{category.unitsSold} units sold</span>
               <div className="flex items-center gap-3">
                 <span>{formatNumber(category.demandShare)}% of demand</span>
-                <span className={getAccuracyColor(category.avgForecastAccuracy)}>
+                <span
+                  className={getAccuracyColor(category.avgForecastAccuracy)}
+                >
                   <Target className="inline h-3 w-3 mr-1" />
                   {formatNumber(category.avgForecastAccuracy)}%
                 </span>
@@ -284,28 +208,28 @@ function CategoryPerformanceList({
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function getMoverIcon(direction: MoverDirection) {
   switch (direction) {
     case "UP":
-      return <ArrowUp className="h-4 w-4 text-green-500" />
+      return <ArrowUp className="h-4 w-4 text-green-500" />;
     case "DOWN":
-      return <ArrowDown className="h-4 w-4 text-red-500" />
+      return <ArrowDown className="h-4 w-4 text-red-500" />;
     default:
-      return <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      return <ArrowRight className="h-4 w-4 text-muted-foreground" />;
   }
 }
 
 function getMoverColor(direction: MoverDirection): string {
   switch (direction) {
     case "UP":
-      return "text-green-600"
+      return "text-green-600";
     case "DOWN":
-      return "text-red-600"
+      return "text-red-600";
     default:
-      return "text-muted-foreground"
+      return "text-muted-foreground";
   }
 }
 
@@ -315,10 +239,10 @@ function MoversCard({
   isLoading,
   icon: Icon,
 }: {
-  title: string
-  movers?: Mover[]
-  isLoading: boolean
-  icon: typeof TrendingUp
+  title: string;
+  movers?: Mover[];
+  isLoading: boolean;
+  icon: typeof TrendingUp;
 }) {
   if (isLoading) {
     return (
@@ -332,7 +256,7 @@ function MoversCard({
           ))}
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -362,7 +286,12 @@ function MoversCard({
               </div>
               <div className="flex items-center gap-2">
                 {getMoverIcon(mover.direction)}
-                <span className={cn("text-sm font-semibold", getMoverColor(mover.direction))}>
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    getMoverColor(mover.direction),
+                  )}
+                >
                   {mover.percentChange >= 0 ? "+" : ""}
                   {mover.percentChange.toFixed(0)}%
                 </span>
@@ -372,11 +301,11 @@ function MoversCard({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 export function TabInsights() {
-  const { data, isLoading, isError } = useInsights()
+  const { data, isLoading, isError } = useInsights();
 
   if (isError) {
     return (
@@ -385,18 +314,17 @@ export function TabInsights() {
         <h3 className="text-lg font-semibold">Failed to load insights</h3>
         <p className="text-muted-foreground">Please try again later.</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
-        <PeriodComparisonCard
-          current={data?.currentPeriod}
-          previous={data?.previousPeriod}
+        <LongestRunningDisplaysCard />
+        <DayOfWeekChart
+          patterns={data?.dayOfWeekPatterns}
           isLoading={isLoading}
         />
-        <DayOfWeekChart patterns={data?.dayOfWeekPatterns} isLoading={isLoading} />
       </div>
 
       <CategoryPerformanceList
@@ -419,5 +347,5 @@ export function TabInsights() {
         />
       </div>
     </div>
-  )
+  );
 }
