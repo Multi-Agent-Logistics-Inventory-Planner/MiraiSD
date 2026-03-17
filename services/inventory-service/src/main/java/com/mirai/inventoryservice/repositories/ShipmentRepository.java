@@ -19,6 +19,10 @@ import java.util.UUID;
 public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     Optional<Shipment> findByShipmentNumber(String shipmentNumber);
 
+    Optional<Shipment> findByTrackingId(String trackingId);
+
+    Optional<Shipment> findByEasypostTrackerId(String easypostTrackerId);
+
     List<Shipment> findByStatusOrderByCreatedAtDesc(ShipmentStatus status);
 
     List<Shipment> findBySupplierNameContainingIgnoreCaseOrderByCreatedAtDesc(String supplierName);
