@@ -128,7 +128,7 @@ export default function ShipmentsPage() {
           shipmentNumber: selectedShipment.shipmentNumber,
           status: selectedShipment.status,
           orderDate: selectedShipment.orderDate,
-          trackingId: trackingId || null,
+          trackingId: trackingId || undefined,
           items: selectedShipment.items.map((item) => ({
             itemId: item.item.id,
             orderedQuantity: item.orderedQuantity,
