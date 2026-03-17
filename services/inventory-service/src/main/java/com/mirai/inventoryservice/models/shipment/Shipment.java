@@ -61,6 +61,9 @@ public class Shipment {
     @Column(name = "tracking_id")
     private String trackingId;
 
+    @Column(name = "easypost_tracker_id")
+    private String easypostTrackerId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

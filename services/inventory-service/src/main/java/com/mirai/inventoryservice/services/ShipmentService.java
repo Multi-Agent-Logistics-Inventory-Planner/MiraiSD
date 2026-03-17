@@ -287,9 +287,8 @@ public class ShipmentService {
         if (requestDTO.getNotes() != null) {
             shipment.setNotes(requestDTO.getNotes());
         }
-        if (requestDTO.getTrackingId() != null) {
-            shipment.setTrackingId(requestDTO.getTrackingId());
-        }
+        // Always update trackingId (allows clearing by setting to null)
+        shipment.setTrackingId(requestDTO.getTrackingId());
 
         // Handle items update
         if (requestDTO.getItems() != null && !requestDTO.getItems().isEmpty()) {

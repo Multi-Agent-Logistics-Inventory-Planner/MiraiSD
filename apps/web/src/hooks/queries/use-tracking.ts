@@ -13,6 +13,8 @@ export function useTracking(trackingNumber: string | null) {
     enabled: !!trackingNumber,
     staleTime: 15 * 60 * 1000, // 15 minutes
     gcTime: 30 * 60 * 1000, // keep in cache for 30 minutes
+    retry: false, // Don't retry on failure to avoid duplicate requests
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
 }
 
