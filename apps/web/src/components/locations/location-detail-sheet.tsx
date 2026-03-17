@@ -39,7 +39,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { LocationType, DISPLAY_ONLY_LOCATION_TYPES } from "@/types/api";
+import {
+  LocationType,
+  DISPLAY_ONLY_LOCATION_TYPES,
+  MACHINE_LOCATION_TYPES,
+} from "@/types/api";
 import type {
   StorageLocation,
   Inventory,
@@ -84,15 +88,6 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { type LocationSelection } from "@/types/transfer";
 
-const MACHINE_LOCATION_TYPES: LocationType[] = [
-  LocationType.DOUBLE_CLAW_MACHINE,
-  LocationType.FOUR_CORNER_MACHINE,
-  LocationType.GACHAPON,
-  LocationType.KEYCHAIN_MACHINE,
-  LocationType.PUSHER_MACHINE,
-  LocationType.SINGLE_CLAW_MACHINE,
-];
-
 const HISTORY_PAGE_SIZE = 5;
 
 function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
@@ -133,12 +128,15 @@ function formatDuration(startedAt: string, endedAt: string | null): string {
   return `${days} days`;
 }
 
+type LocationDetailTab = "products" | "display" | "history";
+
 interface LocationDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locationType: LocationType;
   location: StorageLocation | null;
   onEdit: (location: StorageLocation) => void;
+  defaultTab?: LocationDetailTab;
 }
 
 export function LocationDetailSheet({
@@ -147,6 +145,7 @@ export function LocationDetailSheet({
   locationType,
   location,
   onEdit,
+  defaultTab,
 }: LocationDetailSheetProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -215,11 +214,15 @@ export function LocationDetailSheet({
   // Reset state when dialog opens / location changes
   useEffect(() => {
     if (open) {
-      // Display-only locations default to display tab (no products tab)
-      setActiveTab(isDisplayOnly ? "display" : "products");
+      // Use defaultTab if provided, otherwise use display for display-only locations
+      if (defaultTab) {
+        setActiveTab(defaultTab);
+      } else {
+        setActiveTab(isDisplayOnly ? "display" : "products");
+      }
       setHistoryPage(0);
     }
-  }, [open, locationId, isDisplayOnly]);
+  }, [open, locationId, isDisplayOnly, defaultTab]);
 
   const code = location ? getLocationCode(locationType, location) : "";
 
