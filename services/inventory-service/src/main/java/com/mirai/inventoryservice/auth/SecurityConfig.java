@@ -45,6 +45,9 @@ public class SecurityConfig {
                 // Block dev endpoints in all profiles (defense in depth)
                 .requestMatchers("/api/dev/**").denyAll()
 
+                // Webhook endpoints (validated by signature, not JWT)
+                .requestMatchers("/api/webhooks/**").permitAll()
+
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 

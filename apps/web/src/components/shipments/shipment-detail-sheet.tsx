@@ -331,8 +331,8 @@ export function ShipmentDetailSheet({
   const [trackingSaving, setTrackingSaving] = useState(false);
 
   async function handleTrackingSave() {
+    if (!onTrackingUpdate) return;
     const value = trackingInput.trim();
-    if (!value || !onTrackingUpdate) return;
     setTrackingSaving(true);
     try {
       await onTrackingUpdate(value);
@@ -600,7 +600,7 @@ export function ShipmentDetailSheet({
                           size="icon"
                           className="h-8 w-8 shrink-0"
                           onClick={handleTrackingSave}
-                          disabled={trackingSaving || !trackingInput.trim()}
+                          disabled={trackingSaving}
                         >
                           {trackingSaving ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
