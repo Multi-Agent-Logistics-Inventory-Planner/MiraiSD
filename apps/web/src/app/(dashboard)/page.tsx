@@ -24,7 +24,6 @@ import {
 } from "@/hooks/queries/use-activity-feed";
 import { useAllForecasts } from "@/hooks/queries/use-forecasts";
 import { useProducts } from "@/hooks/queries/use-products";
-import { ActionRequiredPanel } from "@/components/dashboard/action-required-panel";
 import { RiskDistributionDonut } from "@/components/dashboard/risk-distribution-donut";
 import { UnifiedActivityFeed } from "@/components/dashboard/unified-activity-feed";
 import { FilterableStockList } from "@/components/dashboard/filterable-stock-list";
@@ -186,12 +185,6 @@ export default function DashboardPage() {
             </AlertDescription>
           </Alert>
         )}
-
-        {/* Action Required Panel */}
-        <ActionRequiredPanel
-          items={metricsQuery.data?.actionRequired.items ?? []}
-          isLoading={metricsQuery.isLoading}
-        />
 
         {/* Supply Chain Status + Top Reviewers */}
         <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
