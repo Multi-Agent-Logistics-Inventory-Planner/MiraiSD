@@ -48,8 +48,13 @@ public class TrackingService {
         log.info("Tracking Number: {}", request.trackingNumber());
         log.info("Carrier: {}", request.carrier());
         try {
-            // Create tracker via EasyPost REST API
-            EasyPostTrackerResponse tracker = createTracker(request.trackingNumber(), request.carrier());
+            // First try to retrieve existing tracker
+            EasyPostTrackerResponse tracker = getExistingTracker(request.trackingNumber());
+
+            // If no existing tracker found, create one
+            if (tracker == null) {
+                tracker = createTracker(request.trackingNumber(), request.carrier());
+            }
 
             // Try to find associated shipment in your system
             Optional<Shipment> shipmentOpt = shipmentRepository
@@ -70,8 +75,13 @@ public class TrackingService {
 
     public TrackingLookupResponseDTO getTracking(String trackingNumber) {
         try {
-            // Create new tracker lookup
-            EasyPostTrackerResponse tracker = createTracker(trackingNumber, null);
+            // First try to retrieve existing tracker
+            EasyPostTrackerResponse tracker = getExistingTracker(trackingNumber);
+
+            // If no existing tracker found, create one
+            if (tracker == null) {
+                tracker = createTracker(trackingNumber, null);
+            }
 
             Optional<Shipment> shipmentOpt = shipmentRepository
                 .findByShipmentNumber(trackingNumber);
@@ -83,6 +93,37 @@ public class TrackingService {
         } catch (Exception e) {
             throw new TrackingException("Failed to retrieve tracking: " + e.getMessage(), e);
         }
+    }
+
+    private EasyPostTrackerResponse getExistingTracker(String trackingCode) {
+        log.info("=== Retrieving Existing EasyPost Tracker ===");
+        log.info("Tracking Code: {}", trackingCode);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        headers.setBasicAuth(apiKey, "");
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<EasyPostTrackerListResponse> response = restTemplate.exchange(
+                EASYPOST_API_URL + "/trackers?tracking_code=" + trackingCode,
+                HttpMethod.GET,
+                entity,
+                EasyPostTrackerListResponse.class
+            );
+
+            EasyPostTrackerListResponse body = response.getBody();
+            if (body != null && body.getTrackers() != null && !body.getTrackers().isEmpty()) {
+                log.info("Found existing tracker for {}", trackingCode);
+                return body.getTrackers().get(0);
+            }
+        } catch (HttpClientErrorException e) {
+            log.warn("Error retrieving existing tracker: {}", e.getMessage());
+        }
+
+        log.info("No existing tracker found for {}", trackingCode);
+        return null;
     }
 
     private EasyPostTrackerResponse createTracker(String trackingCode, String carrier) {
@@ -228,6 +269,12 @@ public class TrackingService {
     }
 
     // EasyPost API Response Models
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class EasyPostTrackerListResponse {
+        private List<EasyPostTrackerResponse> trackers;
+    }
+
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class EasyPostTrackerResponse {
