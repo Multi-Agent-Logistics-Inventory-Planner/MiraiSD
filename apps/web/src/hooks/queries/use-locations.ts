@@ -1,15 +1,49 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { LocationType, type StorageLocation, type Inventory } from "@/types/api";
-import { getLocationsByType } from "@/lib/api/locations";
-import { getInventoryByLocation } from "@/lib/api/inventory";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { LocationType, type StorageLocation } from "@/types/api";
+import {
+  getLocationsByType,
+  getBoxBinById,
+  getCabinetById,
+  getDoubleClawMachineById,
+  getFourCornerMachineById,
+  getGachaponById,
+  getKeychainMachineById,
+  getPusherMachineById,
+  getRackById,
+  getSingleClawMachineById,
+  getWindowById,
+} from "@/lib/api/locations";
 
-export interface LocationWithCounts<TLocation extends StorageLocation = StorageLocation> {
-  locationType: LocationType;
-  location: TLocation;
-  inventoryRecords: number;
-  totalQuantity: number;
+async function getLocationById(
+  locationType: LocationType,
+  id: string
+): Promise<StorageLocation> {
+  switch (locationType) {
+    case LocationType.BOX_BIN:
+      return getBoxBinById(id);
+    case LocationType.CABINET:
+      return getCabinetById(id);
+    case LocationType.DOUBLE_CLAW_MACHINE:
+      return getDoubleClawMachineById(id);
+    case LocationType.FOUR_CORNER_MACHINE:
+      return getFourCornerMachineById(id);
+    case LocationType.GACHAPON:
+      return getGachaponById(id);
+    case LocationType.KEYCHAIN_MACHINE:
+      return getKeychainMachineById(id);
+    case LocationType.PUSHER_MACHINE:
+      return getPusherMachineById(id);
+    case LocationType.RACK:
+      return getRackById(id);
+    case LocationType.SINGLE_CLAW_MACHINE:
+      return getSingleClawMachineById(id);
+    case LocationType.WINDOW:
+      return getWindowById(id);
+    default:
+      throw new Error(`Unknown location type: ${locationType}`);
+  }
 }
 
 export function useLocations(locationType: LocationType) {
@@ -35,33 +69,18 @@ export function useLocationsOnly(locationType: LocationType) {
 }
 
 /**
- * @deprecated Use useLocationsWithCounts() from use-locations-with-counts.ts instead.
- * This function makes N+1 API calls and will be removed in a future version.
- *
- * Fetch inventory counts only for specific location IDs.
- * This is optimized to only fetch data for visible items (pagination).
+ * Fetch a single location by type and ID.
  */
-export function useLocationCounts(
-  locationType: LocationType,
-  locations: StorageLocation[]
-) {
+export function useLocation(
+  locationType: LocationType | undefined,
+  locationId: string | undefined
+): UseQueryResult<StorageLocation> {
   return useQuery({
-    queryKey: ["locationCounts", locationType, locations.map((l) => l.id)],
-    queryFn: async (): Promise<Map<string, { records: number; quantity: number }>> => {
-      const counts = new Map<string, { records: number; quantity: number }>();
-
-      await Promise.all(
-        locations.map(async (loc) => {
-          const inv = (await getInventoryByLocation(locationType, loc.id)) as Inventory[];
-          const totalQuantity = inv.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
-          counts.set(loc.id, { records: inv.length, quantity: totalQuantity });
-        })
-      );
-
-      return counts;
-    },
-    enabled: locationType !== LocationType.NOT_ASSIGNED && locations.length > 0,
+    queryKey: ["location", locationType, locationId],
+    queryFn: () => getLocationById(locationType!, locationId!),
+    enabled:
+      !!locationType &&
+      locationType !== LocationType.NOT_ASSIGNED &&
+      !!locationId,
   });
 }
-
-
