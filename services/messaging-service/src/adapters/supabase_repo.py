@@ -203,8 +203,10 @@ class SupabaseRepo:
         # Generate UUID client-side (matching Hibernate's GenerationType.UUID behavior)
         notification_id = uuid.uuid4()
 
-        # Use INSERT with ON CONFLICT for idempotency when source_event_id is provided
-        if source_event_id and dedupe_key:
+        # Use INSERT with ON CONFLICT for idempotency based on dedupe_key + date
+        # This prevents duplicate notifications for the same alert on the same day,
+        # while allowing re-alerting on different days
+        if dedupe_key:
             query = text("""
                 INSERT INTO notifications (
                     id,
@@ -233,8 +235,8 @@ class SupabaseRepo:
                     :source_event_id,
                     :dedupe_key
                 )
-                ON CONFLICT (source_event_id, dedupe_key)
-                WHERE source_event_id IS NOT NULL
+                ON CONFLICT (dedupe_key, (created_at::date))
+                WHERE dedupe_key IS NOT NULL
                 DO NOTHING
                 RETURNING id
             """)

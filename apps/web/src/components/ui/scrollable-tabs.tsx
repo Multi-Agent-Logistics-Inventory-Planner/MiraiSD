@@ -41,7 +41,7 @@ export function ScrollableTabs<T extends string>({
               onClick={() => onValueChange(tabValue)}
               className={
                 active
-                  ? ""
+                  ? "bg-[#0b66c2] dark:bg-[#7c3aed] text-white hover:bg-[#0b66c2]/90 dark:hover:bg-[#7c3aed]/90"
                   : "bg-[#f2f2f2] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"
               }
             >

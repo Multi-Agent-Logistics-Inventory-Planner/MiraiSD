@@ -773,6 +773,16 @@ export const DISPLAY_ONLY_LOCATION_TYPES: LocationType[] = [
   LocationType.KEYCHAIN_MACHINE,
 ];
 
+// Machine location types (machines that display products)
+export const MACHINE_LOCATION_TYPES: LocationType[] = [
+  LocationType.SINGLE_CLAW_MACHINE,
+  LocationType.DOUBLE_CLAW_MACHINE,
+  LocationType.FOUR_CORNER_MACHINE,
+  LocationType.GACHAPON,
+  LocationType.KEYCHAIN_MACHINE,
+  LocationType.PUSHER_MACHINE,
+];
+
 // Review types
 
 export interface ReviewSummary {

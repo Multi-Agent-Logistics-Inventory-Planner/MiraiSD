@@ -1,15 +1,31 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.dtos.responses.ActionCenterDTO;
+import com.mirai.inventoryservice.dtos.responses.ActionCenterDTO.ActionItem;
+import com.mirai.inventoryservice.dtos.responses.ActionCenterDTO.ActionUrgency;
+import com.mirai.inventoryservice.dtos.responses.ActionCenterDTO.RiskSummary;
 import com.mirai.inventoryservice.dtos.responses.CategoryInventoryDTO;
 import com.mirai.inventoryservice.dtos.responses.DailySalesDTO;
+import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO;
+import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.CategoryRanking;
+import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.DemandLeader;
+import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO.DemandSummary;
+import com.mirai.inventoryservice.dtos.responses.InsightsDTO;
+import com.mirai.inventoryservice.dtos.responses.InsightsDTO.DayOfWeekPattern;
+import com.mirai.inventoryservice.dtos.responses.InsightsDTO.Mover;
+import com.mirai.inventoryservice.dtos.responses.InsightsDTO.MoverDirection;
+import com.mirai.inventoryservice.dtos.responses.InsightsDTO.PeriodSummary;
 import com.mirai.inventoryservice.dtos.responses.MonthlySalesDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -26,11 +42,15 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,18 +59,105 @@ import java.util.stream.Collectors;
 public class AnalyticsService {
 
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final DailySalesRollupRepository dailySalesRollupRepository;
+
+    private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    private static final int MOVERS_LIMIT = 10;
+    private static final int CATEGORY_RANKINGS_LIMIT = 5;
+
+    /**
+     * Helper record for extracted forecast features.
+     */
+    private record ForecastFeatures(
+        BigDecimal muHat,
+        BigDecimal sigmaDHat,
+        BigDecimal mape,
+        List<Double> dowMultipliers
+    ) {}
+
+    /**
+     * Extract features from ForecastPrediction JSONB.
+     */
+    private ForecastFeatures extractFeatures(ForecastPrediction fp) {
+        Map<String, Object> features = fp.getFeatures();
+        if (features == null) {
+            return new ForecastFeatures(null, null, null, null);
+        }
+
+        BigDecimal muHat = extractBigDecimal(features.get("mu_hat"));
+        BigDecimal sigmaDHat = extractBigDecimal(features.get("sigma_d_hat"));
+        BigDecimal mape = extractBigDecimal(features.get("mape"));
+
+        List<Double> dowMultipliers = null;
+        Object dowObj = features.get("dow_multipliers");
+        if (dowObj instanceof List<?> list) {
+            dowMultipliers = list.stream()
+                .filter(o -> o instanceof Number)
+                .map(o -> ((Number) o).doubleValue())
+                .toList();
+        }
+
+        return new ForecastFeatures(muHat, sigmaDHat, mape, dowMultipliers);
+    }
+
+    private BigDecimal extractBigDecimal(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) {
+            return BigDecimal.valueOf(n.doubleValue()).setScale(4, RoundingMode.HALF_UP);
+        }
+        if (value instanceof String s) {
+            try {
+                return new BigDecimal(s).setScale(4, RoundingMode.HALF_UP);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Calculate forecast accuracy from MAPE: (1 - mape) * 100
+     */
+    private BigDecimal calculateForecastAccuracy(BigDecimal mape) {
+        if (mape == null) return null;
+        return BigDecimal.ONE.subtract(mape)
+            .multiply(BigDecimal.valueOf(100))
+            .setScale(1, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculate demand volatility (coefficient of variation): sigma_d_hat / mu_hat
+     */
+    private BigDecimal calculateDemandVolatility(BigDecimal muHat, BigDecimal sigmaDHat) {
+        if (muHat == null || sigmaDHat == null || muHat.compareTo(BigDecimal.ZERO) == 0) {
+            return null;
+        }
+        return sigmaDHat.divide(muHat, 4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Assign sequential ranks to a list of items using a mapper function.
+     * @param items The list of items to rank
+     * @param rankMapper Function that takes (1-based rank, item) and returns a new ranked item
+     * @return A new list with ranks assigned
+     */
+    private <T, R> List<R> assignRanks(List<T> items, BiFunction<Integer, T, R> rankMapper) {
+        List<R> ranked = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            ranked.add(rankMapper.apply(i + 1, items.get(i)));
+        }
+        return ranked;
+    }
 
     @Transactional(readOnly = true)
     public List<CategoryInventoryDTO> getInventoryByCategory() {
         List<Product> products = productRepository.findAllWithCategories();
-
-        // Bulk fetch all stock totals in a single query
         Map<UUID, Integer> stockTotals = inventoryTotalsRepository.findAllStockTotalsMap();
 
-        // Group products by category
         Map<Category, List<Product>> productsByCategory = products.stream()
                 .collect(Collectors.groupingBy(Product::getCategory));
 
@@ -60,7 +167,6 @@ public class AnalyticsService {
             String categoryName = entry.getKey().getName();
             List<Product> categoryProducts = entry.getValue();
 
-            // Calculate total stock for this category using pre-fetched map
             int totalStock = categoryProducts.stream()
                     .mapToInt(p -> stockTotals.getOrDefault(p.getId(), 0))
                     .sum();
@@ -73,24 +179,24 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public PerformanceMetricsDTO getPerformanceMetrics() {
-        // 1. Forecast Accuracy: Average confidence of latest prediction per item only
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
 
-        BigDecimal avgConfidence = BigDecimal.ZERO;
-        if (!latestPredictions.isEmpty()) {
-            double average = latestPredictions.stream()
-                    .map(ForecastPrediction::getConfidence)
-                    .filter(Objects::nonNull)
-                    .mapToDouble(BigDecimal::doubleValue)
-                    .average()
-                    .orElse(0.0);
-            avgConfidence = BigDecimal.valueOf(average * 100).setScale(1, RoundingMode.HALF_UP);
+        // Calculate average forecast accuracy from MAPE
+        BigDecimal avgAccuracy = BigDecimal.ZERO;
+        int accuracyCount = 0;
+        for (ForecastPrediction fp : latestPredictions) {
+            ForecastFeatures features = extractFeatures(fp);
+            BigDecimal accuracy = calculateForecastAccuracy(features.mape());
+            if (accuracy != null) {
+                avgAccuracy = avgAccuracy.add(accuracy);
+                accuracyCount++;
+            }
+        }
+        if (accuracyCount > 0) {
+            avgAccuracy = avgAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP);
         }
 
-        // 2. Stockout Rate: % of items with 0 stock (now includes all 9 inventory tables)
         List<Product> allProducts = productRepository.findAll();
-
-        // Bulk fetch all stock totals in a single query
         Map<UUID, Integer> stockByProduct = inventoryTotalsRepository.findAllStockTotalsMap();
 
         long outOfStockCount = allProducts.stream()
@@ -103,61 +209,45 @@ public class AnalyticsService {
             stockoutRate = BigDecimal.valueOf(rate * 100).setScale(1, RoundingMode.HALF_UP);
         }
 
-        // 3. Fill Rate: inverse of stockout rate
         BigDecimal fillRate = BigDecimal.valueOf(100).subtract(stockoutRate);
 
-        // 4. Turnover Rate: COGS (last 12 months) / Average Inventory Value
-        BigDecimal turnoverRate = computeTurnoverRate(allProducts, stockByProduct);
+        // Turnover rate based on demand velocity instead of COGS
+        BigDecimal turnoverRate = computeDemandBasedTurnover(latestPredictions, stockByProduct);
 
-        return new PerformanceMetricsDTO(turnoverRate, avgConfidence, stockoutRate, fillRate);
+        return new PerformanceMetricsDTO(turnoverRate, avgAccuracy, stockoutRate, fillRate);
     }
 
-    private BigDecimal computeTurnoverRate(List<Product> allProducts, Map<UUID, Integer> stockByProduct) {
-        LocalDate today = LocalDate.now();
-        OffsetDateTime startDateTime = today.minusMonths(12).atStartOfDay().atOffset(ZoneOffset.UTC);
+    private BigDecimal computeDemandBasedTurnover(List<ForecastPrediction> predictions, Map<UUID, Integer> stockByProduct) {
+        BigDecimal totalDemandVelocity = BigDecimal.ZERO;
+        int totalStock = 0;
 
-        // COGS: sum of abs(quantityChange) * unitCost for SALE movements in last 12 months
-        // Use JOIN FETCH query to avoid N+1 on item
-        List<StockMovement> salesMovements = stockMovementRepository.findByReasonAndAtAfterWithItem(
-                StockMovementReason.SALE, startDateTime);
-
-        BigDecimal cogs = BigDecimal.ZERO;
-        for (StockMovement movement : salesMovements) {
-            int units = Math.abs(movement.getQuantityChange());
-            BigDecimal unitCost = movement.getItem().getUnitCost();
-            if (unitCost != null) {
-                cogs = cogs.add(unitCost.multiply(BigDecimal.valueOf(units)));
+        for (ForecastPrediction fp : predictions) {
+            ForecastFeatures features = extractFeatures(fp);
+            if (features.muHat() != null) {
+                totalDemandVelocity = totalDemandVelocity.add(features.muHat());
             }
+            totalStock += stockByProduct.getOrDefault(fp.getItemId(), 0);
         }
 
-        // Average Inventory Value: current snapshot of stock * unitCost across all active products
-        BigDecimal inventoryValue = BigDecimal.ZERO;
-        for (Product product : allProducts) {
-            int currentStock = stockByProduct.getOrDefault(product.getId(), 0);
-            BigDecimal unitCost = product.getUnitCost();
-            if (unitCost != null && currentStock > 0) {
-                inventoryValue = inventoryValue.add(unitCost.multiply(BigDecimal.valueOf(currentStock)));
-            }
-        }
-
-        if (inventoryValue.compareTo(BigDecimal.ZERO) == 0) {
+        if (totalStock == 0) {
             return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
         }
 
-        return cogs.divide(inventoryValue, 1, RoundingMode.HALF_UP);
+        // Stock velocity = total demand velocity / total stock * 365 (annualized)
+        return totalDemandVelocity
+            .multiply(BigDecimal.valueOf(365))
+            .divide(BigDecimal.valueOf(totalStock), 1, RoundingMode.HALF_UP);
     }
 
     @Transactional(readOnly = true)
     public SalesSummaryDTO getSalesSummary() {
         LocalDate today = LocalDate.now();
-        // Rolling 12 months for consistent chart display
         LocalDate periodStart = today.minusMonths(12);
         OffsetDateTime startDateTime = periodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
 
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-        // Use JOIN FETCH query to avoid N+1 on item
         List<StockMovement> salesMovements = stockMovementRepository.findByReasonAndAtAfterWithItem(
                 StockMovementReason.SALE, startDateTime);
 
@@ -213,5 +303,545 @@ public class AnalyticsService {
             periodStart.format(dateFormatter),
             today.format(dateFormatter)
         );
+    }
+
+    /**
+     * Get action center data with demand-based metrics.
+     * Returns items needing reorder decisions with demand velocity, volatility, and forecast accuracy.
+     */
+    @Transactional(readOnly = true)
+    public ActionCenterDTO getActionCenter() {
+        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        List<Product> allProducts = productRepository.findAllWithCategories();
+        Map<UUID, Product> productMap = allProducts.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        List<ActionItem> actionItems = new ArrayList<>();
+        int critical = 0, urgent = 0, attention = 0, healthy = 0;
+        BigDecimal totalDemandVelocity = BigDecimal.ZERO;
+        BigDecimal totalAccuracy = BigDecimal.ZERO;
+        int accuracyCount = 0;
+
+        for (ForecastPrediction prediction : latestPredictions) {
+            Product product = productMap.get(prediction.getItemId());
+            if (product == null || !product.getIsActive()) {
+                continue;
+            }
+
+            int currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
+            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 7;
+            BigDecimal daysToStockout = prediction.getDaysToStockout();
+
+            ForecastFeatures features = extractFeatures(prediction);
+            BigDecimal demandVelocity = features.muHat();
+            BigDecimal demandVolatility = calculateDemandVolatility(features.muHat(), features.sigmaDHat());
+            BigDecimal forecastAccuracy = calculateForecastAccuracy(features.mape());
+
+            if (demandVelocity != null) {
+                totalDemandVelocity = totalDemandVelocity.add(demandVelocity);
+            }
+            if (forecastAccuracy != null) {
+                totalAccuracy = totalAccuracy.add(forecastAccuracy);
+                accuracyCount++;
+            }
+
+            ActionUrgency urgency = calculateUrgency(
+                daysToStockout,
+                leadTimeDays,
+                currentStock,
+                product.getReorderPoint()
+            );
+
+            switch (urgency) {
+                case CRITICAL -> critical++;
+                case URGENT -> urgent++;
+                case ATTENTION -> attention++;
+                case HEALTHY -> healthy++;
+            }
+
+            actionItems.add(new ActionItem(
+                product.getId(),
+                product.getName(),
+                product.getSku(),
+                product.getImageUrl(),
+                product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                currentStock,
+                product.getReorderPoint() != null ? product.getReorderPoint() : 10,
+                product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50,
+                daysToStockout,
+                prediction.getAvgDailyDelta(),
+                prediction.getSuggestedReorderQty() != null ? prediction.getSuggestedReorderQty() : 0,
+                prediction.getSuggestedOrderDate(),
+                leadTimeDays,
+                demandVelocity,
+                demandVolatility,
+                forecastAccuracy,
+                prediction.getConfidence(),
+                urgency
+            ));
+        }
+
+        actionItems.sort(Comparator
+            .comparing(ActionItem::urgency)
+            .thenComparing(item -> item.daysToStockout() != null ? item.daysToStockout() : BigDecimal.valueOf(999)));
+
+        BigDecimal avgForecastAccuracy = accuracyCount > 0
+            ? totalAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        return new ActionCenterDTO(
+            actionItems,
+            actionItems.size(),
+            avgForecastAccuracy,
+            totalDemandVelocity.setScale(2, RoundingMode.HALF_UP),
+            new RiskSummary(critical, urgent, attention, healthy)
+        );
+    }
+
+    private ActionUrgency calculateUrgency(BigDecimal daysToStockout, int leadTimeDays, int currentStock, Integer reorderPoint) {
+        if (daysToStockout == null) {
+            return ActionUrgency.HEALTHY;
+        }
+
+        double days = daysToStockout.doubleValue();
+        int rp = reorderPoint != null ? reorderPoint : 10;
+
+        if (days < leadTimeDays) {
+            return ActionUrgency.CRITICAL;
+        }
+        if (days < leadTimeDays * 2) {
+            return ActionUrgency.URGENT;
+        }
+        if (days < leadTimeDays * 3 || currentStock < rp) {
+            return ActionUrgency.ATTENTION;
+        }
+
+        return ActionUrgency.HEALTHY;
+    }
+
+    /**
+     * Get insights with demand-based metrics.
+     * Category performance uses demand velocity instead of revenue.
+     */
+    @Transactional(readOnly = true)
+    public InsightsDTO getInsights() {
+        LocalDate today = LocalDate.now();
+        LocalDate currentPeriodStart = today.minusDays(30);
+        LocalDate previousPeriodStart = today.minusDays(60);
+        LocalDate dowAnalysisStart = today.minusDays(90);
+
+        List<DailySalesRollup> rollups = dailySalesRollupRepository
+            .findByRollupDateBetweenOrderByRollupDateAsc(dowAnalysisStart, today);
+
+        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
+        Map<UUID, ForecastFeatures> featuresMap = new HashMap<>();
+        for (ForecastPrediction fp : latestPredictions) {
+            featuresMap.put(fp.getItemId(), extractFeatures(fp));
+        }
+
+        List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
+        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true);
+        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false);
+        PeriodSummary currentPeriod = computePeriodSummaryWithDemand(rollups, currentPeriodStart, today, "Last 30 Days", featuresMap);
+        PeriodSummary previousPeriod = computePeriodSummaryWithDemand(rollups, previousPeriodStart, currentPeriodStart.minusDays(1), "Previous 30 Days", featuresMap);
+
+        return new InsightsDTO(
+            dowPatterns,
+            topMovers,
+            bottomMovers,
+            currentPeriod,
+            previousPeriod
+        );
+    }
+
+    private List<DayOfWeekPattern> computeDowPatternsWithDemand(
+            List<DailySalesRollup> rollups, Map<UUID, ForecastFeatures> featuresMap) {
+
+        Map<Integer, Integer> unitsByDow = new HashMap<>();
+        Map<Integer, BigDecimal> multiplierSumByDow = new HashMap<>();
+        Map<Integer, Integer> multiplierCountByDow = new HashMap<>();
+
+        for (DailySalesRollup rollup : rollups) {
+            int dow = rollup.getRollupDate().getDayOfWeek().getValue() % 7;
+            unitsByDow.merge(dow, rollup.getUnitsSold(), Integer::sum);
+
+            ForecastFeatures features = featuresMap.get(rollup.getItemId());
+            if (features != null && features.dowMultipliers() != null && features.dowMultipliers().size() > dow) {
+                BigDecimal multiplier = BigDecimal.valueOf(features.dowMultipliers().get(dow));
+                multiplierSumByDow.merge(dow, multiplier, BigDecimal::add);
+                multiplierCountByDow.merge(dow, 1, Integer::sum);
+            }
+        }
+
+        int totalUnits = unitsByDow.values().stream().mapToInt(Integer::intValue).sum();
+
+        List<DayOfWeekPattern> patterns = new ArrayList<>();
+        for (int dow = 0; dow < 7; dow++) {
+            int units = unitsByDow.getOrDefault(dow, 0);
+            BigDecimal percent = totalUnits > 0
+                ? BigDecimal.valueOf(units * 100.0 / totalUnits).setScale(1, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+            int count = multiplierCountByDow.getOrDefault(dow, 0);
+            BigDecimal avgMultiplier = count > 0
+                ? multiplierSumByDow.getOrDefault(dow, BigDecimal.ONE)
+                    .divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ONE;
+
+            patterns.add(new DayOfWeekPattern(dow, DOW_NAMES[dow], units, avgMultiplier, percent));
+        }
+
+        return patterns;
+    }
+
+    private List<Mover> computeMoversFromRollups(
+            List<DailySalesRollup> rollups,
+            LocalDate currentStart, LocalDate previousStart, LocalDate endDate,
+            boolean topMovers) {
+
+        List<Product> products = productRepository.findAllWithCategories();
+        Map<UUID, Product> productMap = products.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        Map<UUID, Integer> currentPeriod = new HashMap<>();
+        Map<UUID, Integer> previousPeriod = new HashMap<>();
+
+        for (DailySalesRollup rollup : rollups) {
+            LocalDate date = rollup.getRollupDate();
+            if (!date.isBefore(currentStart) && !date.isAfter(endDate)) {
+                currentPeriod.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+            } else if (!date.isBefore(previousStart) && date.isBefore(currentStart)) {
+                previousPeriod.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+            }
+        }
+
+        List<Mover> movers = new ArrayList<>();
+        for (UUID itemId : currentPeriod.keySet()) {
+            int current = currentPeriod.get(itemId);
+            int previous = previousPeriod.getOrDefault(itemId, 0);
+            if (previous == 0 && current == 0) continue;
+
+            BigDecimal percentChange;
+            MoverDirection direction;
+            if (previous == 0) {
+                percentChange = BigDecimal.valueOf(100);
+                direction = MoverDirection.UP;
+            } else {
+                double change = ((double) (current - previous) / previous) * 100;
+                percentChange = BigDecimal.valueOf(change).setScale(1, RoundingMode.HALF_UP);
+                direction = change > 5 ? MoverDirection.UP : (change < -5 ? MoverDirection.DOWN : MoverDirection.STABLE);
+            }
+
+            Product product = productMap.get(itemId);
+            if (product == null) continue;
+
+            movers.add(new Mover(
+                0, // rank assigned after sorting
+                itemId,
+                product.getName(),
+                product.getImageUrl(),
+                product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                current,
+                previous,
+                percentChange,
+                direction
+            ));
+        }
+
+        Comparator<Mover> comparator = topMovers
+            ? Comparator.comparing(Mover::percentChange).reversed()
+            : Comparator.comparing(Mover::percentChange);
+
+        List<Mover> sortedMovers = movers.stream()
+            .filter(m -> topMovers ? m.direction() == MoverDirection.UP : m.direction() == MoverDirection.DOWN)
+            .sorted(comparator)
+            .limit(MOVERS_LIMIT)
+            .toList();
+
+        return assignRanks(sortedMovers, (rank, m) -> new Mover(
+            rank, m.itemId(), m.name(), m.imageUrl(), m.categoryName(),
+            m.currentPeriodUnits(), m.previousPeriodUnits(), m.percentChange(), m.direction()
+        ));
+    }
+
+    private PeriodSummary computePeriodSummaryWithDemand(
+            List<DailySalesRollup> rollups, LocalDate startDate, LocalDate endDate, String label,
+            Map<UUID, ForecastFeatures> featuresMap) {
+
+        int totalUnits = 0;
+        int totalMovements = 0;
+        java.util.Set<UUID> uniqueItems = new java.util.HashSet<>();
+
+        for (DailySalesRollup rollup : rollups) {
+            LocalDate date = rollup.getRollupDate();
+            if (!date.isBefore(startDate) && !date.isAfter(endDate)) {
+                totalUnits += rollup.getUnitsSold();
+                totalMovements += rollup.getMovementCount();
+                if (rollup.getUnitsSold() > 0) {
+                    uniqueItems.add(rollup.getItemId());
+                }
+            }
+        }
+
+        BigDecimal totalDemandVelocity = BigDecimal.ZERO;
+        BigDecimal totalAccuracy = BigDecimal.ZERO;
+        int accuracyCount = 0;
+
+        for (UUID itemId : uniqueItems) {
+            ForecastFeatures features = featuresMap.get(itemId);
+            if (features != null) {
+                if (features.muHat() != null) {
+                    totalDemandVelocity = totalDemandVelocity.add(features.muHat());
+                }
+                BigDecimal accuracy = calculateForecastAccuracy(features.mape());
+                if (accuracy != null) {
+                    totalAccuracy = totalAccuracy.add(accuracy);
+                    accuracyCount++;
+                }
+            }
+        }
+
+        BigDecimal avgDemandVelocity = !uniqueItems.isEmpty()
+            ? totalDemandVelocity.divide(BigDecimal.valueOf(uniqueItems.size()), 2, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+        BigDecimal avgAccuracy = accuracyCount > 0
+            ? totalAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        return new PeriodSummary(label, totalUnits, avgDemandVelocity, avgAccuracy, uniqueItems.size(), totalMovements);
+    }
+
+    /**
+     * Get demand leaders - rankings by demand velocity and stock velocity.
+     */
+    @Transactional(readOnly = true)
+    public DemandLeadersDTO getDemandLeaders(String period) {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate;
+        LocalDate previousStart;
+        String periodLabel;
+
+        switch (period != null ? period.toLowerCase() : "30d") {
+            case "7d" -> {
+                startDate = today.minusDays(7);
+                previousStart = today.minusDays(14);
+                periodLabel = "Last 7 Days";
+            }
+            case "90d" -> {
+                startDate = today.minusDays(90);
+                previousStart = today.minusDays(180);
+                periodLabel = "Last 90 Days";
+            }
+            case "ytd" -> {
+                startDate = today.withDayOfYear(1);
+                previousStart = startDate.minusYears(1);
+                periodLabel = "Year to Date";
+            }
+            default -> {
+                startDate = today.minusDays(30);
+                previousStart = today.minusDays(60);
+                periodLabel = "Last 30 Days";
+            }
+        }
+
+        List<Product> products = productRepository.findAllWithCategories();
+        Map<UUID, Product> productMap = products.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+        List<Category> categories = categoryRepository.findAll();
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+
+        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
+        Map<UUID, ForecastFeatures> featuresMap = new HashMap<>();
+        for (ForecastPrediction fp : latestPredictions) {
+            featuresMap.put(fp.getItemId(), extractFeatures(fp));
+        }
+
+        List<DailySalesRollup> rollups = dailySalesRollupRepository
+            .findByRollupDateBetweenOrderByRollupDateAsc(startDate, today);
+
+        Map<UUID, Integer> unitsByItem = new HashMap<>();
+        for (DailySalesRollup rollup : rollups) {
+            unitsByItem.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+        }
+
+        // Calculate demand metrics for each item
+        Map<UUID, BigDecimal> demandVelocityByItem = new HashMap<>();
+        Map<UUID, BigDecimal> stockVelocityByItem = new HashMap<>();
+        Map<UUID, BigDecimal> volatilityByItem = new HashMap<>();
+        Map<UUID, BigDecimal> accuracyByItem = new HashMap<>();
+
+        BigDecimal totalDemandVelocity = BigDecimal.ZERO;
+        BigDecimal totalAccuracy = BigDecimal.ZERO;
+        int accuracyCount = 0;
+
+        for (Product product : products) {
+            ForecastFeatures features = featuresMap.get(product.getId());
+            if (features != null && features.muHat() != null) {
+                BigDecimal muHat = features.muHat();
+                demandVelocityByItem.put(product.getId(), muHat);
+                totalDemandVelocity = totalDemandVelocity.add(muHat);
+
+                int stock = stockMap.getOrDefault(product.getId(), 0);
+                if (stock > 0) {
+                    BigDecimal stockVelocity = muHat.divide(BigDecimal.valueOf(stock), 4, RoundingMode.HALF_UP);
+                    stockVelocityByItem.put(product.getId(), stockVelocity);
+                }
+
+                BigDecimal volatility = calculateDemandVolatility(muHat, features.sigmaDHat());
+                if (volatility != null) {
+                    volatilityByItem.put(product.getId(), volatility);
+                }
+
+                BigDecimal accuracy = calculateForecastAccuracy(features.mape());
+                if (accuracy != null) {
+                    accuracyByItem.put(product.getId(), accuracy);
+                    totalAccuracy = totalAccuracy.add(accuracy);
+                    accuracyCount++;
+                }
+            }
+        }
+
+        // Leaders by demand velocity
+        final BigDecimal finalTotalDemandVelocity = totalDemandVelocity;
+        List<DemandLeader> byDemandVelocity = demandVelocityByItem.entrySet().stream()
+            .sorted(Map.Entry.<UUID, BigDecimal>comparingByValue().reversed())
+            .limit(MOVERS_LIMIT)
+            .map(entry -> {
+                UUID itemId = entry.getKey();
+                Product product = productMap.get(itemId);
+                if (product == null) return null;
+
+                BigDecimal demandVelocity = entry.getValue();
+                BigDecimal percentOfTotal = finalTotalDemandVelocity.compareTo(BigDecimal.ZERO) > 0
+                    ? demandVelocity.multiply(BigDecimal.valueOf(100))
+                        .divide(finalTotalDemandVelocity, 1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+                return new DemandLeader(
+                    0,
+                    itemId,
+                    product.getName(),
+                    product.getSku(),
+                    product.getImageUrl(),
+                    product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                    unitsByItem.getOrDefault(itemId, 0),
+                    demandVelocity.setScale(2, RoundingMode.HALF_UP),
+                    volatilityByItem.getOrDefault(itemId, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                    accuracyByItem.getOrDefault(itemId, BigDecimal.ZERO),
+                    stockVelocityByItem.getOrDefault(itemId, BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP),
+                    percentOfTotal
+                );
+            })
+            .filter(Objects::nonNull)
+            .toList();
+
+        List<DemandLeader> rankedByDemandVelocity = assignRanks(byDemandVelocity, (rank, dl) -> new DemandLeader(
+            rank, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
+            dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
+            dl.stockVelocity(), dl.percentOfTotal()));
+
+        // Leaders by stock velocity
+        List<DemandLeader> byStockVelocity = stockVelocityByItem.entrySet().stream()
+            .sorted(Map.Entry.<UUID, BigDecimal>comparingByValue().reversed())
+            .limit(MOVERS_LIMIT)
+            .map(entry -> {
+                UUID itemId = entry.getKey();
+                Product product = productMap.get(itemId);
+                if (product == null) return null;
+
+                BigDecimal demandVelocity = demandVelocityByItem.getOrDefault(itemId, BigDecimal.ZERO);
+                BigDecimal percentOfTotal = finalTotalDemandVelocity.compareTo(BigDecimal.ZERO) > 0
+                    ? demandVelocity.multiply(BigDecimal.valueOf(100))
+                        .divide(finalTotalDemandVelocity, 1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+                return new DemandLeader(
+                    0,
+                    itemId,
+                    product.getName(),
+                    product.getSku(),
+                    product.getImageUrl(),
+                    product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                    unitsByItem.getOrDefault(itemId, 0),
+                    demandVelocity.setScale(2, RoundingMode.HALF_UP),
+                    volatilityByItem.getOrDefault(itemId, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
+                    accuracyByItem.getOrDefault(itemId, BigDecimal.ZERO),
+                    entry.getValue().setScale(4, RoundingMode.HALF_UP),
+                    percentOfTotal
+                );
+            })
+            .filter(Objects::nonNull)
+            .toList();
+
+        List<DemandLeader> rankedByStockVelocity = assignRanks(byStockVelocity, (rank, dl) -> new DemandLeader(
+            rank, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
+            dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
+            dl.stockVelocity(), dl.percentOfTotal()));
+
+        // Category rankings by demand velocity
+        Map<UUID, BigDecimal> demandVelocityByCategory = new HashMap<>();
+        Map<UUID, Integer> unitsByCategory = new HashMap<>();
+        for (UUID itemId : demandVelocityByItem.keySet()) {
+            Product product = productMap.get(itemId);
+            if (product == null || product.getCategory() == null) continue;
+            UUID categoryId = product.getCategory().getId();
+            demandVelocityByCategory.merge(categoryId, demandVelocityByItem.get(itemId), BigDecimal::add);
+            unitsByCategory.merge(categoryId, unitsByItem.getOrDefault(itemId, 0), Integer::sum);
+        }
+
+        final BigDecimal finalTotalDemandVelocity2 = totalDemandVelocity;
+        List<CategoryRanking> categoryRankings = categories.stream()
+            .filter(cat -> demandVelocityByCategory.containsKey(cat.getId()))
+            .sorted(Comparator.comparing((Category cat) ->
+                demandVelocityByCategory.getOrDefault(cat.getId(), BigDecimal.ZERO)).reversed())
+            .limit(CATEGORY_RANKINGS_LIMIT)
+            .map(cat -> {
+                UUID catId = cat.getId();
+                BigDecimal catDemandVelocity = demandVelocityByCategory.getOrDefault(catId, BigDecimal.ZERO);
+                int catUnits = unitsByCategory.getOrDefault(catId, 0);
+                int totalItems = (int) products.stream()
+                    .filter(p -> p.getCategory() != null && p.getCategory().getId().equals(catId))
+                    .count();
+                BigDecimal percentOfTotal = finalTotalDemandVelocity2.compareTo(BigDecimal.ZERO) > 0
+                    ? catDemandVelocity.multiply(BigDecimal.valueOf(100))
+                        .divide(finalTotalDemandVelocity2, 1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+                return new CategoryRanking(0, catId, cat.getName(), totalItems, catUnits,
+                    catDemandVelocity.setScale(2, RoundingMode.HALF_UP), percentOfTotal);
+            })
+            .toList();
+
+        List<CategoryRanking> rankedCategories = assignRanks(categoryRankings, (rank, cr) ->
+            new CategoryRanking(rank, cr.categoryId(), cr.categoryName(),
+                cr.totalItems(), cr.periodDemand(), cr.totalDemandVelocity(), cr.percentOfTotal()));
+
+        // Previous period comparison for growth calculation
+        List<DailySalesRollup> previousRollups = dailySalesRollupRepository
+            .findByRollupDateBetweenOrderByRollupDateAsc(previousStart, startDate.minusDays(1));
+        int previousTotalUnits = previousRollups.stream().mapToInt(DailySalesRollup::getUnitsSold).sum();
+        int currentTotalUnits = unitsByItem.values().stream().mapToInt(Integer::intValue).sum();
+
+        BigDecimal demandGrowth = BigDecimal.ZERO;
+        if (previousTotalUnits > 0) {
+            demandGrowth = BigDecimal.valueOf((currentTotalUnits - previousTotalUnits) * 100.0 / previousTotalUnits)
+                .setScale(1, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal systemAccuracy = accuracyCount > 0
+            ? totalAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
+        DemandSummary summary = new DemandSummary(
+            totalDemandVelocity.setScale(2, RoundingMode.HALF_UP),
+            currentTotalUnits,
+            demandVelocityByItem.size(),
+            demandGrowth,
+            systemAccuracy,
+            periodLabel
+        );
+
+        return new DemandLeadersDTO(rankedByDemandVelocity, rankedByStockVelocity, rankedCategories, summary);
     }
 }

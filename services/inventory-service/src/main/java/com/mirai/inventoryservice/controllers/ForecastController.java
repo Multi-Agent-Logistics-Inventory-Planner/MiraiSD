@@ -31,6 +31,11 @@ public class ForecastController {
         return ResponseEntity.ok(forecastService.getAllForecasts(pageable));
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<ForecastPredictionResponseDTO>> getAllForecastsUnpaginated() {
+        return ResponseEntity.ok(forecastService.getAllForecastsUnpaginated());
+    }
+
     @GetMapping("/{itemId}")
     public ResponseEntity<ForecastPredictionResponseDTO> getForecastByItem(@PathVariable UUID itemId) {
         ForecastPredictionResponseDTO forecast = forecastService.getForecastByItem(itemId);

@@ -1,3 +1,5 @@
 export { AnalyticsTabs } from "./analytics-tabs"
+export { TabPredictions } from "./tab-predictions"
+export { TabInsights } from "./tab-insights"
+export { TabDemandLeaders } from "./tab-demand-leaders"
 export { TabLegacy } from "./tab-legacy"
-export { TabPlaceholder } from "./tab-placeholder"

@@ -20,9 +20,11 @@ describe("usePermissions", () => {
   describe("when user is ADMIN", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.ADMIN, email: "admin@test.com" },
+        user: { id: "admin-1", role: UserRole.ADMIN, email: "admin@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -54,9 +56,11 @@ describe("usePermissions", () => {
   describe("when user is EMPLOYEE", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -74,7 +78,7 @@ describe("usePermissions", () => {
       const { result } = renderHook(() => usePermissions());
       expect(result.current.can(Permission.PRODUCTS_VIEW)).toBe(true);
       expect(result.current.can(Permission.STORAGE_VIEW)).toBe(true);
-      expect(result.current.can(Permission.SHIPMENTS_CREATE)).toBe(true);
+      expect(result.current.can(Permission.SHIPMENTS_VIEW)).toBe(true);
     });
 
     it("can() should return false for restricted permissions", () => {
@@ -107,8 +111,10 @@ describe("usePermissions", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
         user: null,
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -132,9 +138,11 @@ describe("usePermissions", () => {
   describe("canAll and canAny", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 

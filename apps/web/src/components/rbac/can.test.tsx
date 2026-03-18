@@ -20,9 +20,11 @@ describe("Can component", () => {
   describe("when user is ADMIN", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.ADMIN, email: "admin@test.com" },
+        user: { id: "admin-1", role: UserRole.ADMIN, email: "admin@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -39,9 +41,11 @@ describe("Can component", () => {
   describe("when user is EMPLOYEE", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -80,9 +84,11 @@ describe("Can component", () => {
   describe("with multiple permissions", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -137,8 +143,10 @@ describe("Can component", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
         user: null,
+        session: null,
         isLoading: false,
         signOut: vi.fn(),
+        refreshAuth: vi.fn(),
       } as ReturnType<typeof useAuth>);
     });
 

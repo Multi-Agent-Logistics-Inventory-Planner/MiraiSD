@@ -119,10 +119,10 @@ describe("middleware - permission-based route guards", () => {
           );
         });
 
-        it("should deny access to notifications (NOTIFICATIONS_VIEW)", () => {
+        it("should allow access to notifications (NOTIFICATIONS_VIEW)", () => {
           expect(
             shouldAllowRouteAccess("/notifications", UserRole.EMPLOYEE)
-          ).toBe(false);
+          ).toBe(true);
         });
 
         it("should deny access to team (TEAM_VIEW)", () => {
@@ -131,9 +131,9 @@ describe("middleware - permission-based route guards", () => {
           );
         });
 
-        it("should deny access to settings (SETTINGS_VIEW)", () => {
+        it("should allow access to settings (SETTINGS_VIEW)", () => {
           expect(shouldAllowRouteAccess("/settings", UserRole.EMPLOYEE)).toBe(
-            false
+            true
           );
         });
       });

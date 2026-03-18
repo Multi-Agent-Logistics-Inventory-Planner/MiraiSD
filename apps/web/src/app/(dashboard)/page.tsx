@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { formatDistanceToNowStrict } from "date-fns";
-import { RefreshCw } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ErrorBoundary,
@@ -15,105 +12,31 @@ import {
 } from "@/components/error-boundary";
 
 import { usePermissions, Permission } from "@/hooks/use-permissions";
-import { useDashboardMetrics } from "@/hooks/queries/use-dashboard-metrics";
-import { getShipments } from "@/lib/api/shipments";
-import { ShipmentStatus, type Shipment } from "@/types/api";
 import {
   useActivityFeed,
   type ActivityFeedFilters,
 } from "@/hooks/queries/use-activity-feed";
-import { useAllForecasts } from "@/hooks/queries/use-forecasts";
-import { useProducts } from "@/hooks/queries/use-products";
-import { ActionRequiredPanel } from "@/components/dashboard/action-required-panel";
-import { RiskDistributionDonut } from "@/components/dashboard/risk-distribution-donut";
 import { UnifiedActivityFeed } from "@/components/dashboard/unified-activity-feed";
-import { FilterableStockList } from "@/components/dashboard/filterable-stock-list";
-import { SupplyChainStatusCard } from "@/components/dashboard/supply-chain-status-card";
+import {
+  ConnectedOrdersCard,
+  ConnectedStockStatusCard,
+  ConnectedHighestDemandCard,
+  ConnectedSupplyChainStatusCard,
+} from "@/components/dashboard/connected-cards";
 import { TopReviewersCard } from "@/components/dashboard/top-reviewers-card";
-import type { RiskBand, ActivityEventType } from "@/types/dashboard";
-
-function getNextArrivingShipment(shipments: Shipment[]): Shipment | null {
-  const withDates = shipments.filter(
-    (s): s is Shipment & { expectedDeliveryDate: string } =>
-      s.expectedDeliveryDate !== null && s.expectedDeliveryDate !== undefined
-  );
-  if (withDates.length === 0) return null;
-
-  return withDates.sort(
-    (a, b) =>
-      new Date(a.expectedDeliveryDate).getTime() -
-      new Date(b.expectedDeliveryDate).getTime()
-  )[0];
-}
+import type { ActivityEventType } from "@/types/dashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { can, role } = usePermissions();
 
-  // Data hooks
-  const metricsQuery = useDashboardMetrics();
-  const allForecastsQuery = useAllForecasts();
-  const productsQuery = useProducts();
-
-  // Shipment queries for supply chain status card
-  const pendingShipmentsQuery = useQuery({
-    queryKey: ["shipments", "pending"],
-    queryFn: () => getShipments(ShipmentStatus.PENDING),
-    staleTime: 60 * 1000,
-  });
-
-  const inTransitShipmentsQuery = useQuery({
-    queryKey: ["shipments", "in-transit"],
-    queryFn: () => getShipments(ShipmentStatus.IN_TRANSIT),
-    staleTime: 60 * 1000,
-  });
-
-  // Activity feed with filters
+  // Activity feed with filters (kept at page level for filter state management)
   const [activityFilters, setActivityFilters] = useState<ActivityFeedFilters>({
     types: ["alert", "restock", "sale", "shipment", "adjustment", "transfer"],
     showResolved: false,
   });
   const activityFeed = useActivityFeed(activityFilters);
-
-  // Risk distribution donut filter state
-  const [selectedRiskBand, setSelectedRiskBand] = useState<RiskBand | null>(
-    null,
-  );
-
-  // Memoize supply chain data to avoid recalculating on every render
-  const supplyChainData = useMemo(() => {
-    const allActiveShipments = [
-      ...(pendingShipmentsQuery.data ?? []),
-      ...(inTransitShipmentsQuery.data ?? []),
-    ];
-    const nextShipment = getNextArrivingShipment(allActiveShipments);
-    const additionalCount = allActiveShipments.length - (nextShipment ? 1 : 0);
-
-    return {
-      nextShipment,
-      additionalCount,
-      isLoading: pendingShipmentsQuery.isLoading || inTransitShipmentsQuery.isLoading,
-    };
-  }, [pendingShipmentsQuery.data, inTransitShipmentsQuery.data, pendingShipmentsQuery.isLoading, inTransitShipmentsQuery.isLoading]);
-
-  // Sync state
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-
-  const handleSync = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      await queryClient.invalidateQueries();
-      setLastSyncedAt(new Date());
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [queryClient]);
-
-  const lastSyncedLabel = lastSyncedAt
-    ? `Last synced ${formatDistanceToNowStrict(lastSyncedAt, { addSuffix: true })}`
-    : null;
 
   // Handle activity filter changes
   const handleActivityFilterChange = useCallback(
@@ -133,7 +56,7 @@ export default function DashboardPage() {
 
   if (role && !canViewDashboard) return null;
 
-  const hasError = !!metricsQuery.error || !!activityFeed.error;
+  const hasError = !!activityFeed.error;
 
   function handleRetry() {
     queryClient.invalidateQueries();
@@ -147,29 +70,9 @@ export default function DashboardPage() {
       <div className="flex flex-col min-h-screen">
         <div className="flex-1 p-4 md:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
-            <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            {lastSyncedLabel && (
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {lastSyncedLabel}
-              </span>
-            )}
-            <Button
-              variant="outline"
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] hover:text-white/90 dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground dark:hover:text-gray-300 gap-1.5"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`}
-              />
-              Sync
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="md:hidden" />
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         </div>
 
         {/* Error Alert */}
@@ -187,40 +90,28 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        {/* Action Required Panel */}
-        <ActionRequiredPanel
-          items={metricsQuery.data?.actionRequired.items ?? []}
-          isLoading={metricsQuery.isLoading}
-        />
-
-        {/* Supply Chain Status + Top Reviewers */}
-        <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-          <SupplyChainStatusCard
-            nextShipment={supplyChainData.nextShipment}
-            additionalShipmentCount={supplyChainData.additionalCount}
-            isLoading={supplyChainData.isLoading}
-          />
-          <TopReviewersCard />
-        </div>
-
-        {/* Risk Distribution + Filterable Stock List (related - clicking risk filters list) */}
-        <div className="grid lg:grid-cols-5 border bg-card/95 dark:bg-[#2b2b29] rounded-2xl">
-          <div className="lg:col-span-2">
-            <RiskDistributionDonut
-              data={metricsQuery.data?.riskDistribution ?? []}
-              selectedSegment={selectedRiskBand}
-              onSegmentClick={setSelectedRiskBand}
-              isLoading={metricsQuery.isLoading}
-            />
+        {/* Main Cards Grid - 3 columns with right column spanning 2 rows */}
+        {/* Each card fetches its own data for progressive loading */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-3 md:grid-rows-2">
+          {/* Orders - mobile order 1, desktop row 1 col 1 */}
+          <div className="order-1">
+            <ConnectedOrdersCard />
           </div>
-          <div className="lg:col-span-3">
-            <FilterableStockList
-              forecasts={allForecastsQuery.data ?? []}
-              products={productsQuery.data ?? []}
-              selectedRiskBand={selectedRiskBand}
-              onClearFilter={() => setSelectedRiskBand(null)}
-              isLoading={allForecastsQuery.isLoading || productsQuery.isLoading}
-            />
+          {/* Stock - mobile order 3, desktop row 1 col 2 */}
+          <div className="order-3 md:order-2">
+            <ConnectedStockStatusCard />
+          </div>
+          {/* High Demand - mobile order 5 (last), desktop row-span-2 col 3 */}
+          <div className="order-5 md:order-3 md:row-span-2 h-auto md:h-full">
+            <ConnectedHighestDemandCard />
+          </div>
+          {/* Incoming Shipments - mobile order 2, desktop row 2 col 1 */}
+          <div className="order-2 md:order-4">
+            <ConnectedSupplyChainStatusCard />
+          </div>
+          {/* Top Reviewers - mobile order 4, desktop row 2 col 2 */}
+          <div className="order-4 md:order-5">
+            <TopReviewersCard />
           </div>
         </div>
 
