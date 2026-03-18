@@ -132,10 +132,6 @@ function getInitials(name: string | undefined): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-function getRoleBadgeVariant(role: UserRole): "default" | "secondary" {
-  return role === UserRole.ADMIN ? "default" : "secondary";
-}
-
 function NavItemLink({
   item,
   pathname,
@@ -154,10 +150,7 @@ function NavItemLink({
           <item.icon className="h-4 w-4 dark:text-[#faf9f5]" />
           <span className="flex-1">{item.title}</span>
           {badge !== undefined && badge > 0 && (
-            <Badge
-              variant="destructive"
-              className="ml-auto h-5 min-w-5 px-1.5 text-xs font-medium"
-            >
+            <Badge className="ml-auto h-5 min-w-5 px-1.5 text-xs font-medium text-white bg-[#0b66c2]/80 dark:bg-[#7c3aed]">
               {badge > 99 ? "99+" : badge}
             </Badge>
           )}

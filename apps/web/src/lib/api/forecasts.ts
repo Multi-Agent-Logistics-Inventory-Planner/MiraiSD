@@ -20,10 +20,6 @@ export async function getAtRiskForecasts(daysThreshold: number = 7): Promise<For
   return apiGet<ForecastPrediction[]>(`${BASE_PATH}/at-risk?daysThreshold=${daysThreshold}`)
 }
 
-export async function getForecastByItem(itemId: string): Promise<ForecastPrediction> {
-  return apiGet<ForecastPrediction>(`${BASE_PATH}/${itemId}`)
-}
-
 export async function getAllForecasts(): Promise<ForecastPrediction[]> {
   const first = await getForecasts({ page: 1, limit: 100 })
   if (first.totalPages <= 1) return first.content

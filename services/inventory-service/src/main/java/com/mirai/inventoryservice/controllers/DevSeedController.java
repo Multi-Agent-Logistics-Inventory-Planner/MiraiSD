@@ -32,6 +32,19 @@ import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.repositories.SingleClawMachineRepository;
+import com.mirai.inventoryservice.repositories.DoubleClawMachineRepository;
+import com.mirai.inventoryservice.repositories.GachaponRepository;
+import com.mirai.inventoryservice.repositories.KeychainMachineRepository;
+import com.mirai.inventoryservice.repositories.PusherMachineRepository;
+import com.mirai.inventoryservice.repositories.FourCornerMachineRepository;
+import com.mirai.inventoryservice.models.storage.SingleClawMachine;
+import com.mirai.inventoryservice.models.storage.DoubleClawMachine;
+import com.mirai.inventoryservice.models.storage.Gachapon;
+import com.mirai.inventoryservice.models.storage.KeychainMachine;
+import com.mirai.inventoryservice.models.storage.PusherMachine;
+import com.mirai.inventoryservice.models.storage.FourCornerMachine;
+import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -91,6 +104,13 @@ public class DevSeedController {
     private final ReviewRepository reviewRepository;
     private final ReviewDailyCountRepository reviewDailyCountRepository;
     private final MachineDisplayRepository machineDisplayRepository;
+    private final AnalyticsSeedService analyticsSeedService;
+    private final SingleClawMachineRepository singleClawMachineRepository;
+    private final DoubleClawMachineRepository doubleClawMachineRepository;
+    private final GachaponRepository gachaponRepository;
+    private final KeychainMachineRepository keychainMachineRepository;
+    private final PusherMachineRepository pusherMachineRepository;
+    private final FourCornerMachineRepository fourCornerMachineRepository;
 
     private final Random random = new Random();
 
@@ -1090,5 +1110,257 @@ public class DevSeedController {
             "success", true,
             "deletedCount", staleDisplays.size()
         ));
+    }
+
+    /**
+     * Seed comprehensive analytics data including DOW patterns, daily rollups, and monthly rollups.
+     * This endpoint generates sales with realistic day-of-week patterns and pre-aggregates them
+     * into rollup tables for fast analytics queries.
+     *
+     * @param monthsBack Number of months of historical data to generate (default 6)
+     */
+    @PostMapping("/seed/analytics")
+    public ResponseEntity<Map<String, Object>> seedAnalytics(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        return ResponseEntity.ok(analyticsSeedService.seedAllAnalytics(monthsBack));
+    }
+
+    /**
+     * Seed sales data with realistic day-of-week patterns.
+     * Higher sales on weekends (Friday-Sunday) reflecting arcade traffic patterns.
+     */
+    @PostMapping("/seed/dow-patterns")
+    public ResponseEntity<Map<String, Object>> seedDowPatterns(
+            @RequestParam(defaultValue = "3") @Min(1) @Max(12) int monthsBack) {
+        int count = analyticsSeedService.seedDowPatternSales(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "salesCreated", count
+        ));
+    }
+
+    /**
+     * Seed daily rollups from existing stock movements.
+     * Aggregates sales, restocks, and damages by item and date.
+     */
+    @PostMapping("/seed/daily-rollups")
+    public ResponseEntity<Map<String, Object>> seedDailyRollups(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        int count = analyticsSeedService.seedDailyRollups(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "dailyRollupsCreated", count
+        ));
+    }
+
+    /**
+     * Seed monthly rollups from daily rollups.
+     * Aggregates daily data by category and month.
+     */
+    @PostMapping("/seed/monthly-rollups")
+    public ResponseEntity<Map<String, Object>> seedMonthlyRollups(
+            @RequestParam(defaultValue = "6") @Min(1) @Max(24) int monthsBack) {
+        int count = analyticsSeedService.seedMonthlyRollups(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "monthlyRollupsCreated", count
+        ));
+    }
+
+    /**
+     * Clear all analytics seed data including seeded sales and rollup tables.
+     */
+    @DeleteMapping("/seed/analytics")
+    public ResponseEntity<Map<String, Object>> clearAnalyticsSeedData() {
+        return ResponseEntity.ok(analyticsSeedService.clearAnalyticsSeedData());
+    }
+
+    /**
+     * Seed machine displays for the Longest Running Displays component.
+     * Creates machines if they don't exist, then creates display records with varying ages
+     * to simulate products that have been on display for different durations.
+     *
+     * Distribution of display ages:
+     * - 20% very stale (30-60 days)
+     * - 30% stale (14-29 days)
+     * - 30% approaching stale (7-13 days)
+     * - 20% fresh (1-6 days)
+     */
+    @PostMapping("/seed/machine-displays")
+    public ResponseEntity<Map<String, Object>> seedMachineDisplays(
+            @RequestParam(defaultValue = "20") @Min(5) @Max(50) int displayCount) {
+
+        List<Product> products = productRepository.findAll();
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/all first."
+            ));
+        }
+
+        // Ensure we have machines to display on
+        List<UUID> machineIds = ensureMachinesExist();
+
+        // Clear existing active displays for clean seeding
+        List<MachineDisplay> existingDisplays = machineDisplayRepository.findByEndedAtIsNullOrderByStartedAtAsc();
+        existingDisplays.forEach(d -> d.setEndedAt(OffsetDateTime.now(ZoneOffset.UTC)));
+        machineDisplayRepository.saveAll(existingDisplays);
+
+        List<MachineDisplay> newDisplays = new ArrayList<>();
+        int veryStaleCount = 0, staleCount = 0, approachingCount = 0, freshCount = 0;
+
+        // Create displays with varying ages
+        for (int i = 0; i < displayCount && i < products.size(); i++) {
+            Product product = products.get(i % products.size());
+            int machineIndex = i % machineIds.size();
+            UUID machineId = machineIds.get(machineIndex);
+            LocationType locationType = getLocationTypeForMachineIndex(machineIndex);
+
+            // Determine days ago based on distribution
+            int daysAgo;
+            int mod = i % 10;
+            if (mod < 2) {
+                // 20% very stale (30-60 days)
+                daysAgo = 30 + random.nextInt(31);
+                veryStaleCount++;
+            } else if (mod < 5) {
+                // 30% stale (14-29 days)
+                daysAgo = 14 + random.nextInt(16);
+                staleCount++;
+            } else if (mod < 8) {
+                // 30% approaching stale (7-13 days)
+                daysAgo = 7 + random.nextInt(7);
+                approachingCount++;
+            } else {
+                // 20% fresh (1-6 days)
+                daysAgo = 1 + random.nextInt(6);
+                freshCount++;
+            }
+
+            OffsetDateTime startedAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(daysAgo);
+
+            MachineDisplay display = MachineDisplay.builder()
+                .locationType(locationType)
+                .machineId(machineId)
+                .product(product)
+                .startedAt(startedAt)
+                .endedAt(null) // Active display
+                .build();
+
+            newDisplays.add(display);
+        }
+
+        machineDisplayRepository.saveAll(newDisplays);
+
+        log.info("Seeded {} machine displays (veryStale={}, stale={}, approaching={}, fresh={})",
+            newDisplays.size(), veryStaleCount, staleCount, approachingCount, freshCount);
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "displaysCreated", newDisplays.size(),
+            "distribution", Map.of(
+                "veryStale_30_60_days", veryStaleCount,
+                "stale_14_29_days", staleCount,
+                "approaching_7_13_days", approachingCount,
+                "fresh_1_6_days", freshCount
+            ),
+            "machinesUsed", machineIds.size()
+        ));
+    }
+
+    @DeleteMapping("/seed/machine-displays")
+    public ResponseEntity<Map<String, Object>> clearSeedMachineDisplays() {
+        List<MachineDisplay> activeDisplays = machineDisplayRepository.findByEndedAtIsNullOrderByStartedAtAsc();
+        machineDisplayRepository.deleteAll(activeDisplays);
+
+        log.info("Cleared {} active machine displays", activeDisplays.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "deletedCount", activeDisplays.size()
+        ));
+    }
+
+    /**
+     * Ensure machines exist for each location type.
+     * Creates machines if they don't exist and returns their IDs.
+     */
+    private List<UUID> ensureMachinesExist() {
+        List<UUID> machineIds = new ArrayList<>();
+
+        // Single Claw Machines (S1-S3)
+        for (int i = 1; i <= 3; i++) {
+            String code = "S" + i;
+            SingleClawMachine machine = singleClawMachineRepository.findBySingleClawMachineCode(code)
+                .orElseGet(() -> singleClawMachineRepository.save(
+                    SingleClawMachine.builder().singleClawMachineCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        // Double Claw Machines (D1-D2)
+        for (int i = 1; i <= 2; i++) {
+            String code = "D" + i;
+            DoubleClawMachine machine = doubleClawMachineRepository.findByDoubleClawMachineCode(code)
+                .orElseGet(() -> doubleClawMachineRepository.save(
+                    DoubleClawMachine.builder().doubleClawMachineCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        // Gachapons (G1-G3)
+        for (int i = 1; i <= 3; i++) {
+            String code = "G" + i;
+            Gachapon machine = gachaponRepository.findByGachaponCode(code)
+                .orElseGet(() -> gachaponRepository.save(
+                    Gachapon.builder().gachaponCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        // Keychain Machines (K1-K2)
+        for (int i = 1; i <= 2; i++) {
+            String code = "K" + i;
+            KeychainMachine machine = keychainMachineRepository.findByKeychainMachineCode(code)
+                .orElseGet(() -> keychainMachineRepository.save(
+                    KeychainMachine.builder().keychainMachineCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        // Pusher Machines (P1-P2)
+        for (int i = 1; i <= 2; i++) {
+            String code = "P" + i;
+            PusherMachine machine = pusherMachineRepository.findByPusherMachineCode(code)
+                .orElseGet(() -> pusherMachineRepository.save(
+                    PusherMachine.builder().pusherMachineCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        // Four Corner Machines (M1-M2)
+        for (int i = 1; i <= 2; i++) {
+            String code = "M" + i;
+            FourCornerMachine machine = fourCornerMachineRepository.findByFourCornerMachineCode(code)
+                .orElseGet(() -> fourCornerMachineRepository.save(
+                    FourCornerMachine.builder().fourCornerMachineCode(code).build()
+                ));
+            machineIds.add(machine.getId());
+        }
+
+        return machineIds;
+    }
+
+    /**
+     * Map machine index to location type based on the order machines are created
+     * in ensureMachinesExist().
+     */
+    private LocationType getLocationTypeForMachineIndex(int index) {
+        // Order: S1,S2,S3 (0-2), D1,D2 (3-4), G1,G2,G3 (5-7), K1,K2 (8-9), P1,P2 (10-11), M1,M2 (12-13)
+        if (index < 3) return LocationType.SINGLE_CLAW_MACHINE;
+        if (index < 5) return LocationType.DOUBLE_CLAW_MACHINE;
+        if (index < 8) return LocationType.GACHAPON;
+        if (index < 10) return LocationType.KEYCHAIN_MACHINE;
+        if (index < 12) return LocationType.PUSHER_MACHINE;
+        return LocationType.FOUR_CORNER_MACHINE;
     }
 }
