@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_undelivered
 -- Unique constraint for idempotency (prevent duplicate notifications for same alert on same day)
 -- Using dedupe_key + date allows re-alerting on different days while preventing duplicates
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
-    ON notifications (dedupe_key, (created_at::date))
+    ON notifications (dedupe_key, ((created_at AT TIME ZONE 'UTC')::date))
     WHERE dedupe_key IS NOT NULL;
 
 -- Index for faster lookups by dedupe_key
