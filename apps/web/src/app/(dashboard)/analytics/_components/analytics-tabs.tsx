@@ -3,7 +3,6 @@
 import {
   Activity,
   Lightbulb,
-  Settings,
   TrendingDown,
   Wrench,
 } from "lucide-react";
@@ -29,11 +28,6 @@ const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
     label: "Demand Leaders",
     icon: Activity,
     adminOnly: true,
-  },
-  {
-    value: AnalyticsTab.SETTINGS,
-    label: "Settings",
-    icon: Settings,
   },
   {
     value: AnalyticsTab.LEGACY,

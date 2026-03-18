@@ -13,7 +13,6 @@ import {
   TabPredictions,
   TabInsights,
   TabDemandLeaders,
-  TabSettings,
   TabLegacy,
 } from "./_components"
 
@@ -61,8 +60,6 @@ function AnalyticsContent() {
         return <TabInsights />
       case AnalyticsTab.DEMAND_LEADERS:
         return <TabDemandLeaders />
-      case AnalyticsTab.SETTINGS:
-        return <TabSettings />
       case AnalyticsTab.LEGACY:
       default:
         return (

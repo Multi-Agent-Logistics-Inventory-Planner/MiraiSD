@@ -2,7 +2,6 @@ export enum AnalyticsTab {
   PREDICTIONS = "predictions",
   INSIGHTS = "insights",
   DEMAND_LEADERS = "demand-leaders",
-  SETTINGS = "settings",
   LEGACY = "legacy",
 }
 
@@ -57,9 +56,10 @@ export interface DayOfWeekPattern {
 export type MoverDirection = 'UP' | 'DOWN' | 'STABLE'
 
 export interface Mover {
+  rank: number
   itemId: string
   name: string
-  sku: string
+  imageUrl: string | null
   categoryName: string
   currentPeriodUnits: number
   previousPeriodUnits: number

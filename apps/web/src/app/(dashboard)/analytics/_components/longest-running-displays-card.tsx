@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
-import { ChevronLeft, ChevronRight, Clock, ListFilter, ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, ListFilter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
   PopoverContent,
@@ -20,7 +19,6 @@ import {
   DataTableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getSafeImageUrl } from "@/lib/utils/validation";
 import {
   LocationType,
   LOCATION_TYPE_LABELS,
@@ -35,51 +33,6 @@ import { useLocation } from "@/hooks/queries/use-locations";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
 
 const ROWS_PER_PAGE = 10;
-
-interface ProductImageProps {
-  productId: string;
-  productName: string;
-  productCount: number;
-  productImageMap: Map<string, string | null>;
-}
-
-function ProductImage({
-  productId,
-  productName,
-  productCount,
-  productImageMap,
-}: ProductImageProps) {
-  const [imageError, setImageError] = useState(false);
-  const imageUrl = productImageMap.get(productId);
-  const safeImageUrl = getSafeImageUrl(imageUrl);
-  const hasImage = safeImageUrl && !imageError;
-
-  return (
-    <div className="relative h-10 w-10 shrink-0">
-      <div className="h-10 w-10 rounded-md overflow-hidden bg-muted">
-        {hasImage ? (
-          <Image
-            src={safeImageUrl}
-            alt={productName}
-            fill
-            sizes="40px"
-            className="object-cover"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center">
-            <ImageOff className="h-4 w-4 text-muted-foreground" />
-          </div>
-        )}
-      </div>
-      {productCount > 1 && (
-        <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground text-[10px] font-medium text-white">
-          +{productCount - 1}
-        </span>
-      )}
-    </div>
-  );
-}
 
 function LoadingSkeleton() {
   return (
@@ -245,80 +198,79 @@ export function LongestRunningDisplaysCard() {
                   </DataTableHeader>
                 </Table>
               </div>
-              <ScrollArea className="flex-1 min-h-0">
-                <div className="px-6">
-                  <Table className="table-fixed">
-                    <TableBody>
-                  {paginatedData.map((summary) => {
-                    const firstProduct = summary.products[0];
-                    return (
-                      <TableRow
-                        key={`${summary.locationType}:${summary.machineId}`}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => handleRowClick(summary)}
-                      >
-                        <TableCell className="w-[50%]">
-                          <div className="flex items-center gap-3">
-                            <ProductImage
-                              productId={firstProduct?.productId ?? ""}
-                              productName={firstProduct?.productName ?? "Unknown"}
-                              productCount={summary.productCount}
-                              productImageMap={productImageMap}
-                            />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {summary.machineCode}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {LOCATION_TYPE_LABELS[summary.locationType]}
-                              </p>
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <Table className="table-fixed">
+                  <TableBody>
+                    {paginatedData.map((summary) => {
+                      const firstProduct = summary.products[0];
+                      return (
+                        <TableRow
+                          key={`${summary.locationType}:${summary.machineId}`}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleRowClick(summary)}
+                        >
+                          <TableCell className="w-[50%]">
+                            <div className="flex items-center gap-3">
+                              <ProductThumbnail
+                                imageUrl={productImageMap.get(firstProduct?.productId ?? "")}
+                                alt={firstProduct?.productName ?? "Unknown"}
+                                size="md"
+                                fallbackVariant="icon"
+                                badge={summary.productCount}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {summary.machineCode}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {LOCATION_TYPE_LABELS[summary.locationType]}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell w-[25%] text-center">
-                          {summary.productCount}
-                        </TableCell>
-                        <TableCell className="w-[25%]">
-                          <span className="text-sm font-medium">
-                            {summary.maxDaysActive} day{summary.maxDaysActive !== 1 ? "s" : ""}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                    </TableBody>
-                  </Table>
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between py-3 text-xs text-muted-foreground">
-                      <span>
-                        Page {page + 1} of {totalPages}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setPage((p) => Math.max(0, p - 1))}
-                          disabled={page === 0}
-                          aria-label="Previous page"
-                        >
-                          <ChevronLeft className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                          disabled={page >= totalPages - 1}
-                          aria-label="Next page"
-                        >
-                          <ChevronRight className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell w-[25%] text-center">
+                            {summary.productCount}
+                          </TableCell>
+                          <TableCell className="w-[25%]">
+                            <span className="text-sm font-medium">
+                              {summary.maxDaysActive} day{summary.maxDaysActive !== 1 ? "s" : ""}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-3 text-xs text-muted-foreground shrink-0">
+                  <span>
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-              </ScrollArea>
+              )}
             </div>
           )}
         </CardContent>

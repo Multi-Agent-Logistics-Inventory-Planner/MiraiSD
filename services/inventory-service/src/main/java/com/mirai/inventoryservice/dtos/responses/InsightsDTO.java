@@ -31,9 +31,10 @@ public record InsightsDTO(
      * Product showing significant demand change.
      */
     public record Mover(
+        int rank,
         UUID itemId,
         String name,
-        String sku,
+        String imageUrl,
         String categoryName,
         int currentPeriodUnits,
         int previousPeriodUnits,

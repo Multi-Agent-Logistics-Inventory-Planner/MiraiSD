@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -65,6 +66,8 @@ public class AnalyticsService {
     private final DailySalesRollupRepository dailySalesRollupRepository;
 
     private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    private static final int MOVERS_LIMIT = 10;
+    private static final int CATEGORY_RANKINGS_LIMIT = 5;
 
     /**
      * Helper record for extracted forecast features.
@@ -134,6 +137,20 @@ public class AnalyticsService {
             return null;
         }
         return sigmaDHat.divide(muHat, 4, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Assign sequential ranks to a list of items using a mapper function.
+     * @param items The list of items to rank
+     * @param rankMapper Function that takes (1-based rank, item) and returns a new ranked item
+     * @return A new list with ranks assigned
+     */
+    private <T, R> List<R> assignRanks(List<T> items, BiFunction<Integer, T, R> rankMapper) {
+        List<R> ranked = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            ranked.add(rankMapper.apply(i + 1, items.get(i)));
+        }
+        return ranked;
     }
 
     @Transactional(readOnly = true)
@@ -520,9 +537,10 @@ public class AnalyticsService {
             if (product == null) continue;
 
             movers.add(new Mover(
+                0, // rank assigned after sorting
                 itemId,
                 product.getName(),
-                product.getSku(),
+                product.getImageUrl(),
                 product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
                 current,
                 previous,
@@ -535,11 +553,16 @@ public class AnalyticsService {
             ? Comparator.comparing(Mover::percentChange).reversed()
             : Comparator.comparing(Mover::percentChange);
 
-        return movers.stream()
+        List<Mover> sortedMovers = movers.stream()
             .filter(m -> topMovers ? m.direction() == MoverDirection.UP : m.direction() == MoverDirection.DOWN)
             .sorted(comparator)
-            .limit(5)
+            .limit(MOVERS_LIMIT)
             .toList();
+
+        return assignRanks(sortedMovers, (rank, m) -> new Mover(
+            rank, m.itemId(), m.name(), m.imageUrl(), m.categoryName(),
+            m.currentPeriodUnits(), m.previousPeriodUnits(), m.percentChange(), m.direction()
+        ));
     }
 
     private PeriodSummary computePeriodSummaryWithDemand(
@@ -683,7 +706,7 @@ public class AnalyticsService {
         final BigDecimal finalTotalDemandVelocity = totalDemandVelocity;
         List<DemandLeader> byDemandVelocity = demandVelocityByItem.entrySet().stream()
             .sorted(Map.Entry.<UUID, BigDecimal>comparingByValue().reversed())
-            .limit(10)
+            .limit(MOVERS_LIMIT)
             .map(entry -> {
                 UUID itemId = entry.getKey();
                 Product product = productMap.get(itemId);
@@ -696,7 +719,7 @@ public class AnalyticsService {
                     : BigDecimal.ZERO;
 
                 return new DemandLeader(
-                    0, // rank assigned below
+                    0,
                     itemId,
                     product.getName(),
                     product.getSku(),
@@ -713,20 +736,15 @@ public class AnalyticsService {
             .filter(Objects::nonNull)
             .toList();
 
-        // Assign ranks
-        List<DemandLeader> rankedByDemandVelocity = new ArrayList<>();
-        for (int i = 0; i < byDemandVelocity.size(); i++) {
-            DemandLeader dl = byDemandVelocity.get(i);
-            rankedByDemandVelocity.add(new DemandLeader(
-                i + 1, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
-                dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
-                dl.stockVelocity(), dl.percentOfTotal()));
-        }
+        List<DemandLeader> rankedByDemandVelocity = assignRanks(byDemandVelocity, (rank, dl) -> new DemandLeader(
+            rank, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
+            dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
+            dl.stockVelocity(), dl.percentOfTotal()));
 
         // Leaders by stock velocity
         List<DemandLeader> byStockVelocity = stockVelocityByItem.entrySet().stream()
             .sorted(Map.Entry.<UUID, BigDecimal>comparingByValue().reversed())
-            .limit(10)
+            .limit(MOVERS_LIMIT)
             .map(entry -> {
                 UUID itemId = entry.getKey();
                 Product product = productMap.get(itemId);
@@ -756,14 +774,10 @@ public class AnalyticsService {
             .filter(Objects::nonNull)
             .toList();
 
-        List<DemandLeader> rankedByStockVelocity = new ArrayList<>();
-        for (int i = 0; i < byStockVelocity.size(); i++) {
-            DemandLeader dl = byStockVelocity.get(i);
-            rankedByStockVelocity.add(new DemandLeader(
-                i + 1, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
-                dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
-                dl.stockVelocity(), dl.percentOfTotal()));
-        }
+        List<DemandLeader> rankedByStockVelocity = assignRanks(byStockVelocity, (rank, dl) -> new DemandLeader(
+            rank, dl.itemId(), dl.name(), dl.sku(), dl.imageUrl(), dl.categoryName(),
+            dl.periodDemand(), dl.demandVelocity(), dl.demandVolatility(), dl.forecastAccuracy(),
+            dl.stockVelocity(), dl.percentOfTotal()));
 
         // Category rankings by demand velocity
         Map<UUID, BigDecimal> demandVelocityByCategory = new HashMap<>();
@@ -781,7 +795,7 @@ public class AnalyticsService {
             .filter(cat -> demandVelocityByCategory.containsKey(cat.getId()))
             .sorted(Comparator.comparing((Category cat) ->
                 demandVelocityByCategory.getOrDefault(cat.getId(), BigDecimal.ZERO)).reversed())
-            .limit(5)
+            .limit(CATEGORY_RANKINGS_LIMIT)
             .map(cat -> {
                 UUID catId = cat.getId();
                 BigDecimal catDemandVelocity = demandVelocityByCategory.getOrDefault(catId, BigDecimal.ZERO);
@@ -799,12 +813,9 @@ public class AnalyticsService {
             })
             .toList();
 
-        List<CategoryRanking> rankedCategories = new ArrayList<>();
-        for (int i = 0; i < categoryRankings.size(); i++) {
-            CategoryRanking cr = categoryRankings.get(i);
-            rankedCategories.add(new CategoryRanking(i + 1, cr.categoryId(), cr.categoryName(),
+        List<CategoryRanking> rankedCategories = assignRanks(categoryRankings, (rank, cr) ->
+            new CategoryRanking(rank, cr.categoryId(), cr.categoryName(),
                 cr.totalItems(), cr.periodDemand(), cr.totalDemandVelocity(), cr.percentOfTotal()));
-        }
 
         // Previous period comparison for growth calculation
         List<DailySalesRollup> previousRollups = dailySalesRollupRepository

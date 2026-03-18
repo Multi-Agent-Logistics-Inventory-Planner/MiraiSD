@@ -4,15 +4,12 @@ import { useState } from "react"
 import {
   Activity,
   AlertCircle,
-  BarChart3,
-  Package,
   Target,
-  TrendingDown,
-  TrendingUp,
   Trophy,
   Zap,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { ProductThumbnail } from "@/components/products/product-thumbnail"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,7 +33,6 @@ import { useDemandLeaders } from "@/hooks/queries/use-demand-leaders"
 import type {
   DemandLeader,
   DemandLeadersPeriod,
-  DemandSummary,
 } from "@/types/analytics"
 
 function getAccuracyColor(accuracy: number | null): string {
@@ -44,114 +40,6 @@ function getAccuracyColor(accuracy: number | null): string {
   if (accuracy >= 80) return 'text-green-600'
   if (accuracy >= 60) return 'text-yellow-600'
   return 'text-red-600'
-}
-
-function SummaryCards({
-  summary,
-  isLoading,
-}: {
-  summary?: DemandSummary
-  isLoading: boolean
-}) {
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="mt-2 h-3 w-32" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
-  const changeIsPositive = (summary?.demandGrowthPercent ?? 0) >= 0
-
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Total Demand Velocity</CardTitle>
-          <Activity className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {formatNumber(summary?.totalDemandVelocity ?? 0, 2)}
-            <span className="text-sm font-normal text-muted-foreground ml-1">units/day</span>
-          </div>
-          <div className="flex items-center gap-1 mt-1">
-            {changeIsPositive ? (
-              <TrendingUp className="h-3 w-3 text-green-500" />
-            ) : (
-              <TrendingDown className="h-3 w-3 text-red-500" />
-            )}
-            <span
-              className={cn(
-                "text-xs",
-                changeIsPositive ? "text-green-600" : "text-red-600"
-              )}
-            >
-              {changeIsPositive ? "+" : ""}
-              {formatNumber(summary?.demandGrowthPercent ?? 0)}% vs previous period
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Total Period Demand</CardTitle>
-          <Package className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {(summary?.totalPeriodDemand ?? 0).toLocaleString()}
-            <span className="text-sm font-normal text-muted-foreground ml-1">units</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {summary?.periodLabel}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {summary?.uniqueItemsWithDemand ?? 0}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Products with demand
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium">System Accuracy</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className={cn("text-2xl font-bold", getAccuracyColor(summary?.systemForecastAccuracy ?? null))}>
-            {formatNumber(summary?.systemForecastAccuracy ?? 0)}%
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Average forecast accuracy
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  )
 }
 
 function DemandLeaderRow({ leader, maxValue, metricType }: {
@@ -183,19 +71,12 @@ function DemandLeaderRow({ leader, maxValue, metricType }: {
         )}
       </div>
 
-      <div className="flex-shrink-0 h-12 w-12">
-        {leader.imageUrl ? (
-          <img
-            src={leader.imageUrl}
-            alt={leader.name}
-            className="h-12 w-12 rounded-md object-cover"
-          />
-        ) : (
-          <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center">
-            <Package className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
-      </div>
+      <ProductThumbnail
+        imageUrl={leader.imageUrl}
+        alt={leader.name}
+        size="lg"
+        fallbackVariant="package"
+      />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -298,8 +179,7 @@ export function TabDemandLeaders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Demand Analysis</h2>
+      <div className="flex items-center justify-end">
         <Select value={period} onValueChange={(v) => setPeriod(v as DemandLeadersPeriod)}>
           <SelectTrigger className="w-40">
             <SelectValue />
@@ -313,8 +193,6 @@ export function TabDemandLeaders() {
           </SelectContent>
         </Select>
       </div>
-
-      <SummaryCards summary={data?.summary} isLoading={isLoading} />
 
       <Card>
         <Tabs defaultValue="velocity">

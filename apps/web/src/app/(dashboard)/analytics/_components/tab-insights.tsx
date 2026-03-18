@@ -6,11 +6,19 @@ import {
   ArrowRight,
   ArrowUp,
   Calendar,
+  HelpCircle,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useInsights } from "@/hooks/queries/use-insights";
 import type {
@@ -20,6 +28,8 @@ import type {
 } from "@/types/analytics";
 import { LongestRunningDisplaysCard } from "./longest-running-displays-card";
 import { CategoryDemandSection } from "./category-demand-section";
+
+const MOVERS_SKELETON_COUNT = 5;
 
 function DayOfWeekChart({
   patterns,
@@ -184,24 +194,26 @@ function getMoverColor(direction: MoverDirection): string {
 
 function MoversCard({
   title,
+  tooltip,
   movers,
   isLoading,
   icon: Icon,
 }: {
   title: string;
+  tooltip: string;
   movers?: Mover[];
   isLoading: boolean;
   icon: typeof TrendingUp;
 }) {
   if (isLoading) {
     return (
-      <Card>
+      <Card className="dark:border-0">
         <CardHeader>
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+          {Array.from({ length: MOVERS_SKELETON_COUNT }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
           ))}
         </CardContent>
       </Card>
@@ -209,45 +221,69 @@ function MoversCard({
   }
 
   return (
-    <Card>
+    <Card className="dark:border-0">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Icon className="h-4 w-4" />
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
           {title}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {movers?.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No significant changes
-          </p>
-        ) : (
-          movers?.map((mover) => (
-            <div
-              key={mover.itemId}
-              className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{mover.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {mover.sku} - {mover.categoryName}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {getMoverIcon(mover.direction)}
-                <span
-                  className={cn(
-                    "text-sm font-semibold",
-                    getMoverColor(mover.direction),
-                  )}
-                >
-                  {mover.percentChange >= 0 ? "+" : ""}
-                  {mover.percentChange.toFixed(0)}%
+      <CardContent>
+        {/* Height fits ~5 items comfortably (56px per item); scrolls for additional items */}
+        <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1">
+          {movers?.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No significant changes
+            </p>
+          ) : (
+            movers?.map((mover) => (
+              <div
+                key={mover.itemId}
+                className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+              >
+                <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">
+                  #{mover.rank}
                 </span>
+                <ProductThumbnail
+                  imageUrl={mover.imageUrl}
+                  alt={mover.name}
+                  size="md"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{mover.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {mover.categoryName}
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                  {mover.previousPeriodUnits} → {mover.currentPeriodUnits}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {getMoverIcon(mover.direction)}
+                  <span
+                    className={cn(
+                      "text-sm font-semibold",
+                      getMoverColor(mover.direction),
+                    )}
+                  >
+                    {mover.percentChange >= 0 ? "+" : ""}
+                    {mover.percentChange.toFixed(0)}%
+                  </span>
+                </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -281,12 +317,14 @@ export function TabInsights() {
       <div className="grid gap-4 md:grid-cols-2">
         <MoversCard
           title="Top Movers"
+          tooltip="Items with increasing demand compared to previous 30 days"
           movers={data?.topMovers}
           isLoading={isLoading}
           icon={TrendingUp}
         />
         <MoversCard
           title="Declining Items"
+          tooltip="Items with decreasing demand compared to previous 30 days"
           movers={data?.bottomMovers}
           isLoading={isLoading}
           icon={TrendingDown}
