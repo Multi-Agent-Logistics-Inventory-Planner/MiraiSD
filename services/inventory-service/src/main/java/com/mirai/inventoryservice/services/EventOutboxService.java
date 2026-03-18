@@ -9,6 +9,7 @@ import com.mirai.inventoryservice.repositories.EventOutboxRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,8 +114,14 @@ public class EventOutboxService {
                 .payload(payload)
                 .build();
 
-        eventOutboxRepository.save(event);
-        log.info("Created outbox event for stock movement: {}", movement.getId());
+        try {
+            eventOutboxRepository.save(event);
+            log.info("Created outbox event for stock movement: {}", movement.getId());
+        } catch (DataIntegrityViolationException e) {
+            // Duplicate event for this stock movement already exists (unique constraint violation)
+            // This is expected in race conditions - log and continue gracefully
+            log.warn("Outbox event already exists for stock movement {}, skipping duplicate", movement.getId());
+        }
     }
 
     /**

@@ -25,10 +25,16 @@ CREATE INDEX IF NOT EXISTS idx_notifications_undelivered
     ON notifications (created_at)
     WHERE delivered_at IS NULL AND (delivery_status IS NULL OR delivery_status = 'pending');
 
--- Unique constraint for idempotency (prevent duplicate notifications from same event)
+-- Unique constraint for idempotency (prevent duplicate notifications for same alert on same day)
+-- Using dedupe_key + date allows re-alerting on different days while preventing duplicates
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
-    ON notifications (source_event_id, dedupe_key)
-    WHERE source_event_id IS NOT NULL;
+    ON notifications (dedupe_key, (created_at::date))
+    WHERE dedupe_key IS NOT NULL;
+
+-- Index for faster lookups by dedupe_key
+CREATE INDEX IF NOT EXISTS idx_notifications_dedupe_key
+    ON notifications (dedupe_key)
+    WHERE dedupe_key IS NOT NULL;
 
 -- Index for querying by item
 CREATE INDEX IF NOT EXISTS idx_notifications_item_id ON notifications (item_id);

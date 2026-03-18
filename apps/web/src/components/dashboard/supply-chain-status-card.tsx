@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { differenceInDays, format } from "date-fns";
-import { Package, Truck, ArrowRight, Plus } from "lucide-react";
+import { Package, Truck, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,7 +10,6 @@ import {
   type ProductImageItem,
 } from "./product-image-carousel";
 import type { Shipment } from "@/types/api";
-import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_VARIANTS } from "@/types/api";
 
 interface SupplyChainStatusCardProps {
   nextShipment: Shipment | null;
@@ -20,28 +17,17 @@ interface SupplyChainStatusCardProps {
   isLoading?: boolean;
 }
 
-function formatDeliveryCountdown(date: Date): string {
-  const now = new Date();
-  const diffDays = differenceInDays(date, now);
-
-  if (diffDays < 0) return "overdue";
-  if (diffDays === 0) return "today";
-  if (diffDays === 1) return "tomorrow";
-  if (diffDays < 7) return `in ${diffDays} days`;
-  return format(date, "MMM d");
-}
-
 function LoadingSkeleton() {
   return (
-    <Card className="gap-3">
-      <CardHeader className="pb-0">
+    <Card className="gap-3 h-[240px] flex flex-col">
+      <CardHeader className="pb-0 flex-shrink-0">
         <div className="flex items-center justify-between">
           <Skeleton className="h-5 w-36" />
           <Skeleton className="h-8 w-24" />
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 min-h-[140px]">
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 flex-1">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Skeleton className="h-4 w-32" />
@@ -80,12 +66,6 @@ function NextShipmentDisplay({
   shipment,
   additionalCount,
 }: NextShipmentDisplayProps) {
-  const deliveryDate = shipment.expectedDeliveryDate
-    ? new Date(shipment.expectedDeliveryDate)
-    : null;
-
-  const countdown = deliveryDate ? formatDeliveryCountdown(deliveryDate) : null;
-
   // Convert shipment items to carousel format
   const carouselItems: ProductImageItem[] = shipment.items.map((si) => ({
     id: si.id,
@@ -100,40 +80,33 @@ function NextShipmentDisplay({
   );
 
   return (
-    <div className="space-y-3">
-      {/* Header row: Supplier | Shipment number | Status + Countdown */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm truncate">
-              {shipment.supplierName ?? "Unknown Supplier"}
-            </span>
-            <span className="text-xs text-muted-foreground font-mono">
-              #{shipment.shipmentNumber}
-            </span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {shipment.items.length} item{shipment.items.length !== 1 ? "s" : ""}{" "}
-            ({totalUnits.toLocaleString()} units)
-          </div>
+    <div className="flex flex-col justify-between h-full">
+      <div>
+        {/* Header row: Supplier | Shipment number */}
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">
+            {shipment.supplierName ?? "Unknown Supplier"}
+          </span>
+          <span className="text-xs text-muted-foreground font-mono">
+            #{shipment.shipmentNumber}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge variant={SHIPMENT_STATUS_VARIANTS[shipment.status]}>
-            {SHIPMENT_STATUS_LABELS[shipment.status]}
-          </Badge>
-          {countdown && (
-            <span className="text-xs text-muted-foreground">{countdown}</span>
-          )}
+        {/* Items count */}
+        <div className="text-xs text-muted-foreground mt-0.5">
+          {shipment.items.length} item{shipment.items.length !== 1 ? "s" : ""}{" "}
+          ({totalUnits.toLocaleString()} units)
+        </div>
+
+        {/* Product image carousel */}
+        <div className="mt-2">
+          <ProductImageCarousel items={carouselItems} />
         </div>
       </div>
 
-      {/* Product image carousel */}
-      <ProductImageCarousel items={carouselItems} />
-
       {/* Additional shipments badge */}
       {additionalCount !== undefined && additionalCount > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground mt-3">
           +{additionalCount} more shipment{additionalCount !== 1 ? "s" : ""}{" "}
           arriving soon
         </p>
@@ -152,8 +125,8 @@ export function SupplyChainStatusCard({
   }
 
   return (
-    <Card className="gap-3 shadow-none">
-      <CardHeader className="pb-0">
+    <Card className="gap-3 shadow-none h-[240px] flex flex-col">
+      <CardHeader className="pb-0 flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Truck className="h-4 w-4 text-muted-foreground" />
@@ -167,8 +140,8 @@ export function SupplyChainStatusCard({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl p-4 -mx-2 min-h-[140px] flex flex-col justify-center">
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+        <div className="bg-muted dark:bg-[#1c1c1c] rounded-xl px-4 pt-3 pb-4 -mx-2 flex-1 flex flex-col overflow-hidden">
           {!nextShipment ? (
             <EmptyState />
           ) : (
