@@ -3,8 +3,6 @@
 import { Suspense, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { useAllForecasts } from "@/hooks/queries/use-forecasts"
-import { useSalesSummary } from "@/hooks/queries/use-analytics"
 import { useAuth } from "@/hooks/use-auth"
 import { UserRole } from "@/types/api"
 import { AnalyticsTab } from "@/types/analytics"
@@ -43,15 +41,6 @@ function AnalyticsContent() {
     router.push(`/analytics?tab=${tab}`)
   }
 
-  // Only fetch legacy data when on legacy tab
-  const {
-    data: allForecastsData,
-    isLoading: isLoadingForecasts,
-    isError: isForecastError,
-  } = useAllForecasts()
-
-  const { data: salesData, isLoading: isLoadingSales } = useSalesSummary()
-
   const renderTabContent = () => {
     switch (currentTab) {
       case AnalyticsTab.PREDICTIONS:
@@ -62,16 +51,7 @@ function AnalyticsContent() {
         return <TabDemandLeaders />
       case AnalyticsTab.LEGACY:
       default:
-        return (
-          <TabLegacy
-            isAdmin={isAdmin}
-            forecasts={allForecastsData ?? []}
-            isLoadingForecasts={isLoadingForecasts}
-            isForecastError={isForecastError}
-            salesData={salesData}
-            isLoadingSales={isLoadingSales}
-          />
-        )
+        return <TabLegacy isAdmin={isAdmin} />
     }
   }
 

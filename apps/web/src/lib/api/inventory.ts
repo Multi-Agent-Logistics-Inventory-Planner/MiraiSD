@@ -516,21 +516,8 @@ export async function createInventory(
   }
 }
 
-export interface InventoryLocationEntry {
-  inventoryId: string;
-  item: InventoryItem;
-  quantity: number;
-  locationType: LocationType;
-  locationId: string;
-  locationCode: string;
-  locationLabel: string;
-}
-
-// Optimized batch API - fetches all inventory for a product in one request
-
 /**
  * Fetch all inventory entries for a product across all location types in a single request.
- * This is the optimized replacement for getInventoryEntriesByItemId.
  *
  * @param productId The product ID to look up
  * @returns Product inventory response with all entries
@@ -544,143 +531,7 @@ export async function getProductInventoryEntries(
 /**
  * Fetch aggregated inventory totals for all products in a single query.
  * Returns total quantity and last updated time for each product.
- * Replaces the N+1 pattern of fetching inventory per location.
  */
 export async function getInventoryTotals(): Promise<InventoryTotal[]> {
   return apiGet<InventoryTotal[]>("/api/inventory/totals");
-}
-
-const ALL_LOCATION_TYPES: LocationType[] = [
-  LocationType.BOX_BIN,
-  LocationType.RACK,
-  LocationType.CABINET,
-  LocationType.SINGLE_CLAW_MACHINE,
-  LocationType.DOUBLE_CLAW_MACHINE,
-  LocationType.FOUR_CORNER_MACHINE,
-  LocationType.PUSHER_MACHINE,
-  LocationType.WINDOW,
-  // NOTE: KEYCHAIN_MACHINE and GACHAPON are display-only and do not support inventory
-];
-
-function formatLocationType(locationType: LocationType): string {
-  return locationType
-    .split("_")
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function getLocationDetails(
-  locationType: LocationType,
-  inventory: Inventory
-): { locationId: string; locationCode: string } {
-  switch (locationType) {
-    case LocationType.BOX_BIN: {
-      const inv = inventory as BoxBinInventory;
-      return { locationId: inv.boxBinId, locationCode: inv.boxBinCode };
-    }
-    case LocationType.RACK: {
-      const inv = inventory as RackInventory;
-      return { locationId: inv.rackId, locationCode: inv.rackCode };
-    }
-    case LocationType.CABINET: {
-      const inv = inventory as CabinetInventory;
-      return { locationId: inv.cabinetId, locationCode: inv.cabinetCode };
-    }
-    case LocationType.SINGLE_CLAW_MACHINE: {
-      const inv = inventory as SingleClawMachineInventory;
-      return {
-        locationId: inv.singleClawMachineId,
-        locationCode: inv.singleClawMachineCode,
-      };
-    }
-    case LocationType.DOUBLE_CLAW_MACHINE: {
-      const inv = inventory as DoubleClawMachineInventory;
-      return {
-        locationId: inv.doubleClawMachineId,
-        locationCode: inv.doubleClawMachineCode,
-      };
-    }
-    case LocationType.KEYCHAIN_MACHINE:
-      throw new Error("Keychain Machine is display-only and does not support inventory");
-    case LocationType.FOUR_CORNER_MACHINE: {
-      const inv = inventory as FourCornerMachineInventory;
-      return {
-        locationId: inv.fourCornerMachineId,
-        locationCode: inv.fourCornerMachineCode,
-      };
-    }
-    case LocationType.PUSHER_MACHINE: {
-      const inv = inventory as PusherMachineInventory;
-      return {
-        locationId: inv.pusherMachineId,
-        locationCode: inv.pusherMachineCode,
-      };
-    }
-    case LocationType.WINDOW: {
-      const inv = inventory as WindowInventory;
-      return {
-        locationId: inv.windowId,
-        locationCode: inv.windowCode,
-      };
-    }
-    default:
-      throw new Error(`Unknown location type: ${locationType}`);
-  }
-}
-
-/**
- * @deprecated Use getProductInventoryEntries() instead for better performance.
- * This function makes N+1 API calls and will be removed in a future version.
- */
-export async function getInventoryEntriesByItemId(
-  itemId: string
-): Promise<InventoryLocationEntry[]> {
-  const entries: InventoryLocationEntry[] = [];
-
-  // Fetch NOT_ASSIGNED inventory first (different API pattern - no location)
-  const notAssignedInventories = await getNotAssignedInventoryByProduct(itemId);
-  for (const inv of notAssignedInventories) {
-    entries.push({
-      inventoryId: inv.id,
-      item: inv.item,
-      quantity: inv.quantity ?? 0,
-      locationType: LocationType.NOT_ASSIGNED,
-      locationId: "",
-      locationCode: "NA",
-      locationLabel: "Not Assigned",
-    });
-  }
-
-  // Fetch location-based inventory
-  const locationsByType = await Promise.all(
-    ALL_LOCATION_TYPES.map(async (locationType) => {
-      const locations = await getLocationsByType(locationType);
-      const ids = (locations as Array<{ id: string }>).map((l) => l.id);
-      return { locationType, ids };
-    })
-  );
-
-  await Promise.all(
-    locationsByType.flatMap(({ locationType, ids }) =>
-      ids.map(async (locationId) => {
-        const inventories = await getInventoryByLocation(locationType, locationId);
-        for (const inv of inventories) {
-          if (inv.item.id !== itemId) continue;
-          const { locationId: invLocationId, locationCode } =
-            getLocationDetails(locationType, inv);
-          entries.push({
-            inventoryId: inv.id,
-            item: inv.item,
-            quantity: inv.quantity ?? 0,
-            locationType,
-            locationId: invLocationId ?? locationId,
-            locationCode,
-            locationLabel: `${formatLocationType(locationType)} ${locationCode}`,
-          });
-        }
-      })
-    )
-  );
-
-  return entries.sort((a, b) => a.locationLabel.localeCompare(b.locationLabel));
 }

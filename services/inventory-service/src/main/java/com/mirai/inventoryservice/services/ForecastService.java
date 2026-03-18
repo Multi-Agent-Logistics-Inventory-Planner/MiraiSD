@@ -44,6 +44,12 @@ public class ForecastService {
     }
 
     @Transactional(readOnly = true)
+    public List<ForecastPredictionResponseDTO> getAllForecastsUnpaginated() {
+        List<ForecastPrediction> predictions = forecastPredictionRepository.findAllLatest();
+        return mapToDTOList(predictions);
+    }
+
+    @Transactional(readOnly = true)
     public ForecastPredictionResponseDTO getForecastByItem(UUID itemId) {
         return forecastPredictionRepository.findFirstByItemIdOrderByComputedAtDesc(itemId)
                 .map(p -> {
