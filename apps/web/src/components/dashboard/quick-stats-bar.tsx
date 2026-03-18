@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Package, DollarSign, Bell, Truck } from "lucide-react";
+import { Package, Bell, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -83,7 +83,7 @@ export function QuickStatsBar({ stats, isLoading }: QuickStatsBarProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-t bg-muted/30">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex items-center gap-2 px-4">
             <Skeleton className="h-4 w-4" />
             <div className="flex flex-col gap-1">
@@ -100,23 +100,14 @@ export function QuickStatsBar({ stats, isLoading }: QuickStatsBarProps) {
     return null;
   }
 
-  const formattedStockValue = stats.stockValue >= 1000
-    ? `$${(stats.stockValue / 1000).toFixed(1)}k`
-    : `$${stats.stockValue.toLocaleString()}`;
-
   const hasAlerts = stats.activeAlerts > 0;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1 border-t bg-muted/30">
       <StatItem
         icon={<Package className="h-4 w-4" />}
-        label="Total SKUs"
+        label="Total Products"
         value={stats.totalSkus}
-      />
-      <StatItem
-        icon={<DollarSign className="h-4 w-4" />}
-        label="Stock Value"
-        value={formattedStockValue}
       />
       <StatItem
         icon={<Bell className="h-4 w-4" />}

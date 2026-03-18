@@ -126,7 +126,7 @@ export function ProductImageCarousel({
   return (
     <div className={cn("relative group", className)}>
       <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex gap-2 pb-2">
+        <div className="flex gap-2">
           {items.map((item) => {
             const safeUrl = getSafeImageUrl(item.imageUrl);
             return (
