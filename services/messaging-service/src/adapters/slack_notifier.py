@@ -29,14 +29,22 @@ class AlertMessage:
 class SlackNotifier:
     """Slack notifier for sending inventory alerts."""
 
-    def __init__(self, webhook_url: str | None = None, channel: str | None = None):
+    def __init__(
+        self,
+        webhook_url: str | None = None,
+        channel: str | None = None,
+        review_webhook_url: str | None = None,
+    ):
         self._webhook_url = webhook_url or config.SLACK_WEBHOOK_URL
         self._channel = channel or config.SLACK_CHANNEL
+        self._review_webhook_url = review_webhook_url or config.REVIEW_SLACK_WEBHOOK_URL
         self._enabled = config.SLACK_ENABLED
 
-        # Validate webhook URL if provided and not empty
+        # Validate webhook URLs if provided and not empty
         if self._webhook_url:
             self._validate_webhook_url(self._webhook_url)
+        if self._review_webhook_url:
+            self._validate_webhook_url(self._review_webhook_url)
 
     def _validate_webhook_url(self, url: str) -> None:
         """Validate that webhook URL is a legitimate Slack webhook.
@@ -295,11 +303,16 @@ class SlackNotifier:
 
         target = target_date or date.today()
         dest_channel = channel or config.REVIEW_SLACK_CHANNEL
+        webhook = self._review_webhook_url or self._webhook_url
+
+        if not webhook:
+            logger.warning("No webhook URL configured for review summaries")
+            return False
 
         if not counts:
             # Send "no reviews" message
             text = f"{target.strftime('%B %d, %Y')}: No employee mentions in reviews today."
-            return self._send_simple_message(dest_channel, text)
+            return self._send_simple_message(dest_channel, text, webhook_url=webhook)
 
         # Format the summary
         total = sum(c[1] for c in counts)
@@ -335,7 +348,9 @@ class SlackNotifier:
             },
         ]
 
-        return self._send_blocks(dest_channel, blocks, f"Daily Review Summary - {date_str}")
+        return self._send_blocks(
+            dest_channel, blocks, f"Daily Review Summary - {date_str}", webhook_url=webhook
+        )
 
     def send_monthly_review_summary(
         self,
@@ -360,11 +375,16 @@ class SlackNotifier:
             return False
 
         dest_channel = channel or config.REVIEW_SLACK_CHANNEL
+        webhook = self._review_webhook_url or self._webhook_url
         month_name = date(year, month, 1).strftime("%B %Y")
+
+        if not webhook:
+            logger.warning("No webhook URL configured for review summaries")
+            return False
 
         if not totals:
             text = f"{month_name} Monthly Totals: No employee mentions this month."
-            return self._send_simple_message(dest_channel, text)
+            return self._send_simple_message(dest_channel, text, webhook_url=webhook)
 
         total = sum(t[1] for t in totals)
 
@@ -400,25 +420,31 @@ class SlackNotifier:
             },
         ]
 
-        return self._send_blocks(dest_channel, blocks, f"Monthly Review Leaderboard - {month_name}")
+        return self._send_blocks(
+            dest_channel, blocks, f"Monthly Review Leaderboard - {month_name}", webhook_url=webhook
+        )
 
-    def _send_simple_message(self, channel: str, text: str) -> bool:
+    def _send_simple_message(
+        self, channel: str, text: str, webhook_url: str | None = None
+    ) -> bool:
         """Send a simple text message to Slack.
 
         Args:
             channel: Slack channel.
             text: Message text.
+            webhook_url: Optional webhook URL override.
 
         Returns:
             True if sent successfully, False otherwise.
         """
-        if not self._webhook_url:
-            logger.warning("SLACK_WEBHOOK_URL is not set")
+        url = webhook_url or self._webhook_url
+        if not url:
+            logger.warning("No webhook URL configured")
             return False
 
         try:
             response = requests.post(
-                self._webhook_url,
+                url,
                 json={"channel": channel, "text": text},
                 timeout=10,
             )
@@ -429,24 +455,32 @@ class SlackNotifier:
             logger.error("Failed to send Slack message: %s", e)
             return False
 
-    def _send_blocks(self, channel: str, blocks: list[dict], fallback_text: str) -> bool:
+    def _send_blocks(
+        self,
+        channel: str,
+        blocks: list[dict],
+        fallback_text: str,
+        webhook_url: str | None = None,
+    ) -> bool:
         """Send a Block Kit message to Slack.
 
         Args:
             channel: Slack channel.
             blocks: Block Kit blocks.
             fallback_text: Fallback text for notifications.
+            webhook_url: Optional webhook URL override.
 
         Returns:
             True if sent successfully, False otherwise.
         """
-        if not self._webhook_url:
-            logger.warning("SLACK_WEBHOOK_URL is not set")
+        url = webhook_url or self._webhook_url
+        if not url:
+            logger.warning("No webhook URL configured")
             return False
 
         try:
             response = requests.post(
-                self._webhook_url,
+                url,
                 json={
                     "channel": channel,
                     "text": fallback_text,
