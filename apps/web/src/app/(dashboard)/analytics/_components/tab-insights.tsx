@@ -242,9 +242,11 @@ function MoversCard({
         {/* Height fits ~5 items comfortably (56px per item); scrolls for additional items */}
         <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1">
           {movers?.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No significant changes
-            </p>
+            <div className="min-h-[280px] flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">
+                No significant changes
+              </p>
+            </div>
           ) : (
             movers?.map((mover) => (
               <div

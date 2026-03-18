@@ -68,15 +68,21 @@ function LoadingSkeleton() {
 export function LongestRunningDisplaysCard() {
   const [page, setPage] = useState(0);
   const [machineTypeFilter, setMachineTypeFilter] = useState<string>("all");
-  const [selectedMachine, setSelectedMachine] = useState<MachineDisplaySummary | null>(null);
+  const [selectedMachine, setSelectedMachine] =
+    useState<MachineDisplaySummary | null>(null);
 
-  const locationType = machineTypeFilter === "all"
-    ? undefined
-    : MACHINE_LOCATION_TYPES.includes(machineTypeFilter as LocationType)
-      ? (machineTypeFilter as LocationType)
-      : undefined;
+  const locationType =
+    machineTypeFilter === "all"
+      ? undefined
+      : MACHINE_LOCATION_TYPES.includes(machineTypeFilter as LocationType)
+        ? (machineTypeFilter as LocationType)
+        : undefined;
 
-  const { data: summaries, isLoading, isError } = useLongestRunningDisplays({
+  const {
+    data: summaries,
+    isLoading,
+    isError,
+  } = useLongestRunningDisplays({
     locationType,
   });
 
@@ -85,7 +91,7 @@ export function LongestRunningDisplaysCard() {
   // Fetch the full location data for the selected machine
   const { data: selectedLocation } = useLocation(
     selectedMachine?.locationType,
-    selectedMachine?.machineId
+    selectedMachine?.machineId,
   );
 
   const productImageMap = useMemo(() => {
@@ -185,16 +191,24 @@ export function LongestRunningDisplaysCard() {
         <CardContent className="flex-1 min-h-0 pt-0 px-0 overflow-hidden -mt-4">
           {summaries?.length === 0 ? (
             <div className="flex items-center justify-center h-full px-6">
-              <p className="text-sm text-muted-foreground">No active displays</p>
+              <p className="text-sm text-muted-foreground">
+                All displays are under 14 days old
+              </p>
             </div>
           ) : (
             <div className="flex flex-col h-full">
               <div className="px-6 shrink-0">
                 <Table className="table-fixed">
                   <DataTableHeader>
-                    <TableHead className="rounded-l-lg w-[50%]">Location</TableHead>
-                    <TableHead className="hidden sm:table-cell w-[25%] text-center">Products</TableHead>
-                    <TableHead className="rounded-r-lg w-[25%]">Duration</TableHead>
+                    <TableHead className="rounded-l-lg w-[50%]">
+                      Location
+                    </TableHead>
+                    <TableHead className="hidden sm:table-cell w-[25%] text-center">
+                      Products
+                    </TableHead>
+                    <TableHead className="rounded-r-lg w-[25%]">
+                      Duration
+                    </TableHead>
                   </DataTableHeader>
                 </Table>
               </div>
@@ -212,7 +226,9 @@ export function LongestRunningDisplaysCard() {
                           <TableCell className="w-[50%]">
                             <div className="flex items-center gap-3">
                               <ProductThumbnail
-                                imageUrl={productImageMap.get(firstProduct?.productId ?? "")}
+                                imageUrl={productImageMap.get(
+                                  firstProduct?.productId ?? "",
+                                )}
                                 alt={firstProduct?.productName ?? "Unknown"}
                                 size="md"
                                 fallbackVariant="icon"
@@ -233,7 +249,8 @@ export function LongestRunningDisplaysCard() {
                           </TableCell>
                           <TableCell className="w-[25%]">
                             <span className="text-sm font-medium">
-                              {summary.maxDaysActive} day{summary.maxDaysActive !== 1 ? "s" : ""}
+                              {summary.maxDaysActive} day
+                              {summary.maxDaysActive !== 1 ? "s" : ""}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -262,7 +279,9 @@ export function LongestRunningDisplaysCard() {
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages - 1, p + 1))
+                      }
                       disabled={page >= totalPages - 1}
                       aria-label="Next page"
                     >
