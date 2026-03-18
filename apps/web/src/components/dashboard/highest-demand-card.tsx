@@ -27,10 +27,10 @@ export function HighestDemandCard({
 }: HighestDemandCardProps) {
   if (isLoading) {
     return (
-      <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 h-[240px] md:h-[504px] flex flex-col">
+      <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 md:h-[504px] flex flex-col">
         <Skeleton className="h-6 w-32 bg-white/20 dark:bg-neutral-800/20 rounded-full" />
-        <div className="flex-1 flex items-center justify-center">
-          <Skeleton className="h-48 w-48 md:h-64 md:w-64 rounded-2xl bg-white/20 dark:bg-neutral-800/20" />
+        <div className="flex-1 flex items-center justify-center py-6">
+          <Skeleton className="h-40 w-40 md:h-64 md:w-64 rounded-2xl bg-white/20 dark:bg-neutral-800/20" />
         </div>
         <div className="space-y-2">
           <Skeleton className="h-7 w-3/4 bg-white/20 dark:bg-neutral-800/20" />
@@ -42,12 +42,12 @@ export function HighestDemandCard({
 
   if (!product) {
     return (
-      <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 h-[240px] md:h-[504px] flex flex-col">
+      <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 md:h-[504px] flex flex-col">
         <Badge className="w-fit bg-white/20 dark:bg-neutral-800/20 text-white dark:text-neutral-600 border-0 text-xs px-3 py-1">
           <TrendingUp className="h-3 w-3 mr-1" />
           High demand
         </Badge>
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
           <Package className="h-16 w-16 md:h-24 md:w-24 text-white/30 dark:text-neutral-300 mb-4" />
           <p className="text-sm text-white/60 dark:text-neutral-500">No demand data available</p>
         </div>
@@ -59,7 +59,7 @@ export function HighestDemandCard({
   const dailyDemand = Math.abs(product.avgDailyDelta).toFixed(0);
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 h-[240px] md:h-[504px] flex flex-col">
+    <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-6 shadow-none border-0 md:h-[504px] flex flex-col">
       {/* Badge */}
       <Badge className="w-fit bg-[#0b66c2] dark:bg-violet-500 text-white border-0 text-xs px-3 py-1">
         <TrendingUp className="h-3 w-3 mr-1" />
