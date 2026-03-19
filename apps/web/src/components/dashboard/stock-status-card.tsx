@@ -58,7 +58,7 @@ function LegendItem({ item }: LegendItemProps) {
     switch (item.pattern) {
       case "dots":
         return {
-          backgroundImage: `radial-gradient(circle, #1a1a1a 1.5px, transparent 1.5px)`,
+          backgroundImage: `radial-gradient(circle, currentColor 1.5px, transparent 1.5px)`,
           backgroundSize: "4px 4px",
           backgroundColor: "transparent",
         };
@@ -66,47 +66,48 @@ function LegendItem({ item }: LegendItemProps) {
         return {
           backgroundImage: `repeating-linear-gradient(
             45deg,
-            #1a1a1a,
-            #1a1a1a 1.5px,
+            currentColor,
+            currentColor 1.5px,
             transparent 1.5px,
             transparent 4px
           )`,
         };
       case "solid-dark":
-        return { backgroundColor: "#0a0a0a" };
+        return { backgroundColor: "currentColor", opacity: 0.8 };
       case "solid":
       default:
-        return { backgroundColor: "#1a1a1a" };
+        return { backgroundColor: "currentColor" };
     }
   };
 
   return (
     <div className="flex items-center gap-2.5 py-1">
       <span
-        className="h-3.5 w-3.5 rounded-full shrink-0 border border-black/10 dark:border-white/20"
+        className="h-3.5 w-3.5 rounded-full shrink-0 border border-border text-foreground"
         style={getPatternStyle()}
       />
-      <span className="text-sm text-black/70 dark:text-white/80">{item.label}</span>
+      <span className="text-sm text-muted-foreground">{item.label}</span>
     </div>
   );
 }
 
 // SVG pattern definitions for the pie chart
 function PatternDefs({ isDark }: { isDark?: boolean }) {
-  const bgColor = isDark ? "#8b5cf6" : "#0b66c2"; // violet-500 / accent blue
+  const bgColor = isDark ? "#27272a" : "#e4e4e7"; // zinc-800 / zinc-200
+  const fgColor = isDark ? "#fafafa" : "#18181b"; // zinc-50 / zinc-900
 
   return (
     <defs>
       <pattern id="dotsPattern" patternUnits="userSpaceOnUse" width="6" height="6">
         <rect width="6" height="6" fill={bgColor} />
-        <circle cx="3" cy="3" r="1.5" fill="#1a1a1a" />
+        <circle cx="3" cy="3" r="1.5" fill={fgColor} />
       </pattern>
       <pattern id="diagonalPattern" patternUnits="userSpaceOnUse" width="6" height="6">
         <rect width="6" height="6" fill={bgColor} />
-        <line x1="0" y1="6" x2="6" y2="0" stroke="#1a1a1a" strokeWidth="2" />
+        <line x1="0" y1="6" x2="6" y2="0" stroke={fgColor} strokeWidth="2" />
       </pattern>
       <pattern id="solidPattern" patternUnits="userSpaceOnUse" width="4" height="4">
-        <rect width="4" height="4" fill="#1a1a1a" />
+        <rect width="4" height="4" fill={fgColor} />
       </pattern>
     </defs>
   );
@@ -213,18 +214,18 @@ export function StockStatusCard({ products, isLoading }: StockStatusCardProps) {
 
   if (isLoading) {
     return (
-      <Card className="relative overflow-hidden rounded-2xl bg-[#0b66c2] dark:bg-violet-500 p-6 shadow-none border-0 h-[240px]">
+      <Card className="relative overflow-hidden rounded-2xl p-6 shadow-none h-[240px]">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-16 bg-black/10" />
-          <Skeleton className="h-8 w-8 rounded-full bg-black/10" />
+          <Skeleton className="h-6 w-16" />
+          <Skeleton className="h-8 w-8 rounded-full" />
         </div>
         <div className="mt-4 flex items-center justify-between gap-4">
           <div className="flex flex-col gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-5 w-24 bg-black/10" />
+              <Skeleton key={i} className="h-5 w-24" />
             ))}
           </div>
-          <Skeleton className="h-[90px] w-[150px] rounded-t-full bg-black/10" />
+          <Skeleton className="h-[90px] w-[150px] rounded-t-full" />
         </div>
       </Card>
     );
@@ -232,34 +233,34 @@ export function StockStatusCard({ products, isLoading }: StockStatusCardProps) {
 
   if (total === 0) {
     return (
-      <Card className="relative overflow-hidden rounded-2xl bg-[#0b66c2] dark:bg-violet-500 p-6 shadow-none border-0 h-[240px]">
+      <Card className="relative overflow-hidden rounded-2xl p-6 shadow-none h-[240px]">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-black dark:text-white">Stock</h3>
+          <h3 className="text-lg font-semibold text-foreground">Stock</h3>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-black/40 hover:text-black hover:bg-black/10 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/10"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
           >
             <Settings2 className="h-4 w-4" />
           </Button>
         </div>
         <div className="h-[140px] flex items-center justify-center">
-          <p className="text-sm text-black/60 dark:text-white/70">No products found</p>
+          <p className="text-sm text-muted-foreground">No products found</p>
         </div>
       </Card>
     );
   }
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-[#0b66c2] dark:bg-violet-500 p-6 shadow-none border-0 h-[240px]">
+    <Card className="relative overflow-hidden rounded-2xl p-6 shadow-none h-[240px]">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-black dark:text-white">Stock</h3>
+        <h3 className="text-lg font-semibold text-foreground">Stock</h3>
         <Link href="/products">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-black/40 hover:text-black hover:bg-black/10 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/10"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
           >
             <Settings2 className="h-4 w-4" />
           </Button>
@@ -302,7 +303,7 @@ export function StockStatusCard({ products, isLoading }: StockStatusCardProps) {
                 width="48"
                 height="28"
                 rx="14"
-                fill={isDark ? "rgba(109, 40, 217, 0.8)" : "rgba(11, 102, 194, 0.8)"}
+                fill={isDark ? "rgba(63, 63, 70, 0.9)" : "rgba(39, 39, 42, 0.9)"}
               />
               <text
                 x={getTooltipPosition(hoveredSlice.midAngle).x}
