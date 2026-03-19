@@ -152,11 +152,9 @@ function hasBlockUnreceived(block: DetailBlock): boolean {
 
   if (parentAccounted < block.parentItem.orderedQuantity) return true;
 
+  // Prizes only support damaged (not display/shop)
   return block.prizeItems.some((prize) => {
-    const accounted = prize.receivedQuantity
-      + (prize.damagedQuantity ?? 0)
-      + (prize.displayQuantity ?? 0)
-      + (prize.shopQuantity ?? 0);
+    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
     return accounted < prize.orderedQuantity;
   });
 }
@@ -236,15 +234,15 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
   const hasParentStatusBadges = parentShopQty > 0 || parentDamagedQty > 0 || parentDisplayQty > 0;
   const hasParentBadges = hasParentAllocations || hasParentStatusBadges;
 
-  // Check if any prize has unreceived items
+  // Check if any prize has unreceived items (prizes only support damaged, not display/shop)
   const anyPrizeUnreceived = prizeItems.some((prize) => {
-    const totalReceived = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+    const totalReceived = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
     return totalReceived < prize.orderedQuantity;
   });
 
   // Determine block-level highlight: only if ALL items share the same status
   const allUnreceived = parentHasUnreceived && prizeItems.every((prize) => {
-    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
     return accounted < prize.orderedQuantity;
   });
   const allReceived = !parentHasUnreceived && !anyPrizeUnreceived;
@@ -301,12 +299,10 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             const prizeLabel = letter
               ? prizeLetterDisplay(letter)
               : prize.item.name;
-            const prizeShopQty = prize.shopQuantity ?? 0;
             const prizeDamagedQty = prize.damagedQuantity ?? 0;
-            const prizeDisplayQty = prize.displayQuantity ?? 0;
-            const prizeTotalReceived = prize.receivedQuantity + prizeDamagedQty + prizeDisplayQty + prizeShopQty;
+            // Prizes only support damaged (not display/shop)
+            const prizeTotalReceived = prize.receivedQuantity + prizeDamagedQty;
             const prizeHasUnreceived = prizeTotalReceived < prize.orderedQuantity;
-            const hasStatusBadges = prizeShopQty > 0 || prizeDamagedQty > 0 || prizeDisplayQty > 0;
             return (
               <div key={prize.id} className={cn(
                 "flex flex-wrap items-center gap-2 py-1 px-2 -mx-2 rounded",
@@ -318,13 +314,7 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
                 <span className="text-xs text-muted-foreground">
                   {prize.orderedQuantity} ordered · {prizeTotalReceived} received
                 </span>
-                {hasStatusBadges && (
-                  <div className="flex flex-wrap gap-1">
-                    {prizeShopQty > 0 && <StatusBadge label="Shop" quantity={prizeShopQty} type="shop" />}
-                    {prizeDamagedQty > 0 && <StatusBadge label="Damaged" quantity={prizeDamagedQty} type="damaged" />}
-                    {prizeDisplayQty > 0 && <StatusBadge label="Display" quantity={prizeDisplayQty} type="display" />}
-                  </div>
-                )}
+                {prizeDamagedQty > 0 && <StatusBadge label="Damaged" quantity={prizeDamagedQty} type="damaged" />}
               </div>
             );
           })}

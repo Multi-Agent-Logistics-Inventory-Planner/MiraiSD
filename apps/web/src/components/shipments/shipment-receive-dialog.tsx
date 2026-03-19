@@ -709,13 +709,13 @@ export function ShipmentReceiveDialog({
                                 const sets = parseInt(e.target.value, 10) || 0;
                                 setSetsReceived((prev) => ({ ...prev, [item.id]: sets }));
                                 // Auto-calculate prize quantities based on templateQuantity
+                                // Prizes only support damaged (not display/shop)
                                 childPrizes.forEach((prize) => {
-                                  // Access templateQuantity from the item property
                                   const prizeItem = prize.item as { templateQuantity?: number | null };
                                   const templateQty = prizeItem.templateQuantity ?? 0;
                                   const calculatedQty = templateQty * sets;
                                   const prizeRemaining = prize.orderedQuantity - prize.receivedQuantity -
-                                    (prize.damagedQuantity || 0) - (prize.displayQuantity || 0) - (prize.shopQuantity || 0);
+                                    (prize.damagedQuantity || 0);
                                   // Cap at remaining quantity
                                   setPrizeReceivedQuantity(prize.id, Math.min(calculatedQty, prizeRemaining));
                                 });
@@ -728,14 +728,13 @@ export function ShipmentReceiveDialog({
                         </div>
                         <div className="space-y-3 pl-4 border-l-2 border-primary/20">
                           {childPrizes.map((prize) => {
+                            // Prizes only support damaged (not display/shop)
                             const prizeRemaining = prize.orderedQuantity - prize.receivedQuantity -
-                              (prize.damagedQuantity || 0) - (prize.displayQuantity || 0) - (prize.shopQuantity || 0);
+                              (prize.damagedQuantity || 0);
                             const prizeIsComplete = prizeRemaining <= 0;
                             const prizeQty = prizeReceivedQuantities[prize.id] ?? 0;
                             const prizeDamaged = getDamagedQuantity(prize.id);
-                            const prizeDisplay = getDisplayQuantity(prize.id);
-                            const prizeShop = getShopQuantity(prize.id);
-                            const prizeIsOver = (prizeQty + prizeDamaged + prizeDisplay + prizeShop) > prizeRemaining;
+                            const prizeIsOver = (prizeQty + prizeDamaged) > prizeRemaining;
                             const letter = prize.letter;
                             const prizeLabel = letter ? prizeLetterDisplay(letter) : "?";
                             const prizeItem = prize.item as { templateQuantity?: number | null };
@@ -792,33 +791,9 @@ export function ShipmentReceiveDialog({
                                       }}
                                       className="w-14 h-7 text-xs text-right"
                                     />
-                                    <Label className="text-xs text-muted-foreground">Disp:</Label>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      max={prizeRemaining}
-                                      value={prizeDisplay}
-                                      onChange={(e) => {
-                                        const num = parseInt(e.target.value, 10);
-                                        setDisplayQuantity(prize.id, Number.isNaN(num) ? 0 : num);
-                                      }}
-                                      className="w-14 h-7 text-xs text-right"
-                                    />
-                                    <Label className="text-xs text-muted-foreground">Shop:</Label>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      max={prizeRemaining}
-                                      value={prizeShop}
-                                      onChange={(e) => {
-                                        const num = parseInt(e.target.value, 10);
-                                        setShopQuantity(prize.id, Number.isNaN(num) ? 0 : num);
-                                      }}
-                                      className="w-14 h-7 text-xs text-right"
-                                    />
                                     {prizeIsOver && (
                                       <span className="text-xs text-destructive font-medium">
-                                        Exceeds by {prizeQty + prizeDamaged + prizeDisplay + prizeShop - prizeRemaining}
+                                        Exceeds by {prizeQty + prizeDamaged - prizeRemaining}
                                       </span>
                                     )}
                                   </div>
