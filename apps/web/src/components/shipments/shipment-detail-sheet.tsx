@@ -112,6 +112,31 @@ function AllocationDisplay({ allocation }: { allocation: ConsolidatedAllocation 
   );
 }
 
+interface StatusBadgeProps {
+  label: string;
+  quantity: number;
+  type: 'shop' | 'damaged' | 'display';
+}
+
+const STATUS_BADGE_STYLES: Record<StatusBadgeProps['type'], string> = {
+  shop: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400 dark:border-green-800',
+  damaged: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
+  display: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+};
+
+function StatusBadge({ label, quantity, type }: StatusBadgeProps) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <Badge variant="outline" className={cn("text-xs font-normal", STATUS_BADGE_STYLES[type])}>
+        {label}
+      </Badge>
+      <span className="text-xs text-muted-foreground">
+        x{quantity}
+      </span>
+    </div>
+  );
+}
+
 /** One block in item details: either a Kuji (parent + prizes) or a standalone item. */
 interface DetailBlock {
   parentItem: ShipmentItem;
@@ -141,8 +166,13 @@ function ItemRow({ item }: { item: ShipmentItem }) {
   const allocations = consolidateAllocations(rawAllocations);
   const hasAllocations = allocations.length > 0;
   const imageUrl = item.item?.imageUrl;
-  const totalAccounted = item.receivedQuantity + (item.damagedQuantity ?? 0) + (item.displayQuantity ?? 0) + (item.shopQuantity ?? 0);
-  const hasUnreceived = totalAccounted < item.orderedQuantity;
+  const shopQty = item.shopQuantity ?? 0;
+  const damagedQty = item.damagedQuantity ?? 0;
+  const displayQty = item.displayQuantity ?? 0;
+  const totalReceived = item.receivedQuantity + damagedQty + displayQty + shopQty;
+  const hasUnreceived = totalReceived < item.orderedQuantity;
+  const hasStatusBadges = shopQty > 0 || damagedQty > 0 || displayQty > 0;
+  const hasBadges = hasAllocations || hasStatusBadges;
 
   return (
     <div className={cn(
@@ -169,29 +199,23 @@ function ItemRow({ item }: { item: ShipmentItem }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
           {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
-          {hasAllocations && (
+          {hasBadges && (
             <div className="flex flex-wrap gap-1 mt-1">
               {allocations.map((allocation) => (
                 <AllocationDisplay key={allocation.key} allocation={allocation} />
               ))}
+              {shopQty > 0 && <StatusBadge label="Shop" quantity={shopQty} type="shop" />}
+              {damagedQty > 0 && <StatusBadge label="Damaged" quantity={damagedQty} type="damaged" />}
+              {displayQty > 0 && <StatusBadge label="Display" quantity={displayQty} type="display" />}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
-            <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
+            <span>{item.orderedQuantity} ordered · {totalReceived} received</span>
           </div>
         </div>
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{item.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
-          {(item.damagedQuantity ?? 0) > 0 && (
-            <p className="text-xs text-amber-600">{item.damagedQuantity} damaged</p>
-          )}
-          {(item.displayQuantity ?? 0) > 0 && (
-            <p className="text-xs text-blue-600">{item.displayQuantity} display</p>
-          )}
-          {(item.shopQuantity ?? 0) > 0 && (
-            <p className="text-xs text-green-600">{item.shopQuantity} shop</p>
-          )}
+          <p className="text-xs text-muted-foreground">{totalReceived} received</p>
         </div>
       </div>
     </div>
@@ -204,13 +228,18 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
   const rawParentAllocations = parentItem.allocations ?? [];
   const parentAllocations = consolidateAllocations(rawParentAllocations);
   const hasParentAllocations = parentAllocations.length > 0;
-  const parentTotalAccounted = parentItem.receivedQuantity + (parentItem.damagedQuantity ?? 0) + (parentItem.displayQuantity ?? 0) + (parentItem.shopQuantity ?? 0);
-  const parentHasUnreceived = parentTotalAccounted < parentItem.orderedQuantity;
+  const parentShopQty = parentItem.shopQuantity ?? 0;
+  const parentDamagedQty = parentItem.damagedQuantity ?? 0;
+  const parentDisplayQty = parentItem.displayQuantity ?? 0;
+  const parentTotalReceived = parentItem.receivedQuantity + parentDamagedQty + parentDisplayQty + parentShopQty;
+  const parentHasUnreceived = parentTotalReceived < parentItem.orderedQuantity;
+  const hasParentStatusBadges = parentShopQty > 0 || parentDamagedQty > 0 || parentDisplayQty > 0;
+  const hasParentBadges = hasParentAllocations || hasParentStatusBadges;
 
   // Check if any prize has unreceived items
   const anyPrizeUnreceived = prizeItems.some((prize) => {
-    const totalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
-    return totalAccounted < prize.orderedQuantity;
+    const totalReceived = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+    return totalReceived < prize.orderedQuantity;
   });
 
   // Determine block-level highlight: only if ALL items share the same status
@@ -244,29 +273,23 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{parentItem.item.name}</p>
           {parentItem.item.sku && <p className="text-xs text-muted-foreground font-mono">{parentItem.item.sku}</p>}
-          {hasParentAllocations && (
+          {hasParentBadges && (
             <div className="flex flex-wrap gap-1 mt-1">
               {parentAllocations.map((allocation) => (
                 <AllocationDisplay key={allocation.key} allocation={allocation} />
               ))}
+              {parentShopQty > 0 && <StatusBadge label="Shop" quantity={parentShopQty} type="shop" />}
+              {parentDamagedQty > 0 && <StatusBadge label="Damaged" quantity={parentDamagedQty} type="damaged" />}
+              {parentDisplayQty > 0 && <StatusBadge label="Display" quantity={parentDisplayQty} type="display" />}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
-            <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentItem.receivedQuantity} received</span>
+            <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentTotalReceived} received</span>
           </div>
         </div>
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{parentItem.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{parentItem.receivedQuantity} received</p>
-          {(parentItem.damagedQuantity ?? 0) > 0 && (
-            <p className="text-xs text-amber-600">{parentItem.damagedQuantity} damaged</p>
-          )}
-          {(parentItem.displayQuantity ?? 0) > 0 && (
-            <p className="text-xs text-blue-600">{parentItem.displayQuantity} display</p>
-          )}
-          {(parentItem.shopQuantity ?? 0) > 0 && (
-            <p className="text-xs text-green-600">{parentItem.shopQuantity} shop</p>
-          )}
+          <p className="text-xs text-muted-foreground">{parentTotalReceived} received</p>
         </div>
       </div>
       {/* Prizes (same section, indented) */}
@@ -278,27 +301,29 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             const prizeLabel = letter
               ? prizeLetterDisplay(letter)
               : prize.item.name;
-            const prizeTotalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
-            const prizeHasUnreceived = prizeTotalAccounted < prize.orderedQuantity;
+            const prizeShopQty = prize.shopQuantity ?? 0;
+            const prizeDamagedQty = prize.damagedQuantity ?? 0;
+            const prizeDisplayQty = prize.displayQuantity ?? 0;
+            const prizeTotalReceived = prize.receivedQuantity + prizeDamagedQty + prizeDisplayQty + prizeShopQty;
+            const prizeHasUnreceived = prizeTotalReceived < prize.orderedQuantity;
+            const hasStatusBadges = prizeShopQty > 0 || prizeDamagedQty > 0 || prizeDisplayQty > 0;
             return (
               <div key={prize.id} className={cn(
-                "flex items-center gap-2 py-1 px-2 -mx-2 rounded",
+                "flex flex-wrap items-center gap-2 py-1 px-2 -mx-2 rounded",
                 prizeHasUnreceived
                   ? "bg-amber-100/50 dark:bg-amber-900/20"
                   : "bg-green-100/50 dark:bg-green-900/20"
               )}>
                 <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded min-w-[40px] text-center">{prizeLabel}</span>
                 <span className="text-xs text-muted-foreground">
-                  {prize.orderedQuantity} ordered · {prize.receivedQuantity} received
+                  {prize.orderedQuantity} ordered · {prizeTotalReceived} received
                 </span>
-                {(prize.damagedQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-amber-600">{prize.damagedQuantity} damaged</span>
-                )}
-                {(prize.displayQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-blue-600">{prize.displayQuantity} display</span>
-                )}
-                {(prize.shopQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-green-600">{prize.shopQuantity} shop</span>
+                {hasStatusBadges && (
+                  <div className="flex flex-wrap gap-1">
+                    {prizeShopQty > 0 && <StatusBadge label="Shop" quantity={prizeShopQty} type="shop" />}
+                    {prizeDamagedQty > 0 && <StatusBadge label="Damaged" quantity={prizeDamagedQty} type="damaged" />}
+                    {prizeDisplayQty > 0 && <StatusBadge label="Display" quantity={prizeDisplayQty} type="display" />}
+                  </div>
                 )}
               </div>
             );
