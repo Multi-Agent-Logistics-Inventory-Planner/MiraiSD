@@ -708,6 +708,15 @@ export function ShipmentReceiveDialog({
                               onChange={(e) => {
                                 const sets = parseInt(e.target.value, 10) || 0;
                                 setSetsReceived((prev) => ({ ...prev, [item.id]: sets }));
+
+                                // Update parent Kuji item quantity to match sets
+                                const parentAllocations = itemAllocations[item.id] || [];
+                                if (parentAllocations.length > 0) {
+                                  // Update first allocation's quantity
+                                  const cappedSets = Math.min(sets, remaining);
+                                  updateAllocation(item.id, parentAllocations[0].id, { quantity: cappedSets });
+                                }
+
                                 // Auto-calculate prize quantities based on templateQuantity
                                 // Prizes only support damaged (not display/shop)
                                 childPrizes.forEach((prize) => {
