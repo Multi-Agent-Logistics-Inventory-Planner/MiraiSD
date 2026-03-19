@@ -509,10 +509,20 @@ public class ShipmentService {
                 damageMetadata.put("damaged_quantity", damagedQuantity);
                 damageMetadata.put("category", "shipment");
 
+                // Include parent kuji name if this is a prize
+                String productDisplayName = product.getName();
+                if (product.getParentId() != null) {
+                    Product parent = product.getParent();
+                    if (parent != null) {
+                        damageMetadata.put("parent_product_name", parent.getName());
+                        productDisplayName = product.getName() + " (" + parent.getName() + ")";
+                    }
+                }
+
                 Notification damageNotif = Notification.builder()
                         .type(NotificationType.SHIPMENT_DAMAGED)
                         .severity(NotificationSeverity.WARNING)
-                        .message(damagedQuantity + " units of " + product.getName() + " reported damaged in shipment " + shipment.getShipmentNumber())
+                        .message(damagedQuantity + " units of " + productDisplayName + " reported damaged in shipment " + shipment.getShipmentNumber())
                         .itemId(product.getId())
                         .metadata(damageMetadata)
                         .via(List.of("slack", "app"))
@@ -580,7 +590,13 @@ public class ShipmentService {
 
             // Create notification for shipment completion
             List<String> productNames = shipment.getItems().stream()
-                    .map(item -> item.getItem().getName())
+                    .map(item -> {
+                        Product p = item.getItem();
+                        if (p.getParentId() != null && p.getParent() != null) {
+                            return p.getName() + " (" + p.getParent().getName() + ")";
+                        }
+                        return p.getName();
+                    })
                     .toList();
 
             Map<String, Object> completionMetadata = new HashMap<>();
