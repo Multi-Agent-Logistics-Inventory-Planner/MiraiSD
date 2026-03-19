@@ -118,6 +118,24 @@ interface DetailBlock {
   prizeItems: ShipmentItem[];
 }
 
+/** Check if a block has any unreceived items (parent or prizes) */
+function hasBlockUnreceived(block: DetailBlock): boolean {
+  const parentAccounted = block.parentItem.receivedQuantity
+    + (block.parentItem.damagedQuantity ?? 0)
+    + (block.parentItem.displayQuantity ?? 0)
+    + (block.parentItem.shopQuantity ?? 0);
+
+  if (parentAccounted < block.parentItem.orderedQuantity) return true;
+
+  return block.prizeItems.some((prize) => {
+    const accounted = prize.receivedQuantity
+      + (prize.damagedQuantity ?? 0)
+      + (prize.displayQuantity ?? 0)
+      + (prize.shopQuantity ?? 0);
+    return accounted < prize.orderedQuantity;
+  });
+}
+
 function ItemRow({ item }: { item: ShipmentItem }) {
   const rawAllocations = item.allocations ?? [];
   const allocations = consolidateAllocations(rawAllocations);
@@ -129,8 +147,10 @@ function ItemRow({ item }: { item: ShipmentItem }) {
 
   return (
     <div className={cn(
-      "py-3 border-b last:border-b-0",
-      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+      "py-3 border-b last:border-b-0 -mx-4 px-4 border-l-2",
+      hasUnreceived
+        ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400"
+        : "bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       <div className="flex items-center gap-3">
         {/* Product Image */}
@@ -213,8 +233,10 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
 
   return (
     <div className={cn(
-      "py-3 border-b last:border-b-0",
-      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+      "py-3 border-b last:border-b-0 -mx-4 px-4 border-l-2",
+      hasUnreceived
+        ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400"
+        : "bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       {/* Parent row (Kuji set) */}
       <div className="flex items-center gap-3">
@@ -287,7 +309,9 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             return (
               <div key={prize.id} className={cn(
                 "flex items-center gap-2 py-1 px-2 -mx-2 rounded",
-                prizeHasUnreceived && "bg-amber-100/50 dark:bg-amber-900/20"
+                prizeHasUnreceived
+                  ? "bg-amber-100/50 dark:bg-amber-900/20"
+                  : "bg-green-100/50 dark:bg-green-900/20"
               )}>
                 <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded min-w-[40px] text-center">{prizeLabel}</span>
                 <span className="text-xs text-muted-foreground">
@@ -367,7 +391,7 @@ export function ShipmentDetailSheet({
         prizesByParentId[pid].push(i);
       }
     });
-    return roots.map((parentItem) => {
+    const blocks = roots.map((parentItem) => {
       // Sort prizes: LP first, then A, B, C, etc.
       const unsortedPrizes = prizesByParentId[parentItem.item.id] ?? [];
       const sortedPrizes = sortPrizes(
@@ -381,6 +405,19 @@ export function ShipmentDetailSheet({
         parentItem,
         prizeItems: sortedPrizes,
       };
+    });
+
+    // Sort blocks: unreceived items first (A-Z), then received items (A-Z)
+    return blocks.sort((a, b) => {
+      const aUnreceived = hasBlockUnreceived(a);
+      const bUnreceived = hasBlockUnreceived(b);
+
+      // Unreceived items first
+      if (aUnreceived && !bUnreceived) return -1;
+      if (!aUnreceived && bUnreceived) return 1;
+
+      // Within same status group, sort alphabetically by item name
+      return a.parentItem.item.name.localeCompare(b.parentItem.item.name);
     });
   }, [shipment?.items]);
 
