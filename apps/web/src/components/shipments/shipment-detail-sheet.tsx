@@ -140,7 +140,6 @@ function ItemRow({ item }: { item: ShipmentItem }) {
   const rawAllocations = item.allocations ?? [];
   const allocations = consolidateAllocations(rawAllocations);
   const hasAllocations = allocations.length > 0;
-  const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
   const imageUrl = item.item?.imageUrl;
   const totalAccounted = item.receivedQuantity + (item.damagedQuantity ?? 0) + (item.displayQuantity ?? 0) + (item.shopQuantity ?? 0);
   const hasUnreceived = totalAccounted < item.orderedQuantity;
@@ -179,8 +178,6 @@ function ItemRow({ item }: { item: ShipmentItem }) {
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
             <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
-            {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
-            {lineTotal && <span className="font-medium text-foreground">{formatCurrency(lineTotal)}</span>}
           </div>
         </div>
         <div className="hidden sm:block text-right text-sm shrink-0">
@@ -195,19 +192,6 @@ function ItemRow({ item }: { item: ShipmentItem }) {
           {(item.shopQuantity ?? 0) > 0 && (
             <p className="text-xs text-green-600">{item.shopQuantity} shop</p>
           )}
-        </div>
-        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
-          {item.unitCost ? (
-            <>
-              <p>{formatCurrency(item.unitCost)}</p>
-              <p className="text-xs text-muted-foreground">each</p>
-            </>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
-          {lineTotal ? formatCurrency(lineTotal) : "-"}
         </div>
       </div>
     </div>
@@ -229,14 +213,18 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
     return totalAccounted < prize.orderedQuantity;
   });
 
-  const hasUnreceived = parentHasUnreceived || anyPrizeUnreceived;
+  // Determine block-level highlight: only if ALL items share the same status
+  const allUnreceived = parentHasUnreceived && prizeItems.every((prize) => {
+    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
+    return accounted < prize.orderedQuantity;
+  });
+  const allReceived = !parentHasUnreceived && !anyPrizeUnreceived;
 
   return (
     <div className={cn(
-      "py-3 border-b last:border-b-0 -mx-4 px-4 border-l-2",
-      hasUnreceived
-        ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400"
-        : "bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
+      "py-3 border-b last:border-b-0 -mx-4 px-4",
+      allUnreceived && "border-l-2 bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400",
+      allReceived && "border-l-2 bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       {/* Parent row (Kuji set) */}
       <div className="flex items-center gap-3">
@@ -280,26 +268,12 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             <p className="text-xs text-green-600">{parentItem.shopQuantity} shop</p>
           )}
         </div>
-        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
-          {parentItem.unitCost ? (
-            <>
-              <p>{formatCurrency(parentItem.unitCost)}</p>
-              <p className="text-xs text-muted-foreground">each</p>
-            </>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
-          {parentItem.unitCost ? formatCurrency(parentItem.orderedQuantity * parentItem.unitCost) : "-"}
-        </div>
       </div>
       {/* Prizes (same section, indented) */}
       {prizeItems.length > 0 && (
         <div className="mt-2 pl-4 border-l-2 border-muted space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Prizes</p>
           {prizeItems.map((prize) => {
-            const lineTotal = prize.unitCost ? prize.orderedQuantity * prize.unitCost : undefined;
             const letter = (prize.item as { letter?: string | null }).letter;
             const prizeLabel = letter
               ? prizeLetterDisplay(letter)
@@ -325,9 +299,6 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
                 )}
                 {(prize.shopQuantity ?? 0) > 0 && (
                   <span className="text-xs text-green-600">{prize.shopQuantity} shop</span>
-                )}
-                {lineTotal != null && (
-                  <span className="text-xs font-medium ml-auto">{formatCurrency(lineTotal)}</span>
                 )}
               </div>
             );
@@ -511,8 +482,6 @@ export function ShipmentDetailSheet({
               <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
                 <span className="flex-1">Name</span>
                 <span className="text-right w-24">Qty</span>
-                <span className="text-right w-20">Price</span>
-                <span className="text-right w-24">Total</span>
               </div>
             </div>
 
