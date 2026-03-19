@@ -56,10 +56,10 @@ function Bar({ value, label, heightPercent, pattern }: BarProps) {
 
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-lg font-bold text-white dark:text-neutral-900">{value}</span>
-      <span className="text-[10px] text-white/70 dark:text-neutral-600">{label}</span>
+      <span className="text-lg font-bold text-foreground">{value}</span>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
       <div
-        className="w-10 rounded-md bg-white/20 dark:bg-neutral-800/20 mt-0.5"
+        className="w-10 rounded-md bg-muted dark:bg-[#1c1c1c] mt-0.5"
         style={{ height: `${height}px`, ...getPatternStyle() }}
       />
     </div>
@@ -75,15 +75,15 @@ export function OrdersCard({
 }: OrdersCardProps) {
   if (isLoading) {
     return (
-      <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-5 shadow-none border-0 h-[240px] flex flex-col">
-        <Skeleton className="h-6 w-16 bg-white/20 dark:bg-neutral-800/20" />
+      <Card className="relative overflow-hidden rounded-2xl p-5 shadow-none h-[240px] flex flex-col">
+        <Skeleton className="h-6 w-16" />
         <div className="mt-3 flex items-end justify-between gap-2 flex-1">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex flex-col items-center gap-2">
-              <Skeleton className="h-5 w-8 bg-white/20 dark:bg-neutral-800/20" />
-              <Skeleton className="h-4 w-12 bg-white/20 dark:bg-neutral-800/20" />
+              <Skeleton className="h-5 w-8" />
+              <Skeleton className="h-4 w-12" />
               <Skeleton
-                className="w-12 bg-white/20 dark:bg-neutral-800/20 rounded-lg"
+                className="w-12 rounded-lg"
                 style={{ height: `${30 + i * 20}px` }}
               />
             </div>
@@ -99,15 +99,15 @@ export function OrdersCard({
   const getHeightPercent = (value: number) => value / maxValue;
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl bg-neutral-800 dark:bg-white p-5 shadow-none border-0 h-[240px] flex flex-col">
+    <Card className="relative overflow-hidden rounded-2xl p-5 shadow-none h-[240px] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white dark:text-neutral-900">Orders</h3>
+        <h3 className="text-lg font-semibold text-foreground">Orders</h3>
         <Link href="/shipments">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 dark:text-neutral-500 dark:hover:text-neutral-900 dark:hover:bg-neutral-800/10"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
           >
             <Settings2 className="h-4 w-4" />
           </Button>
