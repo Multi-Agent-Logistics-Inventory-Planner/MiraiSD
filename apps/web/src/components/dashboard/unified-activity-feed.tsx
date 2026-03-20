@@ -171,7 +171,7 @@ export function UnifiedActivityFeed({
 
   if (isLoading && events.length === 0) {
     return (
-      <Card>
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
@@ -197,7 +197,7 @@ export function UnifiedActivityFeed({
   }
 
   return (
-    <Card>
+    <Card className="shadow-none">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
