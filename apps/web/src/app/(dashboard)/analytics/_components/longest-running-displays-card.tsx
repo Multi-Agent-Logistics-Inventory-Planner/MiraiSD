@@ -36,7 +36,7 @@ const ROWS_PER_PAGE = 10;
 
 function LoadingSkeleton() {
   return (
-    <Card className="flex flex-col overflow-hidden h-[340px] dark:border-0">
+    <Card className="flex flex-col overflow-hidden h-[340px] dark:border-none">
       <CardHeader className="shrink-0 pb-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export function LongestRunningDisplaysCard() {
 
   return (
     <>
-      <Card className="flex flex-col overflow-hidden h-[340px] dark:border-0">
+      <Card className="flex flex-col overflow-hidden h-[340px] dark:border-none">
         <CardHeader className="shrink-0 pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
