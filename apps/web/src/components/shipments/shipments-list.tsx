@@ -13,7 +13,7 @@ interface ShipmentsListProps {
 
 function ShipmentCardSkeleton() {
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border dark:border-none bg-card p-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-3">
         <div className="flex-1">

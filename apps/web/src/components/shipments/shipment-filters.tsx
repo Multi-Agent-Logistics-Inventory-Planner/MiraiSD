@@ -30,8 +30,7 @@ export function ShipmentFilters({
       <Can permission={Permission.SHIPMENTS_CREATE}>
         <Button
           onClick={onAddClick}
-          size="sm"
-          className="shrink-0 text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-white"
+          className="shrink-0 text-white bg-brand-primary hover:bg-brand-primary-hover"
         >
           <Plus className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">New Shipment</span>
