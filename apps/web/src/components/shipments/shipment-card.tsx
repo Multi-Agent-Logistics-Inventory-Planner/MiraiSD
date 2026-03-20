@@ -131,8 +131,8 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card p-4 transition-colors cursor-pointer",
-        "hover:bg-muted/50",
+        "rounded-xl border dark:border-none bg-card p-4 transition-colors cursor-pointer",
+        "hover:bg-muted/50 dark:hover:bg-card/80",
       )}
       onClick={onClick}
     >

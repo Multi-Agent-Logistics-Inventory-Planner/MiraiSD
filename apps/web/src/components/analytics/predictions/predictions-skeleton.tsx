@@ -32,7 +32,10 @@ export function PredictionsSkeleton() {
       {/* Items Grid Skeleton */}
       <div className="grid gap-2 grid-cols-1">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="bg-card border border-border dark:border-0 shadow-none">
+          <Card
+            key={i}
+            className="bg-card border border-border dark:border-none shadow-none"
+          >
             <CardContent className="px-4 py-0">
               {/* Desktop layout skeleton */}
               <div className="hidden sm:flex items-center gap-4">

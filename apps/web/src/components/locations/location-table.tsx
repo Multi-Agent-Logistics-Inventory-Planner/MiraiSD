@@ -30,7 +30,7 @@ export function LocationTable({
     return (
       <div className={GRID}>
         {Array.from({ length: pageSize }).map((_, i) => (
-          <div key={i} className="rounded-xl border bg-card p-4">
+          <div key={i} className="rounded-xl border dark:border-none bg-card p-4">
             <Skeleton className="h-5 w-16 mb-3" />
             <div className="grid grid-cols-2 gap-x-2 gap-y-1">
               <Skeleton className="h-3 w-8" />
@@ -66,8 +66,8 @@ export function LocationTable({
             key={item.id}
             type="button"
             className={cn(
-              "group relative min-w-0 cursor-pointer rounded-xl border bg-card p-3 sm:p-4 text-left transition-all",
-              "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
+              "group relative min-w-0 cursor-pointer rounded-xl border dark:border-none bg-card p-3 sm:p-4 text-left transition-all",
+              "hover:border-primary/40 dark:hover:border-none hover:shadow-md hover:-translate-y-0.5",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               !isActive && "opacity-55"
             )}

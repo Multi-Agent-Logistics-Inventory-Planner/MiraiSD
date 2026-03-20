@@ -106,7 +106,7 @@ export function ShipmentProgress({
                   state === "completed" &&
                     "border-emerald-700 bg-emerald-700 text-white",
                   state === "active" &&
-                    "border-emerald-700 bg-card text-white",
+                    "border-emerald-700 bg-background text-emerald-700",
                   state === "pending" &&
                     "border-muted-foreground/30 bg-background text-muted-foreground/50",
                 )}

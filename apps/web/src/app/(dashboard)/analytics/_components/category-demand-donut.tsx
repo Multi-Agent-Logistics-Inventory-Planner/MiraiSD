@@ -110,7 +110,7 @@ export function CategoryDemandDonut({
 
   if (isLoading) {
     return (
-      <Card className="h-full border-0 border-b lg:border-b-0 lg:border-r dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
+      <Card className="h-full border-0 border-b-[0.5px] lg:border-b-0 lg:border-r-[0.5px] dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
         <CardHeader className="shrink-0 pb-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export function CategoryDemandDonut({
 
   if (!rankings || rankings.length === 0 || totalDemand === 0) {
     return (
-      <Card className="h-full border-0 border-b lg:border-b-0 lg:border-r dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
+      <Card className="h-full border-0 border-b-[0.5px] lg:border-b-0 lg:border-r-[0.5px] dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
         <CardHeader className="shrink-0 pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -193,7 +193,7 @@ export function CategoryDemandDonut({
   };
 
   return (
-    <Card className="h-full border-0 border-b lg:border-b-0 lg:border-r dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
+    <Card className="h-full border-0 border-b-[0.5px] lg:border-b-0 lg:border-r-[0.5px] dark:border-b-0 dark:lg:border-r-0 rounded-xl shadow-none">
       <CardHeader className="shrink-0 pb-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">

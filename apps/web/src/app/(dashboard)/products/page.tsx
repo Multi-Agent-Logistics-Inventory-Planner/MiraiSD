@@ -66,10 +66,11 @@ export default function ProductsPage() {
 
       let matchesCategory = true;
       if (filters.selectedSubcategoryId) {
-        matchesCategory = row.product.category.id === filters.selectedSubcategoryId;
+        matchesCategory =
+          row.product.category.id === filters.selectedSubcategoryId;
       } else if (filters.selectedCategoryId) {
         const selectedCat = (categories ?? []).find(
-          (c) => c.id === filters.selectedCategoryId
+          (c) => c.id === filters.selectedCategoryId,
         );
         const childIds = selectedCat?.children.map((c) => c.id) ?? [];
         matchesCategory =
@@ -141,7 +142,7 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="p-2 border-none">
+        <Card className="p-2 dark:border-none">
           <CardContent className="p-0">
             <ProductTable
               items={paginatedItems}

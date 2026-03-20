@@ -56,7 +56,7 @@ export default function AuditLogPage() {
       />
 
       {/* Borderless table */}
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-xl border dark:border-none bg-card overflow-hidden">
         <AuditLogTable
           data={data}
           isLoading={isLoading}
