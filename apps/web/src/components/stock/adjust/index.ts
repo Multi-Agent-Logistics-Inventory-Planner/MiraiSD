@@ -4,6 +4,7 @@ export { AdjustSummary } from "./adjust-summary";
 export { SelectedProductCard } from "./selected-product-card";
 export { ProductFilterHeader } from "./product-filter-header";
 export { ReasonSelector } from "./reason-selector";
+export { AdjustmentConfirmDialog } from "./adjustment-confirm-dialog";
 export {
   type AdjustAction,
   type NormalizedInventory,

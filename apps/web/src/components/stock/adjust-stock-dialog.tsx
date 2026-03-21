@@ -37,6 +37,7 @@ import {
   ProductList,
   SelectedProductCard,
   ProductFilterHeader,
+  AdjustmentConfirmDialog,
   type AdjustAction,
   type NormalizedInventory,
   normalizeInventory,
@@ -91,6 +92,7 @@ export function AdjustStockDialog({
   const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
   const [reason, setReason] = useState<StockMovementReason>(DEFAULT_REASON_BY_ACTION["subtract"]);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const adjustMutation = useAdjustStockMutation();
 
@@ -120,6 +122,7 @@ export function AdjustStockDialog({
       setChildCategoryFilters([]);
       setQuantityWarning(null);
       setReason(DEFAULT_REASON_BY_ACTION["subtract"]);
+      setConfirmDialogOpen(false);
     } else if (initialLocationProp && initialLocationProp.locationType != null) {
       setLocation({
         locationType: initialLocationProp.locationType,
@@ -301,6 +304,24 @@ export function AdjustStockDialog({
     setCategoryFilters([]);
     setChildCategoryFilters([]);
     setSearchQuery("");
+  }
+
+  function handleReasonChange(newReason: StockMovementReason) {
+    if (action === "subtract" && newReason === StockMovementReason.ADJUSTMENT) {
+      setConfirmDialogOpen(true);
+      return;
+    }
+    setReason(newReason);
+  }
+
+  function handleConfirmAdjustment() {
+    setReason(StockMovementReason.ADJUSTMENT);
+    setConfirmDialogOpen(false);
+  }
+
+  function handleCancelAdjustment() {
+    setReason(StockMovementReason.SALE);
+    setConfirmDialogOpen(false);
   }
 
   function handleProductSelect(id: string, itemQuantity: number) {
@@ -502,11 +523,11 @@ export function AdjustStockDialog({
                 onValueChange={handleActionChange}
                 variant="outline"
                 disabled={isAdjusting}
-                className="border border-input rounded-md"
+                className="border rounded-md dark:border-[#41413d]"
               >
                 <ToggleGroupItem
                   value="subtract"
-                  className="px-4 border-0 data-[state=on]:bg-rose-600 data-[state=on]:text-white data-[state=off]:bg-rose-500/20 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-rose-500/30 dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
+                  className="px-4 border-none data-[state=on]:bg-rose-600 data-[state=on]:text-white data-[state=off]:bg-rose-500/20 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-rose-500/30 dark:data-[state=on]:bg-amber-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-amber-700/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Subtract stock"
                 >
                   <Minus className="h-4 w-4" />
@@ -514,7 +535,7 @@ export function AdjustStockDialog({
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="add"
-                  className="px-4 border-0 data-[state=on]:bg-emerald-600 data-[state=on]:text-white data-[state=off]:bg-emerald-400/30 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-emerald-500/30 dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
+                  className="px-4 border-none data-[state=on]:bg-emerald-600 data-[state=on]:text-white data-[state=off]:bg-emerald-400/30 data-[state=off]:text-muted-foreground data-[state=off]:hover:bg-emerald-500/30 dark:data-[state=on]:bg-emerald-700 dark:data-[state=on]:text-white dark:data-[state=off]:bg-emerald-800/20 dark:data-[state=off]:text-muted-foreground"
                   aria-label="Add stock"
                 >
                   <Plus className="h-4 w-4" />
@@ -645,7 +666,7 @@ export function AdjustStockDialog({
                 disabled={isAdjusting}
                 onClearSelection={handleClearSelection}
                 onQuantityChange={handleQuantityChange}
-                onReasonChange={setReason}
+                onReasonChange={handleReasonChange}
                 onIncrement={handleIncrement}
                 onDecrement={handleDecrement}
               />
@@ -692,6 +713,12 @@ export function AdjustStockDialog({
             </Button>
           </DialogFooter>
         </div>
+
+        <AdjustmentConfirmDialog
+          open={confirmDialogOpen}
+          onConfirm={handleConfirmAdjustment}
+          onCancel={handleCancelAdjustment}
+        />
 
         {location.locationType && location.locationId && (
           <AddInventoryDialog
