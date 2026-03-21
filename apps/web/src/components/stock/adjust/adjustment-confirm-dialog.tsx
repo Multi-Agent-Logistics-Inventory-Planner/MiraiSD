@@ -32,7 +32,7 @@ export function AdjustmentConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription className="text-center">
             Adjustments are for inventory corrections, damaged items, giveaways,
-            etc. — not sales. If this is a customer purchase, please use
+            etc. — not sales. If this product went to a customer, please use
             &quot;Sale&quot; instead.
           </AlertDialogDescription>
           <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
