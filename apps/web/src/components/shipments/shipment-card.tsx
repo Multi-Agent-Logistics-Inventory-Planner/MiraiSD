@@ -131,8 +131,8 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card p-4 transition-colors cursor-pointer",
-        "hover:bg-muted/50",
+        "rounded-xl border dark:border-none bg-card p-4 transition-colors cursor-pointer",
+        "hover:bg-muted/50 dark:hover:bg-card/80",
       )}
       onClick={onClick}
     >
@@ -174,7 +174,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
       </div>
 
       {/* Product Images Row (only parent/root items; prizes are under parent Kuji) */}
-      <div className="flex items-start gap-3 mb-4 overflow-x-auto pb-1">
+      <div className="flex items-start gap-3 mb-4 overflow-x-auto scrollbar-none pb-1">
         {rootItems.map((item) => (
           <ProductThumbnail key={item.id} item={item} />
         ))}

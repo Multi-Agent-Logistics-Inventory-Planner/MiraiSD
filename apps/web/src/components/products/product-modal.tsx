@@ -334,7 +334,7 @@ export function ProductModal({
               ({totalQuantity.toLocaleString()})
             </span>
           </h3>
-          <div className="rounded-lg overflow-x-auto">
+          <div className="rounded-lg overflow-x-auto scrollbar-none">
             <Card className="p-2 border-none">
               <CardContent className="p-0">
                 <Table>
@@ -410,7 +410,7 @@ export function ProductModal({
               ({activeDisplays.length})
             </span>
           </h3>
-          <div className="rounded-lg overflow-x-auto">
+          <div className="rounded-lg overflow-x-auto scrollbar-none">
             <Card className="p-2 border-none">
               <CardContent className="p-0">
                 <Table>
@@ -490,7 +490,7 @@ export function ProductModal({
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Recent Orders
           </h3>
-          <div className="rounded-lg overflow-x-auto">
+          <div className="rounded-lg overflow-x-auto scrollbar-none">
             <Card className="p-2 border-none">
               <CardContent className="p-0">
                 <Table>

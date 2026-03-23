@@ -125,7 +125,7 @@ export default function NotificationsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="rounded-lg border bg-card">
+          <div className="rounded-lg border dark:border-none bg-card">
             <NotificationsTable
               notifications={notifications}
               isLoading={notificationsQuery.isLoading}

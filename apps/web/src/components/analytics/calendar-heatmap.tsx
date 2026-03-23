@@ -203,7 +203,7 @@ export function CalendarHeatmap({
         </div>
 
         {/* Heatmap Grid - Centered */}
-        <div className="flex overflow-x-auto pb-2 lg:justify-center">
+        <div className="flex overflow-x-auto scrollbar-none pb-2 lg:justify-center">
           <div
             className="flex flex-col"
             style={{ ...gapStyle, width: gridWidth }}
