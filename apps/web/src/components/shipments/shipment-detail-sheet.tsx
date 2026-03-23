@@ -32,6 +32,7 @@ interface ShipmentDetailSheetProps {
   onDeleteClick?: () => void;
   onEditClick?: () => void;
   onUndoReceiveClick?: () => void;
+  onUndoItemClick?: (itemId: string) => void;
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
@@ -159,7 +160,15 @@ function hasBlockUnreceived(block: DetailBlock): boolean {
   });
 }
 
-function ItemRow({ item }: { item: ShipmentItem }) {
+function ItemRow({
+  item,
+  onUndoClick,
+  canUndo
+}: {
+  item: ShipmentItem;
+  onUndoClick?: (itemId: string) => void;
+  canUndo?: boolean;
+}) {
   const rawAllocations = item.allocations ?? [];
   const allocations = consolidateAllocations(rawAllocations);
   const hasAllocations = allocations.length > 0;
@@ -171,6 +180,7 @@ function ItemRow({ item }: { item: ShipmentItem }) {
   const hasUnreceived = totalReceived < item.orderedQuantity;
   const hasStatusBadges = shopQty > 0 || damagedQty > 0 || displayQty > 0;
   const hasBadges = hasAllocations || hasStatusBadges;
+  const hasReceivedContent = totalReceived > 0;
 
   return (
     <div className={cn(
@@ -211,16 +221,42 @@ function ItemRow({ item }: { item: ShipmentItem }) {
             <span>{item.orderedQuantity} ordered · {totalReceived} received</span>
           </div>
         </div>
-        <div className="hidden sm:block text-right text-sm shrink-0">
-          <p>{item.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{totalReceived} received</p>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:block text-right text-sm shrink-0">
+            <p>{item.orderedQuantity} ordered</p>
+            <p className="text-xs text-muted-foreground">{totalReceived} received</p>
+          </div>
+          {hasReceivedContent && canUndo && onUndoClick && (
+            <Can permission={Permission.SHIPMENTS_RECEIVE}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUndoClick(item.id);
+                }}
+              >
+                <Undo2 className="h-3 w-3 mr-1" />
+                Undo
+              </Button>
+            </Can>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function KujiBlockSection({ block }: { block: DetailBlock }) {
+function KujiBlockSection({
+  block,
+  onUndoClick,
+  canUndo
+}: {
+  block: DetailBlock;
+  onUndoClick?: (itemId: string) => void;
+  canUndo?: boolean;
+}) {
   const { parentItem, prizeItems } = block;
   const imageUrl = parentItem.item?.imageUrl;
   const rawParentAllocations = parentItem.allocations ?? [];
@@ -233,6 +269,7 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
   const parentHasUnreceived = parentTotalReceived < parentItem.orderedQuantity;
   const hasParentStatusBadges = parentShopQty > 0 || parentDamagedQty > 0 || parentDisplayQty > 0;
   const hasParentBadges = hasParentAllocations || hasParentStatusBadges;
+  const parentHasReceivedContent = parentTotalReceived > 0;
 
   // Check if any prize has unreceived items (prizes only support damaged, not display/shop)
   const anyPrizeUnreceived = prizeItems.some((prize) => {
@@ -285,9 +322,27 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentTotalReceived} received</span>
           </div>
         </div>
-        <div className="hidden sm:block text-right text-sm shrink-0">
-          <p>{parentItem.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{parentTotalReceived} received</p>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:block text-right text-sm shrink-0">
+            <p>{parentItem.orderedQuantity} ordered</p>
+            <p className="text-xs text-muted-foreground">{parentTotalReceived} received</p>
+          </div>
+          {parentHasReceivedContent && canUndo && onUndoClick && (
+            <Can permission={Permission.SHIPMENTS_RECEIVE}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUndoClick(parentItem.id);
+                }}
+              >
+                <Undo2 className="h-3 w-3 mr-1" />
+                Undo
+              </Button>
+            </Can>
+          )}
         </div>
       </div>
       {/* Prizes (same section, indented) */}
@@ -303,6 +358,7 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
             // Prizes only support damaged (not display/shop)
             const prizeTotalReceived = prize.receivedQuantity + prizeDamagedQty;
             const prizeHasUnreceived = prizeTotalReceived < prize.orderedQuantity;
+            const prizeHasReceivedContent = prizeTotalReceived > 0;
             return (
               <div key={prize.id} className={cn(
                 "flex flex-wrap items-center gap-2 py-1 px-2 -mx-2 rounded",
@@ -311,10 +367,26 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
                   : "bg-green-100/50 dark:bg-green-900/20"
               )}>
                 <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded min-w-[40px] text-center">{prizeLabel}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground flex-1">
                   {prize.orderedQuantity} ordered · {prizeTotalReceived} received
                 </span>
                 {prizeDamagedQty > 0 && <StatusBadge label="Damaged" quantity={prizeDamagedQty} type="damaged" />}
+                {prizeHasReceivedContent && canUndo && onUndoClick && (
+                  <Can permission={Permission.SHIPMENTS_RECEIVE}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-muted-foreground hover:text-destructive px-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUndoClick(prize.id);
+                      }}
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" />
+                      Undo
+                    </Button>
+                  </Can>
+                )}
               </div>
             );
           })}
@@ -332,6 +404,7 @@ export function ShipmentDetailSheet({
   onDeleteClick,
   onEditClick,
   onUndoReceiveClick,
+  onUndoItemClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
   const [trackingExpanded, setTrackingExpanded] = useState(false);
@@ -510,9 +583,19 @@ export function ShipmentDetailSheet({
               ) : (
                 detailBlocks.map((block) =>
                   block.prizeItems.length > 0 ? (
-                    <KujiBlockSection key={block.parentItem.id} block={block} />
+                    <KujiBlockSection
+                      key={block.parentItem.id}
+                      block={block}
+                      onUndoClick={onUndoItemClick}
+                      canUndo={canUndo}
+                    />
                   ) : (
-                    <ItemRow key={block.parentItem.id} item={block.parentItem} />
+                    <ItemRow
+                      key={block.parentItem.id}
+                      item={block.parentItem}
+                      onUndoClick={onUndoItemClick}
+                      canUndo={canUndo}
+                    />
                   )
                 )
               )}

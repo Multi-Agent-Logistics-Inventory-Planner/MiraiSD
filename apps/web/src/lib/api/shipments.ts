@@ -108,6 +108,19 @@ export async function undoReceiveShipment(id: string): Promise<Shipment> {
 }
 
 /**
+ * Undo receiving a single shipment item - reverses inventory changes for just that item
+ */
+export async function undoReceiveShipmentItem(
+  shipmentId: string,
+  itemId: string
+): Promise<Shipment> {
+  return apiPost<Shipment, undefined>(
+    `${BASE_PATH}/${shipmentId}/items/${itemId}/undo-receive`,
+    undefined
+  );
+}
+
+/**
  * Get all shipments containing a specific product
  */
 export async function getShipmentsByProduct(productId: string): Promise<Shipment[]> {
