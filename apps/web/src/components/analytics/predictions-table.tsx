@@ -302,7 +302,7 @@ export function PredictionsTable({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scrollbar-none">
               <Table>
                 <DataTableHeader>
                   <TableHead className="rounded-l-lg" aria-sort={getAriaSort("itemSku", sortField, sortDirection)}>
