@@ -273,6 +273,7 @@ export default function ShipmentsPage() {
         open={receiveDialogOpen}
         onOpenChange={setReceiveDialogOpen}
         shipment={selectedShipment}
+        onUndoItemClick={handleUndoItemClick}
       />
 
       {/* Delete Confirmation Dialog */}
