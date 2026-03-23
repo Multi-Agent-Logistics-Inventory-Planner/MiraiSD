@@ -28,6 +28,7 @@ import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShi
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
 import type { ShipmentDisplayStatus } from "@/lib/shipment-utils";
+import type { SortOption } from "@/components/shipments/shipment-filters";
 
 const PAGE_SIZE = 5;
 
@@ -39,6 +40,7 @@ export default function ShipmentsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
+  const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [page, setPage] = useState(0);
 
   // Dialog/sheet states
@@ -52,9 +54,14 @@ export default function ShipmentsPage() {
     null
   );
 
-  // Use server-side pagination with display status and search filter
+  // Use server-side pagination with display status, search filter, and sorting
   const shipmentsQuery = useShipments(
-    { displayStatus: activeTab, search: searchQuery || undefined },
+    {
+      displayStatus: activeTab,
+      search: searchQuery || undefined,
+      sortBy: "createdAt",
+      sortDir: sortOption === "newest" ? "desc" : "asc",
+    },
     page,
     PAGE_SIZE
   );
@@ -75,6 +82,11 @@ export default function ShipmentsPage() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setPage(0);
+  };
+
+  const handleSortChange = (value: SortOption) => {
+    setSortOption(value);
     setPage(0);
   };
 
@@ -188,6 +200,8 @@ export default function ShipmentsPage() {
           <ShipmentFilters
             search={searchQuery}
             onSearchChange={handleSearchChange}
+            sortOption={sortOption}
+            onSortChange={handleSortChange}
             onAddClick={() => {
               setSelectedShipment(null);
               setCreateDialogOpen(true);
