@@ -10,6 +10,7 @@ import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
 import com.mirai.inventoryservice.exceptions.RackNotFoundException;
+import com.mirai.inventoryservice.exceptions.ShipmentItemNotFoundException;
 import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
 import com.mirai.inventoryservice.exceptions.SingleClawMachineNotFoundException;
 import com.mirai.inventoryservice.exceptions.WindowNotFoundException;
@@ -689,6 +690,86 @@ public class ShipmentService {
         shipment.setStatus(ShipmentStatus.PENDING);
         shipment.setActualDeliveryDate(null);
         shipment.setReceivedBy(null);
+
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Sync product totals
+        stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+
+        // Broadcast updates
+        broadcastService.broadcastShipmentUpdated();
+        broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
+
+        return savedShipment;
+    }
+
+    /**
+     * Undo receipt of a single shipment item: reverse stock additions for just that item.
+     * If the shipment was DELIVERED, it will return to PENDING status.
+     *
+     * @param shipmentId The shipment ID
+     * @param itemId The shipment item ID to undo
+     * @return The updated shipment
+     * @throws ShipmentNotFoundException if shipment not found
+     * @throws ShipmentItemNotFoundException if item not found or doesn't belong to shipment
+     * @throws InvalidShipmentStatusException if item has nothing to undo
+     * @throws InsufficientInventoryException if inventory has been depleted
+     */
+    public Shipment undoReceiveShipmentItem(UUID shipmentId, UUID itemId) {
+        Shipment shipment = getShipmentById(shipmentId);
+
+        // Find the shipment item
+        ShipmentItem shipmentItem = shipment.getItems().stream()
+                .filter(item -> item.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ShipmentItemNotFoundException(
+                        "Shipment item " + itemId + " not found in shipment " + shipmentId));
+
+        // Validate item has something to undo
+        boolean hasReceivedQuantities = shipmentItem.getReceivedQuantity() > 0
+                || shipmentItem.getDamagedQuantity() > 0
+                || shipmentItem.getDisplayQuantity() > 0
+                || shipmentItem.getShopQuantity() > 0;
+        boolean hasAllocations = !shipmentItem.getAllocations().isEmpty();
+
+        if (!hasReceivedQuantities && !hasAllocations) {
+            throw new InvalidShipmentStatusException(
+                    "Shipment item has not been received yet. Nothing to undo.");
+        }
+
+        Product product = shipmentItem.getItem();
+        Set<UUID> affectedProductIds = new java.util.HashSet<>();
+        affectedProductIds.add(product.getId());
+
+        // Reverse each allocation (same logic as undoReceiveShipment)
+        for (ShipmentItemAllocation allocation : shipmentItem.getAllocations()) {
+            LocationType locationType = allocation.getLocationType();
+            UUID locationId = allocation.getLocationId();
+            int quantity = allocation.getQuantity();
+
+            if (locationType == LocationType.NOT_ASSIGNED || locationId == null) {
+                removeFromNotAssignedInventory(product, quantity);
+            } else {
+                removeFromInventory(locationType, locationId, product, quantity);
+            }
+        }
+
+        // Clear allocations (orphanRemoval will delete them)
+        shipmentItem.getAllocations().clear();
+
+        // Reset quantities for this item only
+        shipmentItem.setReceivedQuantity(0);
+        shipmentItem.setDamagedQuantity(0);
+        shipmentItem.setDisplayQuantity(0);
+        shipmentItem.setShopQuantity(0);
+
+        // Update shipment status: if shipment was DELIVERED, it should now be PENDING
+        // since not all items are fully received anymore
+        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
+            shipment.setStatus(ShipmentStatus.PENDING);
+            // Keep actualDeliveryDate and receivedBy since other items may still be received
+        }
 
         Shipment savedShipment = shipmentRepository.save(shipment);
 
