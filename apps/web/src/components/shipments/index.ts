@@ -5,6 +5,7 @@ export { ShipmentProgress } from "./shipment-progress";
 export { ShipmentDetailSheet } from "./shipment-detail-sheet";
 export { ShipmentCreateDialog } from "./shipment-create-dialog";
 export { ShipmentReceiveDialog } from "./shipment-receive-dialog";
+export { ShipmentUndoItemsDialog } from "./shipment-undo-items-dialog";
 export { ShipmentHeader } from "./shipment-header";
 export { ShipmentFilters } from "./shipment-filters";
 export { ShipmentPagination } from "./shipment-pagination";

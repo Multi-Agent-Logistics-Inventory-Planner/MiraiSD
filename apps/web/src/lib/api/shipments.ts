@@ -11,10 +11,14 @@ const BASE_PATH = "/api/shipments";
 
 export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED";
 
+export type SortDirection = "asc" | "desc";
+
 export interface ShipmentFilters {
   status?: ShipmentStatus;
   displayStatus?: ShipmentDisplayStatus;
   search?: string;
+  sortBy?: string;
+  sortDir?: SortDirection;
 }
 
 /**
@@ -44,6 +48,12 @@ export async function getShipmentsPaged(
   }
   if (filters.search) {
     params.append("search", filters.search);
+  }
+  if (filters.sortBy) {
+    params.append("sortBy", filters.sortBy);
+  }
+  if (filters.sortDir) {
+    params.append("sortDir", filters.sortDir);
   }
 
   return apiGet<PaginatedResponse<Shipment>>(`${BASE_PATH}?${params.toString()}`);
@@ -105,6 +115,19 @@ export async function receiveShipment(
  */
 export async function undoReceiveShipment(id: string): Promise<Shipment> {
   return apiPost<Shipment, undefined>(`${BASE_PATH}/${id}/undo-receive`, undefined);
+}
+
+/**
+ * Undo receiving a single shipment item - reverses inventory changes for just that item
+ */
+export async function undoReceiveShipmentItem(
+  shipmentId: string,
+  itemId: string
+): Promise<Shipment> {
+  return apiPost<Shipment, undefined>(
+    `${BASE_PATH}/${shipmentId}/items/${itemId}/undo-receive`,
+    undefined
+  );
 }
 
 /**

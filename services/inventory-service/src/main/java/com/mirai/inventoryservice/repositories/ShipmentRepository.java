@@ -89,8 +89,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE (:status IS NULL OR s.status = :status) " +
-            "ORDER BY s.createdAt DESC",
+            "WHERE (:status IS NULL OR s.status = :status)",
             countQuery = "SELECT COUNT(s) FROM Shipment s WHERE (:status IS NULL OR s.status = :status)")
     Page<Shipment> findByStatusPaged(@Param("status") ShipmentStatus status, Pageable pageable);
 
@@ -99,8 +98,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE (:status IS NULL OR s.status = :status) " +
-            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
-            "ORDER BY s.createdAt DESC",
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE (:status IS NULL OR s.status = :status) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
@@ -111,8 +109,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status IN :statuses " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
-            "ORDER BY s.createdAt DESC",
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status IN :statuses " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
@@ -123,8 +120,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status IN :statuses " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
-            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
-            "ORDER BY s.createdAt DESC",
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status IN :statuses " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
@@ -136,8 +132,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status IN :statuses " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
-            "ORDER BY s.createdAt DESC",
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status IN :statuses " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
@@ -148,8 +143,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status IN :statuses " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
-            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
-            "ORDER BY s.createdAt DESC",
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status IN :statuses " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
@@ -160,8 +154,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE s.status = :status " +
-            "ORDER BY s.createdAt DESC",
+            "WHERE s.status = :status",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = :status")
     Page<Shipment> findCompletedShipments(@Param("status") ShipmentStatus status, Pageable pageable);
@@ -170,8 +163,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = :status " +
-            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern) " +
-            "ORDER BY s.createdAt DESC",
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = :status " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")

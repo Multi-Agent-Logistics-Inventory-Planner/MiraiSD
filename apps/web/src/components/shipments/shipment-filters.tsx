@@ -3,17 +3,30 @@
 import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Can, Permission } from "@/components/rbac";
+
+export type SortOption = "newest" | "oldest";
 
 interface ShipmentFiltersProps {
   search: string;
   onSearchChange: (value: string) => void;
+  sortOption: SortOption;
+  onSortChange: (value: SortOption) => void;
   onAddClick: () => void;
 }
 
 export function ShipmentFilters({
   search,
   onSearchChange,
+  sortOption,
+  onSortChange,
   onAddClick,
 }: ShipmentFiltersProps) {
   return (
@@ -27,6 +40,15 @@ export function ShipmentFilters({
           className="pl-9"
         />
       </div>
+      <Select value={sortOption} onValueChange={(v) => onSortChange(v as SortOption)}>
+        <SelectTrigger className="w-[130px]">
+          <SelectValue placeholder="Sort by" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="newest">Newest First</SelectItem>
+          <SelectItem value="oldest">Oldest First</SelectItem>
+        </SelectContent>
+      </Select>
       <Can permission={Permission.SHIPMENTS_CREATE}>
         <Button
           onClick={onAddClick}

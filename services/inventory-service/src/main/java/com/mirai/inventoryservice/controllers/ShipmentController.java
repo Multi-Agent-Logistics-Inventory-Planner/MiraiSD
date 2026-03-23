@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -49,10 +50,15 @@ public class ShipmentController {
             @RequestParam(required = false) String displayStatus,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
         // If pagination params are provided, use paginated response
         if (page != null && size != null) {
-            Pageable pageable = PageRequest.of(page, size);
+            Sort sort = sortDir.equalsIgnoreCase("asc")
+                    ? Sort.by(sortBy).ascending()
+                    : Sort.by(sortBy).descending();
+            Pageable pageable = PageRequest.of(page, size, sort);
             Page<Shipment> shipmentPage;
 
             // Use displayStatus if provided (ACTIVE, PARTIAL, COMPLETED), otherwise fall back to status
@@ -119,6 +125,15 @@ public class ShipmentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ShipmentResponseDTO> undoReceiveShipment(@PathVariable UUID id) {
         Shipment shipment = shipmentService.undoReceiveShipment(id);
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+    }
+
+    @PostMapping("/{shipmentId}/items/{itemId}/undo-receive")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ShipmentResponseDTO> undoReceiveShipmentItem(
+            @PathVariable UUID shipmentId,
+            @PathVariable UUID itemId) {
+        Shipment shipment = shipmentService.undoReceiveShipmentItem(shipmentId, itemId);
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 }
