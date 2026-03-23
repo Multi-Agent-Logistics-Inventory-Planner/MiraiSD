@@ -115,12 +115,14 @@ export function ShipmentUndoItemsDialog({
     });
   };
 
-  const selectAll = () => {
-    setSelectedItems(new Set(receivedItems.map((item) => item.id)));
-  };
+  const allSelected = selectedItems.size === receivedItems.length && receivedItems.length > 0;
 
-  const selectNone = () => {
-    setSelectedItems(new Set());
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(receivedItems.map((item) => item.id)));
+    }
   };
 
   async function handleConfirm() {
@@ -178,25 +180,16 @@ export function ShipmentUndoItemsDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Select all / none buttons */}
+          {/* Select all toggle */}
           <div className="flex items-center gap-2 text-sm">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={selectAll}
+              onClick={toggleSelectAll}
               disabled={receivedItems.length === 0}
             >
-              Select All
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={selectNone}
-              disabled={selectedItems.size === 0}
-            >
-              Select None
+              {allSelected ? "Deselect All" : "Select All"}
             </Button>
             <span className="text-muted-foreground ml-auto">
               {selectedItems.size} of {receivedItems.length} selected
