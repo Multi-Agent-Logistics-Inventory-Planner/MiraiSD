@@ -712,7 +712,7 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
               {heatmapPeriodLabel}
             </p>
           </div>
-          <div className="w-full overflow-x-auto pb-2">
+          <div className="w-full overflow-x-auto scrollbar-none pb-2">
             <CalendarHeatmap data={data.dailySales} year={selectedYear} />
           </div>
         </CardContent>

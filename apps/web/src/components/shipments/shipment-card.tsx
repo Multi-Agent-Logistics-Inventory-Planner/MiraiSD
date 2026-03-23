@@ -174,7 +174,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
       </div>
 
       {/* Product Images Row (only parent/root items; prizes are under parent Kuji) */}
-      <div className="flex items-start gap-3 mb-4 overflow-x-auto pb-1">
+      <div className="flex items-start gap-3 mb-4 overflow-x-auto scrollbar-none pb-1">
         {rootItems.map((item) => (
           <ProductThumbnail key={item.id} item={item} />
         ))}
