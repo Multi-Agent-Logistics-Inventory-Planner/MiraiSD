@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Package, Undo2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -122,7 +122,6 @@ interface ShipmentReceiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipment: Shipment | null;
-  onUndoItemClick?: (itemId: string) => void;
 }
 
 function AllocationRow({
@@ -223,7 +222,6 @@ export function ShipmentReceiveDialog({
   open,
   onOpenChange,
   shipment,
-  onUndoItemClick,
 }: ShipmentReceiveDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -583,33 +581,19 @@ export function ShipmentReceiveDialog({
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <div className="text-right text-sm">
-                          <div>Ordered: <span className="font-medium">{item.orderedQuantity}</span></div>
-                          <div>Received: <span className="font-medium">{item.receivedQuantity}</span></div>
-                          {(item.damagedQuantity || 0) > 0 && (
-                            <div>Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span></div>
-                          )}
-                          {(item.displayQuantity || 0) > 0 && (
-                            <div>Display: <span className="font-medium text-blue-600">{item.displayQuantity}</span></div>
-                          )}
-                          {(item.shopQuantity || 0) > 0 && (
-                            <div>Shop: <span className="font-medium text-green-600">{item.shopQuantity}</span></div>
-                          )}
-                          <div>Remaining: <span className="font-medium text-primary">{remaining}</span></div>
-                        </div>
-                        {(item.receivedQuantity > 0 || (item.damagedQuantity || 0) > 0 || (item.displayQuantity || 0) > 0 || (item.shopQuantity || 0) > 0) && onUndoItemClick && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-muted-foreground hover:text-destructive shrink-0"
-                            onClick={() => onUndoItemClick(item.id)}
-                          >
-                            <Undo2 className="h-3 w-3 mr-1" />
-                            Undo
-                          </Button>
+                      <div className="text-right text-sm">
+                        <div>Ordered: <span className="font-medium">{item.orderedQuantity}</span></div>
+                        <div>Received: <span className="font-medium">{item.receivedQuantity}</span></div>
+                        {(item.damagedQuantity || 0) > 0 && (
+                          <div>Damaged: <span className="font-medium text-amber-600">{item.damagedQuantity}</span></div>
                         )}
+                        {(item.displayQuantity || 0) > 0 && (
+                          <div>Display: <span className="font-medium text-blue-600">{item.displayQuantity}</span></div>
+                        )}
+                        {(item.shopQuantity || 0) > 0 && (
+                          <div>Shop: <span className="font-medium text-green-600">{item.shopQuantity}</span></div>
+                        )}
+                        <div>Remaining: <span className="font-medium text-primary">{remaining}</span></div>
                       </div>
                     </div>
 
@@ -771,7 +755,7 @@ export function ShipmentReceiveDialog({
                                 className={`py-2 ${prizeIsComplete ? "opacity-50" : ""}`}
                               >
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-wrap flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded">
                                       {prizeLabel}
                                     </span>
@@ -789,18 +773,6 @@ export function ShipmentReceiveDialog({
                                       </span>
                                     )}
                                   </div>
-                                  {(prize.receivedQuantity > 0 || (prize.damagedQuantity || 0) > 0) && onUndoItemClick && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 text-xs text-muted-foreground hover:text-destructive px-2 shrink-0"
-                                      onClick={() => onUndoItemClick(prize.id)}
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" />
-                                      Undo
-                                    </Button>
-                                  )}
                                 </div>
                                 {!prizeIsComplete && (
                                   <div className="mt-2 flex items-center gap-2 flex-wrap">

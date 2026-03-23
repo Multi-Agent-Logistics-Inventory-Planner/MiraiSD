@@ -18,12 +18,13 @@ import {
   ShipmentDetailSheet,
   ShipmentCreateDialog,
   ShipmentReceiveDialog,
+  ShipmentUndoItemsDialog,
   ShipmentHeader,
   ShipmentFilters,
   ShipmentPagination,
 } from "@/components/shipments";
 import { useShipments, useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
-import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShipmentMutation, useUndoReceiveShipmentItemMutation } from "@/hooks/mutations/use-shipment-mutations";
+import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
 import type { ShipmentDisplayStatus } from "@/lib/shipment-utils";
@@ -35,7 +36,6 @@ export default function ShipmentsPage() {
   const deleteMutation = useDeleteShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
   const undoReceiveMutation = useUndoReceiveShipmentMutation();
-  const undoReceiveItemMutation = useUndoReceiveShipmentItemMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
@@ -47,8 +47,7 @@ export default function ShipmentsPage() {
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [undoDialogOpen, setUndoDialogOpen] = useState(false);
-  const [undoItemDialogOpen, setUndoItemDialogOpen] = useState(false);
-  const [selectedItemToUndo, setSelectedItemToUndo] = useState<string | null>(null);
+  const [undoItemsDialogOpen, setUndoItemsDialogOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null
   );
@@ -122,31 +121,8 @@ export default function ShipmentsPage() {
     }
   }
 
-  function handleUndoItemClick(itemId: string) {
-    setSelectedItemToUndo(itemId);
-    setUndoItemDialogOpen(true);
-  }
-
-  async function handleConfirmUndoItem() {
-    if (!selectedShipment || !selectedItemToUndo) return;
-
-    try {
-      const updated = await undoReceiveItemMutation.mutateAsync({
-        shipmentId: selectedShipment.id,
-        itemId: selectedItemToUndo,
-      });
-      setSelectedShipment(updated);
-      toast({
-        title: "Item receipt reversed",
-        description: "Inventory has been restored for this item.",
-      });
-      setUndoItemDialogOpen(false);
-      setSelectedItemToUndo(null);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to undo item receipt";
-      toast({ title: "Error", description: message, variant: "destructive" });
-    }
+  function handleUndoItemsClick() {
+    setUndoItemsDialogOpen(true);
   }
 
   async function handleTrackingUpdate(trackingId: string) {
@@ -265,7 +241,7 @@ export default function ShipmentsPage() {
         onDeleteClick={handleDeleteClick}
         onEditClick={handleEditClick}
         onUndoReceiveClick={handleUndoReceiveClick}
-        onUndoItemClick={handleUndoItemClick}
+        onUndoItemsClick={handleUndoItemsClick}
         onTrackingUpdate={handleTrackingUpdate}
       />
 
@@ -273,7 +249,13 @@ export default function ShipmentsPage() {
         open={receiveDialogOpen}
         onOpenChange={setReceiveDialogOpen}
         shipment={selectedShipment}
-        onUndoItemClick={handleUndoItemClick}
+      />
+
+      <ShipmentUndoItemsDialog
+        open={undoItemsDialogOpen}
+        onOpenChange={setUndoItemsDialogOpen}
+        shipment={selectedShipment}
+        onSuccess={(updated) => setSelectedShipment(updated)}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -311,7 +293,7 @@ export default function ShipmentsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  This will reverse all inventory additions from shipment{" "}
+                  This will reverse inventory additions from shipment{" "}
                   <span className="font-medium font-mono">
                     {selectedShipment?.shipmentNumber}
                   </span>
@@ -336,35 +318,6 @@ export default function ShipmentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Undo Item Receipt Confirmation Dialog */}
-      <AlertDialog open={undoItemDialogOpen} onOpenChange={setUndoItemDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo item receipt?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2">
-                <p>
-                  This will reverse inventory additions for this item only.
-                  Other items in the shipment will not be affected.
-                </p>
-                <p className="text-amber-600 font-medium">
-                  Warning: If inventory for this item has been sold or transferred, the undo will fail.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-amber-600 text-white hover:bg-amber-700"
-              onClick={handleConfirmUndoItem}
-              disabled={undoReceiveItemMutation.isPending}
-            >
-              {undoReceiveItemMutation.isPending ? "Reversing..." : "Undo Item"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
