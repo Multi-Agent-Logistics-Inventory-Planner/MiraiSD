@@ -31,8 +31,8 @@ export function AdjustSummary({
       className={cn(
         "rounded-xl border p-4",
         isSubtract
-          ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900"
-          : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900"
+          ? "bg-amber-50 border-amber-500 dark:bg-amber-950/20 dark:border-amber-900"
+          : "bg-emerald-50 border-emerald-500 dark:bg-emerald-950/20 dark:border-emerald-900"
       )}
     >
       <div className="flex items-center justify-between gap-4">

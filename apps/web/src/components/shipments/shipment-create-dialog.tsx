@@ -670,6 +670,8 @@ export function ShipmentCreateDialog({
                                   onChange={(e) => {
                                     const sets = parseInt(e.target.value, 10) || 0;
                                     form.setValue(`items.${index}.numberOfSets`, sets);
+                                    // Sync Total Kuji (sets) with Sets input
+                                    form.setValue(`items.${index}.orderedQuantity`, sets);
                                     // Auto-calculate prize quantities
                                     const children = childrenByProductId[selectedProductId] ?? [];
                                     const newPrizeQtys: Record<string, number> = {};

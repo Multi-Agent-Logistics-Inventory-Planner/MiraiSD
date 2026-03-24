@@ -18,9 +18,12 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCardProps) {
+export function PredictionItemCard({
+  item,
+  showUrgencyColor,
+}: PredictionItemCardProps) {
   return (
-    <Card className="bg-card hover:bg-card/50 transition-colors border border-border dark:border-0 shadow-none p-2 pr-3">
+    <Card className="bg-card hover:bg-card/50 transition-colors border border-border dark:border-none shadow-none p-2 pr-3">
       <CardContent className="p-0">
         {/* Desktop layout */}
         <div className="hidden sm:flex items-center gap-4">
@@ -59,10 +62,14 @@ export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCar
               </span>
               <span className="flex items-center gap-1 font-light">
                 <Timer className="h-4 w-4" />
-                <span className={cn(
-                  "font-medium font-mono",
-                  showUrgencyColor ? getDaysToStockoutColor(item.daysToStockout) : "text-foreground"
-                )}>
+                <span
+                  className={cn(
+                    "font-medium font-mono",
+                    showUrgencyColor
+                      ? getDaysToStockoutColor(item.daysToStockout)
+                      : "text-foreground",
+                  )}
+                >
                   {item.daysToStockout?.toFixed(2) ?? "N/A"}
                 </span>
                 days
@@ -72,8 +79,12 @@ export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCar
 
           {/* Action Info */}
           <div className="shrink-0 flex items-center gap-1.5 text-base font-semibold">
-            <span className="text-muted-foreground font-normal">Suggestion:</span>
-            {item.suggestedReorderQty} units <span className="font-light text-muted-foreground">by</span> {formatDate(item.suggestedOrderDate)}
+            <span className="text-muted-foreground font-normal">
+              Suggestion:
+            </span>
+            {item.suggestedReorderQty} units{" "}
+            <span className="font-light text-muted-foreground">by</span>{" "}
+            {formatDate(item.suggestedOrderDate)}
           </div>
         </div>
 
@@ -94,7 +105,9 @@ export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCar
                 </div>
               )}
             </div>
-            <h3 className="text-sm font-semibold truncate flex-1">{item.name}</h3>
+            <h3 className="text-sm font-semibold truncate flex-1">
+              {item.name}
+            </h3>
           </div>
 
           {/* Row 2: Metrics with justify-between */}
@@ -115,10 +128,14 @@ export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCar
             </span>
             <span className="flex items-center gap-1 font-light">
               <Timer className="h-4 w-4" />
-              <span className={cn(
-                "font-medium font-mono",
-                showUrgencyColor ? getDaysToStockoutColor(item.daysToStockout) : "text-foreground"
-              )}>
+              <span
+                className={cn(
+                  "font-medium font-mono",
+                  showUrgencyColor
+                    ? getDaysToStockoutColor(item.daysToStockout)
+                    : "text-foreground",
+                )}
+              >
                 {item.daysToStockout?.toFixed(2) ?? "N/A"}
               </span>
               days
@@ -127,8 +144,12 @@ export function PredictionItemCard({ item, showUrgencyColor }: PredictionItemCar
 
           {/* Row 3: Action Info */}
           <div className="flex justify-center items-center gap-1.5 text-sm font-semibold">
-            <span className="text-muted-foreground font-normal">Suggestion:</span>
-            {item.suggestedReorderQty} units <span className="font-light text-muted-foreground">by</span> {formatDate(item.suggestedOrderDate)}
+            <span className="text-muted-foreground font-normal">
+              Suggestion:
+            </span>
+            {item.suggestedReorderQty} units{" "}
+            <span className="font-light text-muted-foreground">by</span>{" "}
+            {formatDate(item.suggestedOrderDate)}
           </div>
         </div>
       </CardContent>

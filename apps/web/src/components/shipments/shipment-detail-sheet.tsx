@@ -32,6 +32,7 @@ interface ShipmentDetailSheetProps {
   onDeleteClick?: () => void;
   onEditClick?: () => void;
   onUndoReceiveClick?: () => void;
+  onUndoItemsClick?: () => void;
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
@@ -112,25 +113,72 @@ function AllocationDisplay({ allocation }: { allocation: ConsolidatedAllocation 
   );
 }
 
+interface StatusBadgeProps {
+  label: string;
+  quantity: number;
+  type: 'shop' | 'damaged' | 'display';
+}
+
+const STATUS_BADGE_STYLES: Record<StatusBadgeProps['type'], string> = {
+  shop: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400 dark:border-green-800',
+  damaged: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
+  display: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+};
+
+function StatusBadge({ label, quantity, type }: StatusBadgeProps) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <Badge variant="outline" className={cn("text-xs font-normal", STATUS_BADGE_STYLES[type])}>
+        {label}
+      </Badge>
+      <span className="text-xs text-muted-foreground">
+        x{quantity}
+      </span>
+    </div>
+  );
+}
+
 /** One block in item details: either a Kuji (parent + prizes) or a standalone item. */
 interface DetailBlock {
   parentItem: ShipmentItem;
   prizeItems: ShipmentItem[];
 }
 
+/** Check if a block has any unreceived items (parent or prizes) */
+function hasBlockUnreceived(block: DetailBlock): boolean {
+  const parentAccounted = block.parentItem.receivedQuantity
+    + (block.parentItem.damagedQuantity ?? 0)
+    + (block.parentItem.displayQuantity ?? 0)
+    + (block.parentItem.shopQuantity ?? 0);
+
+  if (parentAccounted < block.parentItem.orderedQuantity) return true;
+
+  // Prizes only support damaged (not display/shop)
+  return block.prizeItems.some((prize) => {
+    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
+    return accounted < prize.orderedQuantity;
+  });
+}
+
 function ItemRow({ item }: { item: ShipmentItem }) {
   const rawAllocations = item.allocations ?? [];
   const allocations = consolidateAllocations(rawAllocations);
   const hasAllocations = allocations.length > 0;
-  const lineTotal = item.unitCost ? item.orderedQuantity * item.unitCost : undefined;
   const imageUrl = item.item?.imageUrl;
-  const totalAccounted = item.receivedQuantity + (item.damagedQuantity ?? 0) + (item.displayQuantity ?? 0) + (item.shopQuantity ?? 0);
-  const hasUnreceived = totalAccounted < item.orderedQuantity;
+  const shopQty = item.shopQuantity ?? 0;
+  const damagedQty = item.damagedQuantity ?? 0;
+  const displayQty = item.displayQuantity ?? 0;
+  const totalReceived = item.receivedQuantity + damagedQty + displayQty + shopQty;
+  const hasUnreceived = totalReceived < item.orderedQuantity;
+  const hasStatusBadges = shopQty > 0 || damagedQty > 0 || displayQty > 0;
+  const hasBadges = hasAllocations || hasStatusBadges;
 
   return (
     <div className={cn(
-      "py-3 border-b last:border-b-0",
-      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+      "py-3 border-b last:border-b-0 -mx-4 px-4 border-l-2",
+      hasUnreceived
+        ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400"
+        : "bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       <div className="flex items-center gap-3">
         {/* Product Image */}
@@ -150,44 +198,23 @@ function ItemRow({ item }: { item: ShipmentItem }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
           {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
-          {hasAllocations && (
+          {hasBadges && (
             <div className="flex flex-wrap gap-1 mt-1">
               {allocations.map((allocation) => (
                 <AllocationDisplay key={allocation.key} allocation={allocation} />
               ))}
+              {shopQty > 0 && <StatusBadge label="Shop" quantity={shopQty} type="shop" />}
+              {damagedQty > 0 && <StatusBadge label="Damaged" quantity={damagedQty} type="damaged" />}
+              {displayQty > 0 && <StatusBadge label="Display" quantity={displayQty} type="display" />}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
-            <span>{item.orderedQuantity} ordered · {item.receivedQuantity} received</span>
-            {item.unitCost && <span>{formatCurrency(item.unitCost)} each</span>}
-            {lineTotal && <span className="font-medium text-foreground">{formatCurrency(lineTotal)}</span>}
+            <span>{item.orderedQuantity} ordered · {totalReceived} received</span>
           </div>
         </div>
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{item.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{item.receivedQuantity} received</p>
-          {(item.damagedQuantity ?? 0) > 0 && (
-            <p className="text-xs text-amber-600">{item.damagedQuantity} damaged</p>
-          )}
-          {(item.displayQuantity ?? 0) > 0 && (
-            <p className="text-xs text-blue-600">{item.displayQuantity} display</p>
-          )}
-          {(item.shopQuantity ?? 0) > 0 && (
-            <p className="text-xs text-green-600">{item.shopQuantity} shop</p>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
-          {item.unitCost ? (
-            <>
-              <p>{formatCurrency(item.unitCost)}</p>
-              <p className="text-xs text-muted-foreground">each</p>
-            </>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
-          {lineTotal ? formatCurrency(lineTotal) : "-"}
+          <p className="text-xs text-muted-foreground">{totalReceived} received</p>
         </div>
       </div>
     </div>
@@ -200,21 +227,32 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
   const rawParentAllocations = parentItem.allocations ?? [];
   const parentAllocations = consolidateAllocations(rawParentAllocations);
   const hasParentAllocations = parentAllocations.length > 0;
-  const parentTotalAccounted = parentItem.receivedQuantity + (parentItem.damagedQuantity ?? 0) + (parentItem.displayQuantity ?? 0) + (parentItem.shopQuantity ?? 0);
-  const parentHasUnreceived = parentTotalAccounted < parentItem.orderedQuantity;
+  const parentShopQty = parentItem.shopQuantity ?? 0;
+  const parentDamagedQty = parentItem.damagedQuantity ?? 0;
+  const parentDisplayQty = parentItem.displayQuantity ?? 0;
+  const parentTotalReceived = parentItem.receivedQuantity + parentDamagedQty + parentDisplayQty + parentShopQty;
+  const parentHasUnreceived = parentTotalReceived < parentItem.orderedQuantity;
+  const hasParentStatusBadges = parentShopQty > 0 || parentDamagedQty > 0 || parentDisplayQty > 0;
+  const hasParentBadges = hasParentAllocations || hasParentStatusBadges;
 
-  // Check if any prize has unreceived items
+  // Check if any prize has unreceived items (prizes only support damaged, not display/shop)
   const anyPrizeUnreceived = prizeItems.some((prize) => {
-    const totalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
-    return totalAccounted < prize.orderedQuantity;
+    const totalReceived = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
+    return totalReceived < prize.orderedQuantity;
   });
 
-  const hasUnreceived = parentHasUnreceived || anyPrizeUnreceived;
+  // Determine block-level highlight: only if ALL items share the same status
+  const allUnreceived = parentHasUnreceived && prizeItems.every((prize) => {
+    const accounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0);
+    return accounted < prize.orderedQuantity;
+  });
+  const allReceived = !parentHasUnreceived && !anyPrizeUnreceived;
 
   return (
     <div className={cn(
-      "py-3 border-b last:border-b-0",
-      hasUnreceived && "bg-amber-50/50 dark:bg-amber-950/20 -mx-4 px-4 border-l-2 border-l-amber-400"
+      "py-3 border-b last:border-b-0 -mx-4 px-4",
+      allUnreceived && "border-l-2 bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-400",
+      allReceived && "border-l-2 bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       {/* Parent row (Kuji set) */}
       <div className="flex items-center gap-3">
@@ -234,42 +272,23 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{parentItem.item.name}</p>
           {parentItem.item.sku && <p className="text-xs text-muted-foreground font-mono">{parentItem.item.sku}</p>}
-          {hasParentAllocations && (
+          {hasParentBadges && (
             <div className="flex flex-wrap gap-1 mt-1">
               {parentAllocations.map((allocation) => (
                 <AllocationDisplay key={allocation.key} allocation={allocation} />
               ))}
+              {parentShopQty > 0 && <StatusBadge label="Shop" quantity={parentShopQty} type="shop" />}
+              {parentDamagedQty > 0 && <StatusBadge label="Damaged" quantity={parentDamagedQty} type="damaged" />}
+              {parentDisplayQty > 0 && <StatusBadge label="Display" quantity={parentDisplayQty} type="display" />}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 sm:hidden text-xs text-muted-foreground">
-            <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentItem.receivedQuantity} received</span>
+            <span>Total Kuji: {parentItem.orderedQuantity} ordered · {parentTotalReceived} received</span>
           </div>
         </div>
         <div className="hidden sm:block text-right text-sm shrink-0">
           <p>{parentItem.orderedQuantity} ordered</p>
-          <p className="text-xs text-muted-foreground">{parentItem.receivedQuantity} received</p>
-          {(parentItem.damagedQuantity ?? 0) > 0 && (
-            <p className="text-xs text-amber-600">{parentItem.damagedQuantity} damaged</p>
-          )}
-          {(parentItem.displayQuantity ?? 0) > 0 && (
-            <p className="text-xs text-blue-600">{parentItem.displayQuantity} display</p>
-          )}
-          {(parentItem.shopQuantity ?? 0) > 0 && (
-            <p className="text-xs text-green-600">{parentItem.shopQuantity} shop</p>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm w-20 shrink-0">
-          {parentItem.unitCost ? (
-            <>
-              <p>{formatCurrency(parentItem.unitCost)}</p>
-              <p className="text-xs text-muted-foreground">each</p>
-            </>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-        <div className="hidden sm:block text-right text-sm font-medium w-24 shrink-0">
-          {parentItem.unitCost ? formatCurrency(parentItem.orderedQuantity * parentItem.unitCost) : "-"}
+          <p className="text-xs text-muted-foreground">{parentTotalReceived} received</p>
         </div>
       </div>
       {/* Prizes (same section, indented) */}
@@ -277,34 +296,26 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
         <div className="mt-2 pl-4 border-l-2 border-muted space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Prizes</p>
           {prizeItems.map((prize) => {
-            const lineTotal = prize.unitCost ? prize.orderedQuantity * prize.unitCost : undefined;
             const letter = (prize.item as { letter?: string | null }).letter;
             const prizeLabel = letter
               ? prizeLetterDisplay(letter)
               : prize.item.name;
-            const prizeTotalAccounted = prize.receivedQuantity + (prize.damagedQuantity ?? 0) + (prize.displayQuantity ?? 0) + (prize.shopQuantity ?? 0);
-            const prizeHasUnreceived = prizeTotalAccounted < prize.orderedQuantity;
+            const prizeDamagedQty = prize.damagedQuantity ?? 0;
+            // Prizes only support damaged (not display/shop)
+            const prizeTotalReceived = prize.receivedQuantity + prizeDamagedQty;
+            const prizeHasUnreceived = prizeTotalReceived < prize.orderedQuantity;
             return (
               <div key={prize.id} className={cn(
-                "flex items-center gap-2 py-1 px-2 -mx-2 rounded",
-                prizeHasUnreceived && "bg-amber-100/50 dark:bg-amber-900/20"
+                "flex flex-wrap items-center gap-2 py-1 px-2 -mx-2 rounded",
+                prizeHasUnreceived
+                  ? "bg-amber-100/50 dark:bg-amber-900/20"
+                  : "bg-green-100/50 dark:bg-green-900/20"
               )}>
                 <span className="font-mono font-bold text-sm bg-muted px-2 py-0.5 rounded min-w-[40px] text-center">{prizeLabel}</span>
                 <span className="text-xs text-muted-foreground">
-                  {prize.orderedQuantity} ordered · {prize.receivedQuantity} received
+                  {prize.orderedQuantity} ordered · {prizeTotalReceived} received
                 </span>
-                {(prize.damagedQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-amber-600">{prize.damagedQuantity} damaged</span>
-                )}
-                {(prize.displayQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-blue-600">{prize.displayQuantity} display</span>
-                )}
-                {(prize.shopQuantity ?? 0) > 0 && (
-                  <span className="text-xs text-green-600">{prize.shopQuantity} shop</span>
-                )}
-                {lineTotal != null && (
-                  <span className="text-xs font-medium ml-auto">{formatCurrency(lineTotal)}</span>
-                )}
+                {prizeDamagedQty > 0 && <StatusBadge label="Damaged" quantity={prizeDamagedQty} type="damaged" />}
               </div>
             );
           })}
@@ -322,6 +333,7 @@ export function ShipmentDetailSheet({
   onDeleteClick,
   onEditClick,
   onUndoReceiveClick,
+  onUndoItemsClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
   const [trackingExpanded, setTrackingExpanded] = useState(false);
@@ -367,7 +379,7 @@ export function ShipmentDetailSheet({
         prizesByParentId[pid].push(i);
       }
     });
-    return roots.map((parentItem) => {
+    const blocks = roots.map((parentItem) => {
       // Sort prizes: LP first, then A, B, C, etc.
       const unsortedPrizes = prizesByParentId[parentItem.item.id] ?? [];
       const sortedPrizes = sortPrizes(
@@ -382,6 +394,19 @@ export function ShipmentDetailSheet({
         prizeItems: sortedPrizes,
       };
     });
+
+    // Sort blocks: unreceived items first (A-Z), then received items (A-Z)
+    return blocks.sort((a, b) => {
+      const aUnreceived = hasBlockUnreceived(a);
+      const bUnreceived = hasBlockUnreceived(b);
+
+      // Unreceived items first
+      if (aUnreceived && !bUnreceived) return -1;
+      if (!aUnreceived && bUnreceived) return 1;
+
+      // Within same status group, sort alphabetically by item name
+      return a.parentItem.item.name.localeCompare(b.parentItem.item.name);
+    });
   }, [shipment?.items]);
 
   if (!shipment) {
@@ -394,6 +419,15 @@ export function ShipmentDetailSheet({
   const canEdit =
     shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
   const canUndo = shipment.status === "DELIVERED";
+
+  // Check if any items have been received (for showing Undo Items button)
+  const hasReceivedItems = shipment.items.some(
+    (item) =>
+      item.receivedQuantity > 0 ||
+      (item.damagedQuantity ?? 0) > 0 ||
+      (item.displayQuantity ?? 0) > 0 ||
+      (item.shopQuantity ?? 0) > 0
+  );
 
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
@@ -428,12 +462,18 @@ export function ShipmentDetailSheet({
 
         <div className="px-6 pb-6 space-y-6">
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Can permission={Permission.SHIPMENTS_RECEIVE}>
               {canReceive && (
                 <Button onClick={onReceiveClick} size="sm">
                   <PackageCheck className="h-4 w-4 mr-2" />
                   Receive Items
+                </Button>
+              )}
+              {canReceive && hasReceivedItems && (
+                <Button variant="outline" size="sm" onClick={onUndoItemsClick}>
+                  <Undo2 className="h-4 w-4 mr-2" />
+                  Undo Items
                 </Button>
               )}
             </Can>
@@ -447,10 +487,16 @@ export function ShipmentDetailSheet({
             </Can>
             <Can permission={Permission.SHIPMENTS_RECEIVE}>
               {canUndo && (
-                <Button variant="outline" size="sm" onClick={onUndoReceiveClick}>
-                  <Undo2 className="h-4 w-4 mr-2" />
-                  Undo Receipt
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" onClick={onUndoReceiveClick}>
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    Undo Receipt
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={onUndoItemsClick}>
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    Undo Items
+                  </Button>
+                </>
               )}
             </Can>
             <Can permission={Permission.SHIPMENTS_DELETE}>
@@ -474,8 +520,6 @@ export function ShipmentDetailSheet({
               <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
                 <span className="flex-1">Name</span>
                 <span className="text-right w-24">Qty</span>
-                <span className="text-right w-20">Price</span>
-                <span className="text-right w-24">Total</span>
               </div>
             </div>
 

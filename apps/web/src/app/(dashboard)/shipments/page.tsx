@@ -18,6 +18,7 @@ import {
   ShipmentDetailSheet,
   ShipmentCreateDialog,
   ShipmentReceiveDialog,
+  ShipmentUndoItemsDialog,
   ShipmentHeader,
   ShipmentFilters,
   ShipmentPagination,
@@ -27,6 +28,7 @@ import { useDeleteShipmentMutation, useUpdateShipmentMutation, useUndoReceiveShi
 import { useToast } from "@/hooks/use-toast";
 import type { Shipment } from "@/types/api";
 import type { ShipmentDisplayStatus } from "@/lib/shipment-utils";
+import type { SortOption } from "@/components/shipments/shipment-filters";
 
 const PAGE_SIZE = 5;
 
@@ -38,6 +40,7 @@ export default function ShipmentsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
+  const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [page, setPage] = useState(0);
 
   // Dialog/sheet states
@@ -46,13 +49,19 @@ export default function ShipmentsPage() {
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [undoDialogOpen, setUndoDialogOpen] = useState(false);
+  const [undoItemsDialogOpen, setUndoItemsDialogOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null
   );
 
-  // Use server-side pagination with display status and search filter
+  // Use server-side pagination with display status, search filter, and sorting
   const shipmentsQuery = useShipments(
-    { displayStatus: activeTab, search: searchQuery || undefined },
+    {
+      displayStatus: activeTab,
+      search: searchQuery || undefined,
+      sortBy: "createdAt",
+      sortDir: sortOption === "newest" ? "desc" : "asc",
+    },
     page,
     PAGE_SIZE
   );
@@ -73,6 +82,11 @@ export default function ShipmentsPage() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setPage(0);
+  };
+
+  const handleSortChange = (value: SortOption) => {
+    setSortOption(value);
     setPage(0);
   };
 
@@ -117,6 +131,10 @@ export default function ShipmentsPage() {
         err instanceof Error ? err.message : "Failed to undo shipment receipt";
       toast({ title: "Error", description: message, variant: "destructive" });
     }
+  }
+
+  function handleUndoItemsClick() {
+    setUndoItemsDialogOpen(true);
   }
 
   async function handleTrackingUpdate(trackingId: string) {
@@ -182,6 +200,8 @@ export default function ShipmentsPage() {
           <ShipmentFilters
             search={searchQuery}
             onSearchChange={handleSearchChange}
+            sortOption={sortOption}
+            onSortChange={handleSortChange}
             onAddClick={() => {
               setSelectedShipment(null);
               setCreateDialogOpen(true);
@@ -235,6 +255,7 @@ export default function ShipmentsPage() {
         onDeleteClick={handleDeleteClick}
         onEditClick={handleEditClick}
         onUndoReceiveClick={handleUndoReceiveClick}
+        onUndoItemsClick={handleUndoItemsClick}
         onTrackingUpdate={handleTrackingUpdate}
       />
 
@@ -242,6 +263,13 @@ export default function ShipmentsPage() {
         open={receiveDialogOpen}
         onOpenChange={setReceiveDialogOpen}
         shipment={selectedShipment}
+      />
+
+      <ShipmentUndoItemsDialog
+        open={undoItemsDialogOpen}
+        onOpenChange={setUndoItemsDialogOpen}
+        shipment={selectedShipment}
+        onSuccess={(updated) => setSelectedShipment(updated)}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -279,7 +307,7 @@ export default function ShipmentsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  This will reverse all inventory additions from shipment{" "}
+                  This will reverse inventory additions from shipment{" "}
                   <span className="font-medium font-mono">
                     {selectedShipment?.shipmentNumber}
                   </span>
@@ -303,6 +331,7 @@ export default function ShipmentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 }

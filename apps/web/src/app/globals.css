@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -46,8 +54,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: #d9d8d5;
   --sidebar-ring: oklch(0.708 0 0);
-  --table-header: #f4f4f5;
+  --table-header: #f0f0f3;
   --table-header-foreground: #71717a;
+  --brand-primary: #0b66c2;
+  --brand-primary-hover: #0a5eb3;
 }
 
 .dark {
@@ -94,6 +104,8 @@
   --sidebar-ring: oklch(0.439 0 0);
   --table-header: #1c1c1c;
   --table-header-foreground: #a1a1aa;
+  --brand-primary: #7c3aed;
+  --brand-primary-hover: #6d28d9;
 }
 
 @theme inline {
@@ -146,6 +158,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-table-header: var(--table-header);
   --color-table-header-foreground: var(--table-header-foreground);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
   --width-border: 0.5px;
 }
 
@@ -161,4 +175,31 @@
     overscroll-behavior: none;
     min-height: 100dvh;
   }
+}
+
+/* Override default border width to 0.5px
+   Uses :root for specificity (0,1,1) - higher than .border (0,1,0)
+   but lower than .dark .dark\:border-0 (0,2,0) */
+:root .border {
+  border-width: 0.5px;
+}
+:root .border-t {
+  border-top-width: 0.5px;
+}
+:root .border-b {
+  border-bottom-width: 0.5px;
+}
+:root .border-l {
+  border-left-width: 0.5px;
+}
+:root .border-r {
+  border-right-width: 0.5px;
+}
+:root .border-x {
+  border-left-width: 0.5px;
+  border-right-width: 0.5px;
+}
+:root .border-y {
+  border-top-width: 0.5px;
+  border-bottom-width: 0.5px;
 }

@@ -12,7 +12,7 @@ export function CategoryDemandSection() {
   const { data, isLoading } = useDemandLeaders(period);
 
   return (
-    <div className="grid lg:grid-cols-5 border dark:border-0 bg-card/95 dark:bg-[#2b2b29] rounded-2xl">
+    <div className="grid lg:grid-cols-5 border dark:border-none bg-card/95 dark:bg-[#2b2b29] rounded-2xl">
       <div className="lg:col-span-2">
         <CategoryDemandDonut
           rankings={data?.categoryRankings}

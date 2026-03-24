@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import type { LucideIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface TabConfig<T extends string> {
-  value: T
-  label: string
-  icon: LucideIcon
-  adminOnly?: boolean
+  value: T;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
 }
 
 interface ScrollableTabsProps<T extends string> {
-  tabs: TabConfig<T>[]
-  value: T
-  onValueChange: (value: T) => void
-  isAdmin?: boolean
+  tabs: TabConfig<T>[];
+  value: T;
+  onValueChange: (value: T) => void;
+  isAdmin?: boolean;
 }
 
 export function ScrollableTabs<T extends string>({
@@ -23,7 +23,7 @@ export function ScrollableTabs<T extends string>({
   onValueChange,
   isAdmin = false,
 }: ScrollableTabsProps<T>) {
-  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin)
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
     <div className="relative">
@@ -32,7 +32,7 @@ export function ScrollableTabs<T extends string>({
 
       <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 pr-6">
         {visibleTabs.map(({ value: tabValue, label, icon: Icon }) => {
-          const active = value === tabValue
+          const active = value === tabValue;
           return (
             <Button
               key={tabValue}
@@ -41,16 +41,16 @@ export function ScrollableTabs<T extends string>({
               onClick={() => onValueChange(tabValue)}
               className={
                 active
-                  ? "bg-[#0b66c2] dark:bg-[#7c3aed] text-white hover:bg-[#0b66c2]/90 dark:hover:bg-[#7c3aed]/90"
+                  ? "bg-brand-primary text-white hover:bg-brand-primary/90"
                   : "bg-[#f2f2f2] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"
               }
             >
               <Icon className="h-3.5 w-3.5" />
               {label}
             </Button>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

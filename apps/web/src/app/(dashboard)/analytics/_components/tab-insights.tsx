@@ -42,7 +42,7 @@ function DayOfWeekChart({
 
   if (isLoading) {
     return (
-      <Card className="dark:border-0">
+      <Card className="dark:border-none">
         <CardHeader className="flex flex-row items-center justify-between pb-8">
           <div className="flex items-center gap-2">
             <Skeleton className="h-4 w-4 rounded" />
@@ -91,7 +91,7 @@ function DayOfWeekChart({
   );
 
   return (
-    <Card className="dark:border-0">
+    <Card className="dark:border-none">
       <CardHeader className="flex flex-row items-center justify-between pb-8">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -207,7 +207,7 @@ function MoversCard({
 }) {
   if (isLoading) {
     return (
-      <Card className="dark:border-0">
+      <Card className="dark:border-none">
         <CardHeader>
           <Skeleton className="h-5 w-32" />
         </CardHeader>
@@ -221,7 +221,7 @@ function MoversCard({
   }
 
   return (
-    <Card className="dark:border-0">
+    <Card className="dark:border-none">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
