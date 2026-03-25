@@ -32,7 +32,11 @@ function surgicalProductUpdate(queryClient: QueryClient, itemId: string) {
         (oldData) => {
           if (!oldData || !Array.isArray(oldData)) return oldData;
           const index = oldData.findIndex((p) => p.id === itemId);
-          if (index === -1) return oldData;
+          if (index === -1) {
+            // Product not in list - INSERT event, add it
+            return [...oldData, updatedProduct];
+          }
+          // Existing product - UPDATE in place
           return [
             ...oldData.slice(0, index),
             updatedProduct,
@@ -42,7 +46,7 @@ function surgicalProductUpdate(queryClient: QueryClient, itemId: string) {
       );
     })
     .catch(() => {
-      // Fallback: if single fetch fails, invalidate all
+      // Fallback for DELETE (404) or network error
       queryClient.invalidateQueries({ queryKey: ["products"] });
     });
 }
