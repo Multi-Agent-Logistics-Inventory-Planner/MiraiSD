@@ -14,6 +14,9 @@ from .. import config
 
 logger = logging.getLogger(__name__)
 
+# Notification types that should be routed to the review channel
+REVIEW_NOTIFICATION_TYPES = {"REVIEW_FETCH_ERROR", "REVIEW_SUMMARY"}
+
 
 @dataclass
 class AlertMessage:
@@ -105,6 +108,7 @@ class SlackNotifier:
 
         Generic method for delivering notifications from the database,
         including those created by Java (SHIPMENT_COMPLETED, etc.).
+        Routes review-related notifications to the review channel.
 
         Args:
             notification: Dict with type, severity, message, item_id, metadata
@@ -116,34 +120,48 @@ class SlackNotifier:
             logger.debug("Slack notifications are disabled")
             return False
 
-        if not self._webhook_url:
-            logger.warning("SLACK_WEBHOOK_URL is not set, cannot send notification")
+        notif_type = notification.get("type", "")
+
+        # Route review notifications to review channel
+        if notif_type in REVIEW_NOTIFICATION_TYPES:
+            webhook = self._review_webhook_url or self._webhook_url
+            channel = config.REVIEW_SLACK_CHANNEL
+        else:
+            webhook = self._webhook_url
+            channel = self._channel
+
+        if not webhook:
+            logger.warning("No webhook URL configured, cannot send notification")
             return False
 
-        message = self._format_notification(notification)
+        message = self._format_notification(notification, channel=channel)
 
         try:
             response = requests.post(
-                self._webhook_url,
+                webhook,
                 json=message,
                 timeout=10,
             )
             response.raise_for_status()
             logger.info(
-                "Sent Slack notification: type=%s, id=%s",
-                notification.get("type"),
+                "Sent Slack notification: type=%s, id=%s, channel=%s",
+                notif_type,
                 notification.get("id"),
+                channel,
             )
             return True
         except requests.RequestException as e:
             logger.error("Failed to send Slack notification: %s", e)
             return False
 
-    def _format_notification(self, notification: dict) -> dict:
+    def _format_notification(
+        self, notification: dict, channel: str | None = None
+    ) -> dict:
         """Format any notification for Slack.
 
         Args:
             notification: Dict with type, severity, message, item_id, metadata
+            channel: Target Slack channel. Defaults to self._channel.
 
         Returns:
             Formatted Slack message payload
@@ -153,6 +171,7 @@ class SlackNotifier:
         message = notification.get("message", "")
         item_id = notification.get("item_id")
         metadata = notification.get("metadata") or {}
+        dest_channel = channel or self._channel
 
         # Color by severity
         color_map = {
@@ -172,6 +191,7 @@ class SlackNotifier:
             "SHIPMENT_COMPLETED": "Shipment Completed",
             "SHIPMENT_DAMAGED": "Damaged Items Reported",
             "DISPLAY_STALE": "Stale Display Alert",
+            "REVIEW_FETCH_ERROR": "Review Fetch Error",
         }
         header = header_map.get(notif_type, f"{notif_type} Alert")
 
@@ -216,7 +236,7 @@ class SlackNotifier:
             })
 
         return {
-            "channel": self._channel,
+            "channel": dest_channel,
             "text": f"{header}: {message[:100]}",
             "attachments": [{"color": color, "blocks": blocks}],
         }
