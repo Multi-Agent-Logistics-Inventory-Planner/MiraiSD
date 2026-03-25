@@ -2,7 +2,7 @@
 export type { UrgencyFilter, SortField, SortDirection, SortOption } from "./types";
 
 // Constants
-export { SORT_OPTIONS, PAGE_SIZE, STOCKOUT_THRESHOLDS } from "./constants";
+export { SORT_OPTIONS, PAGE_SIZE, STOCKOUT_THRESHOLDS, STALE_THRESHOLD_MS, WELL_STOCKED_THRESHOLD, isForecastStale } from "./constants";
 
 // Utils
 export { getDaysToStockoutColor, isValidImageUrl } from "./utils";

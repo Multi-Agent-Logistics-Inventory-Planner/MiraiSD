@@ -158,7 +158,7 @@ class SupabaseRepo:
             )
 
         df["item_id"] = df["item_id"].astype(str)
-        df["lead_time_days"] = df["lead_time_days"].fillna(7).astype(int)
+        df["lead_time_days"] = df["lead_time_days"].fillna(14).astype(int)
         df["safety_stock_days"] = df["safety_stock_days"].fillna(7).astype(int)
         return df
 

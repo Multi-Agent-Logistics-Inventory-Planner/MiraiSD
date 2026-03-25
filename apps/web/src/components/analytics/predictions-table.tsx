@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
   ArrowUpDown,
   ArrowUp,
@@ -9,6 +9,7 @@ import {
   Search,
   Filter,
   Loader2,
+  X,
 } from "lucide-react"
 import { format } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,6 +40,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ForecastPrediction } from "@/types/api"
+import { useDismissedPredictions } from "@/hooks/use-dismissed-predictions"
+import { isForecastStale, WELL_STOCKED_THRESHOLD } from "@/components/analytics/predictions"
 
 type SortField = "itemSku" | "itemName" | "currentStock" | "avgDailyDelta" | "daysToStockout" | "suggestedReorderQty" | "suggestedOrderDate"
 type SortDirection = "asc" | "desc"
@@ -57,7 +60,6 @@ function getDaysToStockoutBadgeClass(days: number | null): string {
   if (days <= 14) return "bg-yellow-100 text-yellow-700 border-yellow-200"
   return "bg-green-100 text-green-700 border-green-200"
 }
-
 
 function sanitizeCSVField(value: string): string {
   const escaped = value.replace(/"/g, '""')
@@ -182,12 +184,34 @@ export function PredictionsTable({
   isLoading,
   isError,
 }: PredictionsTableProps) {
+  const { dismissedMap, dismissedIds, dismiss } = useDismissedPredictions()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all")
   const [sortField, setSortField] = useState<SortField>("daysToStockout")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  const isDismissed = useCallback(
+    (item: ForecastPrediction): boolean => {
+      if (!dismissedIds.has(item.itemId)) return false
+      const entry = dismissedMap[item.itemId]
+      if (!entry) return false
+      return entry.computedAt === item.computedAt
+    },
+    [dismissedIds, dismissedMap],
+  )
+
+  // Pre-filter: stale, stockout, dismiss
+  const preFilteredData = useMemo(() => {
+    return data.filter((item) => {
+      if (isForecastStale(item.computedAt)) return false
+      if (item.daysToStockout != null && item.daysToStockout >= WELL_STOCKED_THRESHOLD) return false
+      if (isDismissed(item)) return false
+      return true
+    })
+  }, [data, isDismissed])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -199,12 +223,9 @@ export function PredictionsTable({
     setPage(1)
   }
 
-  const filteredAndSortedData = filterAndSortData(
-    data,
-    searchTerm,
-    riskFilter,
-    sortField,
-    sortDirection
+  const filteredAndSortedData = useMemo(
+    () => filterAndSortData(preFilteredData, searchTerm, riskFilter, sortField, sortDirection),
+    [preFilteredData, searchTerm, riskFilter, sortField, sortDirection],
   )
 
   const totalElements = filteredAndSortedData.length
@@ -291,6 +312,7 @@ export function PredictionsTable({
           </Button>
         </div>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <div className="flex h-[300px] items-center justify-center">
@@ -341,17 +363,18 @@ export function PredictionsTable({
                       <SortIcon field="suggestedReorderQty" currentSortField={sortField} sortDirection={sortDirection} />
                     </Button>
                   </TableHead>
-                  <TableHead className="rounded-r-lg" aria-sort={getAriaSort("suggestedOrderDate", sortField, sortDirection)}>
+                  <TableHead aria-sort={getAriaSort("suggestedOrderDate", sortField, sortDirection)}>
                     <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleSort("suggestedOrderDate")}>
                       Order By
                       <SortIcon field="suggestedOrderDate" currentSortField={sortField} sortDirection={sortDirection} />
                     </Button>
                   </TableHead>
+                  <TableHead className="rounded-r-lg w-8" />
                 </DataTableHeader>
                 <TableBody>
                   {pagedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         {searchTerm || riskFilter !== "all"
                           ? "No items match your filters"
                           : "No predictions available"}
@@ -359,7 +382,7 @@ export function PredictionsTable({
                     </TableRow>
                   ) : (
                     pagedData.map((prediction) => (
-                      <TableRow key={prediction.id}>
+                      <TableRow key={prediction.id} className="group">
                         <TableCell className="font-mono text-sm rounded-l-lg">
                           {prediction.itemSku}
                         </TableCell>
@@ -381,10 +404,20 @@ export function PredictionsTable({
                           </Badge>
                         </TableCell>
                         <TableCell>{prediction.suggestedReorderQty} units</TableCell>
-                        <TableCell className="rounded-r-lg">
+                        <TableCell>
                           {prediction.suggestedOrderDate
                             ? format(new Date(prediction.suggestedOrderDate), "MMM d, yyyy")
                             : "-"}
+                        </TableCell>
+                        <TableCell className="rounded-r-lg w-8 p-1">
+                          <button
+                            type="button"
+                            onClick={() => dismiss(prediction.itemId, prediction.computedAt ?? null)}
+                            className="rounded p-0.5 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-muted hover:text-foreground transition-all"
+                            aria-label="Dismiss prediction"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
                         </TableCell>
                       </TableRow>
                     ))

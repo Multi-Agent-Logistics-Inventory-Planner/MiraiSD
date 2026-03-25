@@ -87,7 +87,7 @@ class ProductControllerSecurityIT extends BaseIntegrationTest {
                     "category": "PLUSH",
                     "reorderPoint": 10,
                     "targetStockLevel": 50,
-                    "leadTimeDays": 7,
+                    "leadTimeDays": 14,
                     "unitCost": 9.99
                 }
                 """;
@@ -144,7 +144,7 @@ class ProductControllerSecurityIT extends BaseIntegrationTest {
                     "category": "PLUSH",
                     "reorderPoint": 10,
                     "targetStockLevel": 50,
-                    "leadTimeDays": 7,
+                    "leadTimeDays": 14,
                     "unitCost": 9.99
                 }
                 """;

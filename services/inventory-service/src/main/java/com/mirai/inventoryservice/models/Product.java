@@ -77,7 +77,7 @@ public class Product {
 
     @Column(name = "lead_time_days")
     @Builder.Default
-    private Integer leadTimeDays = 7;
+    private Integer leadTimeDays = 14;
 
     @Column(name = "unit_cost", precision = 10, scale = 2)
     private BigDecimal unitCost;
