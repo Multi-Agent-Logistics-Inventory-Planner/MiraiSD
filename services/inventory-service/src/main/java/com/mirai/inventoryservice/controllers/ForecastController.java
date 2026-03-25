@@ -50,4 +50,13 @@ public class ForecastController {
             @RequestParam(defaultValue = "7") @Min(1) @Max(365) int daysThreshold) {
         return ResponseEntity.ok(forecastService.getAtRiskForecasts(daysThreshold));
     }
+
+    @GetMapping("/highest-demand")
+    public ResponseEntity<ForecastPredictionResponseDTO> getHighestDemandForecast() {
+        ForecastPredictionResponseDTO forecast = forecastService.getHighestDemandForecast();
+        if (forecast == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(forecast);
+    }
 }

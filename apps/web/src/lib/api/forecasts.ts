@@ -23,3 +23,12 @@ export async function getAtRiskForecasts(daysThreshold: number = 7): Promise<For
 export async function getAllForecasts(): Promise<ForecastPrediction[]> {
   return apiGet<ForecastPrediction[]>(`${BASE_PATH}/all`)
 }
+
+/**
+ * Get the forecast for the item with highest demand (most consumption).
+ * Returns null if no consuming forecasts exist.
+ */
+export async function getHighestDemandForecast(): Promise<ForecastPrediction | null> {
+  const result = await apiGet<ForecastPrediction | undefined>(`${BASE_PATH}/highest-demand`)
+  return result ?? null
+}

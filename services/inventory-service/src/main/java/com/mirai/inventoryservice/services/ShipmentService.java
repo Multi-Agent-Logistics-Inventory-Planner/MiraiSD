@@ -254,6 +254,7 @@ public class ShipmentService {
         counts.put("ACTIVE", shipmentRepository.countActiveShipments(PENDING_STATUSES));
         counts.put("PARTIAL", shipmentRepository.countPartialShipments(PENDING_STATUSES));
         counts.put("COMPLETED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERED));
+        counts.put("OVERDUE", shipmentRepository.countOverdueShipments(PENDING_STATUSES));
         return counts;
     }
 

@@ -60,6 +60,21 @@ public class ForecastService {
                 .orElse(null);
     }
 
+    /**
+     * Get the forecast for the item with highest demand (most negative avgDailyDelta).
+     * Returns null if no consuming forecasts exist.
+     */
+    @Transactional(readOnly = true)
+    public ForecastPredictionResponseDTO getHighestDemandForecast() {
+        return forecastPredictionRepository.findHighestDemandForecast()
+                .map(p -> {
+                    Product product = productRepository.findById(p.getItemId()).orElse(null);
+                    Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+                    return convertToDTO(p, product, stockMap);
+                })
+                .orElse(null);
+    }
+
     private Page<ForecastPredictionResponseDTO> mapToDTOs(Page<ForecastPrediction> predictions) {
         Map<UUID, Product> productMap = getProductMap(predictions.getContent());
         Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();

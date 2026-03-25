@@ -235,7 +235,7 @@ class SupabaseRepo:
                     :source_event_id,
                     :dedupe_key
                 )
-                ON CONFLICT (dedupe_key, (created_at::date))
+                ON CONFLICT (dedupe_key)
                 WHERE dedupe_key IS NOT NULL
                 DO NOTHING
                 RETURNING id

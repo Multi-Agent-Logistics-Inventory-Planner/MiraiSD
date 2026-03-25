@@ -37,6 +37,7 @@ const EVENT_QUERY_KEYS: Record<BroadcastEventType, string[][]> = {
     ["locationInventory"],
     ["notAssignedInventory"],
     ["productInventoryEntries"],
+    ["inventoryTotals"],
     ["products"],
     ["dashboard"],
   ],
@@ -154,8 +155,11 @@ export function useRealtimeBroadcast(enabled = true) {
                       (oldData) => {
                         if (!oldData || !Array.isArray(oldData)) return oldData;
                         const index = oldData.findIndex((p) => p.id === itemId);
-                        if (index === -1) return oldData;
-                        // Return new array with updated product
+                        if (index === -1) {
+                          // Product not in list - INSERT event, add it
+                          return [...oldData, updatedProduct];
+                        }
+                        // Existing product - UPDATE in place
                         return [
                           ...oldData.slice(0, index),
                           updatedProduct,
@@ -165,7 +169,7 @@ export function useRealtimeBroadcast(enabled = true) {
                     );
                   })
                   .catch(() => {
-                    // Fallback: if single fetch fails, invalidate all
+                    // Fallback for DELETE (404) or network error
                     queryClient.invalidateQueries({ queryKey: ["products"] });
                   });
               } else {

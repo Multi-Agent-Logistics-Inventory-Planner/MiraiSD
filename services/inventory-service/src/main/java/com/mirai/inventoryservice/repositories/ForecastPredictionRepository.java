@@ -49,5 +49,16 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
 
     // Delete all predictions for a specific inventory item
     void deleteByItemId(UUID itemId);
+
+    // Find the item with highest demand (lowest avgDailyDelta) using only the latest prediction per item
+    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+            + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
+            + "FROM forecast_predictions GROUP BY item_id) latest "
+            + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
+            + "WHERE fp.avg_daily_delta < 0 "
+            + "ORDER BY fp.avg_daily_delta ASC "
+            + "LIMIT 1",
+            nativeQuery = true)
+    Optional<ForecastPrediction> findHighestDemandForecast();
 }
 

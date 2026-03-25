@@ -67,9 +67,9 @@ function getSeverityIcon(severity: NotificationSeverity) {
 function getSeverityBadgeStyle(severity: NotificationSeverity) {
   switch (severity) {
     case NotificationSeverity.CRITICAL:
-      return "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30";
+      return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30 hover:bg-red-500/30";
     case NotificationSeverity.WARNING:
-      return "bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30";
+      return "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/30";
     case NotificationSeverity.INFO:
       return "bg-muted/80 text-muted-foreground border-border hover:bg-muted";
     default:
@@ -80,15 +80,15 @@ function getSeverityBadgeStyle(severity: NotificationSeverity) {
 function getCategoryBadgeStyle(category: NotificationCategory) {
   switch (category) {
     case "stock":
-      return "bg-purple-500/25 text-purple-300 border-purple-500/40 hover:bg-purple-500/35";
+      return "bg-purple-500/25 text-purple-600 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/35";
     case "shipment":
-      return "bg-cyan-500/25 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/35";
+      return "bg-blue-500/25 text-blue-600 dark:text-blue-300 border-blue-500/40 hover:bg-blue-500/35";
     case "display":
-      return "bg-orange-500/25 text-orange-300 border-orange-500/40 hover:bg-orange-500/35";
+      return "bg-orange-500/25 text-orange-600 dark:text-orange-300 border-orange-500/40 hover:bg-orange-500/35";
     case "system":
-      return "bg-emerald-500/25 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/35";
+      return "bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/35";
     default:
-      return "bg-gray-500/25 text-gray-300 border-gray-500/40 hover:bg-gray-500/35";
+      return "bg-gray-500/25 text-gray-600 dark:text-gray-300 border-gray-500/40 hover:bg-gray-500/35";
   }
 }
 

@@ -182,4 +182,11 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
 
     @Query("SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
     long countCompletedShipments(@Param("status") ShipmentStatus status);
+
+    // Count overdue shipments: pending/in_transit with expectedDeliveryDate in the past
+    @Query("SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status IN :statuses " +
+            "AND s.expectedDeliveryDate IS NOT NULL " +
+            "AND s.expectedDeliveryDate < CURRENT_DATE")
+    long countOverdueShipments(@Param("statuses") List<ShipmentStatus> statuses);
 }

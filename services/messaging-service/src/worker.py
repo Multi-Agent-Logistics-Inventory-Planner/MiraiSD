@@ -344,8 +344,10 @@ class MessagingWorker:
         # Build human-readable message
         message = self._build_alert_message(event, alert)
 
-        # Build dedupe_key for idempotency
-        dedupe_key = f"{alert.alert_type.value}:{event.item_id}"
+        # Build dedupe_key for idempotency (includes date to allow re-alerting next day)
+        from datetime import date
+        today = date.today().isoformat()
+        dedupe_key = f"{alert.alert_type.value}:{event.item_id}:{today}"
 
         # Build metadata for UI display
         metadata = {
