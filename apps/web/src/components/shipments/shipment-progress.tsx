@@ -86,7 +86,7 @@ export function ShipmentProgress({
 
         {/* Progress bar filled */}
         <div
-          className="absolute top-1/2 left-0 h-1 -translate-y-1/2 bg-emerald-600/50 rounded-full transition-all duration-300"
+          className="absolute top-1/2 left-0 h-1 -translate-y-1/2 bg-brand-primary/50 rounded-full transition-all duration-300"
           style={{ width: `${progressPercent}%` }}
         />
 
@@ -104,9 +104,9 @@ export function ShipmentProgress({
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
                   state === "completed" &&
-                    "border-emerald-700 bg-emerald-700 text-white",
+                    "border-brand-primary bg-brand-primary text-white",
                   state === "active" &&
-                    "border-emerald-700 bg-background text-black dark:text-white",
+                    "border-brand-primary bg-background text-black dark:text-white",
                   state === "pending" &&
                     "border-muted-foreground/30 bg-background text-muted-foreground/50",
                 )}
