@@ -25,11 +25,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_event_outbox_stock_movement_dedupe
 -- Drop the old ineffective index
 DROP INDEX IF EXISTS idx_notifications_dedupe;
 
--- Create new index that deduplicates by dedupe_key + date
--- This allows the same alert to fire again on different days, but prevents
--- duplicates within the same day (which is the actual problem)
+-- Create simple unique index on dedupe_key
+-- The date is now included in the dedupe_key itself (e.g., "out_of_stock:uuid:2026-03-25")
+-- This allows the same alert to fire again on different days
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe
-    ON notifications (dedupe_key, (created_at::date))
+    ON notifications (dedupe_key)
     WHERE dedupe_key IS NOT NULL;
 
 -- Add index for faster lookups by dedupe_key

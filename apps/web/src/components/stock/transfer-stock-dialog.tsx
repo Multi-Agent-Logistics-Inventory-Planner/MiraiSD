@@ -128,6 +128,11 @@ export function TransferStockDialog({
   const filteredInventory = useMemo(() => {
     let result = sourceInventory;
 
+    // When in product-filtered mode, show only the preselected product
+    if (isProductFilteredMode && preselectedProduct) {
+      result = result.filter((inv) => inv.item.id === preselectedProduct.product.id);
+    }
+
     if (categoryFilters.length > 0) {
       result = result.filter((inv) => {
         const category = inv.item.category;
@@ -153,7 +158,7 @@ export function TransferStockDialog({
     }
 
     return result;
-  }, [sourceInventory, searchQuery, categoryFilters, childCategoryFilters]);
+  }, [sourceInventory, searchQuery, categoryFilters, childCategoryFilters, isProductFilteredMode, preselectedProduct]);
 
   const availableCategories = useMemo(() => {
     const categoryMap = new Map<string, Category>();
@@ -382,14 +387,14 @@ export function TransferStockDialog({
             <div className="flex-1 min-h-0 flex flex-col mt-4">
               <ProductFilterHeader
                 title={`Products at ${locationLabel}`}
-                itemCount={sourceInventory.length}
+                itemCount={isProductFilteredMode ? filteredInventory.length : sourceInventory.length}
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
                 childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
                 availableChildCategories={availableChildCategories}
                 disabled={isTransferring}
-                showFilters={sourceInventory.length > 0}
+                showFilters={!isProductFilteredMode && sourceInventory.length > 0}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
                 onChildCategoryChange={setChildCategoryFilters}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import type { ProductInventoryEntry, LocationType } from "@/types/api";
 import { LOCATION_TYPE_LABELS } from "@/types/api";
-import { LOCATION_TYPE_CODES, type LocationSelection } from "@/types/transfer";
+import type { LocationSelection } from "@/types/transfer";
 
 interface ProductLocationSelectorProps {
   /** The inventory entries for the product (locations where it exists) */
@@ -66,12 +66,9 @@ export function ProductLocationSelector({
 
   // Helper to format display label (e.g., "B15 - Box Bin (30)")
   function formatEntryLabel(entry: ProductInventoryEntry): string {
-    const typeCode = LOCATION_TYPE_CODES[entry.locationType as LocationType] ?? "";
-    const locationDisplay = entry.locationType === "NOT_ASSIGNED"
-      ? "NA"
-      : `${typeCode}${entry.locationCode}`;
     const typeLabel = LOCATION_TYPE_LABELS[entry.locationType as LocationType] ?? entry.locationType;
-    return `${locationDisplay} - ${typeLabel} (${entry.quantity})`;
+    // locationCode already includes the prefix (e.g., "B1" for Box Bin 1)
+    return `${entry.locationCode} - ${typeLabel} (${entry.quantity})`;
   }
 
   // Format the trigger display text
@@ -82,10 +79,8 @@ export function ProductLocationSelector({
       (e) => e.locationId === value.locationId || e.inventoryId === value.locationId
     );
     if (!entry) return "";
-    const typeCode = LOCATION_TYPE_CODES[entry.locationType as LocationType] ?? "";
-    return entry.locationType === "NOT_ASSIGNED"
-      ? "NA"
-      : `${typeCode}${entry.locationCode}`;
+    // locationCode already includes the prefix (e.g., "B1" for Box Bin 1)
+    return entry.locationCode;
   }
 
   if (inventoryEntries.length === 0) {

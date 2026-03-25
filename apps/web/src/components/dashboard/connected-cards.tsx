@@ -8,9 +8,9 @@ import { HighestDemandCard } from "./highest-demand-card";
 import { SupplyChainStatusCard } from "./supply-chain-status-card";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
-import { useAllForecasts } from "@/hooks/queries/use-forecasts";
+import { useHighestDemandForecast } from "@/hooks/queries/use-forecasts";
 import { getShipmentsPaged } from "@/lib/api/shipments";
-import { ShipmentStatus, type Shipment } from "@/types/api";
+import { type Shipment } from "@/types/api";
 
 function getNextArrivingShipment(shipments: Shipment[]): Shipment | null {
   const withDates = shipments.filter(
@@ -28,38 +28,18 @@ function getNextArrivingShipment(shipments: Shipment[]): Shipment | null {
 
 /**
  * OrdersCard that fetches its own data for independent loading
+ * Uses server-side counts instead of fetching all shipments for efficiency
  */
 export function ConnectedOrdersCard() {
   const statusCountsQuery = useShipmentDisplayStatusCounts();
-  const shipmentsQuery = useQuery({
-    queryKey: ["shipments", "all-recent"],
-    queryFn: async () => {
-      const response = await getShipmentsPaged({}, 0, 200);
-      return response.content;
-    },
-    staleTime: 60 * 1000,
-  });
-
-  const overdueCount = useMemo(() => {
-    const shipments = shipmentsQuery.data ?? [];
-    const now = new Date();
-    return shipments.filter((s) => {
-      if (!s.expectedDeliveryDate) return false;
-      return (
-        new Date(s.expectedDeliveryDate) < now &&
-        s.status !== ShipmentStatus.DELIVERED &&
-        s.status !== ShipmentStatus.CANCELLED
-      );
-    }).length;
-  }, [shipmentsQuery.data]);
 
   return (
     <OrdersCard
-      overdue={overdueCount}
+      overdue={statusCountsQuery.data?.OVERDUE ?? 0}
       active={statusCountsQuery.data?.ACTIVE ?? 0}
       partial={statusCountsQuery.data?.PARTIAL ?? 0}
       completed={statusCountsQuery.data?.COMPLETED ?? 0}
-      isLoading={shipmentsQuery.isLoading || statusCountsQuery.isLoading}
+      isLoading={statusCountsQuery.isLoading}
     />
   );
 }
@@ -80,54 +60,51 @@ export function ConnectedStockStatusCard() {
 
 /**
  * HighestDemandCard that fetches its own data for independent loading
+ * Uses dedicated endpoint instead of fetching all forecasts for efficiency
  */
 export function ConnectedHighestDemandCard() {
-  const allForecastsQuery = useAllForecasts();
+  const highestDemandQuery = useHighestDemandForecast();
   const productsQuery = useProducts();
 
   const highestDemandProduct = useMemo(() => {
-    const forecasts = allForecastsQuery.data ?? [];
-    const consuming = forecasts.filter((f) => f.avgDailyDelta < 0);
-    if (!consuming.length) return null;
+    const forecast = highestDemandQuery.data;
+    if (!forecast) return null;
 
-    const sorted = [...consuming].sort((a, b) => a.avgDailyDelta - b.avgDailyDelta);
-    const top = sorted[0];
-    const product = productsQuery.data?.find((p) => p.id === top.itemId);
+    const product = productsQuery.data?.find((p) => p.id === forecast.itemId);
 
     return {
-      ...top,
+      ...forecast,
       imageUrl: product?.imageUrl ?? null,
     };
-  }, [allForecastsQuery.data, productsQuery.data]);
+  }, [highestDemandQuery.data, productsQuery.data]);
 
   return (
     <HighestDemandCard
       product={highestDemandProduct}
-      isLoading={allForecastsQuery.isLoading || productsQuery.isLoading}
+      isLoading={highestDemandQuery.isLoading || productsQuery.isLoading}
     />
   );
 }
 
 /**
  * SupplyChainStatusCard that fetches its own data for independent loading
+ * Fetches only active shipments (PENDING/IN_TRANSIT with no received items) to find next arriving
  */
 export function ConnectedSupplyChainStatusCard() {
   const shipmentsQuery = useQuery({
-    queryKey: ["shipments", "all-recent"],
+    queryKey: ["shipments", "active-for-supply-chain"],
     queryFn: async () => {
-      const response = await getShipmentsPaged({}, 0, 200);
+      // Only fetch ACTIVE display status shipments (reduces payload significantly)
+      const response = await getShipmentsPaged({ displayStatus: "ACTIVE" }, 0, 20);
       return response.content;
     },
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - supply chain status doesn't need real-time updates
   });
 
   const supplyChainData = useMemo(() => {
     const shipments = shipmentsQuery.data ?? [];
-    const activeShipments = shipments.filter(
-      (s) => s.status === ShipmentStatus.PENDING || s.status === ShipmentStatus.IN_TRANSIT
-    );
-    const nextShipment = getNextArrivingShipment(activeShipments);
-    const additionalCount = activeShipments.length - (nextShipment ? 1 : 0);
+    const nextShipment = getNextArrivingShipment(shipments);
+    const additionalCount = shipments.length - (nextShipment ? 1 : 0);
 
     return {
       nextShipment,

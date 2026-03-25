@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { getForecasts, getAtRiskForecasts, getAllForecasts } from '@/lib/api/forecasts'
+import { getForecasts, getAtRiskForecasts, getAllForecasts, getHighestDemandForecast } from '@/lib/api/forecasts'
 import { queryKeys } from '@/lib/query-keys'
 
 /**
@@ -36,5 +36,17 @@ export function useAllForecasts() {
     queryKey: queryKeys.forecasts.all(),
     queryFn: getAllForecasts,
     staleTime: 5 * 60 * 1000, // 5 minutes - matches paginated forecasts
+  })
+}
+
+/**
+ * Hook for fetching the single highest-demand forecast.
+ * Returns the item with the most negative avgDailyDelta (highest consumption).
+ */
+export function useHighestDemandForecast() {
+  return useQuery({
+    queryKey: queryKeys.forecasts.highestDemand(),
+    queryFn: getHighestDemandForecast,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   })
 }

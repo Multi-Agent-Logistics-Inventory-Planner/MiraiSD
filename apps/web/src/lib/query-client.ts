@@ -10,8 +10,8 @@ export function createQueryClient(): QueryClient {
         gcTime: 30 * 60 * 1000,
         // Retry failed requests 3 times with exponential backoff
         retry: 3,
-        // Refetch on window focus for fresh data
-        refetchOnWindowFocus: true,
+        // Disabled: realtime subscriptions handle updates; window focus was causing excessive refetches
+        refetchOnWindowFocus: false,
         // Don't refetch on mount if data is fresh
         refetchOnMount: true,
       },

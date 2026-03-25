@@ -19,5 +19,6 @@ export const queryKeys = {
     all: () => ['forecasts'] as const,
     list: (page: number, limit: number) => ['forecasts', 'list', { page, limit }] as const,
     atRisk: (daysThreshold: number) => ['forecasts', 'at-risk', daysThreshold] as const,
+    highestDemand: () => ['forecasts', 'highest-demand'] as const,
   },
 } as const

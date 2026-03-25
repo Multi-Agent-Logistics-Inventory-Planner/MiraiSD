@@ -95,7 +95,7 @@ export async function uploadProductImage(
   const { error } = await client.storage
     .from(BUCKET_NAME)
     .upload(filename, file, {
-      cacheControl: "3600",
+      cacheControl: "604800", // 1 week cache for product images
       upsert: false,
     });
 

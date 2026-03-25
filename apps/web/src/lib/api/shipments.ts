@@ -11,6 +11,9 @@ const BASE_PATH = "/api/shipments";
 
 export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED";
 
+// Type for the counts response (includes OVERDUE which overlaps with ACTIVE/PARTIAL)
+export type ShipmentStatusCounts = Record<ShipmentDisplayStatus | "OVERDUE", number>;
+
 export type SortDirection = "asc" | "desc";
 
 export interface ShipmentFilters {
@@ -60,10 +63,10 @@ export async function getShipmentsPaged(
 }
 
 /**
- * Get counts for each display status (ACTIVE, PARTIAL, COMPLETED)
+ * Get counts for each display status (ACTIVE, PARTIAL, COMPLETED, OVERDUE)
  */
-export async function getDisplayStatusCounts(): Promise<Record<ShipmentDisplayStatus, number>> {
-  return apiGet<Record<ShipmentDisplayStatus, number>>(`${BASE_PATH}/display-status-counts`);
+export async function getDisplayStatusCounts(): Promise<ShipmentStatusCounts> {
+  return apiGet<ShipmentStatusCounts>(`${BASE_PATH}/display-status-counts`);
 }
 
 /**
