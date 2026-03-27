@@ -341,6 +341,12 @@ class MessagingWorker:
         }
         notification_type, severity = type_map.get(alert.alert_type, ("LOW_STOCK", "WARNING"))
 
+        # Determine delivery channels - LOW_STOCK skips Slack, OUT_OF_STOCK goes to both
+        if alert.alert_type == AlertType.TOTAL_LOW_STOCK:
+            via = ["app"]
+        else:
+            via = ["slack", "app"]
+
         # Build human-readable message
         message = self._build_alert_message(event, alert)
 
@@ -371,6 +377,7 @@ class MessagingWorker:
             metadata=metadata,
             source_event_id=event.event_id,
             dedupe_key=dedupe_key,
+            via=via,
         )
 
         if notification_id:
