@@ -182,6 +182,16 @@ export function ProductModal({
                 {p.isActive ? "Active" : "Inactive"}
               </span>
             </div>
+            {isKuji && isAdmin && (
+              <Button
+                size="sm"
+                className="sm:hidden bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs mt-1"
+                onClick={() => setPrizesDialogOpen(true)}
+              >
+                <Trophy className="h-3 w-3 mr-0.5" />
+                Prizes
+              </Button>
+            )}
 
             <div className="hidden sm:flex items-center gap-2 pt-2">
               {isKuji && isAdmin && (
@@ -256,16 +266,6 @@ export function ProductModal({
         </div>
 
         <div className="flex sm:hidden justify-center gap-1 mt-2">
-          {isKuji && isAdmin && (
-            <Button
-              size="sm"
-              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
-              onClick={() => setPrizesDialogOpen(true)}
-            >
-              <Trophy className="h-3 w-3 mr-0.5" />
-              Prizes
-            </Button>
-          )}
           <Button
             size="sm"
             className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
