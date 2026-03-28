@@ -40,7 +40,9 @@ public record ActionCenterDTO(
         BigDecimal demandVolatility,
         BigDecimal forecastAccuracy,
         BigDecimal confidence,
-        ActionUrgency urgency
+        ActionUrgency urgency,
+        boolean overdue,
+        String computedAt
     ) {}
 
     /**

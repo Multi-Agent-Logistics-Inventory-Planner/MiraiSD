@@ -406,7 +406,7 @@ public class DevSeedController {
         // Distribution: 10% critical-urgent, 10% critical, 20% warning, 30% healthy, 20% safe, 10% overstocked
         for (Product product : products) {
             int currentStock = inventoryByProduct.getOrDefault(product.getId(), 0);
-            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 7;
+            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 14;
 
             // Determine risk band based on product index for even distribution
             String riskBand;
