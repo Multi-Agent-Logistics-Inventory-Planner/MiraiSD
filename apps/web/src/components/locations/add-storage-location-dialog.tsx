@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Archive,
   Box,
@@ -78,6 +78,12 @@ export function AddStorageLocationDialog({
 }: AddStorageLocationDialogProps) {
   const { toast } = useToast();
   const { data: storageLocations } = useStorageLocations();
+
+  // Filter out NOT_ASSIGNED from presets (it's a system location, auto-created via migration)
+  const filteredPresets = useMemo(
+    () => missingPresets.filter((p) => p.code !== "NOT_ASSIGNED"),
+    [missingPresets]
+  );
   const createMutation = useCreateStorageLocationMutation();
 
   // Form state
@@ -189,11 +195,11 @@ export function AddStorageLocationDialog({
         </DialogHeader>
 
         {/* Presets Section */}
-        {missingPresets.length > 0 && (
+        {filteredPresets.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Quick Add Preset</Label>
             <div className="flex flex-wrap gap-2">
-              {missingPresets.slice(0, 6).map((config) => (
+              {filteredPresets.slice(0, 6).map((config) => (
                 <Button
                   key={config.code}
                   type="button"
@@ -212,7 +218,7 @@ export function AddStorageLocationDialog({
         )}
 
         {/* Divider */}
-        {missingPresets.length > 0 && (
+        {filteredPresets.length > 0 && (
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />

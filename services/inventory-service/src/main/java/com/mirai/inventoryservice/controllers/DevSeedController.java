@@ -103,6 +103,102 @@ public class DevSeedController {
 
     private final Random random = new Random();
 
+    /**
+     * Ensure core entities exist: MAIN site, BOX_BINS storage location, and NOT_ASSIGNED with NA location.
+     * This is idempotent and can be called multiple times safely.
+     */
+    @PostMapping("/seed/core")
+    public ResponseEntity<Map<String, Object>> seedCoreEntities() {
+        Map<String, Object> result = ensureCoreEntitiesExist();
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Helper method to ensure MAIN site, BOX_BINS, NOT_ASSIGNED storage locations, and NA location exist.
+     * Called by seedAll() and can be invoked directly via /api/dev/seed/core.
+     */
+    private Map<String, Object> ensureCoreEntitiesExist() {
+        boolean siteCreated = false;
+        boolean boxBinsCreated = false;
+        boolean notAssignedCreated = false;
+        boolean naLocationCreated = false;
+
+        // 1. Ensure MAIN site exists
+        Site site = siteRepository.findByCode(DEFAULT_SITE_CODE).orElse(null);
+        if (site == null) {
+            site = siteRepository.save(Site.builder()
+                .name("Main Store")
+                .code(DEFAULT_SITE_CODE)
+                .country("USA")
+                .build());
+            siteCreated = true;
+            log.info("Created MAIN site: {}", site.getId());
+        }
+
+        // 2. Ensure BOX_BINS storage location exists (required by seedAll)
+        StorageLocation boxBinsStorage = storageLocationRepository
+            .findByCodeAndSite_Code("BOX_BINS", DEFAULT_SITE_CODE)
+            .orElse(null);
+        if (boxBinsStorage == null) {
+            boxBinsStorage = storageLocationRepository.save(StorageLocation.builder()
+                .site(site)
+                .name("Box Bins")
+                .code("BOX_BINS")
+                .codePrefix("B")
+                .icon("Box")
+                .hasDisplay(false)
+                .isDisplayOnly(false)
+                .displayOrder(1)
+                .build());
+            boxBinsCreated = true;
+            log.info("Created BOX_BINS storage location: {}", boxBinsStorage.getId());
+        }
+
+        // 3. Ensure NOT_ASSIGNED storage location exists
+        StorageLocation notAssignedStorage = storageLocationRepository
+            .findByCodeAndSite_Code("NOT_ASSIGNED", DEFAULT_SITE_CODE)
+            .orElse(null);
+        if (notAssignedStorage == null) {
+            notAssignedStorage = storageLocationRepository.save(StorageLocation.builder()
+                .site(site)
+                .name("Not Assigned")
+                .code("NOT_ASSIGNED")
+                .codePrefix("NA")
+                .icon("CircleHelp")
+                .hasDisplay(false)
+                .isDisplayOnly(false)
+                .displayOrder(99)
+                .build());
+            notAssignedCreated = true;
+            log.info("Created NOT_ASSIGNED storage location: {}", notAssignedStorage.getId());
+        }
+
+        // 4. Ensure NA location exists within NOT_ASSIGNED
+        Location naLocation = locationRepository
+            .findByLocationCodeAndStorageLocation_Id("NA", notAssignedStorage.getId())
+            .orElse(null);
+        if (naLocation == null) {
+            naLocation = locationRepository.save(Location.builder()
+                .storageLocation(notAssignedStorage)
+                .locationCode("NA")
+                .build());
+            naLocationCreated = true;
+            log.info("Created NA location: {}", naLocation.getId());
+        }
+
+        return Map.of(
+            "success", true,
+            "siteId", site.getId().toString(),
+            "siteCreated", siteCreated,
+            "boxBinsStorageLocationId", boxBinsStorage.getId().toString(),
+            "boxBinsCreated", boxBinsCreated,
+            "notAssignedStorageLocationId", notAssignedStorage.getId().toString(),
+            "notAssignedCreated", notAssignedCreated,
+            "naLocationId", naLocation.getId().toString(),
+            "naLocationCreated", naLocationCreated
+        );
+    }
+
     @PostMapping("/seed/all")
     public ResponseEntity<Map<String, Object>> seedAll() {
         if (productRepository.count() > 0) {
@@ -111,6 +207,9 @@ public class DevSeedController {
                 "hint", "Reset with: docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d"
             ));
         }
+
+        // Ensure core entities exist first (MAIN site, NOT_ASSIGNED, NA location)
+        ensureCoreEntitiesExist();
 
         // 1. Products (15)
         List<Category> categories = categoryRepository.findByParentIsNullAndIsActiveTrueOrderByDisplayOrderAsc();
