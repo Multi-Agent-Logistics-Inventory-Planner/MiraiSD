@@ -5,13 +5,15 @@ import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.*;
-import com.mirai.inventoryservice.models.storage.*;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
@@ -29,57 +31,38 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Service for managing stock movements and inventory operations.
+ *
+ * Uses the unified location_inventory table which consolidates all inventory
+ * from storage locations (box bins, racks, machines, etc.).
+ */
 @Service
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
     private final AuditLogRepository auditLogRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
-    private final BoxBinInventoryRepository boxBinInventoryRepository;
-    private final SingleClawMachineInventoryRepository singleClawMachineInventoryRepository;
-    private final DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository;
-    private final CabinetInventoryRepository cabinetInventoryRepository;
-    private final RackInventoryRepository rackInventoryRepository;
-    private final FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository;
-    private final PusherMachineInventoryRepository pusherMachineInventoryRepository;
-    private final WindowInventoryRepository windowInventoryRepository;
-    private final NotAssignedInventoryRepository notAssignedInventoryRepository;
-    private final BoxBinRepository boxBinRepository;
-    private final SingleClawMachineRepository singleClawMachineRepository;
-    private final DoubleClawMachineRepository doubleClawMachineRepository;
-    private final KeychainMachineRepository keychainMachineRepository;
-    private final CabinetRepository cabinetRepository;
-    private final RackRepository rackRepository;
-    private final FourCornerMachineRepository fourCornerMachineRepository;
-    private final PusherMachineRepository pusherMachineRepository;
-    private final WindowRepository windowRepository;
+    private final LocationInventoryRepository locationInventoryRepository;
+    private final LocationRepository locationRepository;
+    private final StorageLocationRepository storageLocationRepository;
+    private final SiteRepository siteRepository;
     private final EntityManager entityManager;
     private final SupabaseBroadcastService broadcastService;
     private final EventOutboxService eventOutboxService;
+
+    // Default site code - will be used until multi-site support is implemented
+    private static final String DEFAULT_SITE_CODE = "MAIN";
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
             AuditLogRepository auditLogRepository,
             ProductRepository productRepository,
             UserRepository userRepository,
-            BoxBinInventoryRepository boxBinInventoryRepository,
-            SingleClawMachineInventoryRepository singleClawMachineInventoryRepository,
-            DoubleClawMachineInventoryRepository doubleClawMachineInventoryRepository,
-            CabinetInventoryRepository cabinetInventoryRepository,
-            RackInventoryRepository rackInventoryRepository,
-            FourCornerMachineInventoryRepository fourCornerMachineInventoryRepository,
-            PusherMachineInventoryRepository pusherMachineInventoryRepository,
-            WindowInventoryRepository windowInventoryRepository,
-            NotAssignedInventoryRepository notAssignedInventoryRepository,
-            BoxBinRepository boxBinRepository,
-            SingleClawMachineRepository singleClawMachineRepository,
-            DoubleClawMachineRepository doubleClawMachineRepository,
-            KeychainMachineRepository keychainMachineRepository,
-            CabinetRepository cabinetRepository,
-            RackRepository rackRepository,
-            FourCornerMachineRepository fourCornerMachineRepository,
-            PusherMachineRepository pusherMachineRepository,
-            WindowRepository windowRepository,
+            LocationInventoryRepository locationInventoryRepository,
+            LocationRepository locationRepository,
+            StorageLocationRepository storageLocationRepository,
+            SiteRepository siteRepository,
             EntityManager entityManager,
             SupabaseBroadcastService broadcastService,
             @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
@@ -87,24 +70,10 @@ public class StockMovementService {
         this.auditLogRepository = auditLogRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
-        this.boxBinInventoryRepository = boxBinInventoryRepository;
-        this.singleClawMachineInventoryRepository = singleClawMachineInventoryRepository;
-        this.doubleClawMachineInventoryRepository = doubleClawMachineInventoryRepository;
-        this.cabinetInventoryRepository = cabinetInventoryRepository;
-        this.rackInventoryRepository = rackInventoryRepository;
-        this.fourCornerMachineInventoryRepository = fourCornerMachineInventoryRepository;
-        this.pusherMachineInventoryRepository = pusherMachineInventoryRepository;
-        this.windowInventoryRepository = windowInventoryRepository;
-        this.notAssignedInventoryRepository = notAssignedInventoryRepository;
-        this.boxBinRepository = boxBinRepository;
-        this.singleClawMachineRepository = singleClawMachineRepository;
-        this.doubleClawMachineRepository = doubleClawMachineRepository;
-        this.keychainMachineRepository = keychainMachineRepository;
-        this.cabinetRepository = cabinetRepository;
-        this.rackRepository = rackRepository;
-        this.fourCornerMachineRepository = fourCornerMachineRepository;
-        this.pusherMachineRepository = pusherMachineRepository;
-        this.windowRepository = windowRepository;
+        this.locationInventoryRepository = locationInventoryRepository;
+        this.locationRepository = locationRepository;
+        this.storageLocationRepository = storageLocationRepository;
+        this.siteRepository = siteRepository;
         this.entityManager = entityManager;
         this.broadcastService = broadcastService;
         this.eventOutboxService = eventOutboxService;
@@ -116,14 +85,12 @@ public class StockMovementService {
      */
     @Transactional
     public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
-        // Load inventory records
-        Object inventory = loadInventory(locationType, inventoryId);
+        LocationInventory inventory = locationInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
 
-        int currentQuantity = getInventoryQuantity(inventory);
-
+        int currentQuantity = inventory.getQuantity();
         int newQuantity = currentQuantity + request.getQuantityChange();
 
-        // Validate
         if (newQuantity < 0) {
             throw new InsufficientInventoryException(
                     String.format("Cannot reduce quantity by %d. Current quantity: %d",
@@ -132,16 +99,17 @@ public class StockMovementService {
         }
 
         if (newQuantity == 0) {
-            deleteInventory(locationType, inventory);
+            locationInventoryRepository.delete(inventory);
         } else {
-            setInventoryQuantity(inventory, newQuantity);
-            saveInventory(locationType, inventory);
+            inventory.setQuantity(newQuantity);
+            locationInventoryRepository.save(inventory);
         }
 
-        UUID locationId = getLocationId(inventory, locationType);
-        String locationCode = resolveLocationCode(locationId, locationType);
+        UUID locationId = inventory.getLocation().getId();
+        String locationCode = inventory.getLocation().getLocationCode();
+        String storageLocationCode = inventory.getLocation().getStorageLocation().getCode();
+        LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
 
-        // Create audit log entry
         AuditLog auditLog = createAuditLog(
                 request.getActorId(),
                 request.getReason(),
@@ -151,11 +119,10 @@ public class StockMovementService {
                 locationCode,
                 1,
                 Math.abs(request.getQuantityChange()),
-                getInventoryProduct(inventory).getName(),
+                inventory.getProduct().getName(),
                 request.getNotes()
         );
 
-        // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         if (request.getNotes() != null) {
             metadata.put("notes", request.getNotes());
@@ -164,8 +131,8 @@ public class StockMovementService {
 
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
-                .item(getInventoryProduct(inventory))
-                .locationType(locationType)
+                .item(inventory.getProduct())
+                .locationType(derivedLocationType)
                 .toLocationId(locationId)
                 .previousQuantity(currentQuantity)
                 .currentQuantity(newQuantity)
@@ -179,11 +146,9 @@ public class StockMovementService {
         StockMovement savedMovement = stockMovementRepository.save(movement);
         eventOutboxService.createStockMovementEvent(savedMovement);
 
-        // Update product active status based on total inventory
         boolean productChanged = updateProductActiveStatus(savedMovement.getItem());
 
-        // Broadcast real-time update to connected clients
-        broadcastService.broadcastInventoryUpdated(locationType.name(), savedMovement.getItem().getId().toString());
+        broadcastService.broadcastInventoryUpdated(storageLocationCode, savedMovement.getItem().getId().toString());
         broadcastService.broadcastAuditLogCreated(savedMovement.getItem().getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(savedMovement.getItem().getId().toString()));
@@ -199,15 +164,15 @@ public class StockMovementService {
      */
     @Transactional
     public void transferInventory(TransferInventoryRequestDTO request) {
-        Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
-        int sourceQuantity = getInventoryQuantity(sourceInventory);
+        LocationInventory sourceInventory = locationInventoryRepository.findById(request.getSourceInventoryId())
+                .orElseThrow(() -> new InventoryNotFoundException("Source inventory not found: " + request.getSourceInventoryId()));
 
-        UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
-        String sourceLocationCode = resolveLocationCode(sourceLocationId, request.getSourceLocationType());
+        int sourceQuantity = sourceInventory.getQuantity();
+        UUID sourceLocationId = sourceInventory.getLocation().getId();
+        String sourceLocationCode = sourceInventory.getLocation().getLocationCode();
 
-        // Resolve destination location code before executing so the AuditLog captures it
         UUID destLocationId = resolveDestinationLocationId(request);
-        String destLocationCode = resolveLocationCode(destLocationId, request.getDestinationLocationType());
+        String destLocationCode = resolveLocationCode(destLocationId);
 
         AuditLog auditLog = createAuditLog(
                 request.getActorId(),
@@ -218,13 +183,12 @@ public class StockMovementService {
                 destLocationCode,
                 1,
                 request.getQuantity(),
-                getInventoryProduct(sourceInventory).getName(),
+                sourceInventory.getProduct().getName(),
                 request.getNotes()
         );
 
         executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
 
-        // Broadcast real-time update to connected clients
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
     }
@@ -237,19 +201,20 @@ public class StockMovementService {
     public void batchTransferInventory(BatchTransferInventoryRequestDTO batchRequest) {
         List<TransferInventoryRequestDTO> transfers = batchRequest.getTransfers();
 
-        // Use first transfer's location info for the shared AuditLog
         TransferInventoryRequestDTO first = transfers.get(0);
-        Object firstSource = loadInventory(first.getSourceLocationType(), first.getSourceInventoryId());
-        UUID sourceLocationId = getLocationId(firstSource, first.getSourceLocationType());
-        String sourceLocationCode = resolveLocationCode(sourceLocationId, first.getSourceLocationType());
+        LocationInventory firstSource = locationInventoryRepository.findById(first.getSourceInventoryId())
+                .orElseThrow(() -> new InventoryNotFoundException("Source inventory not found: " + first.getSourceInventoryId()));
+
+        UUID sourceLocationId = firstSource.getLocation().getId();
+        String sourceLocationCode = firstSource.getLocation().getLocationCode();
 
         UUID destLocationId = resolveDestinationLocationId(first);
-        String destLocationCode = resolveLocationCode(destLocationId, first.getDestinationLocationType());
+        String destLocationCode = resolveLocationCode(destLocationId);
 
         int totalQuantity = transfers.stream().mapToInt(TransferInventoryRequestDTO::getQuantity).sum();
 
         String productSummary = transfers.size() == 1
-                ? getInventoryProduct(firstSource).getName()
+                ? firstSource.getProduct().getName()
                 : transfers.size() + " products";
 
         AuditLog auditLog = createAuditLog(
@@ -266,22 +231,22 @@ public class StockMovementService {
         );
 
         for (TransferInventoryRequestDTO request : transfers) {
-            Object sourceInventory = loadInventory(request.getSourceLocationType(), request.getSourceInventoryId());
-            int sourceQuantity = getInventoryQuantity(sourceInventory);
+            LocationInventory sourceInventory = locationInventoryRepository.findById(request.getSourceInventoryId())
+                    .orElseThrow(() -> new InventoryNotFoundException("Source inventory not found: " + request.getSourceInventoryId()));
+            int sourceQuantity = sourceInventory.getQuantity();
             executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
         }
 
-        // Broadcast real-time update to connected clients
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
     }
 
     /**
      * Core transfer logic: validates, moves inventory, creates withdrawal + deposit StockMovements
-     * linked to the provided AuditLog. Used by both single and batch transfer paths.
+     * linked to the provided AuditLog.
      */
     private void executeTransfer(TransferInventoryRequestDTO request,
-                                  Object sourceInventory, int sourceQuantity,
+                                  LocationInventory sourceInventory, int sourceQuantity,
                                   AuditLog auditLog) {
         if (sourceQuantity < request.getQuantity()) {
             throw new InsufficientInventoryException(
@@ -290,40 +255,58 @@ public class StockMovementService {
             );
         }
 
-        Object destinationInventory;
+        LocationInventory destinationInventory;
         int destinationQuantity;
         UUID destinationInventoryId = request.getDestinationInventoryId();
 
         if (destinationInventoryId != null) {
-            destinationInventory = loadInventory(request.getDestinationLocationType(), destinationInventoryId);
-            destinationQuantity = getInventoryQuantity(destinationInventory);
+            destinationInventory = locationInventoryRepository.findById(destinationInventoryId)
+                    .orElseThrow(() -> new InventoryNotFoundException("Destination inventory not found: " + destinationInventoryId));
+            destinationQuantity = destinationInventory.getQuantity();
         } else {
-            if (request.getDestinationLocationId() == null
-                    && request.getDestinationLocationType() != com.mirai.inventoryservice.models.enums.LocationType.NOT_ASSIGNED) {
-                throw new IllegalArgumentException("Either destinationInventoryId or destinationLocationId must be provided");
+            UUID destLocationId = request.getDestinationLocationId();
+            if (destLocationId == null) {
+                // For NOT_ASSIGNED, find or create the NA location
+                destLocationId = getNotAssignedLocationId();
             }
-            destinationInventory = createInventoryAtLocation(
-                    request.getDestinationLocationType(),
-                    request.getDestinationLocationId(),
-                    getInventoryProduct(sourceInventory),
-                    0
-            );
-            destinationQuantity = 0;
-            destinationInventoryId = getInventoryId(destinationInventory);
+
+            Location destLocation = locationRepository.findById(destLocationId)
+                    .orElseThrow(() -> new LocationNotFoundException("Destination location not found: " + destLocationId));
+
+            // Check if inventory already exists at this location for this product
+            destinationInventory = locationInventoryRepository
+                    .findByLocation_IdAndProduct_Id(destLocationId, sourceInventory.getProduct().getId())
+                    .orElseGet(() -> {
+                        LocationInventory newInv = LocationInventory.builder()
+                                .location(destLocation)
+                                .site(destLocation.getStorageLocation().getSite())
+                                .product(sourceInventory.getProduct())
+                                .quantity(0)
+                                .build();
+                        return locationInventoryRepository.save(newInv);
+                    });
+            destinationQuantity = destinationInventory.getQuantity();
+            destinationInventoryId = destinationInventory.getId();
         }
 
         int newSourceQuantity = sourceQuantity - request.getQuantity();
-        setInventoryQuantity(destinationInventory, destinationQuantity + request.getQuantity());
-        if (newSourceQuantity == 0) {
-            deleteInventory(request.getSourceLocationType(), sourceInventory);
-        } else {
-            setInventoryQuantity(sourceInventory, newSourceQuantity);
-            saveInventory(request.getSourceLocationType(), sourceInventory);
-        }
-        saveInventory(request.getDestinationLocationType(), destinationInventory);
+        destinationInventory.setQuantity(destinationQuantity + request.getQuantity());
 
-        UUID sourceLocationId = getLocationId(sourceInventory, request.getSourceLocationType());
-        UUID destinationLocationId = getLocationId(destinationInventory, request.getDestinationLocationType());
+        if (newSourceQuantity == 0) {
+            locationInventoryRepository.delete(sourceInventory);
+        } else {
+            sourceInventory.setQuantity(newSourceQuantity);
+            locationInventoryRepository.save(sourceInventory);
+        }
+        locationInventoryRepository.save(destinationInventory);
+
+        UUID sourceLocationId = sourceInventory.getLocation().getId();
+        UUID destinationLocationId = destinationInventory.getLocation().getId();
+
+        String sourceStorageCode = sourceInventory.getLocation().getStorageLocation().getCode();
+        String destStorageCode = destinationInventory.getLocation().getStorageLocation().getCode();
+        LocationType sourceLocationType = mapStorageLocationCodeToLocationType(sourceStorageCode);
+        LocationType destLocationType = mapStorageLocationCodeToLocationType(destStorageCode);
 
         Map<String, Object> withdrawalMetadata = new HashMap<>();
         Map<String, Object> depositMetadata = new HashMap<>();
@@ -338,8 +321,8 @@ public class StockMovementService {
 
         StockMovement withdrawal = StockMovement.builder()
                 .auditLog(auditLog)
-                .item(getInventoryProduct(sourceInventory))
-                .locationType(request.getSourceLocationType())
+                .item(sourceInventory.getProduct())
+                .locationType(sourceLocationType)
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
                 .previousQuantity(sourceQuantity)
@@ -353,8 +336,8 @@ public class StockMovementService {
 
         StockMovement deposit = StockMovement.builder()
                 .auditLog(auditLog)
-                .item(getInventoryProduct(destinationInventory))
-                .locationType(request.getDestinationLocationType())
+                .item(destinationInventory.getProduct())
+                .locationType(destLocationType)
                 .fromLocationId(sourceLocationId)
                 .toLocationId(destinationLocationId)
                 .previousQuantity(destinationQuantity)
@@ -371,36 +354,39 @@ public class StockMovementService {
         eventOutboxService.createStockMovementEvent(savedWithdrawal);
         eventOutboxService.createStockMovementEvent(savedDeposit);
 
-        updateProductActiveStatus(getInventoryProduct(sourceInventory));
+        updateProductActiveStatus(sourceInventory.getProduct());
     }
 
     /**
      * Resolves the physical destination location UUID for a transfer request.
-     * Returns null for NOT_ASSIGNED (no physical location).
      */
     private UUID resolveDestinationLocationId(TransferInventoryRequestDTO request) {
         if (request.getDestinationLocationId() != null) {
             return request.getDestinationLocationId();
         }
         if (request.getDestinationInventoryId() != null) {
-            Object destInventory = loadInventory(request.getDestinationLocationType(), request.getDestinationInventoryId());
-            return getLocationId(destInventory, request.getDestinationLocationType());
+            LocationInventory destInventory = locationInventoryRepository.findById(request.getDestinationInventoryId())
+                    .orElseThrow(() -> new InventoryNotFoundException("Destination inventory not found: " + request.getDestinationInventoryId()));
+            return destInventory.getLocation().getId();
         }
-        return null; // NOT_ASSIGNED
+        // For NOT_ASSIGNED destination
+        return getNotAssignedLocationId();
+    }
+
+    /**
+     * Get the NOT_ASSIGNED location ID for the default site
+     */
+    private UUID getNotAssignedLocationId() {
+        return storageLocationRepository.findByCodeAndSite_Code("NOT_ASSIGNED", DEFAULT_SITE_CODE)
+                .map(sl -> locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", sl.getSite().getId())
+                        .stream().findFirst()
+                        .orElseThrow(() -> new LocationNotFoundException("NOT_ASSIGNED location not found"))
+                        .getId())
+                .orElseThrow(() -> new StorageLocationNotFoundException("NOT_ASSIGNED storage location not found"));
     }
 
     /**
      * Create new inventory at a location with tracking.
-     * Creates the inventory record and a stock movement for audit.
-     *
-     * @param locationType The type of storage location
-     * @param locationId The ID of the storage location (null for NOT_ASSIGNED)
-     * @param product The product to add
-     * @param quantity The initial quantity
-     * @param reason The reason for adding (typically INITIAL_STOCK or RESTOCK)
-     * @param actorId The user performing the action (optional)
-     * @param notes Additional notes (optional)
-     * @return The created inventory ID
      */
     @Transactional
     public UUID createInventoryWithTracking(LocationType locationType, UUID locationId,
@@ -410,18 +396,42 @@ public class StockMovementService {
             throw new IllegalArgumentException("Quantity must be positive");
         }
 
-        // Create the inventory record
-        Object inventory = createInventoryAtLocation(locationType, locationId, product, quantity);
-        UUID inventoryId = getInventoryId(inventory);
-        String locationCode = resolveLocationCode(locationId, locationType);
+        Location location;
+        if (locationId != null) {
+            location = locationRepository.findById(locationId)
+                    .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
+        } else {
+            // NOT_ASSIGNED case
+            location = locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", getDefaultSiteId())
+                    .stream().findFirst()
+                    .orElseThrow(() -> new LocationNotFoundException("NOT_ASSIGNED location not found"));
+        }
 
-        // Create audit log entry
+        // Check if storage location allows inventory
+        if (location.getStorageLocation().getIsDisplayOnly()) {
+            throw new InvalidInventoryOperationException(
+                    location.getStorageLocation().getName() + " is display-only and does not support inventory");
+        }
+
+        LocationInventory inventory = LocationInventory.builder()
+                .location(location)
+                .site(location.getStorageLocation().getSite())
+                .product(product)
+                .quantity(quantity)
+                .build();
+        inventory = locationInventoryRepository.save(inventory);
+
+        UUID inventoryId = inventory.getId();
+        String locationCode = location.getLocationCode();
+        String storageLocationCode = location.getStorageLocation().getCode();
+        LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
+
         AuditLog auditLog = createAuditLog(
                 actorId,
                 reason,
                 null,
                 null,
-                locationId,
+                location.getId(),
                 locationCode,
                 1,
                 quantity,
@@ -429,7 +439,6 @@ public class StockMovementService {
                 notes
         );
 
-        // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         if (notes != null) {
             metadata.put("notes", notes);
@@ -439,8 +448,8 @@ public class StockMovementService {
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
                 .item(product)
-                .locationType(locationType)
-                .toLocationId(locationId)
+                .locationType(derivedLocationType)
+                .toLocationId(location.getId())
                 .previousQuantity(0)
                 .currentQuantity(quantity)
                 .quantityChange(quantity)
@@ -453,11 +462,9 @@ public class StockMovementService {
         StockMovement savedMovement = stockMovementRepository.save(movement);
         eventOutboxService.createStockMovementEvent(savedMovement);
 
-        // Update product active status
         boolean productChanged = updateProductActiveStatus(product);
 
-        // Broadcast real-time update to connected clients
-        broadcastService.broadcastInventoryUpdated(locationType.name(), product.getId().toString());
+        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
         broadcastService.broadcastAuditLogCreated(product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
@@ -468,28 +475,23 @@ public class StockMovementService {
 
     /**
      * Remove inventory from a location with tracking.
-     * Deletes the inventory record and creates a stock movement for audit.
-     *
-     * @param locationType The type of storage location
-     * @param inventoryId The ID of the inventory record to remove
-     * @param reason The reason for removal (typically REMOVED, DAMAGE, or SALE)
-     * @param actorId The user performing the action (optional)
-     * @param notes Additional notes (optional)
      */
     @Transactional
     public void removeInventoryWithTracking(LocationType locationType, UUID inventoryId,
                                             StockMovementReason reason, UUID actorId, String notes) {
-        // Load the inventory to get current state
-        Object inventory = loadInventory(locationType, inventoryId);
-        int currentQuantity = getInventoryQuantity(inventory);
-        Product product = getInventoryProduct(inventory);
-        UUID locationId = getLocationId(inventory, locationType);
-        String locationCode = resolveLocationCode(locationId, locationType);
+        LocationInventory inventory = locationInventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
 
-        // Delete the inventory record
-        deleteInventory(locationType, inventory);
+        int currentQuantity = inventory.getQuantity();
+        Product product = inventory.getProduct();
+        Location location = inventory.getLocation();
+        UUID locationId = location.getId();
+        String locationCode = location.getLocationCode();
+        String storageLocationCode = location.getStorageLocation().getCode();
+        LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
 
-        // Create audit log entry
+        locationInventoryRepository.delete(inventory);
+
         AuditLog auditLog = createAuditLog(
                 actorId,
                 reason,
@@ -503,7 +505,6 @@ public class StockMovementService {
                 notes
         );
 
-        // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         if (notes != null) {
             metadata.put("notes", notes);
@@ -513,7 +514,7 @@ public class StockMovementService {
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
                 .item(product)
-                .locationType(locationType)
+                .locationType(derivedLocationType)
                 .fromLocationId(locationId)
                 .previousQuantity(currentQuantity)
                 .currentQuantity(0)
@@ -527,11 +528,9 @@ public class StockMovementService {
         StockMovement savedMovement = stockMovementRepository.save(movement);
         eventOutboxService.createStockMovementEvent(savedMovement);
 
-        // Update product active status
         boolean productChanged = updateProductActiveStatus(product);
 
-        // Broadcast real-time update to connected clients
-        broadcastService.broadcastInventoryUpdated(locationType.name(), product.getId().toString());
+        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
         broadcastService.broadcastAuditLogCreated(product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
@@ -559,8 +558,37 @@ public class StockMovementService {
     // ========= Helper Methods =========
 
     /**
+     * Get the default site ID
+     */
+    private UUID getDefaultSiteId() {
+        return siteRepository.findByCode(DEFAULT_SITE_CODE)
+                .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE))
+                .getId();
+    }
+
+    /**
+     * Maps storage location code to LocationType enum for backward compatibility.
+     * This mapping is needed until LocationType is fully deprecated from StockMovement.
+     */
+    private LocationType mapStorageLocationCodeToLocationType(String storageLocationCode) {
+        return switch (storageLocationCode) {
+            case "BOX_BINS" -> LocationType.BOX_BIN;
+            case "RACKS" -> LocationType.RACK;
+            case "CABINETS" -> LocationType.CABINET;
+            case "WINDOWS" -> LocationType.WINDOW;
+            case "SINGLE_CLAW" -> LocationType.SINGLE_CLAW_MACHINE;
+            case "DOUBLE_CLAW" -> LocationType.DOUBLE_CLAW_MACHINE;
+            case "FOUR_CORNER" -> LocationType.FOUR_CORNER_MACHINE;
+            case "PUSHER" -> LocationType.PUSHER_MACHINE;
+            case "GACHAPON" -> LocationType.GACHAPON;
+            case "KEYCHAIN" -> LocationType.KEYCHAIN_MACHINE;
+            case "NOT_ASSIGNED" -> LocationType.NOT_ASSIGNED;
+            default -> throw new IllegalArgumentException("Unknown storage location code: " + storageLocationCode);
+        };
+    }
+
+    /**
      * Updates the product's denormalized quantity and active status based on total inventory.
-     * Always persists so the products table stays in sync without a 9-table union query on reads.
      */
     private boolean updateProductActiveStatus(Product product) {
         int totalInventory = calculateTotalInventory(product.getId());
@@ -581,7 +609,6 @@ public class StockMovementService {
 
     /**
      * Sync denormalized product totals (quantity/isActive) and broadcast changes.
-     * Useful for flows that create StockMovements without using StockMovementService (e.g. shipments).
      */
     @Transactional
     public void syncProductTotals(List<UUID> productIds) {
@@ -603,267 +630,39 @@ public class StockMovementService {
         }
     }
 
-    @NonNull
-    private Object loadInventory(LocationType locationType, UUID inventoryId) {
-        return switch (locationType) {
-            case BOX_BIN -> boxBinInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new BoxBinInventoryNotFoundException("BoxBin inventory not found: " + inventoryId));
-            case CABINET -> cabinetInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new CabinetInventoryNotFoundException("Cabinet inventory not found: " + inventoryId));
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new DoubleClawMachineInventoryNotFoundException("DoubleClawMachine inventory not found: " + inventoryId));
-            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new FourCornerMachineInventoryNotFoundException("FourCornerMachine inventory not found: " + inventoryId));
-            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
-            case KEYCHAIN_MACHINE -> throw new InvalidInventoryOperationException("Keychain Machine is display-only and does not support inventory");
-            case PUSHER_MACHINE -> pusherMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new PusherMachineInventoryNotFoundException("PusherMachine inventory not found: " + inventoryId));
-            case RACK -> rackInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new RackInventoryNotFoundException("Rack inventory not found: " + inventoryId));
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new SingleClawMachineInventoryNotFoundException("SingleClawMachine inventory not found: " + inventoryId));
-            case WINDOW -> windowInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new WindowInventoryNotFoundException("Window inventory not found: " + inventoryId));
-            case NOT_ASSIGNED -> notAssignedInventoryRepository.findById(inventoryId)
-                    .orElseThrow(() -> new NotAssignedInventoryNotFoundException("NotAssigned inventory not found: " + inventoryId));
-        };
-    }
-
-    private int getInventoryQuantity(Object inventory) {
-        return switch (inventory) {
-            case BoxBinInventory bbi -> bbi.getQuantity();
-            case SingleClawMachineInventory scmi -> scmi.getQuantity();
-            case DoubleClawMachineInventory dcmi -> dcmi.getQuantity();
-            case CabinetInventory ci -> ci.getQuantity();
-            case RackInventory ri -> ri.getQuantity();
-            case FourCornerMachineInventory fcmi -> fcmi.getQuantity();
-            case PusherMachineInventory pmi -> pmi.getQuantity();
-            case WindowInventory wi -> wi.getQuantity();
-            case NotAssignedInventory nai -> nai.getQuantity();
-            default -> throw new IllegalArgumentException("Unknown inventory type");
-        };
-    }
-
-    private void setInventoryQuantity(Object inventory, int quantity) {
-        switch (inventory) {
-            case BoxBinInventory bbi -> bbi.setQuantity(quantity);
-            case SingleClawMachineInventory scmi -> scmi.setQuantity(quantity);
-            case DoubleClawMachineInventory dcmi -> dcmi.setQuantity(quantity);
-            case CabinetInventory ci -> ci.setQuantity(quantity);
-            case RackInventory ri -> ri.setQuantity(quantity);
-            case FourCornerMachineInventory fcmi -> fcmi.setQuantity(quantity);
-            case PusherMachineInventory pmi -> pmi.setQuantity(quantity);
-            case WindowInventory wi -> wi.setQuantity(quantity);
-            case NotAssignedInventory nai -> nai.setQuantity(quantity);
-            default -> throw new IllegalArgumentException("Unknown inventory type");
-        }
-    }
-
-    private void saveInventory(LocationType locationType, Object inventory) {
-        switch (locationType) {
-            case BOX_BIN -> boxBinInventoryRepository.save((BoxBinInventory) inventory);
-            case CABINET -> cabinetInventoryRepository.save((CabinetInventory) inventory);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.save((DoubleClawMachineInventory) inventory);
-            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.save((FourCornerMachineInventory) inventory);
-            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
-            case KEYCHAIN_MACHINE -> throw new InvalidInventoryOperationException("Keychain Machine is display-only and does not support inventory");
-            case PUSHER_MACHINE -> pusherMachineInventoryRepository.save((PusherMachineInventory) inventory);
-            case RACK -> rackInventoryRepository.save((RackInventory) inventory);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.save((SingleClawMachineInventory) inventory);
-            case WINDOW -> windowInventoryRepository.save((WindowInventory) inventory);
-            case NOT_ASSIGNED -> notAssignedInventoryRepository.save((NotAssignedInventory) inventory);
-        }
-    }
-
-    private void deleteInventory(LocationType locationType, Object inventory) {
-        switch (locationType) {
-            case BOX_BIN -> boxBinInventoryRepository.delete((BoxBinInventory) inventory);
-            case CABINET -> cabinetInventoryRepository.delete((CabinetInventory) inventory);
-            case DOUBLE_CLAW_MACHINE -> doubleClawMachineInventoryRepository.delete((DoubleClawMachineInventory) inventory);
-            case FOUR_CORNER_MACHINE -> fourCornerMachineInventoryRepository.delete((FourCornerMachineInventory) inventory);
-            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
-            case KEYCHAIN_MACHINE -> throw new InvalidInventoryOperationException("Keychain Machine is display-only and does not support inventory");
-            case PUSHER_MACHINE -> pusherMachineInventoryRepository.delete((PusherMachineInventory) inventory);
-            case RACK -> rackInventoryRepository.delete((RackInventory) inventory);
-            case SINGLE_CLAW_MACHINE -> singleClawMachineInventoryRepository.delete((SingleClawMachineInventory) inventory);
-            case WINDOW -> windowInventoryRepository.delete((WindowInventory) inventory);
-            case NOT_ASSIGNED -> notAssignedInventoryRepository.delete((NotAssignedInventory) inventory);
-        }
-    }
-
-    private UUID getLocationId(Object inventory, LocationType locationType) {
-        return switch (locationType) {
-            case BOX_BIN -> ((BoxBinInventory) inventory).getBoxBin().getId();
-            case CABINET -> ((CabinetInventory) inventory).getCabinet().getId();
-            case DOUBLE_CLAW_MACHINE -> ((DoubleClawMachineInventory) inventory).getDoubleClawMachine().getId();
-            case FOUR_CORNER_MACHINE -> ((FourCornerMachineInventory) inventory).getFourCornerMachine().getId();
-            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
-            case KEYCHAIN_MACHINE -> throw new InvalidInventoryOperationException("Keychain Machine is display-only and does not support inventory");
-            case PUSHER_MACHINE -> ((PusherMachineInventory) inventory).getPusherMachine().getId();
-            case RACK -> ((RackInventory) inventory).getRack().getId();
-            case SINGLE_CLAW_MACHINE -> ((SingleClawMachineInventory) inventory).getSingleClawMachine().getId();
-            case WINDOW -> ((WindowInventory) inventory).getWindow().getId();
-            case NOT_ASSIGNED -> null;  // No location for NOT_ASSIGNED
-        };
-    }
-
-    private com.mirai.inventoryservice.models.Product getInventoryProduct(Object inventory) {
-        return switch (inventory) {
-            case BoxBinInventory bbi -> bbi.getItem();
-            case SingleClawMachineInventory scmi -> scmi.getItem();
-            case DoubleClawMachineInventory dcmi -> dcmi.getItem();
-            case CabinetInventory ci -> ci.getItem();
-            case RackInventory ri -> ri.getItem();
-            case FourCornerMachineInventory fcmi -> fcmi.getItem();
-            case PusherMachineInventory pmi -> pmi.getItem();
-            case WindowInventory wi -> wi.getItem();
-            case NotAssignedInventory nai -> nai.getItem();
-            default -> throw new IllegalArgumentException("Unknown inventory type");
-        };
-    }
-
     /**
-     * Create a new inventory record at the specified location
+     * Resolve location UUID → code
      */
-    private Object createInventoryAtLocation(LocationType locationType, UUID locationId,
-            com.mirai.inventoryservice.models.Product product, int quantity) {
-        return switch (locationType) {
-            case BOX_BIN -> {
-                BoxBin boxBin = boxBinRepository.findById(locationId)
-                        .orElseThrow(() -> new BoxBinNotFoundException("BoxBin not found: " + locationId));
-                BoxBinInventory inv = new BoxBinInventory();
-                inv.setBoxBin(boxBin);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield boxBinInventoryRepository.save(inv);
-            }
-            case CABINET -> {
-                Cabinet cabinet = cabinetRepository.findById(locationId)
-                        .orElseThrow(() -> new CabinetNotFoundException("Cabinet not found: " + locationId));
-                CabinetInventory inv = new CabinetInventory();
-                inv.setCabinet(cabinet);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield cabinetInventoryRepository.save(inv);
-            }
-            case DOUBLE_CLAW_MACHINE -> {
-                DoubleClawMachine machine = doubleClawMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new DoubleClawMachineNotFoundException("DoubleClawMachine not found: " + locationId));
-                DoubleClawMachineInventory inv = new DoubleClawMachineInventory();
-                inv.setDoubleClawMachine(machine);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield doubleClawMachineInventoryRepository.save(inv);
-            }
-            case FOUR_CORNER_MACHINE -> {
-                FourCornerMachine machine = fourCornerMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new FourCornerMachineNotFoundException("FourCornerMachine not found: " + locationId));
-                FourCornerMachineInventory inv = new FourCornerMachineInventory();
-                inv.setFourCornerMachine(machine);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield fourCornerMachineInventoryRepository.save(inv);
-            }
-            case GACHAPON -> throw new InvalidInventoryOperationException("Gachapon is display-only and does not support inventory");
-            case KEYCHAIN_MACHINE -> throw new InvalidInventoryOperationException("Keychain Machine is display-only and does not support inventory");
-            case PUSHER_MACHINE -> {
-                PusherMachine machine = pusherMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new PusherMachineNotFoundException("PusherMachine not found: " + locationId));
-                PusherMachineInventory inv = new PusherMachineInventory();
-                inv.setPusherMachine(machine);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield pusherMachineInventoryRepository.save(inv);
-            }
-            case RACK -> {
-                Rack rack = rackRepository.findById(locationId)
-                        .orElseThrow(() -> new RackNotFoundException("Rack not found: " + locationId));
-                RackInventory inv = new RackInventory();
-                inv.setRack(rack);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield rackInventoryRepository.save(inv);
-            }
-            case SINGLE_CLAW_MACHINE -> {
-                SingleClawMachine machine = singleClawMachineRepository.findById(locationId)
-                        .orElseThrow(() -> new SingleClawMachineNotFoundException("SingleClawMachine not found: " + locationId));
-                SingleClawMachineInventory inv = new SingleClawMachineInventory();
-                inv.setSingleClawMachine(machine);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield singleClawMachineInventoryRepository.save(inv);
-            }
-            case WINDOW -> {
-                Window window = windowRepository.findById(locationId)
-                        .orElseThrow(() -> new WindowNotFoundException("Window not found: " + locationId));
-                WindowInventory inv = new WindowInventory();
-                inv.setWindow(window);
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield windowInventoryRepository.save(inv);
-            }
-            case NOT_ASSIGNED -> {
-                NotAssignedInventory inv = new NotAssignedInventory();
-                inv.setItem(product);
-                inv.setQuantity(quantity);
-                yield notAssignedInventoryRepository.save(inv);
-            }
-        };
+    public String resolveLocationCode(UUID locationId) {
+        if (locationId == null) {
+            return null;
+        }
+        return locationRepository.findById(locationId)
+                .map(Location::getLocationCode)
+                .orElse(null);
     }
 
     /**
-     * Get the ID from an inventory object
-     */
-    private UUID getInventoryId(Object inventory) {
-        return switch (inventory) {
-            case BoxBinInventory bbi -> bbi.getId();
-            case SingleClawMachineInventory scmi -> scmi.getId();
-            case DoubleClawMachineInventory dcmi -> dcmi.getId();
-            case CabinetInventory ci -> ci.getId();
-            case RackInventory ri -> ri.getId();
-            case FourCornerMachineInventory fcmi -> fcmi.getId();
-            case PusherMachineInventory pmi -> pmi.getId();
-            case WindowInventory wi -> wi.getId();
-            case NotAssignedInventory nai -> nai.getId();
-            default -> throw new IllegalArgumentException("Unknown inventory type");
-        };
-    }
-
-    /**
-     * Resolve location UUID → code (for Kafka/UI use)
-     * Calls the database function resolve_location_code() for consistency.
+     * Resolve location UUID → code (backward compatible signature)
      */
     public String resolveLocationCode(UUID locationId, LocationType locationType) {
-        // NOT_ASSIGNED locations have no locationId, but should return "NA"
         if (locationId == null) {
             return locationType == LocationType.NOT_ASSIGNED ? "NA" : null;
         }
-
-        Object result = entityManager.createNativeQuery("SELECT resolve_location_code(:locationId, :locationType)")
-                .setParameter("locationId", locationId)
-                .setParameter("locationType", locationType.name())
-                .getSingleResult();
-
-        return result != null ? result.toString() : null;
+        return resolveLocationCode(locationId);
     }
 
     /**
      * Calculate total inventory for a product across all storage locations.
-     * Calls the database function calculate_total_inventory() for consistency.
      */
     public int calculateTotalInventory(UUID productId) {
         entityManager.flush();
-        Object result = entityManager.createNativeQuery("SELECT calculate_total_inventory(:productId)")
-                .setParameter("productId", productId)
-                .getSingleResult();
-
-        return ((Number) result).intValue();
+        Integer total = locationInventoryRepository.sumQuantityByProductId(productId);
+        return total != null ? total : 0;
     }
 
     /**
      * Create an audit log entry for a stock movement action.
-     * productSummary is denormalized at write-time so the list view never needs to
-     * lazy-load movements just to display the product name.
      */
     private AuditLog createAuditLog(
             UUID actorId,
