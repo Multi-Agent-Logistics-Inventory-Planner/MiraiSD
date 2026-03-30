@@ -39,36 +39,11 @@ import type {
   ShipmentItemReceipt,
   DestinationAllocation,
   StorageLocation,
-  BoxBin,
-  Cabinet,
-  DoubleClawMachine,
-  FourCornerMachine,
-  Gachapon,
-  KeychainMachine,
-  PusherMachine,
-  Rack,
-  SingleClawMachine,
-  Window,
 } from "@/types/api";
 import { LocationType } from "@/types/api";
 
 function getLocationCode(location: StorageLocation): string {
-  if ("boxBinCode" in location) return (location as BoxBin).boxBinCode;
-  if ("cabinetCode" in location) return (location as Cabinet).cabinetCode;
-  if ("doubleClawMachineCode" in location)
-    return (location as DoubleClawMachine).doubleClawMachineCode;
-  if ("fourCornerMachineCode" in location)
-    return (location as FourCornerMachine).fourCornerMachineCode;
-  if ("gachaponCode" in location) return (location as Gachapon).gachaponCode;
-  if ("keychainMachineCode" in location)
-    return (location as KeychainMachine).keychainMachineCode;
-  if ("pusherMachineCode" in location)
-    return (location as PusherMachine).pusherMachineCode;
-  if ("rackCode" in location) return (location as Rack).rackCode;
-  if ("singleClawMachineCode" in location)
-    return (location as SingleClawMachine).singleClawMachineCode;
-  if ("windowCode" in location) return (location as Window).windowCode;
-  return "";
+  return location.locationCode ?? "";
 }
 
 const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
