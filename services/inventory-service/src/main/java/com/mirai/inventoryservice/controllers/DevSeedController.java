@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.Notification;
@@ -13,37 +14,28 @@ import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
+import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.models.shipment.Shipment;
-import com.mirai.inventoryservice.models.storage.BoxBin;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
-import com.mirai.inventoryservice.repositories.BoxBinRepository;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
+import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.repositories.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
+import com.mirai.inventoryservice.repositories.SiteRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.repositories.StorageLocationRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
-import com.mirai.inventoryservice.repositories.SingleClawMachineRepository;
-import com.mirai.inventoryservice.repositories.DoubleClawMachineRepository;
-import com.mirai.inventoryservice.repositories.GachaponRepository;
-import com.mirai.inventoryservice.repositories.KeychainMachineRepository;
-import com.mirai.inventoryservice.repositories.PusherMachineRepository;
-import com.mirai.inventoryservice.repositories.FourCornerMachineRepository;
-import com.mirai.inventoryservice.models.storage.SingleClawMachine;
-import com.mirai.inventoryservice.models.storage.DoubleClawMachine;
-import com.mirai.inventoryservice.models.storage.Gachapon;
-import com.mirai.inventoryservice.models.storage.KeychainMachine;
-import com.mirai.inventoryservice.models.storage.PusherMachine;
-import com.mirai.inventoryservice.models.storage.FourCornerMachine;
 import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,12 +82,15 @@ public class DevSeedController {
     private static final int PRODUCT_SUMMARY_DISPLAY_LIMIT = 3;
     private static final int NOTES_INTERVAL = 5;
     private static final String DEV_SEED_AUDIT_SOURCE = "dev_seed_audit";
+    private static final String DEFAULT_SITE_CODE = "MAIN";
 
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
     private final AuditLogRepository auditLogRepository;
-    private final BoxBinRepository boxBinRepository;
-    private final BoxBinInventoryRepository boxBinInventoryRepository;
+    private final SiteRepository siteRepository;
+    private final StorageLocationRepository storageLocationRepository;
+    private final LocationRepository locationRepository;
+    private final LocationInventoryRepository locationInventoryRepository;
     private final ShipmentRepository shipmentRepository;
     private final CategoryRepository categoryRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
@@ -105,12 +100,6 @@ public class DevSeedController {
     private final ReviewDailyCountRepository reviewDailyCountRepository;
     private final MachineDisplayRepository machineDisplayRepository;
     private final AnalyticsSeedService analyticsSeedService;
-    private final SingleClawMachineRepository singleClawMachineRepository;
-    private final DoubleClawMachineRepository doubleClawMachineRepository;
-    private final GachaponRepository gachaponRepository;
-    private final KeychainMachineRepository keychainMachineRepository;
-    private final PusherMachineRepository pusherMachineRepository;
-    private final FourCornerMachineRepository fourCornerMachineRepository;
 
     private final Random random = new Random();
 
@@ -149,20 +138,29 @@ public class DevSeedController {
         }
         products = productRepository.saveAll(products);
 
-        // 2. Box bins (5)
-        List<BoxBin> boxBins = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            boxBins.add(BoxBin.builder()
-                .boxBinCode("B" + String.format("%03d", i + 1))
-                .build());
-        }
-        boxBins = boxBinRepository.saveAll(boxBins);
+        // 2. Get site and BOX_BINS storage location
+        Site site = siteRepository.findByCode(DEFAULT_SITE_CODE)
+            .orElseThrow(() -> new RuntimeException("Default site not found: " + DEFAULT_SITE_CODE));
+        StorageLocation boxBinsStorage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", DEFAULT_SITE_CODE)
+            .orElseThrow(() -> new RuntimeException("BOX_BINS storage location not found"));
 
-        // 3. Inventory records — mix of good / low / critical / out-of-stock
-        List<BoxBinInventory> inventoryRecords = new ArrayList<>();
+        // 3. Create box bin locations (5)
+        List<Location> locations = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            String code = "B" + String.format("%03d", i + 1);
+            Location location = locationRepository.findByLocationCodeAndStorageLocation_Id(code, boxBinsStorage.getId())
+                .orElseGet(() -> locationRepository.save(Location.builder()
+                    .storageLocation(boxBinsStorage)
+                    .locationCode(code)
+                    .build()));
+            locations.add(location);
+        }
+
+        // 4. Inventory records — mix of good / low / critical / out-of-stock
+        List<LocationInventory> inventoryRecords = new ArrayList<>();
         for (int i = 0; i < products.size(); i++) {
             Product product = products.get(i);
-            BoxBin bin = boxBins.get(i % boxBins.size());
+            Location location = locations.get(i % locations.size());
             int reorderPoint = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
 
             int quantity;
@@ -183,13 +181,14 @@ public class DevSeedController {
                 quantity = 0;
             }
 
-            inventoryRecords.add(BoxBinInventory.builder()
-                .boxBin(bin)
-                .item(product)
+            inventoryRecords.add(LocationInventory.builder()
+                .location(location)
+                .site(site)
+                .product(product)
                 .quantity(quantity)
                 .build());
         }
-        boxBinInventoryRepository.saveAll(inventoryRecords);
+        locationInventoryRepository.saveAll(inventoryRecords);
 
         // 4. Shipments (8) spread across current month
         String[] suppliers = {"Mirai Wholesale", "Japan Arcade Supply Co.", "ACE Toys Ltd", "Pacific Toy Imports"};
@@ -246,13 +245,13 @@ public class DevSeedController {
         }
         stockMovementRepository.saveAll(movements);
 
-        log.info("Seeded: {} products, {} box bins, {} inventory records, {} shipments, {} sales",
-            products.size(), boxBins.size(), inventoryRecords.size(), shipments.size(), movements.size());
+        log.info("Seeded: {} products, {} locations, {} inventory records, {} shipments, {} sales",
+            products.size(), locations.size(), inventoryRecords.size(), shipments.size(), movements.size());
 
         return ResponseEntity.ok(Map.of(
             "success", true,
             "productsCreated", products.size(),
-            "boxBinsCreated", boxBins.size(),
+            "locationsCreated", locations.size(),
             "inventoryRecordsCreated", inventoryRecords.size(),
             "shipmentsCreated", shipments.size(),
             "salesCreated", movements.size()
@@ -393,10 +392,10 @@ public class DevSeedController {
             ));
         }
 
-        // Get current inventory quantities
+        // Get current inventory quantities from unified inventory table
         Map<UUID, Integer> inventoryByProduct = new HashMap<>();
-        boxBinInventoryRepository.findAll().forEach(inv ->
-            inventoryByProduct.merge(inv.getItem().getId(), inv.getQuantity(), Integer::sum)
+        locationInventoryRepository.findAll().forEach(inv ->
+            inventoryByProduct.merge(inv.getProduct().getId(), inv.getQuantity(), Integer::sum)
         );
 
         List<ForecastPrediction> forecasts = new ArrayList<>();
@@ -858,10 +857,18 @@ public class DevSeedController {
             ));
         }
 
-        List<BoxBin> boxBins = boxBinRepository.findAll();
-        if (boxBins.isEmpty()) {
+        // Get BOX_BINS storage location and its locations
+        StorageLocation boxBinsStorage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", DEFAULT_SITE_CODE)
+            .orElse(null);
+        if (boxBinsStorage == null) {
             return ResponseEntity.badRequest().body(Map.of(
-                "error", "No box bins found. Run /api/dev/seed/all first."
+                "error", "BOX_BINS storage location not found. Check database setup."
+            ));
+        }
+        List<Location> boxBinLocations = locationRepository.findByStorageLocation_Id(boxBinsStorage.getId());
+        if (boxBinLocations.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No box bin locations found. Run /api/dev/seed/all first."
             ));
         }
 
@@ -923,11 +930,11 @@ public class DevSeedController {
                 summary.append(" +").append(selectedProducts.size() - PRODUCT_SUMMARY_DISPLAY_LIMIT).append(" more");
             }
 
-            // Select locations based on reason
-            BoxBin fromBin = boxBins.get(random.nextInt(boxBins.size()));
-            BoxBin toBin = boxBins.get(random.nextInt(boxBins.size()));
-            while (toBin.equals(fromBin) && boxBins.size() > 1) {
-                toBin = boxBins.get(random.nextInt(boxBins.size()));
+            // Select locations based on reason (using unified Location entities)
+            Location fromLoc = boxBinLocations.get(random.nextInt(boxBinLocations.size()));
+            Location toLoc = boxBinLocations.get(random.nextInt(boxBinLocations.size()));
+            while (toLoc.equals(fromLoc) && boxBinLocations.size() > 1) {
+                toLoc = boxBinLocations.get(random.nextInt(boxBinLocations.size()));
             }
 
             UUID fromLocationId = null;
@@ -937,22 +944,22 @@ public class DevSeedController {
 
             switch (reason) {
                 case TRANSFER -> {
-                    fromLocationId = fromBin.getId();
-                    toLocationId = toBin.getId();
-                    fromLocationCode = fromBin.getBoxBinCode();
-                    toLocationCode = toBin.getBoxBinCode();
+                    fromLocationId = fromLoc.getId();
+                    toLocationId = toLoc.getId();
+                    fromLocationCode = fromLoc.getLocationCode();
+                    toLocationCode = toLoc.getLocationCode();
                 }
                 case RESTOCK, INITIAL_STOCK -> {
-                    toLocationId = toBin.getId();
-                    toLocationCode = toBin.getBoxBinCode();
+                    toLocationId = toLoc.getId();
+                    toLocationCode = toLoc.getLocationCode();
                 }
                 case SALE, DAMAGE, REMOVED -> {
-                    fromLocationId = fromBin.getId();
-                    fromLocationCode = fromBin.getBoxBinCode();
+                    fromLocationId = fromLoc.getId();
+                    fromLocationCode = fromLoc.getLocationCode();
                 }
                 case ADJUSTMENT, RETURN -> {
-                    toLocationId = toBin.getId();
-                    toLocationCode = toBin.getBoxBinCode();
+                    toLocationId = toLoc.getId();
+                    toLocationCode = toLoc.getLocationCode();
                 }
             }
 
@@ -1281,70 +1288,43 @@ public class DevSeedController {
     }
 
     /**
-     * Ensure machines exist for each location type.
-     * Creates machines if they don't exist and returns their IDs.
+     * Ensure machine locations exist for each display-capable storage location type.
+     * Uses the unified Location and StorageLocation tables.
+     * Returns location IDs that can be used for machine displays.
      */
     private List<UUID> ensureMachinesExist() {
         List<UUID> machineIds = new ArrayList<>();
 
-        // Single Claw Machines (S1-S3)
-        for (int i = 1; i <= 3; i++) {
-            String code = "S" + i;
-            SingleClawMachine machine = singleClawMachineRepository.findBySingleClawMachineCode(code)
-                .orElseGet(() -> singleClawMachineRepository.save(
-                    SingleClawMachine.builder().singleClawMachineCode(code).build()
-                ));
-            machineIds.add(machine.getId());
-        }
+        // Machine types and their codes (matching storage location codes)
+        record MachineSpec(String storageCode, String prefix, int count) {}
+        List<MachineSpec> specs = List.of(
+            new MachineSpec("SINGLE_CLAW", "S", 3),
+            new MachineSpec("DOUBLE_CLAW", "D", 2),
+            new MachineSpec("GACHAPON", "G", 3),
+            new MachineSpec("KEYCHAIN", "K", 2),
+            new MachineSpec("PUSHER", "P", 2),
+            new MachineSpec("FOUR_CORNER", "M", 2)
+        );
 
-        // Double Claw Machines (D1-D2)
-        for (int i = 1; i <= 2; i++) {
-            String code = "D" + i;
-            DoubleClawMachine machine = doubleClawMachineRepository.findByDoubleClawMachineCode(code)
-                .orElseGet(() -> doubleClawMachineRepository.save(
-                    DoubleClawMachine.builder().doubleClawMachineCode(code).build()
-                ));
-            machineIds.add(machine.getId());
-        }
+        for (MachineSpec spec : specs) {
+            StorageLocation storage = storageLocationRepository.findByCodeAndSite_Code(spec.storageCode, DEFAULT_SITE_CODE)
+                .orElse(null);
+            if (storage == null) {
+                log.warn("Storage location not found: {}", spec.storageCode);
+                continue;
+            }
 
-        // Gachapons (G1-G3)
-        for (int i = 1; i <= 3; i++) {
-            String code = "G" + i;
-            Gachapon machine = gachaponRepository.findByGachaponCode(code)
-                .orElseGet(() -> gachaponRepository.save(
-                    Gachapon.builder().gachaponCode(code).build()
-                ));
-            machineIds.add(machine.getId());
-        }
-
-        // Keychain Machines (K1-K2)
-        for (int i = 1; i <= 2; i++) {
-            String code = "K" + i;
-            KeychainMachine machine = keychainMachineRepository.findByKeychainMachineCode(code)
-                .orElseGet(() -> keychainMachineRepository.save(
-                    KeychainMachine.builder().keychainMachineCode(code).build()
-                ));
-            machineIds.add(machine.getId());
-        }
-
-        // Pusher Machines (P1-P2)
-        for (int i = 1; i <= 2; i++) {
-            String code = "P" + i;
-            PusherMachine machine = pusherMachineRepository.findByPusherMachineCode(code)
-                .orElseGet(() -> pusherMachineRepository.save(
-                    PusherMachine.builder().pusherMachineCode(code).build()
-                ));
-            machineIds.add(machine.getId());
-        }
-
-        // Four Corner Machines (M1-M2)
-        for (int i = 1; i <= 2; i++) {
-            String code = "M" + i;
-            FourCornerMachine machine = fourCornerMachineRepository.findByFourCornerMachineCode(code)
-                .orElseGet(() -> fourCornerMachineRepository.save(
-                    FourCornerMachine.builder().fourCornerMachineCode(code).build()
-                ));
-            machineIds.add(machine.getId());
+            for (int i = 1; i <= spec.count; i++) {
+                String code = spec.prefix + i;
+                Location location = locationRepository.findByLocationCodeAndStorageLocation_Id(code, storage.getId())
+                    .orElseGet(() -> locationRepository.save(
+                        Location.builder()
+                            .storageLocation(storage)
+                            .locationCode(code)
+                            .build()
+                    ));
+                machineIds.add(location.getId());
+            }
         }
 
         return machineIds;

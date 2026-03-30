@@ -106,4 +106,25 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
      * Delete all display records for a product (e.g. when deleting the product).
      */
     void deleteByProduct_Id(UUID productId);
+
+    // ========= New methods using unified location_id FK =========
+
+    /**
+     * Find all active displays for a location (unified approach)
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.location.id = :locationId AND md.endedAt IS NULL ORDER BY md.startedAt ASC")
+    List<MachineDisplay> findActiveByLocationId(@Param("locationId") UUID locationId);
+
+    /**
+     * Find display history for a location (unified approach)
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    List<MachineDisplay> findByLocation_IdOrderByStartedAtDesc(UUID locationId);
+
+    /**
+     * Find display history for a location with pagination (unified approach)
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    Page<MachineDisplay> findByLocation_IdOrderByStartedAtDesc(UUID locationId, Pageable pageable);
 }

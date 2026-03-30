@@ -6,12 +6,15 @@ import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.MachineDisplayDTO;
+import com.mirai.inventoryservice.exceptions.LocationNotFoundException;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.repositories.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
@@ -35,6 +38,7 @@ public class MachineDisplayService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final LocationRepository locationRepository;
     private final EntityManager entityManager;
     private final AuditLogService auditLogService;
 
@@ -46,12 +50,14 @@ public class MachineDisplayService {
             ProductRepository productRepository,
             UserRepository userRepository,
             StockMovementRepository stockMovementRepository,
+            LocationRepository locationRepository,
             EntityManager entityManager,
             AuditLogService auditLogService) {
         this.machineDisplayRepository = machineDisplayRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
+        this.locationRepository = locationRepository;
         this.entityManager = entityManager;
         this.auditLogService = auditLogService;
     }
@@ -75,8 +81,13 @@ public class MachineDisplayService {
             throw new IllegalArgumentException("Product is already displayed on this machine");
         }
 
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationRepository.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
         OffsetDateTime now = OffsetDateTime.now();
         MachineDisplay newDisplay = MachineDisplay.builder()
+                .location(location)
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
                 .product(product)
@@ -156,10 +167,15 @@ public class MachineDisplayService {
             }
         }
 
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationRepository.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
         // Build all display entities
         OffsetDateTime now = OffsetDateTime.now();
         List<MachineDisplay> newDisplays = newProductIds.stream()
                 .map(productId -> MachineDisplay.builder()
+                        .location(location)
                         .locationType(request.getLocationType())
                         .machineId(request.getMachineId())
                         .product(productsById.get(productId))
@@ -329,7 +345,12 @@ public class MachineDisplayService {
             throw new IllegalArgumentException("Product is already displayed on this machine");
         }
 
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationRepository.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
         MachineDisplay newDisplay = MachineDisplay.builder()
+                .location(location)
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
                 .product(incoming)
@@ -418,6 +439,10 @@ public class MachineDisplayService {
                 Map<UUID, Product> productsById = productRepository.findAllById(newProductIds).stream()
                         .collect(Collectors.toMap(Product::getId, p -> p));
 
+                // Look up location by machineId (UUIDs preserved during migration)
+                Location location = locationRepository.findById(request.getMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
                 for (UUID productId : newProductIds) {
                     Product product = productsById.get(productId);
                     if (product == null) {
@@ -425,6 +450,7 @@ public class MachineDisplayService {
                     }
 
                     MachineDisplay newDisplay = MachineDisplay.builder()
+                            .location(location)
                             .locationType(request.getLocationType())
                             .machineId(request.getMachineId())
                             .product(product)
@@ -456,6 +482,10 @@ public class MachineDisplayService {
                         .map(d -> d.getProduct().getId())
                         .collect(Collectors.toSet());
 
+                // Look up location by machineId (UUIDs preserved during migration)
+                Location currentLocation = locationRepository.findById(request.getMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
                 for (UUID displayId : request.getDisplayIdsFromTarget()) {
                     MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
                             .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
@@ -477,6 +507,7 @@ public class MachineDisplayService {
 
                     // Create new display on current machine
                     MachineDisplay newDisplay = MachineDisplay.builder()
+                            .location(currentLocation)
                             .locationType(request.getLocationType())
                             .machineId(request.getMachineId())
                             .product(product)
@@ -505,6 +536,10 @@ public class MachineDisplayService {
                         .map(d -> d.getProduct().getId())
                         .collect(Collectors.toSet());
 
+                // Look up target location by machineId (UUIDs preserved during migration)
+                Location targetLocation = locationRepository.findById(request.getTargetMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Target location not found: " + request.getTargetMachineId()));
+
                 for (UUID displayId : request.getDisplayIdsToTarget()) {
                     MachineDisplay display = machineDisplayRepository.findByIdWithProduct(displayId)
                             .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
@@ -526,6 +561,7 @@ public class MachineDisplayService {
 
                     // Create new display on target machine
                     MachineDisplay newDisplay = MachineDisplay.builder()
+                            .location(targetLocation)
                             .locationType(request.getTargetLocationType())
                             .machineId(request.getTargetMachineId())
                             .product(product)
@@ -594,6 +630,10 @@ public class MachineDisplayService {
             return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
         }
 
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationRepository.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
         OffsetDateTime now = OffsetDateTime.now();
         List<MachineDisplay> renewedDisplays = new ArrayList<>();
         List<String> productNames = new ArrayList<>();
@@ -615,6 +655,7 @@ public class MachineDisplayService {
 
             // Create a new display with fresh startedAt
             MachineDisplay newDisplay = MachineDisplay.builder()
+                    .location(location)
                     .locationType(request.getLocationType())
                     .machineId(request.getMachineId())
                     .product(product)
