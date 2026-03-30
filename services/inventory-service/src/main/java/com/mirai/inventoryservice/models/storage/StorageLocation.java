@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.storage;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.mirai.inventoryservice.models.Site;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +32,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class StorageLocation {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
