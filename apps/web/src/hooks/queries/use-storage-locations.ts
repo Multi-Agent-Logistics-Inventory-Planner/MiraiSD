@@ -7,6 +7,8 @@ export interface StorageLocationCategory {
   id: string;
   code: string;
   name: string;
+  codePrefix?: string;
+  icon?: string;
   hasDisplay: boolean;
   isDisplayOnly: boolean;
   displayOrder: number;
