@@ -105,7 +105,7 @@ public class ProductService {
                 .description(description)
                 .reorderPoint(reorderPoint != null ? reorderPoint : 10)
                 .targetStockLevel(targetStockLevel != null ? targetStockLevel : 50)
-                .leadTimeDays(leadTimeDays != null ? leadTimeDays : 7)
+                .leadTimeDays(leadTimeDays != null ? leadTimeDays : 14)
                 .unitCost(unitCost)
                 .imageUrl(imageUrl)
                 .notes(notes)

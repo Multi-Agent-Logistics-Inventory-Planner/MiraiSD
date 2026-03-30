@@ -31,7 +31,6 @@ interface ShipmentDetailSheetProps {
   onReceiveClick?: () => void;
   onDeleteClick?: () => void;
   onEditClick?: () => void;
-  onUndoReceiveClick?: () => void;
   onUndoItemsClick?: () => void;
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
@@ -332,7 +331,6 @@ export function ShipmentDetailSheet({
   onReceiveClick,
   onDeleteClick,
   onEditClick,
-  onUndoReceiveClick,
   onUndoItemsClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
@@ -487,16 +485,10 @@ export function ShipmentDetailSheet({
             </Can>
             <Can permission={Permission.SHIPMENTS_RECEIVE}>
               {canUndo && (
-                <>
-                  <Button variant="outline" size="sm" onClick={onUndoReceiveClick}>
-                    <Undo2 className="h-4 w-4 mr-2" />
-                    Undo Receipt
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={onUndoItemsClick}>
-                    <Undo2 className="h-4 w-4 mr-2" />
-                    Undo Items
-                  </Button>
-                </>
+                <Button variant="outline" size="sm" onClick={onUndoItemsClick}>
+                  <Undo2 className="h-4 w-4 mr-2" />
+                  Undo Items
+                </Button>
               )}
             </Can>
             <Can permission={Permission.SHIPMENTS_DELETE}>

@@ -6,7 +6,6 @@ import {
   updateShipment,
   deleteShipment,
   receiveShipment,
-  undoReceiveShipment,
   undoReceiveShipmentItem,
 } from "@/lib/api/shipments";
 import type {
@@ -53,17 +52,6 @@ export function useReceiveShipmentMutation() {
     { id: string; payload: ReceiveShipmentRequest }
   >({
     mutationFn: ({ id, payload }) => receiveShipment(id, payload),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["shipments"] });
-      await qc.invalidateQueries({ queryKey: ["products"] });
-    },
-  });
-}
-
-export function useUndoReceiveShipmentMutation() {
-  const qc = useQueryClient();
-  return useMutation<Shipment, Error, { id: string }>({
-    mutationFn: ({ id }) => undoReceiveShipment(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["shipments"] });
       await qc.invalidateQueries({ queryKey: ["products"] });
