@@ -260,8 +260,9 @@ public class StockMovementService {
         UUID destinationInventoryId = request.getDestinationInventoryId();
 
         if (destinationInventoryId != null) {
+            final UUID destInvId = destinationInventoryId;
             destinationInventory = locationInventoryRepository.findById(destinationInventoryId)
-                    .orElseThrow(() -> new InventoryNotFoundException("Destination inventory not found: " + destinationInventoryId));
+                    .orElseThrow(() -> new InventoryNotFoundException("Destination inventory not found: " + destInvId));
             destinationQuantity = destinationInventory.getQuantity();
         } else {
             UUID destLocationId = request.getDestinationLocationId();
@@ -270,8 +271,9 @@ public class StockMovementService {
                 destLocationId = getNotAssignedLocationId();
             }
 
+            final UUID destLocId = destLocationId;
             Location destLocation = locationRepository.findById(destLocationId)
-                    .orElseThrow(() -> new LocationNotFoundException("Destination location not found: " + destLocationId));
+                    .orElseThrow(() -> new LocationNotFoundException("Destination location not found: " + destLocId));
 
             // Check if inventory already exists at this location for this product
             destinationInventory = locationInventoryRepository
