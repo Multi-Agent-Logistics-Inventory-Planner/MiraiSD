@@ -74,40 +74,8 @@ function getLocationCode(
   locationType: LocationType,
   location: StorageLocation
 ): string {
-  switch (locationType) {
-    case "BOX_BIN":
-      return "boxBinCode" in location ? location.boxBinCode : "";
-    case "CABINET":
-      return "cabinetCode" in location ? location.cabinetCode : "";
-    case "DOUBLE_CLAW_MACHINE":
-      return "doubleClawMachineCode" in location
-        ? location.doubleClawMachineCode
-        : "";
-    case "FOUR_CORNER_MACHINE":
-      return "fourCornerMachineCode" in location
-        ? location.fourCornerMachineCode
-        : "";
-    case "GACHAPON":
-      return "gachaponCode" in location ? location.gachaponCode : "";
-    case "KEYCHAIN_MACHINE":
-      return "keychainMachineCode" in location
-        ? location.keychainMachineCode
-        : "";
-    case "PUSHER_MACHINE":
-      return "pusherMachineCode" in location
-        ? location.pusherMachineCode
-        : "";
-    case "RACK":
-      return "rackCode" in location ? location.rackCode : "";
-    case "SINGLE_CLAW_MACHINE":
-      return "singleClawMachineCode" in location
-        ? location.singleClawMachineCode
-        : "";
-    case "WINDOW":
-      return "windowCode" in location ? location.windowCode : "";
-    default:
-      return "";
-  }
+  // Unified Location type has locationCode field directly
+  return location.locationCode ?? "";
 }
 
 export function LocationSelector({

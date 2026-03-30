@@ -1,30 +1,36 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { NotAssignedInventory, InventoryRequest } from "@/types/api";
+import type { LocationInventory, InventoryRequest } from "@/types/api";
 import {
-  updateNotAssignedInventory,
-  deleteNotAssignedInventory,
+  updateLocationInventory,
+  deleteLocationInventory,
 } from "@/lib/api/inventory";
 
 function invalidateNotAssignedInventory(qc: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
+    qc.invalidateQueries({ queryKey: ["locationInventory"] }),
     qc.invalidateQueries({ queryKey: ["products"] }),
     qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
+    qc.invalidateQueries({ queryKey: ["inventoryTotals"] }),
   ]);
 }
 
-export function useUpdateNotAssignedInventoryMutation() {
+/**
+ * Hook for updating NOT_ASSIGNED inventory.
+ * Requires the NOT_ASSIGNED location ID.
+ */
+export function useUpdateNotAssignedInventoryMutation(notAssignedLocationId: string) {
   const qc = useQueryClient();
 
   return useMutation<
-    NotAssignedInventory,
+    LocationInventory,
     Error,
     { inventoryId: string; payload: InventoryRequest }
   >({
     mutationFn: async ({ inventoryId, payload }) => {
-      return updateNotAssignedInventory(inventoryId, payload);
+      return updateLocationInventory(notAssignedLocationId, inventoryId, payload);
     },
     onSuccess: async () => {
       await invalidateNotAssignedInventory(qc);
@@ -32,12 +38,16 @@ export function useUpdateNotAssignedInventoryMutation() {
   });
 }
 
-export function useDeleteNotAssignedInventoryMutation() {
+/**
+ * Hook for deleting NOT_ASSIGNED inventory.
+ * Requires the NOT_ASSIGNED location ID.
+ */
+export function useDeleteNotAssignedInventoryMutation(notAssignedLocationId: string) {
   const qc = useQueryClient();
 
   return useMutation<void, Error, { inventoryId: string }>({
     mutationFn: async ({ inventoryId }) => {
-      return deleteNotAssignedInventory(inventoryId);
+      return deleteLocationInventory(notAssignedLocationId, inventoryId);
     },
     onSuccess: async () => {
       await invalidateNotAssignedInventory(qc);

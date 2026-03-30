@@ -47,16 +47,6 @@ import {
 import type {
   StorageLocation,
   Inventory,
-  BoxBin,
-  Rack,
-  Cabinet,
-  SingleClawMachine,
-  DoubleClawMachine,
-  KeychainMachine,
-  FourCornerMachine,
-  PusherMachine,
-  Window as WindowLocation,
-  Gachapon,
   MachineDisplay,
   SetMachineDisplayBatchRequest,
 } from "@/types/api";
@@ -91,30 +81,8 @@ import { type LocationSelection } from "@/types/transfer";
 const HISTORY_PAGE_SIZE = 5;
 
 function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
-  switch (locationType) {
-    case "BOX_BIN":
-      return (loc as BoxBin).boxBinCode;
-    case "CABINET":
-      return (loc as Cabinet).cabinetCode;
-    case "DOUBLE_CLAW_MACHINE":
-      return (loc as DoubleClawMachine).doubleClawMachineCode;
-    case "FOUR_CORNER_MACHINE":
-      return (loc as FourCornerMachine).fourCornerMachineCode;
-    case "GACHAPON":
-      return (loc as Gachapon).gachaponCode;
-    case "KEYCHAIN_MACHINE":
-      return (loc as KeychainMachine).keychainMachineCode;
-    case "PUSHER_MACHINE":
-      return (loc as PusherMachine).pusherMachineCode;
-    case "RACK":
-      return (loc as Rack).rackCode;
-    case "SINGLE_CLAW_MACHINE":
-      return (loc as SingleClawMachine).singleClawMachineCode;
-    case "WINDOW":
-      return (loc as WindowLocation).windowCode;
-    default:
-      return loc.id;
-  }
+  // Unified Location type has locationCode field directly
+  return loc.locationCode ?? loc.id;
 }
 
 function formatDuration(startedAt: string, endedAt: string | null): string {
