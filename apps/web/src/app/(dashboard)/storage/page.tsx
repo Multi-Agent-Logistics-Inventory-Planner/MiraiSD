@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Plus, ArrowUpDown, RefreshCw } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Can, Permission } from "@/components/rbac";
 import {
   LocationType,
+  STORAGE_LOCATION_CODES,
   type StorageLocation,
 } from "@/types/api";
 import { toStorageLocation } from "@/lib/location-utils";
 import { naturalSortCompare } from "@/lib/utils";
-import { LocationTabs } from "@/components/locations/location-tabs";
+import { LocationTabs, LOCATION_TAB_CONFIG } from "@/components/locations/location-tabs";
 import { LocationTable } from "@/components/locations/location-table";
 import { LocationDetailSheet } from "@/components/locations/location-detail-sheet";
 import { LocationForm } from "@/components/locations/location-form";
@@ -23,6 +24,7 @@ import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useLocationsWithCounts } from "@/hooks/queries/use-locations-with-counts";
 import { useNotAssignedInventory } from "@/hooks/queries/use-not-assigned-inventory";
+import { useStorageLocations } from "@/hooks/queries/use-storage-locations";
 import {
   useCreateLocationMutation,
   useUpdateLocationMutation,
@@ -33,17 +35,32 @@ const PAGE_SIZE = 24;
 
 export default function LocationsPage() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType>(
-    LocationType.BOX_BIN,
-  );
+  const [locationType, setLocationType] = useState<LocationType | null>(null);
   const [search, setSearch] = useState("");
   const [locationPage, setLocationPage] = useState(1);
   const [notAssignedPage, setNotAssignedPage] = useState(1);
 
+  // Fetch available storage locations to determine initial tab
+  const { data: storageLocations } = useStorageLocations();
+
+  // Set initial tab to first available storage location
+  useEffect(() => {
+    if (storageLocations && storageLocations.length > 0 && locationType === null) {
+      // Find the first matching LocationType from available storage locations
+      const firstAvailable = LOCATION_TAB_CONFIG.find((config) =>
+        storageLocations.some((sl) => sl.code === config.code)
+      );
+      if (firstAvailable) {
+        setLocationType(firstAvailable.type);
+      }
+    }
+  }, [storageLocations, locationType]);
+
   const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
 
   // Optimized: fetch all locations with counts in a single query
-  const locationsQuery = useLocationsWithCounts(locationType);
+  // Only fetch when we have a selected location type
+  const locationsQuery = useLocationsWithCounts(locationType ?? undefined);
 
   // Not-assigned inventory query
   const notAssignedQuery = useNotAssignedInventory();
@@ -56,8 +73,9 @@ export default function LocationsPage() {
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const createMutation = useCreateLocationMutation(locationType);
-  const updateMutation = useUpdateLocationMutation(locationType);
+  // Default to BOX_BIN for mutations when no location type selected
+  const createMutation = useCreateLocationMutation(locationType ?? LocationType.BOX_BIN);
+  const updateMutation = useUpdateLocationMutation(locationType ?? LocationType.BOX_BIN);
 
   // Filter and sort locations based on search (now using LocationWithCounts directly)
   const filteredLocations = useMemo(() => {
@@ -168,7 +186,8 @@ export default function LocationsPage() {
         </div>
       </div>
 
-      {isNotAssigned ? (
+      {/* Show content only when a location type is selected */}
+      {locationType === null ? null : isNotAssigned ? (
         <>
           {notAssignedQuery.isError ? (
             <Card>
