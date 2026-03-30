@@ -14,6 +14,9 @@ import java.util.UUID;
 /**
  * Repository for fetching aggregated inventory totals across all location types.
  * Uses native SQL to efficiently aggregate inventory quantities by item.
+ *
+ * Uses the unified location_inventory table which consolidates all inventory
+ * from storage locations (box bins, racks, machines, etc.).
  */
 @Repository
 public class InventoryTotalsRepository {
@@ -22,25 +25,6 @@ public class InventoryTotalsRepository {
     private EntityManager entityManager;
 
     private static final String INVENTORY_TOTALS_SQL = """
-        WITH all_inventory AS (
-            SELECT item_id, quantity, updated_at FROM box_bin_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM rack_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM cabinet_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM single_claw_machine_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM double_claw_machine_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM four_corner_machine_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM pusher_machine_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM window_inventory
-            UNION ALL
-            SELECT item_id, quantity, updated_at FROM not_assigned_inventory
-        )
         SELECT
             p.id,
             p.sku,
@@ -52,12 +36,12 @@ public class InventoryTotalsRepository {
             parent.name as parent_category_name,
             p.unit_cost,
             p.is_active,
-            COALESCE(SUM(i.quantity), 0) as total_quantity,
-            MAX(i.updated_at) as last_updated_at
+            COALESCE(SUM(li.quantity), 0) as total_quantity,
+            MAX(li.updated_at) as last_updated_at
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN categories parent ON c.parent_id = parent.id
-        LEFT JOIN all_inventory i ON p.id = i.item_id
+        LEFT JOIN location_inventory li ON p.id = li.product_id
         GROUP BY p.id, p.sku, p.name, p.image_url, c.id, c.name, parent.id, parent.name, p.unit_cost, p.is_active
         ORDER BY p.name
         """;
@@ -87,17 +71,9 @@ public class InventoryTotalsRepository {
     }
 
     private static final String STOCK_TOTALS_SQL = """
-        SELECT item_id, COALESCE(SUM(quantity), 0) as total_quantity FROM (
-            SELECT item_id, quantity FROM box_bin_inventory
-            UNION ALL SELECT item_id, quantity FROM rack_inventory
-            UNION ALL SELECT item_id, quantity FROM cabinet_inventory
-            UNION ALL SELECT item_id, quantity FROM single_claw_machine_inventory
-            UNION ALL SELECT item_id, quantity FROM double_claw_machine_inventory
-            UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
-            UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
-            UNION ALL SELECT item_id, quantity FROM window_inventory
-            UNION ALL SELECT item_id, quantity FROM not_assigned_inventory
-        ) combined GROUP BY item_id
+        SELECT product_id, COALESCE(SUM(quantity), 0) as total_quantity
+        FROM location_inventory
+        GROUP BY product_id
         """;
 
     /**
