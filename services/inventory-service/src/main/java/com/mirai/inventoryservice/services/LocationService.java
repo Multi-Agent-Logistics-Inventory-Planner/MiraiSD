@@ -170,6 +170,46 @@ public class LocationService {
     }
 
     /**
+     * Create a new storage location category.
+     *
+     * @param code The unique code (e.g., "BOX_BINS")
+     * @param name The display name (e.g., "Box Bins")
+     * @param codePrefix The prefix for location codes (e.g., "B")
+     * @param hasDisplay Whether locations track display history
+     * @param isDisplayOnly Whether locations only track display (no inventory)
+     * @param displayOrder The order in the UI tabs
+     * @return The created StorageLocation
+     */
+    public StorageLocation createStorageLocation(
+            String code,
+            String name,
+            String codePrefix,
+            boolean hasDisplay,
+            boolean isDisplayOnly,
+            int displayOrder) {
+
+        Site site = getDefaultSite();
+
+        // Check if storage location with this code already exists
+        if (storageLocationRepository.findByCodeAndSite_Code(code, DEFAULT_SITE_CODE).isPresent()) {
+            throw new DuplicateLocationCodeException(
+                    "Storage location with code '" + code + "' already exists");
+        }
+
+        StorageLocation storageLocation = StorageLocation.builder()
+                .site(site)
+                .code(code)
+                .name(name)
+                .codePrefix(codePrefix)
+                .hasDisplay(hasDisplay)
+                .isDisplayOnly(isDisplayOnly)
+                .displayOrder(displayOrder)
+                .build();
+
+        return storageLocationRepository.save(storageLocation);
+    }
+
+    /**
      * Get a storage location by code.
      */
     public StorageLocation getStorageLocationByCode(String code) {
