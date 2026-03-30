@@ -6,7 +6,52 @@ import {
   ProductInventoryResponse,
   InventoryTotal,
   DISPLAY_ONLY_LOCATION_TYPES,
+  type Location,
 } from "@/types/api";
+import { getLocations } from "./locations";
+
+/** Virtual ID used for NOT_ASSIGNED when no real ID is available */
+const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
+
+/** Cached NA location ID to avoid repeated lookups */
+let cachedNALocationId: string | null = null;
+
+/**
+ * Get the actual NA location ID for NOT_ASSIGNED inventory operations.
+ * Caches the result to avoid repeated API calls.
+ */
+async function getNALocationId(): Promise<string> {
+  if (cachedNALocationId) {
+    return cachedNALocationId;
+  }
+
+  // Get locations within NOT_ASSIGNED storage location
+  const locations = await getLocations("NOT_ASSIGNED");
+
+  const naLocation = locations.find((loc) => loc.locationCode === "NA");
+  if (!naLocation) {
+    throw new Error("NA location not found within NOT_ASSIGNED storage location");
+  }
+
+  cachedNALocationId = naLocation.id;
+  return cachedNALocationId;
+}
+
+/**
+ * Resolve location ID, handling the NOT_ASSIGNED virtual ID case.
+ */
+async function resolveLocationId(
+  locationType: LocationType,
+  locationId: string
+): Promise<string> {
+  if (
+    locationType === LocationType.NOT_ASSIGNED &&
+    locationId === NOT_ASSIGNED_VIRTUAL_ID
+  ) {
+    return getNALocationId();
+  }
+  return locationId;
+}
 
 // Unified inventory API using /api/locations/{locationId}/inventory endpoints
 
@@ -105,6 +150,7 @@ export async function getInventoryByLocation(
 
 /**
  * Create inventory at a location.
+ * Handles NOT_ASSIGNED by automatically resolving the virtual ID to the actual NA location.
  */
 export async function createInventory(
   locationType: LocationType,
@@ -115,11 +161,13 @@ export async function createInventory(
     throw new Error(`${locationType} is display-only and does not support inventory`);
   }
 
-  return createLocationInventory(locationId, data);
+  const resolvedId = await resolveLocationId(locationType, locationId);
+  return createLocationInventory(resolvedId, data);
 }
 
 /**
  * Update inventory at a location.
+ * Handles NOT_ASSIGNED by automatically resolving the virtual ID to the actual NA location.
  */
 export async function updateInventory(
   locationType: LocationType,
@@ -131,11 +179,13 @@ export async function updateInventory(
     throw new Error(`${locationType} is display-only and does not support inventory`);
   }
 
-  return updateLocationInventory(locationId, inventoryId, data);
+  const resolvedId = await resolveLocationId(locationType, locationId);
+  return updateLocationInventory(resolvedId, inventoryId, data);
 }
 
 /**
  * Delete inventory at a location.
+ * Handles NOT_ASSIGNED by automatically resolving the virtual ID to the actual NA location.
  */
 export async function deleteInventory(
   locationType: LocationType,
@@ -146,7 +196,8 @@ export async function deleteInventory(
     throw new Error(`${locationType} is display-only and does not support inventory`);
   }
 
-  return deleteLocationInventory(locationId, inventoryId);
+  const resolvedId = await resolveLocationId(locationType, locationId);
+  return deleteLocationInventory(resolvedId, inventoryId);
 }
 
 // Aggregated inventory queries (already using correct endpoints)
