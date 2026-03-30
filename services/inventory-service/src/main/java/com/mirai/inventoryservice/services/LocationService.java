@@ -184,6 +184,7 @@ public class LocationService {
             String code,
             String name,
             String codePrefix,
+            String icon,
             boolean hasDisplay,
             boolean isDisplayOnly,
             int displayOrder) {
@@ -201,6 +202,7 @@ public class LocationService {
                 .code(code)
                 .name(name)
                 .codePrefix(codePrefix)
+                .icon(icon)
                 .hasDisplay(hasDisplay)
                 .isDisplayOnly(isDisplayOnly)
                 .displayOrder(displayOrder)

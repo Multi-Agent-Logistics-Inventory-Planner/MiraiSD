@@ -20,6 +20,8 @@ public class StorageLocationRequestDTO {
 
     private String codePrefix;
 
+    private String icon;
+
     @NotNull
     @Builder.Default
     private Boolean hasDisplay = false;

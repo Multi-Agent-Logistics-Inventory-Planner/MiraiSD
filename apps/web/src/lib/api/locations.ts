@@ -31,6 +31,8 @@ export async function getStorageLocations(): Promise<
     id: string;
     code: string;
     name: string;
+    codePrefix?: string;
+    icon?: string;
     hasDisplay: boolean;
     isDisplayOnly: boolean;
     displayOrder: number;
@@ -43,6 +45,7 @@ export interface CreateStorageLocationRequest {
   code: string;
   name: string;
   codePrefix?: string;
+  icon?: string;
   hasDisplay: boolean;
   isDisplayOnly: boolean;
   displayOrder: number;
@@ -57,6 +60,8 @@ export async function createStorageLocation(
   id: string;
   code: string;
   name: string;
+  codePrefix?: string;
+  icon?: string;
   hasDisplay: boolean;
   isDisplayOnly: boolean;
   displayOrder: number;

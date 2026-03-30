@@ -42,6 +42,7 @@ public class StorageLocationController {
                 request.getCode(),
                 request.getName(),
                 request.getCodePrefix(),
+                request.getIcon(),
                 request.getHasDisplay(),
                 request.getIsDisplayOnly(),
                 request.getDisplayOrder()

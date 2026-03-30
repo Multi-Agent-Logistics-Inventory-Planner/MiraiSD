@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Archive,
   Box,
@@ -25,6 +25,7 @@ import {
   type StorageLocationCategory,
 } from "@/hooks/queries/use-storage-locations";
 import { useToast } from "@/hooks/use-toast";
+import { AddStorageLocationDialog } from "./add-storage-location-dialog";
 
 // Configuration for each location type
 export interface LocationTabConfig {
@@ -61,6 +62,7 @@ export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
   const { toast } = useToast();
   const { data: storageLocations, isLoading } = useStorageLocations();
   const createMutation = useCreateStorageLocationMutation();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Create a set of existing storage location codes
   const existingCodes = useMemo(() => {
@@ -170,35 +172,22 @@ export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
           );
         })}
 
-        {/* Add button for missing storage locations */}
-        {missingTabs.length > 0 && (
-          <div className="relative group">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-            {/* Dropdown for adding storage locations */}
-            <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-20">
-              <div className="bg-popover border rounded-md shadow-lg p-1 min-w-[150px]">
-                {missingTabs.map((config) => (
-                  <button
-                    key={config.code}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-accent rounded-sm text-left"
-                    onClick={() => handleCreateStorageLocation(config)}
-                    disabled={createMutation.isPending}
-                  >
-                    <config.icon className="h-3.5 w-3.5" />
-                    {config.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Add button for new storage locations */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
       </div>
+
+      <AddStorageLocationDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        missingPresets={missingTabs}
+      />
     </div>
   );
 }
