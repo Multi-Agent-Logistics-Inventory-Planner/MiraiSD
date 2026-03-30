@@ -218,109 +218,35 @@ export interface Invitation {
   status: string;
 }
 
-// Base Storage Location type
+// Unified Location type (replaces 10 type-specific location types)
 
-interface BaseLocation {
+export interface Location {
   id: string;
+  locationCode: string;
+  storageLocationId: string;
+  storageLocationType: string;
   createdAt: string;
   updatedAt: string;
 }
 
-// Storage Location types
-
-export interface BoxBin extends BaseLocation {
-  boxBinCode: string;
+// Unified request for creating/updating locations
+export interface LocationRequest {
+  locationCode: string;
+  storageLocationId: string;
 }
 
-export interface Rack extends BaseLocation {
-  rackCode: string;
-}
-
-export interface Cabinet extends BaseLocation {
-  cabinetCode: string;
-}
-
-export interface SingleClawMachine extends BaseLocation {
-  singleClawMachineCode: string;
-}
-
-export interface DoubleClawMachine extends BaseLocation {
-  doubleClawMachineCode: string;
-}
-
-export interface KeychainMachine extends BaseLocation {
-  keychainMachineCode: string;
-}
-
-export interface FourCornerMachine extends BaseLocation {
-  fourCornerMachineCode: string;
-}
-
-export interface PusherMachine extends BaseLocation {
-  pusherMachineCode: string;
-}
-
-export interface Window extends BaseLocation {
-  windowCode: string;
-}
-
-export interface Gachapon extends BaseLocation {
-  gachaponCode: string;
-}
-
-// Union type for all locations
-export type StorageLocation =
-  | BoxBin
-  | Cabinet
-  | DoubleClawMachine
-  | FourCornerMachine
-  | Gachapon
-  | KeychainMachine
-  | PusherMachine
-  | Rack
-  | SingleClawMachine
-  | Window;
-
-// Location request types
-export interface BoxBinRequest {
-  boxBinCode: string;
-}
-
-export interface RackRequest {
-  rackCode: string;
-}
-
-export interface CabinetRequest {
-  cabinetCode: string;
-}
-
-export interface SingleClawMachineRequest {
-  singleClawMachineCode: string;
-}
-
-export interface DoubleClawMachineRequest {
-  doubleClawMachineCode: string;
-}
-
-export interface KeychainMachineRequest {
-  keychainMachineCode: string;
-}
-
-export interface FourCornerMachineRequest {
-  fourCornerMachineCode: string;
-}
-
-export interface PusherMachineRequest {
-  pusherMachineCode: string;
-}
-
-export interface WindowRequest {
-  windowCode: string;
-}
-
-export interface GachaponRequest {
-  gachaponCode: string;
-}
+// Legacy type aliases for backward compatibility
+export type StorageLocation = Location;
+export type BoxBin = Location;
+export type Rack = Location;
+export type Cabinet = Location;
+export type SingleClawMachine = Location;
+export type DoubleClawMachine = Location;
+export type KeychainMachine = Location;
+export type FourCornerMachine = Location;
+export type PusherMachine = Location;
+export type Window = Location;
+export type Gachapon = Location;
 
 // Inventory item embedded in response (simplified product)
 export interface InventoryItem {
@@ -337,71 +263,29 @@ export interface InventoryItem {
   templateQuantity?: number | null;
 }
 
-// Base Inventory type
-interface BaseInventory {
+// Unified Location Inventory type (replaces 9 type-specific inventory types)
+export interface LocationInventory {
   id: string;
+  locationId: string;
+  locationCode: string;
+  storageLocationType: string;
   item: InventoryItem;
   quantity: number;
   createdAt: string;
   updatedAt: string;
 }
 
-// Inventory types for each location
-export interface BoxBinInventory extends BaseInventory {
-  boxBinId: string;
-  boxBinCode: string;
-}
-
-export interface RackInventory extends BaseInventory {
-  rackId: string;
-  rackCode: string;
-}
-
-export interface CabinetInventory extends BaseInventory {
-  cabinetId: string;
-  cabinetCode: string;
-}
-
-export interface SingleClawMachineInventory extends BaseInventory {
-  singleClawMachineId: string;
-  singleClawMachineCode: string;
-}
-
-export interface DoubleClawMachineInventory extends BaseInventory {
-  doubleClawMachineId: string;
-  doubleClawMachineCode: string;
-}
-
-export interface FourCornerMachineInventory extends BaseInventory {
-  fourCornerMachineId: string;
-  fourCornerMachineCode: string;
-}
-
-export interface PusherMachineInventory extends BaseInventory {
-  pusherMachineId: string;
-  pusherMachineCode: string;
-}
-
-export interface WindowInventory extends BaseInventory {
-  windowId: string;
-  windowCode: string;
-}
-
-export interface NotAssignedInventory extends BaseInventory {
-  // No location fields - NOT_ASSIGNED has no physical location
-}
-
-// Union type for all inventory
-export type Inventory =
-  | BoxBinInventory
-  | RackInventory
-  | CabinetInventory
-  | SingleClawMachineInventory
-  | DoubleClawMachineInventory
-  | FourCornerMachineInventory
-  | PusherMachineInventory
-  | WindowInventory
-  | NotAssignedInventory;
+// Legacy type aliases for backward compatibility
+export type Inventory = LocationInventory;
+export type BoxBinInventory = LocationInventory;
+export type RackInventory = LocationInventory;
+export type CabinetInventory = LocationInventory;
+export type SingleClawMachineInventory = LocationInventory;
+export type DoubleClawMachineInventory = LocationInventory;
+export type FourCornerMachineInventory = LocationInventory;
+export type PusherMachineInventory = LocationInventory;
+export type WindowInventory = LocationInventory;
+export type NotAssignedInventory = LocationInventory;
 
 // Inventory request
 export interface InventoryRequest {
@@ -752,20 +636,23 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.NOT_ASSIGNED]: /^$/,  // No pattern for NOT_ASSIGNED
 };
 
-// Helper type for location endpoints
-export const LOCATION_ENDPOINTS: Record<LocationType, string> = {
-  [LocationType.BOX_BIN]: "box-bins",
-  [LocationType.CABINET]: "cabinets",
-  [LocationType.DOUBLE_CLAW_MACHINE]: "double-claw-machines",
-  [LocationType.FOUR_CORNER_MACHINE]: "four-corner-machines",
-  [LocationType.GACHAPON]: "gachapons",
-  [LocationType.KEYCHAIN_MACHINE]: "keychain-machines",
-  [LocationType.PUSHER_MACHINE]: "pusher-machines",
-  [LocationType.RACK]: "racks",
-  [LocationType.SINGLE_CLAW_MACHINE]: "single-claw-machines",
-  [LocationType.WINDOW]: "windows",
-  [LocationType.NOT_ASSIGNED]: "not-assigned",
+// Maps LocationType to storage_locations.code values in the database
+export const STORAGE_LOCATION_CODES: Record<LocationType, string> = {
+  [LocationType.BOX_BIN]: "BOX_BINS",
+  [LocationType.CABINET]: "CABINETS",
+  [LocationType.DOUBLE_CLAW_MACHINE]: "DOUBLE_CLAW",
+  [LocationType.FOUR_CORNER_MACHINE]: "FOUR_CORNER",
+  [LocationType.GACHAPON]: "GACHAPON",
+  [LocationType.KEYCHAIN_MACHINE]: "KEYCHAIN",
+  [LocationType.PUSHER_MACHINE]: "PUSHER",
+  [LocationType.RACK]: "RACKS",
+  [LocationType.SINGLE_CLAW_MACHINE]: "SINGLE_CLAW",
+  [LocationType.WINDOW]: "WINDOWS",
+  [LocationType.NOT_ASSIGNED]: "NOT_ASSIGNED",
 };
+
+// Legacy alias - prefer STORAGE_LOCATION_CODES for new code
+export const LOCATION_ENDPOINTS = STORAGE_LOCATION_CODES;
 
 // Location types that only support machine display (no inventory storage)
 export const DISPLAY_ONLY_LOCATION_TYPES: LocationType[] = [

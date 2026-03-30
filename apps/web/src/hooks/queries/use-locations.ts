@@ -1,50 +1,8 @@
 "use client";
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { LocationType, type StorageLocation } from "@/types/api";
-import {
-  getLocationsByType,
-  getBoxBinById,
-  getCabinetById,
-  getDoubleClawMachineById,
-  getFourCornerMachineById,
-  getGachaponById,
-  getKeychainMachineById,
-  getPusherMachineById,
-  getRackById,
-  getSingleClawMachineById,
-  getWindowById,
-} from "@/lib/api/locations";
-
-async function getLocationById(
-  locationType: LocationType,
-  id: string
-): Promise<StorageLocation> {
-  switch (locationType) {
-    case LocationType.BOX_BIN:
-      return getBoxBinById(id);
-    case LocationType.CABINET:
-      return getCabinetById(id);
-    case LocationType.DOUBLE_CLAW_MACHINE:
-      return getDoubleClawMachineById(id);
-    case LocationType.FOUR_CORNER_MACHINE:
-      return getFourCornerMachineById(id);
-    case LocationType.GACHAPON:
-      return getGachaponById(id);
-    case LocationType.KEYCHAIN_MACHINE:
-      return getKeychainMachineById(id);
-    case LocationType.PUSHER_MACHINE:
-      return getPusherMachineById(id);
-    case LocationType.RACK:
-      return getRackById(id);
-    case LocationType.SINGLE_CLAW_MACHINE:
-      return getSingleClawMachineById(id);
-    case LocationType.WINDOW:
-      return getWindowById(id);
-    default:
-      throw new Error(`Unknown location type: ${locationType}`);
-  }
-}
+import { LocationType, type Location } from "@/types/api";
+import { getLocationsByType, getLocationById } from "@/lib/api/locations";
 
 export function useLocations(locationType: LocationType) {
   return useQuery({
@@ -61,23 +19,23 @@ export function useLocations(locationType: LocationType) {
 export function useLocationsOnly(locationType: LocationType) {
   return useQuery({
     queryKey: ["locationsOnly", locationType],
-    queryFn: async (): Promise<StorageLocation[]> => {
-      return (await getLocationsByType(locationType)) as StorageLocation[];
+    queryFn: async (): Promise<Location[]> => {
+      return getLocationsByType(locationType);
     },
     enabled: locationType !== LocationType.NOT_ASSIGNED,
   });
 }
 
 /**
- * Fetch a single location by type and ID.
+ * Fetch a single location by ID.
  */
 export function useLocation(
   locationType: LocationType | undefined,
   locationId: string | undefined
-): UseQueryResult<StorageLocation> {
+): UseQueryResult<Location> {
   return useQuery({
     queryKey: ["location", locationType, locationId],
-    queryFn: () => getLocationById(locationType!, locationId!),
+    queryFn: () => getLocationById(locationId!),
     enabled:
       !!locationType &&
       locationType !== LocationType.NOT_ASSIGNED &&

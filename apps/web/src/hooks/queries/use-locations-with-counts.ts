@@ -18,7 +18,8 @@ export function useLocationsWithCounts(locationType?: LocationType) {
       ? ["locationsWithCounts", locationType]
       : ["locationsWithCounts"],
     queryFn: () => getLocationsWithCounts(locationType),
-    enabled: locationType !== LocationType.NOT_ASSIGNED,
+    // Disable query when no location type or NOT_ASSIGNED (uses different endpoint)
+    enabled: !!locationType && locationType !== LocationType.NOT_ASSIGNED,
     staleTime: 30_000, // 30 seconds - data is refreshed by realtime subscriptions
   });
 }

@@ -4,75 +4,27 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   LocationType,
   InventoryRequest,
-  Inventory,
-  StorageLocation,
+  LocationInventory,
+  Location,
 } from "@/types/api";
+import { STORAGE_LOCATION_CODES } from "@/types/api";
 import {
-  createBoxBin,
-  updateBoxBin,
-  deleteBoxBin,
-  createCabinet,
-  updateCabinet,
-  deleteCabinet,
-  createDoubleClawMachine,
-  updateDoubleClawMachine,
-  deleteDoubleClawMachine,
-  createFourCornerMachine,
-  updateFourCornerMachine,
-  deleteFourCornerMachine,
-  createGachapon,
-  updateGachapon,
-  deleteGachapon,
-  createKeychainMachine,
-  updateKeychainMachine,
-  deleteKeychainMachine,
-  createPusherMachine,
-  updatePusherMachine,
-  deletePusherMachine,
-  createRack,
-  updateRack,
-  deleteRack,
-  createSingleClawMachine,
-  updateSingleClawMachine,
-  deleteSingleClawMachine,
-  createWindow,
-  updateWindow,
-  deleteWindow,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  getStorageLocationByCode,
 } from "@/lib/api/locations";
 import {
-  createBoxBinInventory,
-  updateBoxBinInventory,
-  deleteBoxBinInventory,
-  createRackInventory,
-  updateRackInventory,
-  deleteRackInventory,
-  createCabinetInventory,
-  updateCabinetInventory,
-  deleteCabinetInventory,
-  createSingleClawMachineInventory,
-  updateSingleClawMachineInventory,
-  deleteSingleClawMachineInventory,
-  createDoubleClawMachineInventory,
-  updateDoubleClawMachineInventory,
-  deleteDoubleClawMachineInventory,
-  createFourCornerMachineInventory,
-  updateFourCornerMachineInventory,
-  deleteFourCornerMachineInventory,
-  createPusherMachineInventory,
-  updatePusherMachineInventory,
-  deletePusherMachineInventory,
-  createWindowInventory,
-  updateWindowInventory,
-  deleteWindowInventory,
-  createNotAssignedInventory,
+  createLocationInventory,
+  updateLocationInventory,
+  deleteLocationInventory,
 } from "@/lib/api/inventory";
-
-type LocationPayload = Record<string, string>;
 
 function invalidateLocations(qc: ReturnType<typeof useQueryClient>, locationType: LocationType) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locations", locationType] }),
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts"] }),
   ]);
 }
 
@@ -81,52 +33,31 @@ function invalidateLocationInventory(
   locationType: LocationType,
   locationId: string
 ) {
-  // NOT_ASSIGNED uses different query keys
-  if (locationType === "NOT_ASSIGNED") {
-    return Promise.all([
-      qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
-      qc.invalidateQueries({ queryKey: ["products"] }),
-      qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
-    ]);
-  }
-
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locationInventory", locationType, locationId] }),
+    qc.invalidateQueries({ queryKey: ["locationInventory", locationId] }),
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts"] }),
+    qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }),
     qc.invalidateQueries({ queryKey: ["products"] }),
     qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
+    qc.invalidateQueries({ queryKey: ["inventoryTotals"] }),
   ]);
 }
 
 export function useCreateLocationMutation(locationType: LocationType) {
   const qc = useQueryClient();
 
-  return useMutation<StorageLocation, Error, LocationPayload>({
-    mutationFn: async (payload) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return createBoxBin(payload as any);
-        case "CABINET":
-          return createCabinet(payload as any);
-        case "DOUBLE_CLAW_MACHINE":
-          return createDoubleClawMachine(payload as any);
-        case "FOUR_CORNER_MACHINE":
-          return createFourCornerMachine(payload as any);
-        case "GACHAPON":
-          return createGachapon(payload as any);
-        case "KEYCHAIN_MACHINE":
-          return createKeychainMachine(payload as any);
-        case "PUSHER_MACHINE":
-          return createPusherMachine(payload as any);
-        case "RACK":
-          return createRack(payload as any);
-        case "SINGLE_CLAW_MACHINE":
-          return createSingleClawMachine(payload as any);
-        case "WINDOW":
-          return createWindow(payload as any);
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+  return useMutation<Location, Error, { locationCode: string }>({
+    mutationFn: async ({ locationCode }) => {
+      // Look up the storage location ID for this location type
+      const storageLocationCode = STORAGE_LOCATION_CODES[locationType];
+      const storageLocation = await getStorageLocationByCode(storageLocationCode);
+
+      return createLocation({
+        locationCode,
+        storageLocationId: storageLocation.id,
+      });
     },
     onSuccess: async () => {
       await invalidateLocations(qc, locationType);
@@ -137,32 +68,9 @@ export function useCreateLocationMutation(locationType: LocationType) {
 export function useUpdateLocationMutation(locationType: LocationType) {
   const qc = useQueryClient();
 
-  return useMutation<StorageLocation, Error, { id: string; payload: LocationPayload }>({
+  return useMutation<Location, Error, { id: string; payload: { locationCode: string } }>({
     mutationFn: async ({ id, payload }) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return updateBoxBin(id, payload as any);
-        case "CABINET":
-          return updateCabinet(id, payload as any);
-        case "DOUBLE_CLAW_MACHINE":
-          return updateDoubleClawMachine(id, payload as any);
-        case "FOUR_CORNER_MACHINE":
-          return updateFourCornerMachine(id, payload as any);
-        case "GACHAPON":
-          return updateGachapon(id, payload as any);
-        case "KEYCHAIN_MACHINE":
-          return updateKeychainMachine(id, payload as any);
-        case "PUSHER_MACHINE":
-          return updatePusherMachine(id, payload as any);
-        case "RACK":
-          return updateRack(id, payload as any);
-        case "SINGLE_CLAW_MACHINE":
-          return updateSingleClawMachine(id, payload as any);
-        case "WINDOW":
-          return updateWindow(id, payload as any);
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+      return updateLocation(id, payload);
     },
     onSuccess: async () => {
       await invalidateLocations(qc, locationType);
@@ -175,30 +83,7 @@ export function useDeleteLocationMutation(locationType: LocationType) {
 
   return useMutation<void, Error, { id: string }>({
     mutationFn: async ({ id }) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return deleteBoxBin(id);
-        case "CABINET":
-          return deleteCabinet(id);
-        case "DOUBLE_CLAW_MACHINE":
-          return deleteDoubleClawMachine(id);
-        case "FOUR_CORNER_MACHINE":
-          return deleteFourCornerMachine(id);
-        case "GACHAPON":
-          return deleteGachapon(id);
-        case "KEYCHAIN_MACHINE":
-          return deleteKeychainMachine(id);
-        case "PUSHER_MACHINE":
-          return deletePusherMachine(id);
-        case "RACK":
-          return deleteRack(id);
-        case "SINGLE_CLAW_MACHINE":
-          return deleteSingleClawMachine(id);
-        case "WINDOW":
-          return deleteWindow(id);
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+      return deleteLocation(id);
     },
     onSuccess: async () => {
       await invalidateLocations(qc, locationType);
@@ -209,32 +94,9 @@ export function useDeleteLocationMutation(locationType: LocationType) {
 export function useCreateInventoryMutation(locationType: LocationType, locationId: string) {
   const qc = useQueryClient();
 
-  return useMutation<Inventory, Error, InventoryRequest>({
+  return useMutation<LocationInventory, Error, InventoryRequest>({
     mutationFn: async (payload) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return (await createBoxBinInventory(locationId, payload)) as any;
-        case "RACK":
-          return (await createRackInventory(locationId, payload)) as any;
-        case "CABINET":
-          return (await createCabinetInventory(locationId, payload)) as any;
-        case "SINGLE_CLAW_MACHINE":
-          return (await createSingleClawMachineInventory(locationId, payload)) as any;
-        case "DOUBLE_CLAW_MACHINE":
-          return (await createDoubleClawMachineInventory(locationId, payload)) as any;
-        case "KEYCHAIN_MACHINE":
-          throw new Error("Keychain Machine is display-only and does not support inventory");
-        case "FOUR_CORNER_MACHINE":
-          return (await createFourCornerMachineInventory(locationId, payload)) as any;
-        case "PUSHER_MACHINE":
-          return (await createPusherMachineInventory(locationId, payload)) as any;
-        case "WINDOW":
-          return (await createWindowInventory(locationId, payload)) as any;
-        case "NOT_ASSIGNED":
-          return (await createNotAssignedInventory(payload)) as any;
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+      return createLocationInventory(locationId, payload);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);
@@ -248,30 +110,9 @@ export function useUpdateInventoryMutation(
 ) {
   const qc = useQueryClient();
 
-  return useMutation<Inventory, Error, { inventoryId: string; payload: InventoryRequest }>({
+  return useMutation<LocationInventory, Error, { inventoryId: string; payload: InventoryRequest }>({
     mutationFn: async ({ inventoryId, payload }) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return (await updateBoxBinInventory(locationId, inventoryId, payload)) as any;
-        case "RACK":
-          return (await updateRackInventory(locationId, inventoryId, payload)) as any;
-        case "CABINET":
-          return (await updateCabinetInventory(locationId, inventoryId, payload)) as any;
-        case "SINGLE_CLAW_MACHINE":
-          return (await updateSingleClawMachineInventory(locationId, inventoryId, payload)) as any;
-        case "DOUBLE_CLAW_MACHINE":
-          return (await updateDoubleClawMachineInventory(locationId, inventoryId, payload)) as any;
-        case "KEYCHAIN_MACHINE":
-          throw new Error("Keychain Machine is display-only and does not support inventory");
-        case "FOUR_CORNER_MACHINE":
-          return (await updateFourCornerMachineInventory(locationId, inventoryId, payload)) as any;
-        case "PUSHER_MACHINE":
-          return (await updatePusherMachineInventory(locationId, inventoryId, payload)) as any;
-        case "WINDOW":
-          return (await updateWindowInventory(locationId, inventoryId, payload)) as any;
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+      return updateLocationInventory(locationId, inventoryId, payload);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);
@@ -287,32 +128,10 @@ export function useDeleteInventoryMutation(
 
   return useMutation<void, Error, { inventoryId: string }>({
     mutationFn: async ({ inventoryId }) => {
-      switch (locationType) {
-        case "BOX_BIN":
-          return deleteBoxBinInventory(locationId, inventoryId);
-        case "RACK":
-          return deleteRackInventory(locationId, inventoryId);
-        case "CABINET":
-          return deleteCabinetInventory(locationId, inventoryId);
-        case "SINGLE_CLAW_MACHINE":
-          return deleteSingleClawMachineInventory(locationId, inventoryId);
-        case "DOUBLE_CLAW_MACHINE":
-          return deleteDoubleClawMachineInventory(locationId, inventoryId);
-        case "KEYCHAIN_MACHINE":
-          throw new Error("Keychain Machine is display-only and does not support inventory");
-        case "FOUR_CORNER_MACHINE":
-          return deleteFourCornerMachineInventory(locationId, inventoryId);
-        case "PUSHER_MACHINE":
-          return deletePusherMachineInventory(locationId, inventoryId);
-        case "WINDOW":
-          return deleteWindowInventory(locationId, inventoryId);
-        default:
-          throw new Error(`Unsupported location type: ${locationType}`);
-      }
+      return deleteLocationInventory(locationId, inventoryId);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);
     },
   });
 }
-
