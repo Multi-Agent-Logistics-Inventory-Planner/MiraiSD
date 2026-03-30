@@ -68,6 +68,8 @@ public class AnalyticsService {
     private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final int MOVERS_LIMIT = 10;
     private static final int CATEGORY_RANKINGS_LIMIT = 5;
+    private static final BigDecimal MU_HAT_EPSILON = new BigDecimal("0.001");
+    private static final BigDecimal MAX_DAYS = new BigDecimal("365");
 
     /**
      * Helper record for extracted forecast features.
@@ -151,6 +153,50 @@ public class AnalyticsService {
             ranked.add(rankMapper.apply(i + 1, items.get(i)));
         }
         return ranked;
+    }
+
+    /**
+     * Recalculate days to stockout using live stock and stored mu_hat.
+     * Returns null if mu_hat is missing or negligible.
+     */
+    private BigDecimal recalculateDaysToStockout(int currentStock, BigDecimal muHat) {
+        if (currentStock <= 0) {
+            return BigDecimal.ZERO;
+        }
+        if (muHat == null || muHat.compareTo(MU_HAT_EPSILON) <= 0) {
+            return null;
+        }
+        BigDecimal result = BigDecimal.valueOf(currentStock)
+            .divide(muHat, 2, RoundingMode.HALF_UP);
+        if (result.compareTo(MAX_DAYS) > 0) {
+            return MAX_DAYS;
+        }
+        return result;
+    }
+
+    /**
+     * Recalculate suggested order date from fresh days-to-stockout and lead time.
+     * Returns null if daysToStockout is null (infinite horizon).
+     */
+    private LocalDate recalculateSuggestedOrderDate(BigDecimal daysToStockout, int leadTimeDays, LocalDate today) {
+        if (daysToStockout == null) {
+            return null;
+        }
+        long daysUntilStockout = daysToStockout.setScale(0, RoundingMode.CEILING).longValue();
+        if (daysUntilStockout <= leadTimeDays) {
+            return today;
+        }
+        return today.plusDays(daysUntilStockout - leadTimeDays);
+    }
+
+    /**
+     * Check if an item is overdue: original suggested order date has passed AND stock is below reorder point.
+     */
+    private boolean isOverdue(LocalDate originalDate, int currentStock, int reorderPoint, LocalDate today) {
+        if (originalDate == null) {
+            return false;
+        }
+        return !originalDate.isAfter(today) && currentStock < reorderPoint;
     }
 
     @Transactional(readOnly = true)
@@ -322,6 +368,7 @@ public class AnalyticsService {
         BigDecimal totalDemandVelocity = BigDecimal.ZERO;
         BigDecimal totalAccuracy = BigDecimal.ZERO;
         int accuracyCount = 0;
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         for (ForecastPrediction prediction : latestPredictions) {
             Product product = productMap.get(prediction.getItemId());
@@ -330,13 +377,23 @@ public class AnalyticsService {
             }
 
             int currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
-            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 7;
-            BigDecimal daysToStockout = prediction.getDaysToStockout();
+            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 14;
+            int rp = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
 
             ForecastFeatures features = extractFeatures(prediction);
             BigDecimal demandVelocity = features.muHat();
             BigDecimal demandVolatility = calculateDemandVolatility(features.muHat(), features.sigmaDHat());
             BigDecimal forecastAccuracy = calculateForecastAccuracy(features.mape());
+
+            // Recalculate dynamic fields from live stock + stored mu_hat
+            BigDecimal daysToStockout = recalculateDaysToStockout(currentStock, features.muHat());
+            LocalDate suggestedOrderDate = recalculateSuggestedOrderDate(daysToStockout, leadTimeDays, today);
+            // Use recalculated date so overdue badge is consistent with displayed order date
+            boolean overdue = isOverdue(suggestedOrderDate, currentStock, rp, today);
+
+            String computedAt = prediction.getComputedAt() != null
+                ? prediction.getComputedAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                : null;
 
             if (demandVelocity != null) {
                 totalDemandVelocity = totalDemandVelocity.add(demandVelocity);
@@ -350,7 +407,7 @@ public class AnalyticsService {
                 daysToStockout,
                 leadTimeDays,
                 currentStock,
-                product.getReorderPoint()
+                rp
             );
 
             switch (urgency) {
@@ -367,18 +424,20 @@ public class AnalyticsService {
                 product.getImageUrl(),
                 product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
                 currentStock,
-                product.getReorderPoint() != null ? product.getReorderPoint() : 10,
+                rp,
                 product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50,
                 daysToStockout,
                 prediction.getAvgDailyDelta(),
                 prediction.getSuggestedReorderQty() != null ? prediction.getSuggestedReorderQty() : 0,
-                prediction.getSuggestedOrderDate(),
+                suggestedOrderDate,
                 leadTimeDays,
                 demandVelocity,
                 demandVolatility,
                 forecastAccuracy,
                 prediction.getConfidence(),
-                urgency
+                urgency,
+                overdue,
+                computedAt
             ));
         }
 

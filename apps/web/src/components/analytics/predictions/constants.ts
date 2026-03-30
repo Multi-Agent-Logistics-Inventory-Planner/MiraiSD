@@ -18,3 +18,13 @@ export const STOCKOUT_THRESHOLDS = {
   URGENT: 7,
   ATTENTION: 14,
 } as const;
+
+export const STALE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const WELL_STOCKED_THRESHOLD = 30; // daysToStockout cutoff
+
+export function isForecastStale(computedAt: string | null): boolean {
+  if (!computedAt) return true;
+  const date = new Date(computedAt);
+  if (isNaN(date.getTime())) return true;
+  return Date.now() - date.getTime() > STALE_THRESHOLD_MS;
+}

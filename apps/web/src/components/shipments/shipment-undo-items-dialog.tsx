@@ -332,11 +332,11 @@ export function ShipmentUndoItemsDialog({
 
       {/* Confirmation Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo shipment receipt?</AlertDialogTitle>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader className="flex flex-col items-center gap-4">
+            <AlertDialogTitle className="text-center">Undo shipment receipt?</AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-2">
+              <div className="space-y-2 text-center">
                 <p>
                   This will reverse inventory additions from shipment{" "}
                   <span className="font-medium font-mono">
@@ -349,8 +349,18 @@ export function ShipmentUndoItemsDialog({
                 </p>
               </div>
             </AlertDialogDescription>
+            <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
+              <Image
+                src="/dont-mess-up.jpg"
+                alt="Warning"
+                fill
+                className="object-contain"
+                sizes="(max-width: 640px) 280px, 320px"
+                priority
+              />
+            </div>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
             <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-amber-600 text-white hover:bg-amber-700"

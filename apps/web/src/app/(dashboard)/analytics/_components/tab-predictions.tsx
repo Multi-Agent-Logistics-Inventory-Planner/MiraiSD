@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { AlertCircle, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { usePredictions } from "@/hooks/queries/use-predictions";
+import { useDismissedPredictions } from "@/hooks/use-dismissed-predictions";
 import type { MultiSelectOption } from "@/components/ui/multi-select";
+import type { ActionItem, ActionUrgency } from "@/types/analytics";
 import {
   PAGE_SIZE,
+  WELL_STOCKED_THRESHOLD,
+  isForecastStale,
   PredictionItemCard,
   UrgencyTabs,
   MobileFilterControls,
@@ -19,8 +23,17 @@ import {
   type SortOption,
 } from "@/components/analytics/predictions";
 
+function countByUrgency(items: readonly ActionItem[]): Record<ActionUrgency, number> {
+  return items.reduce<Record<ActionUrgency, number>>(
+    (acc, item) => ({ ...acc, [item.urgency]: acc[item.urgency] + 1 }),
+    { CRITICAL: 0, URGENT: 0, ATTENTION: 0, HEALTHY: 0 },
+  );
+}
+
 export function TabPredictions() {
   const { data, isLoading, isError } = usePredictions();
+  const { dismissedMap, dismissedIds, dismiss, restore } = useDismissedPredictions();
+
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>("daysToStockout-asc");
@@ -30,24 +43,62 @@ export function TabPredictions() {
   // Parse sort option into field and direction
   const [sortField, sortDirection] = sortOption.split("-") as [SortField, SortDirection];
 
-  // Extract unique categories from data
-  const categories = useMemo((): MultiSelectOption<string>[] => {
+  // Check if a dismissed item should be auto-undismissed (forecast was re-run)
+  const isDismissed = useCallback(
+    (item: ActionItem): boolean => {
+      if (!dismissedIds.has(item.itemId)) return false;
+      const entry = dismissedMap[item.itemId];
+      if (!entry) return false;
+      return entry.computedAt === item.computedAt;
+    },
+    [dismissedIds, dismissedMap],
+  );
+
+  // Items that pass stale + stockout filters (before dismiss filter)
+  const nonStaleItems = useMemo(() => {
     if (!data?.items) return [];
-    const uniqueCategories = [...new Set(data.items.map((item) => item.categoryName))].sort();
-    return uniqueCategories.map((cat) => ({ value: cat, label: cat }));
+    return data.items.filter((item) => {
+      if (isForecastStale(item.computedAt)) return false;
+      if (item.daysToStockout != null && item.daysToStockout >= WELL_STOCKED_THRESHOLD) return false;
+      return true;
+    });
   }, [data?.items]);
+
+  // Active items (not dismissed)
+  const baseFilteredItems = useMemo(
+    () => nonStaleItems.filter((item) => !isDismissed(item)),
+    [nonStaleItems, isDismissed],
+  );
+
+  // Resolved items (dismissed, not yet archived -- auto-archived after 30 days by hook)
+  const resolvedItems = useMemo(
+    () => nonStaleItems.filter((item) => isDismissed(item)),
+    [nonStaleItems, isDismissed],
+  );
+
+  // Recalculate urgency counts from active items
+  const filteredCounts = useMemo(() => countByUrgency(baseFilteredItems), [baseFilteredItems]);
+
+  // Pick the right source list based on active tab
+  const sourceItems = urgencyFilter === "RESOLVED" ? resolvedItems : baseFilteredItems;
+
+  // Extract unique categories from current source
+  const categories = useMemo((): MultiSelectOption<string>[] => {
+    const uniqueCategories = [...new Set(sourceItems.map((item) => item.categoryName))].sort();
+    return uniqueCategories.map((cat) => ({ value: cat, label: cat }));
+  }, [sourceItems]);
 
   // Filter, sort, and paginate items
   const processedItems = useMemo(() => {
-    if (!data?.items) return { items: [], totalCount: 0 };
+    if (sourceItems.length === 0) return { items: [], totalCount: 0 };
 
-    // Filter by urgency
-    let filtered = urgencyFilter === "ALL"
-      ? [...data.items]
-      : data.items.filter((item) => item.urgency === urgencyFilter);
+    // Filter by urgency (skip for ALL and RESOLVED -- already scoped)
+    let filtered = (urgencyFilter === "ALL" || urgencyFilter === "RESOLVED")
+      ? [...sourceItems]
+      : sourceItems.filter((item) => item.urgency === urgencyFilter);
 
-    // Filter by search query (only in ALL tab)
-    if (urgencyFilter === "ALL" && searchQuery.trim()) {
+    // Filter by search query (only in ALL/RESOLVED tabs)
+    if ((urgencyFilter === "ALL" || urgencyFilter === "RESOLVED") && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((item) =>
         item.name.toLowerCase().includes(query)
@@ -65,8 +116,9 @@ export function TabPredictions() {
       if (sortField === "name") {
         return multiplier * a.name.localeCompare(b.name);
       }
-      const aVal = a[sortField] ?? 0;
-      const bVal = b[sortField] ?? 0;
+      const nullFallback = sortDirection === "asc" ? Infinity : -Infinity;
+      const aVal = a[sortField] ?? nullFallback;
+      const bVal = b[sortField] ?? nullFallback;
       return multiplier * (aVal - bVal);
     });
 
@@ -76,12 +128,13 @@ export function TabPredictions() {
       items: sortedItems.slice(start, start + PAGE_SIZE),
       totalCount: filtered.length,
     };
-  }, [data?.items, urgencyFilter, categoryFilter, searchQuery, sortField, sortDirection, page]);
+  }, [sourceItems, urgencyFilter, categoryFilter, searchQuery, sortField, sortDirection, page]);
 
   // Reset page when filters change
   const handleUrgencyChange = (newUrgency: UrgencyFilter) => {
     setUrgencyFilter(newUrgency);
-    setSearchQuery(""); // Clear search when changing tabs
+    setSearchQuery("");
+    setCategoryFilter([]);
     setPage(0);
   };
 
@@ -100,6 +153,20 @@ export function TabPredictions() {
     setPage(0);
   };
 
+  const handleDismiss = useCallback(
+    (item: ActionItem) => {
+      dismiss(item.itemId, item.computedAt);
+    },
+    [dismiss],
+  );
+
+  const handleRestore = useCallback(
+    (item: ActionItem) => {
+      restore(item.itemId);
+    },
+    [restore],
+  );
+
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -113,13 +180,15 @@ export function TabPredictions() {
   const totalPages = Math.ceil(processedItems.totalCount / PAGE_SIZE);
   const startItem = page * PAGE_SIZE + 1;
   const endItem = Math.min(startItem + PAGE_SIZE - 1, processedItems.totalCount);
+  const isResolved = urgencyFilter === "RESOLVED";
 
   const urgencyTabs = data ? [
-    { value: "ALL" as const, label: "All", count: data.items.length },
-    { value: "CRITICAL" as const, label: "Critical", count: data.riskSummary.critical },
-    { value: "URGENT" as const, label: "Urgent", count: data.riskSummary.urgent },
-    { value: "ATTENTION" as const, label: "Attention", count: data.riskSummary.attention },
-    { value: "HEALTHY" as const, label: "Safe", count: data.riskSummary.healthy },
+    { value: "ALL" as const, label: "All", count: baseFilteredItems.length },
+    { value: "CRITICAL" as const, label: "Critical", count: filteredCounts.CRITICAL },
+    { value: "URGENT" as const, label: "Urgent", count: filteredCounts.URGENT },
+    { value: "ATTENTION" as const, label: "Attention", count: filteredCounts.ATTENTION },
+    { value: "HEALTHY" as const, label: "Safe", count: filteredCounts.HEALTHY },
+    { value: "RESOLVED" as const, label: "Resolved", count: resolvedItems.length },
   ] : [];
 
   return (
@@ -159,20 +228,32 @@ export function TabPredictions() {
             <Card className="bg-card border-0 p-6 text-center">
               <Package className="h-12 w-12 mx-auto text-green-500 mb-4" />
               <h3 className="text-lg font-semibold text-green-700 dark:text-green-300">
-                {urgencyFilter === "ALL" ? "No items" : `No ${urgencyFilter.toLowerCase()} items`}
+                {isResolved
+                  ? "No resolved items"
+                  : urgencyFilter === "ALL"
+                    ? "No items"
+                    : `No ${urgencyFilter.toLowerCase()} items`}
               </h3>
               <p className="text-muted-foreground">
                 {categoryFilter.length > 0
                   ? "No items match your filters."
-                  : urgencyFilter === "ALL"
-                    ? "No prediction items available."
-                    : `No items with ${urgencyFilter.toLowerCase()} urgency level.`}
+                  : isResolved
+                    ? "Dismissed items appear here. They auto-archive after 30 days."
+                    : urgencyFilter === "ALL"
+                      ? "No prediction items available."
+                      : `No items with ${urgencyFilter.toLowerCase()} urgency level.`}
               </p>
             </Card>
           ) : (
             <div className="grid gap-2 grid-cols-1">
               {processedItems.items.map((item) => (
-                <PredictionItemCard key={item.itemId} item={item} showUrgencyColor />
+                <PredictionItemCard
+                  key={item.itemId}
+                  item={item}
+                  showUrgencyColor
+                  onDismiss={isResolved ? undefined : () => handleDismiss(item)}
+                  onRestore={isResolved ? () => handleRestore(item) : undefined}
+                />
               ))}
             </div>
           )}

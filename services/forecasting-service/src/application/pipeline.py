@@ -312,9 +312,9 @@ class ForecastingPipeline:
             if "lead_time_days" in merged.columns:
                 merged["lead_time_days"] = merged["avg_lead_time"].fillna(
                     merged["lead_time_days"]
-                ).fillna(7)
+                ).fillna(14)
             else:
-                merged["lead_time_days"] = merged["avg_lead_time"].fillna(7)
+                merged["lead_time_days"] = merged["avg_lead_time"].fillna(14)
             merged["sigma_L"] = merged["sigma_L"].fillna(config.LEAD_TIME_STD_DEFAULT_DAYS)
             sigma_L_series = merged["sigma_L"].astype(float)
 
@@ -335,9 +335,9 @@ class ForecastingPipeline:
 
         # Handle lead_time_days column (may not exist)
         if "lead_time_days" in merged.columns:
-            lead_time = merged["lead_time_days"].fillna(7).astype(float)
+            lead_time = merged["lead_time_days"].fillna(14).astype(float)
         else:
-            lead_time = 7.0  # Scalar default
+            lead_time = 14.0  # Scalar default
 
         service_level = config.SERVICE_LEVEL_DEFAULT
 
@@ -484,7 +484,7 @@ class ForecastingPipeline:
             mu_hat = float(row["mu_hat"])
             sigma_d_hat = float(row["sigma_d_hat"])
             current_qty = int(row["current_qty"])
-            lead_time = int(row.get("lead_time_days", 7))
+            lead_time = int(row.get("lead_time_days", 14))
             service_level = config.SERVICE_LEVEL_DEFAULT
 
             # Compute safety stock

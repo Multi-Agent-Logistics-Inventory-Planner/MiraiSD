@@ -180,6 +180,7 @@ class SupabaseRepo:
         metadata: dict | None = None,
         source_event_id: str | None = None,
         dedupe_key: str | None = None,
+        via: list[str] | None = None,
     ) -> str | None:
         """Create a notification record in the database.
 
@@ -193,6 +194,7 @@ class SupabaseRepo:
             metadata: Optional JSON metadata
             source_event_id: Optional source Kafka event ID for idempotency
             dedupe_key: Optional deduplication key (e.g., "LOW_LOC:{item_id}:{location}")
+            via: Optional list of delivery channels (e.g., ["slack", "app"]). Defaults to ["slack", "app"].
 
         Returns:
             Created notification ID, or None if creation failed or duplicate
@@ -275,7 +277,8 @@ class SupabaseRepo:
         try:
             with self._engine.connect() as conn:
                 # Prepare parameters
-                via_array_str = "{" + ",".join(f'"{v}"' for v in ["slack", "app"]) + "}"
+                via_channels = via if via is not None else ["slack", "app"]
+                via_array_str = "{" + ",".join(f'"{v}"' for v in via_channels) + "}"
                 metadata_json_str = json.dumps(metadata if metadata else {})
 
                 params = {

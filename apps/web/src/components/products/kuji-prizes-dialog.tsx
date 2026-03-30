@@ -107,22 +107,22 @@ export function KujiPrizesDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="p-6 pb-4">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-4 min-w-0 overflow-hidden">
             <DialogTitle>Manage Prizes</DialogTitle>
             <DialogDescription>
               Add prizes to {productName}. Prizes will be sorted with LP first, then A, B, C, etc.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 pb-4">
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-6 pb-4">
             {prizes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No prizes added yet.</p>
                 <p className="text-sm mt-1">Click &quot;Add Prize&quot; to get started.</p>
               </div>
             ) : (
-              <Table>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-24">Letter</TableHead>

@@ -17,16 +17,18 @@ export interface ActionItem {
   currentStock: number
   reorderPoint: number
   targetStockLevel: number
-  daysToStockout: number
+  daysToStockout: number | null
   avgDailyDelta: number
   suggestedReorderQty: number
-  suggestedOrderDate: string
+  suggestedOrderDate: string | null
   leadTimeDays: number
   demandVelocity: number | null
   demandVolatility: number | null
   forecastAccuracy: number | null
   confidence: number
   urgency: ActionUrgency
+  overdue: boolean
+  computedAt: string | null
 }
 
 export interface RiskSummary {

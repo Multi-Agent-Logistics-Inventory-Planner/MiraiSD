@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import {
   AlertDialog,
@@ -23,8 +24,28 @@ export function AdjustmentConfirmDialog({
   onConfirm,
   onCancel,
 }: AdjustmentConfirmDialogProps) {
+  // Track if user clicked confirm to prevent onCancel firing on dialog close
+  const confirmedRef = useRef(false);
+
+  useEffect(() => {
+    if (open) {
+      confirmedRef.current = false;
+    }
+  }, [open]);
+
+  function handleConfirm() {
+    confirmedRef.current = true;
+    onConfirm();
+  }
+
+  function handleOpenChange(isOpen: boolean) {
+    if (!isOpen && !confirmedRef.current) {
+      onCancel();
+    }
+  }
+
   return (
-    <AlertDialog open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="sm:max-w-md">
         <AlertDialogHeader className="flex flex-col items-center gap-4">
           <AlertDialogTitle className="text-center">
@@ -55,7 +76,7 @@ export function AdjustmentConfirmDialog({
             Use Sale Instead
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-700 dark:hover:bg-amber-800"
           >
             Yes, it&apos;s an Adjustment

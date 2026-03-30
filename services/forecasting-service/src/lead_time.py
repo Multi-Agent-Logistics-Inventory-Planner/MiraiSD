@@ -35,7 +35,7 @@ def compute_lead_time_stats(
     if shipment_df.empty:
         return pd.DataFrame({
             "item_id": fb["item_id"],
-            "avg_lead_time": fb["lead_time_days"].fillna(7).astype(float),
+            "avg_lead_time": fb["lead_time_days"].fillna(14).astype(float),
             "sigma_L": config.LEAD_TIME_STD_DEFAULT_DAYS,
             "shipment_count": 0,
             "source": "product_default",
@@ -50,7 +50,7 @@ def compute_lead_time_stats(
     if sdf.empty:
         return pd.DataFrame({
             "item_id": fb["item_id"],
-            "avg_lead_time": fb["lead_time_days"].fillna(7).astype(float),
+            "avg_lead_time": fb["lead_time_days"].fillna(14).astype(float),
             "sigma_L": config.LEAD_TIME_STD_DEFAULT_DAYS,
             "shipment_count": 0,
             "source": "product_default",
@@ -80,7 +80,7 @@ def compute_lead_time_stats(
     missing_mask = merged["source"].isna()
     merged.loc[missing_mask, "avg_lead_time"] = fb.set_index("item_id").reindex(
         merged.loc[missing_mask, "item_id"]
-    )["lead_time_days"].fillna(7).values
+    )["lead_time_days"].fillna(14).values
     merged.loc[missing_mask, "sigma_L"] = config.LEAD_TIME_STD_DEFAULT_DAYS
     merged.loc[missing_mask, "shipment_count"] = 0
     merged.loc[missing_mask, "source"] = "product_default"

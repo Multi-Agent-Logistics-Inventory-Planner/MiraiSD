@@ -108,7 +108,7 @@ BEGIN
         -- Based on lead time and consumption rate
         reorder_qty := GREATEST(
             10,
-            CEIL(ABS(daily_delta) * COALESCE(product_record.lead_time_days, 7) * 1.5)
+            CEIL(ABS(daily_delta) * COALESCE(product_record.lead_time_days, 14) * 1.5)
         )::INTEGER;
 
         -- Adjust reorder qty for overstocked items (shouldn't reorder)
@@ -117,10 +117,10 @@ BEGIN
         END IF;
 
         -- Calculate suggested order date based on lead time
-        IF days_stockout <= COALESCE(product_record.lead_time_days, 7) THEN
+        IF days_stockout <= COALESCE(product_record.lead_time_days, 14) THEN
             order_date := CURRENT_DATE;  -- Order immediately
         ELSE
-            order_date := CURRENT_DATE + (days_stockout - COALESCE(product_record.lead_time_days, 7))::INTEGER;
+            order_date := CURRENT_DATE + (days_stockout - COALESCE(product_record.lead_time_days, 14))::INTEGER;
         END IF;
 
         -- Set confidence based on data quality (simulated)
