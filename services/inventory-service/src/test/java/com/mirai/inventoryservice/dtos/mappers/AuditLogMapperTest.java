@@ -3,13 +3,16 @@ package com.mirai.inventoryservice.dtos.mappers;
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.Site;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.models.storage.*;
-import com.mirai.inventoryservice.repositories.*;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
+import com.mirai.inventoryservice.repositories.LocationRepository;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,46 +31,48 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
+/**
+ * Unit tests for AuditLogMapper.
+ * Uses the unified Location table for resolving location codes.
+ */
 @ExtendWith(MockitoExtension.class)
 class AuditLogMapperTest {
 
     @Mock
     private UserRepository userRepository;
     @Mock
-    private BoxBinRepository boxBinRepository;
-    @Mock
-    private SingleClawMachineRepository singleClawMachineRepository;
-    @Mock
-    private DoubleClawMachineRepository doubleClawMachineRepository;
-    @Mock
-    private KeychainMachineRepository keychainMachineRepository;
-    @Mock
-    private CabinetRepository cabinetRepository;
-    @Mock
-    private RackRepository rackRepository;
-    @Mock
-    private FourCornerMachineRepository fourCornerMachineRepository;
-    @Mock
-    private GachaponRepository gachaponRepository;
-    @Mock
-    private PusherMachineRepository pusherMachineRepository;
+    private LocationRepository locationRepository;
 
     private AuditLogMapper auditLogMapper;
 
+    private Site testSite;
+    private StorageLocation boxBinsStorage;
+    private StorageLocation racksStorage;
+
     @BeforeEach
     void setUp() {
-        auditLogMapper = new AuditLogMapper(
-                userRepository,
-                boxBinRepository,
-                singleClawMachineRepository,
-                doubleClawMachineRepository,
-                keychainMachineRepository,
-                cabinetRepository,
-                rackRepository,
-                fourCornerMachineRepository,
-                gachaponRepository,
-                pusherMachineRepository
-        );
+        auditLogMapper = new AuditLogMapper(userRepository, locationRepository);
+
+        // Set up test site and storage locations
+        testSite = Site.builder()
+                .id(UUID.randomUUID())
+                .code("MAIN")
+                .name("Main Warehouse")
+                .build();
+
+        boxBinsStorage = StorageLocation.builder()
+                .id(UUID.randomUUID())
+                .site(testSite)
+                .code("BOX_BINS")
+                .name("Box Bins")
+                .build();
+
+        racksStorage = StorageLocation.builder()
+                .id(UUID.randomUUID())
+                .site(testSite)
+                .code("RACKS")
+                .name("Racks")
+                .build();
     }
 
     @Nested
@@ -81,7 +86,7 @@ class AuditLogMapperTest {
 
             assertTrue(result.isEmpty());
             verifyNoInteractions(userRepository);
-            verifyNoInteractions(boxBinRepository);
+            verifyNoInteractions(locationRepository);
         }
 
         @Test
@@ -136,27 +141,27 @@ class AuditLogMapperTest {
         }
 
         @Test
-        @DisplayName("should batch fetch locations only once per location type")
-        void shouldBatchFetchLocationsOnlyOncePerType() {
-            UUID boxBin1Id = UUID.randomUUID();
-            UUID boxBin2Id = UUID.randomUUID();
-            BoxBin boxBin1 = createBoxBin(boxBin1Id, "B1");
-            BoxBin boxBin2 = createBoxBin(boxBin2Id, "B2");
+        @DisplayName("should batch fetch locations only once")
+        void shouldBatchFetchLocationsOnlyOnce() {
+            UUID loc1Id = UUID.randomUUID();
+            UUID loc2Id = UUID.randomUUID();
+            Location loc1 = createLocation(loc1Id, "B1", boxBinsStorage);
+            Location loc2 = createLocation(loc2Id, "B2", boxBinsStorage);
 
             List<StockMovement> movements = List.of(
-                    createMovement(null, LocationType.BOX_BIN, boxBin1Id, boxBin2Id),
-                    createMovement(null, LocationType.BOX_BIN, boxBin2Id, boxBin1Id),
-                    createMovement(null, LocationType.BOX_BIN, boxBin1Id, boxBin1Id)
+                    createMovement(null, LocationType.BOX_BIN, loc1Id, loc2Id),
+                    createMovement(null, LocationType.BOX_BIN, loc2Id, loc1Id),
+                    createMovement(null, LocationType.BOX_BIN, loc1Id, loc1Id)
             );
 
-            when(boxBinRepository.findAllById(anyCollection())).thenReturn(List.of(boxBin1, boxBin2));
+            when(locationRepository.findAllById(anyCollection())).thenReturn(List.of(loc1, loc2));
 
             List<AuditLogEntryDTO> result = auditLogMapper.toAuditLogEntryDTOList(movements);
 
             assertEquals(3, result.size());
 
-            // Verify batch fetch was called only ONCE for BOX_BIN type
-            verify(boxBinRepository, times(1)).findAllById(anyCollection());
+            // Verify batch fetch was called only ONCE
+            verify(locationRepository, times(1)).findAllById(anyCollection());
         }
 
         @Test
@@ -164,16 +169,15 @@ class AuditLogMapperTest {
         void shouldHandleMovementsWithDifferentLocationTypes() {
             UUID boxBinId = UUID.randomUUID();
             UUID rackId = UUID.randomUUID();
-            BoxBin boxBin = createBoxBin(boxBinId, "B1");
-            Rack rack = createRack(rackId, "R1");
+            Location boxBin = createLocation(boxBinId, "B1", boxBinsStorage);
+            Location rack = createLocation(rackId, "R1", racksStorage);
 
             List<StockMovement> movements = List.of(
                     createMovement(null, LocationType.BOX_BIN, boxBinId, null),
                     createMovement(null, LocationType.RACK, rackId, null)
             );
 
-            when(boxBinRepository.findAllById(anyCollection())).thenReturn(List.of(boxBin));
-            when(rackRepository.findAllById(anyCollection())).thenReturn(List.of(rack));
+            when(locationRepository.findAllById(anyCollection())).thenReturn(List.of(boxBin, rack));
 
             List<AuditLogEntryDTO> result = auditLogMapper.toAuditLogEntryDTOList(movements);
 
@@ -181,9 +185,8 @@ class AuditLogMapperTest {
             assertEquals("B1", result.get(0).getFromLocationCode());
             assertEquals("R1", result.get(1).getFromLocationCode());
 
-            // Verify each location type was fetched once
-            verify(boxBinRepository, times(1)).findAllById(anyCollection());
-            verify(rackRepository, times(1)).findAllById(anyCollection());
+            // Verify unified location fetch was called once
+            verify(locationRepository, times(1)).findAllById(anyCollection());
         }
 
         @Test
@@ -221,8 +224,8 @@ class AuditLogMapperTest {
             assertNull(result.get(0).getFromLocationCode());
             assertNull(result.get(0).getToLocationCode());
 
-            // Should not call boxBinRepository when all location IDs are null
-            verify(boxBinRepository, never()).findAllById(anyCollection());
+            // Should not call locationRepository when all location IDs are null
+            verify(locationRepository, never()).findAllById(anyCollection());
         }
 
         @Test
@@ -232,8 +235,8 @@ class AuditLogMapperTest {
             UUID fromLocationId = UUID.randomUUID();
             UUID toLocationId = UUID.randomUUID();
             User actor = createUser(actorId, "Jane Doe");
-            BoxBin fromBoxBin = createBoxBin(fromLocationId, "B1");
-            BoxBin toBoxBin = createBoxBin(toLocationId, "B2");
+            Location fromLoc = createLocation(fromLocationId, "B1", boxBinsStorage);
+            Location toLoc = createLocation(toLocationId, "B2", boxBinsStorage);
 
             Category testCategory = Category.builder()
                     .id(UUID.randomUUID())
@@ -264,7 +267,7 @@ class AuditLogMapperTest {
                     .build();
 
             when(userRepository.findAllById(anyCollection())).thenReturn(List.of(actor));
-            when(boxBinRepository.findAllById(anyCollection())).thenReturn(List.of(fromBoxBin, toBoxBin));
+            when(locationRepository.findAllById(anyCollection())).thenReturn(List.of(fromLoc, toLoc));
 
             List<AuditLogEntryDTO> result = auditLogMapper.toAuditLogEntryDTOList(List.of(movement));
 
@@ -372,12 +375,23 @@ class AuditLogMapperTest {
         }
 
         @Test
-        @DisplayName("should make exactly 1 location query per location type")
-        void shouldMakeExactlyOneLocationQueryPerType() {
+        @DisplayName("should make exactly 1 location query for all location types")
+        void shouldMakeExactlyOneLocationQuery() {
             // Create movements across different location types
             UUID boxBinId = UUID.randomUUID();
             UUID rackId = UUID.randomUUID();
             UUID cabinetId = UUID.randomUUID();
+
+            StorageLocation cabinetStorage = StorageLocation.builder()
+                    .id(UUID.randomUUID())
+                    .site(testSite)
+                    .code("CABINETS")
+                    .name("Cabinets")
+                    .build();
+
+            Location boxBin = createLocation(boxBinId, "B1", boxBinsStorage);
+            Location rack = createLocation(rackId, "R1", racksStorage);
+            Location cabinet = createLocation(cabinetId, "C1", cabinetStorage);
 
             List<StockMovement> movements = List.of(
                     createMovement(null, LocationType.BOX_BIN, boxBinId, boxBinId),
@@ -388,26 +402,13 @@ class AuditLogMapperTest {
                     createMovement(null, LocationType.CABINET, cabinetId, null)
             );
 
-            when(boxBinRepository.findAllById(anyCollection()))
-                    .thenReturn(List.of(createBoxBin(boxBinId, "B1")));
-            when(rackRepository.findAllById(anyCollection()))
-                    .thenReturn(List.of(createRack(rackId, "R1")));
-            when(cabinetRepository.findAllById(anyCollection()))
-                    .thenReturn(List.of(createCabinet(cabinetId, "C1")));
+            when(locationRepository.findAllById(anyCollection()))
+                    .thenReturn(List.of(boxBin, rack, cabinet));
 
             auditLogMapper.toAuditLogEntryDTOList(movements);
 
-            // Critical assertion: exactly 1 query per location type used
-            verify(boxBinRepository, times(1)).findAllById(anyCollection());
-            verify(rackRepository, times(1)).findAllById(anyCollection());
-            verify(cabinetRepository, times(1)).findAllById(anyCollection());
-
-            // Unused location types should not be queried
-            verify(singleClawMachineRepository, never()).findAllById(anyCollection());
-            verify(doubleClawMachineRepository, never()).findAllById(anyCollection());
-            verify(keychainMachineRepository, never()).findAllById(anyCollection());
-            verify(fourCornerMachineRepository, never()).findAllById(anyCollection());
-            verify(pusherMachineRepository, never()).findAllById(anyCollection());
+            // Critical assertion: exactly 1 query for all locations (unified table)
+            verify(locationRepository, times(1)).findAllById(anyCollection());
         }
 
         @Test
@@ -422,12 +423,12 @@ class AuditLogMapperTest {
                 actors.add(createUser(id, "User " + i));
             }
 
-            List<UUID> boxBinIds = new ArrayList<>();
-            List<BoxBin> boxBins = new ArrayList<>();
+            List<UUID> locationIds = new ArrayList<>();
+            List<Location> locations = new ArrayList<>();
             for (int i = 0; i < 10; i++) {
                 UUID id = UUID.randomUUID();
-                boxBinIds.add(id);
-                boxBins.add(createBoxBin(id, "B" + i));
+                locationIds.add(id);
+                locations.add(createLocation(id, "B" + i, boxBinsStorage));
             }
 
             List<StockMovement> movements = new ArrayList<>();
@@ -435,13 +436,13 @@ class AuditLogMapperTest {
                 movements.add(createMovement(
                         actorIds.get(i % 20),
                         LocationType.BOX_BIN,
-                        boxBinIds.get(i % 10),
-                        boxBinIds.get((i + 1) % 10)
+                        locationIds.get(i % 10),
+                        locationIds.get((i + 1) % 10)
                 ));
             }
 
             when(userRepository.findAllById(anyCollection())).thenReturn(actors);
-            when(boxBinRepository.findAllById(anyCollection())).thenReturn(boxBins);
+            when(locationRepository.findAllById(anyCollection())).thenReturn(locations);
 
             List<AuditLogEntryDTO> result = auditLogMapper.toAuditLogEntryDTOList(movements);
 
@@ -450,7 +451,7 @@ class AuditLogMapperTest {
             // Critical assertion: only 1 user query and 1 location query
             // Without batch fetching, this would be 100 user queries + 200 location queries
             verify(userRepository, times(1)).findAllById(anyCollection());
-            verify(boxBinRepository, times(1)).findAllById(anyCollection());
+            verify(locationRepository, times(1)).findAllById(anyCollection());
         }
     }
 
@@ -465,24 +466,11 @@ class AuditLogMapperTest {
                 .build();
     }
 
-    private BoxBin createBoxBin(UUID id, String code) {
-        return BoxBin.builder()
+    private Location createLocation(UUID id, String code, StorageLocation storageLocation) {
+        return Location.builder()
                 .id(id)
-                .boxBinCode(code)
-                .build();
-    }
-
-    private Rack createRack(UUID id, String code) {
-        return Rack.builder()
-                .id(id)
-                .rackCode(code)
-                .build();
-    }
-
-    private Cabinet createCabinet(UUID id, String code) {
-        return Cabinet.builder()
-                .id(id)
-                .cabinetCode(code)
+                .locationCode(code)
+                .storageLocation(storageLocation)
                 .build();
     }
 

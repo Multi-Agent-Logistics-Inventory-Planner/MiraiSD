@@ -3,15 +3,16 @@ package com.mirai.inventoryservice.controllers;
 import com.mirai.inventoryservice.BaseIntegrationTest;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
-import com.mirai.inventoryservice.models.storage.BoxBin;
-import com.mirai.inventoryservice.models.storage.Rack;
-import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
-import com.mirai.inventoryservice.repositories.BoxBinRepository;
+import com.mirai.inventoryservice.models.Site;
+import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.repositories.LocationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
-import com.mirai.inventoryservice.repositories.RackRepository;
+import com.mirai.inventoryservice.repositories.SiteRepository;
+import com.mirai.inventoryservice.repositories.StorageLocationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,18 +28,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Integration tests for LocationAggregateController.
  * Tests the optimized /api/locations/with-counts endpoint.
+ * Uses the unified Location and LocationInventory tables.
  */
 @DisplayName("LocationAggregateController Integration Tests")
 class LocationAggregateControllerIT extends BaseIntegrationTest {
 
     @Autowired
-    private BoxBinRepository boxBinRepository;
+    private SiteRepository siteRepository;
 
     @Autowired
-    private RackRepository rackRepository;
+    private StorageLocationRepository storageLocationRepository;
 
     @Autowired
-    private BoxBinInventoryRepository boxBinInventoryRepository;
+    private LocationRepository locationRepository;
+
+    @Autowired
+    private LocationInventoryRepository locationInventoryRepository;
 
     @Autowired
     private ProductRepository productRepository;
@@ -46,20 +51,64 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
-    private BoxBin testBoxBin;
-    private Rack testRack;
+    private Site testSite;
+    private StorageLocation boxBinsStorage;
+    private StorageLocation racksStorage;
+    private Location testBoxBin;
+    private Location testRack;
     private Product testProduct;
     private Category testCategory;
 
     @BeforeEach
     void setUp() {
+        // Get or create site
+        testSite = siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder()
+                        .name("Main Warehouse")
+                        .code("MAIN")
+                        .build()));
+
+        // Get or create storage locations
+        boxBinsStorage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(testSite)
+                        .name("Box Bins")
+                        .code("BOX_BINS")
+                        .codePrefix("B")
+                        .hasDisplay(false)
+                        .isDisplayOnly(false)
+                        .displayOrder(1)
+                        .build()));
+
+        racksStorage = storageLocationRepository.findByCodeAndSite_Code("RACKS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(testSite)
+                        .name("Racks")
+                        .code("RACKS")
+                        .codePrefix("R")
+                        .hasDisplay(false)
+                        .isDisplayOnly(false)
+                        .displayOrder(2)
+                        .build()));
+
+        // Create test category
         testCategory = categoryRepository.save(Category.builder()
                 .name("Test Category")
                 .slug("test-category-" + UUID.randomUUID())
                 .build());
 
-        testBoxBin = boxBinRepository.save(BoxBin.builder().boxBinCode("B99").build());
-        testRack = rackRepository.save(Rack.builder().rackCode("R99").build());
+        // Create test locations
+        testBoxBin = locationRepository.save(Location.builder()
+                .storageLocation(boxBinsStorage)
+                .locationCode("B99")
+                .build());
+
+        testRack = locationRepository.save(Location.builder()
+                .storageLocation(racksStorage)
+                .locationCode("R99")
+                .build());
+
+        // Create test product
         testProduct = productRepository.save(Product.builder()
                 .sku("TEST-001")
                 .name("Test Product")
@@ -78,8 +127,8 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
                             .header("Authorization", "Bearer " + employeeToken()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", isA(java.util.List.class)))
-                    .andExpect(jsonPath("$[*].locationType", hasItem("BOX_BIN")))
-                    .andExpect(jsonPath("$[*].locationType", hasItem("RACK")));
+                    .andExpect(jsonPath("$[*].locationType", hasItem("BOX_BINS")))
+                    .andExpect(jsonPath("$[*].locationType", hasItem("RACKS")));
         }
 
         @Test
@@ -89,15 +138,16 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
                             .param("type", "BOX_BIN")
                             .header("Authorization", "Bearer " + employeeToken()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].locationType", everyItem(equalTo("BOX_BIN"))));
+                    .andExpect(jsonPath("$[*].locationType", everyItem(equalTo("BOX_BINS"))));
         }
 
         @Test
         @DisplayName("Should return correct inventory counts")
         void getLocationsWithCounts_withInventory_returnsCorrectCounts() throws Exception {
-            boxBinInventoryRepository.save(BoxBinInventory.builder()
-                    .boxBin(testBoxBin)
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testBoxBin)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(10)
                     .build());
 
