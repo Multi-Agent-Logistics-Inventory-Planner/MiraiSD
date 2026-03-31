@@ -238,12 +238,11 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should allow USER role to list by product")
-        void listByProduct_userRole_notForbidden() throws Exception {
+        @DisplayName("Should deny USER role from listing by product (EMPLOYEE+ required)")
+        void listByProduct_userRole_returns403() throws Exception {
             mockMvc.perform(get(PRODUCT_URL)
                             .header("Authorization", "Bearer " + userToken()))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
+                    .andExpect(status().isForbidden());
         }
     }
 }
