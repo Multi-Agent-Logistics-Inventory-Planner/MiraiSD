@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/hooks/use-auth"
@@ -37,22 +37,20 @@ function AnalyticsContent() {
     }
   }, [isAdmin, currentTab, router])
 
+  // Track which tabs have been visited (lazy mount - only mount on first visit)
+  const [mountedTabs, setMountedTabs] = useState<Set<AnalyticsTab>>(
+    () => new Set([currentTab]),
+  )
+
+  useEffect(() => {
+    setMountedTabs((prev) => {
+      if (prev.has(currentTab)) return prev
+      return new Set([...prev, currentTab])
+    })
+  }, [currentTab])
+
   const handleTabChange = (tab: AnalyticsTab) => {
     router.push(`/analytics?tab=${tab}`)
-  }
-
-  const renderTabContent = () => {
-    switch (currentTab) {
-      case AnalyticsTab.PREDICTIONS:
-        return <TabPredictions />
-      case AnalyticsTab.INSIGHTS:
-        return <TabInsights />
-      case AnalyticsTab.DEMAND_LEADERS:
-        return <TabDemandLeaders />
-      case AnalyticsTab.LEGACY:
-      default:
-        return <TabLegacy isAdmin={isAdmin} />
-    }
   }
 
   return (
@@ -62,7 +60,20 @@ function AnalyticsContent() {
         onValueChange={handleTabChange}
         isAdmin={isAdmin}
       />
-      {renderTabContent()}
+      <div className={currentTab !== AnalyticsTab.INSIGHTS ? "hidden" : undefined}>
+        {mountedTabs.has(AnalyticsTab.INSIGHTS) && <TabInsights />}
+      </div>
+      <div className={currentTab !== AnalyticsTab.PREDICTIONS ? "hidden" : undefined}>
+        {mountedTabs.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
+      </div>
+      {isAdmin && (
+        <div className={currentTab !== AnalyticsTab.DEMAND_LEADERS ? "hidden" : undefined}>
+          {mountedTabs.has(AnalyticsTab.DEMAND_LEADERS) && <TabDemandLeaders />}
+        </div>
+      )}
+      <div className={currentTab !== AnalyticsTab.LEGACY ? "hidden" : undefined}>
+        {mountedTabs.has(AnalyticsTab.LEGACY) && <TabLegacy isAdmin={isAdmin} />}
+      </div>
     </div>
   )
 }

@@ -71,6 +71,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
               <img
                 src={item.imageUrl!}
                 alt={item.name}
+                loading="lazy"
                 className="h-16 w-16 rounded-lg object-cover"
               />
             ) : (
@@ -145,6 +146,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                 <img
                   src={item.imageUrl!}
                   alt={item.name}
+                  loading="lazy"
                   className="h-10 w-10 rounded-lg object-cover"
                 />
               ) : (
