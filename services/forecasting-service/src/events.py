@@ -18,8 +18,8 @@ class EventPayload(BaseModel):
     quantity_change: int
     reason: str | None = None
     at: datetime
-    from_box_id: str | None = None
-    to_box_id: str | None = None
+    from_location_code: str | None = None
+    to_location_code: str | None = None
     actor_id: str | None = None
     current_total_qty: int | None = None
     previous_total_qty: int | None = None

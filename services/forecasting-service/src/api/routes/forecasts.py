@@ -91,6 +91,18 @@ def run_forecast_job(
             }
         )
 
+    except FileNotFoundError as e:
+        # File system errors - log details, return generic message
+        # Must be before OSError since FileNotFoundError is a subclass of OSError
+        logger.error(f"File not found in forecast job: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Forecast calculation failed",
+                "code": "FILE_ERROR"
+            }
+        )
+
     except (ConnectionError, OSError) as e:
         # Database/network connection errors - log details, return generic message
         logger.error(f"Database error in forecast job: {str(e)}", exc_info=True)
@@ -110,17 +122,6 @@ def run_forecast_job(
             detail={
                 "error": "An unexpected error occurred",
                 "code": "INTERNAL_ERROR"
-            }
-        )
-
-    except FileNotFoundError as e:
-        # File system errors - log details, return generic message
-        logger.error(f"File not found in forecast job: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Forecast calculation failed",
-                "code": "FILE_ERROR"
             }
         )
 
