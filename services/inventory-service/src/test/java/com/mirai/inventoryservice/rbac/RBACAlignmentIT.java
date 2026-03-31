@@ -113,75 +113,83 @@ class RBACAlignmentIT extends BaseIntegrationTest {
     }
 
     /**
-     * Storage Feature: View (ALL), Modify (ADMIN only)
-     * Frontend: storage:view (all), storage:create/update/delete (ADMIN)
-     * Backend: Location controllers GET (all authenticated), POST/PUT/DELETE (ADMIN)
+     * Storage Feature: View (ALL), Create/Update (EMPLOYEE+), Delete (ADMIN only)
+     * Frontend: storage:view (all), storage:create/update (EMPLOYEE+), storage:delete (ADMIN)
+     * Backend: LocationController GET (all authenticated), POST/PUT (EMPLOYEE+), DELETE (ADMIN)
      */
     @Nested
-    @DisplayName("Storage (View: ALL, Modify: ADMIN)")
+    @DisplayName("Storage (View: ALL, Create/Update: EMPLOYEE+, Delete: ADMIN)")
     class StoragePermissions {
 
         @Test
-        @DisplayName("Employee can view racks")
-        void employee_canViewRacks() throws Exception {
-            mockMvc.perform(get("/api/racks")
+        @DisplayName("Employee can view locations")
+        void employee_canViewLocations() throws Exception {
+            mockMvc.perform(get("/api/locations")
                             .header("Authorization", "Bearer " + employeeToken()))
-                    .andExpect(status().isOk());
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
+                    });
         }
 
         @Test
-        @DisplayName("Employee denied rack creation")
-        void employee_cannotCreateRack() throws Exception {
+        @DisplayName("Employee can create locations")
+        void employee_canCreateLocation() throws Exception {
             String json = """
                     {
-                        "name": "Rack 1",
-                        "capacity": 100
+                        "locationCode": "T99",
+                        "storageLocationId": "550e8400-e29b-41d4-a716-446655440000"
                     }
                     """;
-            mockMvc.perform(post("/api/racks")
+            mockMvc.perform(post("/api/locations")
                             .header("Authorization", "Bearer " + employeeToken())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
+                    });
+        }
+
+        @Test
+        @DisplayName("Employee denied location deletion")
+        void employee_cannotDeleteLocation() throws Exception {
+            mockMvc.perform(delete("/api/locations/550e8400-e29b-41d4-a716-446655440000")
+                            .header("Authorization", "Bearer " + employeeToken()))
                     .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("Admin can create racks")
-        void admin_canCreateRack() throws Exception {
-            String json = """
-                    {
-                        "name": "Rack 1",
-                        "capacity": 100
-                    }
-                    """;
-            mockMvc.perform(post("/api/racks")
-                            .header("Authorization", "Bearer " + adminToken())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(json))
-                    .andExpect(status().isCreated());
+        @DisplayName("Admin can delete locations")
+        void admin_canDeleteLocation() throws Exception {
+            mockMvc.perform(delete("/api/locations/550e8400-e29b-41d4-a716-446655440000")
+                            .header("Authorization", "Bearer " + adminToken()))
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
+                    });
         }
     }
 
     /**
      * Inventory Operations: EMPLOYEE + ADMIN
-     * Frontend: inventory:adjust, inventory:transfer (EMPLOYEE + ADMIN)
-     * Backend: Inventory controllers adjust/transfer (EMPLOYEE + ADMIN)
+     * Frontend: inventory:adjust, inventory:add (EMPLOYEE + ADMIN)
+     * Backend: LocationInventoryController POST/PUT (EMPLOYEE+), StockMovementController adjust (EMPLOYEE+)
      */
     @Nested
     @DisplayName("Inventory Operations (EMPLOYEE + ADMIN)")
     class InventoryPermissions {
 
         @Test
-        @DisplayName("Employee can adjust inventory")
-        void employee_canAdjustInventory() throws Exception {
+        @DisplayName("Employee can add inventory to a location")
+        void employee_canAddInventory() throws Exception {
             String json = """
                     {
-                        "productId": "550e8400-e29b-41d4-a716-446655440000",
-                        "quantityChange": 10,
-                        "reason": "RECEIVED"
+                        "itemId": "550e8400-e29b-41d4-a716-446655440000",
+                        "quantity": 10
                     }
                     """;
-            mockMvc.perform(post("/api/rack-inventory/adjust")
+            mockMvc.perform(post("/api/locations/550e8400-e29b-41d4-a716-446655440000/inventory")
                             .header("Authorization", "Bearer " + employeeToken())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
@@ -194,16 +202,15 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Admin can adjust inventory")
-        void admin_canAdjustInventory() throws Exception {
+        @DisplayName("Admin can add inventory to a location")
+        void admin_canAddInventory() throws Exception {
             String json = """
                     {
-                        "productId": "550e8400-e29b-41d4-a716-446655440000",
-                        "quantityChange": 10,
-                        "reason": "RECEIVED"
+                        "itemId": "550e8400-e29b-41d4-a716-446655440000",
+                        "quantity": 10
                     }
                     """;
-            mockMvc.perform(post("/api/rack-inventory/adjust")
+            mockMvc.perform(post("/api/locations/550e8400-e29b-41d4-a716-446655440000/inventory")
                             .header("Authorization", "Bearer " + adminToken())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
