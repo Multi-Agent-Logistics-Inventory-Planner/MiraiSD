@@ -1,7 +1,12 @@
 """Unit tests for Slack notifier webhook validation."""
 
+from unittest.mock import patch
+
 import pytest
 from src.adapters.slack_notifier import SlackNotifier
+
+# Valid token must be 24+ alphanumeric chars to match the regex in _validate_webhook_url
+VALID_URL = "https://hooks.slack.com" + "/services/X00000000/Y00000000/AbCdEfGhIjKlMnOpQrStUvWx"
 
 
 class TestSlackWebhookValidation:
@@ -9,9 +14,8 @@ class TestSlackWebhookValidation:
 
     def test_valid_slack_webhook_url(self):
         """Valid Slack webhook URL should be accepted."""
-        url = "https://hooks.slack.com" + "/services/X00000000/Y00000000/XXXXXXXXXXXXXXXXXXXX"
-        notifier = SlackNotifier(webhook_url=url)
-        assert notifier._webhook_url == url
+        notifier = SlackNotifier(webhook_url=VALID_URL)
+        assert notifier._webhook_url == VALID_URL
 
     def test_invalid_webhook_url_raises_error(self):
         """Non-Slack URLs should raise ValueError."""
@@ -28,40 +32,48 @@ class TestSlackWebhookValidation:
         with pytest.raises(ValueError, match="Invalid Slack webhook URL"):
             SlackNotifier(webhook_url="http://hooks.slack.com/services/X00/Y00/XXX")
 
-    def test_none_webhook_url_with_config(self, monkeypatch):
-        """None webhook URL should use config value if available."""
-        monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com" + "/services/X00/Y00/XXX123")
-        # This test assumes config loads from environment
-        # If config is not set, validation should not run for None
-        notifier = SlackNotifier(webhook_url=None)
-        # If config has a valid URL, it should pass validation
-        # If config is None/empty, notifier should still be created (validation skipped for None)
-        assert notifier is not None
+    def test_none_webhook_url_with_empty_config(self):
+        """None webhook URL with empty config should skip validation."""
+        with patch("src.adapters.slack_notifier.config") as mock_config:
+            mock_config.SLACK_WEBHOOK_URL = ""
+            mock_config.SLACK_CHANNEL = "#test"
+            mock_config.REVIEW_SLACK_WEBHOOK_URL = ""
+            mock_config.SLACK_ENABLED = False
+            notifier = SlackNotifier(webhook_url=None)
+            assert notifier._webhook_url == ""
 
     def test_empty_string_webhook_skips_validation(self):
         """Empty string webhook URL should skip validation (treated as disabled)."""
-        notifier = SlackNotifier(webhook_url="")
-        assert notifier._webhook_url == ""
+        with patch("src.adapters.slack_notifier.config") as mock_config:
+            mock_config.SLACK_WEBHOOK_URL = ""
+            mock_config.SLACK_CHANNEL = "#test"
+            mock_config.REVIEW_SLACK_WEBHOOK_URL = ""
+            mock_config.SLACK_ENABLED = False
+            notifier = SlackNotifier(webhook_url="")
+            assert notifier._webhook_url == ""
 
     def test_webhook_with_trailing_slash(self):
-        """Webhook URL with trailing slash should be accepted."""
-        url = "https://hooks.slack.com" + "/services/X00000000/Y00000000/XXXXXXXXXXXXXXXXXXXX/"
+        """Webhook URL with trailing slash should be rejected."""
         with pytest.raises(ValueError, match="Malformed Slack webhook URL"):
-            SlackNotifier(webhook_url=url)
+            SlackNotifier(webhook_url=VALID_URL + "/")
 
     def test_webhook_with_query_params_rejected(self):
         """Webhook URL with query parameters should be rejected."""
-        url = "https://hooks.slack.com" + "/services/X00000000/Y00000000/XXXXXXXXXXXXXXXXXXXX?foo=bar"
         with pytest.raises(ValueError, match="Malformed Slack webhook URL"):
-            SlackNotifier(webhook_url=url)
+            SlackNotifier(webhook_url=VALID_URL + "?foo=bar")
 
     def test_valid_webhook_variations(self):
         """Test various valid Slack webhook URL formats."""
         valid_urls = [
-            "https://hooks.slack.com" + "/services/X00000000/Y00000000/XXXXXXXXXXXXXXXXXXXX",
-            "https://hooks.slack.com" + "/services/XAAAAAAAA/YBBBBBBBB/1234567890123456789012",
-            "https://hooks.slack.com" + "/services/X12345678/Y87654321/AbCdEfGhIjKlMnOpQrStUvWx",
+            "https://hooks.slack.com" + "/services/X00000000/Y00000000/AbCdEfGhIjKlMnOpQrStUvWx",
+            "https://hooks.slack.com" + "/services/XAAAAAAAA/YBBBBBBBB/123456789012345678901234",
+            "https://hooks.slack.com" + "/services/X12345678/Y87654321/AbCdEfGhIjKlMnOpQrStUvXxYz",
         ]
         for url in valid_urls:
             notifier = SlackNotifier(webhook_url=url)
             assert notifier._webhook_url == url
+
+    def test_short_token_rejected(self):
+        """Token shorter than 24 chars should be rejected."""
+        with pytest.raises(ValueError, match="Malformed Slack webhook URL"):
+            SlackNotifier(webhook_url="https://hooks.slack.com" + "/services/X00000000/Y00000000/ShortToken123")
