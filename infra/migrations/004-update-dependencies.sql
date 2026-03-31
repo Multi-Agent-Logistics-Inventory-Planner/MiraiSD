@@ -34,8 +34,6 @@ ALTER TABLE machine_display ALTER COLUMN location_id SET NOT NULL;
 -- Create index for new FK
 CREATE INDEX IF NOT EXISTS idx_machine_display_location ON machine_display(location_id);
 
-RAISE NOTICE 'machine_display.location_id column added and backfilled';
-
 -- ============================================================================
 -- Step 2: Add FK constraints to stock_movements
 -- The to_location_id and from_location_id columns already exist
@@ -61,8 +59,6 @@ FOREIGN KEY (from_location_id) REFERENCES locations(id);
 -- Create indexes for the FKs
 CREATE INDEX IF NOT EXISTS idx_stock_movements_to_location ON stock_movements(to_location_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_from_location ON stock_movements(from_location_id);
-
-RAISE NOTICE 'stock_movements FK constraints added';
 
 -- ============================================================================
 -- Verification
