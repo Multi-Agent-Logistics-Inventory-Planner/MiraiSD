@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -110,7 +111,7 @@ public class EventOutboxService {
                 .topic(inventoryChangesTopic)
                 .eventType("CREATED") // Expects "CREATED" or "UPDATED"
                 .entityType("stock_movement")
-                .entityId(UUID.randomUUID()) // Generate UUID for the outbox event
+                .entityId(UUID.nameUUIDFromBytes(movement.getId().toString().getBytes(StandardCharsets.UTF_8)))
                 .payload(payload)
                 .build();
 

@@ -298,7 +298,7 @@ export default function ReviewsPage() {
       </div>
 
       {/* Leaderboard */}
-      <Card className="py-0">
+      <Card className="p-2 dark:border-none">
         <CardContent className="p-0">
           <LeaderboardTable
             summaries={summaries}
