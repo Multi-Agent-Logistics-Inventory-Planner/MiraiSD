@@ -31,7 +31,7 @@ public class ReviewEmployee {
     private String canonicalName;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "name_variants", columnDefinition = "text[]")
+    @Column(name = "name_variants")
     private List<String> nameVariants;
 
     @Column(name = "is_active")

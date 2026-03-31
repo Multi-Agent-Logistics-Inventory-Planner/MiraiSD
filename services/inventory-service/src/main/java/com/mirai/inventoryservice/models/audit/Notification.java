@@ -53,11 +53,9 @@ public class Notification {
     private UUID inventoryId;  // Related inventory record
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(columnDefinition = "text[]")
     private List<String> via;  // Delivery channels: email, sms, push
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata;
 
     @CreationTimestamp
