@@ -55,6 +55,21 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
         );
   
+        http.exceptionHandling(ex -> ex
+            .authenticationEntryPoint((request, response, authException) -> {
+                response.setStatus(401);
+                response.setContentType("application/json");
+                response.getWriter().write(
+                    "{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+            })
+            .accessDeniedHandler((request, response, accessDeniedException) -> {
+                response.setStatus(403);
+                response.setContentType("application/json");
+                response.getWriter().write(
+                    "{\"status\":403,\"error\":\"Forbidden\",\"message\":\"Insufficient permissions\"}");
+            })
+        );
+
         // Add rate limiting filter BEFORE JWT authentication
         // This ensures rate limiting happens first, protecting against DoS attacks
         http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
