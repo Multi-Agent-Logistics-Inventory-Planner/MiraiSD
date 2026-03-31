@@ -2,16 +2,19 @@ package com.mirai.inventoryservice.integration;
 
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.audit.EventDeadLetter;
+import com.mirai.inventoryservice.models.Site;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
-import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
-import com.mirai.inventoryservice.models.storage.BoxBin;
-import com.mirai.inventoryservice.repositories.BoxBinInventoryRepository;
-import com.mirai.inventoryservice.repositories.BoxBinRepository;
+import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
+import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.repositories.LocationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.repositories.SiteRepository;
+import com.mirai.inventoryservice.repositories.StorageLocationRepository;
 import com.mirai.inventoryservice.services.EventOutboxService;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -55,10 +58,16 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     private ProductRepository productRepository;
 
     @Autowired
-    private BoxBinRepository boxBinRepository;
+    private SiteRepository siteRepository;
 
     @Autowired
-    private BoxBinInventoryRepository boxBinInventoryRepository;
+    private StorageLocationRepository storageLocationRepository;
+
+    @Autowired
+    private LocationRepository locationRepository;
+
+    @Autowired
+    private LocationInventoryRepository locationInventoryRepository;
 
     @Autowired
     private EventOutboxRepository eventOutboxRepository;
@@ -69,39 +78,60 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @Autowired
     private EventOutboxService eventOutboxService;
 
-    private BoxBinInventory testInventory;
+    private LocationInventory testInventory;
     private Product testProduct;
 
     @BeforeEach
     void seedTestData() {
-        // Create prerequisite entities
+        String suffix = UUID.randomUUID().toString().substring(0, 6);
+
         Category category = new Category();
-        category.setName("Test Category");
+        category.setName("Test Category " + suffix);
         category = categoryRepository.save(category);
 
         testProduct = new Product();
         testProduct.setName("Test Product");
-        testProduct.setSku("TST-INT-001");
+        testProduct.setSku("TST-INT-" + suffix);
         testProduct.setCategory(category);
         testProduct.setQuantity(50);
         testProduct.setReorderPoint(10);
         testProduct = productRepository.save(testProduct);
 
-        BoxBin boxBin = new BoxBin();
-        boxBin.setBoxBinCode("B99");
-        boxBin = boxBinRepository.save(boxBin);
+        Site site = siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder()
+                        .code("MAIN")
+                        .name("Main Warehouse")
+                        .build()));
 
-        testInventory = new BoxBinInventory();
-        testInventory.setBoxBin(boxBin);
-        testInventory.setItem(testProduct);
-        testInventory.setQuantity(20);
-        testInventory = boxBinInventoryRepository.save(testInventory);
+        StorageLocation boxBinsStorage = storageLocationRepository
+                .findByCodeAndSite_Code("BOX_BINS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(site)
+                        .code("BOX_BINS")
+                        .name("Box Bins")
+                        .hasDisplay(false)
+                        .isDisplayOnly(false)
+                        .displayOrder(1)
+                        .build()));
+
+        Location location = locationRepository.save(Location.builder()
+                .storageLocation(boxBinsStorage)
+                .locationCode("B99-" + suffix)
+                .build());
+
+        testInventory = locationInventoryRepository.save(LocationInventory.builder()
+                .location(location)
+                .site(site)
+                .product(testProduct)
+                .quantity(20)
+                .build());
     }
 
     @AfterEach
     void cleanup() {
         eventOutboxRepository.deleteAll();
         eventDeadLetterRepository.deleteAll();
+        locationInventoryRepository.deleteAll();
     }
 
     @Test
@@ -151,7 +181,7 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         // Verify payload values
         assertThat(payload.get("product_id")).isEqualTo(testProduct.getId().toString());
         assertThat(payload.get("product_name")).isEqualTo("Test Product");
-        assertThat(payload.get("sku")).isEqualTo("TST-INT-001");
+        assertThat(payload.get("sku")).isEqualTo(testProduct.getSku());
         assertThat(payload.get("quantity_change")).isEqualTo(-3);
         assertThat(payload.get("reason")).isEqualTo("sale");
         assertThat(payload.get("reorder_point")).isEqualTo(10);
