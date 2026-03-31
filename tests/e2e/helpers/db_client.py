@@ -21,19 +21,19 @@ def create_e2e_engine() -> Engine:
 
 
 def find_test_inventory(engine: Engine) -> dict[str, Any] | None:
-    """Find a box_bin_inventory record with quantity > 5 for safe test adjustments.
+    """Find a location_inventory record with quantity > 5 for safe test adjustments.
 
     Returns dict with keys: inventory_id, quantity, product_id, product_name, sku
     """
     with engine.connect() as conn:
         row = conn.execute(
             text("""
-                SELECT bbi.id as inventory_id, bbi.quantity,
+                SELECT li.id as inventory_id, li.quantity,
                        p.id as product_id, p.name as product_name, p.sku
-                FROM box_bin_inventories bbi
-                JOIN products p ON bbi.item_id = p.id
-                WHERE bbi.quantity > 5
-                ORDER BY bbi.quantity DESC
+                FROM location_inventory li
+                JOIN products p ON li.product_id = p.id
+                WHERE li.quantity > 5
+                ORDER BY li.quantity DESC
                 LIMIT 1
             """)
         ).fetchone()

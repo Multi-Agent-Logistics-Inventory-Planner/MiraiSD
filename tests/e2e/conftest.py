@@ -95,13 +95,13 @@ def seed_data(wait_for_services):
 
 @pytest.fixture(scope="session")
 def test_inventory_record(db_engine, seed_data):
-    """Find a box_bin_inventory record suitable for test adjustments.
+    """Find a location_inventory record suitable for test adjustments.
 
     Returns dict with: inventory_id, quantity, product_id, product_name, sku
     """
     record = find_test_inventory(db_engine)
     if record is None:
-        pytest.fail("Seed data must include box_bin_inventory with quantity > 5")
+        pytest.fail("Seed data must include location_inventory with quantity > 5")
     return record
 
 
