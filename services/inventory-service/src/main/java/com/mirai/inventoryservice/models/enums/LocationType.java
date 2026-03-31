@@ -9,6 +9,7 @@ public enum LocationType {
     KEYCHAIN_MACHINE,
     PUSHER_MACHINE,
     RACK,
+    SHELF,
     SINGLE_CLAW_MACHINE,
     WINDOW,
     NOT_ASSIGNED

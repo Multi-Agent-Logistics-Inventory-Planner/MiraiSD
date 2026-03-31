@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocations } from "@/hooks/queries/use-locations";
-import { LocationType, type StorageLocation } from "@/types/api";
+import { LocationType, type Location } from "@/types/api";
 import { cn, naturalSortCompare } from "@/lib/utils";
 import {
   CODE_TO_LOCATION_TYPE,
@@ -72,7 +72,7 @@ interface LocationSelectorProps {
 
 function getLocationCode(
   locationType: LocationType,
-  location: StorageLocation
+  location: Location
 ): string {
   // Unified Location type has locationCode field directly
   return location.locationCode ?? "";
@@ -115,7 +115,7 @@ export function LocationSelector({
   const availableLocations = useMemo(() => {
     if (isNotAssigned || !value.locationType || !locationsQuery.data) return [];
 
-    return (locationsQuery.data as StorageLocation[])
+    return (locationsQuery.data as Location[])
       .map((loc) => {
         const code = getLocationCode(value.locationType!, loc);
         return {

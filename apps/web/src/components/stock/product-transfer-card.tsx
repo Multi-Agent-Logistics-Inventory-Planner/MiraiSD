@@ -6,11 +6,11 @@ import { ImageOff, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Inventory } from "@/types/api";
+import type { LocationInventory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface ProductTransferCardProps {
-  inventory: Inventory;
+  inventory: LocationInventory;
   transferQuantity: number;
   onQuantityChange: (qty: number) => void;
   maxQuantity: number;

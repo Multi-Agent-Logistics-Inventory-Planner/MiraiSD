@@ -4,10 +4,10 @@ import Image from "next/image";
 import { ImageOff, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { NotAssignedInventory } from "@/types/api";
+import type { LocationInventory } from "@/types/api";
 
 interface NotAssignedTableProps {
-  items: NotAssignedInventory[];
+  items: LocationInventory[];
   isLoading: boolean;
   pageSize?: number;
 }

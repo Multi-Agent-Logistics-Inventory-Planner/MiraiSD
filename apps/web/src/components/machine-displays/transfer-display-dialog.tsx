@@ -29,7 +29,7 @@ import { getSafeImageUrl } from "@/lib/utils/validation";
 import {
   LocationType,
   MachineDisplay,
-  StorageLocation,
+  Location,
   Product,
 } from "@/types/api";
 import { useQuery } from "@tanstack/react-query";
@@ -63,7 +63,7 @@ interface TransferDisplayDialogProps {
   isSubmitting?: boolean;
 }
 
-function getMachineCode(locationType: LocationType, loc: StorageLocation): string {
+function getMachineCode(locationType: LocationType, loc: Location): string {
   // Unified Location type has locationCode field directly
   return loc.locationCode ?? loc.id;
 }
@@ -199,7 +199,7 @@ function ProductItem({ product, selected, onToggle, disabled }: ProductItemProps
 }
 
 interface MachineCardProps {
-  machine: StorageLocation;
+  machine: Location;
   locationType: LocationType;
   selected: boolean;
   onSelect: () => void;

@@ -27,6 +27,7 @@ export enum LocationType {
   KEYCHAIN_MACHINE = "KEYCHAIN_MACHINE",
   PUSHER_MACHINE = "PUSHER_MACHINE",
   RACK = "RACK",
+  SHELF = "SHELF",
   SINGLE_CLAW_MACHINE = "SINGLE_CLAW_MACHINE",
   WINDOW = "WINDOW",
   NOT_ASSIGNED = "NOT_ASSIGNED",
@@ -41,6 +42,7 @@ export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "Keychain Machine",
   [LocationType.PUSHER_MACHINE]: "Pusher",
   [LocationType.RACK]: "Rack",
+  [LocationType.SHELF]: "Shelf",
   [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.WINDOW]: "Window",
   [LocationType.NOT_ASSIGNED]: "Not Assigned",
@@ -235,19 +237,6 @@ export interface LocationRequest {
   storageLocationId: string;
 }
 
-// Legacy type aliases for backward compatibility
-export type StorageLocation = Location;
-export type BoxBin = Location;
-export type Rack = Location;
-export type Cabinet = Location;
-export type SingleClawMachine = Location;
-export type DoubleClawMachine = Location;
-export type KeychainMachine = Location;
-export type FourCornerMachine = Location;
-export type PusherMachine = Location;
-export type Window = Location;
-export type Gachapon = Location;
-
 // Inventory item embedded in response (simplified product)
 export interface InventoryItem {
   id: string;
@@ -274,18 +263,6 @@ export interface LocationInventory {
   createdAt: string;
   updatedAt: string;
 }
-
-// Legacy type aliases for backward compatibility
-export type Inventory = LocationInventory;
-export type BoxBinInventory = LocationInventory;
-export type RackInventory = LocationInventory;
-export type CabinetInventory = LocationInventory;
-export type SingleClawMachineInventory = LocationInventory;
-export type DoubleClawMachineInventory = LocationInventory;
-export type FourCornerMachineInventory = LocationInventory;
-export type PusherMachineInventory = LocationInventory;
-export type WindowInventory = LocationInventory;
-export type NotAssignedInventory = LocationInventory;
 
 // Inventory request
 export interface InventoryRequest {
@@ -631,6 +608,7 @@ export const LOCATION_CODE_PATTERNS: Record<LocationType, RegExp> = {
   [LocationType.KEYCHAIN_MACHINE]: /^K\d+$/,
   [LocationType.PUSHER_MACHINE]: /^P\d+$/,
   [LocationType.RACK]: /^R\d+$/,
+  [LocationType.SHELF]: /^SH\d+$/,
   [LocationType.SINGLE_CLAW_MACHINE]: /^S\d+$/,
   [LocationType.WINDOW]: /^W\d+$/,
   [LocationType.NOT_ASSIGNED]: /^$/,  // No pattern for NOT_ASSIGNED
@@ -646,6 +624,7 @@ export const STORAGE_LOCATION_CODES: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "KEYCHAIN",
   [LocationType.PUSHER_MACHINE]: "PUSHER",
   [LocationType.RACK]: "RACKS",
+  [LocationType.SHELF]: "SHELVES",
   [LocationType.SINGLE_CLAW_MACHINE]: "SINGLE_CLAW",
   [LocationType.WINDOW]: "WINDOWS",
   [LocationType.NOT_ASSIGNED]: "NOT_ASSIGNED",

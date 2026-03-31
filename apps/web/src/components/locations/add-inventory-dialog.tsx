@@ -15,14 +15,14 @@ import { Button } from "@/components/ui/button";
 import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
 import { ProductList, SelectedProduct } from "./add-inventory";
 import { getProducts } from "@/lib/api/products";
-import type { Product, LocationType, InventoryRequest, Inventory, Category } from "@/types/api";
+import type { Product, LocationType, InventoryRequest, LocationInventory, Category } from "@/types/api";
 
 interface AddInventoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locationType: LocationType;
   locationId: string;
-  existingInventory?: Inventory[];
+  existingInventory?: LocationInventory[];
   isSaving?: boolean;
   onSubmit: (payload: InventoryRequest, isUpdate: boolean, inventoryId?: string) => Promise<void> | void;
 }

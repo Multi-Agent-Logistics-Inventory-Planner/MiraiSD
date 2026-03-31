@@ -1,4 +1,4 @@
-import type { Inventory, InventoryItem, Category } from "@/types/api";
+import type { LocationInventory, InventoryItem, Category } from "@/types/api";
 import { StockMovementReason } from "@/types/api";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 
@@ -64,7 +64,7 @@ export function createNormalizedInventory(
 /**
  * Convert an Inventory to NormalizedInventory
  */
-export function normalizeInventory(inventory: Inventory): NormalizedInventory {
+export function normalizeInventory(inventory: LocationInventory): NormalizedInventory {
   return {
     id: inventory.id,
     item: inventory.item,

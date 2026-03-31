@@ -45,8 +45,8 @@ import {
   MACHINE_LOCATION_TYPES,
 } from "@/types/api";
 import type {
-  StorageLocation,
-  Inventory,
+  Location,
+  LocationInventory,
   MachineDisplay,
   SetMachineDisplayBatchRequest,
 } from "@/types/api";
@@ -80,7 +80,7 @@ import { type LocationSelection } from "@/types/transfer";
 
 const HISTORY_PAGE_SIZE = 5;
 
-function getLocationCode(locationType: LocationType, loc: StorageLocation): string {
+function getLocationCode(locationType: LocationType, loc: Location): string {
   // Unified Location type has locationCode field directly
   return loc.locationCode ?? loc.id;
 }
@@ -102,8 +102,8 @@ interface LocationDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locationType: LocationType;
-  location: StorageLocation | null;
-  onEdit: (location: StorageLocation) => void;
+  location: Location | null;
+  onEdit: (location: Location) => void;
   defaultTab?: LocationDetailTab;
 }
 
@@ -194,7 +194,7 @@ export function LocationDetailSheet({
 
   const code = location ? getLocationCode(locationType, location) : "";
 
-  const inventory = (inventoryQuery.data ?? []) as Inventory[];
+  const inventory = (inventoryQuery.data ?? []) as LocationInventory[];
 
   const totalQty = useMemo(() => {
     return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);

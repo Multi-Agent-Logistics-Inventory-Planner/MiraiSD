@@ -38,11 +38,11 @@ import type {
   ShipmentItem,
   ShipmentItemReceipt,
   DestinationAllocation,
-  StorageLocation,
+  Location,
 } from "@/types/api";
 import { LocationType } from "@/types/api";
 
-function getLocationCode(location: StorageLocation): string {
+function getLocationCode(location: Location): string {
   return location.locationCode ?? "";
 }
 
@@ -55,6 +55,7 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
   [LocationType.KEYCHAIN_MACHINE]: "Keychain",
   [LocationType.PUSHER_MACHINE]: "Pusher",
   [LocationType.RACK]: "Rack",
+  [LocationType.SHELF]: "Shelf",
   [LocationType.SINGLE_CLAW_MACHINE]: "Single Claw",
   [LocationType.WINDOW]: "Window",
   [LocationType.NOT_ASSIGNED]: "Not Assigned",
@@ -119,7 +120,7 @@ function AllocationRow({
   );
 
   const locations = useMemo(() => {
-    return (locationsQuery.data ?? []) as StorageLocation[];
+    return (locationsQuery.data ?? []) as Location[];
   }, [locationsQuery.data]);
 
   const showLocationSelect =

@@ -584,6 +584,7 @@ public class StockMovementService {
             case "BOX_BINS" -> LocationType.BOX_BIN;
             case "RACKS" -> LocationType.RACK;
             case "CABINETS" -> LocationType.CABINET;
+            case "SHELVES" -> LocationType.SHELF;
             case "WINDOWS" -> LocationType.WINDOW;
             case "SINGLE_CLAW" -> LocationType.SINGLE_CLAW_MACHINE;
             case "DOUBLE_CLAW" -> LocationType.DOUBLE_CLAW_MACHINE;

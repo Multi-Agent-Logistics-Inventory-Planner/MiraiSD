@@ -102,6 +102,7 @@ public class InventoryAggregateService {
             case "BOX_BINS" -> "BOX_BIN";
             case "RACKS" -> "RACK";
             case "CABINETS" -> "CABINET";
+            case "SHELVES" -> "SHELF";
             case "WINDOWS" -> "WINDOW";
             case "SINGLE_CLAW" -> "SINGLE_CLAW_MACHINE";
             case "DOUBLE_CLAW" -> "DOUBLE_CLAW_MACHINE";

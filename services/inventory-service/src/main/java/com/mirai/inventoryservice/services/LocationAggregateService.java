@@ -51,6 +51,7 @@ public class LocationAggregateService {
             case BOX_BIN -> "BOX_BINS";
             case RACK -> "RACKS";
             case CABINET -> "CABINETS";
+            case SHELF -> "SHELVES";
             case WINDOW -> "WINDOWS";
             case SINGLE_CLAW_MACHINE -> "SINGLE_CLAW";
             case DOUBLE_CLAW_MACHINE -> "DOUBLE_CLAW";

@@ -881,12 +881,14 @@ public class MachineDisplayService {
     private String resolveLocationCode(UUID locationId, LocationType locationType) {
         if (locationId == null) return null;
 
-        Object result = entityManager.createNativeQuery("SELECT resolve_location_code(:locationId, :locationType)")
-                .setParameter("locationId", locationId)
-                .setParameter("locationType", locationType.name())
-                .getSingleResult();
+        // Handle NOT_ASSIGNED specially - it has no physical location
+        if (locationType == LocationType.NOT_ASSIGNED) {
+            return "NA";
+        }
 
-        return result != null ? result.toString() : null;
+        return locationRepository.findById(locationId)
+                .map(Location::getLocationCode)
+                .orElse(null);
     }
 
     private String resolveActorName(UUID actorId) {
@@ -912,61 +914,36 @@ public class MachineDisplayService {
     private Map<String, String> batchResolveMachineCodes(List<MachineDisplay> displays) {
         Map<String, String> result = new HashMap<>();
 
-        // Group by location type
-        Map<LocationType, Set<UUID>> machineIdsByType = displays.stream()
-                .collect(Collectors.groupingBy(
-                        MachineDisplay::getLocationType,
-                        Collectors.mapping(MachineDisplay::getMachineId, Collectors.toSet())
-                ));
+        // Collect all machine IDs (which are location IDs in the unified schema)
+        Set<UUID> allMachineIds = displays.stream()
+                .map(MachineDisplay::getMachineId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
-        // Batch fetch codes per location type (1 query per type instead of N queries per machine)
-        for (Map.Entry<LocationType, Set<UUID>> entry : machineIdsByType.entrySet()) {
-            LocationType locationType = entry.getKey();
-            Set<UUID> machineIds = entry.getValue();
+        if (allMachineIds.isEmpty()) {
+            return result;
+        }
 
-            if (machineIds.isEmpty()) continue;
+        // Batch fetch all locations in a single query
+        List<Location> locations = locationRepository.findAllById(allMachineIds);
+        Map<UUID, String> locationCodeMap = locations.stream()
+                .collect(Collectors.toMap(Location::getId, Location::getLocationCode));
 
-            String tableName = getTableNameForLocationType(locationType);
-            String codeColumn = getCodeColumnForLocationType(locationType);
+        // Build the result map with locationType:machineId keys
+        for (MachineDisplay display : displays) {
+            LocationType locationType = display.getLocationType();
+            UUID machineId = display.getMachineId();
 
-            if (tableName == null || codeColumn == null) {
-                // Handle NOT_ASSIGNED or unknown types
-                for (UUID machineId : machineIds) {
-                    result.put(locationType + ":" + machineId, "NA");
-                }
+            if (machineId == null || locationType == LocationType.NOT_ASSIGNED) {
+                result.put(locationType + ":" + machineId, "NA");
                 continue;
             }
 
-            // Single query to fetch all codes for this location type
-            @SuppressWarnings("unchecked")
-            List<Object[]> rows = entityManager.createNativeQuery(
-                    "SELECT id, " + codeColumn + " FROM " + tableName + " WHERE id IN (:ids)")
-                    .setParameter("ids", machineIds)
-                    .getResultList();
-
-            for (Object[] row : rows) {
-                UUID id = (UUID) row[0];
-                String code = (String) row[1];
-                result.put(locationType + ":" + id, code);
-            }
+            String code = locationCodeMap.get(machineId);
+            result.put(locationType + ":" + machineId, code != null ? code : "NA");
         }
 
         return result;
-    }
-
-    private String getTableNameForLocationType(LocationType locationType) {
-        return switch (locationType) {
-            case BOX_BIN -> "box_bins";
-            case SINGLE_CLAW_MACHINE -> "single_claw_machines";
-            case DOUBLE_CLAW_MACHINE -> "double_claw_machines";
-            case KEYCHAIN_MACHINE -> "keychain_machines";
-            case CABINET -> "cabinets";
-            case RACK -> "racks";
-            case FOUR_CORNER_MACHINE -> "four_corner_machines";
-            case GACHAPON -> "gachapons";
-            case PUSHER_MACHINE -> "pusher_machines";
-            case WINDOW, NOT_ASSIGNED -> null;
-        };
     }
 
     private String buildProductSummary(List<String> productNames) {
@@ -976,18 +953,4 @@ public class MachineDisplayService {
         return productNames.get(0) + " + " + (productNames.size() - 1) + " more";
     }
 
-    private String getCodeColumnForLocationType(LocationType locationType) {
-        return switch (locationType) {
-            case BOX_BIN -> "box_bin_code";
-            case SINGLE_CLAW_MACHINE -> "single_claw_machine_code";
-            case DOUBLE_CLAW_MACHINE -> "double_claw_machine_code";
-            case KEYCHAIN_MACHINE -> "keychain_machine_code";
-            case CABINET -> "cabinet_code";
-            case RACK -> "rack_code";
-            case FOUR_CORNER_MACHINE -> "four_corner_machine_code";
-            case GACHAPON -> "gachapon_code";
-            case PUSHER_MACHINE -> "pusher_machine_code";
-            case WINDOW, NOT_ASSIGNED -> null;
-        };
-    }
 }

@@ -6,12 +6,12 @@ import { ImageOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Product, Inventory } from "@/types/api";
+import type { Product, LocationInventory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface SelectedProductProps {
   product: Product;
-  existingInventory?: Inventory;
+  existingInventory?: LocationInventory;
   quantity: string;
   quantityError: string | null;
   onQuantityChange: (value: string) => void;
