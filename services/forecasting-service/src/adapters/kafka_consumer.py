@@ -194,8 +194,8 @@ class KafkaEventConsumer:
                 "quantity_change": -1,
                 "reason": "sale",
                 "at": "2024-01-01T12:00:00Z",
-                "from_box_id": "B1",
-                "to_box_id": null,
+                "from_location_code": "B1",
+                "to_location_code": null,
                 "actor_id": "uuid"
             },
             "created_at": "2024-01-01T12:00:00Z"

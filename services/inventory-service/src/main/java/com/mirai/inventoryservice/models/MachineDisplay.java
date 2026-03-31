@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.models;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.storage.Location;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -16,9 +17,11 @@ import java.util.UUID;
         indexes = {
                 @Index(name = "idx_machine_display_active", columnList = "location_type, machine_id, ended_at"),
                 @Index(name = "idx_machine_display_product", columnList = "product_id"),
-                @Index(name = "idx_machine_display_started_at", columnList = "started_at")
+                @Index(name = "idx_machine_display_started_at", columnList = "started_at"),
+                @Index(name = "idx_machine_display_location", columnList = "location_id")
         })
 @NamedEntityGraph(name = "MachineDisplay.withProduct", attributeNodes = @NamedAttributeNode("product"))
+@NamedEntityGraph(name = "MachineDisplay.withLocation", attributeNodes = @NamedAttributeNode("location"))
 @Data
 @Builder
 @NoArgsConstructor
@@ -28,6 +31,14 @@ public class MachineDisplay {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // New unified location reference (preferred)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id", nullable = false)
+    @NotNull
+    private Location location;
+
+    // Legacy fields - kept for backward compatibility during migration
+    // TODO: Remove in Phase C after 30+ days
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "location_type", nullable = false)

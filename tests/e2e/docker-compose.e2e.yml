@@ -1,0 +1,127 @@
+# E2E Test Stack - Optimized for fast integration testing
+# Usage: docker compose -f tests/e2e/docker-compose.e2e.yml up -d --build --wait
+#
+# Differences from infra/docker-compose.dev.yml:
+#   - No frontend, no kafka-ui (not needed for backend E2E)
+#   - Faster outbox polling interval cannot be changed (hardcoded at 10s)
+#   - Shorter forecasting batch window (5s vs 30s)
+#   - Shorter debounce (1s vs 5s)
+#   - Slack disabled for messaging-service
+#   - Health checks on all services
+
+services:
+  postgres-e2e:
+    image: postgres:16-alpine
+    container_name: postgres-e2e
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: mirai_inventory
+      POSTGRES_USER: postgres
+      # SECURITY NOTE: Hardcoded password is acceptable for local E2E tests only.
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ../../infra/init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - mirai-e2e
+
+  kafka-e2e:
+    image: apache/kafka:latest
+    container_name: kafka-e2e
+    ports:
+      - "9093:9092"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-e2e:9092
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-e2e:9093
+      - CLUSTER_ID=5L6g3nShT-eMCtK--X86sw
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    networks:
+      - mirai-e2e
+
+  inventory-service-e2e:
+    container_name: inventory-service-e2e
+    build:
+      context: ../../services/inventory-service
+      dockerfile: Dockerfile
+    image: inventory-service:e2e
+    ports:
+      - "4001:4000"
+    env_file:
+      - ../../.env
+    environment:
+      - JAVA_OPTS=-XX:MaxMetaspaceSize=256m -Xmx512m -XX:+UseG1GC
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-e2e:5432/mirai_inventory
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-e2e:9092
+    depends_on:
+      postgres-e2e:
+        condition: service_healthy
+      kafka-e2e:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4000/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mirai-e2e
+
+  forecasting-service-e2e:
+    container_name: forecasting-service-e2e
+    build:
+      context: ../../services/forecasting-service
+      dockerfile: Dockerfile
+    image: forecasting-service:e2e
+    ports:
+      - "5011:5000"
+    environment:
+      - SUPABASE_DB_URL=postgresql://postgres-e2e:5432/mirai_inventory
+      - SUPABASE_DB_USERNAME=postgres
+      - SUPABASE_DB_PASSWORD=postgres
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-e2e:9092
+      - KAFKA_TOPIC=inventory-changes
+      - KAFKA_CONSUMER_GROUP=forecasting-service-e2e
+      # Faster processing for E2E tests
+      - BATCH_WINDOW_SECONDS=5
+      - BATCH_SIZE_TRIGGER=1
+      - ITEM_DEBOUNCE_SECONDS=1
+    depends_on:
+      postgres-e2e:
+        condition: service_healthy
+      kafka-e2e:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mirai-e2e
+    restart: unless-stopped
+
+networks:
+  mirai-e2e:
+    driver: bridge

@@ -3,11 +3,10 @@ package com.mirai.inventoryservice.controllers;
 import com.mirai.inventoryservice.BaseIntegrationTest;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.inventory.BoxBinInventory;
-import com.mirai.inventoryservice.models.inventory.RackInventory;
-import com.mirai.inventoryservice.models.inventory.NotAssignedInventory;
-import com.mirai.inventoryservice.models.storage.BoxBin;
-import com.mirai.inventoryservice.models.storage.Rack;
+import com.mirai.inventoryservice.models.Site;
+import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Integration tests for InventoryAggregateController.
  * Tests the optimized /api/inventory/by-product/{productId} endpoint.
+ * Uses unified location_inventory table.
  */
 @DisplayName("InventoryAggregateController Integration Tests")
 class InventoryAggregateControllerIT extends BaseIntegrationTest {
@@ -35,23 +35,25 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
-    private BoxBinRepository boxBinRepository;
+    private SiteRepository siteRepository;
 
     @Autowired
-    private RackRepository rackRepository;
+    private StorageLocationRepository storageLocationRepository;
 
     @Autowired
-    private BoxBinInventoryRepository boxBinInventoryRepository;
+    private LocationRepository locationRepository;
 
     @Autowired
-    private RackInventoryRepository rackInventoryRepository;
-
-    @Autowired
-    private NotAssignedInventoryRepository notAssignedInventoryRepository;
+    private LocationInventoryRepository locationInventoryRepository;
 
     private Product testProduct;
-    private BoxBin testBoxBin;
-    private Rack testRack;
+    private Site testSite;
+    private StorageLocation boxBinsStorage;
+    private StorageLocation racksStorage;
+    private StorageLocation notAssignedStorage;
+    private Location testBoxBinLocation;
+    private Location testRackLocation;
+    private Location testNotAssignedLocation;
     private Category testCategory;
 
     @BeforeEach
@@ -67,8 +69,62 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
                 .category(testCategory)
                 .build());
 
-        testBoxBin = boxBinRepository.save(BoxBin.builder().boxBinCode("B98").build());
-        testRack = rackRepository.save(Rack.builder().rackCode("R98").build());
+        // Get or create test site
+        testSite = siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder()
+                        .code("MAIN")
+                        .name("Main Warehouse")
+                        .build()));
+
+        // Get or create storage locations
+        boxBinsStorage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(testSite)
+                        .code("BOX_BINS")
+                        .name("Box Bins")
+                        .isDisplayOnly(false)
+                        .hasDisplay(false)
+                        .displayOrder(1)
+                        .build()));
+
+        racksStorage = storageLocationRepository.findByCodeAndSite_Code("RACKS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(testSite)
+                        .code("RACKS")
+                        .name("Racks")
+                        .isDisplayOnly(false)
+                        .hasDisplay(false)
+                        .displayOrder(2)
+                        .build()));
+
+        notAssignedStorage = storageLocationRepository.findByCodeAndSite_Code("NOT_ASSIGNED", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(testSite)
+                        .code("NOT_ASSIGNED")
+                        .name("Not Assigned")
+                        .isDisplayOnly(false)
+                        .hasDisplay(false)
+                        .displayOrder(99)
+                        .build()));
+
+        // Create test locations within storage locations
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 4);
+        testBoxBinLocation = locationRepository.save(Location.builder()
+                .storageLocation(boxBinsStorage)
+                .locationCode("B98" + uniqueSuffix)
+                .build());
+
+        testRackLocation = locationRepository.save(Location.builder()
+                .storageLocation(racksStorage)
+                .locationCode("R98" + uniqueSuffix)
+                .build());
+
+        testNotAssignedLocation = locationRepository
+                .findByLocationCodeAndStorageLocation_Id("NA", notAssignedStorage.getId())
+                .orElseGet(() -> locationRepository.save(Location.builder()
+                        .storageLocation(notAssignedStorage)
+                        .locationCode("NA")
+                        .build()));
     }
 
     @Nested
@@ -78,15 +134,17 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         @Test
         @DisplayName("Should return all inventory entries across location types")
         void getInventoryByProduct_multipleLocations_returnsAll() throws Exception {
-            boxBinInventoryRepository.save(BoxBinInventory.builder()
-                    .boxBin(testBoxBin)
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testBoxBinLocation)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(5)
                     .build());
 
-            rackInventoryRepository.save(RackInventory.builder()
-                    .rack(testRack)
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testRackLocation)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(10)
                     .build());
 
@@ -104,8 +162,10 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         @Test
         @DisplayName("Should include NOT_ASSIGNED entries")
         void getInventoryByProduct_withNotAssigned_includesNotAssigned() throws Exception {
-            notAssignedInventoryRepository.save(NotAssignedInventory.builder()
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testNotAssignedLocation)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(7)
                     .build());
 
@@ -115,7 +175,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.totalQuantity", is(7)))
                     .andExpect(jsonPath("$.entries", hasSize(1)))
                     .andExpect(jsonPath("$.entries[0].locationType", is("NOT_ASSIGNED")))
-                    .andExpect(jsonPath("$.entries[0].locationLabel", is("Not Assigned")));
+                    .andExpect(jsonPath("$.entries[0].locationLabel", is("Not Assigned NA")));
         }
 
         @Test
@@ -156,14 +216,17 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         @Test
         @DisplayName("Should calculate correct total quantity from all locations")
         void getInventoryByProduct_multipleEntriesSameLocation_calculatesCorrectTotal() throws Exception {
-            boxBinInventoryRepository.save(BoxBinInventory.builder()
-                    .boxBin(testBoxBin)
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testBoxBinLocation)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(3)
                     .build());
 
-            notAssignedInventoryRepository.save(NotAssignedInventory.builder()
-                    .item(testProduct)
+            locationInventoryRepository.save(LocationInventory.builder()
+                    .location(testNotAssignedLocation)
+                    .site(testSite)
+                    .product(testProduct)
                     .quantity(12)
                     .build());
 

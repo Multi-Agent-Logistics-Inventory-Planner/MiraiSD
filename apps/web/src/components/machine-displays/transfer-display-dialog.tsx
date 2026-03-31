@@ -30,12 +30,6 @@ import {
   LocationType,
   MachineDisplay,
   StorageLocation,
-  SingleClawMachine,
-  DoubleClawMachine,
-  KeychainMachine,
-  FourCornerMachine,
-  Gachapon,
-  PusherMachine,
   Product,
 } from "@/types/api";
 import { useQuery } from "@tanstack/react-query";
@@ -70,22 +64,8 @@ interface TransferDisplayDialogProps {
 }
 
 function getMachineCode(locationType: LocationType, loc: StorageLocation): string {
-  switch (locationType) {
-    case LocationType.SINGLE_CLAW_MACHINE:
-      return (loc as SingleClawMachine).singleClawMachineCode;
-    case LocationType.DOUBLE_CLAW_MACHINE:
-      return (loc as DoubleClawMachine).doubleClawMachineCode;
-    case LocationType.KEYCHAIN_MACHINE:
-      return (loc as KeychainMachine).keychainMachineCode;
-    case LocationType.FOUR_CORNER_MACHINE:
-      return (loc as FourCornerMachine).fourCornerMachineCode;
-    case LocationType.GACHAPON:
-      return (loc as Gachapon).gachaponCode;
-    case LocationType.PUSHER_MACHINE:
-      return (loc as PusherMachine).pusherMachineCode;
-    default:
-      return loc.id;
-  }
+  // Unified Location type has locationCode field directly
+  return loc.locationCode ?? loc.id;
 }
 
 interface DisplayItemProps {

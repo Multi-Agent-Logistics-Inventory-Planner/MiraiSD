@@ -21,7 +21,7 @@ export function useActiveDisplays() {
   return useQuery({
     queryKey: ["machine-displays", "active"],
     queryFn: getActiveDisplays,
-    staleTime: 30_000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -33,7 +33,7 @@ export function useActiveDisplaysByType(locationType?: LocationType) {
     queryKey: ["machine-displays", "active", "by-type", locationType],
     queryFn: () => getActiveDisplaysByType(locationType!),
     enabled: !!locationType,
-    staleTime: 30_000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -51,7 +51,7 @@ export function useMachineDisplayHistoryPaged(
     queryFn: () => getMachineHistoryPaged(locationType!, machineId!, page, size),
     enabled: !!locationType && !!machineId,
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -63,7 +63,7 @@ export function useProductDisplayHistory(productId?: string) {
     queryKey: ["machine-displays", "product-history", productId],
     queryFn: () => getProductDisplayHistory(productId!),
     enabled: !!productId,
-    staleTime: 30_000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -78,7 +78,7 @@ export function useActiveDisplaysForMachine(
     queryKey: ["machine-displays", "machine-active", locationType, machineId],
     queryFn: () => getActiveDisplaysForMachine(locationType!, machineId!),
     enabled: !!locationType && !!machineId,
-    staleTime: 30_000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 

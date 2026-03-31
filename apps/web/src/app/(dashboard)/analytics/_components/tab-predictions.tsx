@@ -24,10 +24,13 @@ import {
 } from "@/components/analytics/predictions";
 
 function countByUrgency(items: readonly ActionItem[]): Record<ActionUrgency, number> {
-  return items.reduce<Record<ActionUrgency, number>>(
-    (acc, item) => ({ ...acc, [item.urgency]: acc[item.urgency] + 1 }),
-    { CRITICAL: 0, URGENT: 0, ATTENTION: 0, HEALTHY: 0 },
-  );
+  const counts: Record<ActionUrgency, number> = { CRITICAL: 0, URGENT: 0, ATTENTION: 0, HEALTHY: 0 };
+  for (const item of items) {
+    if (item.urgency in counts) {
+      counts[item.urgency]++;
+    }
+  }
+  return counts;
 }
 
 export function TabPredictions() {

@@ -1,414 +1,16 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./client";
 import {
   LocationType,
-  LOCATION_ENDPOINTS,
-  BoxBin,
-  Cabinet,
-  DoubleClawMachine,
-  FourCornerMachine,
-  Gachapon,
-  KeychainMachine,
-  PusherMachine,
-  Rack,
-  SingleClawMachine,
-  Window,
-  BoxBinRequest,
-  CabinetRequest,
-  DoubleClawMachineRequest,
-  FourCornerMachineRequest,
-  GachaponRequest,
-  KeychainMachineRequest,
-  PusherMachineRequest,
-  RackRequest,
-  SingleClawMachineRequest,
-  WindowRequest,
+  Location,
+  LocationRequest,
   LocationWithCounts,
+  STORAGE_LOCATION_CODES,
 } from "@/types/api";
 
-// Generic location API functions
+// Storage location types are fixed and seeded automatically.
+// Use GET endpoints only - no create/update operations available.
 
-function getBasePath(locationType: LocationType): string {
-  return `/api/${LOCATION_ENDPOINTS[locationType]}`;
-}
-
-// BoxBin API
-
-export async function getBoxBins(): Promise<BoxBin[]> {
-  return apiGet<BoxBin[]>(getBasePath(LocationType.BOX_BIN));
-}
-
-export async function getBoxBinById(id: string): Promise<BoxBin> {
-  return apiGet<BoxBin>(`${getBasePath(LocationType.BOX_BIN)}/${id}`);
-}
-
-export async function createBoxBin(data: BoxBinRequest): Promise<BoxBin> {
-  return apiPost<BoxBin, BoxBinRequest>(getBasePath(LocationType.BOX_BIN), data);
-}
-
-export async function updateBoxBin(
-  id: string,
-  data: BoxBinRequest
-): Promise<BoxBin> {
-  return apiPut<BoxBin, BoxBinRequest>(
-    `${getBasePath(LocationType.BOX_BIN)}/${id}`,
-    data
-  );
-}
-
-export async function deleteBoxBin(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.BOX_BIN)}/${id}`);
-}
-
-// Rack API
-
-export async function getRacks(): Promise<Rack[]> {
-  return apiGet<Rack[]>(getBasePath(LocationType.RACK));
-}
-
-export async function getRackById(id: string): Promise<Rack> {
-  return apiGet<Rack>(`${getBasePath(LocationType.RACK)}/${id}`);
-}
-
-export async function createRack(data: RackRequest): Promise<Rack> {
-  return apiPost<Rack, RackRequest>(getBasePath(LocationType.RACK), data);
-}
-
-export async function updateRack(id: string, data: RackRequest): Promise<Rack> {
-  return apiPut<Rack, RackRequest>(
-    `${getBasePath(LocationType.RACK)}/${id}`,
-    data
-  );
-}
-
-export async function deleteRack(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.RACK)}/${id}`);
-}
-
-// Cabinet API
-
-export async function getCabinets(): Promise<Cabinet[]> {
-  return apiGet<Cabinet[]>(getBasePath(LocationType.CABINET));
-}
-
-export async function getCabinetById(id: string): Promise<Cabinet> {
-  return apiGet<Cabinet>(`${getBasePath(LocationType.CABINET)}/${id}`);
-}
-
-export async function createCabinet(data: CabinetRequest): Promise<Cabinet> {
-  return apiPost<Cabinet, CabinetRequest>(
-    getBasePath(LocationType.CABINET),
-    data
-  );
-}
-
-export async function updateCabinet(
-  id: string,
-  data: CabinetRequest
-): Promise<Cabinet> {
-  return apiPut<Cabinet, CabinetRequest>(
-    `${getBasePath(LocationType.CABINET)}/${id}`,
-    data
-  );
-}
-
-export async function deleteCabinet(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.CABINET)}/${id}`);
-}
-
-// SingleClawMachine API
-
-export async function getSingleClawMachines(): Promise<SingleClawMachine[]> {
-  return apiGet<SingleClawMachine[]>(
-    getBasePath(LocationType.SINGLE_CLAW_MACHINE)
-  );
-}
-
-export async function getSingleClawMachineById(
-  id: string
-): Promise<SingleClawMachine> {
-  return apiGet<SingleClawMachine>(
-    `${getBasePath(LocationType.SINGLE_CLAW_MACHINE)}/${id}`
-  );
-}
-
-export async function createSingleClawMachine(
-  data: SingleClawMachineRequest
-): Promise<SingleClawMachine> {
-  return apiPost<SingleClawMachine, SingleClawMachineRequest>(
-    getBasePath(LocationType.SINGLE_CLAW_MACHINE),
-    data
-  );
-}
-
-export async function updateSingleClawMachine(
-  id: string,
-  data: SingleClawMachineRequest
-): Promise<SingleClawMachine> {
-  return apiPut<SingleClawMachine, SingleClawMachineRequest>(
-    `${getBasePath(LocationType.SINGLE_CLAW_MACHINE)}/${id}`,
-    data
-  );
-}
-
-export async function deleteSingleClawMachine(id: string): Promise<void> {
-  return apiDelete<void>(
-    `${getBasePath(LocationType.SINGLE_CLAW_MACHINE)}/${id}`
-  );
-}
-
-// DoubleClawMachine API
-
-export async function getDoubleClawMachines(): Promise<DoubleClawMachine[]> {
-  return apiGet<DoubleClawMachine[]>(
-    getBasePath(LocationType.DOUBLE_CLAW_MACHINE)
-  );
-}
-
-export async function getDoubleClawMachineById(
-  id: string
-): Promise<DoubleClawMachine> {
-  return apiGet<DoubleClawMachine>(
-    `${getBasePath(LocationType.DOUBLE_CLAW_MACHINE)}/${id}`
-  );
-}
-
-export async function createDoubleClawMachine(
-  data: DoubleClawMachineRequest
-): Promise<DoubleClawMachine> {
-  return apiPost<DoubleClawMachine, DoubleClawMachineRequest>(
-    getBasePath(LocationType.DOUBLE_CLAW_MACHINE),
-    data
-  );
-}
-
-export async function updateDoubleClawMachine(
-  id: string,
-  data: DoubleClawMachineRequest
-): Promise<DoubleClawMachine> {
-  return apiPut<DoubleClawMachine, DoubleClawMachineRequest>(
-    `${getBasePath(LocationType.DOUBLE_CLAW_MACHINE)}/${id}`,
-    data
-  );
-}
-
-export async function deleteDoubleClawMachine(id: string): Promise<void> {
-  return apiDelete<void>(
-    `${getBasePath(LocationType.DOUBLE_CLAW_MACHINE)}/${id}`
-  );
-}
-
-// KeychainMachine API
-
-export async function getKeychainMachines(): Promise<KeychainMachine[]> {
-  return apiGet<KeychainMachine[]>(getBasePath(LocationType.KEYCHAIN_MACHINE));
-}
-
-export async function getKeychainMachineById(
-  id: string
-): Promise<KeychainMachine> {
-  return apiGet<KeychainMachine>(
-    `${getBasePath(LocationType.KEYCHAIN_MACHINE)}/${id}`
-  );
-}
-
-export async function createKeychainMachine(
-  data: KeychainMachineRequest
-): Promise<KeychainMachine> {
-  return apiPost<KeychainMachine, KeychainMachineRequest>(
-    getBasePath(LocationType.KEYCHAIN_MACHINE),
-    data
-  );
-}
-
-export async function updateKeychainMachine(
-  id: string,
-  data: KeychainMachineRequest
-): Promise<KeychainMachine> {
-  return apiPut<KeychainMachine, KeychainMachineRequest>(
-    `${getBasePath(LocationType.KEYCHAIN_MACHINE)}/${id}`,
-    data
-  );
-}
-
-export async function deleteKeychainMachine(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.KEYCHAIN_MACHINE)}/${id}`);
-}
-
-// FourCornerMachine API
-
-export async function getFourCornerMachines(): Promise<FourCornerMachine[]> {
-  return apiGet<FourCornerMachine[]>(getBasePath(LocationType.FOUR_CORNER_MACHINE));
-}
-
-export async function getFourCornerMachineById(
-  id: string
-): Promise<FourCornerMachine> {
-  return apiGet<FourCornerMachine>(
-    `${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`
-  );
-}
-
-export async function createFourCornerMachine(
-  data: FourCornerMachineRequest
-): Promise<FourCornerMachine> {
-  return apiPost<FourCornerMachine, FourCornerMachineRequest>(
-    getBasePath(LocationType.FOUR_CORNER_MACHINE),
-    data
-  );
-}
-
-export async function updateFourCornerMachine(
-  id: string,
-  data: FourCornerMachineRequest
-): Promise<FourCornerMachine> {
-  return apiPut<FourCornerMachine, FourCornerMachineRequest>(
-    `${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`,
-    data
-  );
-}
-
-export async function deleteFourCornerMachine(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.FOUR_CORNER_MACHINE)}/${id}`);
-}
-
-// Gachapon API
-
-export async function getGachapons(): Promise<Gachapon[]> {
-  return apiGet<Gachapon[]>(getBasePath(LocationType.GACHAPON));
-}
-
-export async function getGachaponById(id: string): Promise<Gachapon> {
-  return apiGet<Gachapon>(`${getBasePath(LocationType.GACHAPON)}/${id}`);
-}
-
-export async function createGachapon(data: GachaponRequest): Promise<Gachapon> {
-  return apiPost<Gachapon, GachaponRequest>(
-    getBasePath(LocationType.GACHAPON),
-    data
-  );
-}
-
-export async function updateGachapon(
-  id: string,
-  data: GachaponRequest
-): Promise<Gachapon> {
-  return apiPut<Gachapon, GachaponRequest>(
-    `${getBasePath(LocationType.GACHAPON)}/${id}`,
-    data
-  );
-}
-
-export async function deleteGachapon(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.GACHAPON)}/${id}`);
-}
-
-// PusherMachine API
-
-export async function getPusherMachines(): Promise<PusherMachine[]> {
-  return apiGet<PusherMachine[]>(getBasePath(LocationType.PUSHER_MACHINE));
-}
-
-export async function getPusherMachineById(
-  id: string
-): Promise<PusherMachine> {
-  return apiGet<PusherMachine>(
-    `${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`
-  );
-}
-
-export async function createPusherMachine(
-  data: PusherMachineRequest
-): Promise<PusherMachine> {
-  return apiPost<PusherMachine, PusherMachineRequest>(
-    getBasePath(LocationType.PUSHER_MACHINE),
-    data
-  );
-}
-
-export async function updatePusherMachine(
-  id: string,
-  data: PusherMachineRequest
-): Promise<PusherMachine> {
-  return apiPut<PusherMachine, PusherMachineRequest>(
-    `${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`,
-    data
-  );
-}
-
-export async function deletePusherMachine(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.PUSHER_MACHINE)}/${id}`);
-}
-
-// Window API
-
-export async function getWindows(): Promise<Window[]> {
-  return apiGet<Window[]>(getBasePath(LocationType.WINDOW));
-}
-
-export async function getWindowById(id: string): Promise<Window> {
-  return apiGet<Window>(`${getBasePath(LocationType.WINDOW)}/${id}`);
-}
-
-export async function createWindow(data: WindowRequest): Promise<Window> {
-  return apiPost<Window, WindowRequest>(getBasePath(LocationType.WINDOW), data);
-}
-
-export async function updateWindow(
-  id: string,
-  data: WindowRequest
-): Promise<Window> {
-  return apiPut<Window, WindowRequest>(
-    `${getBasePath(LocationType.WINDOW)}/${id}`,
-    data
-  );
-}
-
-export async function deleteWindow(id: string): Promise<void> {
-  return apiDelete<void>(`${getBasePath(LocationType.WINDOW)}/${id}`);
-}
-
-// Helper to get all locations of a specific type
-export async function getLocationsByType(
-  locationType: LocationType
-): Promise<
-  | BoxBin[]
-  | Cabinet[]
-  | DoubleClawMachine[]
-  | FourCornerMachine[]
-  | Gachapon[]
-  | KeychainMachine[]
-  | PusherMachine[]
-  | Rack[]
-  | SingleClawMachine[]
-  | Window[]
-> {
-  switch (locationType) {
-    case LocationType.BOX_BIN:
-      return getBoxBins();
-    case LocationType.CABINET:
-      return getCabinets();
-    case LocationType.DOUBLE_CLAW_MACHINE:
-      return getDoubleClawMachines();
-    case LocationType.FOUR_CORNER_MACHINE:
-      return getFourCornerMachines();
-    case LocationType.GACHAPON:
-      return getGachapons();
-    case LocationType.KEYCHAIN_MACHINE:
-      return getKeychainMachines();
-    case LocationType.PUSHER_MACHINE:
-      return getPusherMachines();
-    case LocationType.RACK:
-      return getRacks();
-    case LocationType.SINGLE_CLAW_MACHINE:
-      return getSingleClawMachines();
-    case LocationType.WINDOW:
-      return getWindows();
-    default:
-      throw new Error(`Unknown location type: ${locationType}`);
-  }
-}
-
-// Optimized batch API - fetches all locations with inventory counts in one request
+// Unified location API using /api/locations endpoints
 
 /**
  * Fetch all locations with their inventory counts in a single request.
@@ -423,3 +25,97 @@ export async function getLocationsWithCounts(
   const params = locationType ? `?type=${locationType}` : "";
   return apiGet<LocationWithCounts[]>(`/api/locations/with-counts${params}`);
 }
+
+/**
+ * Get all storage locations (categories like BOX_BINS, RACKS, etc.)
+ */
+export async function getStorageLocations(): Promise<
+  Array<{
+    id: string;
+    code: string;
+    name: string;
+    codePrefix?: string;
+    icon?: string;
+    hasDisplay: boolean;
+    isDisplayOnly: boolean;
+    displayOrder: number;
+  }>
+> {
+  return apiGet("/api/storage-locations");
+}
+
+/**
+ * Get a storage location by code.
+ */
+export async function getStorageLocationByCode(
+  code: string
+): Promise<{
+  id: string;
+  code: string;
+  name: string;
+  hasDisplay: boolean;
+  isDisplayOnly: boolean;
+}> {
+  return apiGet(`/api/storage-locations/by-code/${code}`);
+}
+
+// Location CRUD operations
+// These use the unified /api/locations endpoints
+
+/**
+ * Get all locations (optionally filtered by storage location code).
+ */
+export async function getLocations(
+  storageLocationCode?: string
+): Promise<Location[]> {
+  const params = storageLocationCode ? `?storageLocation=${storageLocationCode}` : "";
+  return apiGet<Location[]>(`/api/locations${params}`);
+}
+
+/**
+ * Get a location by ID.
+ */
+export async function getLocationById(id: string): Promise<Location> {
+  return apiGet<Location>(`/api/locations/${id}`);
+}
+
+/**
+ * Create a new location.
+ */
+export async function createLocation(data: LocationRequest): Promise<Location> {
+  return apiPost<Location, LocationRequest>("/api/locations", data);
+}
+
+/**
+ * Update a location.
+ */
+export async function updateLocation(
+  id: string,
+  data: Partial<LocationRequest>
+): Promise<Location> {
+  return apiPut<Location, Partial<LocationRequest>>(`/api/locations/${id}`, data);
+}
+
+/**
+ * Delete a location.
+ */
+export async function deleteLocation(id: string): Promise<void> {
+  return apiDelete<void>(`/api/locations/${id}`);
+}
+
+// Helper to get locations by type (uses storage location code mapping)
+
+/**
+ * Get all locations of a specific type.
+ * Uses the STORAGE_LOCATION_CODES mapping to filter.
+ */
+export async function getLocationsByType(
+  locationType: LocationType
+): Promise<Location[]> {
+  if (locationType === LocationType.NOT_ASSIGNED) {
+    return [];
+  }
+  const storageCode = STORAGE_LOCATION_CODES[locationType];
+  return getLocations(storageCode);
+}
+

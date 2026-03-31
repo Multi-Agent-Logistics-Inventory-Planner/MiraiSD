@@ -167,49 +167,23 @@ class SupabaseRepo:
 
         Returns DataFrame with columns: item_id, as_of_ts, current_qty
 
-        Optimization: When item_ids is provided, the WHERE clause is pushed into
-        each UNION branch so PostgreSQL can filter early at each table scan,
-        rather than scanning all tables and filtering at the end.
+        Uses the unified location_inventory table which consolidates all
+        inventory from storage locations (box bins, racks, machines, etc.).
         """
-        # Union all inventory tables and sum quantities per item
-        inventory_tables = [
-            ("box_bin_inventory", "box_bin_id"),
-            ("rack_inventory", "rack_id"),
-            ("cabinet_inventory", "cabinet_id"),
-            ("single_claw_machine_inventory", "single_claw_machine_id"),
-            ("double_claw_machine_inventory", "double_claw_machine_id"),
-            ("pusher_machine_inventory", "pusher_machine_id"),
-            ("four_corner_machine_inventory", "four_corner_machine_id"),
-            ("window_inventory", "window_id"),
-            ("not_assigned_inventory", "item_id"),
-        ]
-
-        params: dict = {}
-
-        # Build UNION parts - push filter into each branch when item_ids provided
-        union_parts = []
-        if item_ids:
-            # Push WHERE clause into each UNION branch for early filtering
-            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
-            for table, _ in inventory_tables:
-                union_parts.append(
-                    f"SELECT item_id, quantity FROM {table} WHERE item_id = ANY(:item_ids)"
-                )
-        else:
-            # No filter - simple select from each table
-            for table, _ in inventory_tables:
-                union_parts.append(f"SELECT item_id, quantity FROM {table}")
-
-        union_query = " UNION ALL ".join(union_parts)
-
-        query = f"""
+        query = """
             SELECT
-                item_id::text AS item_id,
+                product_id::text AS item_id,
                 NOW() AS as_of_ts,
                 COALESCE(SUM(quantity), 0)::int AS current_qty
-            FROM ({union_query}) AS all_inventory
-            GROUP BY item_id
+            FROM location_inventory
         """
+        params: dict = {}
+
+        if item_ids:
+            query += " WHERE product_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+
+        query += " GROUP BY product_id"
 
         with self._engine.connect() as conn:
             df = pd.read_sql(text(query), conn, params=params)

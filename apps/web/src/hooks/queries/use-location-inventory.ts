@@ -1,8 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { LocationType, type Inventory, type NotAssignedInventory } from "@/types/api";
-import { getInventoryByLocation, getNotAssignedInventory } from "@/lib/api/inventory";
+import { LocationType, type LocationInventory, DISPLAY_ONLY_LOCATION_TYPES } from "@/types/api";
+import { getLocationInventory, getStorageLocationInventory } from "@/lib/api/inventory";
+import { getStorageLocationByCode } from "@/lib/api/locations";
+
+/** Virtual ID used for NOT_ASSIGNED when no real ID is available */
+const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
 
 /** Filter inventory to root products only (exclude child/prize products from storage view). */
 function filterToRootProducts<T extends { item: { parentId?: string | null } }>(
@@ -13,13 +17,16 @@ function filterToRootProducts<T extends { item: { parentId?: string | null } }>(
 
 /**
  * Hook to fetch inventory for a location.
- * Handles NOT_ASSIGNED specially by fetching from the not-assigned inventory API.
+ * Uses the unified /api/locations/{locationId}/inventory endpoint.
  * Returns only root products (excludes Kuji prizes) so storage operations apply to parents.
+ *
+ * For NOT_ASSIGNED, automatically looks up the storage location ID.
  */
 export function useLocationInventory(
   locationType: LocationType | undefined,
   locationId: string | undefined
 ) {
+  const isDisplayOnly = locationType && DISPLAY_ONLY_LOCATION_TYPES.includes(locationType);
   const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
 
   return useQuery({
@@ -27,19 +34,21 @@ export function useLocationInventory(
       ? ["notAssignedInventory"]
       : ["locationInventory", locationType, locationId],
     queryFn: async () => {
-      let data: Inventory[];
+      let data: LocationInventory[];
+
       if (isNotAssigned) {
-        const notAssigned = await getNotAssignedInventory();
-        data = notAssigned as unknown as Inventory[];
+        // For NOT_ASSIGNED, look up the storage location ID
+        const storageLocation = await getStorageLocationByCode("NOT_ASSIGNED");
+        data = await getStorageLocationInventory(storageLocation.id);
       } else {
-        data = (await getInventoryByLocation(
-          locationType as LocationType,
-          locationId as string
-        )) as Inventory[];
+        if (!locationId) {
+          return [];
+        }
+        data = await getLocationInventory(locationId);
       }
+
       return filterToRootProducts(data);
     },
-    enabled: isNotAssigned || (Boolean(locationType) && Boolean(locationId)),
+    enabled: !isDisplayOnly && Boolean(locationType) && (isNotAssigned || Boolean(locationId)),
   });
 }
-

@@ -56,7 +56,6 @@ public class ForecastPrediction {
     private BigDecimal confidence;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
     private Map<String, Object> features;
 
     @NotNull

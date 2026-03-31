@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InventoryChangeEvent",
+  "description": "Event envelope published by inventory-service to the inventory-changes Kafka topic. Consumed by forecasting-service and messaging-service.",
+  "type": "object",
+  "required": ["event_id", "payload"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "topic": {
+      "type": ["string", "null"]
+    },
+    "event_type": {
+      "type": ["string", "null"],
+      "enum": ["CREATED", "UPDATED", null]
+    },
+    "entity_type": {
+      "type": ["string", "null"]
+    },
+    "entity_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["item_id", "quantity_change", "at"],
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "product_name": {
+          "type": ["string", "null"]
+        },
+        "sku": {
+          "type": ["string", "null"]
+        },
+        "item_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "quantity_change": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": ["string", "null"]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "from_location_code": {
+          "type": ["string", "null"]
+        },
+        "to_location_code": {
+          "type": ["string", "null"]
+        },
+        "previous_location_qty": {
+          "type": ["integer", "null"]
+        },
+        "current_location_qty": {
+          "type": ["integer", "null"]
+        },
+        "previous_total_qty": {
+          "type": ["integer", "null"]
+        },
+        "current_total_qty": {
+          "type": ["integer", "null"]
+        },
+        "reorder_point": {
+          "type": ["integer", "null"]
+        },
+        "actor_id": {
+          "type": ["string", "null"]
+        },
+        "stock_movement_id": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

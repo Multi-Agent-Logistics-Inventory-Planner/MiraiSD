@@ -9,48 +9,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LOCATION_CODE_PATTERNS, type LocationType, type StorageLocation } from "@/types/api";
-
-function getCodeField(locationType: LocationType): string {
-  switch (locationType) {
-    case "BOX_BIN":
-      return "boxBinCode";
-    case "CABINET":
-      return "cabinetCode";
-    case "DOUBLE_CLAW_MACHINE":
-      return "doubleClawMachineCode";
-    case "FOUR_CORNER_MACHINE":
-      return "fourCornerMachineCode";
-    case "GACHAPON":
-      return "gachaponCode";
-    case "KEYCHAIN_MACHINE":
-      return "keychainMachineCode";
-    case "PUSHER_MACHINE":
-      return "pusherMachineCode";
-    case "RACK":
-      return "rackCode";
-    case "SINGLE_CLAW_MACHINE":
-      return "singleClawMachineCode";
-    case "WINDOW":
-      return "windowCode";
-    default:
-      return "code";
-  }
-}
-
-function getExistingCode(locationType: LocationType, loc: StorageLocation | null | undefined): string {
-  if (!loc) return "";
-  const field = getCodeField(locationType);
-  return (loc as any)[field] ?? "";
-}
+import { LOCATION_CODE_PATTERNS, type LocationType, type Location } from "@/types/api";
 
 interface LocationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   locationType: LocationType;
-  initialLocation?: StorageLocation | null;
+  initialLocation?: Location | null;
   isSaving?: boolean;
-  onSubmit: (payload: Record<string, string>) => Promise<void> | void;
+  onSubmit: (payload: { locationCode: string }) => Promise<void> | void;
 }
 
 export function LocationForm({
@@ -61,7 +28,6 @@ export function LocationForm({
   isSaving,
   onSubmit,
 }: LocationFormProps) {
-  const codeField = getCodeField(locationType);
   const schema = z.object({
     code: z
       .string()
@@ -80,11 +46,11 @@ export function LocationForm({
 
   useEffect(() => {
     if (!open) return;
-    form.reset({ code: getExistingCode(locationType, initialLocation) });
-  }, [open, form, locationType, initialLocation]);
+    form.reset({ code: initialLocation?.locationCode ?? "" });
+  }, [open, form, initialLocation]);
 
   async function handleSubmit(values: FormValues) {
-    await onSubmit({ [codeField]: values.code.trim() });
+    await onSubmit({ locationCode: values.code.trim() });
     onOpenChange(false);
   }
 
@@ -131,4 +97,3 @@ export function LocationForm({
     </Dialog>
   );
 }
-

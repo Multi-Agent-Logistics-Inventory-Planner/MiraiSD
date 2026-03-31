@@ -22,31 +22,31 @@ import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
-import com.mirai.inventoryservice.models.audit.StockMovement;
-import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -62,7 +62,6 @@ public class AnalyticsService {
     private final CategoryRepository categoryRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
-    private final StockMovementRepository stockMovementRepository;
     private final DailySalesRollupRepository dailySalesRollupRepository;
 
     private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
@@ -285,52 +284,40 @@ public class AnalyticsService {
             .divide(BigDecimal.valueOf(totalStock), 1, RoundingMode.HALF_UP);
     }
 
+    @Cacheable(CacheConfig.SALES_SUMMARY_CACHE)
     @Transactional(readOnly = true)
     public SalesSummaryDTO getSalesSummary() {
         LocalDate today = LocalDate.now();
         LocalDate periodStart = today.minusMonths(12);
-        OffsetDateTime startDateTime = periodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
-
-        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-        List<StockMovement> salesMovements = stockMovementRepository.findByReasonAndAtAfterWithItem(
-                StockMovementReason.SALE, startDateTime);
+        // Use pre-aggregated rollup table instead of loading raw stock movements
+        List<Object[]> monthlyRows = dailySalesRollupRepository.aggregateByMonth(periodStart);
+        List<DailySalesRollup> dailyRollups = dailySalesRollupRepository
+            .findByRollupDateBetweenOrderByRollupDateAsc(periodStart, today);
+        Object[] totals = dailySalesRollupRepository.getTotalsForPeriod(periodStart, today);
 
-        Map<String, BigDecimal> monthlyRevenue = new TreeMap<>();
-        Map<String, Integer> monthlyUnits = new TreeMap<>();
+        List<MonthlySalesDTO> monthlySales = monthlyRows.stream()
+            .map(row -> {
+                int year = ((Number) row[0]).intValue();
+                int month = ((Number) row[1]).intValue();
+                String monthKey = String.format("%d-%02d", year, month);
+                int units = ((Number) row[2]).intValue();
+                BigDecimal revenue = row[3] instanceof BigDecimal bd
+                    ? bd.setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.valueOf(((Number) row[3]).doubleValue()).setScale(2, RoundingMode.HALF_UP);
+                return new MonthlySalesDTO(monthKey, revenue, units);
+            })
+            .toList();
+
+        // Aggregate daily rollups by date (multiple items per day -> one row per day)
         Map<String, Integer> dailyUnits = new TreeMap<>();
         Map<String, BigDecimal> dailyRevenue = new TreeMap<>();
-
-        BigDecimal totalRevenue = BigDecimal.ZERO;
-        int totalUnits = 0;
-
-        for (StockMovement movement : salesMovements) {
-            int units = Math.abs(movement.getQuantityChange());
-            BigDecimal unitCost = movement.getItem().getUnitCost();
-            BigDecimal revenue = unitCost != null
-                ? unitCost.multiply(BigDecimal.valueOf(units))
-                : BigDecimal.ZERO;
-
-            String monthKey = movement.getAt().format(monthFormatter);
-            String dateKey = movement.getAt().format(dateFormatter);
-
-            monthlyRevenue.merge(monthKey, revenue, BigDecimal::add);
-            monthlyUnits.merge(monthKey, units, Integer::sum);
-            dailyUnits.merge(dateKey, units, Integer::sum);
-            dailyRevenue.merge(dateKey, revenue, BigDecimal::add);
-
-            totalRevenue = totalRevenue.add(revenue);
-            totalUnits += units;
+        for (DailySalesRollup rollup : dailyRollups) {
+            String dateKey = rollup.getRollupDate().format(dateFormatter);
+            dailyUnits.merge(dateKey, rollup.getUnitsSold(), Integer::sum);
+            dailyRevenue.merge(dateKey, rollup.getRevenue(), BigDecimal::add);
         }
-
-        List<MonthlySalesDTO> monthlySales = monthlyRevenue.entrySet().stream()
-            .map(entry -> new MonthlySalesDTO(
-                entry.getKey(),
-                entry.getValue().setScale(2, RoundingMode.HALF_UP),
-                monthlyUnits.getOrDefault(entry.getKey(), 0)
-            ))
-            .toList();
 
         List<DailySalesDTO> dailySales = dailyUnits.entrySet().stream()
             .map(entry -> new DailySalesDTO(
@@ -341,10 +328,17 @@ public class AnalyticsService {
             ))
             .toList();
 
+        int totalUnits = totals[0] != null ? ((Number) totals[0]).intValue() : 0;
+        BigDecimal totalRevenue = totals[1] != null
+            ? (totals[1] instanceof BigDecimal bd
+                ? bd.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(((Number) totals[1]).doubleValue()).setScale(2, RoundingMode.HALF_UP))
+            : BigDecimal.ZERO;
+
         return new SalesSummaryDTO(
             monthlySales,
             dailySales,
-            totalRevenue.setScale(2, RoundingMode.HALF_UP),
+            totalRevenue,
             totalUnits,
             periodStart.format(dateFormatter),
             today.format(dateFormatter)
@@ -355,6 +349,7 @@ public class AnalyticsService {
      * Get action center data with demand-based metrics.
      * Returns items needing reorder decisions with demand velocity, volatility, and forecast accuracy.
      */
+    @Cacheable(CacheConfig.PREDICTIONS_CACHE)
     @Transactional(readOnly = true)
     public ActionCenterDTO getActionCenter() {
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
@@ -483,6 +478,7 @@ public class AnalyticsService {
      * Get insights with demand-based metrics.
      * Category performance uses demand velocity instead of revenue.
      */
+    @Cacheable(CacheConfig.INSIGHTS_CACHE)
     @Transactional(readOnly = true)
     public InsightsDTO getInsights() {
         LocalDate today = LocalDate.now();
@@ -499,9 +495,14 @@ public class AnalyticsService {
             featuresMap.put(fp.getItemId(), extractFeatures(fp));
         }
 
+        // Load products once and share across movers computation
+        List<Product> allProducts = productRepository.findAllWithCategories();
+        Map<UUID, Product> productMap = allProducts.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+
         List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
-        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true);
-        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false);
+        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap);
+        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false, productMap);
         PeriodSummary currentPeriod = computePeriodSummaryWithDemand(rollups, currentPeriodStart, today, "Last 30 Days", featuresMap);
         PeriodSummary previousPeriod = computePeriodSummaryWithDemand(rollups, previousPeriodStart, currentPeriodStart.minusDays(1), "Previous 30 Days", featuresMap);
 
@@ -557,11 +558,7 @@ public class AnalyticsService {
     private List<Mover> computeMoversFromRollups(
             List<DailySalesRollup> rollups,
             LocalDate currentStart, LocalDate previousStart, LocalDate endDate,
-            boolean topMovers) {
-
-        List<Product> products = productRepository.findAllWithCategories();
-        Map<UUID, Product> productMap = products.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
+            boolean topMovers, Map<UUID, Product> productMap) {
 
         Map<UUID, Integer> currentPeriod = new HashMap<>();
         Map<UUID, Integer> previousPeriod = new HashMap<>();
@@ -630,7 +627,7 @@ public class AnalyticsService {
 
         int totalUnits = 0;
         int totalMovements = 0;
-        java.util.Set<UUID> uniqueItems = new java.util.HashSet<>();
+        Set<UUID> uniqueItems = new HashSet<>();
 
         for (DailySalesRollup rollup : rollups) {
             LocalDate date = rollup.getRollupDate();
@@ -674,6 +671,7 @@ public class AnalyticsService {
     /**
      * Get demand leaders - rankings by demand velocity and stock velocity.
      */
+    @Cacheable(value = CacheConfig.DEMAND_LEADERS_CACHE, key = "#period")
     @Transactional(readOnly = true)
     public DemandLeadersDTO getDemandLeaders(String period) {
         LocalDate today = LocalDate.now();
@@ -716,12 +714,20 @@ public class AnalyticsService {
             featuresMap.put(fp.getItemId(), extractFeatures(fp));
         }
 
-        List<DailySalesRollup> rollups = dailySalesRollupRepository
-            .findByRollupDateBetweenOrderByRollupDateAsc(startDate, today);
+        // Fetch rollups for both current and previous periods in a single query
+        List<DailySalesRollup> allRollups = dailySalesRollupRepository
+            .findByRollupDateBetweenOrderByRollupDateAsc(previousStart, today);
 
+        // Partition into current and previous periods in-memory
         Map<UUID, Integer> unitsByItem = new HashMap<>();
-        for (DailySalesRollup rollup : rollups) {
-            unitsByItem.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+        int previousTotalUnits = 0;
+        for (DailySalesRollup rollup : allRollups) {
+            LocalDate rollupDate = rollup.getRollupDate();
+            if (!rollupDate.isBefore(startDate)) {
+                unitsByItem.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+            } else {
+                previousTotalUnits += rollup.getUnitsSold();
+            }
         }
 
         // Calculate demand metrics for each item
@@ -876,10 +882,7 @@ public class AnalyticsService {
             new CategoryRanking(rank, cr.categoryId(), cr.categoryName(),
                 cr.totalItems(), cr.periodDemand(), cr.totalDemandVelocity(), cr.percentOfTotal()));
 
-        // Previous period comparison for growth calculation
-        List<DailySalesRollup> previousRollups = dailySalesRollupRepository
-            .findByRollupDateBetweenOrderByRollupDateAsc(previousStart, startDate.minusDays(1));
-        int previousTotalUnits = previousRollups.stream().mapToInt(DailySalesRollup::getUnitsSold).sum();
+        // Growth calculation using already-partitioned data
         int currentTotalUnits = unitsByItem.values().stream().mapToInt(Integer::intValue).sum();
 
         BigDecimal demandGrowth = BigDecimal.ZERO;

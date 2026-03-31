@@ -173,7 +173,6 @@ secrets/
 # Personal documentation
 # ============================================
 refs/
-tests/
 codemaps/
 # IDE - Cursor
 .cursor/
