@@ -7,6 +7,9 @@ import {
   STORAGE_LOCATION_CODES,
 } from "@/types/api";
 
+// Storage location types are fixed and seeded automatically.
+// Use GET endpoints only - no create/update operations available.
+
 // Unified location API using /api/locations endpoints
 
 /**
@@ -39,34 +42,6 @@ export async function getStorageLocations(): Promise<
   }>
 > {
   return apiGet("/api/storage-locations");
-}
-
-export interface CreateStorageLocationRequest {
-  code: string;
-  name: string;
-  codePrefix?: string;
-  icon?: string;
-  hasDisplay: boolean;
-  isDisplayOnly: boolean;
-  displayOrder: number;
-}
-
-/**
- * Create a new storage location category.
- */
-export async function createStorageLocation(
-  data: CreateStorageLocationRequest
-): Promise<{
-  id: string;
-  code: string;
-  name: string;
-  codePrefix?: string;
-  icon?: string;
-  hasDisplay: boolean;
-  isDisplayOnly: boolean;
-  displayOrder: number;
-}> {
-  return apiPost("/api/storage-locations", data);
 }
 
 /**

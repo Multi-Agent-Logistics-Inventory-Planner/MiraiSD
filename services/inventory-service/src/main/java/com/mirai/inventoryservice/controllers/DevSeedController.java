@@ -104,7 +104,7 @@ public class DevSeedController {
     private final Random random = new Random();
 
     /**
-     * Ensure core entities exist: MAIN site, BOX_BINS storage location, and NOT_ASSIGNED with NA location.
+     * Ensure core entities exist: MAIN site, all standard storage locations, and NA location.
      * This is idempotent and can be called multiple times safely.
      */
     @PostMapping("/seed/core")
@@ -114,13 +114,35 @@ public class DevSeedController {
     }
 
     /**
-     * Helper method to ensure MAIN site, BOX_BINS, NOT_ASSIGNED storage locations, and NA location exist.
+     * Standard storage location type specification.
+     */
+    private record StorageTypeSpec(String code, String name, String prefix, String icon,
+                                   boolean hasDisplay, boolean isDisplayOnly, int order) {}
+
+    /**
+     * All standard storage location types. These are fixed and cannot be created by users.
+     */
+    private static final List<StorageTypeSpec> STANDARD_STORAGE_TYPES = List.of(
+        new StorageTypeSpec("BOX_BINS", "Box Bins", "B", "Box", false, false, 0),
+        new StorageTypeSpec("CABINETS", "Cabinets", "C", "Archive", false, false, 1),
+        new StorageTypeSpec("RACKS", "Racks", "R", "Layers", false, false, 2),
+        new StorageTypeSpec("WINDOWS", "Windows", "W", "PanelsTopLeft", false, false, 3),
+        new StorageTypeSpec("SINGLE_CLAW", "Single Claw", "SC", "Gamepad2", true, false, 4),
+        new StorageTypeSpec("DOUBLE_CLAW", "Double Claw", "DC", "Gamepad", true, false, 5),
+        new StorageTypeSpec("FOUR_CORNER", "Four Corner", "FC", "LayoutGrid", true, false, 6),
+        new StorageTypeSpec("PUSHER", "Pusher", "P", "ChevronsRight", true, false, 7),
+        new StorageTypeSpec("GACHAPON", "Gachapon", "G", "Disc3", true, true, 8),
+        new StorageTypeSpec("KEYCHAIN", "Keychain", "K", "Key", true, true, 9),
+        new StorageTypeSpec("NOT_ASSIGNED", "Not Assigned", "NA", "CircleHelp", false, false, 99)
+    );
+
+    /**
+     * Helper method to ensure MAIN site, all standard storage locations, and NA location exist.
      * Called by seedAll() and can be invoked directly via /api/dev/seed/core.
      */
     private Map<String, Object> ensureCoreEntitiesExist() {
         boolean siteCreated = false;
-        boolean boxBinsCreated = false;
-        boolean notAssignedCreated = false;
+        int storageLocationsCreated = 0;
         boolean naLocationCreated = false;
 
         // 1. Ensure MAIN site exists
@@ -135,45 +157,32 @@ public class DevSeedController {
             log.info("Created MAIN site: {}", site.getId());
         }
 
-        // 2. Ensure BOX_BINS storage location exists (required by seedAll)
-        StorageLocation boxBinsStorage = storageLocationRepository
-            .findByCodeAndSite_Code("BOX_BINS", DEFAULT_SITE_CODE)
-            .orElse(null);
-        if (boxBinsStorage == null) {
-            boxBinsStorage = storageLocationRepository.save(StorageLocation.builder()
-                .site(site)
-                .name("Box Bins")
-                .code("BOX_BINS")
-                .codePrefix("B")
-                .icon("Box")
-                .hasDisplay(false)
-                .isDisplayOnly(false)
-                .displayOrder(1)
-                .build());
-            boxBinsCreated = true;
-            log.info("Created BOX_BINS storage location: {}", boxBinsStorage.getId());
+        // 2. Ensure all standard storage locations exist
+        for (StorageTypeSpec spec : STANDARD_STORAGE_TYPES) {
+            StorageLocation existing = storageLocationRepository
+                .findByCodeAndSite_Code(spec.code(), DEFAULT_SITE_CODE)
+                .orElse(null);
+            if (existing == null) {
+                storageLocationRepository.save(StorageLocation.builder()
+                    .site(site)
+                    .name(spec.name())
+                    .code(spec.code())
+                    .codePrefix(spec.prefix())
+                    .icon(spec.icon())
+                    .hasDisplay(spec.hasDisplay())
+                    .isDisplayOnly(spec.isDisplayOnly())
+                    .displayOrder(spec.order())
+                    .build());
+                storageLocationsCreated++;
+                log.info("Created {} storage location", spec.code());
+            }
         }
 
-        // 3. Ensure NOT_ASSIGNED storage location exists
+        // 3. Ensure NA location exists within NOT_ASSIGNED
         StorageLocation notAssignedStorage = storageLocationRepository
             .findByCodeAndSite_Code("NOT_ASSIGNED", DEFAULT_SITE_CODE)
-            .orElse(null);
-        if (notAssignedStorage == null) {
-            notAssignedStorage = storageLocationRepository.save(StorageLocation.builder()
-                .site(site)
-                .name("Not Assigned")
-                .code("NOT_ASSIGNED")
-                .codePrefix("NA")
-                .icon("CircleHelp")
-                .hasDisplay(false)
-                .isDisplayOnly(false)
-                .displayOrder(99)
-                .build());
-            notAssignedCreated = true;
-            log.info("Created NOT_ASSIGNED storage location: {}", notAssignedStorage.getId());
-        }
+            .orElseThrow(() -> new RuntimeException("NOT_ASSIGNED storage location should exist"));
 
-        // 4. Ensure NA location exists within NOT_ASSIGNED
         Location naLocation = locationRepository
             .findByLocationCodeAndStorageLocation_Id("NA", notAssignedStorage.getId())
             .orElse(null);
@@ -190,10 +199,8 @@ public class DevSeedController {
             "success", true,
             "siteId", site.getId().toString(),
             "siteCreated", siteCreated,
-            "boxBinsStorageLocationId", boxBinsStorage.getId().toString(),
-            "boxBinsCreated", boxBinsCreated,
-            "notAssignedStorageLocationId", notAssignedStorage.getId().toString(),
-            "notAssignedCreated", notAssignedCreated,
+            "storageLocationsCreated", storageLocationsCreated,
+            "totalStorageTypes", STANDARD_STORAGE_TYPES.size(),
             "naLocationId", naLocation.getId().toString(),
             "naLocationCreated", naLocationCreated
         );

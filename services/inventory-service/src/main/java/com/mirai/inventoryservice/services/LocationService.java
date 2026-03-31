@@ -4,7 +4,6 @@ import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.exceptions.LocationNotFoundException;
 import com.mirai.inventoryservice.exceptions.SiteNotFoundException;
 import com.mirai.inventoryservice.exceptions.StorageLocationNotFoundException;
-import com.mirai.inventoryservice.models.Site;
 import com.mirai.inventoryservice.models.storage.Location;
 import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.LocationRepository;
@@ -160,55 +159,15 @@ public class LocationService {
                 locationCode, storageLocation.getId());
     }
 
-    // ========= Storage Location Management =========
+    // ========= Storage Location Queries =========
+    // Note: Storage location types are fixed and seeded automatically.
+    // Use DevSeedController.seedCoreEntities() to create all standard types.
 
     /**
      * Get all storage locations for the default site.
      */
     public List<StorageLocation> getAllStorageLocations() {
         return storageLocationRepository.findBySite_CodeOrderByDisplayOrder(DEFAULT_SITE_CODE);
-    }
-
-    /**
-     * Create a new storage location category.
-     *
-     * @param code The unique code (e.g., "BOX_BINS")
-     * @param name The display name (e.g., "Box Bins")
-     * @param codePrefix The prefix for location codes (e.g., "B")
-     * @param hasDisplay Whether locations track display history
-     * @param isDisplayOnly Whether locations only track display (no inventory)
-     * @param displayOrder The order in the UI tabs
-     * @return The created StorageLocation
-     */
-    public StorageLocation createStorageLocation(
-            String code,
-            String name,
-            String codePrefix,
-            String icon,
-            boolean hasDisplay,
-            boolean isDisplayOnly,
-            int displayOrder) {
-
-        Site site = getDefaultSite();
-
-        // Check if storage location with this code already exists
-        if (storageLocationRepository.findByCodeAndSite_Code(code, DEFAULT_SITE_CODE).isPresent()) {
-            throw new DuplicateLocationCodeException(
-                    "Storage location with code '" + code + "' already exists");
-        }
-
-        StorageLocation storageLocation = StorageLocation.builder()
-                .site(site)
-                .code(code)
-                .name(name)
-                .codePrefix(codePrefix)
-                .icon(icon)
-                .hasDisplay(hasDisplay)
-                .isDisplayOnly(isDisplayOnly)
-                .displayOrder(displayOrder)
-                .build();
-
-        return storageLocationRepository.save(storageLocation);
     }
 
     /**
@@ -251,10 +210,5 @@ public class LocationService {
         return siteRepository.findByCode(DEFAULT_SITE_CODE)
                 .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE))
                 .getId();
-    }
-
-    private Site getDefaultSite() {
-        return siteRepository.findByCode(DEFAULT_SITE_CODE)
-                .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE));
     }
 }

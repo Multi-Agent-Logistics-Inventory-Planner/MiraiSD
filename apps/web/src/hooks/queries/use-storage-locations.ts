@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getStorageLocations, createStorageLocation, type CreateStorageLocationRequest } from "@/lib/api/locations";
+import { useQuery } from "@tanstack/react-query";
+import { getStorageLocations } from "@/lib/api/locations";
 
 export interface StorageLocationCategory {
   id: string;
@@ -16,7 +16,7 @@ export interface StorageLocationCategory {
 
 /**
  * Hook to fetch all storage location categories.
- * Use this to get storage location IDs for querying inventory.
+ * Storage location types are fixed and seeded automatically.
  */
 export function useStorageLocations() {
   return useQuery<StorageLocationCategory[]>({
@@ -42,18 +42,4 @@ export function useNotAssignedStorageLocation() {
     storageLocationId: notAssignedLocation?.id,
     ...rest,
   };
-}
-
-/**
- * Hook to create a new storage location category.
- */
-export function useCreateStorageLocationMutation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: CreateStorageLocationRequest) => createStorageLocation(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["storageLocations"] });
-    },
-  });
 }
