@@ -178,14 +178,13 @@ class TestE2EBackwardCompatibility:
         assert saved == 1
 
 
-class TestE2EPushFilterIntoUnion:
-    """E2E test: Verify filter is pushed into UNION branches."""
+class TestE2EUnifiedInventoryQuery:
+    """E2E test: Verify query uses unified location_inventory table."""
 
     def test_get_current_inventory_query_structure(self):
-        """Verify the SQL query pushes WHERE into each UNION branch."""
+        """Verify the SQL query uses the unified location_inventory table with a single WHERE."""
         from src.adapters.supabase_repo import SupabaseRepo
 
-        # Create mock engine that captures the query
         mock_engine = MagicMock()
         mock_conn = MagicMock()
         mock_engine.connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
@@ -204,10 +203,13 @@ class TestE2EPushFilterIntoUnion:
                 "550e8400-e29b-41d4-a716-446655440002",
             ])
 
-        # Verify 9 WHERE clauses (one per inventory table)
         assert captured_query is not None
-        where_count = captured_query.count("WHERE item_id = ANY")
-        assert where_count == 9, f"Expected 9 WHERE clauses, got {where_count}"
+        # Unified schema: single table, single WHERE clause
+        assert "location_inventory" in captured_query.lower(), (
+            "Query should use unified location_inventory table"
+        )
+        where_count = captured_query.lower().count("where")
+        assert where_count == 1, f"Expected 1 WHERE clause (unified table), got {where_count}"
 
 
 class TestE2EBatchUpsert:
