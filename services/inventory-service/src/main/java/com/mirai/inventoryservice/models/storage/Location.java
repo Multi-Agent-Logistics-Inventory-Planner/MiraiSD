@@ -48,7 +48,6 @@ public class Location {
     private String locationCode;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
     @Builder.Default
     private Map<String, Object> metadata = Map.of();
 

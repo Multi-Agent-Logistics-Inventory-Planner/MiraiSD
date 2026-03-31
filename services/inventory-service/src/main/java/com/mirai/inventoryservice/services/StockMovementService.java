@@ -17,6 +17,8 @@ import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
+import com.mirai.inventoryservice.config.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -83,6 +85,7 @@ public class StockMovementService {
      * Adjust inventory quantity (restock, sale, damage, etc.)
      * Creates a single stock movement record linked to an audit log
      */
+    @CacheEvict(value = {CacheConfig.PREDICTIONS_CACHE, CacheConfig.INSIGHTS_CACHE, CacheConfig.DEMAND_LEADERS_CACHE}, allEntries = true)
     @Transactional
     public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
         LocationInventory inventory = locationInventoryRepository.findById(inventoryId)
@@ -162,6 +165,7 @@ public class StockMovementService {
      * Creates TWO stock movement records (withdrawal + deposit) linked to a single audit log.
      * If destination inventory doesn't exist, creates it automatically.
      */
+    @CacheEvict(value = {CacheConfig.PREDICTIONS_CACHE, CacheConfig.INSIGHTS_CACHE, CacheConfig.DEMAND_LEADERS_CACHE}, allEntries = true)
     @Transactional
     public void transferInventory(TransferInventoryRequestDTO request) {
         LocationInventory sourceInventory = locationInventoryRepository.findById(request.getSourceInventoryId())
@@ -197,6 +201,7 @@ public class StockMovementService {
      * Transfer multiple inventory items between two locations in a single batch.
      * Creates ONE audit log entry covering all items, with itemCount = number of distinct products.
      */
+    @CacheEvict(value = {CacheConfig.PREDICTIONS_CACHE, CacheConfig.INSIGHTS_CACHE, CacheConfig.DEMAND_LEADERS_CACHE}, allEntries = true)
     @Transactional
     public void batchTransferInventory(BatchTransferInventoryRequestDTO batchRequest) {
         List<TransferInventoryRequestDTO> transfers = batchRequest.getTransfers();
@@ -390,6 +395,7 @@ public class StockMovementService {
     /**
      * Create new inventory at a location with tracking.
      */
+    @CacheEvict(value = {CacheConfig.PREDICTIONS_CACHE, CacheConfig.INSIGHTS_CACHE, CacheConfig.DEMAND_LEADERS_CACHE}, allEntries = true)
     @Transactional
     public UUID createInventoryWithTracking(LocationType locationType, UUID locationId,
                                             Product product, int quantity,
@@ -478,6 +484,7 @@ public class StockMovementService {
     /**
      * Remove inventory from a location with tracking.
      */
+    @CacheEvict(value = {CacheConfig.PREDICTIONS_CACHE, CacheConfig.INSIGHTS_CACHE, CacheConfig.DEMAND_LEADERS_CACHE}, allEntries = true)
     @Transactional
     public void removeInventoryWithTracking(LocationType locationType, UUID inventoryId,
                                             StockMovementReason reason, UUID actorId, String notes) {

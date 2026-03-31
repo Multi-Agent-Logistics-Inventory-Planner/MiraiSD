@@ -130,10 +130,20 @@ public class LocationAggregateRepository {
         return mapResultsToDTO(results);
     }
 
+    private UUID toUUID(Object value) {
+        if (value instanceof UUID) return (UUID) value;
+        if (value instanceof byte[] bytes) {
+            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(bytes);
+            return new UUID(bb.getLong(), bb.getLong());
+        }
+        if (value instanceof String) return UUID.fromString((String) value);
+        throw new IllegalArgumentException("Cannot convert " + value.getClass() + " to UUID");
+    }
+
     private List<LocationWithCountsDTO> mapResultsToDTO(List<Object[]> results) {
         return results.stream()
                 .map(row -> LocationWithCountsDTO.builder()
-                        .id((UUID) row[0])
+                        .id(toUUID(row[0]))
                         .locationType((String) row[1])
                         .locationCode((String) row[2])
                         .inventoryRecords(((Number) row[3]).intValue())

@@ -49,7 +49,7 @@ public class User {
     private String canonicalName;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "name_variants", columnDefinition = "text[]")
+    @Column(name = "name_variants")
     @Builder.Default
     private List<String> nameVariants = List.of();
 

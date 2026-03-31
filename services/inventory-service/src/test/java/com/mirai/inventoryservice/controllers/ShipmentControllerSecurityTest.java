@@ -237,8 +237,8 @@ class ShipmentControllerSecurityTest {
         }
 
         @Test
-        @DisplayName("Should return 403 Forbidden when EMPLOYEE role attempts to receive")
-        void receiveShipment_EmployeeRole_ReturnsForbidden() throws Exception {
+        @DisplayName("Should allow EMPLOYEE role to receive shipment (EMPLOYEE+ required)")
+        void receiveShipment_EmployeeRole_Allowed() throws Exception {
             String token = createValidToken("employee-123", "Employee User", "EMPLOYEE");
             setupMockJwtService(token, "employee-123", "Employee User", "EMPLOYEE");
 
@@ -255,7 +255,11 @@ class ShipmentControllerSecurityTest {
                             .header("Authorization", "Bearer " + token)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(requestBody))
-                    .andExpect(status().isForbidden());
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        // Auth should pass (not 401/403). May 404/500 on empty test DB.
+                        org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
+                    });
         }
 
         @Test

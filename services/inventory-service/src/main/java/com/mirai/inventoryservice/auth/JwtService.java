@@ -37,7 +37,7 @@ public class JwtService {
             }
             // Fallback to email if name not set
             String email = claims.get("email", String.class);
-            return email != null ? email.split("@")[0] : "Unknown";
+            return email != null ? email.split("@")[0] : null;
         });
     }
 

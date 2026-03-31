@@ -71,7 +71,6 @@ public class StockMovement {
     private OffsetDateTime at;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata;
 
     @PrePersist
