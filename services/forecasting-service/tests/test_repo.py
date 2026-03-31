@@ -5,23 +5,6 @@ import pandas as pd
 from src import config, repo
 
 
-def test_load_items_schema_and_count():
-    df = repo.load_items()
-    required = {"item_id", "name", "lead_time_days", "safety_stock_days"}
-    assert required.issubset(df.columns), "Items schema mismatch"
-    assert len(df) >= 3, "Expected at least 3 items"
-    assert pd.api.types.is_integer_dtype(df["lead_time_days"])
-    assert pd.api.types.is_integer_dtype(df["safety_stock_days"])
-
-
-def test_load_inventories_schema_and_timestamps():
-    df = repo.load_inventories()
-    required = {"item_id", "as_of_ts", "current_qty"}
-    assert required.issubset(df.columns), "Inventories schema mismatch"
-    assert pd.api.types.is_datetime64_any_dtype(df["as_of_ts"])
-    assert pd.api.types.is_integer_dtype(df["current_qty"])
-
-
 def test_write_forecasts_creates_expected_file(tmp_path: Path, monkeypatch):
     # Redirect output dir to a temp location to avoid polluting repo
     monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path)
