@@ -10,14 +10,14 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Inventory, LocationType } from "@/types/api";
+import type { LocationInventory, LocationType } from "@/types/api";
 import { LOCATION_TYPE_CODES } from "@/types/transfer";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface InventoryPreviewTooltipProps {
   locationType: LocationType;
   locationCode: string;
-  inventory: Inventory[];
+  inventory: LocationInventory[];
   isLoading: boolean;
 }
 

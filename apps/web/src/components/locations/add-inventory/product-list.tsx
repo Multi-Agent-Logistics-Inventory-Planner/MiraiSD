@@ -3,11 +3,11 @@
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProductCard } from "./product-card";
-import type { Product, Category, Inventory } from "@/types/api";
+import type { Product, Category, LocationInventory } from "@/types/api";
 
 interface ProductListProps {
   products: Product[];
-  existingInventory: Inventory[];
+  existingInventory: LocationInventory[];
   selectedId: string | null;
   onSelect: (productId: string) => void;
   isLoading: boolean;

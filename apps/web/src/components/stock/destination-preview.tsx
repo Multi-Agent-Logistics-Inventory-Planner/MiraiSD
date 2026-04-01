@@ -6,14 +6,14 @@ import { ImageOff } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Inventory } from "@/types/api";
+import type { LocationInventory } from "@/types/api";
 
 interface DestinationPreviewProps {
-  inventory: Inventory[];
+  inventory: LocationInventory[];
   isLoading: boolean;
 }
 
-function DestinationItem({ inventory }: { inventory: Inventory }) {
+function DestinationItem({ inventory }: { inventory: LocationInventory }) {
   const [imageError, setImageError] = useState(false);
   const item = inventory.item;
   const hasImage = item.imageUrl && !imageError;

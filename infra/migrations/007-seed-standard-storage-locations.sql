@@ -18,13 +18,14 @@ CROSS JOIN (VALUES
     ('Box Bins', 'BOX_BINS', 'B', 'Box', false, false, 0),
     ('Cabinets', 'CABINETS', 'C', 'Archive', false, false, 1),
     ('Racks', 'RACKS', 'R', 'Layers', false, false, 2),
-    ('Windows', 'WINDOWS', 'W', 'PanelsTopLeft', false, false, 3),
-    ('Single Claw', 'SINGLE_CLAW', 'SC', 'Gamepad2', true, false, 4),
-    ('Double Claw', 'DOUBLE_CLAW', 'DC', 'Gamepad', true, false, 5),
-    ('Four Corner', 'FOUR_CORNER', 'FC', 'LayoutGrid', true, false, 6),
-    ('Pusher', 'PUSHER', 'P', 'ChevronsRight', true, false, 7),
-    ('Gachapon', 'GACHAPON', 'G', 'Disc3', true, true, 8),
-    ('Keychain', 'KEYCHAIN', 'K', 'Key', true, true, 9),
+    ('Shelves', 'SHELVES', 'SH', 'BookOpen', false, false, 3),
+    ('Windows', 'WINDOWS', 'W', 'PanelsTopLeft', false, false, 4),
+    ('Single Claw', 'SINGLE_CLAW', 'SC', 'Gamepad2', true, false, 5),
+    ('Double Claw', 'DOUBLE_CLAW', 'DC', 'Gamepad', true, false, 6),
+    ('Four Corner', 'FOUR_CORNER', 'FC', 'LayoutGrid', true, false, 7),
+    ('Pusher', 'PUSHER', 'P', 'ChevronsRight', true, false, 8),
+    ('Gachapon', 'GACHAPON', 'G', 'Disc3', true, true, 9),
+    ('Keychain', 'KEYCHAIN', 'K', 'Key', true, true, 10),
     ('Not Assigned', 'NOT_ASSIGNED', 'NA', 'CircleHelp', false, false, 99)
 ) AS v(name, code, code_prefix, icon, has_display, is_display_only, display_order)
 WHERE NOT EXISTS (

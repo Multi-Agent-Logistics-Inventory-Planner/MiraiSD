@@ -10,7 +10,7 @@ import { Can, Permission } from "@/components/rbac";
 import {
   LocationType,
   STORAGE_LOCATION_CODES,
-  type StorageLocation,
+  type Location,
 } from "@/types/api";
 import { toStorageLocation } from "@/lib/location-utils";
 import { naturalSortCompare } from "@/lib/utils";
@@ -66,10 +66,10 @@ export default function LocationsPage() {
   const notAssignedQuery = useNotAssignedInventory();
 
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selected, setSelected] = useState<StorageLocation | null>(null);
+  const [selected, setSelected] = useState<Location | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<StorageLocation | null>(null);
+  const [editing, setEditing] = useState<Location | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 

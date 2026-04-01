@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   Archive,
+  BookOpen,
   Box,
   ChevronsRight,
   CircleHelp,
@@ -36,13 +37,14 @@ export const LOCATION_TAB_CONFIG: LocationTabConfig[] = [
   { type: LocationType.BOX_BIN,             code: "BOX_BINS",     label: "Box Bins",     icon: Box,            codePrefix: "B",  hasDisplay: false, isDisplayOnly: false, displayOrder: 0 },
   { type: LocationType.CABINET,             code: "CABINETS",     label: "Cabinets",     icon: Archive,        codePrefix: "C",  hasDisplay: false, isDisplayOnly: false, displayOrder: 1 },
   { type: LocationType.RACK,                code: "RACKS",        label: "Racks",        icon: Layers,         codePrefix: "R",  hasDisplay: false, isDisplayOnly: false, displayOrder: 2 },
-  { type: LocationType.WINDOW,              code: "WINDOWS",      label: "Windows",      icon: PanelsTopLeft,  codePrefix: "W",  hasDisplay: false, isDisplayOnly: false, displayOrder: 3 },
-  { type: LocationType.SINGLE_CLAW_MACHINE, code: "SINGLE_CLAW",  label: "Single Claw",  icon: Gamepad2,       codePrefix: "SC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 4 },
-  { type: LocationType.DOUBLE_CLAW_MACHINE, code: "DOUBLE_CLAW",  label: "Double Claw",  icon: Gamepad,        codePrefix: "DC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 5 },
-  { type: LocationType.FOUR_CORNER_MACHINE, code: "FOUR_CORNER",  label: "Four Corner",  icon: LayoutGrid,     codePrefix: "FC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 6 },
-  { type: LocationType.PUSHER_MACHINE,      code: "PUSHER",       label: "Pusher",       icon: ChevronsRight,  codePrefix: "P",  hasDisplay: true,  isDisplayOnly: false, displayOrder: 7 },
-  { type: LocationType.GACHAPON,            code: "GACHAPON",     label: "Gachapon",     icon: Disc3,          codePrefix: "G",  hasDisplay: true,  isDisplayOnly: true,  displayOrder: 8 },
-  { type: LocationType.KEYCHAIN_MACHINE,    code: "KEYCHAIN",     label: "Keychain",     icon: Key,            codePrefix: "K",  hasDisplay: true,  isDisplayOnly: true,  displayOrder: 9 },
+  { type: LocationType.SHELF,               code: "SHELVES",      label: "Shelves",      icon: BookOpen,       codePrefix: "SH", hasDisplay: false, isDisplayOnly: false, displayOrder: 3 },
+  { type: LocationType.WINDOW,              code: "WINDOWS",      label: "Windows",      icon: PanelsTopLeft,  codePrefix: "W",  hasDisplay: false, isDisplayOnly: false, displayOrder: 4 },
+  { type: LocationType.SINGLE_CLAW_MACHINE, code: "SINGLE_CLAW",  label: "Single Claw",  icon: Gamepad2,       codePrefix: "SC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 5 },
+  { type: LocationType.DOUBLE_CLAW_MACHINE, code: "DOUBLE_CLAW",  label: "Double Claw",  icon: Gamepad,        codePrefix: "DC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 6 },
+  { type: LocationType.FOUR_CORNER_MACHINE, code: "FOUR_CORNER",  label: "Four Corner",  icon: LayoutGrid,     codePrefix: "FC", hasDisplay: true,  isDisplayOnly: false, displayOrder: 7 },
+  { type: LocationType.PUSHER_MACHINE,      code: "PUSHER",       label: "Pusher",       icon: ChevronsRight,  codePrefix: "P",  hasDisplay: true,  isDisplayOnly: false, displayOrder: 8 },
+  { type: LocationType.GACHAPON,            code: "GACHAPON",     label: "Gachapon",     icon: Disc3,          codePrefix: "G",  hasDisplay: true,  isDisplayOnly: true,  displayOrder: 9 },
+  { type: LocationType.KEYCHAIN_MACHINE,    code: "KEYCHAIN",     label: "Keychain",     icon: Key,            codePrefix: "K",  hasDisplay: true,  isDisplayOnly: true,  displayOrder: 10 },
   { type: LocationType.NOT_ASSIGNED,        code: "NOT_ASSIGNED", label: "Not Assigned", icon: CircleHelp,     codePrefix: "NA", hasDisplay: false, isDisplayOnly: false, displayOrder: 99 },
 ];
 
