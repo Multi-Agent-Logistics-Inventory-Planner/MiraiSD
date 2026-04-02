@@ -100,13 +100,42 @@ def compute_daily_demand(conn) -> list[dict]:
         return [dict(row) for row in cur.fetchall()]
 
 
-def cleanup(conn) -> None:
-    """Remove not_assigned_inventory rows for DEV products."""
+def get_not_assigned_location_id(conn) -> str:
+    """Get the NOT_ASSIGNED location ID from the unified locations schema."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            DELETE FROM not_assigned_inventory
-            WHERE item_id IN (
+            SELECT l.id FROM locations l
+            JOIN storage_locations sl ON l.storage_location_id = sl.id
+            WHERE sl.code = 'NOT_ASSIGNED'
+            LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+        if row:
+            return str(row[0])
+        # If no location exists, create one
+        cur.execute(
+            """
+            INSERT INTO locations (storage_location_id, location_code)
+            SELECT sl.id, 'NA1'
+            FROM storage_locations sl
+            WHERE sl.code = 'NOT_ASSIGNED'
+            RETURNING id
+            """
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return str(row[0])
+
+
+def cleanup(conn) -> None:
+    """Remove location_inventory rows for DEV products."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM location_inventory
+            WHERE product_id IN (
                 SELECT id FROM products WHERE sku LIKE 'DEV-%%'
             )
             """
@@ -120,6 +149,9 @@ def seed(conn) -> None:
     """Compute demand rates and insert inventory quantities."""
     # Remove existing inventory for DEV products first
     cleanup(conn)
+
+    # Get the NOT_ASSIGNED location for placing unassigned inventory
+    location_id = get_not_assigned_location_id(conn)
 
     products = compute_daily_demand(conn)
 
@@ -148,16 +180,16 @@ def seed(conn) -> None:
             f"{mu:>12.2f} {target_band:<14} {stock:>10}"
         )
 
-        inventory_rows.append((str(uuid.uuid4()), str(product["product_id"]), stock))
+        inventory_rows.append((str(uuid.uuid4()), location_id, str(product["product_id"]), stock))
 
     print()
 
     with conn.cursor() as cur:
         psycopg2.extras.execute_values(
             cur,
-            "INSERT INTO not_assigned_inventory (id, item_id, quantity) VALUES %s",
+            "INSERT INTO location_inventory (id, location_id, product_id, quantity) VALUES %s",
             inventory_rows,
-            template="(%s::uuid, %s::uuid, %s)",
+            template="(%s::uuid, %s::uuid, %s::uuid, %s)",
         )
     conn.commit()
     print(f"Inserted {len(inventory_rows)} inventory rows.")
@@ -204,7 +236,7 @@ def show_results(conn) -> None:
             SELECT DISTINCT ON (p.id)
                 p.sku,
                 p.name,
-                ni.quantity as current_stock,
+                COALESCE(li.quantity, 0) as current_stock,
                 fp.avg_daily_delta,
                 fp.days_to_stockout,
                 fp.suggested_reorder_qty,
@@ -213,7 +245,7 @@ def show_results(conn) -> None:
                 fp.computed_at
             FROM forecast_predictions fp
             JOIN products p ON p.id = fp.item_id
-            LEFT JOIN not_assigned_inventory ni ON ni.item_id = p.id
+            LEFT JOIN location_inventory li ON li.product_id = p.id
             WHERE p.sku LIKE 'DEV-%%'
             ORDER BY p.id, fp.computed_at DESC
             """,

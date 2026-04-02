@@ -119,6 +119,35 @@ def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
+def get_not_assigned_location_id(conn) -> str:
+    """Get the NOT_ASSIGNED location ID from the unified locations schema."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT l.id FROM locations l
+            JOIN storage_locations sl ON l.storage_location_id = sl.id
+            WHERE sl.code = 'NOT_ASSIGNED'
+            LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+        if row:
+            return str(row[0])
+        # If no location exists, create one
+        cur.execute(
+            """
+            INSERT INTO locations (storage_location_id, location_code)
+            SELECT sl.id, 'NA1'
+            FROM storage_locations sl
+            WHERE sl.code = 'NOT_ASSIGNED'
+            RETURNING id
+            """
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return str(row[0])
+
+
 def cleanup(conn) -> None:
     """Remove all TEST-* products and related data."""
     with conn.cursor() as cur:
@@ -137,7 +166,7 @@ def cleanup(conn) -> None:
         forecast_count = cur.rowcount
         cur.execute("DELETE FROM stock_movements WHERE item_id IN %s", (id_tuple,))
         movement_count = cur.rowcount
-        cur.execute("DELETE FROM not_assigned_inventory WHERE item_id IN %s", (id_tuple,))
+        cur.execute("DELETE FROM location_inventory WHERE product_id IN %s", (id_tuple,))
         inventory_count = cur.rowcount
         cur.execute("DELETE FROM products WHERE id IN %s", (id_tuple,))
         product_count = cur.rowcount
@@ -151,6 +180,9 @@ def seed(conn) -> None:
     """Insert test products, inventory, and stock movements."""
     # First clean up any existing test data
     cleanup(conn)
+
+    # Get the NOT_ASSIGNED location for placing unassigned inventory
+    location_id = get_not_assigned_location_id(conn)
 
     now = datetime.now(timezone.utc)
     variance_pattern = generate_variance_pattern(DAYS_OF_HISTORY)
@@ -174,19 +206,19 @@ def seed(conn) -> None:
         )
         print(f"Inserted {len(product_rows)} products")
 
-        # 2. Insert inventory
+        # 2. Insert inventory (unified location_inventory table)
         inventory_rows = []
         for sku, _, _, stock, _ in TEST_PRODUCTS:
             product_id = make_product_id(sku)
             inv_id = str(uuid.uuid4())
-            inventory_rows.append((inv_id, product_id, stock))
+            inventory_rows.append((inv_id, location_id, product_id, stock))
 
         psycopg2.extras.execute_values(
             cur,
-            """INSERT INTO not_assigned_inventory (id, item_id, quantity)
+            """INSERT INTO location_inventory (id, location_id, product_id, quantity)
                VALUES %s""",
             inventory_rows,
-            template="(%s::uuid, %s::uuid, %s)",
+            template="(%s::uuid, %s::uuid, %s::uuid, %s)",
         )
         print(f"Inserted {len(inventory_rows)} inventory rows")
 

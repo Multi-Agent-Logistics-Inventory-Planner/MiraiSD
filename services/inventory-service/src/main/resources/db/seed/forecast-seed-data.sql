@@ -50,20 +50,11 @@ BEGIN
             COALESCE(inv.total_qty, 0) as current_stock
         FROM products p
         LEFT JOIN (
-            -- Aggregate inventory across all location types
-            SELECT item_id, SUM(quantity) as total_qty
-            FROM (
-                SELECT item_id, quantity FROM box_bin_inventory
-                UNION ALL SELECT item_id, quantity FROM rack_inventory
-                UNION ALL SELECT item_id, quantity FROM cabinet_inventory
-                UNION ALL SELECT item_id, quantity FROM single_claw_machine_inventory
-                UNION ALL SELECT item_id, quantity FROM double_claw_machine_inventory
-                UNION ALL SELECT item_id, quantity FROM four_corner_machine_inventory
-                UNION ALL SELECT item_id, quantity FROM pusher_machine_inventory
-                UNION ALL SELECT item_id, quantity FROM not_assigned_inventory
-            ) all_inv
-            GROUP BY item_id
-        ) inv ON inv.item_id = p.id
+            -- Aggregate inventory across all locations (unified schema)
+            SELECT product_id, SUM(quantity) as total_qty
+            FROM location_inventory
+            GROUP BY product_id
+        ) inv ON inv.product_id = p.id
         WHERE p.is_active = true
         ORDER BY p.created_at
     LOOP
