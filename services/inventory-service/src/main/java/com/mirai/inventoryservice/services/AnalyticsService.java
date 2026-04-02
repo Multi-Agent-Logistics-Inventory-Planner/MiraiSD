@@ -295,7 +295,8 @@ public class AnalyticsService {
         List<Object[]> monthlyRows = dailySalesRollupRepository.aggregateByMonth(periodStart);
         List<DailySalesRollup> dailyRollups = dailySalesRollupRepository
             .findByRollupDateBetweenOrderByRollupDateAsc(periodStart, today);
-        Object[] totals = dailySalesRollupRepository.getTotalsForPeriod(periodStart, today);
+        List<Object[]> totalsList = dailySalesRollupRepository.getTotalsForPeriod(periodStart, today);
+        Object[] totals = totalsList.isEmpty() ? new Object[]{0, BigDecimal.ZERO} : totalsList.get(0);
 
         List<MonthlySalesDTO> monthlySales = monthlyRows.stream()
             .map(row -> {
