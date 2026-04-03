@@ -69,7 +69,7 @@ public interface DailySalesRollupRepository extends JpaRepository<DailySalesRoll
         FROM DailySalesRollup r
         WHERE r.rollupDate >= :startDate AND r.rollupDate <= :endDate
         """)
-    Object[] getTotalsForPeriod(
+    List<Object[]> getTotalsForPeriod(
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate);
 

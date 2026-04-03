@@ -224,7 +224,7 @@ class AnalyticsServiceTest {
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
             when(dailySalesRollupRepository.getTotalsForPeriod(any(), any()))
-                    .thenReturn(new Object[]{0L, BigDecimal.ZERO});
+                    .thenReturn(Collections.singletonList(new Object[]{0L, BigDecimal.ZERO}));
 
             SalesSummaryDTO result = analyticsService.getSalesSummary();
 
@@ -261,7 +261,7 @@ class AnalyticsServiceTest {
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(List.of(rollup));
             when(dailySalesRollupRepository.getTotalsForPeriod(any(), any()))
-                    .thenReturn(new Object[]{100L, BigDecimal.valueOf(500.00)});
+                    .thenReturn(Collections.singletonList(new Object[]{100L, BigDecimal.valueOf(500.00)}));
 
             SalesSummaryDTO result = analyticsService.getSalesSummary();
 
