@@ -4,11 +4,22 @@ import { Notification, NotificationCounts, NotificationSearchParams, PaginatedRe
 const BASE_PATH = "/api/notifications";
 
 /**
- * Get all notifications
+ * Get notifications with pagination
+ * @param recipientId Optional recipient ID filter
+ * @param page Page number (0-indexed)
+ * @param size Page size (default 50)
  */
-export async function getNotifications(recipientId?: string): Promise<Notification[]> {
-  const params = recipientId ? `?recipientId=${recipientId}` : "";
-  return apiGet<Notification[]>(`${BASE_PATH}${params}`);
+export async function getNotifications(
+  recipientId?: string,
+  page: number = 0,
+  size: number = 50
+): Promise<PaginatedResponse<Notification>> {
+  const params = new URLSearchParams();
+  if (recipientId) params.set("recipientId", recipientId);
+  params.set("page", String(page));
+  params.set("size", String(size));
+  const query = params.toString();
+  return apiGet<PaginatedResponse<Notification>>(`${BASE_PATH}?${query}`);
 }
 
 /**

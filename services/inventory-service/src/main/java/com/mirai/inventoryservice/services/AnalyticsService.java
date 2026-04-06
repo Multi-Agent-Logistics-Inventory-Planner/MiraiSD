@@ -222,6 +222,7 @@ public class AnalyticsService {
         return result;
     }
 
+    @Cacheable(CacheConfig.PERFORMANCE_METRICS_CACHE)
     @Transactional(readOnly = true)
     public PerformanceMetricsDTO getPerformanceMetrics() {
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();

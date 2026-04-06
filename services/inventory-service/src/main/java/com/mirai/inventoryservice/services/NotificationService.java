@@ -28,9 +28,17 @@ public class NotificationService {
         return notificationRepository.findAll();
     }
 
+    public Page<Notification> getAllNotifications(Pageable pageable) {
+        return notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
     public List<Notification> getNotificationsByRecipient(UUID recipientId) {
         // Include broadcast notifications (recipient_id IS NULL) along with user-specific ones
         return notificationRepository.findByRecipientIdOrBroadcastOrderByCreatedAtDesc(recipientId);
+    }
+
+    public Page<Notification> getNotificationsByRecipient(UUID recipientId, Pageable pageable) {
+        return notificationRepository.findByRecipientIdOrBroadcastOrderByCreatedAtDesc(recipientId, pageable);
     }
 
     public List<Notification> getUnreadNotifications(UUID recipientId) {

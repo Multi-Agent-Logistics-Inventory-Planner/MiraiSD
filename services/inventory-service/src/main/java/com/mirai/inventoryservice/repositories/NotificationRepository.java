@@ -3,6 +3,8 @@ package com.mirai.inventoryservice.repositories;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -45,5 +47,16 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     // Count unread active notifications (not resolved AND not read by user)
     long countByResolvedAtIsNullAndReadAtIsNull();
+
+    // Paginated: find all notifications ordered by createdAt desc
+    Page<Notification> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // Paginated: find unresolved notifications (for activity feed)
+    @Query("SELECT n FROM Notification n WHERE n.resolvedAt IS NULL ORDER BY n.createdAt DESC")
+    Page<Notification> findUnresolvedOrderByCreatedAtDesc(Pageable pageable);
+
+    // Paginated: find notifications for a specific recipient OR broadcast
+    @Query("SELECT n FROM Notification n WHERE n.recipientId = :recipientId OR n.recipientId IS NULL ORDER BY n.createdAt DESC")
+    Page<Notification> findByRecipientIdOrBroadcastOrderByCreatedAtDesc(@Param("recipientId") UUID recipientId, Pageable pageable);
 }
 
