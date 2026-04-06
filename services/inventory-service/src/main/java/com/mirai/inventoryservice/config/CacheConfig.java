@@ -19,15 +19,17 @@ public class CacheConfig {
     public static final String INSIGHTS_CACHE = "analytics-insights";
     public static final String DEMAND_LEADERS_CACHE = "analytics-demand-leaders";
     public static final String SALES_SUMMARY_CACHE = "analytics-sales-summary";
+    public static final String PERFORMANCE_METRICS_CACHE = "analytics-performance-metrics";
 
     @Bean
     public CacheManager cacheManager() {
         SimpleCacheManager manager = new SimpleCacheManager();
         manager.setCaches(List.of(
-            buildCache(PREDICTIONS_CACHE, 2, TimeUnit.MINUTES, 10),
+            buildCache(PREDICTIONS_CACHE, 10, TimeUnit.MINUTES, 10),
             buildCache(INSIGHTS_CACHE, 60, TimeUnit.MINUTES, 10),
             buildCache(DEMAND_LEADERS_CACHE, 60, TimeUnit.MINUTES, 20),
-            buildCache(SALES_SUMMARY_CACHE, 60, TimeUnit.MINUTES, 10)
+            buildCache(SALES_SUMMARY_CACHE, 60, TimeUnit.MINUTES, 10),
+            buildCache(PERFORMANCE_METRICS_CACHE, 5, TimeUnit.MINUTES, 5)
         ));
         return manager;
     }

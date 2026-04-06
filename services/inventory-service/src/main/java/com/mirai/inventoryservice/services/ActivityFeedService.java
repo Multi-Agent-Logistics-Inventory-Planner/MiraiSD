@@ -91,13 +91,20 @@ public class ActivityFeedService {
             }
         }
 
-        // Fetch notifications (alerts)
+        // Fetch notifications (alerts) - paginated to reduce egress
         if (typeSet == null || typeSet.contains("alert")) {
-            List<Notification> notifications = notificationRepository.findAll();
+            int notificationLimit = Math.min(limit, 100);
+            List<Notification> notifications;
+            if (includeResolved) {
+                notifications = notificationRepository.findAllByOrderByCreatedAtDesc(
+                        PageRequest.of(0, notificationLimit)).getContent();
+            } else {
+                notifications = notificationRepository.findUnresolvedOrderByCreatedAtDesc(
+                        PageRequest.of(0, notificationLimit)).getContent();
+            }
 
             for (Notification notification : notifications) {
                 boolean isResolved = notification.getResolvedAt() != null;
-                if (isResolved && !includeResolved) continue;
 
                 Map<String, Object> metadata = new HashMap<>();
                 metadata.put("notificationId", notification.getId().toString());

@@ -43,16 +43,17 @@ public class NotificationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<NotificationResponseDTO>> getAllNotifications(
-            @RequestParam(required = false) UUID recipientId) {
-        List<Notification> notifications;
+    public ResponseEntity<Page<NotificationResponseDTO>> getAllNotifications(
+            @RequestParam(required = false) UUID recipientId,
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<Notification> notifications;
         if (recipientId != null) {
-            notifications = notificationService.getNotificationsByRecipient(recipientId);
+            notifications = notificationService.getNotificationsByRecipient(recipientId, pageable);
         } else {
-            notifications = notificationService.getAllNotifications();
+            notifications = notificationService.getAllNotifications(pageable);
         }
-        List<NotificationResponseDTO> response = notificationMapper.toResponseDTOList(notifications);
-        populateItemNames(response);
+        Page<NotificationResponseDTO> response = notifications.map(notificationMapper::toResponseDTO);
+        populateItemNames(response.getContent());
         return ResponseEntity.ok(response);
     }
 

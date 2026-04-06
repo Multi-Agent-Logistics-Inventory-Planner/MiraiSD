@@ -15,10 +15,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { NotificationSearchParams } from "@/types/api";
 
-export function useNotifications() {
+export function useNotifications(page: number = 0, size: number = 50) {
   return useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => getNotifications(),
+    queryKey: ["notifications", { page, size }],
+    queryFn: () => getNotifications(undefined, page, size),
+    select: (data) => data.content,
   });
 }
 
