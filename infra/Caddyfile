@@ -2,7 +2,7 @@
     email admin@mirai-inventory.com
 }
 
-api.yummyyummy.site {
+api.mirai-inventory.com {
     reverse_proxy inventory-service:4000 {
         health_uri /actuator/health
         health_interval 30s

@@ -33,7 +33,7 @@ const nextConfig = {
     // Production CSP includes actual backend domain and WebSocket connections
     const connectSrc = isLocalDevelopment
       ? "'self' http://localhost:3000 http://localhost:4000 https://*.supabase.co wss://*.supabase.co"
-      : `'self' https://*.supabase.co wss://*.supabase.co http://*.yummyyummy.site https://*.yummyyummy.site`;
+      : `'self' https://*.supabase.co wss://*.supabase.co http://*.mirai-inventory.com https://*.mirai-inventory.com`;
 
     return [
       {

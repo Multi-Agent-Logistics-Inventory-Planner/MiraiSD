@@ -87,8 +87,8 @@ public class SecurityConfig {
 
         // Default allowed origins: custom domain, Vercel deployments, and local development
         java.util.List<String> allowedOrigins = new java.util.ArrayList<>(Arrays.asList(
-            "https://www.yummyyummy.site",
-            "https://yummyyummy.site",
+            "https://www.mirai-inventory.com",
+            "https://mirai-inventory.com",
             "https://mirai-inventory.vercel.app",
             "https://mirai-inventory-felipes-projects-59edcd3e.vercel.app",
             "http://localhost:3000"
