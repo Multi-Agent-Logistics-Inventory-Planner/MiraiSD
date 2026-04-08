@@ -7,13 +7,25 @@ export type DemandCategory = "Fast seller" | "Moderate" | "Slow mover";
 
 /**
  * Formats demand velocity to a rounded, human-readable string.
- * @example formatDemandVelocity(4.71) => "~5/day"
- * @example formatDemandVelocity(0.3) => "<1/day"
+ * @example formatDemandVelocity(4.71) => "~5 sold/day"
+ * @example formatDemandVelocity(0.3) => "<1 sold/day"
  */
 export function formatDemandVelocity(velocity: number | null): string {
   if (velocity === null || velocity === undefined) return "N/A";
-  if (velocity < 0.5) return "<1/day";
-  return `~${Math.round(velocity)}/day`;
+  if (velocity < 0.5) return "<1 sold/day";
+  return `~${Math.round(velocity)} sold/day`;
+}
+
+/**
+ * Formats days to stockout as a friendly, rounded string.
+ * @example formatDaysRemaining(2.71) => "~3 days left"
+ * @example formatDaysRemaining(0.5) => "<1 day left"
+ */
+export function formatDaysRemaining(days: number | null): string {
+  if (days === null || days === undefined) return "N/A";
+  if (days <= 0) return "Out of stock";
+  if (days < 1) return "<1 day left";
+  return `~${Math.round(days)} days left`;
 }
 
 /**

@@ -1,16 +1,24 @@
 "use client";
 
-import { Package, Warehouse, Activity, Timer, X, Undo2 } from "lucide-react";
+import { Package, Warehouse, Activity, Timer, X, Undo2, HelpCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ActionItem } from "@/types/analytics";
 import { getDaysToStockoutColor, isValidImageUrl } from "./utils";
 import {
   formatDemandVelocity,
+  formatDaysRemaining,
   getDemandCategory,
   getDemandCategoryStyle,
   formatCoverageContext,
 } from "@/lib/utils/format-forecast";
+import { METRIC_TOOLTIPS, BADGE_TOOLTIPS } from "./help-content";
+import type { DemandCategory } from "@/lib/utils/format-forecast";
 
 interface PredictionItemCardProps {
   item: ActionItem;
@@ -91,64 +99,105 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold truncate">{item.name}</h3>
-              <span className={cn(
-                "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
-                getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
-              )}>
-                {getDemandCategory(item.demandVelocity)}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={cn(
+                    "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium cursor-help",
+                    getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
+                  )}>
+                    {getDemandCategory(item.demandVelocity)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {BADGE_TOOLTIPS[getDemandCategory(item.demandVelocity) as DemandCategory]}
+                </TooltipContent>
+              </Tooltip>
               {item.overdue && (
-                <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400">
-                  Overdue
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400 cursor-help">
+                      Overdue
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {BADGE_TOOLTIPS.Overdue}
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
             {forecastAge && (
               <p className="text-xs text-muted-foreground">Forecast updated: {forecastAge}</p>
             )}
             <div className="flex flex-wrap gap-8 mt-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1 font-light">
-                <Warehouse className="h-4 w-4" />
-                <span className="text-foreground font-medium font-mono">
-                  {item.currentStock}
-                </span>
-                units
-              </span>
-              <span className="flex items-center gap-1 font-light">
-                <Activity className="h-4 w-4" />
-                <span className="text-foreground font-medium font-mono">
-                  {formatDemandVelocity(item.demandVelocity)}
-                </span>
-              </span>
-              <span className="flex items-center gap-1 font-light">
-                <Timer className="h-4 w-4" />
-                <span
-                  className={cn(
-                    "font-medium font-mono",
-                    showUrgencyColor
-                      ? getDaysToStockoutColor(item.daysToStockout)
-                      : "text-foreground",
-                  )}
-                >
-                  {item.daysToStockout?.toFixed(2) ?? "N/A"}
-                </span>
-                days
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 font-light cursor-help">
+                    <Warehouse className="h-4 w-4" />
+                    <span className="text-foreground font-medium font-mono">
+                      {item.currentStock}
+                    </span>
+                    in stock
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {METRIC_TOOLTIPS.currentStock}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 font-light cursor-help">
+                    <Activity className="h-4 w-4" />
+                    <span className="text-foreground font-medium font-mono">
+                      {formatDemandVelocity(item.demandVelocity)}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {METRIC_TOOLTIPS.demandVelocity}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 font-light cursor-help">
+                    <Timer className="h-4 w-4" />
+                    <span
+                      className={cn(
+                        "font-medium font-mono",
+                        showUrgencyColor
+                          ? getDaysToStockoutColor(item.daysToStockout)
+                          : "text-foreground",
+                      )}
+                    >
+                      {formatDaysRemaining(item.daysToStockout)}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {METRIC_TOOLTIPS.daysToStockout}
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
           {/* Action Info */}
-          <div className="shrink-0 flex items-center gap-1.5 text-base font-semibold">
-            <span className="text-muted-foreground font-normal">
-              Suggestion:
-            </span>
-            {item.suggestedReorderQty} units{" "}
-            <span className="font-normal text-muted-foreground">
-              {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
-            </span>{" "}
-            <span className="font-light text-muted-foreground">by</span>{" "}
-            {formatDate(item.suggestedOrderDate)}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="shrink-0 flex items-center gap-1.5 text-base font-semibold cursor-help">
+                <span className="text-muted-foreground font-normal">
+                  Reorder:
+                </span>
+                {item.suggestedReorderQty} units{" "}
+                <span className="font-normal text-muted-foreground">
+                  {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
+                </span>{" "}
+                <span className="font-light text-muted-foreground">by</span>{" "}
+                {formatDate(item.suggestedOrderDate)}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {METRIC_TOOLTIPS.suggestion}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Mobile layout */}
@@ -172,16 +221,30 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 className="text-sm font-semibold truncate">{item.name}</h3>
-                <span className={cn(
-                  "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium",
-                  getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
-                )}>
-                  {getDemandCategory(item.demandVelocity)}
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={cn(
+                      "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium cursor-help",
+                      getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
+                    )}>
+                      {getDemandCategory(item.demandVelocity)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {BADGE_TOOLTIPS[getDemandCategory(item.demandVelocity) as DemandCategory]}
+                  </TooltipContent>
+                </Tooltip>
                 {item.overdue && (
-                  <span className="shrink-0 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400">
-                    Overdue
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="shrink-0 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400 cursor-help">
+                        Overdue
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {BADGE_TOOLTIPS.Overdue}
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
               {forecastAge && (
@@ -192,47 +255,74 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
 
           {/* Row 2: Metrics with justify-between */}
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span className="flex items-center gap-1 font-light">
-              <Warehouse className="h-4 w-4" />
-              <span className="text-foreground font-medium font-mono">
-                {item.currentStock}
-              </span>
-              units
-            </span>
-            <span className="flex items-center gap-1 font-light">
-              <Activity className="h-4 w-4" />
-              <span className="text-foreground font-medium font-mono">
-                {formatDemandVelocity(item.demandVelocity)}
-              </span>
-            </span>
-            <span className="flex items-center gap-1 font-light">
-              <Timer className="h-4 w-4" />
-              <span
-                className={cn(
-                  "font-medium font-mono",
-                  showUrgencyColor
-                    ? getDaysToStockoutColor(item.daysToStockout)
-                    : "text-foreground",
-                )}
-              >
-                {item.daysToStockout?.toFixed(2) ?? "N/A"}
-              </span>
-              days
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 font-light cursor-help">
+                  <Warehouse className="h-4 w-4" />
+                  <span className="text-foreground font-medium font-mono">
+                    {item.currentStock}
+                  </span>
+                  in stock
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {METRIC_TOOLTIPS.currentStock}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 font-light cursor-help">
+                  <Activity className="h-4 w-4" />
+                  <span className="text-foreground font-medium font-mono">
+                    {formatDemandVelocity(item.demandVelocity)}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {METRIC_TOOLTIPS.demandVelocity}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 font-light cursor-help">
+                  <Timer className="h-4 w-4" />
+                  <span
+                    className={cn(
+                      "font-medium font-mono",
+                      showUrgencyColor
+                        ? getDaysToStockoutColor(item.daysToStockout)
+                        : "text-foreground",
+                    )}
+                  >
+                    {formatDaysRemaining(item.daysToStockout)}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {METRIC_TOOLTIPS.daysToStockout}
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Row 3: Action Info */}
-          <div className="flex justify-center items-center gap-1.5 text-sm font-semibold">
-            <span className="text-muted-foreground font-normal">
-              Suggestion:
-            </span>
-            {item.suggestedReorderQty} units{" "}
-            <span className="font-normal text-muted-foreground">
-              {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
-            </span>{" "}
-            <span className="font-light text-muted-foreground">by</span>{" "}
-            {formatDate(item.suggestedOrderDate)}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex justify-center items-center gap-1.5 text-sm font-semibold cursor-help">
+                <span className="text-muted-foreground font-normal">
+                  Reorder:
+                </span>
+                {item.suggestedReorderQty} units{" "}
+                <span className="font-normal text-muted-foreground">
+                  {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
+                </span>{" "}
+                <span className="font-light text-muted-foreground">by</span>{" "}
+                {formatDate(item.suggestedOrderDate)}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {METRIC_TOOLTIPS.suggestion}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </CardContent>
     </Card>
