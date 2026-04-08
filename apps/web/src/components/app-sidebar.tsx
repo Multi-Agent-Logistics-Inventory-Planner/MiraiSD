@@ -9,14 +9,12 @@ import {
   Warehouse,
   Truck,
   BarChart3,
-  Bell,
   ClipboardList,
   Users,
   Settings,
   LogOut,
   ArrowUpDown,
   RefreshCw,
-  Star,
   ChevronsUpDown,
   HeartCrack,
 } from "lucide-react";
@@ -50,7 +48,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
-import { useNotificationCounts } from "@/hooks/queries/use-notifications";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
 import type { PermissionKey } from "@/lib/rbac";
@@ -98,22 +95,10 @@ const managementItems: NavItem[] = [
     permission: Permission.ANALYTICS_VIEW,
   },
   {
-    title: "Reviews",
-    href: "/reviews",
-    icon: Star,
-    permission: Permission.REVIEWS_VIEW,
-  },
-  {
     title: "Audit Log",
     href: "/audit-log",
     icon: ClipboardList,
     permission: Permission.AUDIT_LOG_VIEW,
-  },
-  {
-    title: "Notifications",
-    href: "/notifications",
-    icon: Bell,
-    permission: Permission.NOTIFICATIONS_VIEW,
   },
   {
     title: "Team",
@@ -212,7 +197,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
   const { can } = usePermissions();
-  const { data: notificationCounts } = useNotificationCounts();
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
@@ -300,11 +284,6 @@ export function AppSidebar() {
                     key={item.href}
                     item={item}
                     pathname={pathname}
-                    badge={
-                      item.href === "/notifications"
-                        ? notificationCounts?.unread
-                        : undefined
-                    }
                   />
                 ))}
               </SidebarMenu>

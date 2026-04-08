@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Bell,
   Lightbulb,
   TrendingDown,
   Wrench,
@@ -33,6 +34,11 @@ const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
     value: AnalyticsTab.LEGACY,
     label: "Legacy",
     icon: Wrench,
+  },
+  {
+    value: AnalyticsTab.NOTIFICATIONS,
+    label: "Notifications",
+    icon: Bell,
   },
 ];
 

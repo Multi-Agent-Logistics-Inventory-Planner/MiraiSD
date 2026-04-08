@@ -3,6 +3,7 @@ export enum AnalyticsTab {
   INSIGHTS = "insights",
   DEMAND_LEADERS = "demand-leaders",
   LEGACY = "legacy",
+  NOTIFICATIONS = "notifications",
 }
 
 // Predictions Types - Demand-based metrics for reorder decisions

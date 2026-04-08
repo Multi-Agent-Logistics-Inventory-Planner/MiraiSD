@@ -68,10 +68,8 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey> = {
   "/storage": Permission.STORAGE_VIEW,
   "/shipments": Permission.SHIPMENTS_VIEW,
   "/analytics": Permission.ANALYTICS_VIEW,
-  "/notifications": Permission.NOTIFICATIONS_VIEW,
   "/audit-log": Permission.AUDIT_LOG_VIEW,
   "/team": Permission.TEAM_VIEW,
   "/settings": Permission.SETTINGS_VIEW,
-  "/reviews": Permission.REVIEWS_VIEW,
   "/machine-displays": Permission.MACHINE_DISPLAYS_VIEW,
 };

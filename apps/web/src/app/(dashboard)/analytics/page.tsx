@@ -12,6 +12,7 @@ import {
   TabInsights,
   TabDemandLeaders,
   TabLegacy,
+  TabNotifications,
 } from "./_components"
 
 const ADMIN_ONLY_TABS = new Set([AnalyticsTab.DEMAND_LEADERS])
@@ -73,6 +74,9 @@ function AnalyticsContent() {
       )}
       <div className={currentTab !== AnalyticsTab.LEGACY ? "hidden" : undefined}>
         {mountedTabs.has(AnalyticsTab.LEGACY) && <TabLegacy isAdmin={isAdmin} />}
+      </div>
+      <div className={currentTab !== AnalyticsTab.NOTIFICATIONS ? "hidden" : undefined}>
+        {mountedTabs.has(AnalyticsTab.NOTIFICATIONS) && <TabNotifications />}
       </div>
     </div>
   )

@@ -1,170 +1,73 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  TeamTable,
-  TeamFilters,
-  TeamPagination,
-  InviteMemberDialog,
-  EditMemberDialog,
-  TeamMemberRow,
-} from "@/components/team";
-import { useToast } from "@/hooks/use-toast";
-import { useTeamData } from "@/hooks/queries/use-team-data";
-import { deleteUser } from "@/lib/api/users";
-import {
-  resendInvitation,
-  cancelInvitation,
-} from "@/lib/api/invitations";
-import { User, UserRole } from "@/types/api";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { TeamTab } from "@/types/team";
+import { TeamTabs, TabMembers, TabReviews } from "./_components";
 
-const PAGE_SIZE = 10;
+function isValidTab(value: string | null): value is TeamTab {
+  return Object.values(TeamTab).includes(value as TeamTab);
+}
 
-const ROLE_ORDER: Record<string, number> = {
-  admin: 0,
-  employee: 1,
-};
+function TeamContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
 
-function sortByRoleThenName(a: TeamMemberRow, b: TeamMemberRow): number {
-  const roleA = ROLE_ORDER[a.role.toLowerCase()] ?? 2;
-  const roleB = ROLE_ORDER[b.role.toLowerCase()] ?? 2;
-  if (roleA !== roleB) {
-    return roleA - roleB;
-  }
-  return a.fullName.localeCompare(b.fullName);
+  const currentTab = isValidTab(tabParam) ? tabParam : TeamTab.MEMBERS;
+
+  // Track which tabs have been visited (lazy mount - only mount on first visit)
+  const [mountedTabs, setMountedTabs] = useState<Set<TeamTab>>(
+    () => new Set([currentTab])
+  );
+
+  useEffect(() => {
+    setMountedTabs((prev) => {
+      if (prev.has(currentTab)) return prev;
+      return new Set([...prev, currentTab]);
+    });
+  }, [currentTab]);
+
+  const handleTabChange = (tab: TeamTab) => {
+    router.push(`/team?tab=${tab}`);
+  };
+
+  return (
+    <div className="flex-1 space-y-4">
+      <TeamTabs value={currentTab} onValueChange={handleTabChange} />
+      <div className={currentTab !== TeamTab.MEMBERS ? "hidden" : undefined}>
+        {mountedTabs.has(TeamTab.MEMBERS) && <TabMembers />}
+      </div>
+      <div className={currentTab !== TeamTab.REVIEWS ? "hidden" : undefined}>
+        {mountedTabs.has(TeamTab.REVIEWS) && <TabReviews />}
+      </div>
+    </div>
+  );
+}
+
+function TeamFallback() {
+  return (
+    <div className="flex-1 space-y-4">
+      <div className="h-9 bg-muted/30 animate-pulse rounded-md w-full max-w-xl" />
+      <div className="space-y-4">
+        <div className="h-12 bg-muted/30 animate-pulse rounded-lg" />
+        <div className="h-96 bg-muted/30 animate-pulse rounded-lg" />
+      </div>
+    </div>
+  );
 }
 
 export default function TeamPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<User | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: tableData = [], isLoading } = useTeamData();
-
-  const invalidateTeamData = () => {
-    queryClient.invalidateQueries({ queryKey: ["team-data"] });
-  };
-
-  const filteredAndSortedData = useMemo(() => {
-    const filtered = tableData.filter((row) => {
-      return (
-        row.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    });
-    return [...filtered].sort(sortByRoleThenName);
-  }, [tableData, searchQuery]);
-
-  const paginatedData = useMemo(() => {
-    const start = page * PAGE_SIZE;
-    return filteredAndSortedData.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSortedData, page]);
-
-  const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
-    setPage(0);
-  };
-
-  const handleResendInvite = async (email: string) => {
-    try {
-      await resendInvitation(email);
-      toast({ title: "Invitation resent successfully" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to resend invitation";
-      toast({
-        title: "Failed to resend invitation",
-        description: message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEditMember = (row: TeamMemberRow) => {
-    if (row.type !== "member") return;
-    const user: User = {
-      id: row.id,
-      fullName: row.fullName,
-      email: row.email,
-      role: row.role as UserRole,
-      createdAt: row.createdAt,
-      updatedAt: row.createdAt,
-    };
-    setEditingMember(user);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleDelete = async (row: TeamMemberRow) => {
-    try {
-      if (row.type === "member") {
-        await deleteUser(row.id);
-        toast({ title: "Team member removed successfully" });
-      } else {
-        await cancelInvitation(row.email);
-        toast({ title: "Invitation cancelled successfully" });
-      }
-      invalidateTeamData();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Operation failed";
-      toast({
-        title: row.type === "member" ? "Failed to remove team member" : "Failed to cancel invitation",
-        description: message,
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
       </div>
-
-      <TeamFilters
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        onInviteClick={() => setIsInviteDialogOpen(true)}
-      />
-
-      <Card className="p-2 border-none">
-        <CardContent className="p-0">
-          <TeamTable
-            data={paginatedData}
-            isLoading={isLoading}
-            onEdit={handleEditMember}
-            onDelete={handleDelete}
-            onResendInvite={handleResendInvite}
-          />
-        </CardContent>
-      </Card>
-
-      <TeamPagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalItems={filteredAndSortedData.length}
-        isLoading={isLoading}
-        onPageChange={setPage}
-      />
-
-      <InviteMemberDialog
-        open={isInviteDialogOpen}
-        onOpenChange={setIsInviteDialogOpen}
-        onSuccess={invalidateTeamData}
-      />
-
-      <EditMemberDialog
-        member={editingMember}
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSuccess={invalidateTeamData}
-      />
+      <Suspense fallback={<TeamFallback />}>
+        <TeamContent />
+      </Suspense>
     </div>
   );
 }
