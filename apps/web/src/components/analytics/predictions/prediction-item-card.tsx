@@ -5,6 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ActionItem } from "@/types/analytics";
 import { getDaysToStockoutColor, isValidImageUrl } from "./utils";
+import {
+  formatDemandVelocity,
+  getDemandCategory,
+  getDemandCategoryStyle,
+  formatCoverageContext,
+} from "@/lib/utils/format-forecast";
 
 interface PredictionItemCardProps {
   item: ActionItem;
@@ -85,6 +91,12 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold truncate">{item.name}</h3>
+              <span className={cn(
+                "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
+              )}>
+                {getDemandCategory(item.demandVelocity)}
+              </span>
               {item.overdue && (
                 <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400">
                   Overdue
@@ -105,9 +117,8 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
               <span className="flex items-center gap-1 font-light">
                 <Activity className="h-4 w-4" />
                 <span className="text-foreground font-medium font-mono">
-                  {item.demandVelocity?.toFixed(2) ?? "N/A"}
+                  {formatDemandVelocity(item.demandVelocity)}
                 </span>
-                units/day
               </span>
               <span className="flex items-center gap-1 font-light">
                 <Timer className="h-4 w-4" />
@@ -132,6 +143,9 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
               Suggestion:
             </span>
             {item.suggestedReorderQty} units{" "}
+            <span className="font-normal text-muted-foreground">
+              {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
+            </span>{" "}
             <span className="font-light text-muted-foreground">by</span>{" "}
             {formatDate(item.suggestedOrderDate)}
           </div>
@@ -158,6 +172,12 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 className="text-sm font-semibold truncate">{item.name}</h3>
+                <span className={cn(
+                  "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium",
+                  getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
+                )}>
+                  {getDemandCategory(item.demandVelocity)}
+                </span>
                 {item.overdue && (
                   <span className="shrink-0 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-400">
                     Overdue
@@ -182,9 +202,8 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
             <span className="flex items-center gap-1 font-light">
               <Activity className="h-4 w-4" />
               <span className="text-foreground font-medium font-mono">
-                {item.demandVelocity?.toFixed(2) ?? "N/A"}
+                {formatDemandVelocity(item.demandVelocity)}
               </span>
-              units/day
             </span>
             <span className="flex items-center gap-1 font-light">
               <Timer className="h-4 w-4" />
@@ -208,6 +227,9 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
               Suggestion:
             </span>
             {item.suggestedReorderQty} units{" "}
+            <span className="font-normal text-muted-foreground">
+              {formatCoverageContext(item.suggestedReorderQty, item.demandVelocity)}
+            </span>{" "}
             <span className="font-light text-muted-foreground">by</span>{" "}
             {formatDate(item.suggestedOrderDate)}
           </div>

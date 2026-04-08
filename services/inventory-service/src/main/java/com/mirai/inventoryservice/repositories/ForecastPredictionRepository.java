@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +60,9 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
 
     // Delete all predictions for a specific inventory item
     void deleteByItemId(UUID itemId);
+
+    // Delete predictions with suggested order date before the given date (overdue cleanup)
+    int deleteBySuggestedOrderDateBefore(LocalDate date);
 
     // Find the item with highest demand (lowest avgDailyDelta) using only the latest prediction per item
     @Query(value = "SELECT fp.* FROM forecast_predictions fp "

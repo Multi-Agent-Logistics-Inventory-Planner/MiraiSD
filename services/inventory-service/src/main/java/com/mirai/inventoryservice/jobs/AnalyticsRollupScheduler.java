@@ -1,11 +1,13 @@
 package com.mirai.inventoryservice.jobs;
 
+import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -25,6 +27,7 @@ import java.time.LocalDate;
 public class AnalyticsRollupScheduler {
 
     private final AnalyticsSeedService analyticsSeedService;
+    private final ForecastPredictionRepository forecastPredictionRepository;
 
     /**
      * Nightly job to refresh daily rollups.
@@ -59,6 +62,25 @@ public class AnalyticsRollupScheduler {
             log.info("Completed nightly forecast snapshot: {} snapshots created", count);
         } catch (Exception e) {
             log.error("Error during nightly forecast snapshot", e);
+        }
+    }
+
+    /**
+     * Cleanup overdue forecast predictions.
+     * Runs at 2:30 AM every day.
+     * Deletes forecasts where suggested_order_date has passed.
+     * Fresh forecasts will be regenerated on the next pipeline run.
+     */
+    @Scheduled(cron = "0 30 2 * * *")
+    @Transactional
+    public void cleanupOverdueForecasts() {
+        log.info("Starting overdue forecast cleanup");
+        try {
+            LocalDate today = LocalDate.now();
+            int count = forecastPredictionRepository.deleteBySuggestedOrderDateBefore(today);
+            log.info("Completed overdue forecast cleanup: {} forecasts deleted", count);
+        } catch (Exception e) {
+            log.error("Error during overdue forecast cleanup", e);
         }
     }
 
