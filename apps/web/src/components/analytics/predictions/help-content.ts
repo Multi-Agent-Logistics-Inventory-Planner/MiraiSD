@@ -8,6 +8,7 @@ export const METRIC_TOOLTIPS = {
   demandVelocity: "Average units sold per day",
   daysToStockout: "Days until stockout (Stock / Daily Sales)",
   suggestion: "Order quantity and date to prevent stockout",
+  accuracy: "How accurate past forecasts were for this item",
 } as const;
 
 export const BADGE_TOOLTIPS = {
@@ -22,4 +23,10 @@ export const TAB_TOOLTIPS = {
   WATCH: "Will run out within 14 days",
   HEALTHY: "14+ days of stock remaining",
   RESOLVED: "Items marked as handled",
+} as const;
+
+export const CONFIDENCE_TOOLTIPS = {
+  High: "Stable demand with accurate past forecasts",
+  Moderate: "Reasonable prediction but some variability",
+  Low: "Limited data or volatile demand - monitor closely",
 } as const;

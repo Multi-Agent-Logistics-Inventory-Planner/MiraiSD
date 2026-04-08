@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { AlertCircle, Package } from "lucide-react";
+import { AlertCircle, Package, TrendingUp, Target } from "lucide-react";
+import { computePriorityScore } from "@/lib/utils/format-forecast";
 import { Card } from "@/components/ui/card";
 import { usePredictions } from "@/hooks/queries/use-predictions";
 import { useDismissedPredictions } from "@/hooks/use-dismissed-predictions";
@@ -51,7 +52,7 @@ export function TabPredictions() {
 
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("ACTION_NEEDED");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortOption, setSortOption] = useState<SortOption>("daysToStockout-asc");
+  const [sortOption, setSortOption] = useState<SortOption>("priority-desc");
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -93,6 +94,19 @@ export function TabPredictions() {
 
   // Recalculate tab counts from active items
   const tabCounts = useMemo(() => countByTab(baseFilteredItems), [baseFilteredItems]);
+
+  // Find top priority item from action-needed items
+  const topPriorityItem = useMemo(() => {
+    const actionItems = baseFilteredItems.filter(
+      (item) => item.daysToStockout === null || item.daysToStockout <= STOCKOUT_THRESHOLDS.URGENT
+    );
+    if (actionItems.length === 0) return null;
+    return actionItems.reduce((top, item) => {
+      const topScore = computePriorityScore(top);
+      const itemScore = computePriorityScore(item);
+      return itemScore > topScore ? item : top;
+    });
+  }, [baseFilteredItems]);
 
   // Pick the right source list based on active tab
   const sourceItems = urgencyFilter === "RESOLVED" ? resolvedItems : baseFilteredItems;
@@ -146,6 +160,11 @@ export function TabPredictions() {
       const multiplier = sortDirection === "asc" ? 1 : -1;
       if (sortField === "name") {
         return multiplier * a.name.localeCompare(b.name);
+      }
+      if (sortField === "priority") {
+        const aVal = computePriorityScore(a);
+        const bVal = computePriorityScore(b);
+        return multiplier * (aVal - bVal);
       }
       const nullFallback = sortDirection === "asc" ? Infinity : -Infinity;
       const aVal = a[sortField] ?? nullFallback;
@@ -220,15 +239,58 @@ export function TabPredictions() {
     { value: "RESOLVED" as const, label: "Resolved", count: resolvedItems.length },
   ] : [];
 
+  // Format order date for summary
+  const formatOrderDate = (dateStr: string | null): string => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
   return (
     <div className="space-y-6">
       {!isLoading && data && (
-        <Card className="bg-background border-0 rounded-none py-0 shadow-none">
-          <UrgencyTabs
-            tabs={urgencyTabs}
-            activeTab={urgencyFilter}
-            onTabChange={handleUrgencyChange}
-          />
+        <>
+          {/* Summary Header */}
+          {tabCounts.actionNeeded > 0 && topPriorityItem && (
+            <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <span className="font-semibold text-amber-900 dark:text-amber-100">
+                      {tabCounts.actionNeeded} {tabCounts.actionNeeded === 1 ? "item needs" : "items need"} ordering this week
+                    </span>
+                  </div>
+                  {data.avgForecastAccuracy > 0 && (
+                    <span className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+                      <Target className="h-4 w-4" />
+                      {Math.round(data.avgForecastAccuracy * 100)}% system accuracy
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                <span className="font-medium">Top priority:</span>{" "}
+                <span className="font-semibold">{topPriorityItem.name}</span>
+                {topPriorityItem.suggestedReorderQty > 0 && (
+                  <>
+                    {" "}- order {topPriorityItem.suggestedReorderQty} units
+                    {topPriorityItem.suggestedOrderDate && (
+                      <> by {formatOrderDate(topPriorityItem.suggestedOrderDate)}</>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <Card className="bg-background border-0 rounded-none py-0 shadow-none">
+            <UrgencyTabs
+              tabs={urgencyTabs}
+              activeTab={urgencyFilter}
+              onTabChange={handleUrgencyChange}
+            />
 
           <MobileFilterControls
             searchQuery={searchQuery}
@@ -301,6 +363,7 @@ export function TabPredictions() {
             />
           )}
         </Card>
+        </>
       )}
 
       {isLoading && <PredictionsSkeleton />}
