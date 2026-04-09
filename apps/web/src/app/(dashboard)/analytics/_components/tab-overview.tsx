@@ -123,6 +123,11 @@ function MoversCard({
                     {mover.categoryName}
                   </p>
                 </div>
+                {mover.demandVelocity != null && (
+                  <div className="text-xs font-medium text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                    {mover.demandVelocity.toFixed(1)}/day
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground whitespace-nowrap">
                   {mover.previousPeriodUnits} → {mover.currentPeriodUnits}
                 </div>
@@ -173,7 +178,7 @@ export function TabOverview() {
       <div className="grid gap-4 md:grid-cols-2">
         <MoversCard
           title="Top Movers"
-          tooltip="Items with increasing demand compared to previous 30 days"
+          tooltip="Top items ranked by demand velocity weighted by display consistency (ACV-weighted velocity)"
           movers={insightsData?.topMovers}
           isLoading={insightsLoading}
           icon={TrendingUp}
