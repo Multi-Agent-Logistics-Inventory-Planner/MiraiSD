@@ -189,7 +189,7 @@ function LineChartTooltip({
     <div className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white shadow-lg">
       <p className="font-semibold">Week of {weekLabel}</p>
       {currentValue && !isNaN(currentRevenue) && (
-        <p className="text-purple-300">
+        <p className="text-[#b3cde0] dark:text-purple-300">
           Current: {formatCurrency(currentRevenue)}
         </p>
       )}
