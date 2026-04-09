@@ -145,6 +145,7 @@ export function InviteMemberDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="ASSISTANT_MANAGER">Assistant Manager</SelectItem>
                 <SelectItem value="EMPLOYEE">Employee</SelectItem>
               </SelectContent>
             </Select>

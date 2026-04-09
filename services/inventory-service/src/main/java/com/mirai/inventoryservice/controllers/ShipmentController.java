@@ -37,7 +37,7 @@ public class ShipmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<ShipmentResponseDTO> createShipment(@Valid @RequestBody ShipmentRequestDTO requestDTO) {
         Shipment shipment = shipmentService.createShipment(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -97,7 +97,7 @@ public class ShipmentController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<ShipmentResponseDTO> updateShipment(
             @PathVariable UUID id,
             @Valid @RequestBody ShipmentRequestDTO requestDTO) {
@@ -106,14 +106,14 @@ public class ShipmentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Void> deleteShipment(@PathVariable UUID id) {
         shipmentService.deleteShipment(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/receive")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<ShipmentResponseDTO> receiveShipment(
             @PathVariable UUID id,
             @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO) {
@@ -122,7 +122,7 @@ public class ShipmentController {
     }
 
     @PostMapping("/{shipmentId}/items/{itemId}/undo-receive")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<ShipmentResponseDTO> undoReceiveShipmentItem(
             @PathVariable UUID shipmentId,
             @PathVariable UUID itemId) {

@@ -38,6 +38,7 @@ import { SelectShipmentProductDialog } from "@/components/shipments/select-shipm
 import { useCreateShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   ShipmentStatus,
   type Product,
@@ -87,6 +88,7 @@ export function ShipmentCreateDialog({
 }: ShipmentCreateDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canViewCosts } = usePermissions();
   const createMutation = useCreateShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
   const productsQuery = useProducts({ rootOnly: true });
@@ -513,7 +515,7 @@ export function ShipmentCreateDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={canViewCosts ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : ""}>
                 <div className="grid gap-2">
                   <Label htmlFor="trackingId">Tracking Number (optional)</Label>
                   <Input
@@ -522,17 +524,19 @@ export function ShipmentCreateDialog({
                     {...form.register("trackingId")}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="totalCost">Total Cost</Label>
-                  <Input
-                    id="totalCost"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    placeholder="Optional"
-                    {...form.register("totalCost")}
-                  />
-                </div>
+                {canViewCosts && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="totalCost">Total Cost</Label>
+                    <Input
+                      id="totalCost"
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      placeholder="Optional"
+                      {...form.register("totalCost")}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Items */}
@@ -644,16 +648,18 @@ export function ShipmentCreateDialog({
                                 </p>
                               )}
                             </div>
-                            <div className="grid gap-2">
-                              <Label className="text-xs">Unit Cost</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                placeholder="Optional"
-                                {...form.register(`items.${index}.unitCost`)}
-                              />
-                            </div>
+                            {canViewCosts && (
+                              <div className="grid gap-2">
+                                <Label className="text-xs">Unit Cost</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  placeholder="Optional"
+                                  {...form.register(`items.${index}.unitCost`)}
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {childrenByProductId[selectedProductId]?.length ? (

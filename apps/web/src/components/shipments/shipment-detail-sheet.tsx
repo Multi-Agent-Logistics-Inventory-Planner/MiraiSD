@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
@@ -334,6 +335,7 @@ export function ShipmentDetailSheet({
   onUndoItemsClick,
   onTrackingUpdate,
 }: ShipmentDetailSheetProps) {
+  const { canViewCosts } = usePermissions();
   const [trackingExpanded, setTrackingExpanded] = useState(false);
   const [infoExpanded, setInfoExpanded] = useState(false);
   const [isEditingTracking, setIsEditingTracking] = useState(false);
@@ -540,14 +542,14 @@ export function ShipmentDetailSheet({
                   <span className="text-muted-foreground">
                     {totalReceived} / {totalOrdered} units received
                   </span>
-                  {itemsTotal > 0 && (
+                  {canViewCosts && itemsTotal > 0 && (
                     <div className="text-right">
                       <span className="text-muted-foreground mr-4">Items Total:</span>
                       <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
                     </div>
                   )}
                 </div>
-                {shipment.totalCost != null && shipment.totalCost > 0 && shipment.totalCost !== itemsTotal && (
+                {canViewCosts && shipment.totalCost != null && shipment.totalCost > 0 && shipment.totalCost !== itemsTotal && (
                   <div className="flex justify-end items-center text-sm mt-1">
                     <span className="text-muted-foreground mr-4">Shipment Total:</span>
                     <span className="font-semibold">{formatCurrency(shipment.totalCost)}</span>

@@ -12,6 +12,7 @@ import {
   TeamMemberRow,
 } from "@/components/team";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTeamData } from "@/hooks/queries/use-team-data";
 import { deleteUser } from "@/lib/api/users";
 import {
@@ -24,7 +25,8 @@ const PAGE_SIZE = 10;
 
 const ROLE_ORDER: Record<string, number> = {
   admin: 0,
-  employee: 1,
+  assistant_manager: 1,
+  employee: 2,
 };
 
 function sortByRoleThenName(a: TeamMemberRow, b: TeamMemberRow): number {
@@ -43,6 +45,7 @@ export function TabMembers() {
   const [editingMember, setEditingMember] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { canManageUsers } = usePermissions();
   const queryClient = useQueryClient();
 
   const { data: tableData = [], isLoading } = useTeamData();
@@ -125,6 +128,7 @@ export function TabMembers() {
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
         onInviteClick={() => setIsInviteDialogOpen(true)}
+        canManageUsers={canManageUsers}
       />
 
       <Card className="p-2 border-none">
@@ -135,6 +139,7 @@ export function TabMembers() {
             onEdit={handleEditMember}
             onDelete={handleDelete}
             onResendInvite={handleResendInvite}
+            canManageUsers={canManageUsers}
           />
         </CardContent>
       </Card>
@@ -147,18 +152,22 @@ export function TabMembers() {
         onPageChange={setPage}
       />
 
-      <InviteMemberDialog
-        open={isInviteDialogOpen}
-        onOpenChange={setIsInviteDialogOpen}
-        onSuccess={invalidateTeamData}
-      />
+      {canManageUsers && (
+        <>
+          <InviteMemberDialog
+            open={isInviteDialogOpen}
+            onOpenChange={setIsInviteDialogOpen}
+            onSuccess={invalidateTeamData}
+          />
 
-      <EditMemberDialog
-        member={editingMember}
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSuccess={invalidateTeamData}
-      />
+          <EditMemberDialog
+            member={editingMember}
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            onSuccess={invalidateTeamData}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -18,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/invitations")
-@PreAuthorize("hasRole('ADMIN')")
 public class InvitationController {
     private final InvitationService invitationService;
     private final InvitationMapper invitationMapper;
@@ -29,12 +28,14 @@ public class InvitationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<List<InvitationResponseDTO>> getPendingInvitations() {
         List<Invitation> invitations = invitationService.getPendingInvitations();
         return ResponseEntity.ok(invitationMapper.toResponseDTOList(invitations));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<InvitationResponseDTO> inviteUser(
             @Valid @RequestBody InvitationRequestDTO requestDTO,
             Authentication authentication) {
@@ -56,12 +57,14 @@ public class InvitationController {
     }
 
     @PostMapping("/{email}/resend")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<InvitationResponseDTO> resendInvitation(@PathVariable String email) {
         Invitation invitation = invitationService.resendInvitation(email);
         return ResponseEntity.ok(invitationMapper.toResponseDTO(invitation));
     }
 
     @DeleteMapping("/{email}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> cancelInvitation(@PathVariable String email) {
         invitationService.cancelInvitation(email);
         return ResponseEntity.noContent().build();

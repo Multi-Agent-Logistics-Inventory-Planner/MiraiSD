@@ -54,6 +54,12 @@ export const Permission = {
   // Machine Displays
   MACHINE_DISPLAYS_VIEW: "machine_displays:view",
   MACHINE_DISPLAYS_MANAGE: "machine_displays:manage",
+
+  // Cost visibility (admin-only)
+  COSTS_VIEW: "costs:view",
+
+  // User management (admin-only)
+  USERS_MANAGE: "users:manage",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];
