@@ -64,11 +64,11 @@ function MoversCard({
 }) {
   if (isLoading) {
     return (
-      <Card className="dark:border-none">
-        <CardHeader>
+      <Card className="flex flex-col overflow-hidden h-[340px] dark:border-none">
+        <CardHeader className="shrink-0">
           <Skeleton className="h-5 w-32" />
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="flex-1 min-h-0 space-y-3">
           {Array.from({ length: MOVERS_SKELETON_COUNT }).map((_, i) => (
             <Skeleton key={i} className="h-14 w-full" />
           ))}
@@ -78,8 +78,8 @@ function MoversCard({
   }
 
   return (
-    <Card className="dark:border-none">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+    <Card className="flex flex-col overflow-hidden h-[340px] dark:border-none">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
           {title}
@@ -95,11 +95,10 @@ function MoversCard({
           </TooltipProvider>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        {/* Height fits ~5 items comfortably (56px per item); scrolls for additional items */}
-        <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1">
+      <CardContent className="flex-1 min-h-0">
+        <div className="h-full overflow-y-auto space-y-2 pr-1">
           {movers?.length === 0 ? (
-            <div className="min-h-[280px] flex items-center justify-center">
+            <div className="h-full flex items-center justify-center">
               <p className="text-sm text-muted-foreground">
                 No significant changes
               </p>

@@ -16,7 +16,7 @@ import {
   ReferenceLine,
   CartesianGrid,
 } from "recharts";
-import { TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart3, DollarSign, CalendarDays } from "lucide-react";
 import { CalendarHeatmap } from "./calendar-heatmap";
 import { cn } from "@/lib/utils";
 import type { SalesSummary, MonthlySales, DailySales } from "@/types/api";
@@ -550,7 +550,10 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
     <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
       <Card className="border min-w-0">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base font-medium">Total Sales</CardTitle>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            Total Sales
+          </CardTitle>
           <div className="flex items-center gap-2">
             <ViewToggle value={viewMode} onChange={setViewMode} />
             <TimeFilterTabs
@@ -691,7 +694,10 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
       {/* Sales Trend - Heatmap */}
       <Card className="border min-w-0">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base font-medium">Sales Trend</CardTitle>
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            Sales Trend
+          </CardTitle>
           {availableYears.length > 0 && (
             <TimeFilterTabs
               value={String(selectedYear)}
