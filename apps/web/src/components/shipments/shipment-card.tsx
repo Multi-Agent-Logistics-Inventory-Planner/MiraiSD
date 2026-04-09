@@ -5,6 +5,7 @@ import { MoreVertical, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ShipmentProgress } from "./shipment-progress";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Shipment, ShipmentItem } from "@/types/api";
 import { getShipmentDisplayStatus } from "@/lib/shipment-utils";
 
@@ -101,6 +102,7 @@ function ProductThumbnail({ item }: { item: ShipmentItem }) {
 }
 
 export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
+  const { canViewCosts } = usePermissions();
   const displayStatus = getShipmentDisplayStatus(shipment);
   const statusInfo = getStatusText(shipment);
 
@@ -154,7 +156,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {totalCost > 0 && (
+          {canViewCosts && totalCost > 0 && (
             <span className="font-semibold text-sm">
               {formatCurrency(totalCost)}
             </span>

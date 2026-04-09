@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import {
   useCategories,
@@ -91,6 +92,7 @@ export function ProductForm({
 }: ProductFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canViewCosts } = usePermissions();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
@@ -544,7 +546,7 @@ export function ProductForm({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className={canViewCosts ? "grid grid-cols-2 gap-4" : ""}>
                 <div className="grid gap-2">
                   <Label htmlFor="sku">
                     SKU{" "}
@@ -564,21 +566,23 @@ export function ProductForm({
                   ) : null}
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="unitCost">
-                    Unit Cost{" "}
-                    <span className="text-muted-foreground font-normal">
-                      (optional)
-                    </span>
-                  </Label>
-                  <Input
-                    id="unitCost"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    {...form.register("unitCost")}
-                  />
-                </div>
+                {canViewCosts && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="unitCost">
+                      Unit Cost{" "}
+                      <span className="text-muted-foreground font-normal">
+                        (optional)
+                      </span>
+                    </Label>
+                    <Input
+                      id="unitCost"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...form.register("unitCost")}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Initial stock — create mode only */}

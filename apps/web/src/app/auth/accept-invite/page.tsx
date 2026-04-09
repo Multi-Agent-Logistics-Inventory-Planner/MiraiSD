@@ -175,7 +175,8 @@ function AcceptInviteContent() {
       }
 
       // Redirect based on role - employees go to storage, admins go to dashboard
-      const userRole = sessionData.session?.user?.user_metadata?.role;
+      const rawRole = sessionData.session?.user?.user_metadata?.role as string | undefined;
+      const userRole = rawRole?.toUpperCase();
       if (userRole === "EMPLOYEE") {
         router.push("/storage");
       } else {

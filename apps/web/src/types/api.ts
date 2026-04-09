@@ -90,6 +90,7 @@ export const SHIPMENT_STATUS_VARIANTS: Record<
 
 export enum UserRole {
   ADMIN = "ADMIN",
+  ASSISTANT_MANAGER = "ASSISTANT_MANAGER",
   EMPLOYEE = "EMPLOYEE",
 }
 

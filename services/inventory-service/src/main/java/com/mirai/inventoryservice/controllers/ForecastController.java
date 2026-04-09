@@ -20,7 +20,7 @@ import java.util.UUID;
 @RequestMapping("/api/forecasts")
 @RequiredArgsConstructor
 @Validated
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class ForecastController {
 
     private final ForecastService forecastService;

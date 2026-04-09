@@ -9,14 +9,12 @@ import {
   Warehouse,
   Truck,
   BarChart3,
-  Bell,
   ClipboardList,
   Users,
   Settings,
   LogOut,
   ArrowUpDown,
   RefreshCw,
-  Star,
   ChevronsUpDown,
   HeartCrack,
 } from "lucide-react";
@@ -50,9 +48,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
-import { useNotificationCounts } from "@/hooks/queries/use-notifications";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
+import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -98,22 +96,10 @@ const managementItems: NavItem[] = [
     permission: Permission.ANALYTICS_VIEW,
   },
   {
-    title: "Reviews",
-    href: "/reviews",
-    icon: Star,
-    permission: Permission.REVIEWS_VIEW,
-  },
-  {
     title: "Audit Log",
     href: "/audit-log",
     icon: ClipboardList,
     permission: Permission.AUDIT_LOG_VIEW,
-  },
-  {
-    title: "Notifications",
-    href: "/notifications",
-    icon: Bell,
-    permission: Permission.NOTIFICATIONS_VIEW,
   },
   {
     title: "Team",
@@ -212,7 +198,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading, signOut } = useAuth();
   const { can } = usePermissions();
-  const { data: notificationCounts } = useNotificationCounts();
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
@@ -300,11 +285,6 @@ export function AppSidebar() {
                     key={item.href}
                     item={item}
                     pathname={pathname}
-                    badge={
-                      item.href === "/notifications"
-                        ? notificationCounts?.unread
-                        : undefined
-                    }
                   />
                 ))}
               </SidebarMenu>
@@ -334,8 +314,13 @@ export function AppSidebar() {
                   <span className="text-sm font-medium truncate">
                     {user.personName || user.email}
                   </span>
-                  <span className="text-[10px] text-white bg-[#0b66c2] dark:bg-[#7c3aed] dark:text-foreground px-2 py-0.5 rounded-sm w-fit">
-                    {user.role}
+                  <span className={cn(
+                    "text-[10px] text-white px-2 py-0.5 rounded-sm w-fit",
+                    user.role === UserRole.ASSISTANT_MANAGER
+                      ? "bg-[#f97316] dark:bg-[#ea580c]"
+                      : "bg-[#0b66c2] dark:bg-[#7c3aed]"
+                  )}>
+                    {user.role === UserRole.ASSISTANT_MANAGER ? "ASM" : user.role}
                   </span>
                 </div>
                 <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0" />

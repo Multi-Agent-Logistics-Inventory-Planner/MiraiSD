@@ -98,6 +98,7 @@ export function EditMemberDialog({ member, open, onOpenChange, onSuccess }: Edit
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                <SelectItem value={UserRole.ASSISTANT_MANAGER}>Assistant Manager</SelectItem>
                 <SelectItem value={UserRole.EMPLOYEE}>Employee</SelectItem>
               </SelectContent>
             </Select>

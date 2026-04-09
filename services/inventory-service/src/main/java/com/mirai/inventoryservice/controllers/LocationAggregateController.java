@@ -34,7 +34,7 @@ public class LocationAggregateController {
      * @return List of locations with inventory record counts and total quantities
      */
     @GetMapping("/with-counts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<LocationWithCountsDTO>> getLocationsWithCounts(
             @RequestParam(required = false) LocationType type) {
 

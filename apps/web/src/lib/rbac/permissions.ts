@@ -54,6 +54,12 @@ export const Permission = {
   // Machine Displays
   MACHINE_DISPLAYS_VIEW: "machine_displays:view",
   MACHINE_DISPLAYS_MANAGE: "machine_displays:manage",
+
+  // Cost visibility (admin-only)
+  COSTS_VIEW: "costs:view",
+
+  // User management (admin-only)
+  USERS_MANAGE: "users:manage",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];
@@ -68,10 +74,8 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey> = {
   "/storage": Permission.STORAGE_VIEW,
   "/shipments": Permission.SHIPMENTS_VIEW,
   "/analytics": Permission.ANALYTICS_VIEW,
-  "/notifications": Permission.NOTIFICATIONS_VIEW,
   "/audit-log": Permission.AUDIT_LOG_VIEW,
   "/team": Permission.TEAM_VIEW,
   "/settings": Permission.SETTINGS_VIEW,
-  "/reviews": Permission.REVIEWS_VIEW,
   "/machine-displays": Permission.MACHINE_DISPLAYS_VIEW,
 };
