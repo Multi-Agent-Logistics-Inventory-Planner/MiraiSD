@@ -19,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/analytics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;

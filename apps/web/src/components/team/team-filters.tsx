@@ -8,12 +8,14 @@ interface TeamFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onInviteClick: () => void;
+  canManageUsers?: boolean;
 }
 
 export function TeamFilters({
   searchQuery,
   onSearchChange,
   onInviteClick,
+  canManageUsers = false,
 }: TeamFiltersProps) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -26,13 +28,15 @@ export function TeamFilters({
           className="pl-9"
         />
       </div>
-      <Button
-        onClick={onInviteClick}
-        className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
-      >
-        <Mail className="mr-2 h-4 w-4" />
-        Invite Employee
-      </Button>
+      {canManageUsers && (
+        <Button
+          onClick={onInviteClick}
+          className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
+        >
+          <Mail className="mr-2 h-4 w-4" />
+          Invite Employee
+        </Button>
+      )}
     </div>
   );
 }

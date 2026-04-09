@@ -23,6 +23,10 @@ export interface UsePermissionsResult {
   canAccessRoute: (route: string) => boolean;
   /** Whether user is an admin */
   isAdmin: boolean;
+  /** Whether user can view cost fields (admin-only) */
+  canViewCosts: boolean;
+  /** Whether user can manage users (admin-only) */
+  canManageUsers: boolean;
   /** Current user role */
   role: UserRole | undefined;
 }
@@ -48,6 +52,8 @@ export function usePermissions(): UsePermissionsResult {
         return hasPermission(role, requiredPermission);
       },
       isAdmin: role === UserRole.ADMIN,
+      canViewCosts: role === UserRole.ADMIN,
+      canManageUsers: role === UserRole.ADMIN,
       role,
     }),
     [role]

@@ -19,7 +19,7 @@ public class TrackingController {
     }
 
     @PostMapping("/lookup")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<TrackingLookupResponseDTO> lookupTracking(
             @Valid @RequestBody TrackingLookupRequestDTO request) {
         TrackingLookupResponseDTO response = trackingService.lookupTracking(request);
@@ -27,7 +27,7 @@ public class TrackingController {
     }
 
     @GetMapping("/{trackingNumber}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<TrackingLookupResponseDTO> getTracking(
             @PathVariable String trackingNumber) {
         TrackingLookupResponseDTO response = trackingService.getTracking(trackingNumber);

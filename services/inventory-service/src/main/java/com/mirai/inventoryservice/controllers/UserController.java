@@ -18,7 +18,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
-@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
     private final UserService userService;
     private final UserMapper userMapper;
@@ -29,40 +28,47 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         List<User> users = userService.getAllUsers();
         return ResponseEntity.ok(userMapper.toResponseDTOList(users));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable UUID id) {
         User user = userService.getUserById(id);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @GetMapping("/{id}/last-audit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<OffsetDateTime> getLastAudit(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.getLastAuditDate(id).orElse(null));
     }
 
     @GetMapping("/last-audits")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Map<UUID, OffsetDateTime>> getAllLastAudits() {
         return ResponseEntity.ok(userService.getAllLastAuditDates());
     }
 
     @GetMapping("/email/{email}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<UserResponseDTO> getUserByEmail(@PathVariable String email) {
         User user = userService.getUserByEmail(email);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @GetMapping("/name/{fullName}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<UserResponseDTO> getUserByFullName(@PathVariable String fullName) {
         User user = userService.getUserByFullName(fullName);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponseDTO> createUser(@Valid @RequestBody UserRequestDTO requestDTO) {
         User user = userService.createUser(
                 requestDTO.getFullName(),
@@ -72,6 +78,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponseDTO> updateUser(
             @PathVariable UUID id,
             @Valid @RequestBody UserRequestDTO requestDTO) {
@@ -84,6 +91,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();

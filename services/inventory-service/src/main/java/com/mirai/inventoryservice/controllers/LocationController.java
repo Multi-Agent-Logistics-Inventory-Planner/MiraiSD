@@ -54,7 +54,7 @@ public class LocationController {
      * Create a new location.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Location> createLocation(@Valid @RequestBody CreateLocationRequest request) {
         Location location = locationService.createLocation(
                 request.getStorageLocationId(),
@@ -66,7 +66,7 @@ public class LocationController {
      * Update a location.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Location> updateLocation(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateLocationRequest request) {
@@ -78,7 +78,7 @@ public class LocationController {
      * Delete a location.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Void> deleteLocation(@PathVariable UUID id) {
         locationService.deleteLocation(id);
         return ResponseEntity.noContent().build();

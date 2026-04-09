@@ -48,7 +48,7 @@ public class LocationInventoryController {
     }
 
     @PostMapping("/api/locations/{locationId}/inventory")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<LocationInventoryResponseDTO> addInventory(
             @PathVariable UUID locationId,
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
@@ -63,7 +63,7 @@ public class LocationInventoryController {
     }
 
     @PutMapping("/api/locations/{locationId}/inventory/{inventoryId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<LocationInventoryResponseDTO> updateInventory(
             @PathVariable UUID locationId,
             @PathVariable UUID inventoryId,
@@ -75,7 +75,7 @@ public class LocationInventoryController {
     }
 
     @DeleteMapping("/api/locations/{locationId}/inventory/{inventoryId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Void> deleteInventory(
             @PathVariable UUID locationId,
             @PathVariable UUID inventoryId,

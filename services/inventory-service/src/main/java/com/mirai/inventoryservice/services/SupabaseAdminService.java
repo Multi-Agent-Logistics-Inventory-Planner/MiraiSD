@@ -136,10 +136,11 @@ public class SupabaseAdminService {
      * Updates a user's metadata in Supabase auth.
      *
      * @param email the email of the user to update
-     * @param name the new display name
+     * @param name the new display name (null to skip)
+     * @param role the new role (null to skip)
      * @return true if updated successfully, false otherwise
      */
-    public boolean updateUserMetadata(String email, String name) {
+    public boolean updateUserMetadata(String email, String name, String role) {
         String userId = getSupabaseUserId(email);
         if (userId == null) {
             log.info("No Supabase user found for email: {}", email);
@@ -155,7 +156,8 @@ public class SupabaseAdminService {
 
         ObjectNode body = objectMapper.createObjectNode();
         ObjectNode userMetadata = objectMapper.createObjectNode();
-        userMetadata.put("name", name);
+        if (name != null) userMetadata.put("name", name);
+        if (role != null) userMetadata.put("role", role.toUpperCase());
         body.set("user_metadata", userMetadata);
 
         HttpEntity<String> request;

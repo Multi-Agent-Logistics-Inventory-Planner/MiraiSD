@@ -71,6 +71,7 @@ public class UserService {
         User user = getUserById(id);
 
         boolean nameChanged = fullName != null && !fullName.equals(user.getFullName());
+        boolean roleChanged = role != null && role != user.getRole();
 
         if (fullName != null) user.setFullName(fullName);
         if (email != null) user.setEmail(email);
@@ -78,9 +79,13 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
-        // Sync name change to Supabase auth
-        if (nameChanged) {
-            supabaseAdminService.updateUserMetadata(user.getEmail(), fullName);
+        // Sync changes to Supabase auth (name and/or role)
+        if (nameChanged || roleChanged) {
+            supabaseAdminService.updateUserMetadata(
+                user.getEmail(),
+                nameChanged ? fullName : null,
+                roleChanged ? role.name() : null
+            );
         }
 
         return savedUser;

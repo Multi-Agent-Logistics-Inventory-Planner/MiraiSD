@@ -13,8 +13,9 @@ export async function middleware(request: NextRequest) {
   // Update session and get user
   const { user, supabaseResponse } = await updateSession(request);
 
-  // Extract user role from user object
-  const userRole = user?.user_metadata?.role as UserRole | undefined;
+  // Extract user role from user object (normalize to uppercase to match UserRole enum)
+  const rawRole = user?.user_metadata?.role as string | undefined;
+  const userRole = rawRole?.toUpperCase() as UserRole | undefined;
 
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some((route) =>

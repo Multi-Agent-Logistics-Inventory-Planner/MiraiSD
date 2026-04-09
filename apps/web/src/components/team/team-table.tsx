@@ -47,15 +47,24 @@ function getStatusColor(status: "active" | "pending") {
   }
 }
 
-function getRoleColor(role: "admin" | "employee") {
+function getRoleColor(role: "admin" | "assistant_manager" | "employee") {
   switch (role) {
     case "admin":
       return "bg-[#0b66c2] text-white dark:bg-[#7c3aed] dark:text-purple-100";
+    case "assistant_manager":
+      return "bg-[#f97316] text-white dark:bg-[#ea580c] dark:text-orange-100";
     case "employee":
       return "bg-gray-100 text-gray-700";
     default:
       return "bg-gray-100 text-gray-700";
   }
+}
+
+function formatRoleLabel(role: string): string {
+  if (role.toLowerCase() === "assistant_manager") {
+    return "ASM";
+  }
+  return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
 }
 
 function TableSkeleton() {
@@ -93,6 +102,7 @@ interface TeamTableProps {
   onEdit: (row: TeamMemberRow) => void;
   onDelete: (row: TeamMemberRow) => void;
   onResendInvite: (email: string) => void;
+  canManageUsers?: boolean;
 }
 
 export function TeamTable({
@@ -101,6 +111,7 @@ export function TeamTable({
   onEdit,
   onDelete,
   onResendInvite,
+  canManageUsers = false,
 }: TeamTableProps) {
   const [deleteTarget, setDeleteTarget] = useState<TeamMemberRow | null>(null);
 
@@ -115,12 +126,14 @@ export function TeamTable({
     <>
     <Table>
       <DataTableHeader>
-        <TableHead className="rounded-l-lg">Name</TableHead>
+        <TableHead className={canManageUsers ? "rounded-l-lg" : "rounded-l-lg"}>Name</TableHead>
         <TableHead>Email</TableHead>
         <TableHead className="text-center">Role</TableHead>
         <TableHead className="text-center">Status</TableHead>
-        <TableHead className="text-center">Last Audit</TableHead>
-        <TableHead className="w-[120px] rounded-r-lg">Actions</TableHead>
+        <TableHead className={canManageUsers ? "text-center" : "text-center rounded-r-lg"}>Last Audit</TableHead>
+        {canManageUsers && (
+          <TableHead className="w-[120px] rounded-r-lg">Actions</TableHead>
+        )}
       </DataTableHeader>
       <TableBody>
         {isLoading ? (
@@ -128,7 +141,7 @@ export function TeamTable({
         ) : data.length === 0 ? (
           <TableRow>
             <TableCell
-              colSpan={6}
+              colSpan={canManageUsers ? 6 : 5}
               className="h-24 text-center text-muted-foreground"
             >
               No team members found
@@ -143,11 +156,10 @@ export function TeamTable({
                 <Badge
                   className={cn(
                     "text-xs",
-                    getRoleColor(row.role.toLowerCase() as "admin" | "employee")
+                    getRoleColor(row.role.toLowerCase() as "admin" | "assistant_manager" | "employee")
                   )}
                 >
-                  {row.role.charAt(0).toUpperCase() +
-                    row.role.slice(1).toLowerCase()}
+                  {formatRoleLabel(row.role)}
                 </Badge>
               </TableCell>
               <TableCell className="text-center">
@@ -157,42 +169,44 @@ export function TeamTable({
                   {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
                 </Badge>
               </TableCell>
-              <TableCell className="text-center text-muted-foreground">
+              <TableCell className={cn("text-center text-muted-foreground", !canManageUsers && "rounded-r-lg")}>
                 {row.lastAudit
                   ? new Date(row.lastAudit).toLocaleDateString()
                   : "-"}
               </TableCell>
-              <TableCell className="rounded-r-lg">
-                <div className="flex items-center gap-1">
-                  {row.status === "pending" && (
+              {canManageUsers && (
+                <TableCell className="rounded-r-lg">
+                  <div className="flex items-center gap-1">
+                    {row.status === "pending" && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Resend invitation"
+                        onClick={() => onResendInvite(row.email)}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {row.type === "member" && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => onEdit(row)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      title="Resend invitation"
-                      onClick={() => onResendInvite(row.email)}
+                      className="text-destructive"
+                      onClick={() => setDeleteTarget(row)}
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                  {row.type === "member" && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onEdit(row)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive"
-                    onClick={() => setDeleteTarget(row)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))
         )}

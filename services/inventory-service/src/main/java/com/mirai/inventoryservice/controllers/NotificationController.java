@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/notifications")
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class NotificationController {
     private final NotificationService notificationService;
     private final NotificationMapper notificationMapper;
@@ -97,7 +97,7 @@ public class NotificationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Void> deleteNotification(@PathVariable UUID id) {
         notificationService.deleteNotification(id);
         return ResponseEntity.noContent().build();
