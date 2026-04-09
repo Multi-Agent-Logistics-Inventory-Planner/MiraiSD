@@ -39,9 +39,9 @@ export type TeamMemberRow = {
 function getStatusColor(status: "active" | "pending") {
   switch (status) {
     case "active":
-      return "bg-[#20d760] text-black";
+      return "bg-[#20d760] text-white";
     case "pending":
-      return "bg-[#ffce00] text-black";
+      return "bg-[#ffce00] text-white";
     default:
       return "bg-[#e50815] text-white";
   }
