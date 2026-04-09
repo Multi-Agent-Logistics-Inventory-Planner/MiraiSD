@@ -4,6 +4,9 @@ export type { UrgencyFilter, SortField, SortDirection, SortOption } from "./type
 // Constants
 export { SORT_OPTIONS, PAGE_SIZE, STOCKOUT_THRESHOLDS, STALE_THRESHOLD_MS, WELL_STOCKED_THRESHOLD, isForecastStale } from "./constants";
 
+// Help Content
+export { METRIC_TOOLTIPS, BADGE_TOOLTIPS, TAB_TOOLTIPS } from "./help-content";
+
 // Utils
 export { getDaysToStockoutColor, isValidImageUrl } from "./utils";
 

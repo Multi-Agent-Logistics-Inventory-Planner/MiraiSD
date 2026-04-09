@@ -121,8 +121,8 @@ class ForecastingPipeline:
             logger.warning("No features built, skipping forecast")
             return 0
 
-        estimates_df = fc.estimate_mu_sigma(features_df, method="ma14")
-        logger.debug("Estimated demand for %d items", len(estimates_df))
+        estimates_df = fc.estimate_mu_sigma(features_df, method="dow_weighted")
+        logger.debug("Estimated demand for %d items (DOW-weighted)", len(estimates_df))
 
         # Step 5b: Compute backtest MAPE
         mape_df = pd.DataFrame(columns=["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"])

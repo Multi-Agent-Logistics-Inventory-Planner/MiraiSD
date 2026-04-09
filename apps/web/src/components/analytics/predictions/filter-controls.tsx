@@ -18,10 +18,9 @@ import {
 } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/multi-select";
 import { SORT_OPTIONS } from "./constants";
-import type { SortOption, UrgencyFilter } from "./types";
+import type { SortOption } from "./types";
 
 interface FilterControlsProps {
-  urgencyFilter: UrgencyFilter;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   categories: MultiSelectOption<string>[];
@@ -32,7 +31,6 @@ interface FilterControlsProps {
 }
 
 export function MobileFilterControls({
-  urgencyFilter,
   searchQuery,
   onSearchChange,
   categories,
@@ -41,100 +39,70 @@ export function MobileFilterControls({
   sortOption,
   onSortChange,
 }: FilterControlsProps) {
-  if (urgencyFilter === "ALL") {
-    return (
-      <div className="flex sm:hidden items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search items..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 text-sm"
-          />
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 dark:bg-input dark:border-[#41413d]"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {categoryFilter.length > 0 && (
-                <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-table-header text-[10px] font-medium text-table-header-foreground">
-                  {categoryFilter.length}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64" align="end">
-            <div className="grid grid-cols-1 gap-3">
-              <div className="grid gap-1.5">
-                <Label className="text-xs text-muted-foreground">Category</Label>
-                <MultiSelect
-                  options={categories}
-                  selected={categoryFilter}
-                  onChange={onCategoryChange}
-                  placeholder="All Categories"
-                  className="w-full"
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs text-muted-foreground">Sort By</Label>
-                <Select
-                  value={sortOption}
-                  onValueChange={(val) => onSortChange(val as SortOption)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    );
-  }
-
   return (
     <div className="flex sm:hidden items-center gap-2">
-      <MultiSelect
-        options={categories}
-        selected={categoryFilter}
-        onChange={onCategoryChange}
-        placeholder="All Categories"
-        className="flex-1 w-0 min-w-0 shrink overflow-hidden"
-      />
-      <Select
-        value={sortOption}
-        onValueChange={(val) => onSortChange(val as SortOption)}
-      >
-        <SelectTrigger className="flex-1 w-0 min-w-0 shrink overflow-hidden [&>span:first-child]:truncate">
-          <SelectValue placeholder="Sort by" />
-        </SelectTrigger>
-        <SelectContent>
-          {SORT_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search items..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-9 text-sm"
+        />
+      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 dark:bg-input dark:border-[#41413d]"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {categoryFilter.length > 0 && (
+              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-table-header text-[10px] font-medium text-table-header-foreground">
+                {categoryFilter.length}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64" align="end">
+          <div className="grid grid-cols-1 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-muted-foreground">Category</Label>
+              <MultiSelect
+                options={categories}
+                selected={categoryFilter}
+                onChange={onCategoryChange}
+                placeholder="All Categories"
+                className="w-full"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs text-muted-foreground">Sort By</Label>
+              <Select
+                value={sortOption}
+                onValueChange={(val) => onSortChange(val as SortOption)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
 
 export function DesktopFilterControls({
-  urgencyFilter,
   searchQuery,
   onSearchChange,
   categories,
@@ -145,17 +113,15 @@ export function DesktopFilterControls({
 }: FilterControlsProps) {
   return (
     <div className="hidden sm:flex items-center gap-2">
-      {urgencyFilter === "ALL" && (
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search items..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-      )}
+      <div className="relative w-64">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search items..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-9"
+        />
+      </div>
       <MultiSelect
         options={categories}
         selected={categoryFilter}

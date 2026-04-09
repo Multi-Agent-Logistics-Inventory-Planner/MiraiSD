@@ -12,6 +12,7 @@ public class UserRoleConverter implements AttributeConverter<UserRole, String> {
         if (role == null) return null;
         return switch (role) {
             case ADMIN -> "admin";
+            case ASSISTANT_MANAGER -> "assistant_manager";
             case EMPLOYEE -> "employee";
         };
     }

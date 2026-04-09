@@ -1,6 +1,7 @@
 import type { SortOption } from "./types";
 
 export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "priority-desc", label: "Priority: Highest First" },
   { value: "daysToStockout-asc", label: "Days to Stockout: Low to High" },
   { value: "daysToStockout-desc", label: "Days to Stockout: High to Low" },
   { value: "demandVelocity-desc", label: "Demand Velocity: High to Low" },

@@ -16,7 +16,7 @@ import java.util.List;
 @RequestMapping("/api/activity-feed")
 @RequiredArgsConstructor
 @Validated
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class ActivityFeedController {
 
     private final ActivityFeedService activityFeedService;

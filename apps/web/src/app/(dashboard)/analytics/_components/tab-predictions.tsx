@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { AlertCircle, Package } from "lucide-react";
+import { AlertCircle, Package, TrendingUp, Target } from "lucide-react";
+import { computePriorityScore } from "@/lib/utils/format-forecast";
 import { Card } from "@/components/ui/card";
 import { usePredictions } from "@/hooks/queries/use-predictions";
 import { useDismissedPredictions } from "@/hooks/use-dismissed-predictions";
 import type { MultiSelectOption } from "@/components/ui/multi-select";
-import type { ActionItem, ActionUrgency } from "@/types/analytics";
+import type { ActionItem } from "@/types/analytics";
+import { STOCKOUT_THRESHOLDS } from "@/components/analytics/predictions";
 import {
   PAGE_SIZE,
   WELL_STOCKED_THRESHOLD,
@@ -23,11 +25,22 @@ import {
   type SortOption,
 } from "@/components/analytics/predictions";
 
-function countByUrgency(items: readonly ActionItem[]): Record<ActionUrgency, number> {
-  const counts: Record<ActionUrgency, number> = { CRITICAL: 0, URGENT: 0, ATTENTION: 0, HEALTHY: 0 };
+interface TabCounts {
+  actionNeeded: number;
+  watch: number;
+  healthy: number;
+}
+
+function countByTab(items: readonly ActionItem[]): TabCounts {
+  const counts: TabCounts = { actionNeeded: 0, watch: 0, healthy: 0 };
   for (const item of items) {
-    if (item.urgency in counts) {
-      counts[item.urgency]++;
+    const days = item.daysToStockout;
+    if (days === null || days <= STOCKOUT_THRESHOLDS.URGENT) {
+      counts.actionNeeded++;
+    } else if (days <= STOCKOUT_THRESHOLDS.ATTENTION) {
+      counts.watch++;
+    } else {
+      counts.healthy++;
     }
   }
   return counts;
@@ -37,9 +50,9 @@ export function TabPredictions() {
   const { data, isLoading, isError } = usePredictions();
   const { dismissedMap, dismissedIds, dismiss, restore } = useDismissedPredictions();
 
-  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("ALL");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("ACTION_NEEDED");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortOption, setSortOption] = useState<SortOption>("daysToStockout-asc");
+  const [sortOption, setSortOption] = useState<SortOption>("priority-desc");
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -79,8 +92,21 @@ export function TabPredictions() {
     [nonStaleItems, isDismissed],
   );
 
-  // Recalculate urgency counts from active items
-  const filteredCounts = useMemo(() => countByUrgency(baseFilteredItems), [baseFilteredItems]);
+  // Recalculate tab counts from active items
+  const tabCounts = useMemo(() => countByTab(baseFilteredItems), [baseFilteredItems]);
+
+  // Find top priority item from action-needed items
+  const topPriorityItem = useMemo(() => {
+    const actionItems = baseFilteredItems.filter(
+      (item) => item.daysToStockout === null || item.daysToStockout <= STOCKOUT_THRESHOLDS.URGENT
+    );
+    if (actionItems.length === 0) return null;
+    return actionItems.reduce((top, item) => {
+      const topScore = computePriorityScore(top);
+      const itemScore = computePriorityScore(item);
+      return itemScore > topScore ? item : top;
+    });
+  }, [baseFilteredItems]);
 
   // Pick the right source list based on active tab
   const sourceItems = urgencyFilter === "RESOLVED" ? resolvedItems : baseFilteredItems;
@@ -95,13 +121,29 @@ export function TabPredictions() {
   const processedItems = useMemo(() => {
     if (sourceItems.length === 0) return { items: [], totalCount: 0 };
 
-    // Filter by urgency (skip for ALL and RESOLVED -- already scoped)
-    let filtered = (urgencyFilter === "ALL" || urgencyFilter === "RESOLVED")
-      ? [...sourceItems]
-      : sourceItems.filter((item) => item.urgency === urgencyFilter);
+    // Filter by tab (based on daysToStockout thresholds)
+    let filtered: ActionItem[];
+    if (urgencyFilter === "RESOLVED") {
+      filtered = [...sourceItems];
+    } else if (urgencyFilter === "ACTION_NEEDED") {
+      filtered = sourceItems.filter((item) =>
+        item.daysToStockout === null || item.daysToStockout <= STOCKOUT_THRESHOLDS.URGENT
+      );
+    } else if (urgencyFilter === "WATCH") {
+      filtered = sourceItems.filter((item) =>
+        item.daysToStockout !== null &&
+        item.daysToStockout > STOCKOUT_THRESHOLDS.URGENT &&
+        item.daysToStockout <= STOCKOUT_THRESHOLDS.ATTENTION
+      );
+    } else {
+      // HEALTHY
+      filtered = sourceItems.filter((item) =>
+        item.daysToStockout !== null && item.daysToStockout > STOCKOUT_THRESHOLDS.ATTENTION
+      );
+    }
 
-    // Filter by search query (only in ALL/RESOLVED tabs)
-    if ((urgencyFilter === "ALL" || urgencyFilter === "RESOLVED") && searchQuery.trim()) {
+    // Filter by search query
+    if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((item) =>
         item.name.toLowerCase().includes(query)
@@ -118,6 +160,11 @@ export function TabPredictions() {
       const multiplier = sortDirection === "asc" ? 1 : -1;
       if (sortField === "name") {
         return multiplier * a.name.localeCompare(b.name);
+      }
+      if (sortField === "priority") {
+        const aVal = computePriorityScore(a);
+        const bVal = computePriorityScore(b);
+        return multiplier * (aVal - bVal);
       }
       const nullFallback = sortDirection === "asc" ? Infinity : -Infinity;
       const aVal = a[sortField] ?? nullFallback;
@@ -186,26 +233,66 @@ export function TabPredictions() {
   const isResolved = urgencyFilter === "RESOLVED";
 
   const urgencyTabs = data ? [
-    { value: "ALL" as const, label: "All", count: baseFilteredItems.length },
-    { value: "CRITICAL" as const, label: "Critical", count: filteredCounts.CRITICAL },
-    { value: "URGENT" as const, label: "Urgent", count: filteredCounts.URGENT },
-    { value: "ATTENTION" as const, label: "Attention", count: filteredCounts.ATTENTION },
-    { value: "HEALTHY" as const, label: "Safe", count: filteredCounts.HEALTHY },
+    { value: "ACTION_NEEDED" as const, label: "Action Needed", count: tabCounts.actionNeeded },
+    { value: "WATCH" as const, label: "Watch", count: tabCounts.watch },
+    { value: "HEALTHY" as const, label: "Healthy", count: tabCounts.healthy },
     { value: "RESOLVED" as const, label: "Resolved", count: resolvedItems.length },
   ] : [];
+
+  // Format order date for summary
+  const formatOrderDate = (dateStr: string | null): string => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
 
   return (
     <div className="space-y-6">
       {!isLoading && data && (
-        <Card className="bg-background border-0 rounded-none py-0 shadow-none">
-          <UrgencyTabs
-            tabs={urgencyTabs}
-            activeTab={urgencyFilter}
-            onTabChange={handleUrgencyChange}
-          />
+        <>
+          {/* Summary Header */}
+          {tabCounts.actionNeeded > 0 && topPriorityItem && (
+            <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <span className="font-semibold text-amber-900 dark:text-amber-100">
+                      {tabCounts.actionNeeded} {tabCounts.actionNeeded === 1 ? "item needs" : "items need"} ordering this week
+                    </span>
+                  </div>
+                  {data.avgForecastAccuracy > 0 && (
+                    <span className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+                      <Target className="h-4 w-4" />
+                      {Math.round(data.avgForecastAccuracy * 100)}% system accuracy
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+                <span className="font-medium">Top priority:</span>{" "}
+                <span className="font-semibold">{topPriorityItem.name}</span>
+                {topPriorityItem.suggestedReorderQty > 0 && (
+                  <>
+                    {" "}- order {topPriorityItem.suggestedReorderQty} units
+                    {topPriorityItem.suggestedOrderDate && (
+                      <> by {formatOrderDate(topPriorityItem.suggestedOrderDate)}</>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+          )}
+
+          <Card className="bg-background border-0 rounded-none py-0 shadow-none">
+            <UrgencyTabs
+              tabs={urgencyTabs}
+              activeTab={urgencyFilter}
+              onTabChange={handleUrgencyChange}
+            />
 
           <MobileFilterControls
-            urgencyFilter={urgencyFilter}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             categories={categories}
@@ -216,7 +303,6 @@ export function TabPredictions() {
           />
 
           <DesktopFilterControls
-            urgencyFilter={urgencyFilter}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
             categories={categories}
@@ -233,18 +319,22 @@ export function TabPredictions() {
               <h3 className="text-lg font-semibold text-green-700 dark:text-green-300">
                 {isResolved
                   ? "No resolved items"
-                  : urgencyFilter === "ALL"
-                    ? "No items"
-                    : `No ${urgencyFilter.toLowerCase()} items`}
+                  : urgencyFilter === "ACTION_NEEDED"
+                    ? "No action needed"
+                    : urgencyFilter === "WATCH"
+                      ? "Nothing to watch"
+                      : "No healthy items"}
               </h3>
               <p className="text-muted-foreground">
                 {categoryFilter.length > 0
                   ? "No items match your filters."
                   : isResolved
                     ? "Dismissed items appear here. They auto-archive after 30 days."
-                    : urgencyFilter === "ALL"
-                      ? "No prediction items available."
-                      : `No items with ${urgencyFilter.toLowerCase()} urgency level.`}
+                    : urgencyFilter === "ACTION_NEEDED"
+                      ? "Great! No items need immediate attention."
+                      : urgencyFilter === "WATCH"
+                        ? "No items to monitor right now."
+                        : "No items with healthy stock levels."}
               </p>
             </Card>
           ) : (
@@ -273,6 +363,7 @@ export function TabPredictions() {
             />
           )}
         </Card>
+        </>
       )}
 
       {isLoading && <PredictionsSkeleton />}

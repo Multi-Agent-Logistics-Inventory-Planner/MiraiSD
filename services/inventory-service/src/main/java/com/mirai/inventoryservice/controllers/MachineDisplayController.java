@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/machine-displays")
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class MachineDisplayController {
     private final MachineDisplayService machineDisplayService;
 
@@ -217,7 +217,7 @@ public class MachineDisplayController {
      * Delete a display history record (Admin only)
      */
     @DeleteMapping("/history/{displayId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Void> deleteDisplayHistory(@PathVariable UUID displayId) {
         machineDisplayService.deleteDisplayHistory(displayId);
         return ResponseEntity.noContent().build();

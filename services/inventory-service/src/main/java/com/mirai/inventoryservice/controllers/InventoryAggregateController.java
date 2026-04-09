@@ -40,7 +40,7 @@ public class InventoryAggregateController {
      * @return List of inventory totals for all products
      */
     @GetMapping("/totals")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<InventoryTotalDTO>> getInventoryTotals() {
         List<InventoryTotalDTO> totals = inventoryTotalsRepository.findAllInventoryTotals();
         return ResponseEntity.ok(totals);
@@ -54,7 +54,7 @@ public class InventoryAggregateController {
      * @return All inventory entries for the product with location details
      */
     @GetMapping("/by-product/{productId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<ProductInventoryResponseDTO> getInventoryByProduct(
             @PathVariable UUID productId) {
         ProductInventoryResponseDTO response = inventoryAggregateService.getInventoryByProduct(productId);

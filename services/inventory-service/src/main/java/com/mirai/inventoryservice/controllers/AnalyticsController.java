@@ -19,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/analytics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
@@ -40,7 +40,6 @@ public class AnalyticsController {
     }
 
     /**
-     * Consolidated action center - replaces 10+ separate queries.
      * Returns items needing reorder decisions, sorted by urgency.
      * Now includes demand velocity, volatility, and forecast accuracy.
      */

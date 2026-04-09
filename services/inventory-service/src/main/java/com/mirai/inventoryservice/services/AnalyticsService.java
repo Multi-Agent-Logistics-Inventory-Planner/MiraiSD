@@ -77,7 +77,8 @@ public class AnalyticsService {
         BigDecimal muHat,
         BigDecimal sigmaDHat,
         BigDecimal mape,
-        List<Double> dowMultipliers
+        List<Double> dowMultipliers,
+        Integer safetyStock
     ) {}
 
     /**
@@ -86,7 +87,7 @@ public class AnalyticsService {
     private ForecastFeatures extractFeatures(ForecastPrediction fp) {
         Map<String, Object> features = fp.getFeatures();
         if (features == null) {
-            return new ForecastFeatures(null, null, null, null);
+            return new ForecastFeatures(null, null, null, null, null);
         }
 
         BigDecimal muHat = extractBigDecimal(features.get("mu_hat"));
@@ -102,7 +103,13 @@ public class AnalyticsService {
                 .toList();
         }
 
-        return new ForecastFeatures(muHat, sigmaDHat, mape, dowMultipliers);
+        Integer safetyStock = null;
+        Object ssObj = features.get("safety_stock");
+        if (ssObj instanceof Number num) {
+            safetyStock = num.intValue();
+        }
+
+        return new ForecastFeatures(muHat, sigmaDHat, mape, dowMultipliers, safetyStock);
     }
 
     private BigDecimal extractBigDecimal(Object value) {
@@ -186,6 +193,37 @@ public class AnalyticsService {
             return today;
         }
         return today.plusDays(daysUntilStockout - leadTimeDays);
+    }
+
+    /**
+     * Recalculate suggested reorder quantity using forecast model data.
+     * Formula: (targetStock - currentStock) + leadTimeDemand + safetyStock
+     *
+     * @param currentStock Current inventory level
+     * @param targetStockLevel Desired stock level after reorder
+     * @param muHat Demand velocity from forecast (units/day)
+     * @param leadTimeDays Supplier lead time in days
+     * @param safetyStock Safety buffer from forecast model
+     * @return Suggested reorder quantity (minimum 0)
+     */
+    private int recalculateSuggestedReorderQty(
+            int currentStock,
+            int targetStockLevel,
+            BigDecimal muHat,
+            int leadTimeDays,
+            Integer safetyStock) {
+        int baseQty = targetStockLevel - currentStock;
+
+        // Add lead time demand (units sold while waiting for delivery)
+        int leadTimeDemand = 0;
+        if (muHat != null && muHat.compareTo(BigDecimal.ZERO) > 0) {
+            leadTimeDemand = (int) Math.ceil(muHat.doubleValue() * leadTimeDays);
+        }
+
+        // Add safety buffer from forecast (or default to 0)
+        int buffer = safetyStock != null ? safetyStock : 0;
+
+        return Math.max(0, baseQty + leadTimeDemand + buffer);
     }
 
     /**
@@ -376,6 +414,7 @@ public class AnalyticsService {
             int currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
             int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 14;
             int rp = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
+            int targetStock = product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50;
 
             ForecastFeatures features = extractFeatures(prediction);
             BigDecimal demandVelocity = features.muHat();
@@ -385,6 +424,8 @@ public class AnalyticsService {
             // Recalculate dynamic fields from live stock + stored mu_hat
             BigDecimal daysToStockout = recalculateDaysToStockout(currentStock, features.muHat());
             LocalDate suggestedOrderDate = recalculateSuggestedOrderDate(daysToStockout, leadTimeDays, today);
+            int suggestedReorderQty = recalculateSuggestedReorderQty(
+                currentStock, targetStock, features.muHat(), leadTimeDays, features.safetyStock());
             // Use recalculated date so overdue badge is consistent with displayed order date
             boolean overdue = isOverdue(suggestedOrderDate, currentStock, rp, today);
 
@@ -422,10 +463,10 @@ public class AnalyticsService {
                 product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
                 currentStock,
                 rp,
-                product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50,
+                targetStock,
                 daysToStockout,
                 prediction.getAvgDailyDelta(),
-                prediction.getSuggestedReorderQty() != null ? prediction.getSuggestedReorderQty() : 0,
+                suggestedReorderQty,
                 suggestedOrderDate,
                 leadTimeDays,
                 demandVelocity,

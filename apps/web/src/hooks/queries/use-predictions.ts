@@ -11,8 +11,8 @@ export function usePredictions() {
   return useQuery({
     queryKey: queryKeys.analytics.predictions(),
     queryFn: getPredictions,
-    staleTime: 5 * 60 * 1000, // 5 minutes - near real-time for reorder decisions
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer than staleTime
+    staleTime: 10 * 60 * 1000, // 10 minutes - matches backend cache TTL
+    gcTime: 15 * 60 * 1000, // 15 minutes - keep in cache longer than staleTime
     refetchOnMount: false,
     refetchOnWindowFocus: false,
   })

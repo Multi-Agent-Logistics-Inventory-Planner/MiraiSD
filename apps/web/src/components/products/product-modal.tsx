@@ -76,7 +76,7 @@ export function ProductModal({
     useShipmentsByProduct(product?.product.id);
   const { data: displayHistory, isLoading: displaysLoading } =
     useProductDisplayHistory(product?.product.id);
-  const { isAdmin } = usePermissions();
+  const { isAdmin, canViewCosts } = usePermissions();
 
   const activeDisplays = useMemo(() => {
     if (!displayHistory) return [];
@@ -166,14 +166,16 @@ export function ProductModal({
                 {p.category.name}
               </Badge>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs sm:text-sm">
-                Unit Cost:
-              </span>
-              <span className="text-xs sm:text-sm">
-                {formatCurrency(p.unitCost)}
-              </span>
-            </div>
+            {canViewCosts && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm">
+                  Unit Cost:
+                </span>
+                <span className="text-xs sm:text-sm">
+                  {formatCurrency(p.unitCost)}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs sm:text-sm">
                 Status:
