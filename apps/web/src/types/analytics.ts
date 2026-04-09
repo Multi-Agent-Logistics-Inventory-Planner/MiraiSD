@@ -69,6 +69,8 @@ export interface Mover {
   previousPeriodUnits: number
   percentChange: number
   direction: MoverDirection
+  demandVelocity: number | null
+  displayConfidence: number | null
 }
 
 export interface PeriodSummary {

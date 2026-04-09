@@ -29,6 +29,7 @@ public record InsightsDTO(
 
     /**
      * Product showing significant demand change.
+     * Ranked by ACV-weighted velocity (demandVelocity × displayConfidence).
      */
     public record Mover(
         int rank,
@@ -39,7 +40,9 @@ public record InsightsDTO(
         int currentPeriodUnits,
         int previousPeriodUnits,
         BigDecimal percentChange,
-        MoverDirection direction
+        MoverDirection direction,
+        BigDecimal demandVelocity,
+        BigDecimal displayConfidence
     ) {}
 
     public enum MoverDirection {
