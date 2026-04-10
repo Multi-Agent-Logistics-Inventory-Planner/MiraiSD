@@ -12,7 +12,7 @@
 #
 # RESOURCE LIMITS: Configured for DigitalOcean Basic 2GB Droplet
 # Total container memory: ~1.4GB (leaving ~600MB for system overhead)
-# - kafka: 512M, inventory-service: 512M, forecasting: 192M, messaging: 128M, caddy: 64M
+# - kafka: 512M, inventory-service: 512M, forecasting: 192M, messaging: 128M, caddy: 64M, forecast-cron: 16M
 
 services:
   kafka:
@@ -220,6 +220,35 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  forecast-cron:
+    image: alpine:3.21
+    container_name: forecast-cron
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "0 0 * * * wget -qO- --post-data='' http://forecasting-service:5000/forecasts/trigger > /proc/1/fd/1 2>&1" | crontab -
+        echo "forecast-cron: daily recompute scheduled at midnight UTC"
+        crond -f -l 6
+    deploy:
+      resources:
+        limits:
+          memory: 16M
+          cpus: '0.05'
+        reservations:
+          memory: 8M
+    networks:
+      - mirai
+    depends_on:
+      forecasting-service:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   caddy:
     image: caddy:2.8-alpine
