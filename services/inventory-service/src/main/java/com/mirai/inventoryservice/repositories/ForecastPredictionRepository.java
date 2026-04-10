@@ -48,6 +48,15 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findAllLatestLimited(@Param("limit") int limit);
 
+    // Find latest prediction per item, filtered to a set of item IDs
+    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+            + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
+            + "FROM forecast_predictions GROUP BY item_id) latest "
+            + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
+            + "WHERE fp.item_id IN :itemIds",
+            nativeQuery = true)
+    List<ForecastPrediction> findLatestByItemIds(@Param("itemIds") List<UUID> itemIds);
+
     // Find at-risk items using only the latest prediction per item
     @Query(value = "SELECT fp.* FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "

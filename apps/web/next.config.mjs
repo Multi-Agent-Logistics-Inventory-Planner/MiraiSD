@@ -15,7 +15,8 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    unoptimized: true,
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
     remotePatterns: [
       {
         protocol: "https",
@@ -35,13 +36,20 @@ const nextConfig = {
       ? "'self' http://localhost:3000 http://localhost:4000 https://*.supabase.co wss://*.supabase.co"
       : `'self' https://*.supabase.co wss://*.supabase.co http://*.mirai-inventory.com https://*.mirai-inventory.com`;
 
+    // React 19 dev mode uses eval() for source-map reconstruction and Fast
+    // Refresh; allow it only in development. Production never ships eval().
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = isDev
+      ? "'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live"
+      : "'self' 'unsafe-inline' https://vercel.live";
+
     return [
       {
         source: '/:path*',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; script-src 'self' 'unsafe-inline' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src ${connectSrc}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
+            value: `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src ${connectSrc}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
           },
           {
             key: 'X-Frame-Options',
