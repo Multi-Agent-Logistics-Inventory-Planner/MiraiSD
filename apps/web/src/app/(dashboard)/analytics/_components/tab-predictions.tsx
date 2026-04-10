@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { AlertCircle, Package, TrendingUp, Target } from "lucide-react";
+import { AlertCircle, Package, TrendingUp } from "lucide-react";
 import { computePriorityScore } from "@/lib/utils/format-forecast";
 import { Card } from "@/components/ui/card";
 import { usePredictions } from "@/hooks/queries/use-predictions";
@@ -262,12 +262,6 @@ export function TabPredictions() {
                       {tabCounts.actionNeeded} {tabCounts.actionNeeded === 1 ? "item needs" : "items need"} ordering this week
                     </span>
                   </div>
-                  {data.avgForecastAccuracy > 0 && (
-                    <span className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
-                      <Target className="h-4 w-4" />
-                      {Math.round(data.avgForecastAccuracy * 100)}% system accuracy
-                    </span>
-                  )}
                 </div>
               </div>
               <div className="mt-2 text-sm text-amber-800 dark:text-amber-200">
