@@ -81,6 +81,15 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
     List<MachineDisplay> findByProduct_IdOrderByStartedAtDesc(UUID productId);
 
     /**
+     * Find currently-active displays for a product (Product Assistant).
+     * Unlike findByProduct_IdOrderByStartedAtDesc, this excludes ended displays.
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.product.id = :productId " +
+            "AND md.endedAt IS NULL ORDER BY md.startedAt ASC")
+    List<MachineDisplay> findActiveByProduct_Id(@Param("productId") UUID productId);
+
+    /**
      * Find stale displays (active for longer than threshold)
      */
     @EntityGraph(value = "MachineDisplay.withProduct")
