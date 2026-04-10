@@ -3,6 +3,8 @@ import { getSupabaseClient } from "@/lib/supabase";
 const BUCKET_NAME = "product-images";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const WEBP_MAX_EDGE = 1600;
+const WEBP_QUALITY = 0.82;
 
 // Magic numbers for image format validation
 const MAGIC_NUMBERS: Record<string, number[][]> = {
@@ -33,6 +35,47 @@ function generateUniqueFilename(originalFilename: string): string {
   const uuid = crypto.randomUUID();
   const sanitized = sanitizeFilename(originalFilename);
   return `${uuid}_${sanitized}`;
+}
+
+function replaceExtensionWithWebp(filename: string): string {
+  const dotIndex = filename.lastIndexOf(".");
+  const base = dotIndex >= 0 ? filename.slice(0, dotIndex) : filename;
+  return `${base}.webp`;
+}
+
+async function convertToWebp(file: File): Promise<Blob | null> {
+  if (
+    typeof createImageBitmap !== "function" ||
+    typeof OffscreenCanvas === "undefined"
+  ) {
+    return null;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const { width, height } = bitmap;
+    const longest = Math.max(width, height);
+    const scale = longest > WEBP_MAX_EDGE ? WEBP_MAX_EDGE / longest : 1;
+    const targetW = Math.max(1, Math.round(width * scale));
+    const targetH = Math.max(1, Math.round(height * scale));
+
+    const canvas = new OffscreenCanvas(targetW, targetH);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return null;
+    }
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+    bitmap.close();
+
+    const blob = await canvas.convertToBlob({
+      type: "image/webp",
+      quality: WEBP_QUALITY,
+    });
+    return blob;
+  } catch {
+    return null;
+  }
 }
 
 async function validateMagicNumber(file: File): Promise<boolean> {
@@ -90,13 +133,23 @@ export async function uploadProductImage(
     };
   }
 
-  const filename = generateUniqueFilename(file.name);
+  // Re-encode to WebP and downscale to reduce storage + egress.
+  // Falls back to the original file if the browser lacks OffscreenCanvas
+  // or the conversion fails for any reason.
+  const webpBlob = await convertToWebp(file);
+  const uploadBody: Blob = webpBlob ?? file;
+  const uploadContentType = webpBlob ? "image/webp" : file.type;
+  const baseFilename = generateUniqueFilename(file.name);
+  const filename = webpBlob
+    ? replaceExtensionWithWebp(baseFilename)
+    : baseFilename;
 
   const { error } = await client.storage
     .from(BUCKET_NAME)
-    .upload(filename, file, {
+    .upload(filename, uploadBody, {
       cacheControl: "604800", // 1 week cache for product images
       upsert: false,
+      contentType: uploadContentType,
     });
 
   if (error) {
