@@ -3,12 +3,16 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
 import com.mirai.inventoryservice.exceptions.ProductInUseException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
+import com.mirai.inventoryservice.exceptions.SupplierNotFoundException;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.Supplier;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
+import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.repositories.SupplierRepository;
 import com.mirai.inventoryservice.services.InventoryAggregateService;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -41,6 +45,8 @@ public class ProductService {
     private final ShipmentItemRepository shipmentItemRepository;
     private final MachineDisplayRepository machineDisplayRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
+    private final SupplierRepository supplierRepository;
+    private final ShipmentRepository shipmentRepository;
 
     public ProductService(
             ProductRepository productRepository,
@@ -51,7 +57,9 @@ public class ProductService {
             StockMovementRepository stockMovementRepository,
             ShipmentItemRepository shipmentItemRepository,
             MachineDisplayRepository machineDisplayRepository,
-            ForecastPredictionRepository forecastPredictionRepository) {
+            ForecastPredictionRepository forecastPredictionRepository,
+            SupplierRepository supplierRepository,
+            ShipmentRepository shipmentRepository) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
@@ -61,6 +69,8 @@ public class ProductService {
         this.shipmentItemRepository = shipmentItemRepository;
         this.machineDisplayRepository = machineDisplayRepository;
         this.forecastPredictionRepository = forecastPredictionRepository;
+        this.supplierRepository = supplierRepository;
+        this.shipmentRepository = shipmentRepository;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
@@ -147,6 +157,14 @@ public class ProductService {
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + id));
     }
 
+    /**
+     * Get the last delivered supplier for a product.
+     * Returns [supplier_id (UUID), supplier_display_name (String)] or null if no delivered shipments.
+     */
+    public Object[] getLastDeliveredSupplier(UUID productId) {
+        return shipmentRepository.findLastDeliveredSupplierByProductId(productId);
+    }
+
     public Product getProductBySku(String sku) {
         return productRepository.findBySkuWithCategories(sku)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with SKU: " + sku));
@@ -176,7 +194,9 @@ public class ProductService {
                                  String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, String imageUrl, String notes,
-                                 Boolean clearParent, Integer quantity) {
+                                 Boolean clearParent, Integer quantity,
+                                 UUID preferredSupplierId, Boolean preferredSupplierAuto,
+                                 Boolean clearPreferredSupplier) {
         Product product = getProductById(id);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
@@ -227,9 +247,25 @@ public class ProductService {
             product.setQuantity(quantity);
         }
 
-        Product saved = productRepository.save(product);
-        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
-        return saved;
+        // Handle preferred supplier
+        if (preferredSupplierId != null) {
+            Supplier supplier = supplierRepository.findById(preferredSupplierId)
+                .orElseThrow(() -> new SupplierNotFoundException("Supplier not found with id: " + preferredSupplierId));
+            product.setPreferredSupplier(supplier);
+            product.setPreferredSupplierAuto(Boolean.TRUE.equals(preferredSupplierAuto));
+        } else if (Boolean.TRUE.equals(clearPreferredSupplier)) {
+            product.setPreferredSupplier(null);
+            product.setPreferredSupplierAuto(null);
+        } else if (Boolean.TRUE.equals(preferredSupplierAuto) && product.getPreferredSupplierId() != null) {
+            // Switching existing supplier to auto mode (keeps supplier, enables auto-update on delivery)
+            product.setPreferredSupplierAuto(true);
+        }
+
+        productRepository.save(product);
+        broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
+        // Re-fetch to ensure preferredSupplier is eagerly loaded via JOIN FETCH
+        return productRepository.findByIdWithCategories(product.getId())
+                .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + product.getId()));
     }
 
     public void deactivateProduct(UUID id) {
@@ -269,21 +305,26 @@ public class ProductService {
         log.info("[DELETE] Child count: {}", childCount);
         if (childCount > 0) {
             List<Product> children = productRepository.findByParentIdWithCategories(id);
+            // Validate all children are deletable first
             for (Product child : children) {
                 if (shipmentItemRepository.countByItem_Id(child.getId()) > 0) {
                     throw new ProductInUseException(
                             "Cannot delete: prize \"" + child.getName() + "\" is used in one or more shipments. Remove it from those shipments first.");
                 }
             }
+            // Collect child IDs for batch operations (N+1 optimization)
+            Set<UUID> childIds = new HashSet<>();
             for (Product child : children) {
-                log.info("[DELETE] Deleting child: id={}, name='{}'", child.getId(), child.getName());
-                forecastPredictionRepository.deleteByItemId(child.getId());
-                machineDisplayRepository.deleteByProduct_Id(child.getId());
-                inventoryAggregateService.deleteAllInventoryForProduct(child.getId());
-                stockMovementRepository.deleteByItem_Id(child.getId());
-                productRepository.delete(child);
+                childIds.add(child.getId());
                 deletedProductIds.add(child.getId().toString());
             }
+            log.info("[DELETE] Batch deleting dependencies for {} children", childIds.size());
+            // Batch delete all child dependencies in single queries instead of N queries
+            forecastPredictionRepository.deleteAllByItemIdIn(childIds);
+            machineDisplayRepository.deleteAllByProductIdIn(childIds);
+            inventoryAggregateService.deleteAllInventoryForProducts(childIds);
+            stockMovementRepository.deleteAllByItemIdIn(childIds);
+            productRepository.deleteAll(children);
         }
 
         // Delete forecast predictions, machine displays, then parent's (or single product's) inventory and stock movements before deleting the product

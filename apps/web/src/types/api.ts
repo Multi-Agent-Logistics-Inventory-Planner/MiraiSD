@@ -121,6 +121,28 @@ export interface AuthValidationResponse {
   message?: string;
 }
 
+// Supplier types
+
+export interface Supplier {
+  id: string;
+  displayName: string;
+  canonicalName: string;
+  contactEmail?: string;
+  isActive: boolean;
+  shipmentCount?: number;
+  productCount?: number;
+  avgLeadTimeDays?: number;
+  sigmaL?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierRequest {
+  displayName: string;
+  contactEmail?: string;
+  isActive?: boolean;
+}
+
 // Product types
 
 export interface ProductSummary {
@@ -150,6 +172,13 @@ export interface Product {
   children?: ProductSummary[];
   totalChildStock?: number;
   hasChildren?: boolean;
+  // Preferred supplier fields
+  preferredSupplierId?: string | null;
+  preferredSupplierName?: string | null;
+  preferredSupplierAuto?: boolean;
+  // Last delivered supplier for "Use Auto" feature (only on single product fetch)
+  lastDeliveredSupplierId?: string | null;
+  lastDeliveredSupplierName?: string | null;
   // Core fields
   name: string;
   description?: string;
@@ -183,6 +212,10 @@ export interface ProductRequest {
   notes?: string;
   /** Direct quantity update for prize products (products with a parent) */
   quantity?: number;
+  /** Preferred supplier ID for lead time calculations */
+  preferredSupplierId?: string;
+  /** True if auto-assigned from delivery, false if manually set */
+  preferredSupplierAuto?: boolean;
 }
 
 // User types
@@ -309,6 +342,7 @@ export interface ShipmentItem {
 export interface Shipment {
   id: string;
   shipmentNumber: string;
+  supplierId?: string;
   supplierName?: string;
   status: ShipmentStatus;
   orderDate: string;
@@ -335,6 +369,7 @@ export interface ShipmentItemRequest {
 
 export interface ShipmentRequest {
   shipmentNumber: string;
+  supplierId?: string;
   supplierName?: string;
   status?: ShipmentStatus;
   orderDate: string;

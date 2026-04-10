@@ -189,4 +189,22 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "AND s.expectedDeliveryDate IS NOT NULL " +
             "AND s.expectedDeliveryDate < CURRENT_DATE")
     long countOverdueShipments(@Param("statuses") List<ShipmentStatus> statuses);
+
+    /**
+     * Find the last delivered supplier for a product.
+     * Returns [supplier_id, supplier_display_name] or null if no delivered shipments.
+     * Filters to active suppliers only.
+     */
+    @Query(value = """
+        SELECT s.id, s.display_name
+        FROM shipments sh
+        JOIN shipment_items si ON si.shipment_id = sh.id
+        JOIN suppliers s ON s.id = sh.supplier_id
+        WHERE si.item_id = :productId
+          AND sh.status = 'DELIVERED'
+          AND s.is_active = true
+        ORDER BY sh.actual_delivery_date DESC NULLS LAST
+        LIMIT 1
+        """, nativeQuery = true)
+    Object[] findLastDeliveredSupplierByProductId(@Param("productId") UUID productId);
 }

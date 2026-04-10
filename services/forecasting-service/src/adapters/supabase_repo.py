@@ -132,13 +132,14 @@ class SupabaseRepo:
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:
         """Load products (items) from database.
 
-        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days
+        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days, preferred_supplier_id
         """
         query = """
             SELECT
                 id::text AS item_id,
                 name,
                 lead_time_days,
+                preferred_supplier_id::text AS preferred_supplier_id,
                 COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
             FROM products
             WHERE is_active = true
@@ -154,12 +155,13 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "lead_time_days", "safety_stock_days"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "preferred_supplier_id"]
             )
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = df["lead_time_days"].fillna(14).astype(int)
         df["safety_stock_days"] = df["safety_stock_days"].fillna(7).astype(int)
+        # preferred_supplier_id can be null
         return df
 
     def get_current_inventory(self, item_ids: list[str] | None = None) -> pd.DataFrame:
@@ -293,6 +295,47 @@ class SupabaseRepo:
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = pd.to_numeric(df["lead_time_days"], errors="coerce")
+        return df
+
+    def get_lead_time_mv_stats(
+        self,
+        item_ids: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """Load lead time statistics from materialized view.
+
+        Returns DataFrame with columns: item_id, supplier_id, n, avg_lt, sigma_L
+        The MV aggregates shipment lead times per (item, supplier) combination.
+        """
+        query = """
+            SELECT
+                item_id::text AS item_id,
+                supplier_id::text AS supplier_id,
+                n,
+                avg_lt,
+                sigma_L
+            FROM mv_lead_time_stats
+        """
+        params: dict = {}
+
+        if item_ids:
+            query += " WHERE item_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+
+        try:
+            with self._engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception:
+            logger.warning("Failed to query mv_lead_time_stats (MV may not exist yet)")
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        df["item_id"] = df["item_id"].astype(str)
+        df["supplier_id"] = df["supplier_id"].astype(str)
+        df["n"] = df["n"].fillna(0).astype(int)
+        df["avg_lt"] = pd.to_numeric(df["avg_lt"], errors="coerce")
+        df["sigma_L"] = pd.to_numeric(df["sigma_L"], errors="coerce")
         return df
 
     def get_historical_forecasts(

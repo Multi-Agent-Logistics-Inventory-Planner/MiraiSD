@@ -6,11 +6,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,6 +117,13 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
      * Delete all display records for a product (e.g. when deleting the product).
      */
     void deleteByProduct_Id(UUID productId);
+
+    /**
+     * Batch delete all display records for multiple products (optimized for N+1 prevention).
+     */
+    @Modifying
+    @Query("DELETE FROM MachineDisplay md WHERE md.product.id IN :productIds")
+    void deleteAllByProductIdIn(@Param("productIds") Collection<UUID> productIds);
 
     // ========= New methods using unified location_id FK =========
 

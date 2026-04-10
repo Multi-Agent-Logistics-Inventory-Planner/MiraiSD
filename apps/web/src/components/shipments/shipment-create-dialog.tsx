@@ -35,6 +35,7 @@ import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
 import { ProductForm } from "@/components/products/product-form";
 import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
+import { SupplierAutocomplete } from "@/components/suppliers";
 import { useCreateShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -64,6 +65,7 @@ const itemSchema = z.object({
 
 const schema = z.object({
   shipmentNumber: z.string().min(1, "Shipment Name is required"),
+  supplierId: z.string().optional(),
   supplierName: z.string().optional(),
   orderDate: z.string().min(1, "Order date is required"),
   expectedDeliveryDate: z.string().optional(),
@@ -192,6 +194,7 @@ export function ShipmentCreateDialog({
 
         form.reset({
           shipmentNumber: initialShipment.shipmentNumber,
+          supplierId: initialShipment.supplierId ?? "",
           supplierName: initialShipment.supplierName ?? "",
           orderDate: initialShipment.orderDate,
           expectedDeliveryDate: initialShipment.expectedDeliveryDate ?? "",
@@ -213,6 +216,7 @@ export function ShipmentCreateDialog({
         // Create mode: fresh form
         form.reset({
           shipmentNumber: "",
+          supplierId: "",
           supplierName: "",
           orderDate: format(new Date(), "yyyy-MM-dd"),
           expectedDeliveryDate: "",
@@ -304,6 +308,7 @@ export function ShipmentCreateDialog({
     try {
       const payload = {
         shipmentNumber: values.shipmentNumber,
+        supplierId: values.supplierId || undefined,
         supplierName: values.supplierName || undefined,
         status: initialShipment?.status ?? ShipmentStatus.PENDING,
         orderDate: values.orderDate,
@@ -416,11 +421,15 @@ export function ShipmentCreateDialog({
                   )}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="supplierName">Supplier Name</Label>
-                  <Input
-                    id="supplierName"
-                    placeholder="Optional"
-                    {...form.register("supplierName")}
+                  <Label>Supplier</Label>
+                  <SupplierAutocomplete
+                    value={form.watch("supplierId") || null}
+                    displayValue={form.watch("supplierName") || null}
+                    onChange={(supplierId, displayName) => {
+                      form.setValue("supplierId", supplierId ?? "");
+                      form.setValue("supplierName", displayName ?? "");
+                    }}
+                    placeholder="Select supplier (optional)"
                   />
                 </div>
               </div>

@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.shipment;
 
+import com.mirai.inventoryservice.models.Supplier;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import jakarta.persistence.*;
@@ -34,6 +35,20 @@ public class Shipment {
 
     @Column(name = "supplier_name")
     private String supplierName;
+
+    /**
+     * Reference to normalized supplier entity.
+     * May be null for legacy shipments before supplier normalization.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
+    /**
+     * Direct access to FK column to avoid lazy loading when only ID is needed.
+     */
+    @Column(name = "supplier_id", insertable = false, updatable = false)
+    private UUID supplierId;
 
     @NotNull
     @Enumerated(EnumType.STRING)

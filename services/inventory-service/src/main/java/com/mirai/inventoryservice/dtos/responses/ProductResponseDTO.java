@@ -34,6 +34,12 @@ public class ProductResponseDTO {
     private Integer reorderPoint;
     private Integer targetStockLevel;
     private Integer leadTimeDays;
+    private UUID preferredSupplierId;
+    private String preferredSupplierName;
+    private Boolean preferredSupplierAuto;
+    // Last delivered supplier for "Use Auto" feature (only populated for single product fetch)
+    private UUID lastDeliveredSupplierId;
+    private String lastDeliveredSupplierName;
     private BigDecimal unitCost;
     private Boolean isActive;
     private Integer quantity;

@@ -30,7 +30,8 @@ public class GlobalExceptionHandler {
             ProductNotFoundException.class,
             ShipmentNotFoundException.class,
             ShipmentItemNotFoundException.class,
-            CategoryNotFoundException.class
+            CategoryNotFoundException.class,
+            SupplierNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()
