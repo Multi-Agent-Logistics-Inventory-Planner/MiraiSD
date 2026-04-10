@@ -9,6 +9,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +17,7 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,6 +63,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     List<StockMovement> findByMetadataSource(@Param("source") String source);
 
     void deleteByItem_Id(UUID productId);
+
+    // Batch delete all stock movements for multiple products (optimized for N+1 prevention)
+    @Modifying
+    @Query("DELETE FROM StockMovement sm WHERE sm.item.id IN :itemIds")
+    void deleteAllByItemIdIn(@Param("itemIds") Collection<UUID> itemIds);
 
     /**
      * Product Assistant drill-down. Returns a projection so Hibernate never

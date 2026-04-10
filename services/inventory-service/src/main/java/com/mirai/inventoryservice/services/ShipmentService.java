@@ -12,6 +12,7 @@ import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
 import com.mirai.inventoryservice.exceptions.SiteNotFoundException;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.Site;
+import com.mirai.inventoryservice.models.Supplier;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -61,6 +62,7 @@ public class ShipmentService {
     private final AuditLogService auditLogService;
     private final SupabaseBroadcastService broadcastService;
     private final EventOutboxService eventOutboxService;
+    private final SupplierService supplierService;
 
     private static final String DEFAULT_SITE_CODE = "MAIN";
 
@@ -80,7 +82,8 @@ public class ShipmentService {
             StockMovementService stockMovementService,
             AuditLogService auditLogService,
             SupabaseBroadcastService broadcastService,
-            EventOutboxService eventOutboxService) {
+            EventOutboxService eventOutboxService,
+            SupplierService supplierService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productRepository = productRepository;
@@ -97,12 +100,21 @@ public class ShipmentService {
         this.auditLogService = auditLogService;
         this.broadcastService = broadcastService;
         this.eventOutboxService = eventOutboxService;
+        this.supplierService = supplierService;
     }
 
     public Shipment createShipment(ShipmentRequestDTO requestDTO) {
+        // Resolve supplier from supplier name (creates if not exists)
+        Supplier supplier = null;
+        String supplierName = requestDTO.getSupplierName();
+        if (supplierName != null && !supplierName.isBlank()) {
+            supplier = supplierService.resolveOrCreate(supplierName);
+        }
+
         Shipment shipment = Shipment.builder()
                 .shipmentNumber(requestDTO.getShipmentNumber())
-                .supplierName(requestDTO.getSupplierName())
+                .supplierName(supplier != null ? supplier.getDisplayName() : supplierName)
+                .supplier(supplier)
                 .status(requestDTO.getStatus() != null ? requestDTO.getStatus() : ShipmentStatus.PENDING)
                 .orderDate(requestDTO.getOrderDate())
                 .expectedDeliveryDate(requestDTO.getExpectedDeliveryDate())
@@ -225,7 +237,14 @@ public class ShipmentService {
             shipment.setShipmentNumber(requestDTO.getShipmentNumber());
         }
         if (requestDTO.getSupplierName() != null) {
-            shipment.setSupplierName(requestDTO.getSupplierName());
+            // Resolve supplier from supplier name (creates if not exists)
+            if (!requestDTO.getSupplierName().isBlank()) {
+                Supplier supplier = supplierService.resolveOrCreate(requestDTO.getSupplierName());
+                shipment.setSupplier(supplier);
+                shipment.setSupplierName(supplier != null ? supplier.getDisplayName() : requestDTO.getSupplierName());
+            } else {
+                shipment.setSupplierName(requestDTO.getSupplierName());
+            }
         }
         if (requestDTO.getStatus() != null) {
             shipment.setStatus(requestDTO.getStatus());
@@ -545,6 +564,11 @@ public class ShipmentService {
         // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
         if (allItemsFullyReceived) {
             shipment.setStatus(ShipmentStatus.DELIVERED);
+
+            // Auto-assign preferred supplier to products in this shipment
+            if (shipment.getSupplier() != null) {
+                autoAssignPreferredSupplier(shipment);
+            }
 
             // Create notification for shipment completion
             List<String> productNames = shipment.getItems().stream()
@@ -934,6 +958,40 @@ public class ShipmentService {
         } else {
             inventory.setQuantity(newQuantity);
             locationInventoryRepository.save(inventory);
+        }
+    }
+
+    /**
+     * Auto-assign the shipment's supplier as the preferred supplier for all products in the shipment.
+     * Sets preferred_supplier_auto = true to indicate this was auto-assigned (not manually set).
+     * Respects manual selections: only updates if no supplier set OR not explicitly manual (auto != false).
+     *
+     * Optimized to batch all product updates in a single saveAll() call instead of N individual saves.
+     */
+    private void autoAssignPreferredSupplier(Shipment shipment) {
+        Supplier supplier = shipment.getSupplier();
+        if (supplier == null) {
+            return;
+        }
+
+        List<Product> productsToUpdate = new ArrayList<>();
+
+        for (ShipmentItem item : shipment.getItems()) {
+            Product product = item.getItem();
+            if (product != null) {
+                // Only auto-assign if no supplier OR not explicitly manual
+                // Treats null as "auto" for backward compatibility with existing data
+                if (product.getPreferredSupplierId() == null ||
+                    !Boolean.FALSE.equals(product.getPreferredSupplierAuto())) {
+                    product.setPreferredSupplier(supplier);
+                    product.setPreferredSupplierAuto(true);
+                    productsToUpdate.add(product);
+                }
+            }
+        }
+
+        if (!productsToUpdate.isEmpty()) {
+            productRepository.saveAll(productsToUpdate);
         }
     }
 }

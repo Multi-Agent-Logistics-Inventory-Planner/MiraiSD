@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ import {
   ShipmentFilters,
   ShipmentPagination,
 } from "@/components/shipments";
+import { SuppliersTab } from "@/components/suppliers";
 import { useShipments, useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
 import { useDeleteShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -32,11 +33,14 @@ import type { SortOption } from "@/components/shipments/shipment-filters";
 
 const PAGE_SIZE = 5;
 
+type PageView = "shipments" | "suppliers";
+
 export default function ShipmentsPage() {
   const { toast } = useToast();
   const deleteMutation = useDeleteShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
 
+  const [pageView, setPageView] = useState<PageView>("shipments");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
@@ -158,59 +162,74 @@ export default function ShipmentsPage() {
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       <ShipmentHeader />
 
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList>
-            <TabsTrigger value="ACTIVE">
-              Active ({statusCounts.ACTIVE})
-            </TabsTrigger>
-            <TabsTrigger value="PARTIAL">
-              Partial ({statusCounts.PARTIAL})
-            </TabsTrigger>
-            <TabsTrigger value="COMPLETED">
-              Completed ({statusCounts.COMPLETED})
-            </TabsTrigger>
-          </TabsList>
+      {/* Top-level view selector */}
+      <Tabs value={pageView} onValueChange={(v) => setPageView(v as PageView)}>
+        <TabsList>
+          <TabsTrigger value="shipments">Shipments</TabsTrigger>
+          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+        </TabsList>
 
-          <ShipmentFilters
-            search={searchQuery}
-            onSearchChange={handleSearchChange}
-            sortOption={sortOption}
-            onSortChange={handleSortChange}
-            onAddClick={() => {
-              setSelectedShipment(null);
-              setCreateDialogOpen(true);
-            }}
+        <TabsContent value="suppliers" className="mt-4">
+          <SuppliersTab />
+        </TabsContent>
+
+        <TabsContent value="shipments" className="mt-4 space-y-4">
+          {/* Shipment status tabs */}
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <TabsList>
+                <TabsTrigger value="ACTIVE">
+                  Active ({statusCounts.ACTIVE})
+                </TabsTrigger>
+                <TabsTrigger value="PARTIAL">
+                  Partial ({statusCounts.PARTIAL})
+                </TabsTrigger>
+                <TabsTrigger value="COMPLETED">
+                  Completed ({statusCounts.COMPLETED})
+                </TabsTrigger>
+              </TabsList>
+
+              <ShipmentFilters
+                search={searchQuery}
+                onSearchChange={handleSearchChange}
+                sortOption={sortOption}
+                onSortChange={handleSortChange}
+                onAddClick={() => {
+                  setSelectedShipment(null);
+                  setCreateDialogOpen(true);
+                }}
+              />
+            </div>
+          </Tabs>
+
+          {shipmentsQuery.error ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Could not load shipments</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {shipmentsQuery.error instanceof Error
+                  ? shipmentsQuery.error.message
+                  : "Unknown error"}
+              </CardContent>
+            </Card>
+          ) : (
+            <ShipmentsList
+              shipments={shipments}
+              isLoading={shipmentsQuery.isLoading}
+              onShipmentClick={handleRowClick}
+            />
+          )}
+
+          <ShipmentPagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={totalElements}
+            isLoading={shipmentsQuery.isLoading}
+            onPageChange={setPage}
           />
-        </div>
+        </TabsContent>
       </Tabs>
-
-      {shipmentsQuery.error ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Could not load shipments</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {shipmentsQuery.error instanceof Error
-              ? shipmentsQuery.error.message
-              : "Unknown error"}
-          </CardContent>
-        </Card>
-      ) : (
-        <ShipmentsList
-          shipments={shipments}
-          isLoading={shipmentsQuery.isLoading}
-          onShipmentClick={handleRowClick}
-        />
-      )}
-
-      <ShipmentPagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalItems={totalElements}
-        isLoading={shipmentsQuery.isLoading}
-        onPageChange={setPage}
-      />
 
       {/* Dialogs and Sheets */}
       <ShipmentCreateDialog

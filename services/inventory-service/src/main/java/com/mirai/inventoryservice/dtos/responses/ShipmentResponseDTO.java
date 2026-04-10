@@ -20,6 +20,7 @@ public class ShipmentResponseDTO {
     private UUID id;
     private String shipmentNumber;
     private String supplierName;
+    private UUID supplierId;
     private ShipmentStatus status;
     private LocalDate orderDate;
     private LocalDate expectedDeliveryDate;

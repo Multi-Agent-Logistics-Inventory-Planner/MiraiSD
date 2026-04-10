@@ -43,6 +43,7 @@ import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import { PrizeTableInline, type PendingPrize } from "./prize-table-inline";
+import { SupplierAutocomplete } from "@/components/suppliers";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import { LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
@@ -66,6 +67,9 @@ const schema = z.object({
   imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
+  preferredSupplierId: z.string().optional(),
+  preferredSupplierName: z.string().optional(),
+  preferredSupplierAuto: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -161,6 +165,9 @@ export function ProductForm({
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
+          preferredSupplierId: initialProduct.preferredSupplierId ?? "",
+          preferredSupplierName: initialProduct.preferredSupplierName ?? "",
+          preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
         });
       } else {
         // It's a root category
@@ -178,6 +185,9 @@ export function ProductForm({
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
+          preferredSupplierId: initialProduct.preferredSupplierId ?? "",
+          preferredSupplierName: initialProduct.preferredSupplierName ?? "",
+          preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
         });
       }
       resetImage(initialProduct.imageUrl);
@@ -266,6 +276,8 @@ export function ProductForm({
       imageUrl,
       notes: values.notes || undefined,
       isActive: values.isActive,
+      preferredSupplierId: values.preferredSupplierId || undefined,
+      preferredSupplierAuto: values.preferredSupplierAuto,
     };
 
     try {
@@ -545,6 +557,70 @@ export function ProductForm({
                   </div>
                 )}
               </div>
+
+              {/* Preferred Supplier - hide for child products */}
+              {!parentId && (
+                <div className="grid gap-2">
+                  <Label>
+                    Preferred Supplier{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                    {form.watch("preferredSupplierAuto") && (
+                      <span className="ml-2 text-xs text-muted-foreground">(auto)</span>
+                    )}
+                  </Label>
+                  <SupplierAutocomplete
+                    value={form.watch("preferredSupplierId") || null}
+                    displayValue={form.watch("preferredSupplierName") || null}
+                    onChange={(supplierId, displayName) => {
+                      form.setValue("preferredSupplierId", supplierId ?? "");
+                      form.setValue("preferredSupplierName", displayName ?? "");
+                      // Manual selection sets auto to false
+                      form.setValue("preferredSupplierAuto", false);
+                    }}
+                    placeholder="Select preferred supplier..."
+                  />
+                  {/* Show auto-suggestion when manually assigned */}
+                  {form.watch("preferredSupplierAuto") === false && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {initialProduct?.lastDeliveredSupplierName ? (
+                        <>
+                          <span>Auto would use: {initialProduct.lastDeliveredSupplierName}</span>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => {
+                              form.setValue("preferredSupplierId", initialProduct.lastDeliveredSupplierId ?? "");
+                              form.setValue("preferredSupplierName", initialProduct.lastDeliveredSupplierName ?? "");
+                              form.setValue("preferredSupplierAuto", true);
+                            }}
+                          >
+                            [Use Auto]
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span>Supplier was manually set</span>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => {
+                              form.setValue("preferredSupplierId", "");
+                              form.setValue("preferredSupplierName", "");
+                              form.setValue("preferredSupplierAuto", true);
+                            }}
+                          >
+                            [Enable Auto]
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className={canViewCosts ? "grid grid-cols-2 gap-4" : ""}>
                 <div className="grid gap-2">
