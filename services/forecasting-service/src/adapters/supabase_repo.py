@@ -456,3 +456,45 @@ class SupabaseRepo:
 
         logger.info("Upserted %d forecast predictions", len(rows))
         return len(rows)
+
+    def update_product_reorder_points(self, forecasts_df: pd.DataFrame) -> int:
+        """Propagate forecast-computed reorder points to the products table.
+
+        Extracts reorder_point from the features dict of each forecast row
+        and updates products.reorder_point so that alerts and UI reflect
+        the dynamically computed threshold instead of the static default.
+
+        Returns number of products updated.
+        """
+        if forecasts_df.empty:
+            return 0
+
+        rows = []
+        for _, row in forecasts_df.iterrows():
+            features = row.get("features")
+            if not isinstance(features, dict):
+                continue
+            rop = features.get("reorder_point")
+            if rop is None:
+                continue
+            rows.append({
+                "item_id": str(row["item_id"]),
+                "reorder_point": int(round(float(rop))),
+            })
+
+        if not rows:
+            return 0
+
+        update_query = """
+            UPDATE products
+            SET reorder_point = :reorder_point,
+                updated_at = NOW()
+            WHERE id = CAST(:item_id AS uuid)
+        """
+
+        with self._engine.begin() as conn:
+            result = conn.execute(text(update_query), rows)
+            updated = result.rowcount
+
+        logger.info("Updated reorder_point for %d products", updated)
+        return updated
