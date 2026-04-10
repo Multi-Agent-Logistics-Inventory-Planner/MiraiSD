@@ -1,0 +1,16 @@
+{
+  "name": "mirai-scripts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "One-off maintenance scripts. Not part of the app build.",
+  "scripts": {
+    "backfill:images:dry": "node backfill_product_images_webp.mjs --dry-run",
+    "backfill:images": "node backfill_product_images_webp.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "pg": "^8.13.0",
+    "sharp": "^0.33.5"
+  }
+}

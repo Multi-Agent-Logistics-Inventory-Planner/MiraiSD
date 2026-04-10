@@ -85,7 +85,7 @@ export function ProductFilterHeader({
 
   return (
     <div className="shrink-0 flex flex-col gap-2 mb-2">
-      <Label className="text-xs sm:text-sm text-muted-foreground">
+      <Label className="text-xs sm:text-sm dark:text-muted-foreground">
         {title} ({itemCount})
       </Label>
 
@@ -109,7 +109,7 @@ export function ProductFilterHeader({
               <Button
                 variant={hasActiveFilters ? "default" : "outline"}
                 size="sm"
-                className="shrink-0 h-9 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
+                className="shrink-0 h-9 border dark:bg-input dark:border-border dark:text-muted-foreground"
                 disabled={disabled}
               >
                 <SlidersHorizontal className="h-4 w-4 sm:mr-2" />
@@ -197,7 +197,7 @@ export function ProductFilterHeader({
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 h-9 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
+              className="shrink-0 h-9 border dark:bg-input dark:border-border dark:text-muted-foreground"
               onClick={onAddClick}
               disabled={disabled}
             >

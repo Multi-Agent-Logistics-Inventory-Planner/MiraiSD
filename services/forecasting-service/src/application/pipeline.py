@@ -163,6 +163,18 @@ class ForecastingPipeline:
         # Step 7: Save to database
         saved = self._repo.upsert_forecasts(forecasts_df)
         logger.info("Saved %d forecast predictions", saved)
+
+        # Step 8: Propagate dynamic reorder points to products table.
+        # Wrapped in try/except so a DB failure here does not crash the pipeline
+        # after forecasts were already committed in Step 7.
+        try:
+            updated = self._repo.update_product_reorder_points(forecasts_df)
+            logger.info("Propagated reorder points for %d products", updated)
+        except Exception:
+            logger.exception(
+                "Failed to propagate reorder points; forecasts were saved"
+            )
+
         return saved
 
     def run_all(self) -> int:
@@ -371,20 +383,15 @@ class ForecastingPipeline:
         )
 
         # Confidence: blend variability score with MAPE when available
-        # Use log-dampened ratio to avoid extreme penalty for slow movers
-        raw_ratio = sigma_d_hat / np.maximum(mu_hat, config.EPSILON_MU)
-        dampened_ratio = np.log1p(raw_ratio) / np.log1p(10)
-        variability_score = (1.0 - np.minimum(1.0, dampened_ratio)).clip(lower=0.2)
-
+        variability_score = 1.0 - np.minimum(1.0, sigma_d_hat / np.maximum(mu_hat, 0.1))
         if "mape" in merged.columns:
             has_mape = merged["mape"].notna()
-            clamped_mape = merged["mape"].fillna(0.0).clip(lower=0.0, upper=1.0)
-            mape_score = 1.0 - clamped_mape
+            mape_score = (1.0 - merged["mape"].fillna(0.0)).clip(lower=0.0)
             confidence = pd.Series(variability_score, index=merged.index)
-            confidence[has_mape] = 0.5 * variability_score[has_mape] + 0.5 * mape_score[has_mape]
+            confidence[has_mape] = 0.4 * variability_score[has_mape] + 0.6 * mape_score[has_mape]
         else:
             confidence = variability_score
-        confidence = np.round(confidence.clip(lower=0.3), 3)
+        confidence = np.round(confidence, 3)
 
         # Vectorized order date computation
         lead_time_arr = (
@@ -527,9 +534,9 @@ class ForecastingPipeline:
             else:
                 order_date = None  # No urgency
 
-            # Confidence based on data quality (simple heuristic)
-            confidence = min(1.0, sigma_d_hat / max(mu_hat, 0.1))
-            confidence = 1.0 - confidence  # Higher sigma = lower confidence
+            # Confidence: sigmoid-like variability score
+            cv = sigma_d_hat / max(mu_hat, 0.1)
+            confidence = 1.0 / (1.0 + cv)
 
             forecasts.append(
                 {
