@@ -84,6 +84,9 @@ public class Product {
     @Column(name = "unit_cost", precision = 10, scale = 2)
     private BigDecimal unitCost;
 
+    @Column(name = "msrp", precision = 10, scale = 2)
+    private BigDecimal msrp;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;

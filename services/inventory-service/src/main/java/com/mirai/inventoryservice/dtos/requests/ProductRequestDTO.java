@@ -47,6 +47,8 @@ public class ProductRequestDTO {
 
     private BigDecimal unitCost;
 
+    private BigDecimal msrp;
+
     @Pattern(
         regexp = "^(https://[a-zA-Z0-9-]+\\.supabase\\.co/storage/v1/object/public/product-images/[a-zA-Z0-9._-]+)?$",
         message = "Image URL must be from Supabase storage"

@@ -76,7 +76,7 @@ public class ProductService {
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
                                  String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
-                                 BigDecimal unitCost, String imageUrl, String notes,
+                                 BigDecimal unitCost, BigDecimal msrp, String imageUrl, String notes,
                                  Integer initialStock) {
         // Validate parent if provided
         Product parent = null;
@@ -117,6 +117,7 @@ public class ProductService {
                 .targetStockLevel(targetStockLevel != null ? targetStockLevel : 50)
                 .leadTimeDays(leadTimeDays != null ? leadTimeDays : 14)
                 .unitCost(unitCost)
+                .msrp(msrp)
                 .imageUrl(imageUrl)
                 .notes(notes)
                 .isActive(startsActive)
@@ -193,7 +194,7 @@ public class ProductService {
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
                                  String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
-                                 BigDecimal unitCost, String imageUrl, String notes,
+                                 BigDecimal unitCost, BigDecimal msrp, String imageUrl, String notes,
                                  Boolean clearParent, Integer quantity,
                                  UUID preferredSupplierId, Boolean preferredSupplierAuto,
                                  Boolean clearPreferredSupplier) {
@@ -240,6 +241,7 @@ public class ProductService {
         if (targetStockLevel != null) product.setTargetStockLevel(targetStockLevel);
         if (leadTimeDays != null) product.setLeadTimeDays(leadTimeDays);
         if (unitCost != null) product.setUnitCost(unitCost);
+        if (msrp != null) product.setMsrp(msrp);
         if (imageUrl != null) product.setImageUrl(imageUrl);
         if (notes != null) product.setNotes(notes);
         // Allow direct quantity update only for prize products (products with a parent)
