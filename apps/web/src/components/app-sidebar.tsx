@@ -50,7 +50,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
-import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -314,12 +313,7 @@ export function AppSidebar() {
                   <span className="text-sm font-medium truncate">
                     {user.personName || user.email}
                   </span>
-                  <span className={cn(
-                    "text-[10px] text-white px-2 py-0.5 rounded-sm w-fit",
-                    user.role === UserRole.ASSISTANT_MANAGER
-                      ? "bg-[#f97316] dark:bg-[#ea580c]"
-                      : "bg-[#0b66c2] dark:bg-[#7c3aed]"
-                  )}>
+                  <span className="text-[10px] px-2 py-0.5 rounded-sm w-fit bg-brand-primary text-white">
                     {user.role === UserRole.ASSISTANT_MANAGER ? "ASM" : user.role}
                   </span>
                 </div>
