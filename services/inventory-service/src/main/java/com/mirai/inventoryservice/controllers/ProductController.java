@@ -100,6 +100,7 @@ public class ProductController {
                 requestDTO.getTargetStockLevel(),
                 requestDTO.getLeadTimeDays(),
                 requestDTO.getUnitCost(),
+                requestDTO.getMsrp(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
                 requestDTO.getInitialStock()
@@ -127,6 +128,7 @@ public class ProductController {
                 requestDTO.getTargetStockLevel(),
                 requestDTO.getLeadTimeDays(),
                 requestDTO.getUnitCost(),
+                requestDTO.getMsrp(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
                 clearParent,

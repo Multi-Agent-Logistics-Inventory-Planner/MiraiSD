@@ -186,6 +186,7 @@ export interface Product {
   targetStockLevel?: number;
   leadTimeDays?: number;
   unitCost?: number;
+  msrp?: number;
   isActive: boolean;
   quantity: number;
   imageUrl?: string;
@@ -207,6 +208,7 @@ export interface ProductRequest {
   targetStockLevel?: number;
   leadTimeDays?: number;
   unitCost?: number;
+  msrp?: number;
   isActive?: boolean;
   imageUrl?: string;
   notes?: string;

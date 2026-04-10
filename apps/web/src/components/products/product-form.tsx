@@ -64,6 +64,7 @@ const schema = z.object({
   targetStockLevel: z.coerce.number().int().min(0).optional(),
   leadTimeDays: z.coerce.number().int().min(0).optional(),
   unitCost: z.coerce.number().min(0).optional(),
+  msrp: z.coerce.number().min(0).optional(),
   imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -136,6 +137,7 @@ export function ProductForm({
       targetStockLevel: undefined,
       leadTimeDays: undefined,
       unitCost: undefined,
+      msrp: undefined,
       imageUrl: "",
       notes: "",
       isActive: true,
@@ -162,6 +164,7 @@ export function ProductForm({
           targetStockLevel: initialProduct.targetStockLevel ?? undefined,
           leadTimeDays: initialProduct.leadTimeDays ?? undefined,
           unitCost: initialProduct.unitCost ?? undefined,
+          msrp: initialProduct.msrp ?? undefined,
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
@@ -182,6 +185,7 @@ export function ProductForm({
           targetStockLevel: initialProduct.targetStockLevel ?? undefined,
           leadTimeDays: initialProduct.leadTimeDays ?? undefined,
           unitCost: initialProduct.unitCost ?? undefined,
+          msrp: initialProduct.msrp ?? undefined,
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
@@ -273,6 +277,7 @@ export function ProductForm({
       targetStockLevel: values.targetStockLevel,
       leadTimeDays: values.leadTimeDays,
       unitCost: values.unitCost,
+      msrp: values.msrp,
       imageUrl,
       notes: values.notes || undefined,
       isActive: values.isActive,
@@ -643,20 +648,38 @@ export function ProductForm({
                 </div>
 
                 {canViewCosts && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="unitCost">
-                      Unit Cost{" "}
-                      <span className="text-muted-foreground font-normal">
-                        (optional)
-                      </span>
-                    </Label>
-                    <Input
-                      id="unitCost"
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...form.register("unitCost")}
-                    />
+                  <div className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="unitCost">
+                        Unit Cost{" "}
+                        <span className="text-muted-foreground font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="unitCost"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...form.register("unitCost")}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="msrp">
+                        MSRP{" "}
+                        <span className="text-muted-foreground font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="msrp"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...form.register("msrp")}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
