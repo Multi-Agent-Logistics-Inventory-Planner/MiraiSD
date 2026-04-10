@@ -371,15 +371,20 @@ class ForecastingPipeline:
         )
 
         # Confidence: blend variability score with MAPE when available
-        variability_score = 1.0 - np.minimum(1.0, sigma_d_hat / np.maximum(mu_hat, 0.1))
+        # Use log-dampened ratio to avoid extreme penalty for slow movers
+        raw_ratio = sigma_d_hat / np.maximum(mu_hat, config.EPSILON_MU)
+        dampened_ratio = np.log1p(raw_ratio) / np.log1p(10)
+        variability_score = (1.0 - np.minimum(1.0, dampened_ratio)).clip(lower=0.2)
+
         if "mape" in merged.columns:
             has_mape = merged["mape"].notna()
-            mape_score = (1.0 - merged["mape"].fillna(0.0)).clip(lower=0.0)
+            clamped_mape = merged["mape"].fillna(0.0).clip(lower=0.0, upper=1.0)
+            mape_score = 1.0 - clamped_mape
             confidence = pd.Series(variability_score, index=merged.index)
-            confidence[has_mape] = 0.4 * variability_score[has_mape] + 0.6 * mape_score[has_mape]
+            confidence[has_mape] = 0.5 * variability_score[has_mape] + 0.5 * mape_score[has_mape]
         else:
             confidence = variability_score
-        confidence = np.round(confidence, 3)
+        confidence = np.round(confidence.clip(lower=0.3), 3)
 
         # Vectorized order date computation
         lead_time_arr = (

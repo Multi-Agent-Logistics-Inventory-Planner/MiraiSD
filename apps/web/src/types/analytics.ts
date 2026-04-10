@@ -1,9 +1,10 @@
 export enum AnalyticsTab {
+  OVERVIEW = "overview",
   PREDICTIONS = "predictions",
-  INSIGHTS = "insights",
-  DEMAND_LEADERS = "demand-leaders",
-  LEGACY = "legacy",
-  NOTIFICATIONS = "notifications",
+  // Archived tabs (moved to _archive folder)
+  // DEMAND_LEADERS = "demand-leaders",
+  // LEGACY = "legacy",
+  // NOTIFICATIONS = "notifications",
 }
 
 // Predictions Types - Demand-based metrics for reorder decisions
@@ -68,6 +69,8 @@ export interface Mover {
   previousPeriodUnits: number
   percentChange: number
   direction: MoverDirection
+  demandVelocity: number | null
+  displayConfidence: number | null
 }
 
 export interface PeriodSummary {

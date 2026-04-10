@@ -127,4 +127,30 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
      */
     @EntityGraph(value = "MachineDisplay.withProduct")
     Page<MachineDisplay> findByLocation_IdOrderByStartedAtDesc(UUID locationId, Pageable pageable);
+
+    // ========= Analytics methods =========
+
+    /**
+     * Calculate total display days per product within a date range.
+     * Handles partial overlaps with period boundaries.
+     * Returns [product_id, display_days] pairs.
+     */
+    @Query(value = """
+        SELECT md.product_id,
+               SUM(
+                   GREATEST(0,
+                       EXTRACT(EPOCH FROM (
+                           LEAST(COALESCE(md.ended_at, :endDate), :endDate) -
+                           GREATEST(md.started_at, :startDate)
+                       )) / 86400.0
+                   )
+               ) as display_days
+        FROM machine_display md
+        WHERE md.started_at < :endDate
+          AND (md.ended_at IS NULL OR md.ended_at > :startDate)
+        GROUP BY md.product_id
+        """, nativeQuery = true)
+    List<Object[]> calculateDisplayDaysByProduct(
+        @Param("startDate") OffsetDateTime startDate,
+        @Param("endDate") OffsetDateTime endDate);
 }

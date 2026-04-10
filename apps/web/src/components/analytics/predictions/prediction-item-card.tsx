@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Warehouse, Activity, Timer, X, Undo2, Target } from "lucide-react";
+import { Package, Warehouse, Activity, Timer, X, Undo2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
@@ -16,13 +16,9 @@ import {
   getDemandCategory,
   getDemandCategoryStyle,
   formatCoverageContext,
-  getConfidenceLevel,
-  getConfidenceLevelStyle,
-  formatAccuracy,
-  getAccuracyColor,
 } from "@/lib/utils/format-forecast";
-import { METRIC_TOOLTIPS, BADGE_TOOLTIPS, CONFIDENCE_TOOLTIPS } from "./help-content";
-import type { DemandCategory, ConfidenceLevel } from "@/lib/utils/format-forecast";
+import { METRIC_TOOLTIPS, BADGE_TOOLTIPS } from "./help-content";
+import type { DemandCategory } from "@/lib/utils/format-forecast";
 
 interface PredictionItemCardProps {
   item: ActionItem;
@@ -38,24 +34,7 @@ function formatDate(dateStr: string | null): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatTimeAgo(isoString: string | null): string | null {
-  if (!isoString) return null;
-  const date = new Date(isoString);
-  if (isNaN(date.getTime())) return null;
-  const diffMs = Date.now() - date.getTime();
-  if (diffMs < 0) return "just now";
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
 export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestore }: PredictionItemCardProps) {
-  const forecastAge = formatTimeAgo(item.computedAt);
-  const confidenceLevel = getConfidenceLevel(item.confidence);
   return (
     <Card className={cn(
       "bg-card hover:bg-card/50 transition-colors border border-border dark:border-none shadow-none p-2 pr-3 relative group",
@@ -130,23 +109,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                 </Tooltip>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {forecastAge && <span>Forecast: {forecastAge}</span>}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={cn(
-                    "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium cursor-help",
-                    getConfidenceLevelStyle(confidenceLevel)
-                  )}>
-                    {confidenceLevel} confidence
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {CONFIDENCE_TOOLTIPS[confidenceLevel as ConfidenceLevel]}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex flex-wrap gap-8 mt-1 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-4 mt-1 text-sm text-muted-foreground">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="flex items-center gap-1 font-light cursor-help">
@@ -172,20 +135,6 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   {METRIC_TOOLTIPS.demandVelocity}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex items-center gap-1 font-light cursor-help">
-                    <Target className="h-4 w-4" />
-                    <span className={cn("font-medium font-mono", getAccuracyColor(item.forecastAccuracy))}>
-                      {formatAccuracy(item.forecastAccuracy)}
-                    </span>
-                    <span>accurate</span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {METRIC_TOOLTIPS.accuracy}
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -279,22 +228,6 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                   </Tooltip>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                {forecastAge && <span>Forecast: {forecastAge}</span>}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={cn(
-                      "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium cursor-help",
-                      getConfidenceLevelStyle(confidenceLevel)
-                    )}>
-                      {confidenceLevel}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {CONFIDENCE_TOOLTIPS[confidenceLevel as ConfidenceLevel]}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
             </div>
           </div>
 
@@ -324,19 +257,6 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
               </TooltipTrigger>
               <TooltipContent side="top">
                 {METRIC_TOOLTIPS.demandVelocity}
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex items-center gap-1 font-light cursor-help">
-                  <Target className="h-3.5 w-3.5" />
-                  <span className={cn("font-medium font-mono", getAccuracyColor(item.forecastAccuracy))}>
-                    {formatAccuracy(item.forecastAccuracy)}
-                  </span>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {METRIC_TOOLTIPS.accuracy}
               </TooltipContent>
             </Tooltip>
             <Tooltip>

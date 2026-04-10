@@ -26,6 +26,7 @@ import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -63,9 +65,12 @@ public class AnalyticsService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
     private final DailySalesRollupRepository dailySalesRollupRepository;
+    private final MachineDisplayRepository machineDisplayRepository;
 
     private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final int MOVERS_LIMIT = 10;
+    private static final double MIN_DISPLAY_DAYS = 3.0;
+    private static final double PERIOD_DAYS = 30.0;
     private static final int CATEGORY_RANKINGS_LIMIT = 5;
     private static final BigDecimal MU_HAT_EPSILON = new BigDecimal("0.001");
     private static final BigDecimal MAX_DAYS = new BigDecimal("365");
@@ -519,7 +524,7 @@ public class AnalyticsService {
 
     /**
      * Get insights with demand-based metrics.
-     * Category performance uses demand velocity instead of revenue.
+     * Top movers use ACV-weighted velocity (demandVelocity × displayConfidence).
      */
     @Cacheable(CacheConfig.INSIGHTS_CACHE)
     @Transactional(readOnly = true)
@@ -543,9 +548,20 @@ public class AnalyticsService {
         Map<UUID, Product> productMap = allProducts.stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
 
+        // Fetch display days for current period (for ACV-weighted velocity)
+        OffsetDateTime currentStartOdt = currentPeriodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime todayOdt = today.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+        Map<UUID, Double> currentDisplayDays = machineDisplayRepository
+            .calculateDisplayDaysByProduct(currentStartOdt, todayOdt)
+            .stream()
+            .collect(Collectors.toMap(
+                row -> (UUID) row[0],
+                row -> ((Number) row[1]).doubleValue()
+            ));
+
         List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
-        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap);
-        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false, productMap);
+        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap, featuresMap, currentDisplayDays);
+        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false, productMap, featuresMap, currentDisplayDays);
         PeriodSummary currentPeriod = computePeriodSummaryWithDemand(rollups, currentPeriodStart, today, "Last 30 Days", featuresMap);
         PeriodSummary previousPeriod = computePeriodSummaryWithDemand(rollups, previousPeriodStart, currentPeriodStart.minusDays(1), "Previous 30 Days", featuresMap);
 
@@ -598,28 +614,49 @@ public class AnalyticsService {
         return patterns;
     }
 
+    /**
+     * Compute movers using ACV-weighted velocity ranking.
+     * Score = demandVelocity × displayConfidence × (1 + growthBonus)
+     */
     private List<Mover> computeMoversFromRollups(
             List<DailySalesRollup> rollups,
             LocalDate currentStart, LocalDate previousStart, LocalDate endDate,
-            boolean topMovers, Map<UUID, Product> productMap) {
+            boolean topMovers, Map<UUID, Product> productMap,
+            Map<UUID, ForecastFeatures> featuresMap,
+            Map<UUID, Double> currentDisplayDays) {
 
-        Map<UUID, Integer> currentPeriod = new HashMap<>();
-        Map<UUID, Integer> previousPeriod = new HashMap<>();
+        Map<UUID, Integer> currentPeriodUnits = new HashMap<>();
+        Map<UUID, Integer> previousPeriodUnits = new HashMap<>();
 
         for (DailySalesRollup rollup : rollups) {
             LocalDate date = rollup.getRollupDate();
             if (!date.isBefore(currentStart) && !date.isAfter(endDate)) {
-                currentPeriod.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+                currentPeriodUnits.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
             } else if (!date.isBefore(previousStart) && date.isBefore(currentStart)) {
-                previousPeriod.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
+                previousPeriodUnits.merge(rollup.getItemId(), rollup.getUnitsSold(), Integer::sum);
             }
         }
 
         List<Mover> movers = new ArrayList<>();
-        for (UUID itemId : currentPeriod.keySet()) {
-            int current = currentPeriod.get(itemId);
-            int previous = previousPeriod.getOrDefault(itemId, 0);
+        for (UUID itemId : currentPeriodUnits.keySet()) {
+            int current = currentPeriodUnits.get(itemId);
+            int previous = previousPeriodUnits.getOrDefault(itemId, 0);
             if (previous == 0 && current == 0) continue;
+
+            // Skip products with insufficient display history
+            Double displayDays = currentDisplayDays.getOrDefault(itemId, 0.0);
+            if (displayDays < MIN_DISPLAY_DAYS) continue;
+
+            BigDecimal displayConfidence = BigDecimal.valueOf(Math.min(displayDays / PERIOD_DAYS, 1.0))
+                .setScale(2, RoundingMode.HALF_UP);
+
+            // Get demand velocity from forecast, fallback to estimated from sales
+            ForecastFeatures features = featuresMap.get(itemId);
+            BigDecimal demandVelocity = features != null ? features.muHat() : null;
+            if (demandVelocity == null && current > 0 && displayDays > 0) {
+                demandVelocity = BigDecimal.valueOf(current / displayDays)
+                    .setScale(2, RoundingMode.HALF_UP);
+            }
 
             BigDecimal percentChange;
             MoverDirection direction;
@@ -644,12 +681,23 @@ public class AnalyticsService {
                 current,
                 previous,
                 percentChange,
-                direction
+                direction,
+                demandVelocity,
+                displayConfidence
             ));
         }
 
+        // ACV-weighted velocity comparator with growth bonus
         Comparator<Mover> comparator = topMovers
-            ? Comparator.comparing(Mover::percentChange).reversed()
+            ? Comparator.comparing((Mover m) -> {
+                BigDecimal velocity = m.demandVelocity() != null ? m.demandVelocity() : BigDecimal.ZERO;
+                BigDecimal confidence = m.displayConfidence() != null ? m.displayConfidence() : BigDecimal.ZERO;
+                BigDecimal baseScore = velocity.multiply(confidence);
+                double growthBonus = m.percentChange().doubleValue() > 0
+                    ? Math.min(m.percentChange().doubleValue() / 100.0, 0.5)
+                    : 0.0;
+                return baseScore.multiply(BigDecimal.valueOf(1.0 + growthBonus));
+            }).reversed()
             : Comparator.comparing(Mover::percentChange);
 
         List<Mover> sortedMovers = movers.stream()
@@ -660,7 +708,8 @@ public class AnalyticsService {
 
         return assignRanks(sortedMovers, (rank, m) -> new Mover(
             rank, m.itemId(), m.name(), m.imageUrl(), m.categoryName(),
-            m.currentPeriodUnits(), m.previousPeriodUnits(), m.percentChange(), m.direction()
+            m.currentPeriodUnits(), m.previousPeriodUnits(), m.percentChange(), m.direction(),
+            m.demandVelocity(), m.displayConfidence()
         ));
     }
 

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Activity,
-  Bell,
-  Lightbulb,
-  TrendingDown,
-  Wrench,
-} from "lucide-react";
+import { LayoutDashboard, TrendingDown } from "lucide-react";
 import {
   ScrollableTabs,
   type TabConfig,
@@ -15,30 +9,14 @@ import { AnalyticsTab } from "@/types/analytics";
 
 const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
   {
-    value: AnalyticsTab.INSIGHTS,
-    label: "Insights",
-    icon: Lightbulb,
+    value: AnalyticsTab.OVERVIEW,
+    label: "Overview",
+    icon: LayoutDashboard,
   },
   {
     value: AnalyticsTab.PREDICTIONS,
     label: "Stockout Predictions",
     icon: TrendingDown,
-  },
-  {
-    value: AnalyticsTab.DEMAND_LEADERS,
-    label: "Demand Leaders",
-    icon: Activity,
-    adminOnly: true,
-  },
-  {
-    value: AnalyticsTab.LEGACY,
-    label: "Legacy",
-    icon: Wrench,
-  },
-  {
-    value: AnalyticsTab.NOTIFICATIONS,
-    label: "Notifications",
-    icon: Bell,
   },
 ];
 

@@ -9,13 +9,11 @@ import { AnalyticsTab } from "@/types/analytics"
 import {
   AnalyticsTabs,
   TabPredictions,
-  TabInsights,
-  TabDemandLeaders,
-  TabLegacy,
-  TabNotifications,
+  TabOverview,
 } from "./_components"
 
-const ADMIN_ONLY_TABS = new Set([AnalyticsTab.DEMAND_LEADERS])
+// Old tab values that should redirect to overview
+const DEPRECATED_TABS = ["insights", "demand-leaders", "legacy", "notifications"]
 
 function isValidTab(value: string | null): value is AnalyticsTab {
   return Object.values(AnalyticsTab).includes(value as AnalyticsTab)
@@ -29,14 +27,14 @@ function AnalyticsContent() {
   const { user } = useAuth()
   const isAdmin = user?.role === UserRole.ADMIN
 
-  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.INSIGHTS
-
-  // Redirect non-admins from admin-only tabs
+  // Redirect deprecated tabs to overview
   useEffect(() => {
-    if (!isAdmin && ADMIN_ONLY_TABS.has(currentTab)) {
-      router.replace("/analytics?tab=insights")
+    if (tabParam && DEPRECATED_TABS.includes(tabParam)) {
+      router.replace("/analytics?tab=overview")
     }
-  }, [isAdmin, currentTab, router])
+  }, [tabParam, router])
+
+  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.OVERVIEW
 
   // Track which tabs have been visited (lazy mount - only mount on first visit)
   const [mountedTabs, setMountedTabs] = useState<Set<AnalyticsTab>>(
@@ -61,22 +59,11 @@ function AnalyticsContent() {
         onValueChange={handleTabChange}
         isAdmin={isAdmin}
       />
-      <div className={currentTab !== AnalyticsTab.INSIGHTS ? "hidden" : undefined}>
-        {mountedTabs.has(AnalyticsTab.INSIGHTS) && <TabInsights />}
+      <div className={currentTab !== AnalyticsTab.OVERVIEW ? "hidden" : undefined}>
+        {mountedTabs.has(AnalyticsTab.OVERVIEW) && <TabOverview />}
       </div>
       <div className={currentTab !== AnalyticsTab.PREDICTIONS ? "hidden" : undefined}>
         {mountedTabs.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
-      </div>
-      {isAdmin && (
-        <div className={currentTab !== AnalyticsTab.DEMAND_LEADERS ? "hidden" : undefined}>
-          {mountedTabs.has(AnalyticsTab.DEMAND_LEADERS) && <TabDemandLeaders />}
-        </div>
-      )}
-      <div className={currentTab !== AnalyticsTab.LEGACY ? "hidden" : undefined}>
-        {mountedTabs.has(AnalyticsTab.LEGACY) && <TabLegacy isAdmin={isAdmin} />}
-      </div>
-      <div className={currentTab !== AnalyticsTab.NOTIFICATIONS ? "hidden" : undefined}>
-        {mountedTabs.has(AnalyticsTab.NOTIFICATIONS) && <TabNotifications />}
       </div>
     </div>
   )
