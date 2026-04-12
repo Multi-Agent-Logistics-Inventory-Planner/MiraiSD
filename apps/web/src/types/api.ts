@@ -53,6 +53,9 @@ export enum StockMovementReason {
   RESTOCK = "RESTOCK",
   SHIPMENT_RECEIPT = "SHIPMENT_RECEIPT",
   SHIPMENT_RECEIPT_REVERSED = "SHIPMENT_RECEIPT_REVERSED",
+  SHIPMENT_PARTIAL_RECEIPT = "SHIPMENT_PARTIAL_RECEIPT",
+  SHIPMENT_EDITED = "SHIPMENT_EDITED",
+  SHIPMENT_DELETED = "SHIPMENT_DELETED",
   SALE = "SALE",
   DAMAGE = "DAMAGE",
   ADJUSTMENT = "ADJUSTMENT",
@@ -69,6 +72,7 @@ export enum ShipmentStatus {
   IN_TRANSIT = "IN_TRANSIT",
   DELIVERED = "DELIVERED",
   CANCELLED = "CANCELLED",
+  DELIVERY_FAILED = "DELIVERY_FAILED",
 }
 
 export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
@@ -76,16 +80,18 @@ export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
   [ShipmentStatus.IN_TRANSIT]: "In Transit",
   [ShipmentStatus.DELIVERED]: "Delivered",
   [ShipmentStatus.CANCELLED]: "Cancelled",
+  [ShipmentStatus.DELIVERY_FAILED]: "Delivery Failed",
 };
 
 export const SHIPMENT_STATUS_VARIANTS: Record<
   ShipmentStatus,
-  "default" | "secondary" | "destructive" | "outline"
+  "default" | "secondary" | "destructive" | "outline" | "warning"
 > = {
   [ShipmentStatus.PENDING]: "outline",
   [ShipmentStatus.IN_TRANSIT]: "secondary",
   [ShipmentStatus.DELIVERED]: "default",
   [ShipmentStatus.CANCELLED]: "destructive",
+  [ShipmentStatus.DELIVERY_FAILED]: "warning",
 };
 
 export enum UserRole {
@@ -102,6 +108,7 @@ export enum NotificationType {
   SYSTEM_ALERT = "SYSTEM_ALERT",
   SHIPMENT_COMPLETED = "SHIPMENT_COMPLETED",
   SHIPMENT_DAMAGED = "SHIPMENT_DAMAGED",
+  SHIPMENT_DELIVERY_FAILED = "SHIPMENT_DELIVERY_FAILED",
   DISPLAY_STALE = "DISPLAY_STALE",
 }
 

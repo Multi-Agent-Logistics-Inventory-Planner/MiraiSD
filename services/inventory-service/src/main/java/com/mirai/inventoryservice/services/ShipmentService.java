@@ -195,7 +195,7 @@ public class ShipmentService {
     /**
      * List shipments by display status with pagination.
      * Display statuses are: ACTIVE (pending with no received items), PARTIAL (partially received),
-     * COMPLETED (fully delivered).
+     * COMPLETED (fully delivered), FAILED (delivery failed).
      */
     public Page<Shipment> listShipmentsByDisplayStatus(String displayStatus, String search, Pageable pageable) {
         String searchPattern = (search != null && !search.isBlank()) ? "%" + search.toLowerCase() + "%" : null;
@@ -210,6 +210,9 @@ public class ShipmentService {
             case "COMPLETED" -> searchPattern != null
                     ? shipmentRepository.findCompletedShipmentsWithSearch(ShipmentStatus.DELIVERED, searchPattern, pageable)
                     : shipmentRepository.findCompletedShipments(ShipmentStatus.DELIVERED, pageable);
+            case "FAILED" -> searchPattern != null
+                    ? shipmentRepository.findByStatusAndSearch(ShipmentStatus.DELIVERY_FAILED, searchPattern, pageable)
+                    : shipmentRepository.findByStatusPaged(ShipmentStatus.DELIVERY_FAILED, pageable);
             default -> listShipmentsPaged(null, search, pageable);
         };
     }
@@ -222,6 +225,7 @@ public class ShipmentService {
         counts.put("ACTIVE", shipmentRepository.countActiveShipments(PENDING_STATUSES));
         counts.put("PARTIAL", shipmentRepository.countPartialShipments(PENDING_STATUSES));
         counts.put("COMPLETED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERED));
+        counts.put("FAILED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERY_FAILED));
         counts.put("OVERDUE", shipmentRepository.countOverdueShipments(PENDING_STATUSES));
         return counts;
     }
@@ -230,8 +234,21 @@ public class ShipmentService {
         return shipmentRepository.findByItemsContainingProduct(productId);
     }
 
+    /**
+     * Update shipment without audit logging (for backward compatibility)
+     */
     public Shipment updateShipment(UUID id, ShipmentRequestDTO requestDTO) {
+        return updateShipment(id, requestDTO, null, null);
+    }
+
+    /**
+     * Update shipment with audit logging
+     */
+    public Shipment updateShipment(UUID id, ShipmentRequestDTO requestDTO, UUID actorId, String actorName) {
         Shipment shipment = getShipmentById(id);
+
+        // Capture before state for audit
+        ShipmentSnapshot before = captureShipmentSnapshot(shipment);
 
         if (requestDTO.getShipmentNumber() != null) {
             shipment.setShipmentNumber(requestDTO.getShipmentNumber());
@@ -345,17 +362,35 @@ public class ShipmentService {
 
         Shipment savedShipment = shipmentRepository.save(shipment);
 
+        // Capture after state and create audit for any changes
+        ShipmentSnapshot after = captureShipmentSnapshot(savedShipment);
+        createShipmentEditAudit(savedShipment, before, after, actorId, actorName);
+
         // Broadcast real-time update to connected clients
         broadcastService.broadcastShipmentUpdated();
 
         return savedShipment;
     }
 
+    /**
+     * Delete shipment without audit logging (for backward compatibility)
+     */
     public void deleteShipment(UUID id) {
+        deleteShipment(id, null, null);
+    }
+
+    /**
+     * Delete shipment with audit logging
+     */
+    public void deleteShipment(UUID id, UUID actorId, String actorName) {
         Shipment shipment = getShipmentById(id);
         if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
             throw new InvalidShipmentStatusException("Cannot delete a delivered shipment");
         }
+
+        // Create audit before deleting (captures full shipment details)
+        createShipmentDeletionAudit(shipment, actorId, actorName);
+
         shipmentRepository.delete(shipment);
 
         // Broadcast real-time update to connected clients
@@ -397,6 +432,10 @@ public class ShipmentService {
                 .collect(Collectors.toMap(ShipmentItem::getId, Function.identity()));
 
         Set<UUID> affectedProductIds = new java.util.HashSet<>();
+
+        // Track what was received in this batch for audit
+        List<String> receivedItemSummaries = new ArrayList<>();
+        int totalReceivedInBatch = 0;
 
         for (ReceiveShipmentRequestDTO.ItemReceiptDTO receipt : requestDTO.getItemReceipts()) {
             ShipmentItem shipmentItem = shipmentItemMap.get(receipt.getShipmentItemId());
@@ -476,6 +515,14 @@ public class ShipmentService {
             shipmentItem.setDamagedQuantity(newDamagedQuantity);
             shipmentItem.setDisplayQuantity(newDisplayQuantity);
             shipmentItem.setShopQuantity(newShopQuantity);
+
+            // Track for audit: what was received in this batch
+            int receivedInThisBatch = quantityToReceive + damagedQuantity + displayQuantity + shopQuantity;
+            if (receivedInThisBatch > 0) {
+                String itemName = shipmentItem.getItem().getName();
+                receivedItemSummaries.add(itemName + " (" + receivedInThisBatch + ")");
+                totalReceivedInBatch += receivedInThisBatch;
+            }
 
             // Create notification for damaged items
             if (damagedQuantity > 0) {
@@ -600,12 +647,29 @@ public class ShipmentService {
         }
 
         // Set receivedBy if provided
+        User receivedByUser = null;
         if (requestDTO.getReceivedBy() != null) {
-            userRepository.findById(requestDTO.getReceivedBy())
-                    .ifPresent(shipment::setReceivedBy);
+            receivedByUser = userRepository.findById(requestDTO.getReceivedBy()).orElse(null);
+            if (receivedByUser != null) {
+                shipment.setReceivedBy(receivedByUser);
+            }
         }
 
         Shipment savedShipment = shipmentRepository.save(shipment);
+
+        // Create partial receipt audit if anything was received
+        if (!receivedItemSummaries.isEmpty()) {
+            UUID auditActorId = receivedByUser != null ? receivedByUser.getId() : validatedActorId;
+            String auditActorName = receivedByUser != null ? receivedByUser.getFullName() : null;
+            createPartialReceiptAudit(
+                    savedShipment,
+                    receivedItemSummaries,
+                    totalReceivedInBatch,
+                    allItemsFullyReceived,
+                    auditActorId,
+                    auditActorName
+            );
+        }
 
         // Ensure product quantity/isActive denormalized fields stay in sync for UI reads
         stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
@@ -993,5 +1057,240 @@ public class ShipmentService {
         if (!productsToUpdate.isEmpty()) {
             productRepository.saveAll(productsToUpdate);
         }
+    }
+
+    // ============================================================
+    // Shipment Audit Helper Methods
+    // ============================================================
+
+    /**
+     * Snapshot of shipment state for change detection
+     */
+    private record ShipmentSnapshot(
+            String shipmentNumber,
+            String supplierName,
+            ShipmentStatus status,
+            java.time.LocalDate orderDate,
+            java.time.LocalDate expectedDeliveryDate,
+            java.time.LocalDate actualDeliveryDate,
+            java.math.BigDecimal totalCost,
+            String notes,
+            String trackingId,
+            List<ItemSnapshot> items
+    ) {}
+
+    private record ItemSnapshot(
+            UUID productId,
+            String productName,
+            int orderedQuantity
+    ) {}
+
+    /**
+     * Capture current shipment state for comparison
+     */
+    private ShipmentSnapshot captureShipmentSnapshot(Shipment shipment) {
+        List<ItemSnapshot> items = shipment.getItems().stream()
+                .map(item -> new ItemSnapshot(
+                        item.getItem().getId(),
+                        item.getItem().getName(),
+                        item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0
+                ))
+                .toList();
+
+        return new ShipmentSnapshot(
+                shipment.getShipmentNumber(),
+                shipment.getSupplierName(),
+                shipment.getStatus(),
+                shipment.getOrderDate(),
+                shipment.getExpectedDeliveryDate(),
+                shipment.getActualDeliveryDate(),
+                shipment.getTotalCost(),
+                shipment.getNotes(),
+                shipment.getTrackingId(),
+                items
+        );
+    }
+
+    /**
+     * Create audit log for shipment edit, capturing all changes
+     */
+    private void createShipmentEditAudit(
+            Shipment shipment,
+            ShipmentSnapshot before,
+            ShipmentSnapshot after,
+            UUID actorId,
+            String actorName
+    ) {
+        List<String> changes = new ArrayList<>();
+
+        // Compare scalar fields
+        if (!java.util.Objects.equals(before.supplierName(), after.supplierName())) {
+            changes.add("Supplier: " + nvl(before.supplierName()) + " -> " + nvl(after.supplierName()));
+        }
+        if (!java.util.Objects.equals(before.shipmentNumber(), after.shipmentNumber())) {
+            changes.add("Number: " + nvl(before.shipmentNumber()) + " -> " + nvl(after.shipmentNumber()));
+        }
+        if (!java.util.Objects.equals(before.status(), after.status())) {
+            changes.add("Status: " + before.status() + " -> " + after.status());
+        }
+        if (!java.util.Objects.equals(before.orderDate(), after.orderDate())) {
+            changes.add("Order Date: " + nvl(before.orderDate()) + " -> " + nvl(after.orderDate()));
+        }
+        if (!java.util.Objects.equals(before.expectedDeliveryDate(), after.expectedDeliveryDate())) {
+            changes.add("Expected Date: " + nvl(before.expectedDeliveryDate()) + " -> " + nvl(after.expectedDeliveryDate()));
+        }
+        if (!java.util.Objects.equals(before.actualDeliveryDate(), after.actualDeliveryDate())) {
+            changes.add("Actual Date: " + nvl(before.actualDeliveryDate()) + " -> " + nvl(after.actualDeliveryDate()));
+        }
+        if (!bigDecimalEquals(before.totalCost(), after.totalCost())) {
+            changes.add("Cost: " + nvl(before.totalCost()) + " -> " + nvl(after.totalCost()));
+        }
+        if (!java.util.Objects.equals(before.trackingId(), after.trackingId())) {
+            changes.add("Tracking: " + nvl(before.trackingId()) + " -> " + nvl(after.trackingId()));
+        }
+        if (!java.util.Objects.equals(before.notes(), after.notes())) {
+            changes.add("Notes updated");
+        }
+
+        // Compare items
+        Set<UUID> beforeProductIds = before.items().stream().map(ItemSnapshot::productId).collect(Collectors.toSet());
+        Set<UUID> afterProductIds = after.items().stream().map(ItemSnapshot::productId).collect(Collectors.toSet());
+
+        List<String> addedItems = after.items().stream()
+                .filter(item -> !beforeProductIds.contains(item.productId()))
+                .map(item -> item.productName() + " (" + item.orderedQuantity() + ")")
+                .toList();
+
+        List<String> removedItems = before.items().stream()
+                .filter(item -> !afterProductIds.contains(item.productId()))
+                .map(item -> item.productName() + " (" + item.orderedQuantity() + ")")
+                .toList();
+
+        if (!addedItems.isEmpty()) {
+            changes.add("Added: " + String.join(", ", addedItems));
+        }
+        if (!removedItems.isEmpty()) {
+            changes.add("Removed: " + String.join(", ", removedItems));
+        }
+
+        // Only create audit if there were actual changes
+        if (changes.isEmpty()) {
+            return;
+        }
+
+        String notesText = String.join(". ", changes);
+
+        auditLogService.createAuditLog(
+                actorId,
+                actorName,
+                StockMovementReason.SHIPMENT_EDITED,
+                null, null, null, null,
+                1,
+                0,
+                "Shipment " + shipment.getShipmentNumber(),
+                notesText
+        );
+    }
+
+    /**
+     * Create audit log for shipment deletion, capturing full details
+     */
+    private void createShipmentDeletionAudit(Shipment shipment, UUID actorId, String actorName) {
+        // Build summary of items being deleted
+        String itemsSummary = shipment.getItems().stream()
+                .map(item -> {
+                    int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
+                    int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+                    String name = item.getItem().getName();
+                    if (received > 0) {
+                        return name + " (ordered: " + ordered + ", received: " + received + ")";
+                    }
+                    return name + " (ordered: " + ordered + ")";
+                })
+                .collect(Collectors.joining(", "));
+
+        String notesText = String.format(
+                "Deleted shipment %s from %s. Items: %s",
+                shipment.getShipmentNumber(),
+                nvl(shipment.getSupplierName()),
+                itemsSummary.isEmpty() ? "none" : itemsSummary
+        );
+
+        auditLogService.createAuditLog(
+                actorId,
+                actorName,
+                StockMovementReason.SHIPMENT_DELETED,
+                null, null, null, null,
+                shipment.getItems().size(),
+                0,
+                "Shipment " + shipment.getShipmentNumber() + " (deleted)",
+                notesText
+        );
+    }
+
+    /**
+     * Create audit log for partial receipt
+     */
+    private void createPartialReceiptAudit(
+            Shipment shipment,
+            List<String> receivedItemSummaries,
+            int totalReceivedInBatch,
+            boolean isComplete,
+            UUID actorId,
+            String actorName
+    ) {
+        // Build remaining items summary
+        List<String> remainingItems = new ArrayList<>();
+        for (ShipmentItem item : shipment.getItems()) {
+            int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
+            int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
+            int damaged = item.getDamagedQuantity() != null ? item.getDamagedQuantity() : 0;
+            int display = item.getDisplayQuantity() != null ? item.getDisplayQuantity() : 0;
+            int shop = item.getShopQuantity() != null ? item.getShopQuantity() : 0;
+            int accountedFor = received + damaged + display + shop;
+            int remaining = ordered - accountedFor;
+            if (remaining > 0) {
+                remainingItems.add(item.getItem().getName() + " (" + remaining + ")");
+            }
+        }
+
+        StockMovementReason reason = isComplete
+                ? StockMovementReason.SHIPMENT_RECEIPT
+                : StockMovementReason.SHIPMENT_PARTIAL_RECEIPT;
+
+        String notesText;
+        if (isComplete) {
+            notesText = "Shipment fully received. Received: " + String.join(", ", receivedItemSummaries);
+        } else {
+            notesText = "Received: " + String.join(", ", receivedItemSummaries);
+            if (!remainingItems.isEmpty()) {
+                notesText += ". Remaining: " + String.join(", ", remainingItems);
+            }
+        }
+
+        auditLogService.createAuditLog(
+                actorId,
+                actorName,
+                reason,
+                null, null, null, null,
+                receivedItemSummaries.size(),
+                totalReceivedInBatch,
+                "Shipment " + shipment.getShipmentNumber(),
+                notesText
+        );
+    }
+
+    private String nvl(Object value) {
+        return value == null ? "(none)" : value.toString();
+    }
+
+    /**
+     * Compare BigDecimals by value (ignoring scale), handling nulls.
+     * Uses compareTo() instead of equals() since 153.00 should equal 153.
+     */
+    private boolean bigDecimalEquals(java.math.BigDecimal a, java.math.BigDecimal b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.compareTo(b) == 0;
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, PackageCheck, Truck, CircleCheck } from "lucide-react";
+import { Package, PackageCheck, Truck, CircleCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShipmentStatus } from "@/types/api";
 
@@ -10,7 +10,7 @@ interface ShipmentProgressProps {
   orderedQuantity: number;
 }
 
-type ProgressStage = "completed" | "active" | "pending";
+type ProgressStage = "completed" | "active" | "pending" | "error";
 
 interface StageConfig {
   icon: typeof Package;
@@ -30,6 +30,7 @@ const STAGES: StageConfig[] = [
  * - PENDING (no items received): Order placed (complete) → Packaging (active)
  * - PENDING (partial received) or IN_TRANSIT: On the Way (active)
  * - DELIVERED or fully received: All stages complete
+ * - DELIVERY_FAILED: Shows error state on delivery stage
  */
 function getStageStates(
   status: ShipmentStatus,
@@ -44,6 +45,11 @@ function getStageStates(
   // Stage 4: Delivered - all complete
   if (status === "DELIVERED" || isFullyReceived) {
     return ["completed", "completed", "completed", "completed"];
+  }
+
+  // Delivery failed - show error state on the delivery stage
+  if (status === "DELIVERY_FAILED") {
+    return ["completed", "completed", "completed", "error"];
   }
 
   // Stage 3: In Transit OR partial received - on the way is active
@@ -93,7 +99,7 @@ export function ShipmentProgress({
         {/* Stage icons */}
         {STAGES.map((stage, index) => {
           const state = stageStates[index];
-          const Icon = stage.icon;
+          const Icon = state === "error" ? AlertTriangle : stage.icon;
 
           return (
             <div
@@ -109,6 +115,8 @@ export function ShipmentProgress({
                     "border-brand-primary bg-background text-black dark:text-white",
                   state === "pending" &&
                     "border-muted-foreground/30 bg-background text-muted-foreground/50",
+                  state === "error" &&
+                    "border-red-500 bg-red-500 text-white",
                 )}
               >
                 <Icon className="h-4 w-4" />

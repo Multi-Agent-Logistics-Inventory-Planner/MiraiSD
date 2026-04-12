@@ -37,7 +37,7 @@ public class AuditLogService {
     private final SupabaseBroadcastService broadcastService;
 
     /**
-     * Create a new audit log entry
+     * Create a new audit log entry (looks up actor by ID)
      */
     @Transactional
     public AuditLog createAuditLog(
@@ -59,6 +59,53 @@ public class AuditLogService {
             actorName = user != null ? user.getFullName() : null;
         }
 
+        return createAuditLogInternal(user, actorName, reason, primaryFromLocationId,
+                primaryFromLocationCode, primaryToLocationId, primaryToLocationCode,
+                itemCount, totalQuantityMoved, productSummary, notes);
+    }
+
+    /**
+     * Create a new audit log entry with pre-resolved actor info (avoids redundant user lookup)
+     */
+    @Transactional
+    public AuditLog createAuditLog(
+            UUID actorId,
+            String actorName,
+            StockMovementReason reason,
+            UUID primaryFromLocationId,
+            String primaryFromLocationCode,
+            UUID primaryToLocationId,
+            String primaryToLocationCode,
+            int itemCount,
+            int totalQuantityMoved,
+            String productSummary,
+            String notes
+    ) {
+        // When actorName is provided, skip the user lookup to avoid redundant query
+        User user = null;
+        if (actorId != null && actorName == null) {
+            user = userRepository.findById(actorId).orElse(null);
+            actorName = user != null ? user.getFullName() : null;
+        }
+
+        return createAuditLogInternal(user, actorName, reason, primaryFromLocationId,
+                primaryFromLocationCode, primaryToLocationId, primaryToLocationCode,
+                itemCount, totalQuantityMoved, productSummary, notes);
+    }
+
+    private AuditLog createAuditLogInternal(
+            User user,
+            String actorName,
+            StockMovementReason reason,
+            UUID primaryFromLocationId,
+            String primaryFromLocationCode,
+            UUID primaryToLocationId,
+            String primaryToLocationCode,
+            int itemCount,
+            int totalQuantityMoved,
+            String productSummary,
+            String notes
+    ) {
         AuditLog auditLog = AuditLog.builder()
                 .user(user)
                 .actorName(actorName)

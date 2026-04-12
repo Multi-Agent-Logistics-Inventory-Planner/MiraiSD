@@ -202,14 +202,15 @@ public class EasyPostWebhookService {
             case "pre_transit", "unknown" -> ShipmentStatus.PENDING;
             case "in_transit", "out_for_delivery", "available_for_pickup" -> ShipmentStatus.IN_TRANSIT;
             case "delivered" -> ShipmentStatus.DELIVERED;
-            case "cancelled", "return_to_sender", "failure", "error" -> ShipmentStatus.CANCELLED;
+            case "cancelled", "return_to_sender" -> ShipmentStatus.CANCELLED;
+            case "failure", "error" -> ShipmentStatus.DELIVERY_FAILED;
             default -> ShipmentStatus.PENDING;
         };
     }
 
     /**
      * Create notification for tracking status changes.
-     * Only creates notifications for DELIVERED and CANCELLED (failure) statuses.
+     * Only creates notifications for DELIVERED, CANCELLED, and DELIVERY_FAILED statuses.
      */
     private void createTrackingNotification(
             Shipment shipment,
@@ -225,10 +226,15 @@ public class EasyPostWebhookService {
             type = NotificationType.SHIPMENT_COMPLETED;
             severity = NotificationSeverity.INFO;
             message = String.format("Shipment %s has been delivered", shipment.getShipmentNumber());
+        } else if (newStatus == ShipmentStatus.DELIVERY_FAILED) {
+            type = NotificationType.SHIPMENT_DELIVERY_FAILED;
+            severity = NotificationSeverity.WARNING;
+            message = String.format("Shipment %s delivery failed: %s",
+                    shipment.getShipmentNumber(), easyPostStatus);
         } else if (newStatus == ShipmentStatus.CANCELLED) {
             type = NotificationType.SHIPMENT_DAMAGED;
             severity = NotificationSeverity.WARNING;
-            message = String.format("Shipment %s delivery failed: %s",
+            message = String.format("Shipment %s was cancelled: %s",
                     shipment.getShipmentNumber(), easyPostStatus);
         } else {
             // No notification for other transitions (PENDING -> IN_TRANSIT)

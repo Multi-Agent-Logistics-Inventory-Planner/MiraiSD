@@ -19,6 +19,7 @@ import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.models.shipment.Shipment;
+import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.models.storage.Location;
 import com.mirai.inventoryservice.models.storage.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
@@ -1091,9 +1092,9 @@ public class DevSeedController {
                 totalQuantity += qty;
 
                 int quantityChange = switch (reason) {
-                    case SALE, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED -> -qty;
-                    case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT -> qty;
-                    case TRANSFER, ADJUSTMENT -> random.nextBoolean() ? qty : -qty;
+                    case SALE, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED, SHIPMENT_DELETED -> -qty;
+                    case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT, SHIPMENT_PARTIAL_RECEIPT -> qty;
+                    case TRANSFER, ADJUSTMENT, SHIPMENT_EDITED -> random.nextBoolean() ? qty : -qty;
                     case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> 0;
                 };
 
@@ -1448,5 +1449,133 @@ public class DevSeedController {
         if (index < 10) return LocationType.KEYCHAIN_MACHINE;
         if (index < 12) return LocationType.PUSHER_MACHINE;
         return LocationType.FOUR_CORNER_MACHINE;
+    }
+
+    /**
+     * Seed shipments for testing auditing features.
+     * Creates shipments in various states: PENDING, IN_TRANSIT, DELIVERED, DELIVERY_FAILED.
+     */
+    @PostMapping("/seed/shipments")
+    public ResponseEntity<Map<String, Object>> seedShipments() {
+        List<Product> products = productRepository.findAll();
+        if (products.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "No products found. Run /api/dev/seed/products first."
+            ));
+        }
+
+        String[] suppliers = {"Mirai Wholesale", "Japan Arcade Supply", "ACE Toys", "Pacific Imports"};
+        LocalDate today = LocalDate.now();
+        List<Shipment> shipments = new ArrayList<>();
+
+        // Create shipments with different statuses for testing
+        ShipmentStatus[] statuses = {
+            ShipmentStatus.PENDING,
+            ShipmentStatus.PENDING,
+            ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.DELIVERED,
+            ShipmentStatus.DELIVERY_FAILED
+        };
+
+        for (int i = 0; i < statuses.length; i++) {
+            LocalDate orderDate = today.minusDays(10 - i);
+            LocalDate expectedDelivery = orderDate.plusDays(5);
+            LocalDate actualDelivery = statuses[i] == ShipmentStatus.DELIVERED ? today.minusDays(1) : null;
+
+            Shipment shipment = Shipment.builder()
+                .shipmentNumber("TEST-SHIP-" + String.format("%03d", i + 1))
+                .supplierName(suppliers[i % suppliers.length])
+                .status(statuses[i])
+                .orderDate(orderDate)
+                .expectedDeliveryDate(expectedDelivery)
+                .actualDeliveryDate(actualDelivery)
+                .totalCost(BigDecimal.valueOf(100 + random.nextInt(400)))
+                .notes("Test shipment for auditing - " + statuses[i].name())
+                .build();
+
+            // Add 2-4 items per shipment
+            int itemCount = 2 + random.nextInt(3);
+            for (int j = 0; j < itemCount && j < products.size(); j++) {
+                Product product = products.get((i * 3 + j) % products.size());
+                int orderedQty = 5 + random.nextInt(10);
+                int receivedQty = 0;
+                if (statuses[i] == ShipmentStatus.DELIVERED) {
+                    receivedQty = orderedQty;
+                } else if (statuses[i] == ShipmentStatus.IN_TRANSIT && j == 0) {
+                    // Partially received for first item on IN_TRANSIT shipments
+                    receivedQty = orderedQty / 2;
+                }
+
+                ShipmentItem item = ShipmentItem.builder()
+                    .shipment(shipment)
+                    .item(product)
+                    .orderedQuantity(orderedQty)
+                    .receivedQuantity(receivedQty)
+                    .damagedQuantity(0)
+                    .displayQuantity(0)
+                    .shopQuantity(0)
+                    .unitCost(product.getUnitCost())
+                    .build();
+                shipment.getItems().add(item);
+            }
+
+            shipments.add(shipment);
+        }
+
+        shipmentRepository.saveAll(shipments);
+
+        log.info("Seeded {} test shipments with items", shipments.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "shipmentsCreated", shipments.size(),
+            "statusBreakdown", Map.of(
+                "PENDING", 2,
+                "IN_TRANSIT", 2,
+                "DELIVERED", 1,
+                "DELIVERY_FAILED", 1
+            )
+        ));
+    }
+
+    /**
+     * Seed test users for development
+     */
+    @PostMapping("/seed/users")
+    public ResponseEntity<Map<String, Object>> seedUsers() {
+        String[][] testUsers = {
+            {"admin@mirai.test", "Admin User", "ADMIN"},
+            {"manager@mirai.test", "Assistant Manager", "ASSISTANT_MANAGER"},
+            {"employee@mirai.test", "Employee User", "EMPLOYEE"}
+        };
+
+        List<User> createdUsers = new ArrayList<>();
+        for (String[] userData : testUsers) {
+            String email = userData[0];
+            String name = userData[1];
+            UserRole role = UserRole.valueOf(userData[2]);
+
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                user = User.builder()
+                    .email(email)
+                    .fullName(name)
+                    .role(role)
+                    .build();
+                user = userRepository.save(user);
+                createdUsers.add(user);
+            }
+        }
+
+        log.info("Seeded {} test users", createdUsers.size());
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "usersCreated", createdUsers.size(),
+            "users", createdUsers.stream()
+                .map(u -> Map.of("email", u.getEmail(), "name", u.getFullName(), "role", u.getRole().name()))
+                .toList()
+        ));
     }
 }

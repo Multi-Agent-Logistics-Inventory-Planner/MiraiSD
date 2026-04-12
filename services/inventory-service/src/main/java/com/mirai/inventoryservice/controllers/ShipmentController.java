@@ -5,8 +5,10 @@ import com.mirai.inventoryservice.dtos.mappers.ShipmentMapperDecorator;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
+import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import com.mirai.inventoryservice.services.ShipmentService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -17,9 +19,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -28,13 +32,36 @@ public class ShipmentController {
     private final ShipmentService shipmentService;
     private final ShipmentMapper shipmentMapper;
     private final ShipmentMapperDecorator shipmentMapperDecorator;
+    private final UserRepository userRepository;
 
     public ShipmentController(ShipmentService shipmentService, ShipmentMapper shipmentMapper,
-                              ShipmentMapperDecorator shipmentMapperDecorator) {
+                              ShipmentMapperDecorator shipmentMapperDecorator,
+                              UserRepository userRepository) {
         this.shipmentService = shipmentService;
         this.shipmentMapper = shipmentMapper;
         this.shipmentMapperDecorator = shipmentMapperDecorator;
+        this.userRepository = userRepository;
     }
+
+    /**
+     * Extract actor info from authentication for audit logging
+     */
+    @SuppressWarnings("unchecked")
+    private ActorInfo getActorInfo(Authentication authentication) {
+        if (authentication == null) {
+            return new ActorInfo(null, null);
+        }
+        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
+        String email = principal.get("email");
+        if (email == null) {
+            return new ActorInfo(null, null);
+        }
+        return userRepository.findByEmail(email)
+                .map(user -> new ActorInfo(user.getId(), user.getFullName()))
+                .orElse(new ActorInfo(null, null));
+    }
+
+    private record ActorInfo(UUID id, String name) {}
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
@@ -100,15 +127,18 @@ public class ShipmentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<ShipmentResponseDTO> updateShipment(
             @PathVariable UUID id,
-            @Valid @RequestBody ShipmentRequestDTO requestDTO) {
-        Shipment shipment = shipmentService.updateShipment(id, requestDTO);
+            @Valid @RequestBody ShipmentRequestDTO requestDTO,
+            Authentication authentication) {
+        ActorInfo actor = getActorInfo(authentication);
+        Shipment shipment = shipmentService.updateShipment(id, requestDTO, actor.id(), actor.name());
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
-    public ResponseEntity<Void> deleteShipment(@PathVariable UUID id) {
-        shipmentService.deleteShipment(id);
+    public ResponseEntity<Void> deleteShipment(@PathVariable UUID id, Authentication authentication) {
+        ActorInfo actor = getActorInfo(authentication);
+        shipmentService.deleteShipment(id, actor.id(), actor.name());
         return ResponseEntity.noContent().build();
     }
 

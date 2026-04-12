@@ -8,6 +8,7 @@ public enum NotificationType {
     SYSTEM_ALERT,
     SHIPMENT_COMPLETED,
     SHIPMENT_DAMAGED,
+    SHIPMENT_DELIVERY_FAILED,
     DISPLAY_STALE
 }
 

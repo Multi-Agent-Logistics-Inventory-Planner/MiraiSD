@@ -74,7 +74,7 @@ export default function ShipmentsPage() {
   const shipments = shipmentsQuery.data?.content ?? [];
   const totalElements = shipmentsQuery.data?.totalElements ?? 0;
 
-  const statusCounts = statusCountsQuery.data ?? { ACTIVE: 0, PARTIAL: 0, COMPLETED: 0 };
+  const statusCounts = statusCountsQuery.data ?? { ACTIVE: 0, PARTIAL: 0, COMPLETED: 0, FAILED: 0 };
 
   // Reset page when tab or search changes
   const handleTabChange = (value: string) => {
@@ -187,6 +187,11 @@ export default function ShipmentsPage() {
                 <TabsTrigger value="COMPLETED">
                   Completed ({statusCounts.COMPLETED})
                 </TabsTrigger>
+                {statusCounts.FAILED > 0 && (
+                  <TabsTrigger value="FAILED" className="text-destructive">
+                    Failed ({statusCounts.FAILED})
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <ShipmentFilters

@@ -9,7 +9,7 @@ import {
 
 const BASE_PATH = "/api/shipments";
 
-export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED";
+export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED" | "FAILED";
 
 // Type for the counts response (includes OVERDUE which overlaps with ACTIVE/PARTIAL)
 export type ShipmentStatusCounts = Record<ShipmentDisplayStatus | "OVERDUE", number>;
