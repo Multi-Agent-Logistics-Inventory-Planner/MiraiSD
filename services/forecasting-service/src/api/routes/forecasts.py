@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from ...adapters.supabase_repo import SupabaseRepo
+from ...application.backtester import run_backtest
 from ...application.pipeline import ForecastingPipeline
 
 # Configure logging
@@ -39,6 +40,41 @@ def trigger_forecast(
         raise HTTPException(
             status_code=500,
             detail={"error": "Forecast trigger failed", "code": "INTERNAL_ERROR"},
+        )
+
+
+@router.get("/backtest")
+def backtest_endpoint(
+    methods: str = Query(default="dow_weighted"),
+    horizon: int = Query(default=7, ge=1, le=30),
+    lookback: int = Query(default=45, ge=14, le=90),
+) -> dict:
+    """Run walk-forward backtest and return summary metrics.
+
+    Args:
+        methods: Comma-separated forecasting methods (e.g. "dow_weighted,ma14").
+        horizon: Forecast horizon in days.
+        lookback: Days of history to load.
+
+    Returns:
+        dict with method_summary, predictions_count, stockout_stats.
+    """
+    try:
+        method_list = [m.strip() for m in methods.split(",") if m.strip()]
+        repo = SupabaseRepo()
+        results = run_backtest(
+            repo=repo,
+            methods=method_list,
+            horizon_days=horizon,
+            lookback_days=lookback,
+        )
+        return results
+
+    except Exception as e:
+        logger.exception("Backtest failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Backtest failed", "code": "INTERNAL_ERROR"},
         )
 
 

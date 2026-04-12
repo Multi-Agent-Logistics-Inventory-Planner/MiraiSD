@@ -30,6 +30,19 @@ LEAD_TIME_MAX_SHIPMENTS = int(os.getenv("LEAD_TIME_MAX_SHIPMENTS", "10"))
 BACKTEST_HORIZON_DAYS = int(os.getenv("BACKTEST_HORIZON_DAYS", "14"))
 MAPE_EPSILON = float(os.getenv("MAPE_EPSILON", "0.1"))
 
+# Confidence formula: enable MAPE blending after 60-90 days of history
+CONFIDENCE_MAPE_ENABLED = os.getenv("CONFIDENCE_MAPE_ENABLED", "false").lower() == "true"
+
+# Stockout correction: minimum in-stock training days required to filter
+# stockout days. If an item has fewer in-stock days than this, all days
+# (including stockouts) are used to avoid noisy estimates from tiny samples.
+MIN_IN_STOCK_DAYS = int(os.getenv("MIN_IN_STOCK_DAYS", "7"))
+
+# Backtest evaluation: minimum in-stock days in test window required to
+# include an item-origin pair in accuracy metrics. Prevents measuring
+# predictions against unobservable demand in stockout-heavy test windows.
+MIN_TEST_IN_STOCK_DAYS = int(os.getenv("MIN_TEST_IN_STOCK_DAYS", "3"))
+
 # API settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "5000"))

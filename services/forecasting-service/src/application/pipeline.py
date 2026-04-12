@@ -105,14 +105,18 @@ class ForecastingPipeline:
             lookback_days,
         )
 
-        # Step 4: Build features
+        # Step 4: Build features (with stockout awareness)
         if movements_df.empty:
             logger.info("No movements found, using zero-demand baseline")
-            # Create zero-demand features for items with no history
             features_df = self._create_zero_demand_features(items_df)
         else:
-            # Build daily usage from movements
             daily_df = feat.build_daily_usage(movements_df)
+            stockout_df = feat.detect_stockout_days(movements_df)
+            if not stockout_df.empty:
+                daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
+                daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
+                stockout_pct = daily_df["is_stockout"].mean() * 100
+                logger.debug("Stockout rate: %.1f%% of item-days", stockout_pct)
             features_df = feat.build_stats(daily_df)
             logger.debug("Built features: %d rows", len(features_df))
 
@@ -123,6 +127,12 @@ class ForecastingPipeline:
 
         estimates_df = fc.estimate_mu_sigma(features_df, method="dow_weighted")
         logger.debug("Estimated demand for %d items (DOW-weighted)", len(estimates_df))
+
+        # Step 5a: Category-pooled fallback for cold-start items only
+        category_map = dict(zip(items_df["item_id"], items_df.get("category_name", "Unknown")))
+        items_with_history = set(features_df["item_id"].unique()) if not features_df.empty else set()
+        estimates_df = fc.apply_category_fallback(estimates_df, category_map, items_with_history)
+        logger.debug("Applied category fallback for cold-start items")
 
         # Step 5b: Compute backtest MAPE
         mape_df = pd.DataFrame(columns=["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"])
@@ -370,21 +380,19 @@ class ForecastingPipeline:
             target_days=config.TARGET_DAYS,
         )
 
-        # Confidence: blend variability score with MAPE when available
-        # Use log-dampened ratio to avoid extreme penalty for slow movers
-        raw_ratio = sigma_d_hat / np.maximum(mu_hat, config.EPSILON_MU)
-        dampened_ratio = np.log1p(raw_ratio) / np.log1p(10)
-        variability_score = (1.0 - np.minimum(1.0, dampened_ratio)).clip(lower=0.2)
+        # Confidence: 1/(1+CV) -- eliminates zero-confidence scores and
+        # correlates well with actual prediction accuracy per backtest results.
+        # MAPE blending disabled until system has 60-90 days of history.
+        cv = sigma_d_hat / np.maximum(mu_hat, config.EPSILON_MU)
+        confidence = np.round(1.0 / (1.0 + cv), 3)
 
-        if "mape" in merged.columns:
+        if config.CONFIDENCE_MAPE_ENABLED and "mape" in merged.columns:
             has_mape = merged["mape"].notna()
             clamped_mape = merged["mape"].fillna(0.0).clip(lower=0.0, upper=1.0)
             mape_score = 1.0 - clamped_mape
-            confidence = pd.Series(variability_score, index=merged.index)
-            confidence[has_mape] = 0.5 * variability_score[has_mape] + 0.5 * mape_score[has_mape]
-        else:
-            confidence = variability_score
-        confidence = np.round(confidence.clip(lower=0.3), 3)
+            confidence = pd.Series(confidence, index=merged.index)
+            confidence[has_mape] = 0.5 * confidence[has_mape] + 0.5 * mape_score[has_mape]
+            confidence = np.round(confidence, 3)
 
         # Vectorized order date computation
         lead_time_arr = (
