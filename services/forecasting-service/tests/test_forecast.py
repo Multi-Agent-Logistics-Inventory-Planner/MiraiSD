@@ -288,3 +288,51 @@ class TestApplyCategoryFallback:
         assert estimates.loc[estimates["item_id"] == "C", "mu_hat"].iloc[0] == original_c_mu
 
 
+# ---------------------------------------------------------------------------
+# Stockout filter disabled: all data used (matching main's superior approach)
+# ---------------------------------------------------------------------------
+
+class TestStockoutFilterDisabled:
+    def test_no_stockout_column_uses_all_data(self):
+        """Without is_stockout column (STOCKOUT_FILTER_ENABLED=false path),
+        all data including zeros is used in the mean.
+
+        The pipeline gates stockout detection: when disabled, is_stockout
+        column is never added, so all rows (including zero-consumption days
+        from stockouts) contribute to the estimate.
+        """
+        dates = pd.date_range("2025-11-03", periods=14, freq="D")
+        # 10 days at 5.0, 4 days at 0.0 (would be stockouts if detected)
+        consumption = [5.0] * 10 + [0.0] * 4
+
+        feats = pd.DataFrame({
+            "date": dates,
+            "item_id": ["A"] * 14,
+            "consumption": consumption,
+        })
+
+        result = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=0)
+        mu = result.iloc[0]["mu_hat"]
+
+        # Mean of all 14 days: (5*10 + 0*4) / 14 = 3.571
+        assert mu == pytest.approx(50.0 / 14.0, abs=0.1)
+
+    def test_stockout_column_present_with_guard_still_filters(self):
+        """When is_stockout IS present (STOCKOUT_FILTER_ENABLED=true path),
+        stockout days are excluded and in-stock mean is used."""
+        dates = pd.date_range("2025-11-03", periods=14, freq="D")
+        consumption = [5.0] * 10 + [0.0] * 4
+
+        feats = pd.DataFrame({
+            "date": dates,
+            "item_id": ["A"] * 14,
+            "consumption": consumption,
+            "is_stockout": [False] * 10 + [True] * 4,
+        })
+
+        result = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=7)
+        mu = result.iloc[0]["mu_hat"]
+
+        # Mean of 10 in-stock days: 5.0
+        assert mu == pytest.approx(5.0, abs=0.01)
+

@@ -44,6 +44,10 @@ MIN_IN_STOCK_DAYS = int(os.getenv("MIN_IN_STOCK_DAYS", "7"))
 # predictions against unobservable demand in stockout-heavy test windows.
 MIN_TEST_IN_STOCK_DAYS = int(os.getenv("MIN_TEST_IN_STOCK_DAYS", "3"))
 
+# Stockout filter: disabled by default. Enable once 60-90+ days of data
+# accumulate, at which point the bias correction outweighs the sample-size penalty.
+STOCKOUT_FILTER_ENABLED = os.getenv("STOCKOUT_FILTER_ENABLED", "false").lower() == "true"
+
 # API settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "5000"))

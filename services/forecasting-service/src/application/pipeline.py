@@ -108,18 +108,21 @@ class ForecastingPipeline:
             lookback_days,
         )
 
-        # Step 4: Build features (with stockout awareness)
+        # Step 4: Build features
         if movements_df.empty:
             logger.info("No movements found, using zero-demand baseline")
             features_df = self._create_zero_demand_features(items_df)
         else:
             daily_df = feat.build_daily_usage(movements_df)
-            stockout_df = feat.detect_stockout_days(movements_df)
-            if not stockout_df.empty:
-                daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
-                daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
-                stockout_pct = daily_df["is_stockout"].mean() * 100
-                logger.debug("Stockout rate: %.1f%% of item-days", stockout_pct)
+            # Stockout awareness: opt-in via config. With <60 days of data,
+            # excluding stockout days hurts accuracy (sample-size penalty > bias correction).
+            if config.STOCKOUT_FILTER_ENABLED:
+                stockout_df = feat.detect_stockout_days(movements_df)
+                if not stockout_df.empty:
+                    daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
+                    daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
+                    stockout_pct = daily_df["is_stockout"].mean() * 100
+                    logger.debug("Stockout filter ON: %.1f%% of item-days are stockout", stockout_pct)
             features_df = feat.build_stats(daily_df)
             logger.debug("Built features: %d rows", len(features_df))
 
@@ -128,11 +131,16 @@ class ForecastingPipeline:
             logger.warning("No features built, skipping forecast")
             return 0
 
-        estimates_df = fc.estimate_mu_sigma(features_df, method="dow_weighted")
+        # Use stockout-aware min_in_stock_days only when filter is enabled
+        min_stock_days = config.MIN_IN_STOCK_DAYS if config.STOCKOUT_FILTER_ENABLED else 0
+        estimates_df = fc.estimate_mu_sigma(
+            features_df, method="dow_weighted", min_in_stock_days=min_stock_days,
+        )
         logger.debug("Estimated demand for %d items (DOW-weighted)", len(estimates_df))
 
         # Step 5a: Category-pooled fallback for cold-start items only
-        category_map = dict(zip(items_df["item_id"], items_df.get("category_name", "Unknown")))
+        cat_col = items_df["category_name"] if "category_name" in items_df.columns else pd.Series("Unknown", index=items_df.index)
+        category_map = dict(zip(items_df["item_id"], cat_col))
         items_with_history = set(features_df["item_id"].unique()) if not features_df.empty else set()
         estimates_df = fc.apply_category_fallback(estimates_df, category_map, items_with_history)
         logger.debug("Applied category fallback for cold-start items")
@@ -402,7 +410,7 @@ class ForecastingPipeline:
         # correlates well with actual prediction accuracy per backtest results.
         # MAPE blending disabled until system has 60-90 days of history.
         cv = sigma_d_hat / np.maximum(mu_hat, config.EPSILON_MU)
-        confidence = np.round(1.0 / (1.0 + cv), 3)
+        confidence = np.clip(np.round(1.0 / (1.0 + cv), 3), 0.01, 1.0)
 
         if config.CONFIDENCE_MAPE_ENABLED and "mape" in merged.columns:
             has_mape = merged["mape"].notna()
@@ -555,9 +563,9 @@ class ForecastingPipeline:
             else:
                 order_date = None  # No urgency
 
-            # Confidence: sigmoid-like variability score
+            # Confidence: 1/(1+CV) -- matches vectorized path, floored at 0.01
             cv = sigma_d_hat / max(mu_hat, 0.1)
-            confidence = 1.0 / (1.0 + cv)
+            confidence = max(1.0 / (1.0 + cv), 0.01)
 
             forecasts.append(
                 {
