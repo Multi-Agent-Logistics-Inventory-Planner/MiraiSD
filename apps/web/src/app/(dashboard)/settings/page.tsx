@@ -239,6 +239,7 @@ export default function SettingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="dark:bg-accent/50 dark:hover:bg-accent"
                       onClick={handleResetPassword}
                       disabled={isResetting}
                     >

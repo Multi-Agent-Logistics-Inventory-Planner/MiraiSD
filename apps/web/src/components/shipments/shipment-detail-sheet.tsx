@@ -479,7 +479,7 @@ export function ShipmentDetailSheet({
             </Can>
             <Can permission={Permission.SHIPMENTS_UPDATE}>
               {canEdit && (
-                <Button variant="outline" size="sm" onClick={onEditClick}>
+                <Button variant="outline" size="sm" className="dark:bg-black dark:text-white dark:hover:bg-black/90" onClick={onEditClick}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
                 </Button>

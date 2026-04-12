@@ -166,12 +166,13 @@ export function InviteMemberDialog({
         <DialogFooter>
           <Button
             variant="outline"
+            className="dark:bg-accent/50 dark:hover:bg-accent"
             onClick={() => handleOpenChange(false)}
             disabled={isSubmitting}
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || success}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || success} className="text-white bg-brand-primary hover:bg-brand-primary-hover">
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

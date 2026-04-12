@@ -692,7 +692,7 @@ export function AdjustStockDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isAdjusting}
-              className="min-h-11 sm:min-h-9"
+              className="min-h-11 sm:min-h-9 dark:bg-accent/50 dark:hover:bg-accent"
             >
               Cancel
             </Button>

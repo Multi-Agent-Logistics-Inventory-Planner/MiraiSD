@@ -821,6 +821,7 @@ export function ProductForm({
               <Button
                 type="button"
                 variant="outline"
+                className="dark:bg-accent/50 dark:hover:bg-accent"
                 onClick={() => onOpenChange(false)}
               >
                 Cancel

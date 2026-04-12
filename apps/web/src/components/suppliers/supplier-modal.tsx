@@ -135,10 +135,10 @@ export function SupplierModal({ open, onOpenChange, supplier }: SupplierModalPro
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" className="dark:bg-accent/50 dark:hover:bg-accent" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending} className="text-white bg-brand-primary hover:bg-brand-primary-hover">
                 {isPending ? "Saving..." : isEditing ? "Save Changes" : "Add Supplier"}
               </Button>
             </DialogFooter>

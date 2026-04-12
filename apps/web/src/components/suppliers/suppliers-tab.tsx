@@ -21,6 +21,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -125,8 +126,8 @@ export function SuppliersTab() {
             />
           </div>
           <Button
-            variant={showInactive ? "secondary" : "outline"}
-            size="sm"
+            variant={showInactive ? "default" : "outline"}
+            className="shrink-0 border dark:bg-input dark:border-[#41413d] dark:text-[#a1a1a1]"
             onClick={() => {
               setShowInactive(!showInactive);
               setPage(0);
@@ -135,14 +136,15 @@ export function SuppliersTab() {
             {showInactive ? "Hide Inactive" : "Show Inactive"}
           </Button>
         </div>
-        <Button onClick={handleCreate}>
+        <Button onClick={handleCreate} className="shrink-0 text-white bg-brand-primary hover:bg-brand-primary-hover">
           <Plus className="h-4 w-4 mr-2" />
           Add Supplier
         </Button>
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden sm:overflow-visible w-full">
+      <Card className="p-2 dark:border-none">
+        <CardContent className="p-0 overflow-hidden sm:overflow-visible w-full">
         <Table className="border-none table-fixed w-full">
           <DataTableHeader>
             <TableHead className="text-left rounded-l-lg">Supplier Name</TableHead>
@@ -262,7 +264,8 @@ export function SuppliersTab() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </CardContent>
+      </Card>
 
       <ProductPagination
         page={page}
