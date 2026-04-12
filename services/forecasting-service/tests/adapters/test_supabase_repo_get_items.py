@@ -30,14 +30,18 @@ class TestGetItems:
             "name": ["Product A", "Product B"],
             "lead_time_days": [7, 14],
             "safety_stock_days": [3, 5],
+            "category_name": ["toys", None],
+            "preferred_supplier_id": [None, "sup-1"],
         })
 
         with patch("pandas.read_sql", return_value=test_df):
             result = repo.get_items()
 
-        # Verify columns - 'category' should NOT be present
-        assert list(result.columns) == ["item_id", "name", "lead_time_days", "safety_stock_days"]
-        assert "category" not in result.columns
+        expected_columns = ["item_id", "name", "lead_time_days", "safety_stock_days",
+                            "category_name", "preferred_supplier_id"]
+        assert list(result.columns) == expected_columns
+        # Null category_name should be filled with "Unknown"
+        assert result.iloc[1]["category_name"] == "Unknown"
 
     def test_get_items_sql_does_not_reference_category(self):
         """Verify SQL query does not reference non-existent category column."""
@@ -76,5 +80,6 @@ class TestGetItems:
         with patch("pandas.read_sql", return_value=pd.DataFrame()):
             result = repo.get_items()
 
-        expected_columns = ["item_id", "name", "lead_time_days", "safety_stock_days"]
+        expected_columns = ["item_id", "name", "lead_time_days", "safety_stock_days",
+                            "category_name", "preferred_supplier_id"]
         assert list(result.columns) == expected_columns
