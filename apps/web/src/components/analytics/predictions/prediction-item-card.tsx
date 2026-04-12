@@ -18,7 +18,6 @@ import {
   formatCoverageContext,
 } from "@/lib/utils/format-forecast";
 import { METRIC_TOOLTIPS, BADGE_TOOLTIPS } from "./help-content";
-import type { DemandCategory } from "@/lib/utils/format-forecast";
 
 interface PredictionItemCardProps {
   item: ActionItem;
@@ -83,19 +82,21 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold truncate">{item.name}</h3>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={cn(
-                    "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium cursor-help",
-                    getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
-                  )}>
-                    {getDemandCategory(item.demandVelocity)}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {BADGE_TOOLTIPS[getDemandCategory(item.demandVelocity) as DemandCategory]}
-                </TooltipContent>
-              </Tooltip>
+              {getDemandCategory(item.demandVelocity) === "Fast seller" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={cn(
+                      "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium cursor-help",
+                      getDemandCategoryStyle("Fast seller")
+                    )}>
+                      Fast seller
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {BADGE_TOOLTIPS["Fast seller"]}
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {item.overdue && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -202,19 +203,21 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 className="text-sm font-semibold truncate">{item.name}</h3>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={cn(
-                      "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium cursor-help",
-                      getDemandCategoryStyle(getDemandCategory(item.demandVelocity))
-                    )}>
-                      {getDemandCategory(item.demandVelocity)}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {BADGE_TOOLTIPS[getDemandCategory(item.demandVelocity) as DemandCategory]}
-                  </TooltipContent>
-                </Tooltip>
+                {getDemandCategory(item.demandVelocity) === "Fast seller" && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "shrink-0 rounded px-1 py-0.5 text-[10px] font-medium cursor-help",
+                        getDemandCategoryStyle("Fast seller")
+                      )}>
+                        Fast seller
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {BADGE_TOOLTIPS["Fast seller"]}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 {item.overdue && (
                   <Tooltip>
                     <TooltipTrigger asChild>

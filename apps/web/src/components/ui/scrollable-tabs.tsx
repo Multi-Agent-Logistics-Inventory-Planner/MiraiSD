@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 export interface TabConfig<T extends string> {
   value: T;
   label: string;
-  icon: LucideIcon;
+  icon: LucideIcon | string;
   adminOnly?: boolean;
 }
 
@@ -42,10 +42,27 @@ export function ScrollableTabs<T extends string>({
               className={
                 active
                   ? "bg-brand-primary text-white hover:bg-brand-primary/90"
-                  : "bg-[#f2f2f2] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"
+                  : "bg-[#e1e1e1] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"
               }
             >
-              <Icon className="h-3.5 w-3.5" />
+              {typeof Icon === "string" ? (
+                <span
+                  aria-hidden
+                  className="inline-block h-4.5 w-4.5 bg-current"
+                  style={{
+                    WebkitMaskImage: `url(${Icon})`,
+                    maskImage: `url(${Icon})`,
+                    WebkitMaskRepeat: "no-repeat",
+                    maskRepeat: "no-repeat",
+                    WebkitMaskSize: "contain",
+                    maskSize: "contain",
+                    WebkitMaskPosition: "center",
+                    maskPosition: "center",
+                  }}
+                />
+              ) : (
+                <Icon className="h-3.5 w-3.5" />
+              )}
               {label}
             </Button>
           );

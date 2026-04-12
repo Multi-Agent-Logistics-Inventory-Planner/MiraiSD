@@ -84,10 +84,11 @@ export function LocationForm({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="dark:bg-accent/50 dark:hover:bg-accent" onClick={() => onOpenChange(false)}>
+            
               Cancel
             </Button>
-            <Button type="submit" disabled={Boolean(isSaving)}>
+            <Button type="submit" disabled={Boolean(isSaving)} className="text-white bg-brand-primary hover:bg-brand-primary-hover">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {initialLocation ? "Save" : "Create"}
             </Button>

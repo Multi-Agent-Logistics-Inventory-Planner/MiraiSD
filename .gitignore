@@ -165,6 +165,14 @@ secrets/
 
 *.md
 !README.md
+
+# ============================================
+# SCRIPT OUTPUTS (local analysis artifacts)
+# ============================================
+scripts/*_output.csv
+scripts/*_summary.txt
+scripts/package-lock.json
+apps/web/pnpm-lock.yaml
 .context/
 .claude/
 .mcp.json

@@ -34,10 +34,10 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Product> searchWithCategories(@Param("query") String query);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.id = :id")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.id = :id")
     Optional<Product> findByIdWithCategories(@Param("id") UUID id);
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE p.sku = :sku")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.sku = :sku")
     Optional<Product> findBySkuWithCategories(@Param("sku") String sku);
 
     // Keep original methods for cases where categories aren't needed
@@ -53,14 +53,14 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     // ==================== Parent-Child Methods ====================
 
     // Find root products only (no parent) - for main product list
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent IS NULL ORDER BY p.name")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.parent IS NULL ORDER BY p.name")
     List<Product> findRootProductsWithCategories();
 
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent IS NULL AND p.isActive = true ORDER BY p.name")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.parent IS NULL AND p.isActive = true ORDER BY p.name")
     List<Product> findRootProductsWithCategoriesActive();
 
     /** Root products that have at least one child (Kuji parents) */
-    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent WHERE p.parent IS NULL AND EXISTS (SELECT 1 FROM Product ch WHERE ch.parent.id = p.id) ORDER BY p.name")
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.parent IS NULL AND EXISTS (SELECT 1 FROM Product ch WHERE ch.parent.id = p.id) ORDER BY p.name")
     List<Product> findRootKujiProductsWithCategories();
 
     // Find children of a parent product
@@ -89,4 +89,12 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     // Batch query: get all product IDs that have at least one child (for hasChildren computation)
     @Query("SELECT DISTINCT p.parent.id FROM Product p WHERE p.parent IS NOT NULL")
     List<UUID> findAllParentIds();
+
+    // Find products by preferred supplier
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.preferredSupplier.id = :supplierId ORDER BY p.name")
+    List<Product> findByPreferredSupplierIdWithCategories(@Param("supplierId") UUID supplierId);
+
+    // Count products by preferred supplier
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.preferredSupplier.id = :supplierId")
+    long countByPreferredSupplierId(@Param("supplierId") UUID supplierId);
 }

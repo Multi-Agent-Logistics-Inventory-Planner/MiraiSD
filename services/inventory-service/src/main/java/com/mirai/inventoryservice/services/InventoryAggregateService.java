@@ -10,6 +10,7 @@ import com.mirai.inventoryservice.repositories.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -69,6 +70,18 @@ public class InventoryAggregateService {
     @Transactional
     public void deleteAllInventoryForProduct(UUID productId) {
         locationInventoryRepository.deleteByProduct_Id(productId);
+    }
+
+    /**
+     * Batch delete all inventory records for multiple products across all locations.
+     * Optimized to prevent N+1 queries when deleting parent products with children.
+     */
+    @Transactional
+    public void deleteAllInventoryForProducts(Collection<UUID> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return;
+        }
+        locationInventoryRepository.deleteAllByProductIdIn(productIds);
     }
 
     /**

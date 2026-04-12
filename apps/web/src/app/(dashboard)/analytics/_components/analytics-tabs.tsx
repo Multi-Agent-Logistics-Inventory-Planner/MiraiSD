@@ -18,6 +18,12 @@ const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
     label: "Stockout Predictions",
     icon: TrendingDown,
   },
+  {
+    value: AnalyticsTab.ASSISTANT,
+    label: "Pito",
+    icon: "/pito.svg",
+    adminOnly: true,
+  },
 ];
 
 interface AnalyticsTabsProps {

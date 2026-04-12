@@ -47,6 +47,8 @@ public class ProductRequestDTO {
 
     private BigDecimal unitCost;
 
+    private BigDecimal msrp;
+
     @Pattern(
         regexp = "^(https://[a-zA-Z0-9-]+\\.supabase\\.co/storage/v1/object/public/product-images/[a-zA-Z0-9._-]+)?$",
         message = "Image URL must be from Supabase storage"
@@ -60,4 +62,10 @@ public class ProductRequestDTO {
     /** Direct quantity update for prize products. Only works for products with a parent. */
     @Min(value = 0, message = "Quantity must be 0 or greater")
     private Integer quantity;
+
+    /** Preferred supplier for lead time calculations. */
+    private UUID preferredSupplierId;
+
+    /** True if auto-assigned from delivery, false if manually set. */
+    private Boolean preferredSupplierAuto;
 }

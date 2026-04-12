@@ -2,12 +2,14 @@ package com.mirai.inventoryservice.repositories;
 
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -15,6 +17,7 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,5 +63,31 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     List<StockMovement> findByMetadataSource(@Param("source") String source);
 
     void deleteByItem_Id(UUID productId);
+
+    // Batch delete all stock movements for multiple products (optimized for N+1 prevention)
+    @Modifying
+    @Query("DELETE FROM StockMovement sm WHERE sm.item.id IN :itemIds")
+    void deleteAllByItemIdIn(@Param("itemIds") Collection<UUID> itemIds);
+
+    /**
+     * Product Assistant drill-down. Returns a projection so Hibernate never
+     * hydrates the item / auditLog / location graphs. Reasons filter is
+     * optional (null = all reasons). Backed by the V19 (item_id, at DESC) index.
+     */
+    @Query("SELECT sm.id AS id, sm.at AS at, sm.reason AS reason, " +
+            "sm.quantityChange AS quantityChange, sm.previousQuantity AS previousQuantity, " +
+            "sm.currentQuantity AS currentQuantity, sm.fromLocationId AS fromLocationId, " +
+            "sm.toLocationId AS toLocationId " +
+            "FROM StockMovement sm " +
+            "WHERE sm.item.id = :productId " +
+            "AND sm.at >= :from AND sm.at < :to " +
+            "AND (:reasons IS NULL OR sm.reason IN :reasons) " +
+            "ORDER BY sm.at DESC")
+    List<StockMovementHistoryView> findHistoryByItemId(
+            @Param("productId") UUID productId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to,
+            @Param("reasons") List<StockMovementReason> reasons,
+            org.springframework.data.domain.Pageable pageable);
 }
 

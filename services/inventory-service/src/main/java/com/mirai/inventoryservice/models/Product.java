@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+// Supplier import for preferred supplier relationship
+
 @Entity
 @Table(name = "products")
 @org.hibernate.annotations.BatchSize(size = 50)
@@ -82,6 +84,9 @@ public class Product {
     @Column(name = "unit_cost", precision = 10, scale = 2)
     private BigDecimal unitCost;
 
+    @Column(name = "msrp", precision = 10, scale = 2)
+    private BigDecimal msrp;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
@@ -95,6 +100,29 @@ public class Product {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    /**
+     * Preferred supplier for this product. Used for lead time calculations.
+     * Auto-assigned when a shipment containing this product is delivered.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "preferred_supplier_id")
+    @ToString.Exclude
+    private Supplier preferredSupplier;
+
+    /**
+     * Direct access to FK column to avoid lazy loading when only ID is needed.
+     */
+    @Column(name = "preferred_supplier_id", insertable = false, updatable = false)
+    private UUID preferredSupplierId;
+
+    /**
+     * True if preferredSupplier was auto-assigned from a shipment delivery.
+     * False if manually set by an admin.
+     */
+    @Column(name = "preferred_supplier_auto")
+    @Builder.Default
+    private Boolean preferredSupplierAuto = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

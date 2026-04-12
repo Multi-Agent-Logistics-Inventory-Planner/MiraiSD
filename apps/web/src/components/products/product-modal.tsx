@@ -176,6 +176,29 @@ export function ProductModal({
                 </span>
               </div>
             )}
+            {canViewCosts && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm">
+                  MSRP:
+                </span>
+                <span className="text-xs sm:text-sm">
+                  {formatCurrency(p.msrp)}
+                </span>
+              </div>
+            )}
+            {p.preferredSupplierName && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm">
+                  Preferred Supplier:
+                </span>
+                <span className="text-xs sm:text-sm">
+                  {p.preferredSupplierName}
+                  {p.preferredSupplierAuto && (
+                    <span className="text-muted-foreground ml-1">(auto)</span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs sm:text-sm">
                 Status:

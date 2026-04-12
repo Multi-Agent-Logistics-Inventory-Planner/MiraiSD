@@ -4,11 +4,13 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,15 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findAllLatestLimited(@Param("limit") int limit);
 
+    // Find latest prediction per item, filtered to a set of item IDs
+    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+            + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
+            + "FROM forecast_predictions GROUP BY item_id) latest "
+            + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
+            + "WHERE fp.item_id IN :itemIds",
+            nativeQuery = true)
+    List<ForecastPrediction> findLatestByItemIds(@Param("itemIds") List<UUID> itemIds);
+
     // Find at-risk items using only the latest prediction per item
     @Query(value = "SELECT fp.* FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
@@ -60,6 +71,11 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
 
     // Delete all predictions for a specific inventory item
     void deleteByItemId(UUID itemId);
+
+    // Batch delete all predictions for multiple inventory items (optimized for N+1 prevention)
+    @Modifying
+    @Query("DELETE FROM ForecastPrediction fp WHERE fp.itemId IN :itemIds")
+    void deleteAllByItemIdIn(@Param("itemIds") Collection<UUID> itemIds);
 
     // Delete predictions with suggested order date before the given date (overdue cleanup)
     int deleteBySuggestedOrderDateBefore(LocalDate date);

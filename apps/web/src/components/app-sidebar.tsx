@@ -16,7 +16,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   ChevronsUpDown,
-  HeartCrack,
+  // HeartCrack,
 } from "lucide-react";
 
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
@@ -50,7 +50,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, Permission } from "@/hooks/use-permissions";
 import { UserRole } from "@/types/api";
 import { Logo } from "@/components/logo";
-import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/rbac";
 
 interface NavItem {
@@ -177,22 +176,22 @@ function SettingsLink() {
   );
 }
 
-function YixinLink() {
-  const { setOpenMobile } = useSidebar();
-
-  return (
-    <DropdownMenuItem asChild>
-      <Link
-        href="/yixin"
-        className="cursor-pointer"
-        onClick={() => setOpenMobile(false)}
-      >
-        <HeartCrack className="h-4 w-4" />
-        <span>Yixin</span>
-      </Link>
-    </DropdownMenuItem>
-  );
-}
+// function YixinLink() {
+//   const { setOpenMobile } = useSidebar();
+//
+//   return (
+//     <DropdownMenuItem asChild>
+//       <Link
+//         href="/yixin"
+//         className="cursor-pointer"
+//         onClick={() => setOpenMobile(false)}
+//       >
+//         <HeartCrack className="h-4 w-4" />
+//         <span>Yixin</span>
+//       </Link>
+//     </DropdownMenuItem>
+//   );
+// }
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -314,12 +313,7 @@ export function AppSidebar() {
                   <span className="text-sm font-medium truncate">
                     {user.personName || user.email}
                   </span>
-                  <span className={cn(
-                    "text-[10px] text-white px-2 py-0.5 rounded-sm w-fit",
-                    user.role === UserRole.ASSISTANT_MANAGER
-                      ? "bg-[#f97316] dark:bg-[#ea580c]"
-                      : "bg-[#0b66c2] dark:bg-[#7c3aed]"
-                  )}>
+                  <span className="text-[10px] px-2 py-0.5 rounded-sm w-fit bg-brand-primary text-white">
                     {user.role === UserRole.ASSISTANT_MANAGER ? "ASM" : user.role}
                   </span>
                 </div>
@@ -332,7 +326,7 @@ export function AppSidebar() {
               className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
             >
               <SettingsLink />
-              <YixinLink />
+              {/* <YixinLink /> */}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                 <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />

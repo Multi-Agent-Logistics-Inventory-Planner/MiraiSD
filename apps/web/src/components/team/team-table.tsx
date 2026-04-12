@@ -39,24 +39,11 @@ export type TeamMemberRow = {
 function getStatusColor(status: "active" | "pending") {
   switch (status) {
     case "active":
-      return "bg-[#20d760] text-white";
+      return "bg-[#20d760] text-black";
     case "pending":
       return "bg-[#ffce00] text-white";
     default:
       return "bg-[#e50815] text-white";
-  }
-}
-
-function getRoleColor(role: "admin" | "assistant_manager" | "employee") {
-  switch (role) {
-    case "admin":
-      return "bg-[#0b66c2] text-white dark:bg-[#7c3aed] dark:text-purple-100";
-    case "assistant_manager":
-      return "bg-[#f97316] text-white dark:bg-[#ea580c] dark:text-orange-100";
-    case "employee":
-      return "bg-gray-100 text-gray-700";
-    default:
-      return "bg-gray-100 text-gray-700";
   }
 }
 
@@ -153,14 +140,9 @@ export function TeamTable({
               <TableCell className="font-medium rounded-l-lg">{row.fullName}</TableCell>
               <TableCell>{row.email}</TableCell>
               <TableCell className="text-center">
-                <Badge
-                  className={cn(
-                    "text-xs",
-                    getRoleColor(row.role.toLowerCase() as "admin" | "assistant_manager" | "employee")
-                  )}
-                >
+                <span className="text-sm text-muted-foreground">
                   {formatRoleLabel(row.role)}
-                </Badge>
+                </span>
               </TableCell>
               <TableCell className="text-center">
                 <Badge

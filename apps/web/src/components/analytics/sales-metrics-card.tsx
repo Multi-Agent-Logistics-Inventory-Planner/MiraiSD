@@ -43,7 +43,7 @@ function TimeFilterTabs<T extends string>({
   options,
 }: TimeFilterTabsProps<T>) {
   return (
-    <div className="flex items-center gap-1 rounded-md bg-muted p-1">
+    <div className="flex items-center gap-1 rounded-md bg-muted dark:bg-table-header p-1">
       {options.map((option) => (
         <button
           key={option}
@@ -51,7 +51,7 @@ function TimeFilterTabs<T extends string>({
           className={cn(
             "px-2 py-0.5 text-xs font-medium rounded transition-colors",
             value === option
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-background dark:bg-muted text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -92,13 +92,13 @@ interface ViewToggleProps {
 
 function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div className="flex gap-1 rounded-md bg-muted p-1">
+    <div className="flex gap-1 rounded-md bg-muted dark:bg-table-header p-1">
       <button
         onClick={() => onChange("bar")}
         className={cn(
           "p-1 rounded transition-colors",
           value === "bar"
-            ? "bg-background shadow-sm"
+            ? "bg-background dark:bg-muted shadow-sm"
             : "text-muted-foreground hover:text-foreground",
         )}
         aria-label="Bar chart view"
@@ -110,7 +110,7 @@ function ViewToggle({ value, onChange }: ViewToggleProps) {
         className={cn(
           "p-1 rounded transition-colors",
           value === "line"
-            ? "bg-background shadow-sm"
+            ? "bg-background dark:bg-muted shadow-sm"
             : "text-muted-foreground hover:text-foreground",
         )}
         aria-label="Trend line view"

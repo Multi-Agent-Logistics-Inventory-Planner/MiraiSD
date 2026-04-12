@@ -132,13 +132,14 @@ class SupabaseRepo:
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:
         """Load products (items) from database.
 
-        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days, category_name
+        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days, category_name, preferred_supplier_id
         """
         query = """
             SELECT
                 p.id::text AS item_id,
                 p.name,
                 p.lead_time_days,
+                p.preferred_supplier_id::text AS preferred_supplier_id,
                 COALESCE(p.reorder_point / NULLIF(p.target_stock_level / NULLIF(p.lead_time_days, 0), 0), 7)::int AS safety_stock_days,
                 c.name AS category_name
             FROM products p
@@ -156,13 +157,14 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "category_name"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "category_name", "preferred_supplier_id"]
             )
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = df["lead_time_days"].fillna(14).astype(int)
         df["safety_stock_days"] = df["safety_stock_days"].fillna(7).astype(int)
         df["category_name"] = df["category_name"].fillna("Unknown")
+        # preferred_supplier_id can be null
         return df
 
     def get_current_inventory(self, item_ids: list[str] | None = None) -> pd.DataFrame:
@@ -304,6 +306,47 @@ class SupabaseRepo:
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = pd.to_numeric(df["lead_time_days"], errors="coerce")
+        return df
+
+    def get_lead_time_mv_stats(
+        self,
+        item_ids: list[str] | None = None,
+    ) -> pd.DataFrame:
+        """Load lead time statistics from materialized view.
+
+        Returns DataFrame with columns: item_id, supplier_id, n, avg_lt, sigma_L
+        The MV aggregates shipment lead times per (item, supplier) combination.
+        """
+        query = """
+            SELECT
+                item_id::text AS item_id,
+                supplier_id::text AS supplier_id,
+                n,
+                avg_lt,
+                sigma_L
+            FROM mv_lead_time_stats
+        """
+        params: dict = {}
+
+        if item_ids:
+            query += " WHERE item_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+
+        try:
+            with self._engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception:
+            logger.warning("Failed to query mv_lead_time_stats (MV may not exist yet)")
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        df["item_id"] = df["item_id"].astype(str)
+        df["supplier_id"] = df["supplier_id"].astype(str)
+        df["n"] = df["n"].fillna(0).astype(int)
+        df["avg_lt"] = pd.to_numeric(df["avg_lt"], errors="coerce")
+        df["sigma_L"] = pd.to_numeric(df["sigma_L"], errors="coerce")
         return df
 
     def get_historical_forecasts(
@@ -467,3 +510,45 @@ class SupabaseRepo:
 
         logger.info("Upserted %d forecast predictions", len(rows))
         return len(rows)
+
+    def update_product_reorder_points(self, forecasts_df: pd.DataFrame) -> int:
+        """Propagate forecast-computed reorder points to the products table.
+
+        Extracts reorder_point from the features dict of each forecast row
+        and updates products.reorder_point so that alerts and UI reflect
+        the dynamically computed threshold instead of the static default.
+
+        Returns number of products updated.
+        """
+        if forecasts_df.empty:
+            return 0
+
+        rows = []
+        for _, row in forecasts_df.iterrows():
+            features = row.get("features")
+            if not isinstance(features, dict):
+                continue
+            rop = features.get("reorder_point")
+            if rop is None:
+                continue
+            rows.append({
+                "item_id": str(row["item_id"]),
+                "reorder_point": int(round(float(rop))),
+            })
+
+        if not rows:
+            return 0
+
+        update_query = """
+            UPDATE products
+            SET reorder_point = :reorder_point,
+                updated_at = NOW()
+            WHERE id = CAST(:item_id AS uuid)
+        """
+
+        with self._engine.begin() as conn:
+            result = conn.execute(text(update_query), rows)
+            updated = result.rowcount
+
+        logger.info("Updated reorder_point for %d products", updated)
+        return updated

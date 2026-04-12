@@ -1,10 +1,8 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { ApiError } from "@/types/api";
+import { BACKEND_BASE_URL } from "@/lib/api/backend-url";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:4000";
+const API_BASE_URL = BACKEND_BASE_URL;
 
 export class ApiClientError extends Error {
   status: number;

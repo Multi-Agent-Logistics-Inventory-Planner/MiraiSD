@@ -26,6 +26,7 @@ public interface ProductMapper {
     @Mapping(target = "hasChildren", source = "product", qualifiedByName = "safeHasChildren")
     @Mapping(target = "children", source = "product", qualifiedByName = "safeChildren")
     @Mapping(target = "totalChildStock", ignore = true) // Computed separately in service
+    @Mapping(target = "preferredSupplierName", source = "product", qualifiedByName = "safePreferredSupplierName")
     ProductResponseDTO toResponseDTO(Product product);
 
     @Mapping(target = "category", source = "category", qualifiedByName = "categoryToDTO")
@@ -71,6 +72,14 @@ public interface ProductMapper {
             return null;
         }
         return product.getParent().getSku();
+    }
+
+    @Named("safePreferredSupplierName")
+    default String safePreferredSupplierName(Product product) {
+        if (product.getPreferredSupplier() == null || !Hibernate.isInitialized(product.getPreferredSupplier())) {
+            return null;
+        }
+        return product.getPreferredSupplier().getDisplayName();
     }
 
     @Named("safeHasChildren")

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -123,6 +125,73 @@ class AnalyticsControllerSecurityIT extends BaseIntegrationTest {
             mockMvc.perform(get(BASE_URL + "/sales-summary")
                             .header("Authorization", "Bearer " + adminToken()))
                     .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/analytics/products/{id}/report-bundle/* (Product Assistant)")
+    class ProductAssistantEndpointsTests {
+
+        private static final UUID PRODUCT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+        @Test
+        @DisplayName("Header: 401 without token")
+        void header_noAuth_returns401() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/report-bundle/header"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Header: 403 for USER role")
+        void header_userRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/report-bundle/header")
+                            .header("Authorization", "Bearer " + userToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Header: 403 for EMPLOYEE role (admin-only)")
+        void header_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/report-bundle/header")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Detail: 403 for EMPLOYEE role")
+        void detail_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/report-bundle/detail")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Movements: 403 for EMPLOYEE role")
+        void movements_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/movements")
+                            .param("from", "2026-01-01T00:00:00Z")
+                            .param("to", "2026-04-01T00:00:00Z")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Movements summary: 403 for EMPLOYEE role")
+        void movementSummary_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/movements/summary")
+                            .param("from", "2026-01-01T00:00:00Z")
+                            .param("to", "2026-04-01T00:00:00Z")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Comparison: 403 for EMPLOYEE role")
+        void comparison_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/products/" + PRODUCT_ID + "/comparison")
+                            .param("metric", "sales_velocity")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
         }
     }
 }

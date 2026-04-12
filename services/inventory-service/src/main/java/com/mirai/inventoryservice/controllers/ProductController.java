@@ -62,13 +62,27 @@ public class ProductController {
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponseDTO> getProductById(@PathVariable UUID id) {
         Product product = productService.getProductById(id);
-        return ResponseEntity.ok(productMapper.toResponseDTO(product));
+        ProductResponseDTO dto = productMapper.toResponseDTO(product);
+        // Enrich with last delivered supplier for "Use Auto" feature
+        Object[] lastSupplier = productService.getLastDeliveredSupplier(id);
+        if (lastSupplier != null && lastSupplier.length >= 2) {
+            dto.setLastDeliveredSupplierId((UUID) lastSupplier[0]);
+            dto.setLastDeliveredSupplierName((String) lastSupplier[1]);
+        }
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/sku/{sku}")
     public ResponseEntity<ProductResponseDTO> getProductBySku(@PathVariable String sku) {
         Product product = productService.getProductBySku(sku);
-        return ResponseEntity.ok(productMapper.toResponseDTO(product));
+        ProductResponseDTO dto = productMapper.toResponseDTO(product);
+        // Enrich with last delivered supplier for "Use Auto" feature
+        Object[] lastSupplier = productService.getLastDeliveredSupplier(product.getId());
+        if (lastSupplier != null && lastSupplier.length >= 2) {
+            dto.setLastDeliveredSupplierId((UUID) lastSupplier[0]);
+            dto.setLastDeliveredSupplierName((String) lastSupplier[1]);
+        }
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping
@@ -86,6 +100,7 @@ public class ProductController {
                 requestDTO.getTargetStockLevel(),
                 requestDTO.getLeadTimeDays(),
                 requestDTO.getUnitCost(),
+                requestDTO.getMsrp(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
                 requestDTO.getInitialStock()
@@ -98,6 +113,7 @@ public class ProductController {
     public ResponseEntity<ProductResponseDTO> updateProduct(
             @PathVariable UUID id,
             @RequestParam(required = false, defaultValue = "false") Boolean clearParent,
+            @RequestParam(required = false, defaultValue = "false") Boolean clearPreferredSupplier,
             @Valid @RequestBody ProductRequestDTO requestDTO) {
         Product product = productService.updateProduct(
                 id,
@@ -112,10 +128,14 @@ public class ProductController {
                 requestDTO.getTargetStockLevel(),
                 requestDTO.getLeadTimeDays(),
                 requestDTO.getUnitCost(),
+                requestDTO.getMsrp(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
                 clearParent,
-                requestDTO.getQuantity()
+                requestDTO.getQuantity(),
+                requestDTO.getPreferredSupplierId(),
+                requestDTO.getPreferredSupplierAuto(),
+                clearPreferredSupplier
         );
         return ResponseEntity.ok(productMapper.toResponseDTO(product));
     }

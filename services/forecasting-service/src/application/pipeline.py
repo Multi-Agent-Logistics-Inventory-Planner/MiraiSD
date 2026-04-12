@@ -14,7 +14,7 @@ from .. import features as feat
 from .. import forecast as fc
 from .. import policy
 from ..backtest import compute_mape
-from ..lead_time import compute_lead_time_stats
+from ..lead_time import compute_hierarchical_lead_time, compute_lead_time_stats
 from ..adapters.supabase_repo import SupabaseRepo
 
 if TYPE_CHECKING:
@@ -69,16 +69,19 @@ class ForecastingPipeline:
 
         logger.debug("Loaded %d items", len(items_df))
 
-        # Step 1b: Load dynamic lead times from shipment history
-        shipment_lt_df = self._repo.get_shipment_lead_times(item_ids=item_list)
-        lead_time_stats_df = compute_lead_time_stats(
-            shipment_lt_df,
-            items_df[["item_id", "lead_time_days"]],
+        # Step 1b: Load dynamic lead times using hierarchical supplier-based computation
+        mv_stats_df = self._repo.get_lead_time_mv_stats(item_ids=item_list)
+        products_for_lt = items_df[["item_id"]].copy()
+        if "preferred_supplier_id" in items_df.columns:
+            products_for_lt["preferred_supplier_id"] = items_df["preferred_supplier_id"]
+        lead_time_stats_df = compute_hierarchical_lead_time(
+            mv_stats_df,
+            products_for_lt,
         )
         logger.debug(
-            "Computed lead time stats for %d items (%d from shipments)",
+            "Computed hierarchical lead time stats for %d items (sources: %s)",
             len(lead_time_stats_df),
-            int((lead_time_stats_df["source"] == "shipment_history").sum()),
+            lead_time_stats_df["source"].value_counts().to_dict() if not lead_time_stats_df.empty else {},
         )
 
         # Step 2: Load current inventory - prefer event-carried state
@@ -173,6 +176,18 @@ class ForecastingPipeline:
         # Step 7: Save to database
         saved = self._repo.upsert_forecasts(forecasts_df)
         logger.info("Saved %d forecast predictions", saved)
+
+        # Step 8: Propagate dynamic reorder points to products table.
+        # Wrapped in try/except so a DB failure here does not crash the pipeline
+        # after forecasts were already committed in Step 7.
+        try:
+            updated = self._repo.update_product_reorder_points(forecasts_df)
+            logger.info("Propagated reorder points for %d products", updated)
+        except Exception:
+            logger.exception(
+                "Failed to propagate reorder points; forecasts were saved"
+            )
+
         return saved
 
     def run_all(self) -> int:
@@ -311,8 +326,11 @@ class ForecastingPipeline:
         # Merge dynamic lead time stats if available
         sigma_L_series = None
         if lead_time_stats_df is not None and not lead_time_stats_df.empty:
+            lt_cols = ["item_id", "avg_lead_time", "sigma_L", "shipment_count", "source"]
+            if "preferred_supplier_id" in lead_time_stats_df.columns:
+                lt_cols.append("preferred_supplier_id")
             merged = merged.merge(
-                lead_time_stats_df[["item_id", "avg_lead_time", "sigma_L", "shipment_count", "source"]].rename(
+                lead_time_stats_df[lt_cols].rename(
                     columns={"source": "lead_time_source"}
                 ),
                 on="item_id",
@@ -420,6 +438,8 @@ class ForecastingPipeline:
                 feat_dict["lead_time_source"] = str(merged["lead_time_source"].iloc[i])
             if "shipment_count" in merged.columns:
                 feat_dict["shipment_count"] = int(merged["shipment_count"].iloc[i])
+            if "preferred_supplier_id" in merged.columns and pd.notna(merged["preferred_supplier_id"].iloc[i]):
+                feat_dict["preferred_supplier_id"] = str(merged["preferred_supplier_id"].iloc[i])
 
             # Add MAPE info
             if "mape" in merged.columns and pd.notna(merged["mape"].iloc[i]):
@@ -535,9 +555,9 @@ class ForecastingPipeline:
             else:
                 order_date = None  # No urgency
 
-            # Confidence based on data quality (simple heuristic)
-            confidence = min(1.0, sigma_d_hat / max(mu_hat, 0.1))
-            confidence = 1.0 - confidence  # Higher sigma = lower confidence
+            # Confidence: sigmoid-like variability score
+            cv = sigma_d_hat / max(mu_hat, 0.1)
+            confidence = 1.0 / (1.0 + cv)
 
             forecasts.append(
                 {

@@ -394,16 +394,16 @@ export function LocationDetailSheet({
     <>
       {location && (
         <div className="shrink-0 flex items-center gap-1 sm:gap-2 py-4">
-          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setAdjustOpen(true)}>
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm dark:bg-black dark:text-white dark:hover:bg-black/90" onClick={() => setAdjustOpen(true)}>
             <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Adjust
           </Button>
-          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setTransferOpen(true)}>
+          <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm dark:bg-black dark:text-white dark:hover:bg-black/90" onClick={() => setTransferOpen(true)}>
             <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             Transfer
           </Button>
           <Can permission={Permission.STORAGE_UPDATE}>
-            <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => onEdit(location)}>
+            <Button variant="outline" size="sm" className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm dark:bg-black dark:text-white dark:hover:bg-black/90" onClick={() => onEdit(location)}>
               <Pencil className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Edit
             </Button>
@@ -412,7 +412,7 @@ export function LocationDetailSheet({
             <Button
               variant="outline"
               size="sm"
-              className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm text-destructive"
+              className="sm:flex-1 h-7 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm text-destructive dark:bg-destructive dark:text-white dark:hover:bg-destructive/90"
               onClick={() => setDeleteOpen(true)}
             >
               <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />

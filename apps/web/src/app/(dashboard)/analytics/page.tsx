@@ -10,7 +10,12 @@ import {
   AnalyticsTabs,
   TabPredictions,
   TabOverview,
+  TabAssistant,
 } from "./_components"
+
+const ADMIN_ONLY_TABS = new Set([
+  AnalyticsTab.ASSISTANT,
+])
 
 // Old tab values that should redirect to overview
 const DEPRECATED_TABS = ["insights", "demand-leaders", "legacy", "notifications"]
@@ -65,6 +70,11 @@ function AnalyticsContent() {
       <div className={currentTab !== AnalyticsTab.PREDICTIONS ? "hidden" : undefined}>
         {mountedTabs.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
       </div>
+      {isAdmin && (
+        <div className={currentTab !== AnalyticsTab.ASSISTANT ? "hidden" : undefined}>
+          {mountedTabs.has(AnalyticsTab.ASSISTANT) && <TabAssistant />}
+        </div>
+      )}
     </div>
   )
 }
