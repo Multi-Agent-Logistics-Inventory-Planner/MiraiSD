@@ -56,7 +56,7 @@ export function AdjustmentConfirmDialog({
             etc. — not sales. If this product went to a customer, please use
             &quot;Sale&quot; instead.
           </AlertDialogDescription>
-          <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
+          {/* <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
             <Image
               src="/dont-mess-up.jpg"
               alt="Lenny"
@@ -65,7 +65,7 @@ export function AdjustmentConfirmDialog({
               sizes="(max-width: 640px) 280px, 320px"
               priority
             />
-          </div>
+          </div> */}
         </AlertDialogHeader>
 
         <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
