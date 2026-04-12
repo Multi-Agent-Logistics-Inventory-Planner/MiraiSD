@@ -185,3 +185,7 @@ docs/
 # ============================================
 services/forecasting-service/experiments/data/
 services/forecasting-service/experiments/results/
+services/forecasting-service/experiments/system_report/
+services/forecasting-service/experiments/report/
+services/forecasting-service/experiments/*.md
+services/forecasting-service/experiments/*.csv
