@@ -195,6 +195,7 @@ export function LoginForm() {
               setValue("rememberMe", checked === true)
             }
             disabled={isLoading}
+            className="cursor-pointer data-[state=checked]:bg-brand-primary data-[state=checked]:border-brand-primary data-[state=checked]:text-white dark:data-[state=checked]:bg-brand-primary dark:data-[state=checked]:border-brand-primary dark:data-[state=checked]:text-white"
           />
           <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
             Remember me
@@ -211,7 +212,7 @@ export function LoginForm() {
         </Button>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button type="submit" className="w-full text-white bg-brand-primary hover:bg-brand-primary-hover" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign in
       </Button>
