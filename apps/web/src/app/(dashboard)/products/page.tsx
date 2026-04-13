@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ProductHeader,
@@ -8,8 +9,6 @@ import {
   ProductFiltersState,
   ProductTable,
   ProductPagination,
-  ProductModal,
-  ProductForm,
   DEFAULT_PRODUCT_FILTERS,
   DEFAULT_PRODUCT_SORT,
   buildParentNameMap,
@@ -17,11 +16,39 @@ import {
   compareProducts,
 } from "@/components/products";
 import type { ProductSort } from "@/components/products";
-import {
-  AdjustStockDialog,
-  type PreselectedProductInfo,
-} from "@/components/stock/adjust-stock-dialog";
-import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
+import type { PreselectedProductInfo } from "@/components/stock/adjust-stock-dialog";
+
+const ProductModal = dynamic(
+  () =>
+    import("@/components/products/product-modal").then((m) => ({
+      default: m.ProductModal,
+    })),
+  { ssr: false }
+);
+
+const ProductForm = dynamic(
+  () =>
+    import("@/components/products/product-form").then((m) => ({
+      default: m.ProductForm,
+    })),
+  { ssr: false }
+);
+
+const AdjustStockDialog = dynamic(
+  () =>
+    import("@/components/stock/adjust-stock-dialog").then((m) => ({
+      default: m.AdjustStockDialog,
+    })),
+  { ssr: false }
+);
+
+const TransferStockDialog = dynamic(
+  () =>
+    import("@/components/stock/transfer-stock-dialog").then((m) => ({
+      default: m.TransferStockDialog,
+    })),
+  { ssr: false }
+);
 import {
   useProductInventory,
   type ProductWithInventory,
