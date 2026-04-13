@@ -1,27 +1,35 @@
 import { ShipmentStatus, type Shipment } from "@/types/api";
 
-export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED";
+export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED" | "FAILED";
 
 export const SHIPMENT_DISPLAY_STATUS_LABELS: Record<ShipmentDisplayStatus, string> = {
   ACTIVE: "Active",
   PARTIAL: "Partial",
   COMPLETED: "Completed",
+  FAILED: "Failed",
 };
 
 export const SHIPMENT_DISPLAY_STATUS_COLORS: Record<ShipmentDisplayStatus, string> = {
   ACTIVE: "bg-blue-100 text-blue-700",
   PARTIAL: "bg-amber-100 text-amber-700",
   COMPLETED: "bg-green-100 text-green-700",
+  FAILED: "bg-red-100 text-red-700",
 };
 
 /**
  * Derives the display status from a shipment's backend status and item receipts.
  * Returns null for cancelled shipments (they should be hidden).
+ * DELIVERY_FAILED shipments are shown in the FAILED status.
  */
 export function getShipmentDisplayStatus(shipment: Shipment): ShipmentDisplayStatus | null {
-  // Exclude cancelled shipments
+  // Exclude cancelled shipments (intentionally cancelled)
   if (shipment.status === ShipmentStatus.CANCELLED) {
     return null;
+  }
+
+  // FAILED = delivery failed (carrier issue, not intentional cancellation)
+  if (shipment.status === ShipmentStatus.DELIVERY_FAILED) {
+    return "FAILED";
   }
 
   // COMPLETED = backend status is DELIVERED
@@ -68,6 +76,7 @@ export function getShipmentDisplayStatusCounts(
     ACTIVE: 0,
     PARTIAL: 0,
     COMPLETED: 0,
+    FAILED: 0,
   };
 
   for (const shipment of shipments) {

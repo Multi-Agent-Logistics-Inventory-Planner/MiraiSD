@@ -18,6 +18,9 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.RESTOCK]: "Restock",
   [StockMovementReason.SHIPMENT_RECEIPT]: "Shipment",
   [StockMovementReason.SHIPMENT_RECEIPT_REVERSED]: "Shipment Reversal",
+  [StockMovementReason.SHIPMENT_PARTIAL_RECEIPT]: "Partial Receipt",
+  [StockMovementReason.SHIPMENT_EDITED]: "Shipment Edited",
+  [StockMovementReason.SHIPMENT_DELETED]: "Shipment Deleted",
   [StockMovementReason.SALE]: "Sale",
   [StockMovementReason.DAMAGE]: "Damage",
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
@@ -40,6 +43,7 @@ function getReasonStyle(reason: StockMovementReason): string {
     case StockMovementReason.RESTOCK:
     case StockMovementReason.INITIAL_STOCK:
     case StockMovementReason.SHIPMENT_RECEIPT:
+    case StockMovementReason.SHIPMENT_PARTIAL_RECEIPT:
       return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400";
     case StockMovementReason.TRANSFER:
       return "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400";
@@ -47,6 +51,7 @@ function getReasonStyle(reason: StockMovementReason): string {
       return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
     case StockMovementReason.DAMAGE:
     case StockMovementReason.SHIPMENT_RECEIPT_REVERSED:
+    case StockMovementReason.SHIPMENT_DELETED:
       return "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400";
     case StockMovementReason.RETURN:
       return "bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400";
@@ -54,6 +59,8 @@ function getReasonStyle(reason: StockMovementReason): string {
     case StockMovementReason.DISPLAY_REMOVED:
     case StockMovementReason.DISPLAY_SWAP:
       return "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-400";
+    case StockMovementReason.SHIPMENT_EDITED:
+      return "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400";
     case StockMovementReason.ADJUSTMENT:
     default:
       return "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400";

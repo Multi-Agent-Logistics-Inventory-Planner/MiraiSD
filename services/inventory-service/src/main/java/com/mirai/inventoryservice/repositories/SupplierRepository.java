@@ -2,7 +2,6 @@ package com.mirai.inventoryservice.repositories;
 
 import com.mirai.inventoryservice.models.Supplier;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -40,20 +39,6 @@ public interface SupplierRepository extends JpaRepository<Supplier, UUID> {
      */
     @Query("SELECT s FROM Supplier s WHERE s.isActive = true AND LOWER(s.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY s.displayName ASC")
     List<Supplier> searchActiveByDisplayName(@Param("query") String query);
-
-    /**
-     * Thread-safe upsert: Insert if not exists, return existing if conflict on canonical_name.
-     * Uses PostgreSQL ON CONFLICT to handle race conditions.
-     * Returns the supplier ID (either newly created or existing).
-     */
-    @Modifying
-    @Query(value = """
-        INSERT INTO suppliers (id, display_name, canonical_name, is_active, created_at, updated_at)
-        VALUES (gen_random_uuid(), :displayName, canonicalize_supplier_name(:displayName), true, NOW(), NOW())
-        ON CONFLICT (canonical_name) DO UPDATE SET updated_at = NOW()
-        RETURNING id
-        """, nativeQuery = true)
-    UUID upsertByDisplayName(@Param("displayName") String displayName);
 
     /**
      * Count shipments associated with a supplier.

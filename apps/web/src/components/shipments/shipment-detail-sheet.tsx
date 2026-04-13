@@ -38,12 +38,13 @@ interface ShipmentDetailSheetProps {
 
 const STATUS_VARIANTS: Record<
   ShipmentStatus,
-  "default" | "secondary" | "destructive" | "outline"
+  "default" | "secondary" | "destructive" | "outline" | "warning"
 > = {
   PENDING: "outline",
   IN_TRANSIT: "secondary",
   DELIVERED: "default",
   CANCELLED: "destructive",
+  DELIVERY_FAILED: "warning",
 };
 
 const STATUS_LABELS: Record<ShipmentStatus, string> = {
@@ -51,6 +52,7 @@ const STATUS_LABELS: Record<ShipmentStatus, string> = {
   IN_TRANSIT: "In Transit",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
+  DELIVERY_FAILED: "Delivery Failed",
 };
 
 function formatDate(dateStr?: string) {
@@ -413,8 +415,9 @@ export function ShipmentDetailSheet({
     return null;
   }
 
+  // DELIVERY_FAILED shipments can still be received (items may arrive despite failure)
   const canReceive =
-    shipment.status === "PENDING" || shipment.status === "IN_TRANSIT";
+    shipment.status === "PENDING" || shipment.status === "IN_TRANSIT" || shipment.status === "DELIVERY_FAILED";
   const canDelete = shipment.status !== "DELIVERED";
   const canEdit =
     shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";

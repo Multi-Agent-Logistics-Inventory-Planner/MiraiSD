@@ -37,7 +37,7 @@ public class SupplierService {
 
     /**
      * Resolve or create a supplier by display name.
-     * Thread-safe via database upsert with ON CONFLICT.
+     * Thread-safe via find-then-create with unique constraint handling.
      */
     public Supplier resolveOrCreate(String displayName) {
         if (displayName == null || displayName.isBlank()) {
@@ -45,8 +45,25 @@ public class SupplierService {
         }
 
         String trimmedName = displayName.trim();
-        UUID id = supplierRepository.upsertByDisplayName(trimmedName);
-        return supplierRepository.findById(id).orElse(null);
+        String canonicalName = canonicalize(trimmedName);
+
+        // Try to find existing supplier by canonical name
+        return supplierRepository.findByCanonicalName(canonicalName)
+                .orElseGet(() -> {
+                    // Not found - create new supplier
+                    // The database trigger will set canonical_name
+                    Supplier newSupplier = Supplier.builder()
+                            .displayName(trimmedName)
+                            .isActive(true)
+                            .build();
+                    try {
+                        return supplierRepository.saveAndFlush(newSupplier);
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        // Race condition: another thread created it first
+                        // Retry the find
+                        return supplierRepository.findByCanonicalName(canonicalName).orElse(null);
+                    }
+                });
     }
 
     /**
