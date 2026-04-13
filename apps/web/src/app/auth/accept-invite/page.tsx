@@ -243,7 +243,7 @@ function AcceptInviteContent() {
                   type="email"
                   value={email}
                   disabled
-                  className="bg-muted"
+                  className="bg-muted dark:bg-[#1c1c1c] placeholder:font-light"
                 />
               </div>
             )}
@@ -258,6 +258,7 @@ function AcceptInviteContent() {
                 onChange={(e) => setFullName(e.target.value)}
                 disabled={isLoading}
                 required
+                className="dark:bg-[#1c1c1c] placeholder:font-light"
               />
             </div>
 
@@ -272,6 +273,7 @@ function AcceptInviteContent() {
                 disabled={isLoading}
                 required
                 minLength={6}
+                className="dark:bg-[#1c1c1c] placeholder:font-light"
               />
             </div>
 
@@ -285,6 +287,7 @@ function AcceptInviteContent() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={isLoading}
                 required
+                className="dark:bg-[#1c1c1c] placeholder:font-light"
               />
             </div>
 

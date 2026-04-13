@@ -148,6 +148,7 @@ export function LoginForm() {
           placeholder="Enter your email"
           autoComplete="email"
           disabled={isLoading}
+          className="dark:bg-[#1c1c1c] placeholder:font-light"
           {...register("email")}
         />
         {errors.email && (
@@ -164,6 +165,7 @@ export function LoginForm() {
             placeholder="Enter your password"
             autoComplete="current-password"
             disabled={isLoading}
+            className="dark:bg-[#1c1c1c] placeholder:font-light"
             {...register("password")}
           />
           <button
