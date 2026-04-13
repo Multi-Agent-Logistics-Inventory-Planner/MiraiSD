@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getSupabaseClient } from "@/lib/supabase";
-import { validateToken } from "@/lib/api/auth";
+import { getAuthSession } from "@/lib/api/auth";
+import { setCachedSession } from "@/lib/auth-cache";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/api";
 
@@ -76,17 +77,21 @@ export function LoginForm() {
         throw new Error("No session returned from authentication");
       }
 
-      // Validate token with backend
-      const validation = await validateToken(authData.session.access_token);
+      // Validate token with backend using combined session endpoint
+      // This also pre-warms the cache so auth-provider doesn't need to re-fetch
+      const session = await getAuthSession(authData.session.access_token);
 
-      if (!validation.valid) {
+      if (!session.valid) {
         // Sign out of Supabase if backend validation fails
         await supabase.auth.signOut();
-        throw new Error(validation.message || "Backend validation failed");
+        throw new Error(session.message || "Backend validation failed");
       }
 
+      // Cache the session so auth-provider can use it without another API call
+      setCachedSession(authData.session.access_token, session);
+
       // Successful login - redirect based on role
-      const redirectPath = validation.role === UserRole.EMPLOYEE ? "/storage" : "/";
+      const redirectPath = session.role === UserRole.EMPLOYEE ? "/storage" : "/";
       router.push(redirectPath);
       router.refresh();
     } catch (err) {

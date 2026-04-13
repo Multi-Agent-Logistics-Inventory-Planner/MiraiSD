@@ -6,11 +6,17 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { useRouter } from "next/navigation";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase";
-import { validateToken, getCurrentUser } from "@/lib/api/auth";
+import { getAuthSession } from "@/lib/api/auth";
+import {
+  getCachedSession,
+  setCachedSession,
+  clearSessionCache,
+} from "@/lib/auth-cache";
 import { UserRole } from "@/types/api";
 
 export interface AuthUser {
@@ -40,35 +46,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Track if initial auth has been processed to prevent duplicate SIGNED_IN handling
+  const initialAuthProcessedRef = useRef(false);
 
   const validateAndSetUser = useCallback(
-    async (supabaseUser: SupabaseUser, accessToken: string) => {
+    async (
+      supabaseUser: SupabaseUser,
+      accessToken: string,
+      bypassCache = false
+    ) => {
       try {
-        const validation = await validateToken(accessToken);
-
-        if (validation.valid && validation.role) {
-          // Fetch fresh user data from database
-          try {
-            const dbUser = await getCurrentUser(accessToken);
+        // Check cache first (unless bypassing)
+        if (!bypassCache) {
+          const cached = getCachedSession(accessToken);
+          if (cached && cached.valid && cached.role) {
             setUser({
               id: supabaseUser.id,
               email: supabaseUser.email || "",
-              role: dbUser.role,
-              personId: dbUser.id,
-              personName: dbUser.fullName,
+              role: cached.user?.role ?? cached.role,
+              personId: cached.user?.id ?? cached.personId,
+              personName: cached.user?.fullName ?? cached.personName,
             });
-          } catch {
-            // Fallback to JWT data if /me endpoint fails
-            setUser({
-              id: supabaseUser.id,
-              email: supabaseUser.email || "",
-              role: validation.role,
-              personId: validation.personId,
-              personName: validation.personName,
-            });
+            return;
           }
+        }
+
+        // Make single combined API call
+        const sessionResponse = await getAuthSession(accessToken);
+
+        if (sessionResponse.valid && sessionResponse.role) {
+          // Use user object if available, fallback to session response fields
+          setUser({
+            id: supabaseUser.id,
+            email: supabaseUser.email || "",
+            role: sessionResponse.user?.role ?? sessionResponse.role,
+            personId: sessionResponse.user?.id ?? sessionResponse.personId,
+            personName:
+              sessionResponse.user?.fullName ?? sessionResponse.personName,
+          });
+          // Cache the successful response
+          setCachedSession(accessToken, sessionResponse);
         } else {
           // Backend validation failed - clear auth state
+          clearSessionCache();
           const supabase = getSupabaseClient();
           if (supabase) {
             await supabase.auth.signOut();
@@ -77,7 +97,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(null);
         }
       } catch {
-        // Validation failed - user might not have backend access
+        // Validation failed - clear cache and auth state
+        clearSessionCache();
         setUser(null);
         setSession(null);
       }
@@ -105,6 +126,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             initialSession.user,
             initialSession.access_token
           );
+          initialAuthProcessedRef.current = true;
         }
       } catch {
         // Failed to get session
@@ -125,13 +147,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // during initialization (INITIAL_SESSION event can have null session briefly)
       if (event === "SIGNED_OUT") {
         setUser(null);
+        clearSessionCache();
+        initialAuthProcessedRef.current = false;
         router.push("/login");
       } else if (
         (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
         newSession?.user &&
         newSession.access_token
       ) {
+        // Skip SIGNED_IN if we already processed it during initialization
+        // This prevents duplicate API calls when both initializeAuth and onAuthStateChange fire
+        if (event === "SIGNED_IN" && initialAuthProcessedRef.current) {
+          return;
+        }
         await validateAndSetUser(newSession.user, newSession.access_token);
+        initialAuthProcessedRef.current = true;
       }
     });
 
@@ -141,6 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [router, validateAndSetUser]);
 
   const signOut = useCallback(async () => {
+    clearSessionCache();
     const supabase = getSupabaseClient();
     if (supabase) {
       await supabase.auth.signOut();
@@ -160,7 +191,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (currentSession?.user && currentSession.access_token) {
       setSession(currentSession);
-      await validateAndSetUser(currentSession.user, currentSession.access_token);
+      // Always bypass cache for refreshAuth - user explicitly wants fresh data
+      await validateAndSetUser(
+        currentSession.user,
+        currentSession.access_token,
+        true
+      );
     }
   }, [validateAndSetUser]);
 
