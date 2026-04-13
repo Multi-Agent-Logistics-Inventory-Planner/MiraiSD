@@ -132,22 +132,24 @@ class SupabaseRepo:
     def get_items(self, item_ids: list[str] | None = None) -> pd.DataFrame:
         """Load products (items) from database.
 
-        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days, preferred_supplier_id
+        Returns DataFrame with columns: item_id, name, lead_time_days, safety_stock_days, preferred_supplier_id, category_name
         """
         query = """
             SELECT
-                id::text AS item_id,
-                name,
-                lead_time_days,
-                preferred_supplier_id::text AS preferred_supplier_id,
-                COALESCE(reorder_point / NULLIF(target_stock_level / NULLIF(lead_time_days, 0), 0), 7)::int AS safety_stock_days
-            FROM products
-            WHERE is_active = true
+                p.id::text AS item_id,
+                p.name,
+                p.lead_time_days,
+                p.preferred_supplier_id::text AS preferred_supplier_id,
+                COALESCE(p.reorder_point / NULLIF(p.target_stock_level / NULLIF(p.lead_time_days, 0), 0), 7)::int AS safety_stock_days,
+                c.name AS category_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.is_active = true
         """
         params: dict = {}
 
         if item_ids:
-            query += " AND id = ANY(:item_ids)"
+            query += " AND p.id = ANY(:item_ids)"
             params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
 
         with self._engine.connect() as conn:
@@ -155,13 +157,13 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "preferred_supplier_id"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "preferred_supplier_id", "category_name"]
             )
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = df["lead_time_days"].fillna(14).astype(int)
         df["safety_stock_days"] = df["safety_stock_days"].fillna(7).astype(int)
-        # preferred_supplier_id can be null
+        df["category_name"] = df["category_name"].fillna("Unknown")
         return df
 
     def get_current_inventory(self, item_ids: list[str] | None = None) -> pd.DataFrame:
@@ -206,7 +208,8 @@ class SupabaseRepo:
     ) -> pd.DataFrame:
         """Load stock movements within time window.
 
-        Returns DataFrame with columns: event_id, item_id, quantity_change, reason, at
+        Returns DataFrame with columns: event_id, item_id, quantity_change, reason, at,
+            previous_quantity, current_quantity
         """
         start_ts = pd.to_datetime(start, utc=True)
         end_ts = pd.to_datetime(end, utc=True)
@@ -217,7 +220,9 @@ class SupabaseRepo:
                 item_id::text AS item_id,
                 quantity_change,
                 LOWER(reason) AS reason,
-                at
+                at,
+                previous_quantity,
+                current_quantity
             FROM stock_movements
             WHERE at >= :start_ts AND at <= :end_ts
         """
@@ -233,13 +238,18 @@ class SupabaseRepo:
             df = pd.read_sql(text(query), conn, params=params)
 
         if df.empty:
-            return pd.DataFrame(columns=["event_id", "item_id", "quantity_change", "reason", "at"])
+            return pd.DataFrame(
+                columns=["event_id", "item_id", "quantity_change", "reason", "at",
+                         "previous_quantity", "current_quantity"]
+            )
 
         df["event_id"] = df["event_id"].astype(str)
         df["item_id"] = df["item_id"].astype(str)
         df["quantity_change"] = df["quantity_change"].astype(int)
         df["reason"] = df["reason"].astype(str)
         df["at"] = pd.to_datetime(df["at"], utc=True)
+        df["previous_quantity"] = pd.to_numeric(df["previous_quantity"], errors="coerce")
+        df["current_quantity"] = pd.to_numeric(df["current_quantity"], errors="coerce")
         return df
 
     def get_shipment_lead_times(
@@ -295,47 +305,6 @@ class SupabaseRepo:
 
         df["item_id"] = df["item_id"].astype(str)
         df["lead_time_days"] = pd.to_numeric(df["lead_time_days"], errors="coerce")
-        return df
-
-    def get_lead_time_mv_stats(
-        self,
-        item_ids: list[str] | None = None,
-    ) -> pd.DataFrame:
-        """Load lead time statistics from materialized view.
-
-        Returns DataFrame with columns: item_id, supplier_id, n, avg_lt, sigma_L
-        The MV aggregates shipment lead times per (item, supplier) combination.
-        """
-        query = """
-            SELECT
-                item_id::text AS item_id,
-                supplier_id::text AS supplier_id,
-                n,
-                avg_lt,
-                sigma_L
-            FROM mv_lead_time_stats
-        """
-        params: dict = {}
-
-        if item_ids:
-            query += " WHERE item_id = ANY(:item_ids)"
-            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
-
-        try:
-            with self._engine.connect() as conn:
-                df = pd.read_sql(text(query), conn, params=params)
-        except Exception:
-            logger.warning("Failed to query mv_lead_time_stats (MV may not exist yet)")
-            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
-
-        if df.empty:
-            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
-
-        df["item_id"] = df["item_id"].astype(str)
-        df["supplier_id"] = df["supplier_id"].astype(str)
-        df["n"] = df["n"].fillna(0).astype(int)
-        df["avg_lt"] = pd.to_numeric(df["avg_lt"], errors="coerce")
-        df["sigma_L"] = pd.to_numeric(df["sigma_L"], errors="coerce")
         return df
 
     def get_historical_forecasts(
@@ -500,6 +469,41 @@ class SupabaseRepo:
         logger.info("Upserted %d forecast predictions", len(rows))
         return len(rows)
 
+    def get_lead_time_mv_stats(self, item_ids: list[str] | None = None) -> pd.DataFrame:
+        """Load pre-aggregated lead time stats from the materialized view.
+
+        Returns DataFrame with columns: item_id, supplier_id, n, avg_lt, sigma_L
+        Returns empty DataFrame if the MV does not exist yet.
+        """
+        query = """
+            SELECT
+                item_id::text AS item_id,
+                supplier_id::text AS supplier_id,
+                n,
+                avg_lt,
+                sigma_L
+            FROM mv_lead_time_stats
+        """
+        params: dict = {}
+
+        if item_ids:
+            query += " WHERE item_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+
+        try:
+            with self._engine.connect() as conn:
+                df = pd.read_sql(text(query), conn, params=params)
+        except Exception:
+            logger.warning("Failed to query mv_lead_time_stats (table may not exist)")
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        if df.empty:
+            return pd.DataFrame(columns=["item_id", "supplier_id", "n", "avg_lt", "sigma_L"])
+
+        df["item_id"] = df["item_id"].astype(str)
+        df["supplier_id"] = df["supplier_id"].astype(str)
+        return df
+
     def update_product_reorder_points(self, forecasts_df: pd.DataFrame) -> int:
         """Propagate forecast-computed reorder points to the products table.
 
@@ -535,9 +539,13 @@ class SupabaseRepo:
             WHERE id = CAST(:item_id AS uuid)
         """
 
+        # Execute row-by-row and accumulate rowcount to avoid psycopg2
+        # executemany undercount (rowcount may only reflect last statement).
+        updated = 0
         with self._engine.begin() as conn:
-            result = conn.execute(text(update_query), rows)
-            updated = result.rowcount
+            for row in rows:
+                result = conn.execute(text(update_query), row)
+                updated += result.rowcount
 
         logger.info("Updated reorder_point for %d products", updated)
         return updated

@@ -28,20 +28,19 @@ def _make_forecasts_df(rows):
 class TestUpdateProductReorderPoints:
     """Tests for propagating reorder points from forecasts to products."""
 
-    def _make_repo(self):
+    def _make_repo(self, rowcount=1):
         mock_engine = MagicMock()
         mock_conn = MagicMock()
         mock_result = MagicMock()
-        mock_result.rowcount = 0
+        mock_result.rowcount = rowcount
         mock_conn.execute.return_value = mock_result
         mock_engine.begin.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_engine.begin.return_value.__exit__ = MagicMock(return_value=False)
         return SupabaseRepo(engine=mock_engine), mock_conn, mock_result
 
     def test_normal_case_sends_correct_values(self):
-        """Rows with valid reorder_point in features are sent to the DB."""
-        repo, mock_conn, mock_result = self._make_repo()
-        mock_result.rowcount = 2
+        """Each valid row gets its own execute call with correct ROP."""
+        repo, mock_conn, _ = self._make_repo(rowcount=1)
 
         item_a = str(uuid.uuid4())
         item_b = str(uuid.uuid4())
@@ -53,14 +52,15 @@ class TestUpdateProductReorderPoints:
         updated = repo.update_product_reorder_points(df)
 
         assert updated == 2
-        assert mock_conn.execute.call_count == 1
+        assert mock_conn.execute.call_count == 2
 
-        # Verify the rows passed to execute
-        args = mock_conn.execute.call_args
-        rows = args[0][1]
-        rop_by_id = {r["item_id"]: r["reorder_point"] for r in rows}
-        assert rop_by_id[item_a] == 16  # round(15.7)
-        assert rop_by_id[item_b] == 8   # round(8.3)
+        calls = mock_conn.execute.call_args_list
+        row_a = calls[0][0][1]
+        row_b = calls[1][0][1]
+        assert row_a["item_id"] == item_a
+        assert row_a["reorder_point"] == 16
+        assert row_b["item_id"] == item_b
+        assert row_b["reorder_point"] == 8
 
     def test_empty_dataframe_returns_zero(self):
         """Empty DataFrame should short-circuit and return 0."""
@@ -114,28 +114,26 @@ class TestUpdateProductReorderPoints:
         assert mock_conn.execute.call_count == 0
 
     def test_mixed_valid_and_invalid_rows(self):
-        """Only valid rows are sent; invalid rows are silently skipped."""
-        repo, mock_conn, mock_result = self._make_repo()
-        mock_result.rowcount = 1
+        """Only valid rows get execute calls; invalid rows silently skipped."""
+        repo, mock_conn, _ = self._make_repo(rowcount=1)
 
         valid_id = str(uuid.uuid4())
         df = _make_forecasts_df([
             (valid_id, {"reorder_point": 10.0}),
-            (str(uuid.uuid4()), {"mu_hat": 1.0}),       # no rop
-            (str(uuid.uuid4()), "bad features"),          # not a dict
+            (str(uuid.uuid4()), {"mu_hat": 1.0}),
+            (str(uuid.uuid4()), "bad features"),
         ])
 
         updated = repo.update_product_reorder_points(df)
 
         assert updated == 1
-        rows = mock_conn.execute.call_args[0][1]
-        assert len(rows) == 1
-        assert rows[0]["item_id"] == valid_id
+        assert mock_conn.execute.call_count == 1
+        row = mock_conn.execute.call_args[0][1]
+        assert row["item_id"] == valid_id
 
     def test_reorder_point_rounds_correctly(self):
         """Reorder point should be rounded to nearest integer."""
-        repo, mock_conn, mock_result = self._make_repo()
-        mock_result.rowcount = 3
+        repo, mock_conn, _ = self._make_repo(rowcount=1)
 
         df = _make_forecasts_df([
             (str(uuid.uuid4()), {"reorder_point": 5.4}),
@@ -145,15 +143,16 @@ class TestUpdateProductReorderPoints:
 
         repo.update_product_reorder_points(df)
 
-        rows = mock_conn.execute.call_args[0][1]
-        rops = [r["reorder_point"] for r in rows]
+        calls = mock_conn.execute.call_args_list
+        rops = [c[0][1]["reorder_point"] for c in calls]
         assert rops == [5, 6, 6]
 
-    def test_uses_result_rowcount_not_len(self):
-        """Should return DB rowcount, not the number of rows sent."""
-        repo, mock_conn, mock_result = self._make_repo()
-        # Simulate: 3 rows sent but only 2 matched in DB (one item deleted)
-        mock_result.rowcount = 2
+    def test_accumulates_rowcount_across_calls(self):
+        """Should sum rowcount from each individual execute, not use last."""
+        repo, mock_conn, _ = self._make_repo(rowcount=1)
+
+        results = [MagicMock(rowcount=1), MagicMock(rowcount=1), MagicMock(rowcount=0)]
+        mock_conn.execute.side_effect = results
 
         df = _make_forecasts_df([
             (str(uuid.uuid4()), {"reorder_point": 10}),
@@ -163,4 +162,5 @@ class TestUpdateProductReorderPoints:
 
         updated = repo.update_product_reorder_points(df)
 
-        assert updated == 2  # rowcount, not 3
+        assert updated == 2
+        assert mock_conn.execute.call_count == 3
