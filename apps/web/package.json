@@ -84,5 +84,11 @@
     "tw-animate-css": "1.3.3",
     "typescript": "5.9.3",
     "vitest": "^4.0.18"
-  }
+  },
+  "browserslist": [
+    "chrome 111",
+    "edge 111",
+    "firefox 111",
+    "safari 16.4"
+  ]
 }
