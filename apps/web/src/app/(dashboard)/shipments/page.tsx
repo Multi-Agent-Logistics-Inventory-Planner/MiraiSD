@@ -178,17 +178,17 @@ export default function ShipmentsPage() {
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <TabsList>
-                <TabsTrigger value="ACTIVE">
+                <TabsTrigger value="ACTIVE" className="tabular-nums">
                   Active ({statusCounts.ACTIVE})
                 </TabsTrigger>
-                <TabsTrigger value="PARTIAL">
+                <TabsTrigger value="PARTIAL" className="tabular-nums">
                   Partial ({statusCounts.PARTIAL})
                 </TabsTrigger>
-                <TabsTrigger value="COMPLETED">
+                <TabsTrigger value="COMPLETED" className="tabular-nums">
                   Completed ({statusCounts.COMPLETED})
                 </TabsTrigger>
                 {statusCounts.FAILED > 0 && (
-                  <TabsTrigger value="FAILED" className="text-destructive">
+                  <TabsTrigger value="FAILED" className="text-destructive tabular-nums">
                     Failed ({statusCounts.FAILED})
                   </TabsTrigger>
                 )}

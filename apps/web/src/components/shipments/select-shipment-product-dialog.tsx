@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ImageOff, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
 import { getProducts } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
@@ -30,11 +30,11 @@ interface SelectShipmentProductDialogProps {
 
 interface ShipmentProductCardProps {
   product: Product;
-  onSelect: () => void;
+  onSelect: (product: Product) => void;
   disabled?: boolean;
 }
 
-function ShipmentProductCard({
+const ShipmentProductCard = memo(function ShipmentProductCard({
   product,
   onSelect,
   disabled = false,
@@ -48,10 +48,10 @@ function ShipmentProductCard({
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => onSelect(product)}
       disabled={disabled}
       className={cn(
-        "overflow-hidden min-w-0 w-full flex items-center gap-2 sm:gap-4 py-3 sm:py-4 sm:px-3 border-b last:border-b-0 cursor-pointer",
+        "overflow-hidden min-w-0 w-full h-full flex items-center gap-2 sm:gap-4 px-3 border-b cursor-pointer",
         "transition-colors text-left",
         "hover:bg-muted/50",
         disabled && "opacity-50 cursor-not-allowed"
@@ -90,7 +90,7 @@ function ShipmentProductCard({
       </div>
     </button>
   );
-}
+});
 
 export function SelectShipmentProductDialog({
   open,
@@ -177,6 +177,16 @@ export function SelectShipmentProductDialog({
     });
   }, [availableProducts, searchQuery, categoryFilters, childCategoryFilters]);
 
+  // Virtualization setup - use callback ref for proper timing
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+
+  const virtualizer = useVirtualizer({
+    count: filteredProducts.length,
+    getScrollElement: () => scrollContainer,
+    estimateSize: () => 88, // Row height: image (64px) + padding (24px)
+    overscan: 5,
+  });
+
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
@@ -186,15 +196,20 @@ export function SelectShipmentProductDialog({
     }
   }, [open]);
 
+  // Scroll to top when filters change
+  useEffect(() => {
+    scrollContainer?.scrollTo({ top: 0 });
+  }, [searchQuery, categoryFilters, childCategoryFilters, scrollContainer]);
+
   function handleClearFilters() {
     setCategoryFilters([]);
     setChildCategoryFilters([]);
   }
 
-  function handleProductSelect(product: Product) {
+  const handleProductSelect = useCallback((product: Product) => {
     onSelect(product);
     onOpenChange(false);
-  }
+  }, [onSelect, onOpenChange]);
 
   const isLoading = productsQuery.isLoading;
 
@@ -244,18 +259,39 @@ export function SelectShipmentProductDialog({
                   No products match your search
                 </div>
               ) : (
-                <div className="flex-1 min-h-0 w-full overflow-hidden">
-                  <ScrollArea className="h-full w-full [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
-                    <div className="w-full overflow-hidden pb-2 pr-3">
-                      {filteredProducts.map((product) => (
-                        <ShipmentProductCard
+                <div
+                  ref={setScrollContainer}
+                  className="flex-1 min-h-0 w-full overflow-auto"
+                >
+                  <div
+                    style={{
+                      height: `${virtualizer.getTotalSize()}px`,
+                      width: "100%",
+                      position: "relative",
+                    }}
+                  >
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                      const product = filteredProducts[virtualRow.index];
+                      return (
+                        <div
                           key={product.id}
-                          product={product}
-                          onSelect={() => handleProductSelect(product)}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            height: `${virtualRow.size}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <ShipmentProductCard
+                            product={product}
+                            onSelect={handleProductSelect}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>
