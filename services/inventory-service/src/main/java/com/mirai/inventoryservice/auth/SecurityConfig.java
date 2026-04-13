@@ -36,7 +36,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth ->
             auth
                 // Public endpoints (no authentication required)
-                .requestMatchers("/api/auth/validate").permitAll()
+                .requestMatchers("/api/auth/validate", "/api/auth/session").permitAll()
                 .requestMatchers("/health").permitAll()
                 // Only expose health endpoint publicly; other actuator endpoints require ADMIN role
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

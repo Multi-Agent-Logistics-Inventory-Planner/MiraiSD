@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
@@ -136,21 +137,34 @@ export function ShipmentCreateDialog({
   });
 
   const items = form.watch("items");
-  // Derive kuji IDs from state for immediate reactivity
-  const selectedKujiIds = Object.values(selectedProductIds).filter((id): id is string => !!id);
+  // Only fetch children for products that actually have children (Kuji products)
+  const selectedKujiIds = useMemo(() => {
+    return Object.values(selectedProductIds)
+      .filter((id): id is string => !!id)
+      .filter((id) => products.find((p) => p.id === id)?.hasChildren);
+  }, [selectedProductIds, products]);
+
   const childrenQueries = useQueries({
     queries: selectedKujiIds.map((id) => ({
       queryKey: ["products", id, "children"],
       queryFn: () => getProductChildren(id),
     })),
   });
-  // Compute children map directly - no useMemo needed for this simple derivation
-  // This ensures reactivity when queries complete
-  const childrenByProductId: Record<string, ProductSummary[]> = {};
-  selectedKujiIds.forEach((id, i) => {
-    const data = childrenQueries[i]?.data;
-    if (data?.length) childrenByProductId[id] = data;
-  });
+  // Memoize children map to prevent unnecessary recalculations
+  const childrenByProductId = useMemo(() => {
+    const result: Record<string, ProductSummary[]> = {};
+    selectedKujiIds.forEach((id, i) => {
+      const data = childrenQueries[i]?.data;
+      if (data?.length) result[id] = data;
+    });
+    return result;
+  }, [selectedKujiIds, childrenQueries]);
+
+  // Helper to check if children are loading for a specific product
+  function isLoadingChildrenForProduct(productId: string): boolean {
+    const idx = selectedKujiIds.indexOf(productId);
+    return idx !== -1 && childrenQueries[idx]?.isLoading === true;
+  }
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -265,14 +279,18 @@ export function ShipmentCreateDialog({
   }, [childrenByProductId, form, items]);
 
   function handleSelectProduct(index: number, product: Product) {
-    form.setValue(`items.${index}.productId`, product.id);
-    form.setValue(`items.${index}.productName`, product.name);
-    form.setValue(`items.${index}.productSku`, product.sku ?? "");
-    form.setValue(`items.${index}.numberOfSets`, undefined);
-    form.setValue(`items.${index}.prizeQuantities`, undefined);
-    if (product.unitCost) {
-      form.setValue(`items.${index}.unitCost`, product.unitCost);
-    }
+    // Batch all form updates into a single setValue call to reduce re-renders
+    const currentItem = form.getValues(`items.${index}`);
+    form.setValue(`items.${index}`, {
+      ...currentItem,
+      productId: product.id,
+      productName: product.name,
+      productSku: product.sku ?? "",
+      numberOfSets: undefined,
+      prizeQuantities: undefined,
+      unitCost: product.unitCost ?? currentItem.unitCost,
+    }, { shouldValidate: false });
+
     // Update state to trigger re-render and fetch children
     setSelectedProductIds((prev) => ({ ...prev, [index]: product.id }));
   }
@@ -671,7 +689,20 @@ export function ShipmentCreateDialog({
                             )}
                           </div>
 
-                          {childrenByProductId[selectedProductId]?.length ? (
+                          {isLoadingChildrenForProduct(selectedProductId) ? (
+                            <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+                              <div className="flex items-center gap-3 pb-2 border-b">
+                                <Skeleton className="h-4 w-10" />
+                                <Skeleton className="h-8 w-20" />
+                              </div>
+                              <Skeleton className="h-4 w-32 mt-2" />
+                              <div className="space-y-2">
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                              </div>
+                            </div>
+                          ) : childrenByProductId[selectedProductId]?.length ? (
                             <div className="space-y-2 rounded-md border p-3 bg-muted/20">
                               {/* Sets input for auto-calculation */}
                               <div className="flex items-center gap-3 pb-2 border-b">

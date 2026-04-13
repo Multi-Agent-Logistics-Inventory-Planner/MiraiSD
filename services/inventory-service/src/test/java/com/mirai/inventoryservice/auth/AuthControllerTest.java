@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -166,5 +167,81 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.role").value("EMPLOYEE"))
                 .andExpect(jsonPath("$.personId").doesNotExist());
+    }
+
+    // Tests for /api/auth/session endpoint
+
+    @Test
+    void testGetSession_Success_WithUser() throws Exception {
+        // Arrange
+        String validToken = "Bearer valid.jwt.token";
+        String tokenWithoutBearer = "valid.jwt.token";
+        String email = "admin@example.com";
+        UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        User user = User.builder()
+                .id(userId)
+                .email(email)
+                .fullName("Admin User")
+                .role(UserRole.ADMIN)
+                .build();
+
+        when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(true);
+        when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("ADMIN");
+        when(jwtService.extractName(tokenWithoutBearer)).thenReturn("Admin User");
+        when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
+        when(userService.existsByEmail(email)).thenReturn(true);
+        when(userService.getUserByEmail(email)).thenReturn(user);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/auth/session")
+                .header("Authorization", validToken)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.personId").value(userId.toString()))
+                .andExpect(jsonPath("$.personName").value("Admin User"));
+    }
+
+    @Test
+    void testGetSession_InvalidToken() throws Exception {
+        // Arrange
+        String invalidToken = "Bearer invalid.jwt.token";
+        String tokenWithoutBearer = "invalid.jwt.token";
+
+        when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(false);
+
+        // Act & Assert
+        mockMvc.perform(get("/api/auth/session")
+                .header("Authorization", invalidToken)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.message").value("Invalid token"));
+    }
+
+    @Test
+    void testGetSession_UserNotInDatabase() throws Exception {
+        // Arrange - User exists in Supabase but not in application database
+        String token = "Bearer new.user.token";
+        String tokenWithoutBearer = "new.user.token";
+        String email = "newuser@example.com";
+
+        when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(true);
+        when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("EMPLOYEE");
+        when(jwtService.extractName(tokenWithoutBearer)).thenReturn("New User");
+        when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
+        when(userService.existsByEmail(email)).thenReturn(false);
+
+        // Act & Assert - user should be null if not in database
+        mockMvc.perform(get("/api/auth/session")
+                .header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.role").value("EMPLOYEE"))
+                .andExpect(jsonPath("$.personName").value("New User"))
+                .andExpect(jsonPath("$.personId").isEmpty())
+                .andExpect(jsonPath("$.user").isEmpty());
     }
 }

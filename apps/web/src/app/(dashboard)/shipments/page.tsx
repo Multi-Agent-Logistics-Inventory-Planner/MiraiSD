@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -15,15 +16,43 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ShipmentsList,
-  ShipmentDetailSheet,
-  ShipmentCreateDialog,
-  ShipmentReceiveDialog,
-  ShipmentUndoItemsDialog,
   ShipmentHeader,
   ShipmentFilters,
   ShipmentPagination,
 } from "@/components/shipments";
 import { SuppliersTab } from "@/components/suppliers";
+
+const ShipmentDetailSheet = dynamic(
+  () =>
+    import("@/components/shipments/shipment-detail-sheet").then((m) => ({
+      default: m.ShipmentDetailSheet,
+    })),
+  { ssr: false }
+);
+
+const ShipmentCreateDialog = dynamic(
+  () =>
+    import("@/components/shipments/shipment-create-dialog").then((m) => ({
+      default: m.ShipmentCreateDialog,
+    })),
+  { ssr: false }
+);
+
+const ShipmentReceiveDialog = dynamic(
+  () =>
+    import("@/components/shipments/shipment-receive-dialog").then((m) => ({
+      default: m.ShipmentReceiveDialog,
+    })),
+  { ssr: false }
+);
+
+const ShipmentUndoItemsDialog = dynamic(
+  () =>
+    import("@/components/shipments/shipment-undo-items-dialog").then((m) => ({
+      default: m.ShipmentUndoItemsDialog,
+    })),
+  { ssr: false }
+);
 import { useShipments, useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
 import { useDeleteShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
@@ -178,17 +207,17 @@ export default function ShipmentsPage() {
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <TabsList>
-                <TabsTrigger value="ACTIVE">
+                <TabsTrigger value="ACTIVE" className="tabular-nums">
                   Active ({statusCounts.ACTIVE})
                 </TabsTrigger>
-                <TabsTrigger value="PARTIAL">
+                <TabsTrigger value="PARTIAL" className="tabular-nums">
                   Partial ({statusCounts.PARTIAL})
                 </TabsTrigger>
-                <TabsTrigger value="COMPLETED">
+                <TabsTrigger value="COMPLETED" className="tabular-nums">
                   Completed ({statusCounts.COMPLETED})
                 </TabsTrigger>
                 {statusCounts.FAILED > 0 && (
-                  <TabsTrigger value="FAILED" className="text-destructive">
+                  <TabsTrigger value="FAILED" className="text-destructive tabular-nums">
                     Failed ({statusCounts.FAILED})
                   </TabsTrigger>
                 )}

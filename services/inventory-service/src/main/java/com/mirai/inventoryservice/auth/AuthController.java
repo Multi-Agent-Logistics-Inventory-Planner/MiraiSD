@@ -70,6 +70,47 @@ public class AuthController {
     }
 
     /**
+     * Combined session endpoint: validates token AND returns user data in one call.
+     * Reduces the N+1 pattern of separate validate + me calls.
+     * Returns validation status, role info, and full user object when available.
+     */
+    @GetMapping("/session")
+    public ResponseEntity<?> getSession(@RequestHeader("Authorization") String authHeader) {
+        try {
+            String token = authHeader.substring(7); // Remove "Bearer "
+
+            if (!jwtService.validateToken(token)) {
+                return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Invalid token"));
+            }
+
+            String role = jwtService.extractRole(token);
+            String personName = jwtService.extractName(token);
+            String email = jwtService.extractEmail(token);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", true);
+            response.put("role", role);
+            response.put("personName", personName);
+            response.put("personId", null);
+            response.put("user", null);
+
+            // Look up user and include full user data in response
+            if (email != null && userService.existsByEmail(email)) {
+                User user = userService.getUserByEmail(email);
+                response.put("personId", user.getId().toString());
+                response.put("role", user.getRole().name()); // Override with DB role
+                response.put("user", userMapper.toResponseDTO(user));
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(Map.of("valid", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Session validation failed"));
+        }
+    }
+
+    /**
      * Get current user profile from database.
      * Returns fresh user data (name, role, etc.) from the database.
      */
