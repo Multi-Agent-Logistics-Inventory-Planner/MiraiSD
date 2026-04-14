@@ -89,5 +89,30 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("to") OffsetDateTime to,
             @Param("reasons") List<StockMovementReason> reasons,
             org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Aggregate sales movements by item and date for rollup computation.
+     * Does the aggregation in SQL to avoid loading all entities into memory.
+     * Returns: item_id, rollup_date, units_sold, revenue, cost, profit, movement_count
+     */
+    @Query(value = """
+        SELECT
+            sm.item_id,
+            DATE(sm.at AT TIME ZONE 'UTC') as rollup_date,
+            SUM(ABS(sm.quantity_change)) as units_sold,
+            SUM(ABS(sm.quantity_change) * COALESCE(p.msrp, 0)) as revenue,
+            SUM(ABS(sm.quantity_change) * COALESCE(p.unit_cost, 0)) as cost,
+            SUM(ABS(sm.quantity_change) * (COALESCE(p.msrp, 0) - COALESCE(p.unit_cost, 0))) as profit,
+            COUNT(*) as movement_count
+        FROM stock_movements sm
+        JOIN products p ON sm.item_id = p.id
+        WHERE sm.reason = 'SALE'
+          AND sm.at >= :startDate
+          AND sm.at < :endDate
+        GROUP BY sm.item_id, DATE(sm.at AT TIME ZONE 'UTC')
+        """, nativeQuery = true)
+    List<Object[]> aggregateSalesByItemAndDate(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate);
 }
 

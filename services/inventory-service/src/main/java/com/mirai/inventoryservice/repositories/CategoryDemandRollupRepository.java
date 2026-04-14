@@ -81,4 +81,11 @@ public interface CategoryDemandRollupRepository extends JpaRepository<CategoryDe
      * Check if rollup exists for category on date.
      */
     boolean existsByCategoryIdAndRollupDate(UUID categoryId, LocalDate rollupDate);
+
+    /**
+     * Find all category IDs that have rollups for a given date.
+     * Used to batch-check existence instead of N individual queries.
+     */
+    @Query("SELECT cr.categoryId FROM CategoryDemandRollup cr WHERE cr.rollupDate = :date")
+    List<UUID> findCategoryIdsByRollupDate(@Param("date") LocalDate date);
 }

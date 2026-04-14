@@ -19,8 +19,10 @@ import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MonthlyPerformanceRollupRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,7 @@ public class AnalyticsSeedService {
     private final ForecastSnapshotRepository forecastSnapshotRepository;
     private final CategoryDemandRollupRepository categoryDemandRollupRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
+    private final CacheManager cacheManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Random random = new Random();
@@ -69,13 +72,16 @@ public class AnalyticsSeedService {
     public Map<String, Object> seedAllAnalytics(int monthsBack) {
         log.info("Starting analytics seed for {} months back", monthsBack);
 
-        // Ensure products have proper defaults before seeding forecasts
-        int productsUpdated = updateProductDefaults();
+        // Load products once and pass to sub-methods to avoid multiple findAll() calls
+        List<Product> products = productRepository.findAll();
 
-        int salesCreated = seedDowPatternSales(monthsBack);
-        int dailyRollups = seedDailyRollups(monthsBack);
+        // Ensure products have proper defaults before seeding forecasts
+        int productsUpdated = updateProductDefaults(products);
+
+        int salesCreated = seedDowPatternSales(monthsBack, products);
+        int dailyRollups = seedDailyRollups(monthsBack, products);
         int monthlyRollups = seedMonthlyRollups(monthsBack);
-        int forecastsCreated = seedForecastPredictions();
+        int forecastsCreated = seedForecastPredictions(products);
 
         return Map.of(
             "success", true,
@@ -97,7 +103,10 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedForecastPredictions() {
-        List<Product> products = productRepository.findAll();
+        return seedForecastPredictions(productRepository.findAll());
+    }
+
+    private int seedForecastPredictions(List<Product> products) {
         if (products.isEmpty()) {
             log.warn("No products found for forecast seeding");
             return 0;
@@ -194,10 +203,19 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedDowPatternSales(int monthsBack) {
-        List<Product> products = productRepository.findAll();
+        return seedDowPatternSales(monthsBack, productRepository.findAll());
+    }
+
+    private int seedDowPatternSales(int monthsBack, List<Product> products) {
         if (products.isEmpty()) {
             log.warn("No products found for DOW pattern seeding");
             return 0;
+        }
+
+        // Build index map once to avoid N+1 in getBaseRateForProduct
+        Map<UUID, Integer> productIndexMap = new HashMap<>();
+        for (int i = 0; i < products.size(); i++) {
+            productIndexMap.put(products.get(i).getId(), i);
         }
 
         LocalDate today = LocalDate.now();
@@ -206,7 +224,7 @@ public class AnalyticsSeedService {
 
         for (Product product : products) {
             // Vary base sales rate per product (simulating top/steady/slow sellers)
-            double baseDailyRate = getBaseRateForProduct(product, products.size());
+            double baseDailyRate = getBaseRateForProduct(product, products.size(), productIndexMap);
 
             LocalDate currentDate = startDate;
             while (!currentDate.isAfter(today)) {
@@ -250,7 +268,10 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedDailyRollups(int monthsBack) {
-        List<Product> products = productRepository.findAll();
+        return seedDailyRollups(monthsBack, productRepository.findAll());
+    }
+
+    private int seedDailyRollups(int monthsBack, List<Product> products) {
         if (products.isEmpty()) {
             return 0;
         }
@@ -277,19 +298,29 @@ public class AnalyticsSeedService {
                     .rollupDate(date)
                     .unitsSold(0)
                     .revenue(BigDecimal.ZERO)
+                    .cost(BigDecimal.ZERO)
+                    .profit(BigDecimal.ZERO)
                     .restockUnits(0)
                     .damageUnits(0)
                     .movementCount(0)
                     .build()
             );
 
+            // Calculate revenue (MSRP-based), cost, and profit
+            Product item = movement.getItem();
             int units = Math.abs(movement.getQuantityChange());
-            BigDecimal revenue = movement.getItem().getUnitCost() != null
-                ? movement.getItem().getUnitCost().multiply(BigDecimal.valueOf(units))
-                : BigDecimal.ZERO;
+            BigDecimal unitQty = BigDecimal.valueOf(units);
+            BigDecimal msrp = item.getMsrp() != null ? item.getMsrp() : BigDecimal.ZERO;
+            BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+
+            BigDecimal revenue = msrp.multiply(unitQty);
+            BigDecimal cost = unitCost.multiply(unitQty);
+            BigDecimal profit = revenue.subtract(cost);
 
             rollup.setUnitsSold(rollup.getUnitsSold() + units);
             rollup.setRevenue(rollup.getRevenue().add(revenue));
+            rollup.setCost(rollup.getCost().add(cost));
+            rollup.setProfit(rollup.getProfit().add(profit));
             rollup.setMovementCount(rollup.getMovementCount() + 1);
         }
 
@@ -316,6 +347,85 @@ public class AnalyticsSeedService {
 
         dailySalesRollupRepository.saveAll(rollups);
         log.info("Seeded {} daily rollups", rollups.size());
+        return rollups.size();
+    }
+
+    /**
+     * Recompute all daily rollups from existing stock movements.
+     * Deletes existing rollups and recreates them with updated MSRP-based revenue calculation.
+     * Clears the sales summary cache after completion.
+     *
+     * OPTIMIZED: Uses bulk delete and SQL aggregation instead of loading entities into memory.
+     *
+     * @param monthsBack Number of months to recompute
+     * @return Number of rollups created
+     */
+    @Transactional
+    public int recomputeAllRollups(int monthsBack) {
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusMonths(monthsBack);
+
+        // Bulk delete existing rollups (single DELETE statement, not entity-by-entity)
+        int deleted = dailySalesRollupRepository.deleteByRollupDateBetween(startDate, today);
+        log.info("Deleted {} existing rollups for recomputation", deleted);
+
+        // Recompute from stock_movements using SQL aggregation
+        int count = recomputeRollupsOptimized(startDate, today);
+
+        // Clear sales summary cache
+        var cache = cacheManager.getCache(CacheConfig.SALES_SUMMARY_CACHE);
+        if (cache != null) {
+            cache.clear();
+            log.info("Cleared sales summary cache");
+        }
+
+        log.info("Recomputed {} daily rollups", count);
+        return count;
+    }
+
+    /**
+     * Optimized rollup computation using SQL aggregation.
+     * Aggregates data in the database instead of loading all movements into memory.
+     */
+    private int recomputeRollupsOptimized(LocalDate startDate, LocalDate endDate) {
+        OffsetDateTime startDateTime = startDate.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime endDateTime = endDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        // Use native SQL aggregation - much faster than loading all entities
+        List<Object[]> aggregatedData = stockMovementRepository.aggregateSalesByItemAndDate(
+            startDateTime, endDateTime);
+
+        if (aggregatedData.isEmpty()) {
+            log.info("No sales movements found in date range");
+            return 0;
+        }
+
+        List<DailySalesRollup> rollups = new ArrayList<>();
+        for (Object[] row : aggregatedData) {
+            UUID itemId = (UUID) row[0];
+            LocalDate rollupDate = ((java.sql.Date) row[1]).toLocalDate();
+            int unitsSold = ((Number) row[2]).intValue();
+            BigDecimal revenue = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
+            BigDecimal cost = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
+            BigDecimal profit = row[5] != null ? new BigDecimal(row[5].toString()) : BigDecimal.ZERO;
+            int movementCount = ((Number) row[6]).intValue();
+
+            rollups.add(DailySalesRollup.builder()
+                .itemId(itemId)
+                .rollupDate(rollupDate)
+                .unitsSold(unitsSold)
+                .revenue(revenue)
+                .cost(cost)
+                .profit(profit)
+                .restockUnits(0)
+                .damageUnits(0)
+                .movementCount(movementCount)
+                .build());
+        }
+
+        // Batch save all rollups
+        dailySalesRollupRepository.saveAll(rollups);
+        log.info("Created {} daily rollups from SQL aggregation", rollups.size());
         return rollups.size();
     }
 
@@ -448,7 +558,10 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int updateProductDefaults() {
-        List<Product> products = productRepository.findAll();
+        return updateProductDefaults(productRepository.findAll());
+    }
+
+    private int updateProductDefaults(List<Product> products) {
         int updated = 0;
 
         for (Product product : products) {
@@ -512,6 +625,8 @@ public class AnalyticsSeedService {
                     .rollupDate(date)
                     .unitsSold(0)
                     .revenue(BigDecimal.ZERO)
+                    .cost(BigDecimal.ZERO)
+                    .profit(BigDecimal.ZERO)
                     .restockUnits(0)
                     .damageUnits(0)
                     .movementCount(0)
@@ -519,13 +634,21 @@ public class AnalyticsSeedService {
             );
 
             if (existing == null) {
+                // Calculate revenue (MSRP-based), cost, and profit
+                Product item = movement.getItem();
                 int units = Math.abs(movement.getQuantityChange());
-                BigDecimal revenue = movement.getItem().getUnitCost() != null
-                    ? movement.getItem().getUnitCost().multiply(BigDecimal.valueOf(units))
-                    : BigDecimal.ZERO;
+                BigDecimal unitQty = BigDecimal.valueOf(units);
+                BigDecimal msrp = item.getMsrp() != null ? item.getMsrp() : BigDecimal.ZERO;
+                BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+
+                BigDecimal revenue = msrp.multiply(unitQty);
+                BigDecimal cost = unitCost.multiply(unitQty);
+                BigDecimal profit = revenue.subtract(cost);
 
                 rollup.setUnitsSold(rollup.getUnitsSold() + units);
                 rollup.setRevenue(rollup.getRevenue().add(revenue));
+                rollup.setCost(rollup.getCost().add(cost));
+                rollup.setProfit(rollup.getProfit().add(profit));
                 rollup.setMovementCount(rollup.getMovementCount() + 1);
             }
         }
@@ -533,9 +656,9 @@ public class AnalyticsSeedService {
         dailySalesRollupRepository.saveAll(rollupMap.values());
     }
 
-    private double getBaseRateForProduct(Product product, int totalProducts) {
+    private double getBaseRateForProduct(Product product, int totalProducts, Map<UUID, Integer> productIndexMap) {
         // Assign products to tiers based on their position
-        int index = productRepository.findAll().indexOf(product);
+        int index = productIndexMap.getOrDefault(product.getId(), 0);
         double position = (double) index / totalProducts;
 
         if (position < 0.2) {
@@ -569,11 +692,15 @@ public class AnalyticsSeedService {
             return 0;
         }
 
+        // Batch fetch existing snapshots for today to avoid N+1 EXISTS queries
+        java.util.Set<UUID> existingItemIds = new java.util.HashSet<>(
+            forecastSnapshotRepository.findItemIdsBySnapshotDate(today));
+
         List<ForecastDailySnapshot> snapshots = new ArrayList<>();
 
         for (ForecastPrediction prediction : latestPredictions) {
             // Skip if already snapshotted today
-            if (forecastSnapshotRepository.existsByItemIdAndSnapshotDate(prediction.getItemId(), today)) {
+            if (existingItemIds.contains(prediction.getItemId())) {
                 continue;
             }
 
@@ -641,6 +768,10 @@ public class AnalyticsSeedService {
             }
         }
 
+        // Batch fetch existing rollups for today to avoid N+1 EXISTS queries
+        java.util.Set<UUID> existingCategoryIds = new java.util.HashSet<>(
+            categoryDemandRollupRepository.findCategoryIdsByRollupDate(today));
+
         List<CategoryDemandRollup> rollups = new ArrayList<>();
 
         for (Map.Entry<UUID, List<Product>> entry : productsByCategory.entrySet()) {
@@ -648,7 +779,7 @@ public class AnalyticsSeedService {
             List<Product> categoryProducts = entry.getValue();
 
             // Skip if already rolled up today
-            if (categoryDemandRollupRepository.existsByCategoryIdAndRollupDate(categoryId, today)) {
+            if (existingCategoryIds.contains(categoryId)) {
                 continue;
             }
 

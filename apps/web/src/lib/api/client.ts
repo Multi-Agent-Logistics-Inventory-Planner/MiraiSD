@@ -31,13 +31,14 @@ async function getAuthToken(): Promise<string | null> {
 interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
   skipAuthRedirect?: boolean;
+  timeoutMs?: number;
 }
 
 export async function apiClient<T>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { skipAuth = false, skipAuthRedirect = false, ...fetchOptions } = options;
+  const { skipAuth = false, skipAuthRedirect = false, timeoutMs, ...fetchOptions } = options;
 
   const headers = new Headers(fetchOptions.headers);
 
@@ -60,44 +61,59 @@ export async function apiClient<T>(
 
   const url = `${API_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
+  // Setup timeout with AbortController if specified
+  let timeoutId: NodeJS.Timeout | undefined;
+  let controller: AbortController | undefined;
+  if (timeoutMs) {
+    controller = new AbortController();
+    timeoutId = setTimeout(() => controller?.abort(), timeoutMs);
+  }
 
-  // Handle 401 Unauthorized - redirect to login (unless skipAuthRedirect is set)
-  if (response.status === 401) {
-    if (!skipAuthRedirect && typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-    throw new ApiClientError({
-      timestamp: new Date().toISOString(),
-      status: 401,
-      error: "Unauthorized",
-      message: "Authentication required",
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+      signal: controller?.signal,
     });
+
+    // Handle 401 Unauthorized - redirect to login (unless skipAuthRedirect is set)
+    if (response.status === 401) {
+      if (!skipAuthRedirect && typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      throw new ApiClientError({
+        timestamp: new Date().toISOString(),
+        status: 401,
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+    }
+
+    // Handle empty response (204 No Content, 201 Created with no body, etc.)
+    const contentLength = response.headers.get("content-length");
+    const contentType = response.headers.get("content-type");
+    const isEmptyResponse =
+      response.status === 204 ||
+      contentLength === "0" ||
+      (response.status === 201 && !contentType?.includes("application/json"));
+
+    if (isEmptyResponse) {
+      return undefined as T;
+    }
+
+    const data = await response.json();
+
+    // Handle error responses
+    if (!response.ok) {
+      throw new ApiClientError(data as ApiError);
+    }
+
+    return data as T;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
-
-  // Handle empty response (204 No Content, 201 Created with no body, etc.)
-  const contentLength = response.headers.get("content-length");
-  const contentType = response.headers.get("content-type");
-  const isEmptyResponse =
-    response.status === 204 ||
-    contentLength === "0" ||
-    (response.status === 201 && !contentType?.includes("application/json"));
-
-  if (isEmptyResponse) {
-    return undefined as T;
-  }
-
-  const data = await response.json();
-
-  // Handle error responses
-  if (!response.ok) {
-    throw new ApiClientError(data as ApiError);
-  }
-
-  return data as T;
 }
 
 // HTTP method helpers

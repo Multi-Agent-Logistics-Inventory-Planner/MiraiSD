@@ -20,6 +20,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useInsights } from "@/hooks/queries/use-insights";
 import { useSalesSummary } from "@/hooks/queries/use-analytics";
+import { useRecomputeRollupsMutation } from "@/hooks/mutations/use-analytics-mutations";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useToast } from "@/hooks/use-toast";
 import { SalesMetricsCard } from "@/components/analytics";
 import type { Mover, MoverDirection } from "@/types/analytics";
 import { LongestRunningDisplaysCard } from "./longest-running-displays-card";
@@ -155,6 +158,27 @@ function MoversCard({
 export function TabOverview() {
   const { data: insightsData, isLoading: insightsLoading, isError } = useInsights();
   const { data: salesData, isLoading: salesLoading } = useSalesSummary();
+  const { isAdmin } = usePermissions();
+  const { toast } = useToast();
+  const recomputeMutation = useRecomputeRollupsMutation();
+
+  const handleRecomputeRollups = () => {
+    recomputeMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        toast({
+          title: "Sales data recomputed",
+          description: `Refreshed ${data.rollupsRecomputed.toLocaleString()} daily records.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Recomputation failed",
+          description: error.message || "Please try again.",
+          variant: "destructive",
+        });
+      },
+    });
+  };
 
   if (isError) {
     return (
@@ -169,7 +193,13 @@ export function TabOverview() {
   return (
     <div className="space-y-6">
       {/* Sales Metrics - Total Sales + Sales Trend */}
-      <SalesMetricsCard data={salesData} isLoading={salesLoading} />
+      <SalesMetricsCard
+        data={salesData}
+        isLoading={salesLoading}
+        onRecomputeRollups={handleRecomputeRollups}
+        isRecomputing={recomputeMutation.isPending}
+        canRecompute={isAdmin}
+      />
 
       {/* Category Demand */}
       <CategoryDemandSection />

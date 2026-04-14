@@ -55,6 +55,20 @@ public class DailySalesRollup {
     @Builder.Default
     private BigDecimal revenue = BigDecimal.ZERO;
 
+    /**
+     * Total cost of goods sold = unit_cost x units_sold.
+     */
+    @Column(name = "cost", precision = 12, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal cost = BigDecimal.ZERO;
+
+    /**
+     * Gross profit = revenue - cost = (msrp - unit_cost) x units_sold.
+     */
+    @Column(name = "profit", precision = 12, scale = 2, nullable = false)
+    @Builder.Default
+    private BigDecimal profit = BigDecimal.ZERO;
+
     @Column(name = "restock_units", nullable = false)
     @Builder.Default
     private Integer restockUnits = 0;

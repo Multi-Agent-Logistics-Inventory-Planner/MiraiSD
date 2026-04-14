@@ -12,6 +12,7 @@ import com.mirai.inventoryservice.dtos.responses.InsightsDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import com.mirai.inventoryservice.services.AnalyticsService;
 import com.mirai.inventoryservice.services.ProductReportBundleService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.constraints.Max;
@@ -31,6 +33,7 @@ import jakarta.validation.constraints.Min;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -42,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
+    private final AnalyticsSeedService analyticsSeedService;
     private final ProductReportBundleService productReportBundleService;
 
     @GetMapping("/inventory-by-category")
@@ -57,6 +61,23 @@ public class AnalyticsController {
     @GetMapping("/sales-summary")
     public SalesSummaryDTO getSalesSummary() {
         return analyticsService.getSalesSummary();
+    }
+
+    /**
+     * Recomputes daily sales rollups from stock movement data.
+     * Use after MSRP updates to recalculate revenue/cost/profit values.
+     * @param monthsBack Number of months to recompute (default 24, max 36)
+     */
+    @PostMapping("/recompute-rollups")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> recomputeRollups(
+            @RequestParam(defaultValue = "24") @Min(1) @Max(36) int monthsBack) {
+        int count = analyticsSeedService.recomputeAllRollups(monthsBack);
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "rollupsRecomputed", count,
+            "monthsBack", monthsBack
+        ));
     }
 
     /**

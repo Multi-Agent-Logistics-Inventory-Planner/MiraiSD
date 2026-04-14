@@ -340,7 +340,9 @@ public class AnalyticsService {
         List<DailySalesRollup> dailyRollups = dailySalesRollupRepository
             .findByRollupDateBetweenOrderByRollupDateAsc(periodStart, today);
         List<Object[]> totalsList = dailySalesRollupRepository.getTotalsForPeriod(periodStart, today);
-        Object[] totals = totalsList.isEmpty() ? new Object[]{0, BigDecimal.ZERO} : totalsList.get(0);
+        Object[] totals = totalsList.isEmpty()
+            ? new Object[]{0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO}
+            : totalsList.get(0);
 
         List<MonthlySalesDTO> monthlySales = monthlyRows.stream()
             .map(row -> {
@@ -348,20 +350,24 @@ public class AnalyticsService {
                 int month = ((Number) row[1]).intValue();
                 String monthKey = String.format("%d-%02d", year, month);
                 int units = ((Number) row[2]).intValue();
-                BigDecimal revenue = row[3] instanceof BigDecimal bd
-                    ? bd.setScale(2, RoundingMode.HALF_UP)
-                    : BigDecimal.valueOf(((Number) row[3]).doubleValue()).setScale(2, RoundingMode.HALF_UP);
-                return new MonthlySalesDTO(monthKey, revenue, units);
+                BigDecimal revenue = toBigDecimal(row[3]);
+                BigDecimal cost = toBigDecimal(row[4]);
+                BigDecimal profit = toBigDecimal(row[5]);
+                return new MonthlySalesDTO(monthKey, revenue, cost, profit, units);
             })
             .toList();
 
         // Aggregate daily rollups by date (multiple items per day -> one row per day)
         Map<String, Integer> dailyUnits = new TreeMap<>();
         Map<String, BigDecimal> dailyRevenue = new TreeMap<>();
+        Map<String, BigDecimal> dailyCost = new TreeMap<>();
+        Map<String, BigDecimal> dailyProfit = new TreeMap<>();
         for (DailySalesRollup rollup : dailyRollups) {
             String dateKey = rollup.getRollupDate().format(dateFormatter);
             dailyUnits.merge(dateKey, rollup.getUnitsSold(), Integer::sum);
             dailyRevenue.merge(dateKey, rollup.getRevenue(), BigDecimal::add);
+            dailyCost.merge(dateKey, rollup.getCost(), BigDecimal::add);
+            dailyProfit.merge(dateKey, rollup.getProfit(), BigDecimal::add);
         }
 
         List<DailySalesDTO> dailySales = dailyUnits.entrySet().stream()
@@ -369,25 +375,39 @@ public class AnalyticsService {
                 entry.getKey(),
                 entry.getValue(),
                 dailyRevenue.getOrDefault(entry.getKey(), BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP),
+                dailyCost.getOrDefault(entry.getKey(), BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP),
+                dailyProfit.getOrDefault(entry.getKey(), BigDecimal.ZERO)
                     .setScale(2, RoundingMode.HALF_UP)
             ))
             .toList();
 
         int totalUnits = totals[0] != null ? ((Number) totals[0]).intValue() : 0;
-        BigDecimal totalRevenue = totals[1] != null
-            ? (totals[1] instanceof BigDecimal bd
-                ? bd.setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.valueOf(((Number) totals[1]).doubleValue()).setScale(2, RoundingMode.HALF_UP))
-            : BigDecimal.ZERO;
+        BigDecimal totalRevenue = toBigDecimal(totals[1]);
+        BigDecimal totalCost = toBigDecimal(totals[2]);
+        BigDecimal totalProfit = toBigDecimal(totals[3]);
 
         return new SalesSummaryDTO(
             monthlySales,
             dailySales,
             totalRevenue,
+            totalCost,
+            totalProfit,
             totalUnits,
             periodStart.format(dateFormatter),
             today.format(dateFormatter)
         );
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal bd) {
+            return bd.setScale(2, RoundingMode.HALF_UP);
+        }
+        return BigDecimal.valueOf(((Number) value).doubleValue()).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -399,8 +419,15 @@ public class AnalyticsService {
     public ActionCenterDTO getActionCenter() {
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
         Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
-        List<Product> allProducts = productRepository.findAllWithCategories();
-        Map<UUID, Product> productMap = allProducts.stream()
+
+        // Fetch only products with forecast predictions instead of all products
+        Set<UUID> itemIds = latestPredictions.stream()
+            .map(ForecastPrediction::getItemId)
+            .collect(Collectors.toSet());
+        List<Product> products = itemIds.isEmpty()
+            ? List.of()
+            : productRepository.findByIdInWithCategories(itemIds);
+        Map<UUID, Product> productMap = products.stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         List<ActionItem> actionItems = new ArrayList<>();
@@ -794,17 +821,23 @@ public class AnalyticsService {
             }
         }
 
-        List<Product> products = productRepository.findAllWithCategories();
-        Map<UUID, Product> productMap = products.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
-        List<Category> categories = categoryRepository.findAll();
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
-
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
         Map<UUID, ForecastFeatures> featuresMap = new HashMap<>();
         for (ForecastPrediction fp : latestPredictions) {
             featuresMap.put(fp.getItemId(), extractFeatures(fp));
         }
+
+        // Fetch only products with forecast predictions instead of all products
+        Set<UUID> itemIds = latestPredictions.stream()
+            .map(ForecastPrediction::getItemId)
+            .collect(Collectors.toSet());
+        List<Product> products = itemIds.isEmpty()
+            ? List.of()
+            : productRepository.findByIdInWithCategories(itemIds);
+        Map<UUID, Product> productMap = products.stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+        List<Category> categories = categoryRepository.findAll();
+        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
 
         // Fetch rollups for both current and previous periods in a single query
         List<DailySalesRollup> allRollups = dailySalesRollupRepository
@@ -947,6 +980,14 @@ public class AnalyticsService {
             unitsByCategory.merge(categoryId, unitsByItem.getOrDefault(itemId, 0), Integer::sum);
         }
 
+        // Pre-compute item counts by category to avoid O(n*m) stream filtering
+        Map<UUID, Integer> itemCountByCategory = new HashMap<>();
+        for (Product product : products) {
+            if (product.getCategory() != null) {
+                itemCountByCategory.merge(product.getCategory().getId(), 1, Integer::sum);
+            }
+        }
+
         final BigDecimal finalTotalDemandVelocity2 = totalDemandVelocity;
         List<CategoryRanking> categoryRankings = categories.stream()
             .filter(cat -> demandVelocityByCategory.containsKey(cat.getId()))
@@ -957,9 +998,7 @@ public class AnalyticsService {
                 UUID catId = cat.getId();
                 BigDecimal catDemandVelocity = demandVelocityByCategory.getOrDefault(catId, BigDecimal.ZERO);
                 int catUnits = unitsByCategory.getOrDefault(catId, 0);
-                int totalItems = (int) products.stream()
-                    .filter(p -> p.getCategory() != null && p.getCategory().getId().equals(catId))
-                    .count();
+                int totalItems = itemCountByCategory.getOrDefault(catId, 0);
                 BigDecimal percentOfTotal = finalTotalDemandVelocity2.compareTo(BigDecimal.ZERO) > 0
                     ? catDemandVelocity.multiply(BigDecimal.valueOf(100))
                         .divide(finalTotalDemandVelocity2, 1, RoundingMode.HALF_UP)
