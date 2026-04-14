@@ -132,7 +132,7 @@ export default function SettingsPage() {
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="flex items-center gap-2 p-4 md:p-6 lg:p-8 pb-0">
-        <SidebarTrigger className="md:hidden" />
+        <SidebarTrigger />
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       </div>
 

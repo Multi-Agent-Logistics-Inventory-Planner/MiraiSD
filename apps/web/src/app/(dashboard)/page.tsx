@@ -71,7 +71,7 @@ export default function DashboardPage() {
         <div className="flex-1 p-4 md:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="md:hidden" />
+          <SidebarTrigger />
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         </div>
 

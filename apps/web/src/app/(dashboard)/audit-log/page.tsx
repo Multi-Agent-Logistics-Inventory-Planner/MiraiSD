@@ -44,7 +44,7 @@ export default function AuditLogPage() {
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       {/* Page header */}
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="md:hidden" />
+        <SidebarTrigger />
         <h1 className="text-2xl font-semibold tracking-tight">Audit Log</h1>
       </div>
 

@@ -133,7 +133,7 @@ export default function LocationsPage() {
   return (
     <div className="flex flex-col p-4 md:p-8 space-y-4">
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="md:hidden" />
+        <SidebarTrigger />
         <h1 className="text-2xl font-semibold tracking-tight">Storage</h1>
       </div>
       <div className="space-y-3">
