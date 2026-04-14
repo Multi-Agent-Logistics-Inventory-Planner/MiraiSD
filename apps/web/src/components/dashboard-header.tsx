@@ -14,7 +14,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ title, description }: DashboardHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-      <SidebarTrigger className="md:hidden" />
+      <SidebarTrigger />
       <div className="flex flex-1 items-center gap-4">
         <div>
           <h1 className="text-lg font-semibold md:text-xl">{title}</h1>
