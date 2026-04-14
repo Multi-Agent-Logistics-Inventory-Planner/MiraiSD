@@ -145,6 +145,7 @@ class SupabaseRepo:
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.is_active = true
+              AND p.parent_id IS NULL
         """
         params: dict = {}
 

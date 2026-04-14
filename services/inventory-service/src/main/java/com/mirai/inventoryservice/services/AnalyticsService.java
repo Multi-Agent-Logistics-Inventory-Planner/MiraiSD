@@ -243,7 +243,9 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public List<CategoryInventoryDTO> getInventoryByCategory() {
-        List<Product> products = productRepository.findAllWithCategories();
+        List<Product> products = productRepository.findAllWithCategories().stream()
+                .filter(p -> p.getParentId() == null)
+                .toList();
         Map<UUID, Integer> stockTotals = inventoryTotalsRepository.findAllStockTotalsMap();
 
         Map<Category, List<Product>> productsByCategory = products.stream()
@@ -285,7 +287,9 @@ public class AnalyticsService {
             avgAccuracy = avgAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP);
         }
 
-        List<Product> allProducts = productRepository.findAll();
+        List<Product> allProducts = productRepository.findAll().stream()
+                .filter(p -> p.getParentId() == null)
+                .toList();
         Map<UUID, Integer> stockByProduct = inventoryTotalsRepository.findAllStockTotalsMap();
 
         long outOfStockCount = allProducts.stream()
@@ -439,7 +443,7 @@ public class AnalyticsService {
 
         for (ForecastPrediction prediction : latestPredictions) {
             Product product = productMap.get(prediction.getItemId());
-            if (product == null || !product.getIsActive()) {
+            if (product == null || !product.getIsActive() || product.getParentId() != null) {
                 continue;
             }
 
@@ -570,8 +574,10 @@ public class AnalyticsService {
             featuresMap.put(fp.getItemId(), extractFeatures(fp));
         }
 
-        // Load products once and share across movers computation
-        List<Product> allProducts = productRepository.findAllWithCategories();
+        // Load products once and share across movers computation (exclude child products)
+        List<Product> allProducts = productRepository.findAllWithCategories().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
         Map<UUID, Product> productMap = allProducts.stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
 
@@ -866,6 +872,10 @@ public class AnalyticsService {
         int accuracyCount = 0;
 
         for (Product product : products) {
+            // Skip child products (prizes) - only process parent products
+            if (product.getParentId() != null) {
+                continue;
+            }
             ForecastFeatures features = featuresMap.get(product.getId());
             if (features != null && features.muHat() != null) {
                 BigDecimal muHat = features.muHat();

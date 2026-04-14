@@ -103,7 +103,11 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedForecastPredictions() {
-        return seedForecastPredictions(productRepository.findAll());
+        // Only seed forecasts for root products (exclude child products/prizes)
+        List<Product> rootProducts = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
+        return seedForecastPredictions(rootProducts);
     }
 
     private int seedForecastPredictions(List<Product> products) {
@@ -203,7 +207,11 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedDowPatternSales(int monthsBack) {
-        return seedDowPatternSales(monthsBack, productRepository.findAll());
+        // Only seed sales for root products (exclude child products/prizes)
+        List<Product> rootProducts = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
+        return seedDowPatternSales(monthsBack, rootProducts);
     }
 
     private int seedDowPatternSales(int monthsBack, List<Product> products) {
@@ -268,7 +276,11 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int seedDailyRollups(int monthsBack) {
-        return seedDailyRollups(monthsBack, productRepository.findAll());
+        // Only seed rollups for root products (exclude child products/prizes)
+        List<Product> rootProducts = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
+        return seedDailyRollups(monthsBack, rootProducts);
     }
 
     private int seedDailyRollups(int monthsBack, List<Product> products) {
@@ -558,7 +570,11 @@ public class AnalyticsSeedService {
      */
     @Transactional
     public int updateProductDefaults() {
-        return updateProductDefaults(productRepository.findAll());
+        // Only update defaults for root products (exclude child products/prizes)
+        List<Product> rootProducts = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
+        return updateProductDefaults(rootProducts);
     }
 
     private int updateProductDefaults(List<Product> products) {
@@ -744,7 +760,10 @@ public class AnalyticsSeedService {
     public int rollupCategoryDemand() {
         LocalDate today = LocalDate.now();
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
-        List<Product> products = productRepository.findAllWithCategories();
+        // Only process root products (exclude child products/prizes)
+        List<Product> products = productRepository.findAllWithCategories().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
         Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
 
         if (products.isEmpty() || latestPredictions.isEmpty()) {

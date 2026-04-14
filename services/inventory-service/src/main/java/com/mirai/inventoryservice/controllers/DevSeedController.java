@@ -370,7 +370,10 @@ public class DevSeedController {
             @RequestParam(defaultValue = "100") @Min(1) @Max(500) int salesPerProduct,
             @RequestParam(defaultValue = "365") @Min(1) @Max(730) int daysBack) {
 
-        List<Product> products = productRepository.findAll();
+        // Only seed sales for root products (exclude child products/prizes)
+        List<Product> products = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
 
         if (products.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -491,7 +494,10 @@ public class DevSeedController {
      */
     @PostMapping("/seed/forecasts")
     public ResponseEntity<Map<String, Object>> seedForecasts() {
-        List<Product> products = productRepository.findAll();
+        // Only seed forecasts for root products (exclude child products/prizes)
+        List<Product> products = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
 
         if (products.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -617,7 +623,10 @@ public class DevSeedController {
      */
     @PostMapping("/seed/notifications")
     public ResponseEntity<Map<String, Object>> seedNotifications() {
-        List<Product> products = productRepository.findAll();
+        // Only seed notifications for root products (exclude child products/prizes)
+        List<Product> products = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
 
         if (products.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -1304,7 +1313,10 @@ public class DevSeedController {
     public ResponseEntity<Map<String, Object>> seedMachineDisplays(
             @RequestParam(defaultValue = "20") @Min(5) @Max(50) int displayCount) {
 
-        List<Product> products = productRepository.findAll();
+        // Only seed displays for root products (exclude child products/prizes)
+        List<Product> products = productRepository.findAll().stream()
+            .filter(p -> p.getParentId() == null)
+            .toList();
         if (products.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
                 "error", "No products found. Run /api/dev/seed/all first."
