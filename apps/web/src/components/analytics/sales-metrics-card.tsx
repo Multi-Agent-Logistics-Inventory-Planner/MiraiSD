@@ -8,6 +8,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -15,8 +17,16 @@ import {
   Cell,
   ReferenceLine,
   CartesianGrid,
+  Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, BarChart3, DollarSign, CalendarDays } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart3, DollarSign, CalendarDays, Layers, RefreshCw, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip as TooltipUI,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CalendarHeatmap } from "./calendar-heatmap";
 import { cn } from "@/lib/utils";
 import type { SalesSummary, MonthlySales, DailySales } from "@/types/api";
@@ -24,10 +34,13 @@ import type { SalesSummary, MonthlySales, DailySales } from "@/types/api";
 interface SalesMetricsCardProps {
   data: SalesSummary | undefined;
   isLoading?: boolean;
+  onRecomputeRollups?: () => void;
+  isRecomputing?: boolean;
+  canRecompute?: boolean;
 }
 
 type BarTimeFilter = "3M" | "6M" | "1Y" | "YTD";
-type ViewMode = "bar" | "line";
+type ViewMode = "bar" | "line" | "area";
 
 const BAR_FILTER_OPTIONS = ["3M", "6M", "1Y", "YTD"] as const;
 
@@ -81,6 +94,8 @@ interface ChartDataItem {
   month: string;
   label: string;
   revenue: number;
+  cost: number;
+  profit: number;
   units: number;
   isCurrent: boolean;
 }
@@ -117,6 +132,18 @@ function ViewToggle({ value, onChange }: ViewToggleProps) {
       >
         <TrendingUp className="h-4 w-4" />
       </button>
+      <button
+        onClick={() => onChange("area")}
+        className={cn(
+          "p-1 rounded transition-colors",
+          value === "area"
+            ? "bg-background dark:bg-muted shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+        aria-label="Revenue/Profit area view"
+      >
+        <Layers className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -131,7 +158,9 @@ function CustomTooltip({
   if (!active || !payload || !payload.length) return null;
 
   const data = payload[0].payload;
-  const monthDate = new Date(data.month + "-01");
+  // Parse year-month manually to avoid UTC timezone issues
+  const [year, month] = data.month.split("-").map(Number);
+  const monthDate = new Date(year, month - 1, 1);
   const monthName = monthDate.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
@@ -148,6 +177,34 @@ function CustomTooltip({
 
 interface LineChartDataItem extends ChartDataItem {
   previousRevenue?: number;
+}
+
+function AreaChartTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ dataKey: string; value: number; payload: ChartDataItem }>;
+}) {
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0].payload;
+  // Parse year-month manually to avoid UTC timezone issues
+  const [year, month] = data.month.split("-").map(Number);
+  const monthDate = new Date(year, month - 1, 1);
+  const monthName = monthDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div className="rounded-lg bg-zinc-900 px-3 py-2 text-sm text-white shadow-lg">
+      <p className="font-semibold mb-1">{monthName}</p>
+      <p className="text-emerald-400">Revenue: {formatCurrency(data.revenue)}</p>
+      <p className="text-red-400">Cost: {formatCurrency(data.cost)}</p>
+      <p className="text-blue-400">Profit: {formatCurrency(data.profit)}</p>
+    </div>
+  );
 }
 
 interface WeeklyChartDataItem {
@@ -332,7 +389,13 @@ function getPreviousPeriodWeekly(
     }));
 }
 
-export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
+export function SalesMetricsCard({
+  data,
+  isLoading,
+  onRecomputeRollups,
+  isRecomputing,
+  canRecompute,
+}: SalesMetricsCardProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [barFilter, setBarFilter] = useState<BarTimeFilter>("1Y");
   const [viewMode, setViewMode] = useState<ViewMode>("bar");
@@ -380,7 +443,9 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
     const filtered = filterMonthlyData(data.monthlySales, barFilter);
 
     const formattedData: ChartDataItem[] = filtered.map((item) => {
-      const monthDate = new Date(item.month + "-01");
+      // Parse year-month manually to avoid UTC timezone issues
+      const [year, month] = item.month.split("-").map(Number);
+      const monthDate = new Date(year, month - 1, 1);
       const monthLabel = monthDate.toLocaleDateString("en-US", {
         month: "short",
       });
@@ -388,6 +453,8 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
         month: item.month,
         label: monthLabel,
         revenue: item.totalRevenue,
+        cost: item.totalCost ?? 0,
+        profit: item.totalProfit ?? 0,
         units: item.totalUnits,
         isCurrent: item.month === currentKey,
       };
@@ -555,6 +622,29 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
             Total Sales
           </CardTitle>
           <div className="flex items-center gap-2">
+            {canRecompute && (
+              <TooltipProvider delayDuration={50}>
+                <TooltipUI>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={onRecomputeRollups}
+                      disabled={isRecomputing || isLoading}
+                    >
+                      {isRecomputing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Recompute sales data
+                  </TooltipContent>
+                </TooltipUI>
+              </TooltipProvider>
+            )}
             <ViewToggle value={viewMode} onChange={setViewMode} />
             <TimeFilterTabs
               value={barFilter}
@@ -593,8 +683,8 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
 
           <div className="relative h-[220px] w-full">
             <div className="absolute inset-0">
-              <ResponsiveContainer width="100%" height="100%">
-                {viewMode === "bar" ? (
+              {viewMode === "bar" && (
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={chartData}
                     margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
@@ -643,7 +733,10 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                       ))}
                     </Bar>
                   </BarChart>
-                ) : (
+                </ResponsiveContainer>
+              )}
+              {viewMode === "line" && (
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={weeklyChartData}
                     margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
@@ -685,8 +778,61 @@ export function SalesMetricsCard({ data, isLoading }: SalesMetricsCardProps) {
                     />
                     <Tooltip content={<LineChartTooltip />} />
                   </LineChart>
-                )}
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              )}
+              {viewMode === "area" && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={chartData}
+                    margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#e5e7eb"
+                    />
+                    <XAxis
+                      dataKey="label"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: "#9ca3af" }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: "#9ca3af" }}
+                      tickFormatter={formatCompactCurrency}
+                      width={45}
+                    />
+                    <Tooltip content={<AreaChartTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#10b981"
+                      fill="#10b981"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                      name="Revenue"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="cost"
+                      stroke="#ef4444"
+                      fill="#ef4444"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                      name="Cost"
+                    />
+                    <Legend
+                      verticalAlign="top"
+                      height={36}
+                      formatter={(value) => (
+                        <span className="text-xs text-muted-foreground">{value}</span>
+                      )}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </CardContent>

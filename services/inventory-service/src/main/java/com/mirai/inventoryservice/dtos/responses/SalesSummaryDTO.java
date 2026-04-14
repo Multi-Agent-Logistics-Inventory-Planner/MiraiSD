@@ -7,6 +7,8 @@ public record SalesSummaryDTO(
     List<MonthlySalesDTO> monthlySales,
     List<DailySalesDTO> dailySales,
     BigDecimal totalRevenue,
+    BigDecimal totalCost,
+    BigDecimal totalProfit,
     Integer totalUnits,
     String periodStart,
     String periodEnd

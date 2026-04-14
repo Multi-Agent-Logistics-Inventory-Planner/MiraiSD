@@ -161,14 +161,14 @@ class AnalyticsServiceTest {
             Category category = buildCategory(UUID.randomUUID(), "Plush");
             Product product = buildProduct(productId, "Test Plush", "PLU-001", category);
 
-            when(productRepository.findAllWithCategories())
+            when(forecastPredictionRepository.findAllLatest())
+                    .thenReturn(List.of(buildPrediction(productId)));
+            when(productRepository.findByIdInWithCategories(any()))
                     .thenReturn(List.of(product));
             when(categoryRepository.findAll())
                     .thenReturn(List.of(category));
             when(inventoryTotalsRepository.findAllStockTotalsMap())
                     .thenReturn(Map.of(productId, 30));
-            when(forecastPredictionRepository.findAllLatest())
-                    .thenReturn(List.of(buildPrediction(productId)));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
 
@@ -181,10 +181,10 @@ class AnalyticsServiceTest {
         @Test
         @DisplayName("uses different date ranges for different periods")
         void usesDifferentDateRangesForDifferentPeriods() {
-            when(productRepository.findAllWithCategories()).thenReturn(Collections.emptyList());
+            when(forecastPredictionRepository.findAllLatest()).thenReturn(Collections.emptyList());
+            // When no predictions, findByIdInWithCategories won't be called (empty ID set)
             when(categoryRepository.findAll()).thenReturn(Collections.emptyList());
             when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Collections.emptyMap());
-            when(forecastPredictionRepository.findAllLatest()).thenReturn(Collections.emptyList());
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
 
@@ -204,11 +204,11 @@ class AnalyticsServiceTest {
             Category category = buildCategory(UUID.randomUUID(), "Figures");
             Product product = buildProduct(productId, "Hot Figure", "FIG-002", category);
 
-            when(productRepository.findAllWithCategories()).thenReturn(List.of(product));
-            when(categoryRepository.findAll()).thenReturn(List.of(category));
-            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Map.of(productId, 50));
             when(forecastPredictionRepository.findAllLatest())
                     .thenReturn(List.of(buildPrediction(productId)));
+            when(productRepository.findByIdInWithCategories(any())).thenReturn(List.of(product));
+            when(categoryRepository.findAll()).thenReturn(List.of(category));
+            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Map.of(productId, 50));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
 
@@ -231,8 +231,9 @@ class AnalyticsServiceTest {
                     .thenReturn(Collections.emptyList());
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
+            // Updated to include cost and profit columns
             when(dailySalesRollupRepository.getTotalsForPeriod(any(), any()))
-                    .thenReturn(Collections.singletonList(new Object[]{0L, BigDecimal.ZERO}));
+                    .thenReturn(Collections.singletonList(new Object[]{0L, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO}));
 
             SalesSummaryDTO result = analyticsService.getSalesSummary();
 
@@ -252,7 +253,8 @@ class AnalyticsServiceTest {
         @DisplayName("returns monthly and daily sales from rollup data")
         void returnsMonthlySalesFromRollupData() {
             LocalDate today = LocalDate.now();
-            Object[] monthlyRow = new Object[]{today.getYear(), today.getMonthValue(), 100, BigDecimal.valueOf(500.00)};
+            // Updated to include cost, profit, and unique_items columns
+            Object[] monthlyRow = new Object[]{today.getYear(), today.getMonthValue(), 100, BigDecimal.valueOf(500.00), BigDecimal.ZERO, BigDecimal.valueOf(500.00), 5};
             List<Object[]> monthlyRows = new java.util.ArrayList<>();
             monthlyRows.add(monthlyRow);
             when(dailySalesRollupRepository.aggregateByMonth(any(LocalDate.class)))
@@ -264,12 +266,15 @@ class AnalyticsServiceTest {
                     .rollupDate(today)
                     .unitsSold(25)
                     .revenue(BigDecimal.valueOf(125.00))
+                    .cost(BigDecimal.ZERO)
+                    .profit(BigDecimal.valueOf(125.00))
                     .movementCount(3)
                     .build();
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(List.of(rollup));
+            // Updated to include cost and profit columns
             when(dailySalesRollupRepository.getTotalsForPeriod(any(), any()))
-                    .thenReturn(Collections.singletonList(new Object[]{100L, BigDecimal.valueOf(500.00)}));
+                    .thenReturn(Collections.singletonList(new Object[]{100L, BigDecimal.valueOf(500.00), BigDecimal.ZERO, BigDecimal.valueOf(500.00)}));
 
             SalesSummaryDTO result = analyticsService.getSalesSummary();
 

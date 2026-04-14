@@ -63,9 +63,12 @@ public interface DailySalesRollupRepository extends JpaRepository<DailySalesRoll
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate);
 
-    // Total revenue and units for a date range
+    // Total revenue, cost, profit and units for a date range
     @Query("""
-        SELECT COALESCE(SUM(r.unitsSold), 0), COALESCE(SUM(r.revenue), 0)
+        SELECT COALESCE(SUM(r.unitsSold), 0),
+               COALESCE(SUM(r.revenue), 0),
+               COALESCE(SUM(r.cost), 0),
+               COALESCE(SUM(r.profit), 0)
         FROM DailySalesRollup r
         WHERE r.rollupDate >= :startDate AND r.rollupDate <= :endDate
         """)
@@ -79,11 +82,13 @@ public interface DailySalesRollupRepository extends JpaRepository<DailySalesRoll
                EXTRACT(MONTH FROM r.rollup_date) as month,
                SUM(r.units_sold) as total_units,
                SUM(r.revenue) as total_revenue,
+               SUM(r.cost) as total_cost,
+               SUM(r.profit) as total_profit,
                COUNT(DISTINCT r.item_id) as unique_items
         FROM analytics_daily_rollup r
         WHERE r.rollup_date >= :startDate
         GROUP BY EXTRACT(YEAR FROM r.rollup_date), EXTRACT(MONTH FROM r.rollup_date)
-        ORDER BY year DESC, month DESC
+        ORDER BY year ASC, month ASC
         """, nativeQuery = true)
     List<Object[]> aggregateByMonth(@Param("startDate") LocalDate startDate);
 
@@ -91,6 +96,11 @@ public interface DailySalesRollupRepository extends JpaRepository<DailySalesRoll
     @Modifying
     @Query("DELETE FROM DailySalesRollup r WHERE r.rollupDate < :cutoffDate")
     int deleteOlderThan(@Param("cutoffDate") LocalDate cutoffDate);
+
+    // Bulk delete rollups in date range (much faster than loading + deleteAll)
+    @Modifying
+    @Query("DELETE FROM DailySalesRollup r WHERE r.rollupDate >= :startDate AND r.rollupDate <= :endDate")
+    int deleteByRollupDateBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     // Find rollups for seeded data cleanup
     @Query("""

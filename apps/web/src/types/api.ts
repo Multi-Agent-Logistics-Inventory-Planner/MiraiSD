@@ -568,6 +568,8 @@ export interface PerformanceMetrics {
 export interface MonthlySales {
   month: string;
   totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
   totalUnits: number;
 }
 
@@ -575,12 +577,16 @@ export interface DailySales {
   date: string;
   totalUnits: number;
   totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
 }
 
 export interface SalesSummary {
   monthlySales: MonthlySales[];
   dailySales: DailySales[];
   totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
   totalUnits: number;
   periodStart: string;
   periodEnd: string;

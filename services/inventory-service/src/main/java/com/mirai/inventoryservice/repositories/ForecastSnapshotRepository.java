@@ -72,4 +72,11 @@ public interface ForecastSnapshotRepository extends JpaRepository<ForecastDailyS
      * Check if snapshot exists for item on date.
      */
     boolean existsByItemIdAndSnapshotDate(UUID itemId, LocalDate snapshotDate);
+
+    /**
+     * Find all item IDs that have snapshots for a given date.
+     * Used to batch-check existence instead of N individual queries.
+     */
+    @Query("SELECT fs.itemId FROM ForecastDailySnapshot fs WHERE fs.snapshotDate = :date")
+    List<UUID> findItemIdsBySnapshotDate(@Param("date") LocalDate date);
 }

@@ -130,12 +130,12 @@ def load_csv(csv_path: Path) -> dict[str, CsvProduct]:
 
 
 def load_db_products(conn) -> list[DbProduct]:
-    """Load all products from database."""
+    """Load all parent products from database (excludes child products)."""
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT id, name, sku, msrp
             FROM products
-            WHERE is_active = true
+            WHERE parent_id IS NULL
             ORDER BY name
         """)
         return [

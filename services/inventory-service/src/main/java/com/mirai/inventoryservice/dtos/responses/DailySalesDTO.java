@@ -5,5 +5,7 @@ import java.math.BigDecimal;
 public record DailySalesDTO(
     String date,
     Integer totalUnits,
-    BigDecimal totalRevenue
+    BigDecimal totalRevenue,
+    BigDecimal totalCost,
+    BigDecimal totalProfit
 ) {}
