@@ -687,7 +687,7 @@ export function SalesMetricsCard({
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={chartData}
-                    margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                    margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
                     onMouseLeave={() => setActiveIndex(null)}
                   >
                     <XAxis
@@ -739,7 +739,7 @@ export function SalesMetricsCard({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={weeklyChartData}
-                    margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                    margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -784,7 +784,7 @@ export function SalesMetricsCard({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={chartData}
-                    margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
+                    margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
