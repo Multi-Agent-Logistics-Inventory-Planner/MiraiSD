@@ -434,7 +434,7 @@ export function ShipmentReceiveDialog({
           itemReceipts,
         },
       });
-      toast({ title: "Items received successfully" });
+      toast({ title: "Items received successfully", variant: "success" });
       onOpenChange(false);
     } catch (err: unknown) {
       const message =

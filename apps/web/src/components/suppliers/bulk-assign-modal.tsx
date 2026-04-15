@@ -74,7 +74,7 @@ export function BulkAssignModal({ open, onOpenChange, supplier }: BulkAssignModa
         supplierId: supplier.id,
         productIds: Array.from(selectedIds),
       });
-      toast({ title: `Assigned ${count} products to ${supplier.displayName}` });
+      toast({ title: `Assigned ${count} products to ${supplier.displayName}`, variant: "success" });
       setSelectedIds(new Set());
       setSearch("");
       onOpenChange(false);

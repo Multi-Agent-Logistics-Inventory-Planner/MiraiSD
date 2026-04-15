@@ -374,7 +374,7 @@ export function AdjustStockDialog({
         ],
       });
 
-      toast({ title: "Stock adjusted" });
+      toast({ title: "Stock adjusted", variant: "success" });
       // Reset to product list view, keep location selected
       setSelectedInventoryId(null);
       setQuantity(1);
@@ -405,7 +405,7 @@ export function AdjustStockDialog({
       } else {
         await createInventoryMutation.mutateAsync(enrichedPayload);
       }
-      toast({ title: "Inventory added successfully" });
+      toast({ title: "Inventory added successfully", variant: "success" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save inventory";
       toast({ title: "Error", description: message, variant: "destructive" });
@@ -450,7 +450,7 @@ export function AdjustStockDialog({
         queryKey: ["productInventoryEntries", preselectedProduct.product.id],
       });
 
-      toast({ title: "Product added to location" });
+      toast({ title: "Product added to location", variant: "success" });
       setQuantity(1);
       onOpenChange(false);
     } catch (err) {

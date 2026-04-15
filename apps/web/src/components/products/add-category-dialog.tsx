@@ -42,7 +42,7 @@ export function AddCategoryDialog({
 
     try {
       const category = await createMutation.mutateAsync({ name: name.trim() });
-      toast({ title: "Category created" });
+      toast({ title: "Category created", variant: "success" });
       onCategoryCreated?.(category);
       setName("");
       onOpenChange(false);

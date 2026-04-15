@@ -294,10 +294,10 @@ export default function LocationsPage() {
               try {
                 if (editing) {
                   await updateMutation.mutateAsync({ id: editing.id, payload });
-                  toast({ title: "Location updated" });
+                  toast({ title: "Location updated", variant: "success" });
                 } else {
                   await createMutation.mutateAsync(payload);
-                  toast({ title: "Location created" });
+                  toast({ title: "Location created", variant: "success" });
                 }
               } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : "Save failed";

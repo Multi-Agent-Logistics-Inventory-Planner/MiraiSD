@@ -102,7 +102,7 @@ export function PrizeForm({
             name: `Prize ${letter}`,
           },
         });
-        toast({ title: "Prize updated" });
+        toast({ title: "Prize updated", variant: "success" });
       } else {
         // Create new prize
         const hasInitialStock = quantity > 0;
@@ -120,6 +120,7 @@ export function PrizeForm({
           description: hasInitialStock
             ? `Initial stock of ${quantity} added.`
             : undefined,
+          variant: "success",
         });
       }
 

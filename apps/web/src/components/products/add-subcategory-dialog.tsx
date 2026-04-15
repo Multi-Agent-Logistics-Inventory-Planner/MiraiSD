@@ -68,7 +68,7 @@ export function AddSubcategoryDialog({
         parentId: categoryId,
         name: name.trim(),
       });
-      toast({ title: "Subcategory created" });
+      toast({ title: "Subcategory created", variant: "success" });
       onSubcategoryCreated?.(subcategory);
       setName("");
       onOpenChange(false);

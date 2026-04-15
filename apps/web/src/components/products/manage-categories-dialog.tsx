@@ -92,7 +92,7 @@ export function ManageCategoriesDialog({
           ...(isSubcategory && category.parentId ? { parentId: category.parentId } : {}),
         },
       });
-      toast({ title: `${isSubcategory ? "Subcategory" : "Category"} renamed` });
+      toast({ title: `${isSubcategory ? "Subcategory" : "Category"} renamed`, variant: "success" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to rename";
       toast({ title: "Cannot rename", description: message, variant: "destructive" });
