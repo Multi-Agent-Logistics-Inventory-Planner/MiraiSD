@@ -56,10 +56,7 @@ export function TabMembers() {
 
   const filteredAndSortedData = useMemo(() => {
     const filtered = tableData.filter((row) => {
-      return (
-        row.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      return row.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     });
     return [...filtered].sort(sortByRoleThenName);
   }, [tableData, searchQuery]);

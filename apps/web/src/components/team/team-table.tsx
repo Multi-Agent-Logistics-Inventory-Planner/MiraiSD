@@ -63,9 +63,6 @@ function TableSkeleton() {
             <Skeleton className="h-4 w-24" />
           </TableCell>
           <TableCell>
-            <Skeleton className="h-4 w-36" />
-          </TableCell>
-          <TableCell>
             <Skeleton className="h-6 w-16" />
           </TableCell>
           <TableCell>
@@ -113,8 +110,7 @@ export function TeamTable({
     <>
     <Table>
       <DataTableHeader>
-        <TableHead className={canManageUsers ? "rounded-l-lg" : "rounded-l-lg"}>Name</TableHead>
-        <TableHead>Email</TableHead>
+        <TableHead className="rounded-l-lg">Name</TableHead>
         <TableHead className="text-center">Role</TableHead>
         <TableHead className="text-center">Status</TableHead>
         <TableHead className={canManageUsers ? "text-center" : "text-center rounded-r-lg"}>Last Audit</TableHead>
@@ -128,7 +124,7 @@ export function TeamTable({
         ) : data.length === 0 ? (
           <TableRow>
             <TableCell
-              colSpan={canManageUsers ? 6 : 5}
+              colSpan={canManageUsers ? 5 : 4}
               className="h-24 text-center text-muted-foreground"
             >
               No team members found
@@ -138,7 +134,6 @@ export function TeamTable({
           data.map((row) => (
             <TableRow key={row.id}>
               <TableCell className="font-medium rounded-l-lg">{row.fullName}</TableCell>
-              <TableCell>{row.email}</TableCell>
               <TableCell className="text-center">
                 <span className="text-sm text-muted-foreground">
                   {formatRoleLabel(row.role)}
