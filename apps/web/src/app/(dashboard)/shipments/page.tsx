@@ -250,7 +250,7 @@ export default function ShipmentsPage() {
           ) : (
             <ShipmentsList
               shipments={shipments}
-              isLoading={shipmentsQuery.isLoading}
+              isLoading={shipmentsQuery.isLoading || shipmentsQuery.isPlaceholderData}
               onShipmentClick={handleRowClick}
             />
           )}
@@ -259,7 +259,7 @@ export default function ShipmentsPage() {
             page={page}
             pageSize={PAGE_SIZE}
             totalItems={totalElements}
-            isLoading={shipmentsQuery.isLoading}
+            isLoading={shipmentsQuery.isLoading || shipmentsQuery.isPlaceholderData}
             onPageChange={setPage}
           />
         </TabsContent>
