@@ -93,7 +93,7 @@ export function KujiPrizesDialog({
 
     try {
       await deleteMutation.mutateAsync({ id: prizeToDelete.id, parentId: productId });
-      toast({ title: "Prize deleted" });
+      toast({ title: "Prize deleted", variant: "success" });
       refetch();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to delete prize";

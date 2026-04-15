@@ -343,10 +343,10 @@ export function ShipmentCreateDialog({
           id: initialShipment.id,
           payload,
         });
-        toast({ title: "Shipment updated successfully" });
+        toast({ title: "Shipment updated successfully", variant: "success" });
       } else {
         await createMutation.mutateAsync(payload);
-        toast({ title: "Shipment created successfully" });
+        toast({ title: "Shipment created successfully", variant: "success" });
       }
       onOpenChange(false);
     } catch (err: unknown) {

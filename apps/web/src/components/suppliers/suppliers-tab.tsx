@@ -100,7 +100,7 @@ export function SuppliersTab() {
     if (!selectedSupplier) return;
     try {
       await deleteMutation.mutateAsync({ id: selectedSupplier.id });
-      toast({ title: `Supplier ${selectedSupplier.isActive ? "deactivated" : "reactivated"}` });
+      toast({ title: `Supplier ${selectedSupplier.isActive ? "deactivated" : "reactivated"}`, variant: "success" });
       setDeactivateDialogOpen(false);
       setSelectedSupplier(null);
     } catch {

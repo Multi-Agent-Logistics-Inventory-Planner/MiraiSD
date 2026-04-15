@@ -288,7 +288,7 @@ export function ProductForm({
     try {
       if (initialProduct) {
         await updateMutation.mutateAsync({ id: initialProduct.id, payload });
-        toast({ title: "Product updated" });
+        toast({ title: "Product updated", variant: "success" });
 
         // Delete old image from storage after successful update (non-blocking)
         if (isReplacingImage) {
@@ -305,7 +305,7 @@ export function ProductForm({
         }
       } else {
         const newProduct = await createMutation.mutateAsync(payload);
-        toast({ title: "Product created" });
+        toast({ title: "Product created", variant: "success" });
         onProductCreated?.(newProduct);
 
         // Add initial stock if enabled (validation already done at start of submit)
@@ -324,7 +324,7 @@ export function ProductForm({
               initialStockLocation.locationId,
               { itemId: newProduct.id, quantity: initialStockQty, actorId },
             );
-            toast({ title: "Initial stock added" });
+            toast({ title: "Initial stock added", variant: "success" });
           } catch (stockErr: unknown) {
             const msg =
               stockErr instanceof Error
@@ -367,7 +367,7 @@ export function ProductForm({
               variant: "destructive",
             });
           } else {
-            toast({ title: `${pendingPrizes.length} prize(s) added` });
+            toast({ title: `${pendingPrizes.length} prize(s) added`, variant: "success" });
           }
         }
       }

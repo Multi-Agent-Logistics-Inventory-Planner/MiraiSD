@@ -45,7 +45,7 @@ export function useMarkNotificationAsRead() {
     mutationFn: markNotificationAsRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "Notification marked as read" });
+      toast({ title: "Notification marked as read", variant: "success" });
     },
     onError: (error) => {
       toast({
@@ -65,7 +65,7 @@ export function useMarkAllNotificationsAsRead() {
     mutationFn: () => markAllNotificationsAsRead(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "All notifications marked as read" });
+      toast({ title: "All notifications marked as read", variant: "success" });
     },
     onError: (error) => {
       toast({
@@ -85,7 +85,7 @@ export function useDeleteNotification() {
     mutationFn: deleteNotification,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "Notification deleted" });
+      toast({ title: "Notification deleted", variant: "success" });
     },
     onError: (error) => {
       toast({
@@ -105,7 +105,7 @@ export function useResolveNotification() {
     mutationFn: resolveNotification,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "Notification resolved" });
+      toast({ title: "Notification resolved", variant: "success" });
     },
     onError: (error) => {
       toast({
@@ -125,7 +125,7 @@ export function useUnresolveNotification() {
     mutationFn: unresolveNotification,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "Notification reopened" });
+      toast({ title: "Notification reopened", variant: "success" });
     },
     onError: (error) => {
       toast({
@@ -145,7 +145,7 @@ export function useMarkAsUserRead() {
     mutationFn: markAsUserRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast({ title: "Marked as read" });
+      toast({ title: "Marked as read", variant: "success" });
     },
     onError: (error) => {
       toast({

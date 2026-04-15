@@ -15,9 +15,9 @@ import {
   getStorageLocationByCode,
 } from "@/lib/api/locations";
 import {
-  createLocationInventory,
-  updateLocationInventory,
-  deleteLocationInventory,
+  createInventory,
+  updateInventory,
+  deleteInventory,
 } from "@/lib/api/inventory";
 
 function invalidateLocations(qc: ReturnType<typeof useQueryClient>, locationType: LocationType) {
@@ -96,7 +96,7 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
 
   return useMutation<LocationInventory, Error, InventoryRequest>({
     mutationFn: async (payload) => {
-      return createLocationInventory(locationId, payload);
+      return createInventory(locationType, locationId, payload);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);
@@ -112,7 +112,7 @@ export function useUpdateInventoryMutation(
 
   return useMutation<LocationInventory, Error, { inventoryId: string; payload: InventoryRequest }>({
     mutationFn: async ({ inventoryId, payload }) => {
-      return updateLocationInventory(locationId, inventoryId, payload);
+      return updateInventory(locationType, locationId, inventoryId, payload);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);
@@ -128,7 +128,7 @@ export function useDeleteInventoryMutation(
 
   return useMutation<void, Error, { inventoryId: string }>({
     mutationFn: async ({ inventoryId }) => {
-      return deleteLocationInventory(locationId, inventoryId);
+      return deleteInventory(locationType, locationId, inventoryId);
     },
     onSuccess: async () => {
       await invalidateLocationInventory(qc, locationType, locationId);

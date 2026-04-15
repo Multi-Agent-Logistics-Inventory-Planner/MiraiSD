@@ -74,7 +74,7 @@ export function TabMembers() {
   const handleResendInvite = async (email: string) => {
     try {
       await resendInvitation(email);
-      toast({ title: "Invitation resent successfully" });
+      toast({ title: "Invitation resent successfully", variant: "success" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to resend invitation";
       toast({
@@ -103,10 +103,10 @@ export function TabMembers() {
     try {
       if (row.type === "member") {
         await deleteUser(row.id);
-        toast({ title: "Team member removed successfully" });
+        toast({ title: "Team member removed successfully", variant: "success" });
       } else {
         await cancelInvitation(row.email);
-        toast({ title: "Invitation cancelled successfully" });
+        toast({ title: "Invitation cancelled successfully", variant: "success" });
       }
       invalidateTeamData();
     } catch (error) {

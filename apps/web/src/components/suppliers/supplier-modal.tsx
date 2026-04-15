@@ -81,10 +81,10 @@ export function SupplierModal({ open, onOpenChange, supplier }: SupplierModalPro
 
       if (isEditing) {
         await updateMutation.mutateAsync({ id: supplier.id, payload });
-        toast({ title: "Supplier updated" });
+        toast({ title: "Supplier updated", variant: "success" });
       } else {
         await createMutation.mutateAsync(payload);
-        toast({ title: "Supplier created" });
+        toast({ title: "Supplier created", variant: "success" });
       }
 
       onOpenChange(false);

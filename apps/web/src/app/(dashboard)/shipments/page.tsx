@@ -163,7 +163,7 @@ export default function ShipmentsPage() {
         },
       });
       setSelectedShipment(updated);
-      toast({ title: "Tracking number updated" });
+      toast({ title: "Tracking number updated", variant: "success" });
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to update tracking number";
@@ -177,7 +177,7 @@ export default function ShipmentsPage() {
 
     try {
       await deleteMutation.mutateAsync({ id: selectedShipment.id });
-      toast({ title: "Shipment deleted" });
+      toast({ title: "Shipment deleted", variant: "success" });
       setDeleteDialogOpen(false);
       setSelectedShipment(null);
     } catch (err: unknown) {
