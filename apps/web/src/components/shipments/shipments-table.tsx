@@ -17,6 +17,7 @@ import {
   getShipmentDisplayStatus,
   SHIPMENT_DISPLAY_STATUS_LABELS,
   SHIPMENT_DISPLAY_STATUS_COLORS,
+  calculateTotalReceived,
   type ShipmentDisplayStatus,
 } from "@/lib/shipment-utils";
 
@@ -41,10 +42,7 @@ function getReceiveProgress(shipment: Shipment) {
     (sum, item) => sum + item.orderedQuantity,
     0
   );
-  const totalReceived = shipment.items.reduce(
-    (sum, item) => sum + item.receivedQuantity,
-    0
-  );
+  const totalReceived = calculateTotalReceived(shipment.items);
   if (totalOrdered === 0) return 0;
   return Math.round((totalReceived / totalOrdered) * 100);
 }
