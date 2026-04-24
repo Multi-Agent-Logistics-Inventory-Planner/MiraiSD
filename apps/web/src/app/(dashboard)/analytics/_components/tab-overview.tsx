@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useInsights } from "@/hooks/queries/use-insights";
-// import { useSalesSummary } from "@/hooks/queries/use-analytics";
 import { useRecomputeRollupsMutation } from "@/hooks/mutations/use-analytics-mutations";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useToast } from "@/hooks/use-toast";
@@ -31,7 +30,6 @@ import { CategoryDemandSection } from "./category-demand-section";
 
 const MOVERS_SKELETON_COUNT = 5;
 
-// Generate mock daily sales data for presentation (deterministic pattern)
 function generateMockDailySales() {
   const dailySales = [];
   const startDate = new Date("2025-01-01");
@@ -39,11 +37,12 @@ function generateMockDailySales() {
 
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split("T")[0];
-    const dayOfYear = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    // Deterministic variation based on day
+    const dayOfYear = Math.floor(
+      (d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const variation = ((dayOfYear * 7) % 20) + ((dayOfYear * 3) % 10);
     const baseUnits = 35 + variation;
-    const baseRevenue = baseUnits * 75 + (variation * 25);
+    const baseRevenue = baseUnits * 75 + variation * 25;
     const baseCost = Math.floor(baseRevenue * 0.7);
     dailySales.push({
       date: dateStr,
@@ -56,7 +55,6 @@ function generateMockDailySales() {
   return dailySales;
 }
 
-// Hardcoded sales data for presentation (hides real numbers)
 const MOCK_SALES_DATA: SalesSummary = {
   totalRevenue: 1250000,
   totalCost: 875000,
@@ -208,7 +206,6 @@ function MoversCard({
 
 export function TabOverview() {
   const { data: insightsData, isLoading: insightsLoading, isError } = useInsights();
-  // const { data: salesData, isLoading: salesLoading } = useSalesSummary();
   const { isAdmin } = usePermissions();
   const { toast } = useToast();
   const recomputeMutation = useRecomputeRollupsMutation();
@@ -243,14 +240,16 @@ export function TabOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Sales Metrics - Total Sales + Sales Trend (using mock data for presentation) */}
-      <SalesMetricsCard
-        data={MOCK_SALES_DATA}
-        isLoading={false}
-        onRecomputeRollups={handleRecomputeRollups}
-        isRecomputing={recomputeMutation.isPending}
-        canRecompute={isAdmin}
-      />
+      {/* Sales Metrics - Total Sales + Sales Trend (admin-only, mock data for presentation) */}
+      {isAdmin && (
+        <SalesMetricsCard
+          data={MOCK_SALES_DATA}
+          isLoading={false}
+          onRecomputeRollups={handleRecomputeRollups}
+          isRecomputing={recomputeMutation.isPending}
+          canRecompute={isAdmin}
+        />
+      )}
 
       {/* Category Demand */}
       <CategoryDemandSection />
