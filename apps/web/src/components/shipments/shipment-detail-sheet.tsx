@@ -23,6 +23,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
 import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
+import { calculateTotalReceived } from "@/lib/shipment-utils";
 import { useTracking } from "@/hooks/queries/use-tracking";
 
 interface ShipmentDetailSheetProps {
@@ -436,10 +437,7 @@ export function ShipmentDetailSheet({
     (sum, item) => sum + item.orderedQuantity,
     0
   );
-  const totalReceived = shipment.items.reduce(
-    (sum, item) => sum + item.receivedQuantity,
-    0
-  );
+  const totalReceived = calculateTotalReceived(shipment.items);
 
   // Calculate items total from unit costs
   const itemsTotal = shipment.items.reduce((sum, item) => {

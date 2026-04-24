@@ -1,6 +1,27 @@
-import { ShipmentStatus, type Shipment } from "@/types/api";
+import { ShipmentStatus, type Shipment, type ShipmentItem } from "@/types/api";
 
 export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED" | "FAILED";
+
+/**
+ * Calculates total received for a single shipment item.
+ * Includes received, damaged, display, and shop quantities.
+ */
+export function calculateItemTotalReceived(item: ShipmentItem): number {
+  return (
+    (item.receivedQuantity ?? 0) +
+    (item.damagedQuantity ?? 0) +
+    (item.displayQuantity ?? 0) +
+    (item.shopQuantity ?? 0)
+  );
+}
+
+/**
+ * Calculates total received quantity for all items in a shipment.
+ * Includes received, damaged, display, and shop quantities.
+ */
+export function calculateTotalReceived(items: ShipmentItem[]): number {
+  return items.reduce((sum, item) => sum + calculateItemTotalReceived(item), 0);
+}
 
 export const SHIPMENT_DISPLAY_STATUS_LABELS: Record<ShipmentDisplayStatus, string> = {
   ACTIVE: "Active",
@@ -37,8 +58,10 @@ export function getShipmentDisplayStatus(shipment: Shipment): ShipmentDisplaySta
     return "COMPLETED";
   }
 
-  // For PENDING and IN_TRANSIT, check received quantities
-  const hasAnyReceived = shipment.items.some(item => item.receivedQuantity > 0);
+  // For PENDING and IN_TRANSIT, check received quantities (including damaged/display/shop)
+  const hasAnyReceived = shipment.items.some(
+    item => calculateItemTotalReceived(item) > 0
+  );
 
   if (hasAnyReceived) {
     return "PARTIAL";

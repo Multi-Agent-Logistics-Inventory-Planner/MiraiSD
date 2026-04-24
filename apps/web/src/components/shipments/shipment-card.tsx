@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { ShipmentProgress } from "./shipment-progress";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Shipment, ShipmentItem } from "@/types/api";
-import { getShipmentDisplayStatus } from "@/lib/shipment-utils";
+import { getShipmentDisplayStatus, calculateTotalReceived } from "@/lib/shipment-utils";
 
 interface ShipmentCardProps {
   shipment: Shipment;
@@ -32,10 +32,7 @@ function getStatusText(shipment: Shipment): { text: string; date: string } {
   const displayStatus = getShipmentDisplayStatus(shipment);
 
   // Calculate if partial received (used as proxy for "on the way" without tracking)
-  const totalReceived = shipment.items.reduce(
-    (sum, item) => sum + item.receivedQuantity,
-    0,
-  );
+  const totalReceived = calculateTotalReceived(shipment.items);
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
     0,
@@ -111,10 +108,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
     (sum, item) => sum + item.orderedQuantity,
     0,
   );
-  const totalReceived = shipment.items.reduce(
-    (sum, item) => sum + item.receivedQuantity,
-    0,
-  );
+  const totalReceived = calculateTotalReceived(shipment.items);
 
   // Show only parent/root items for count and thumbnails (Kuji = 1 block, not parent + prizes)
   const rootItems = shipment.items.filter((item) => !item.item.parentId);

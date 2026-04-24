@@ -155,8 +155,11 @@ public class ShipmentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<ShipmentResponseDTO> undoReceiveShipmentItem(
             @PathVariable UUID shipmentId,
-            @PathVariable UUID itemId) {
-        Shipment shipment = shipmentService.undoReceiveShipmentItem(shipmentId, itemId);
+            @PathVariable UUID itemId,
+            Authentication authentication) {
+        ActorInfo actor = getActorInfo(authentication);
+        Shipment shipment = shipmentService.undoReceiveShipmentItem(
+                shipmentId, itemId, actor.id(), actor.name());
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 }

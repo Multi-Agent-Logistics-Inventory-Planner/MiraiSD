@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -65,7 +66,7 @@ interface ItemAllocation {
   id: string;
   locationType: LocationType;
   locationId: string;
-  quantity: number;
+  quantity: number | "";
 }
 
 interface ItemAllocations {
@@ -73,20 +74,20 @@ interface ItemAllocations {
 }
 
 interface DamagedQuantities {
-  [itemId: string]: number;
+  [itemId: string]: number | "";
 }
 
 interface DisplayQuantities {
-  [itemId: string]: number;
+  [itemId: string]: number | "";
 }
 
 interface ShopQuantities {
-  [itemId: string]: number;
+  [itemId: string]: number | "";
 }
 
 /** Prize items in a Kuji block use parent's receive location; we only store quantity per prize. */
 interface PrizeReceivedQuantities {
-  [shipmentItemId: string]: number;
+  [shipmentItemId: string]: number | "";
 }
 
 /** Track number of sets received per kuji parent (for auto-calculating prize quantities) */
@@ -166,16 +167,11 @@ function AllocationRow({
       )}
 
       <div className="flex items-center gap-2">
-        <Input
-          type="number"
+        <QuantityInput
+          value={allocation.quantity}
+          onChange={(val) => onUpdate({ quantity: val })}
           min={0}
           max={maxQuantity}
-          value={allocation.quantity}
-          onChange={(e) => {
-            const num = parseInt(e.target.value, 10);
-            onUpdate({ quantity: Number.isNaN(num) ? 0 : Math.max(0, num) });
-          }}
-          className="flex-1 sm:w-20 sm:flex-none h-10 sm:h-8 text-xs text-right"
         />
 
         {canRemove && (
@@ -224,20 +220,20 @@ export function ShipmentReceiveDialog({
       shipment.items.forEach((item) => {
         const isPrize = !!item.item.parentId;
         if (isPrize) {
-          initialPrizeQtys[item.id] = 0;
+          initialPrizeQtys[item.id] = "";
         } else {
           initialAllocations[item.id] = [
             {
               id: crypto.randomUUID(),
               locationType: LocationType.NOT_ASSIGNED,
               locationId: "",
-              quantity: 0,
+              quantity: "",
             },
           ];
         }
-        initialDamaged[item.id] = 0;
-        initialDisplay[item.id] = 0;
-        initialShop[item.id] = 0;
+        initialDamaged[item.id] = "";
+        initialDisplay[item.id] = "";
+        initialShop[item.id] = "";
       });
       setItemAllocations(initialAllocations);
       setDamagedQuantities(initialDamaged);
@@ -259,7 +255,7 @@ export function ShipmentReceiveDialog({
           id: crypto.randomUUID(),
           locationType: LocationType.NOT_ASSIGNED,
           locationId: "",
-          quantity: 0,
+          quantity: "",
         },
       ],
     }));
@@ -285,56 +281,62 @@ export function ShipmentReceiveDialog({
     }));
   };
 
-  const getTotalAllocated = (itemId: string) => {
+  const getTotalAllocated = (itemId: string): number => {
     return (itemAllocations[itemId] || []).reduce(
-      (sum, a) => sum + a.quantity,
+      (sum, a) => sum + (a.quantity === "" ? 0 : a.quantity),
       0
     );
   };
 
   /** For prizes we use prizeReceivedQuantities (same location as parent); for roots use itemAllocations. */
-  const getEffectiveTotalAllocated = (item: ShipmentItem) => {
-    if (item.item.parentId) return prizeReceivedQuantities[item.id] ?? 0;
+  const getEffectiveTotalAllocated = (item: ShipmentItem): number => {
+    if (item.item.parentId) {
+      const val = prizeReceivedQuantities[item.id];
+      return val === "" || val === undefined ? 0 : val;
+    }
     return getTotalAllocated(item.id);
   };
 
-  const setPrizeReceivedQuantity = (shipmentItemId: string, quantity: number) => {
+  const setPrizeReceivedQuantity = (shipmentItemId: string, quantity: number | "") => {
     setPrizeReceivedQuantities((prev) => ({
       ...prev,
-      [shipmentItemId]: Math.max(0, quantity),
+      [shipmentItemId]: quantity === "" ? "" : Math.max(0, quantity),
     }));
   };
 
-  const getDamagedQuantity = (itemId: string) => {
-    return damagedQuantities[itemId] || 0;
+  const getDamagedQuantity = (itemId: string): number => {
+    const val = damagedQuantities[itemId];
+    return val === "" || val === undefined ? 0 : val;
   };
 
-  const setDamagedQuantity = (itemId: string, quantity: number) => {
+  const setDamagedQuantity = (itemId: string, quantity: number | "") => {
     setDamagedQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(0, quantity),
+      [itemId]: quantity === "" ? "" : Math.max(0, quantity),
     }));
   };
 
-  const getDisplayQuantity = (itemId: string) => {
-    return displayQuantities[itemId] || 0;
+  const getDisplayQuantity = (itemId: string): number => {
+    const val = displayQuantities[itemId];
+    return val === "" || val === undefined ? 0 : val;
   };
 
-  const setDisplayQuantity = (itemId: string, quantity: number) => {
+  const setDisplayQuantity = (itemId: string, quantity: number | "") => {
     setDisplayQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(0, quantity),
+      [itemId]: quantity === "" ? "" : Math.max(0, quantity),
     }));
   };
 
-  const getShopQuantity = (itemId: string) => {
-    return shopQuantities[itemId] || 0;
+  const getShopQuantity = (itemId: string): number => {
+    const val = shopQuantities[itemId];
+    return val === "" || val === undefined ? 0 : val;
   };
 
-  const setShopQuantity = (itemId: string, quantity: number) => {
+  const setShopQuantity = (itemId: string, quantity: number | "") => {
     setShopQuantities((prev) => ({
       ...prev,
-      [itemId]: Math.max(0, quantity),
+      [itemId]: quantity === "" ? "" : Math.max(0, quantity),
     }));
   };
 
@@ -374,8 +376,10 @@ export function ShipmentReceiveDialog({
         if (item.item.parentId) {
           // Prize: use parent shipment item's location(s) with this prize's quantity (itemAllocations is keyed by shipment item id)
           const parentShipmentItem = shipment.items.find((i) => i.item.id === item.item.parentId);
-          const parentAllocations = (parentShipmentItem ? (itemAllocations[parentShipmentItem.id] || []) : []).filter((a) => a.quantity > 0);
-          const prizeQty = prizeReceivedQuantities[item.id] ?? 0;
+          const parentAllocations = (parentShipmentItem ? (itemAllocations[parentShipmentItem.id] || []) : [])
+            .filter((a) => a.quantity !== "" && a.quantity > 0);
+          const prizeQtyRaw = prizeReceivedQuantities[item.id];
+          const prizeQty = prizeQtyRaw === "" || prizeQtyRaw === undefined ? 0 : prizeQtyRaw;
           if (prizeQty <= 0) {
             allocations = [];
           } else if (parentAllocations.length === 0) {
@@ -400,11 +404,11 @@ export function ShipmentReceiveDialog({
           }
         } else {
           allocations = (itemAllocations[item.id] || [])
-            .filter((a) => a.quantity > 0)
+            .filter((a) => a.quantity !== "" && a.quantity > 0)
             .map((a) => ({
               locationType: a.locationType,
               locationId: a.locationType === LocationType.NOT_ASSIGNED ? undefined : a.locationId || undefined,
-              quantity: a.quantity,
+              quantity: a.quantity as number, // Already filtered to be a positive number
             }));
         }
 
@@ -610,54 +614,36 @@ export function ShipmentReceiveDialog({
                         </Button>
                         <div className="mt-3 pt-3 border-t space-y-2">
                           <div className="flex items-center gap-3">
-                            <Label htmlFor={`damaged-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Damaged:</Label>
-                            <Input
-                              id={`damaged-${item.id}`}
-                              type="number"
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap w-20">Damaged:</Label>
+                            <QuantityInput
+                              value={damagedQuantities[item.id] ?? ""}
+                              onChange={(val) => setDamagedQuantity(item.id, val)}
                               min={0}
                               max={remaining}
-                              value={getDamagedQuantity(item.id)}
-                              onChange={(e) => {
-                                const num = parseInt(e.target.value, 10);
-                                setDamagedQuantity(item.id, Number.isNaN(num) ? 0 : num);
-                              }}
-                              className="w-20 h-8 text-xs text-right"
                             />
                             {getDamagedQuantity(item.id) > 0 && (
                               <span className="text-xs text-amber-600">Won&apos;t be added to inventory</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
-                            <Label htmlFor={`display-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Display:</Label>
-                            <Input
-                              id={`display-${item.id}`}
-                              type="number"
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap w-20">Display:</Label>
+                            <QuantityInput
+                              value={displayQuantities[item.id] ?? ""}
+                              onChange={(val) => setDisplayQuantity(item.id, val)}
                               min={0}
                               max={remaining}
-                              value={getDisplayQuantity(item.id)}
-                              onChange={(e) => {
-                                const num = parseInt(e.target.value, 10);
-                                setDisplayQuantity(item.id, Number.isNaN(num) ? 0 : num);
-                              }}
-                              className="w-20 h-8 text-xs text-right"
                             />
                             {getDisplayQuantity(item.id) > 0 && (
                               <span className="text-xs text-blue-600">For display use</span>
                             )}
                           </div>
                           <div className="flex items-center gap-3">
-                            <Label htmlFor={`shop-${item.id}`} className="text-xs text-muted-foreground whitespace-nowrap w-20">Shop:</Label>
-                            <Input
-                              id={`shop-${item.id}`}
-                              type="number"
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap w-20">Shop:</Label>
+                            <QuantityInput
+                              value={shopQuantities[item.id] ?? ""}
+                              onChange={(val) => setShopQuantity(item.id, val)}
                               min={0}
                               max={remaining}
-                              value={getShopQuantity(item.id)}
-                              onChange={(e) => {
-                                const num = parseInt(e.target.value, 10);
-                                setShopQuantity(item.id, Number.isNaN(num) ? 0 : num);
-                              }}
-                              className="w-20 h-8 text-xs text-right"
                             />
                             {getShopQuantity(item.id) > 0 && (
                               <span className="text-xs text-green-600">For shop use</span>
@@ -717,7 +703,8 @@ export function ShipmentReceiveDialog({
                             const prizeRemaining = prize.orderedQuantity - prize.receivedQuantity -
                               (prize.damagedQuantity || 0);
                             const prizeIsComplete = prizeRemaining <= 0;
-                            const prizeQty = prizeReceivedQuantities[prize.id] ?? 0;
+                            const prizeQtyRaw = prizeReceivedQuantities[prize.id];
+                            const prizeQty = prizeQtyRaw === "" || prizeQtyRaw === undefined ? 0 : prizeQtyRaw;
                             const prizeDamaged = getDamagedQuantity(prize.id);
                             const prizeIsOver = (prizeQty + prizeDamaged) > prizeRemaining;
                             const letter = prize.letter;
@@ -753,28 +740,18 @@ export function ShipmentReceiveDialog({
                                 {!prizeIsComplete && (
                                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                                     <Label className="text-xs text-muted-foreground">Qty:</Label>
-                                    <Input
-                                      type="number"
+                                    <QuantityInput
+                                      value={prizeReceivedQuantities[prize.id] ?? ""}
+                                      onChange={(val) => setPrizeReceivedQuantity(prize.id, val)}
                                       min={0}
                                       max={prizeRemaining}
-                                      value={prizeQty}
-                                      onChange={(e) => {
-                                        const num = parseInt(e.target.value, 10);
-                                        setPrizeReceivedQuantity(prize.id, Number.isNaN(num) ? 0 : num);
-                                      }}
-                                      className="w-16 h-7 text-xs text-right"
                                     />
                                     <Label className="text-xs text-muted-foreground">Dmg:</Label>
-                                    <Input
-                                      type="number"
+                                    <QuantityInput
+                                      value={damagedQuantities[prize.id] ?? ""}
+                                      onChange={(val) => setDamagedQuantity(prize.id, val)}
                                       min={0}
                                       max={prizeRemaining}
-                                      value={prizeDamaged}
-                                      onChange={(e) => {
-                                        const num = parseInt(e.target.value, 10);
-                                        setDamagedQuantity(prize.id, Number.isNaN(num) ? 0 : num);
-                                      }}
-                                      className="w-14 h-7 text-xs text-right"
                                     />
                                     {prizeIsOver && (
                                       <span className="text-xs text-destructive font-medium">

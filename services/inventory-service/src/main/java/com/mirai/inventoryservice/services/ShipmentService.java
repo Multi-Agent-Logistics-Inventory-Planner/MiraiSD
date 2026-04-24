@@ -688,13 +688,15 @@ public class ShipmentService {
      *
      * @param shipmentId The shipment ID
      * @param itemId The shipment item ID to undo
+     * @param actorId The ID of the user performing the undo
+     * @param actorName The name of the user performing the undo
      * @return The updated shipment
      * @throws ShipmentNotFoundException if shipment not found
      * @throws ShipmentItemNotFoundException if item not found or doesn't belong to shipment
      * @throws InvalidShipmentStatusException if item has nothing to undo
      * @throws InsufficientInventoryException if inventory has been depleted
      */
-    public Shipment undoReceiveShipmentItem(UUID shipmentId, UUID itemId) {
+    public Shipment undoReceiveShipmentItem(UUID shipmentId, UUID itemId, UUID actorId, String actorName) {
         Shipment shipment = getShipmentById(shipmentId);
 
         // Find the shipment item
@@ -717,6 +719,7 @@ public class ShipmentService {
         }
 
         Product product = shipmentItem.getItem();
+        String shipmentNumber = shipment.getShipmentNumber();
         Set<UUID> affectedProductIds = new java.util.HashSet<>();
         affectedProductIds.add(product.getId());
 
@@ -727,9 +730,9 @@ public class ShipmentService {
             int quantity = allocation.getQuantity();
 
             if (locationType == LocationType.NOT_ASSIGNED || locationId == null) {
-                removeFromNotAssignedInventory(product, quantity);
+                removeFromNotAssignedInventory(product, quantity, actorId, actorName, shipmentNumber);
             } else {
-                removeFromInventory(locationType, locationId, product, quantity);
+                removeFromInventory(locationType, locationId, product, quantity, actorId, actorName, shipmentNumber);
             }
         }
 
@@ -893,7 +896,8 @@ public class ShipmentService {
      * Remove quantity from inventory at a specific location (for undo operations).
      * Uses the unified location_inventory table.
      */
-    private void removeFromInventory(LocationType locationType, UUID locationId, Product product, int quantity) {
+    private void removeFromInventory(LocationType locationType, UUID locationId, Product product, int quantity,
+                                     UUID actorId, String actorName, String shipmentNumber) {
         LocationInventory inventory = locationInventoryRepository
                 .findByLocation_IdAndProduct_Id(locationId, product.getId())
                 .orElseThrow(() -> new InsufficientInventoryException(
@@ -915,7 +919,8 @@ public class ShipmentService {
 
         // Create audit log for reversal
         AuditLog auditLog = auditLogService.createAuditLog(
-                null,  // No specific actor for system reversal
+                actorId,
+                actorName,
                 StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
                 locationId,
                 locationCode,
@@ -924,7 +929,7 @@ public class ShipmentService {
                 1,
                 quantity,
                 product.getName(),
-                "Shipment receipt reversed"
+                String.format("Reversed receipt for %s from shipment %s", product.getName(), shipmentNumber)
         );
 
         // Create stock movement record
@@ -940,7 +945,7 @@ public class ShipmentService {
                 .currentQuantity(newQuantity)
                 .quantityChange(-quantity)
                 .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
-                .actorId(null)
+                .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
                 .build();
@@ -961,7 +966,8 @@ public class ShipmentService {
      * Remove quantity from NOT_ASSIGNED inventory (for undo operations).
      * Uses the unified location_inventory table.
      */
-    private void removeFromNotAssignedInventory(Product product, int quantity) {
+    private void removeFromNotAssignedInventory(Product product, int quantity,
+                                                UUID actorId, String actorName, String shipmentNumber) {
         Location notAssignedLocation = getNotAssignedLocation();
 
         LocationInventory inventory = locationInventoryRepository
@@ -984,7 +990,8 @@ public class ShipmentService {
 
         // Create audit log
         AuditLog auditLog = auditLogService.createAuditLog(
-                null,
+                actorId,
+                actorName,
                 StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
                 notAssignedLocation.getId(),
                 "NA",
@@ -993,7 +1000,7 @@ public class ShipmentService {
                 1,
                 quantity,
                 product.getName(),
-                "Shipment receipt reversed"
+                String.format("Reversed receipt for %s from shipment %s", product.getName(), shipmentNumber)
         );
 
         // Create stock movement
@@ -1009,7 +1016,7 @@ public class ShipmentService {
                 .currentQuantity(newQuantity)
                 .quantityChange(-quantity)
                 .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
-                .actorId(null)
+                .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
                 .build();

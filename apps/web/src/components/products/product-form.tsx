@@ -745,7 +745,7 @@ export function ProductForm({
                             id="initial-stock-qty"
                             type="number"
                             min={1}
-                            className="text-center"
+                            className="text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             value={initialStockQty}
                             placeholder="0"
                             onChange={(e) => {
