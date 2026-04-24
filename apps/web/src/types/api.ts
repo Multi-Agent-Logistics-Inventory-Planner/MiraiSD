@@ -56,6 +56,7 @@ export enum StockMovementReason {
   SHIPMENT_PARTIAL_RECEIPT = "SHIPMENT_PARTIAL_RECEIPT",
   SHIPMENT_EDITED = "SHIPMENT_EDITED",
   SHIPMENT_DELETED = "SHIPMENT_DELETED",
+  SHIPMENT_STATUS_OVERRIDDEN = "SHIPMENT_STATUS_OVERRIDDEN",
   SALE = "SALE",
   DAMAGE = "DAMAGE",
   ADJUSTMENT = "ADJUSTMENT",
@@ -69,18 +70,28 @@ export enum StockMovementReason {
 
 export enum ShipmentStatus {
   PENDING = "PENDING",
+  RECEIVED = "RECEIVED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum CarrierStatus {
+  PRE_TRANSIT = "PRE_TRANSIT",
   IN_TRANSIT = "IN_TRANSIT",
   DELIVERED = "DELIVERED",
-  CANCELLED = "CANCELLED",
-  DELIVERY_FAILED = "DELIVERY_FAILED",
+  FAILED = "FAILED",
 }
 
 export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
   [ShipmentStatus.PENDING]: "Pending",
-  [ShipmentStatus.IN_TRANSIT]: "In Transit",
-  [ShipmentStatus.DELIVERED]: "Delivered",
+  [ShipmentStatus.RECEIVED]: "Received",
   [ShipmentStatus.CANCELLED]: "Cancelled",
-  [ShipmentStatus.DELIVERY_FAILED]: "Delivery Failed",
+};
+
+export const CARRIER_STATUS_LABELS: Record<CarrierStatus, string> = {
+  [CarrierStatus.PRE_TRANSIT]: "Pre-transit",
+  [CarrierStatus.IN_TRANSIT]: "In transit",
+  [CarrierStatus.DELIVERED]: "Delivered",
+  [CarrierStatus.FAILED]: "Failed",
 };
 
 export const SHIPMENT_STATUS_VARIANTS: Record<
@@ -88,10 +99,8 @@ export const SHIPMENT_STATUS_VARIANTS: Record<
   "default" | "secondary" | "destructive" | "outline" | "warning"
 > = {
   [ShipmentStatus.PENDING]: "outline",
-  [ShipmentStatus.IN_TRANSIT]: "secondary",
-  [ShipmentStatus.DELIVERED]: "default",
+  [ShipmentStatus.RECEIVED]: "default",
   [ShipmentStatus.CANCELLED]: "destructive",
-  [ShipmentStatus.DELIVERY_FAILED]: "warning",
 };
 
 export enum UserRole {
@@ -354,6 +363,8 @@ export interface Shipment {
   supplierId?: string;
   supplierName?: string;
   status: ShipmentStatus;
+  carrierStatus?: CarrierStatus | null;
+  carrierDeliveredAt?: string | null;
   orderDate: string;
   expectedDeliveryDate?: string;
   actualDeliveryDate?: string;

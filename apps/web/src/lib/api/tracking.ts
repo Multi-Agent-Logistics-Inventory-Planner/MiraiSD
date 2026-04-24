@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "./client";
-import { ShipmentStatus } from "@/types/api";
+import { CarrierStatus } from "@/types/api";
 
 const BASE_PATH = "/api/tracking";
 
@@ -19,7 +19,7 @@ export interface TrackingLookupResponse {
   trackingNumber: string;
   carrier: string;
   status: string;
-  orderStatus: ShipmentStatus;
+  carrierStatus: CarrierStatus;
   dateOrdered?: string;
   expectedDelivery?: string;
   actualDelivery?: string;

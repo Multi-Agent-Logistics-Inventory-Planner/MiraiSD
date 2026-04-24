@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +23,8 @@ public class ShipmentResponseDTO {
     private String supplierName;
     private UUID supplierId;
     private ShipmentStatus status;
+    private CarrierStatus carrierStatus;
+    private OffsetDateTime carrierDeliveredAt;
     private LocalDate orderDate;
     private LocalDate expectedDeliveryDate;
     private LocalDate actualDeliveryDate;

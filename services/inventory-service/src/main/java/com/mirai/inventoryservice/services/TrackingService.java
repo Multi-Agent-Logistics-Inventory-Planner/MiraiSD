@@ -7,7 +7,7 @@ import com.mirai.inventoryservice.dtos.requests.TrackingLookupRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.TrackingEventDTO;
 import com.mirai.inventoryservice.dtos.responses.TrackingLookupResponseDTO;
 import com.mirai.inventoryservice.exceptions.TrackingException;
-import com.mirai.inventoryservice.models.enums.ShipmentStatus;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import lombok.Data;
@@ -166,7 +166,7 @@ public class TrackingService {
 
     private TrackingLookupResponseDTO mapToResponseDTO(EasyPostTrackerResponse tracker, Shipment shipment) {
         String status = tracker.getStatus() != null ? tracker.getStatus() : "unknown";
-        ShipmentStatus orderStatus = mapToShipmentStatus(status);
+        CarrierStatus carrierStatus = mapToCarrierStatus(status);
 
         LocalDate expectedDelivery = parseDate(tracker.getEstDeliveryDate());
         LocalDate actualDelivery = findDeliveryDate(tracker.getTrackingDetails());
@@ -177,7 +177,7 @@ public class TrackingService {
             tracker.getTrackingCode(),
             tracker.getCarrier() != null ? tracker.getCarrier() : "Unknown",
             status,
-            orderStatus,
+            carrierStatus,
             shipment != null ? shipment.getOrderDate() : null,
             expectedDelivery,
             actualDelivery,
@@ -187,16 +187,16 @@ public class TrackingService {
         );
     }
 
-    private ShipmentStatus mapToShipmentStatus(String easyPostStatus) {
+    private CarrierStatus mapToCarrierStatus(String easyPostStatus) {
         if (easyPostStatus == null) {
-            return ShipmentStatus.PENDING;
+            return CarrierStatus.PRE_TRANSIT;
         }
 
         return switch (easyPostStatus.toLowerCase()) {
-            case "in_transit", "out_for_delivery", "available_for_pickup" -> ShipmentStatus.IN_TRANSIT;
-            case "delivered" -> ShipmentStatus.DELIVERED;
-            case "cancelled", "return_to_sender", "failure" -> ShipmentStatus.CANCELLED;
-            default -> ShipmentStatus.PENDING;
+            case "in_transit", "out_for_delivery", "available_for_pickup" -> CarrierStatus.IN_TRANSIT;
+            case "delivered" -> CarrierStatus.DELIVERED;
+            case "cancelled", "return_to_sender", "failure", "error" -> CarrierStatus.FAILED;
+            default -> CarrierStatus.PRE_TRANSIT;
         };
     }
 

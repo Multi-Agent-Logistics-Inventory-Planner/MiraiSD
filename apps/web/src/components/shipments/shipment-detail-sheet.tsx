@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X, Undo2 } from "lucide-react";
+import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X, Undo2, Settings2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +20,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Can, Permission } from "@/components/rbac";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { Shipment, ShipmentStatus, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
-import { LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
+import type { Shipment, ShipmentItem, ShipmentItemAllocation } from "@/types/api";
+import { CarrierStatus, LOCATION_TYPE_LABELS, LocationType } from "@/types/api";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
-import { calculateTotalReceived } from "@/lib/shipment-utils";
+import {
+  calculateTotalReceived,
+  getShipmentDisplayStatus,
+  SHIPMENT_DISPLAY_STATUS_LABELS,
+} from "@/lib/shipment-utils";
 import { useTracking } from "@/hooks/queries/use-tracking";
+import { ShipmentStatusOverrideDialog } from "./shipment-status-override-dialog";
 
 interface ShipmentDetailSheetProps {
   open: boolean;
@@ -37,24 +42,25 @@ interface ShipmentDetailSheetProps {
   onTrackingUpdate?: (trackingId: string) => Promise<void>;
 }
 
-const STATUS_VARIANTS: Record<
-  ShipmentStatus,
+const DISPLAY_STATUS_VARIANTS: Record<
+  string,
   "default" | "secondary" | "destructive" | "outline" | "warning"
 > = {
-  PENDING: "outline",
-  IN_TRANSIT: "secondary",
-  DELIVERED: "default",
-  CANCELLED: "destructive",
-  DELIVERY_FAILED: "warning",
+  ACTIVE: "outline",
+  AWAITING_RECEIPT: "warning",
+  PARTIAL: "secondary",
+  COMPLETED: "default",
+  FAILED: "destructive",
 };
 
-const STATUS_LABELS: Record<ShipmentStatus, string> = {
-  PENDING: "Pending",
-  IN_TRANSIT: "In Transit",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-  DELIVERY_FAILED: "Delivery Failed",
-};
+function formatCarrierDeliveredAt(iso?: string | null) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
@@ -342,6 +348,7 @@ export function ShipmentDetailSheet({
   const [trackingExpanded, setTrackingExpanded] = useState(false);
   const [infoExpanded, setInfoExpanded] = useState(false);
   const [isEditingTracking, setIsEditingTracking] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
   const [trackingInput, setTrackingInput] = useState("");
   const [trackingSaving, setTrackingSaving] = useState(false);
 
@@ -416,22 +423,23 @@ export function ShipmentDetailSheet({
     return null;
   }
 
-  // DELIVERY_FAILED shipments can still be received (items may arrive despite failure)
-  const canReceive =
-    shipment.status === "PENDING" || shipment.status === "IN_TRANSIT" || shipment.status === "DELIVERY_FAILED";
-  const canDelete = shipment.status !== "DELIVERED";
-  const canEdit =
-    shipment.status !== "DELIVERED" && shipment.status !== "CANCELLED";
-  const canUndo = shipment.status === "DELIVERED";
-
-  // Check if any items have been received (for showing Undo Items button)
-  const hasReceivedItems = shipment.items.some(
+  // Inventory-status-driven gates (carrier state is independent)
+  const canReceive = shipment.status !== "CANCELLED";
+  const canDelete = shipment.status !== "RECEIVED";
+  const canEdit = shipment.status !== "CANCELLED";
+  // Undo is available whenever any item has receipts to reverse
+  const canUndo = shipment.items.some(
     (item) =>
       item.receivedQuantity > 0 ||
       (item.damagedQuantity ?? 0) > 0 ||
       (item.displayQuantity ?? 0) > 0 ||
-      (item.shopQuantity ?? 0) > 0
+      (item.shopQuantity ?? 0) > 0,
   );
+
+  const displayStatus = getShipmentDisplayStatus(shipment);
+  const showAwaitingReceiptNote =
+    shipment.carrierStatus === CarrierStatus.DELIVERED &&
+    shipment.status === "PENDING";
 
   const totalOrdered = shipment.items.reduce(
     (sum, item) => sum + item.orderedQuantity,
@@ -452,13 +460,39 @@ export function ShipmentDetailSheet({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3 flex-wrap">
             <span className="text-xl font-semibold">Shipment:</span>
             <span className="text-xl font-mono">{shipment.shipmentNumber}</span>
-            <Badge variant={STATUS_VARIANTS[shipment.status]} className="text-xs ml-2">
-              {STATUS_LABELS[shipment.status]}
-            </Badge>
+            <Can permission={Permission.SHIPMENTS_UPDATE}>
+              <button
+                type="button"
+                onClick={() => setOverrideOpen(true)}
+                title="Click to override status"
+                className="ml-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+              >
+                <Badge
+                  variant={
+                    displayStatus
+                      ? DISPLAY_STATUS_VARIANTS[displayStatus]
+                      : "outline"
+                  }
+                  className="text-xs cursor-pointer group-hover:opacity-80"
+                >
+                  {displayStatus
+                    ? SHIPMENT_DISPLAY_STATUS_LABELS[displayStatus]
+                    : "Cancelled"}
+                  <Settings2 className="h-3 w-3 ml-1 opacity-60" />
+                </Badge>
+              </button>
+            </Can>
           </DialogTitle>
+          {showAwaitingReceiptNote && (
+            <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+              Carrier delivered{" "}
+              {formatCarrierDeliveredAt(shipment.carrierDeliveredAt)} - awaiting
+              receipt
+            </p>
+          )}
         </DialogHeader>
 
         <div className="px-6 pb-6 space-y-6">
@@ -469,12 +503,6 @@ export function ShipmentDetailSheet({
                 <Button onClick={onReceiveClick} size="sm">
                   <PackageCheck className="h-4 w-4 mr-2" />
                   Receive Items
-                </Button>
-              )}
-              {canReceive && hasReceivedItems && (
-                <Button variant="outline" size="sm" onClick={onUndoItemsClick}>
-                  <Undo2 className="h-4 w-4 mr-2" />
-                  Undo Items
                 </Button>
               )}
             </Can>
@@ -805,6 +833,11 @@ export function ShipmentDetailSheet({
           )}
         </div>
       </DialogContent>
+      <ShipmentStatusOverrideDialog
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        shipment={shipment}
+      />
     </Dialog>
   );
 }

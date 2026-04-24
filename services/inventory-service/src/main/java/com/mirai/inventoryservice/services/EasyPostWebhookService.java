@@ -5,9 +5,9 @@ import com.mirai.inventoryservice.dtos.easypost.EasyPostTrackerResult;
 import com.mirai.inventoryservice.dtos.easypost.EasyPostWebhookPayload;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.WebhookEvent;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
-import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.WebhookEventRepository;
@@ -21,6 +21,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -117,7 +118,8 @@ public class EasyPostWebhookService {
     }
 
     /**
-     * Process tracker status update
+     * Process tracker status update.
+     * Updates carrier_status (logistics) only - never touches inventory status.
      */
     private void processTrackerEvent(EasyPostTrackerResult tracker) {
         if (tracker == null) {
@@ -127,12 +129,11 @@ public class EasyPostWebhookService {
 
         String trackerId = tracker.getId();
         String trackingCode = tracker.getTrackingCode();
-        String status = tracker.getStatus();
+        String easyPostStatus = tracker.getStatus();
 
         log.info("Processing tracker event: trackerId={}, trackingCode={}, status={}",
-                trackerId, trackingCode, status);
+                trackerId, trackingCode, easyPostStatus);
 
-        // Find shipment by tracker ID or tracking code
         Optional<Shipment> shipmentOpt = shipmentRepository.findByEasypostTrackerId(trackerId);
         if (shipmentOpt.isEmpty() && trackingCode != null) {
             shipmentOpt = shipmentRepository.findByTrackingId(trackingCode);
@@ -145,30 +146,24 @@ public class EasyPostWebhookService {
         }
 
         Shipment shipment = shipmentOpt.get();
-        ShipmentStatus newStatus = mapToShipmentStatus(status);
-        ShipmentStatus oldStatus = shipment.getStatus();
+        CarrierStatus newCarrierStatus = mapToCarrierStatus(easyPostStatus);
+        CarrierStatus oldCarrierStatus = shipment.getCarrierStatus();
 
-        // Only update if status actually changed
-        if (oldStatus == newStatus) {
-            log.debug("Shipment {} status unchanged: {}", shipment.getId(), status);
+        if (oldCarrierStatus == newCarrierStatus) {
+            log.debug("Shipment {} carrier status unchanged: {}", shipment.getId(), easyPostStatus);
             return;
         }
 
-        // Don't overwrite DELIVERED status from webhook - only manual receipt should do this
-        if (oldStatus == ShipmentStatus.DELIVERED) {
-            log.info("Shipment {} already DELIVERED, ignoring webhook status update", shipment.getId());
-            return;
+        shipment.setCarrierStatus(newCarrierStatus);
+
+        if (newCarrierStatus == CarrierStatus.DELIVERED && shipment.getCarrierDeliveredAt() == null) {
+            shipment.setCarrierDeliveredAt(OffsetDateTime.now());
         }
 
-        // Update shipment status
-        shipment.setStatus(newStatus);
-
-        // Store tracker ID if not already set
         if (shipment.getEasypostTrackerId() == null) {
             shipment.setEasypostTrackerId(trackerId);
         }
 
-        // Update expected delivery date if available
         if (tracker.getEstDeliveryDate() != null) {
             try {
                 LocalDate estDate = ZonedDateTime.parse(tracker.getEstDeliveryDate()).toLocalDate();
@@ -180,64 +175,58 @@ public class EasyPostWebhookService {
 
         shipmentRepository.save(shipment);
 
-        // Create notifications only for DELIVERED or CANCELLED (failure)
-        createTrackingNotification(shipment, oldStatus, newStatus, status);
+        createTrackingNotification(shipment, oldCarrierStatus, newCarrierStatus, easyPostStatus);
 
-        // Broadcast update to frontend
         broadcastService.broadcastShipmentUpdated(List.of(shipment.getId().toString()));
 
-        log.info("Updated shipment {} status: {} -> {} (EasyPost: {})",
-                shipment.getId(), oldStatus, newStatus, status);
+        log.info("Updated shipment {} carrier_status: {} -> {} (EasyPost: {})",
+                shipment.getId(), oldCarrierStatus, newCarrierStatus, easyPostStatus);
     }
 
     /**
-     * Map EasyPost status to ShipmentStatus
+     * Map EasyPost status to CarrierStatus.
+     * Returned CarrierStatus reflects logistics only - inventory status is unaffected.
      */
-    private ShipmentStatus mapToShipmentStatus(String easyPostStatus) {
+    private CarrierStatus mapToCarrierStatus(String easyPostStatus) {
         if (easyPostStatus == null) {
-            return ShipmentStatus.PENDING;
+            return CarrierStatus.PRE_TRANSIT;
         }
 
         return switch (easyPostStatus.toLowerCase()) {
-            case "pre_transit", "unknown" -> ShipmentStatus.PENDING;
-            case "in_transit", "out_for_delivery", "available_for_pickup" -> ShipmentStatus.IN_TRANSIT;
-            case "delivered" -> ShipmentStatus.DELIVERED;
-            case "cancelled", "return_to_sender" -> ShipmentStatus.CANCELLED;
-            case "failure", "error" -> ShipmentStatus.DELIVERY_FAILED;
-            default -> ShipmentStatus.PENDING;
+            case "pre_transit", "unknown" -> CarrierStatus.PRE_TRANSIT;
+            case "in_transit", "out_for_delivery", "available_for_pickup" -> CarrierStatus.IN_TRANSIT;
+            case "delivered" -> CarrierStatus.DELIVERED;
+            case "cancelled", "return_to_sender", "failure", "error" -> CarrierStatus.FAILED;
+            default -> CarrierStatus.PRE_TRANSIT;
         };
     }
 
     /**
-     * Create notification for tracking status changes.
-     * Only creates notifications for DELIVERED, CANCELLED, and DELIVERY_FAILED statuses.
+     * Create notification for carrier-side status changes.
+     * DELIVERED prompts the user to verify items; FAILED warns of carrier failure.
      */
     private void createTrackingNotification(
             Shipment shipment,
-            ShipmentStatus oldStatus,
-            ShipmentStatus newStatus,
+            CarrierStatus oldStatus,
+            CarrierStatus newStatus,
             String easyPostStatus) {
 
         NotificationType type;
         NotificationSeverity severity;
         String message;
 
-        if (newStatus == ShipmentStatus.DELIVERED) {
-            type = NotificationType.SHIPMENT_COMPLETED;
+        if (newStatus == CarrierStatus.DELIVERED) {
+            type = NotificationType.PACKAGE_ARRIVED;
             severity = NotificationSeverity.INFO;
-            message = String.format("Shipment %s has been delivered", shipment.getShipmentNumber());
-        } else if (newStatus == ShipmentStatus.DELIVERY_FAILED) {
+            message = String.format(
+                    "Package for Shipment %s has arrived. Please verify and receive items.",
+                    shipment.getShipmentNumber());
+        } else if (newStatus == CarrierStatus.FAILED) {
             type = NotificationType.SHIPMENT_DELIVERY_FAILED;
             severity = NotificationSeverity.WARNING;
             message = String.format("Shipment %s delivery failed: %s",
                     shipment.getShipmentNumber(), easyPostStatus);
-        } else if (newStatus == ShipmentStatus.CANCELLED) {
-            type = NotificationType.SHIPMENT_DAMAGED;
-            severity = NotificationSeverity.WARNING;
-            message = String.format("Shipment %s was cancelled: %s",
-                    shipment.getShipmentNumber(), easyPostStatus);
         } else {
-            // No notification for other transitions (PENDING -> IN_TRANSIT)
             return;
         }
 
@@ -246,8 +235,8 @@ public class EasyPostWebhookService {
         metadata.put("shipment_id", shipment.getId().toString());
         metadata.put("tracking_id", shipment.getTrackingId());
         metadata.put("easypost_status", easyPostStatus);
-        metadata.put("old_status", oldStatus.name());
-        metadata.put("new_status", newStatus.name());
+        metadata.put("old_carrier_status", oldStatus == null ? null : oldStatus.name());
+        metadata.put("new_carrier_status", newStatus.name());
         metadata.put("category", "tracking");
 
         Notification notification = Notification.builder()

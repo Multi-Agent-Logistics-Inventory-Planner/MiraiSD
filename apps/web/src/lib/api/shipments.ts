@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from "./client";
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from "./client";
 import {
   Shipment,
   ShipmentRequest,
@@ -9,10 +9,20 @@ import {
 
 const BASE_PATH = "/api/shipments";
 
-export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED" | "FAILED";
+export type ShipmentDisplayStatus =
+  | "ACTIVE"
+  | "AWAITING_RECEIPT"
+  | "PARTIAL"
+  | "COMPLETED"
+  | "FAILED";
 
 // Type for the counts response (includes OVERDUE which overlaps with ACTIVE/PARTIAL)
 export type ShipmentStatusCounts = Record<ShipmentDisplayStatus | "OVERDUE", number>;
+
+export interface OverrideShipmentStatusRequest {
+  status: ShipmentStatus;
+  reason: string;
+}
 
 export type SortDirection = "asc" | "desc";
 
@@ -123,6 +133,19 @@ export async function undoReceiveShipmentItem(
   return apiPost<Shipment, undefined>(
     `${BASE_PATH}/${shipmentId}/items/${itemId}/undo-receive`,
     undefined
+  );
+}
+
+/**
+ * Manually override a shipment's inventory status. Reason is required.
+ */
+export async function overrideShipmentStatus(
+  id: string,
+  data: OverrideShipmentStatusRequest
+): Promise<Shipment> {
+  return apiPatch<Shipment, OverrideShipmentStatusRequest>(
+    `${BASE_PATH}/${id}/status`,
+    data
   );
 }
 

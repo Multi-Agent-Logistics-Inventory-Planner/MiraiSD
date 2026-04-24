@@ -187,32 +187,34 @@ public class ShipmentService {
         return shipmentRepository.findByStatusPaged(status, pageable);
     }
 
-    // Statuses considered "active" (not yet fully received)
-    private static final List<ShipmentStatus> PENDING_STATUSES = List.of(
-            ShipmentStatus.PENDING, ShipmentStatus.IN_TRANSIT
-    );
-
     /**
      * List shipments by display status with pagination.
-     * Display statuses are: ACTIVE (pending with no received items), PARTIAL (partially received),
-     * COMPLETED (fully delivered), FAILED (delivery failed).
+     * Display statuses (frontend-derived from inventory + carrier status):
+     *   ACTIVE          - PENDING with no receipts and carrier_status != DELIVERED/FAILED
+     *   AWAITING_RECEIPT - PENDING with no receipts and carrier_status = DELIVERED
+     *   PARTIAL         - PENDING with some items received
+     *   COMPLETED       - RECEIVED
+     *   FAILED          - PENDING with carrier_status = FAILED
      */
     public Page<Shipment> listShipmentsByDisplayStatus(String displayStatus, String search, Pageable pageable) {
         String searchPattern = (search != null && !search.isBlank()) ? "%" + search.toLowerCase() + "%" : null;
 
         return switch (displayStatus) {
             case "ACTIVE" -> searchPattern != null
-                    ? shipmentRepository.findActiveShipmentsWithSearch(PENDING_STATUSES, searchPattern, pageable)
-                    : shipmentRepository.findActiveShipments(PENDING_STATUSES, pageable);
+                    ? shipmentRepository.findActiveShipmentsWithSearch(searchPattern, pageable)
+                    : shipmentRepository.findActiveShipments(pageable);
+            case "AWAITING_RECEIPT" -> searchPattern != null
+                    ? shipmentRepository.findAwaitingReceiptShipmentsWithSearch(searchPattern, pageable)
+                    : shipmentRepository.findAwaitingReceiptShipments(pageable);
             case "PARTIAL" -> searchPattern != null
-                    ? shipmentRepository.findPartialShipmentsWithSearch(PENDING_STATUSES, searchPattern, pageable)
-                    : shipmentRepository.findPartialShipments(PENDING_STATUSES, pageable);
+                    ? shipmentRepository.findPartialShipmentsWithSearch(searchPattern, pageable)
+                    : shipmentRepository.findPartialShipments(pageable);
             case "COMPLETED" -> searchPattern != null
-                    ? shipmentRepository.findCompletedShipmentsWithSearch(ShipmentStatus.DELIVERED, searchPattern, pageable)
-                    : shipmentRepository.findCompletedShipments(ShipmentStatus.DELIVERED, pageable);
+                    ? shipmentRepository.findCompletedShipmentsWithSearch(ShipmentStatus.RECEIVED, searchPattern, pageable)
+                    : shipmentRepository.findCompletedShipments(ShipmentStatus.RECEIVED, pageable);
             case "FAILED" -> searchPattern != null
-                    ? shipmentRepository.findByStatusAndSearch(ShipmentStatus.DELIVERY_FAILED, searchPattern, pageable)
-                    : shipmentRepository.findByStatusPaged(ShipmentStatus.DELIVERY_FAILED, pageable);
+                    ? shipmentRepository.findFailedShipmentsWithSearch(searchPattern, pageable)
+                    : shipmentRepository.findFailedShipments(pageable);
             default -> listShipmentsPaged(null, search, pageable);
         };
     }
@@ -222,11 +224,12 @@ public class ShipmentService {
      */
     public Map<String, Long> getDisplayStatusCounts() {
         Map<String, Long> counts = new HashMap<>();
-        counts.put("ACTIVE", shipmentRepository.countActiveShipments(PENDING_STATUSES));
-        counts.put("PARTIAL", shipmentRepository.countPartialShipments(PENDING_STATUSES));
-        counts.put("COMPLETED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERED));
-        counts.put("FAILED", shipmentRepository.countCompletedShipments(ShipmentStatus.DELIVERY_FAILED));
-        counts.put("OVERDUE", shipmentRepository.countOverdueShipments(PENDING_STATUSES));
+        counts.put("ACTIVE", shipmentRepository.countActiveShipments());
+        counts.put("AWAITING_RECEIPT", shipmentRepository.countAwaitingReceiptShipments());
+        counts.put("PARTIAL", shipmentRepository.countPartialShipments());
+        counts.put("COMPLETED", shipmentRepository.countCompletedShipments(ShipmentStatus.RECEIVED));
+        counts.put("FAILED", shipmentRepository.countFailedShipments());
+        counts.put("OVERDUE", shipmentRepository.countOverdueShipments());
         return counts;
     }
 
@@ -286,11 +289,6 @@ public class ShipmentService {
 
         // Handle items update
         if (requestDTO.getItems() != null && !requestDTO.getItems().isEmpty()) {
-            // Cannot modify items on a delivered shipment
-            if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
-                throw new InvalidShipmentStatusException("Cannot modify items on a delivered shipment");
-            }
-
             // Batch fetch all products upfront
             Set<UUID> productIds = requestDTO.getItems().stream()
                     .map(ShipmentItemRequestDTO::getItemId)
@@ -325,17 +323,13 @@ public class ShipmentService {
             for (ShipmentItemRequestDTO itemDTO : requestDTO.getItems()) {
                 UUID productId = itemDTO.getItemId();
 
-                // Skip if this product was already received - it's preserved
+                // Item has receipts - block ordered-quantity changes; corrections must go through Undo + Receive
                 if (existingProductIds.contains(productId)) {
-                    // Optionally update orderedQuantity if the new value is >= total received
                     ShipmentItem receivedItem = receivedItemsByProductId.get(productId);
-                    int totalReceived = receivedItem.getReceivedQuantity()
-                            + receivedItem.getDamagedQuantity()
-                            + receivedItem.getDisplayQuantity()
-                            + receivedItem.getShopQuantity();
-
-                    if (itemDTO.getOrderedQuantity() >= totalReceived) {
-                        receivedItem.setOrderedQuantity(itemDTO.getOrderedQuantity());
+                    if (itemDTO.getOrderedQuantity() != null
+                            && !itemDTO.getOrderedQuantity().equals(receivedItem.getOrderedQuantity())) {
+                        throw new InvalidShipmentStatusException(
+                                "Cannot change ordered quantity for an item with receipts. Undo this item first.");
                     }
                     continue;
                 }
@@ -384,8 +378,8 @@ public class ShipmentService {
      */
     public void deleteShipment(UUID id, UUID actorId, String actorName) {
         Shipment shipment = getShipmentById(id);
-        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
-            throw new InvalidShipmentStatusException("Cannot delete a delivered shipment");
+        if (shipment.getStatus() == ShipmentStatus.RECEIVED) {
+            throw new InvalidShipmentStatusException("Cannot delete a received shipment");
         }
 
         // Create audit before deleting (captures full shipment details)
@@ -404,9 +398,6 @@ public class ShipmentService {
     public Shipment receiveShipment(UUID shipmentId, ReceiveShipmentRequestDTO requestDTO) {
         Shipment shipment = getShipmentById(shipmentId);
 
-        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
-            throw new InvalidShipmentStatusException("Shipment already delivered");
-        }
         if (shipment.getStatus() == ShipmentStatus.CANCELLED) {
             throw new InvalidShipmentStatusException("Cannot receive a cancelled shipment");
         }
@@ -608,9 +599,16 @@ public class ShipmentService {
                     return (received + damaged + display + shop) >= ordered;
                 });
 
-        // Only mark as DELIVERED if all items are fully received, otherwise keep as PENDING
-        if (allItemsFullyReceived) {
-            shipment.setStatus(ShipmentStatus.DELIVERED);
+        // Status transitions:
+        //   * If shipment is already RECEIVED (set via prior receipt or manual override), stay RECEIVED.
+        //     This is the "sticky" semantic - corrections via Undo + Receive don't auto-revert.
+        //   * Otherwise, flip to RECEIVED only when math is satisfied.
+        //   * Don't auto-revert to PENDING here; reverting is the explicit job of Undo.
+        boolean wasAlreadyReceived = shipment.getStatus() == ShipmentStatus.RECEIVED;
+        boolean newlyReceived = !wasAlreadyReceived && allItemsFullyReceived;
+
+        if (newlyReceived) {
+            shipment.setStatus(ShipmentStatus.RECEIVED);
 
             // Auto-assign preferred supplier to products in this shipment
             if (shipment.getSupplier() != null) {
@@ -637,13 +635,11 @@ public class ShipmentService {
             Notification completionNotif = Notification.builder()
                     .type(NotificationType.SHIPMENT_COMPLETED)
                     .severity(NotificationSeverity.INFO)
-                    .message("Shipment " + shipment.getShipmentNumber() + " has been fully received")
+                    .message("Shipment " + shipment.getShipmentNumber() + " is fully received")
                     .metadata(completionMetadata)
                     .via(List.of("slack", "app"))
                     .build();
             notificationService.createNotification(completionNotif);
-        } else {
-            shipment.setStatus(ShipmentStatus.PENDING);
         }
 
         // Set receivedBy if provided
@@ -745,9 +741,18 @@ public class ShipmentService {
         shipmentItem.setDisplayQuantity(0);
         shipmentItem.setShopQuantity(0);
 
-        // Update shipment status: if shipment was DELIVERED, it should now be PENDING
-        // since not all items are fully received anymore
-        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
+        // Recompute status from item math. Undo is an explicit reversal -
+        // if the remaining items no longer satisfy the fully-received check, drop back to PENDING.
+        boolean stillFullyReceived = shipment.getItems().stream()
+                .allMatch(it -> {
+                    int rec = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : 0;
+                    int dmg = it.getDamagedQuantity() != null ? it.getDamagedQuantity() : 0;
+                    int dsp = it.getDisplayQuantity() != null ? it.getDisplayQuantity() : 0;
+                    int shp = it.getShopQuantity() != null ? it.getShopQuantity() : 0;
+                    int ord = it.getOrderedQuantity() != null ? it.getOrderedQuantity() : 0;
+                    return (rec + dmg + dsp + shp) >= ord;
+                });
+        if (shipment.getStatus() == ShipmentStatus.RECEIVED && !stillFullyReceived) {
             shipment.setStatus(ShipmentStatus.PENDING);
             // Keep actualDeliveryDate and receivedBy since other items may still be received
         }
@@ -760,6 +765,49 @@ public class ShipmentService {
         // Broadcast updates
         broadcastService.broadcastShipmentUpdated();
         broadcastService.broadcastInventoryUpdated();
+        broadcastService.broadcastAuditLogCreated();
+
+        return savedShipment;
+    }
+
+    /**
+     * Manually override a shipment's inventory status. Pure label change - no inventory side effects.
+     * Restricted to PENDING / RECEIVED targets; CANCELLED is reachable only via Delete.
+     * Reason is required for the audit trail.
+     */
+    public Shipment overrideShipmentStatus(UUID shipmentId, ShipmentStatus newStatus, String reason,
+                                           UUID actorId, String actorName) {
+        if (newStatus != ShipmentStatus.PENDING && newStatus != ShipmentStatus.RECEIVED) {
+            throw new InvalidShipmentStatusException(
+                    "Status override only supports PENDING or RECEIVED. Use Delete to cancel a shipment.");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new InvalidShipmentStatusException("A reason is required when overriding shipment status.");
+        }
+
+        Shipment shipment = getShipmentById(shipmentId);
+        ShipmentStatus oldStatus = shipment.getStatus();
+        if (oldStatus == newStatus) {
+            return shipment;
+        }
+
+        shipment.setStatus(newStatus);
+        Shipment savedShipment = shipmentRepository.save(shipment);
+
+        String notesText = String.format("Status override: %s -> %s. Reason: %s",
+                oldStatus, newStatus, reason.trim());
+        auditLogService.createAuditLog(
+                actorId,
+                actorName,
+                StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN,
+                null, null, null, null,
+                1,
+                0,
+                "Shipment " + shipment.getShipmentNumber(),
+                notesText
+        );
+
+        broadcastService.broadcastShipmentUpdated();
         broadcastService.broadcastAuditLogCreated();
 
         return savedShipment;

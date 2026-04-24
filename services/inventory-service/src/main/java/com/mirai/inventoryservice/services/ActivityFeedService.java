@@ -138,7 +138,7 @@ public class ActivityFeedService {
             case RESTOCK, INITIAL_STOCK, SHIPMENT_RECEIPT, RETURN -> "restock";
             case TRANSFER, DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> "transfer";
             case ADJUSTMENT, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED -> "adjustment";
-            case SHIPMENT_PARTIAL_RECEIPT, SHIPMENT_EDITED, SHIPMENT_DELETED -> "shipment";
+            case SHIPMENT_PARTIAL_RECEIPT, SHIPMENT_EDITED, SHIPMENT_DELETED, SHIPMENT_STATUS_OVERRIDDEN -> "shipment";
         };
     }
 
@@ -155,6 +155,7 @@ public class ActivityFeedService {
             case SHIPMENT_PARTIAL_RECEIPT -> "Partial receipt: " + qtyStr + " of " + itemName;
             case SHIPMENT_EDITED -> "Shipment edited";
             case SHIPMENT_DELETED -> "Shipment deleted";
+            case SHIPMENT_STATUS_OVERRIDDEN -> "Shipment status overridden";
             case INITIAL_STOCK -> "Added initial stock: " + qtyStr + " of " + itemName;
             case RETURN -> "Returned " + qtyStr + " of " + itemName;
             case TRANSFER -> "Transferred " + qtyStr + " of " + itemName;

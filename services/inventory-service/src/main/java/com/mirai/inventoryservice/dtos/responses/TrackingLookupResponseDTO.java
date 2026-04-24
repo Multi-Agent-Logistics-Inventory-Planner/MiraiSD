@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
-import com.mirai.inventoryservice.models.enums.ShipmentStatus;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -10,9 +10,9 @@ public record TrackingLookupResponseDTO(
     String trackingNumber,
     String carrier,
     String status,
-    ShipmentStatus orderStatus, // Mapped to your ShipmentStatus enum
-    LocalDate dateOrdered,      // From your order system (if found)
-    LocalDate expectedDelivery, // ETA from EasyPost
+    CarrierStatus carrierStatus, // Logistics state derived from EasyPost status
+    LocalDate dateOrdered,       // From your order system (if found)
+    LocalDate expectedDelivery,  // ETA from EasyPost
     LocalDate actualDelivery,
     String statusDetail,
     List<TrackingEventDTO> events,
