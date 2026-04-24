@@ -36,6 +36,7 @@ import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutation
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import { useProductDisplayHistory } from "@/hooks/queries/use-machine-displays";
 import { usePermissions } from "@/hooks/use-permissions";
+import { Permission } from "@/lib/rbac/permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
   LocationType,
@@ -76,7 +77,7 @@ export function ProductModal({
     useShipmentsByProduct(product?.product.id);
   const { data: displayHistory, isLoading: displaysLoading } =
     useProductDisplayHistory(product?.product.id);
-  const { isAdmin, canViewCosts } = usePermissions();
+  const { canViewCosts, can } = usePermissions();
 
   const activeDisplays = useMemo(() => {
     if (!displayHistory) return [];
@@ -207,7 +208,7 @@ export function ProductModal({
                 {p.isActive ? "Active" : "Inactive"}
               </span>
             </div>
-            {isKuji && isAdmin && (
+            {isKuji && can(Permission.PRODUCTS_UPDATE) && (
               <Button
                 size="sm"
                 className="sm:hidden bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs mt-1"
@@ -219,7 +220,7 @@ export function ProductModal({
             )}
 
             <div className="hidden sm:flex items-center gap-2 pt-2">
-              {isKuji && isAdmin && (
+              {isKuji && can(Permission.PRODUCTS_UPDATE) && (
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
@@ -262,7 +263,7 @@ export function ProductModal({
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Transfer
               </Button>
-              {isAdmin && (
+              {can(Permission.PRODUCTS_UPDATE) && (
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
@@ -272,7 +273,7 @@ export function ProductModal({
                   Edit
                 </Button>
               )}
-              {isAdmin && (
+              {can(Permission.PRODUCTS_DELETE) && (
                 <DeleteProductDialog
                   open={deleteDialogOpen}
                   onOpenChange={setDeleteDialogOpen}
@@ -324,7 +325,7 @@ export function ProductModal({
             <RefreshCw className="h-3 w-3 mr-0.5" />
             Transfer
           </Button>
-          {isAdmin && (
+          {can(Permission.PRODUCTS_UPDATE) && (
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
@@ -334,7 +335,7 @@ export function ProductModal({
               Edit
             </Button>
           )}
-          {isAdmin && (
+          {can(Permission.PRODUCTS_DELETE) && (
             <DeleteProductDialog
               open={deleteDialogOpen}
               onOpenChange={setDeleteDialogOpen}
