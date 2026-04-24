@@ -99,12 +99,12 @@ public class AnalyticsController {
     }
 
     /**
-     * Demand leaders by demand velocity and stock velocity - admin only.
+     * Demand leaders by demand velocity and stock velocity - admin and assistant manager.
      * Replaces top-sellers endpoint with demand-based metrics.
      * @param period Time period: 7d, 30d (default), 90d, ytd
      */
     @GetMapping("/demand-leaders")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public DemandLeadersDTO getDemandLeaders(@RequestParam(defaultValue = "30d") String period) {
         return analyticsService.getDemandLeaders(period);
     }

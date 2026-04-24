@@ -129,6 +129,50 @@ class AnalyticsControllerSecurityIT extends BaseIntegrationTest {
     }
 
     @Nested
+    @DisplayName("GET /api/analytics/demand-leaders")
+    class GetDemandLeadersTests {
+
+        @Test
+        @DisplayName("Should return 401 when no token provided")
+        void getDemandLeaders_noAuth_returns401() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/demand-leaders"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("Should return 403 when USER role attempts to access")
+        void getDemandLeaders_userRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/demand-leaders")
+                            .header("Authorization", "Bearer " + userToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Should return 403 when EMPLOYEE role attempts to access")
+        void getDemandLeaders_employeeRole_returns403() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/demand-leaders")
+                            .header("Authorization", "Bearer " + employeeToken()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Should allow ASSISTANT_MANAGER role to access")
+        void getDemandLeaders_assistantManagerRole_returns200() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/demand-leaders")
+                            .header("Authorization", "Bearer " + assistantManagerToken()))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("Should allow ADMIN role to access")
+        void getDemandLeaders_adminRole_returns200() throws Exception {
+            mockMvc.perform(get(BASE_URL + "/demand-leaders")
+                            .header("Authorization", "Bearer " + adminToken()))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
     @DisplayName("GET /api/analytics/products/{id}/report-bundle/* (Product Assistant)")
     class ProductAssistantEndpointsTests {
 
