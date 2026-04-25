@@ -19,65 +19,16 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useInsights } from "@/hooks/queries/use-insights";
+import { useSalesSummary } from "@/hooks/queries/use-analytics";
 import { useRecomputeRollupsMutation } from "@/hooks/mutations/use-analytics-mutations";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useToast } from "@/hooks/use-toast";
 import { SalesMetricsCard } from "@/components/analytics";
-import type { SalesSummary } from "@/types/api";
 import type { Mover, MoverDirection } from "@/types/analytics";
 import { LongestRunningDisplaysCard } from "./longest-running-displays-card";
 import { CategoryDemandSection } from "./category-demand-section";
 
 const MOVERS_SKELETON_COUNT = 5;
-
-function generateMockDailySales() {
-  const dailySales = [];
-  const startDate = new Date("2025-01-01");
-  const endDate = new Date("2025-12-31");
-
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split("T")[0];
-    const dayOfYear = Math.floor(
-      (d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    const variation = ((dayOfYear * 7) % 20) + ((dayOfYear * 3) % 10);
-    const baseUnits = 35 + variation;
-    const baseRevenue = baseUnits * 75 + variation * 25;
-    const baseCost = Math.floor(baseRevenue * 0.7);
-    dailySales.push({
-      date: dateStr,
-      totalUnits: baseUnits,
-      totalRevenue: baseRevenue,
-      totalCost: baseCost,
-      totalProfit: baseRevenue - baseCost,
-    });
-  }
-  return dailySales;
-}
-
-const MOCK_SALES_DATA: SalesSummary = {
-  totalRevenue: 1250000,
-  totalCost: 875000,
-  totalProfit: 375000,
-  totalUnits: 15000,
-  periodStart: "2025-01-01",
-  periodEnd: "2025-12-31",
-  monthlySales: [
-    { month: "2025-01", totalRevenue: 95000, totalCost: 66500, totalProfit: 28500, totalUnits: 1200 },
-    { month: "2025-02", totalRevenue: 88000, totalCost: 61600, totalProfit: 26400, totalUnits: 1100 },
-    { month: "2025-03", totalRevenue: 102000, totalCost: 71400, totalProfit: 30600, totalUnits: 1280 },
-    { month: "2025-04", totalRevenue: 110000, totalCost: 77000, totalProfit: 33000, totalUnits: 1350 },
-    { month: "2025-05", totalRevenue: 98000, totalCost: 68600, totalProfit: 29400, totalUnits: 1220 },
-    { month: "2025-06", totalRevenue: 115000, totalCost: 80500, totalProfit: 34500, totalUnits: 1400 },
-    { month: "2025-07", totalRevenue: 108000, totalCost: 75600, totalProfit: 32400, totalUnits: 1320 },
-    { month: "2025-08", totalRevenue: 112000, totalCost: 78400, totalProfit: 33600, totalUnits: 1380 },
-    { month: "2025-09", totalRevenue: 105000, totalCost: 73500, totalProfit: 31500, totalUnits: 1300 },
-    { month: "2025-10", totalRevenue: 118000, totalCost: 82600, totalProfit: 35400, totalUnits: 1450 },
-    { month: "2025-11", totalRevenue: 99000, totalCost: 69300, totalProfit: 29700, totalUnits: 1250 },
-    { month: "2025-12", totalRevenue: 100000, totalCost: 70000, totalProfit: 30000, totalUnits: 1250 },
-  ],
-  dailySales: generateMockDailySales(),
-};
 
 function getMoverIcon(direction: MoverDirection) {
   switch (direction) {
@@ -206,6 +157,7 @@ function MoversCard({
 
 export function TabOverview() {
   const { data: insightsData, isLoading: insightsLoading, isError } = useInsights();
+  const { data: salesData, isLoading: salesLoading } = useSalesSummary();
   const { isAdmin } = usePermissions();
   const { toast } = useToast();
   const recomputeMutation = useRecomputeRollupsMutation();
@@ -240,11 +192,11 @@ export function TabOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Sales Metrics - Total Sales + Sales Trend (admin-only, mock data for presentation) */}
+      {/* Sales Metrics - Total Sales + Sales Trend (admin-only) */}
       {isAdmin && (
         <SalesMetricsCard
-          data={MOCK_SALES_DATA}
-          isLoading={false}
+          data={salesData}
+          isLoading={salesLoading}
           onRecomputeRollups={handleRecomputeRollups}
           isRecomputing={recomputeMutation.isPending}
           canRecompute={isAdmin}
