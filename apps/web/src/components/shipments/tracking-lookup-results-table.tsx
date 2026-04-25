@@ -11,7 +11,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { type TrackingLookupResponse } from "@/lib/api/tracking";
-import { SHIPMENT_STATUS_LABELS, SHIPMENT_STATUS_VARIANTS } from "@/types/api";
+import { CARRIER_STATUS_LABELS, CarrierStatus } from "@/types/api";
+
+const CARRIER_STATUS_VARIANTS: Record<
+  CarrierStatus,
+  "default" | "secondary" | "destructive" | "outline" | "warning"
+> = {
+  [CarrierStatus.PRE_TRANSIT]: "outline",
+  [CarrierStatus.IN_TRANSIT]: "secondary",
+  [CarrierStatus.DELIVERED]: "default",
+  [CarrierStatus.FAILED]: "destructive",
+};
 
 interface TrackingLookupResultsTableProps {
   trackings: TrackingLookupResponse[];
@@ -34,7 +44,7 @@ export function TrackingLookupResultsTable({
       <DataTableHeader>
         <TableHead className="rounded-l-lg">Tracking Number</TableHead>
         <TableHead>Carrier</TableHead>
-        <TableHead>Order Status</TableHead>
+        <TableHead>Carrier Status</TableHead>
         <TableHead>Date Ordered</TableHead>
         <TableHead className="rounded-r-lg">Expected Delivery</TableHead>
       </DataTableHeader>
@@ -46,8 +56,8 @@ export function TrackingLookupResultsTable({
             </TableCell>
             <TableCell className="capitalize">{tracking.carrier}</TableCell>
             <TableCell>
-              <Badge variant={SHIPMENT_STATUS_VARIANTS[tracking.orderStatus]}>
-                {SHIPMENT_STATUS_LABELS[tracking.orderStatus]}
+              <Badge variant={CARRIER_STATUS_VARIANTS[tracking.carrierStatus]}>
+                {CARRIER_STATUS_LABELS[tracking.carrierStatus]}
               </Badge>
             </TableCell>
             <TableCell>

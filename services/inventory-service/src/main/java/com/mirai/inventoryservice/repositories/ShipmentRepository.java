@@ -40,7 +40,6 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     List<Shipment> findByItemsContainingProduct(@Param("productId") UUID productId);
 
     // Single shipment with JOIN FETCH to avoid N+1
-    // Note: allocations are loaded via @BatchSize(size=50) to avoid MultipleBagFetchException
     @Query("SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -49,7 +48,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "WHERE s.id = :id")
     Optional<Shipment> findByIdWithAssociations(@Param("id") UUID id);
 
-    // Non-paginated list with JOIN FETCH to avoid N+1 (for legacy API calls)
+    // Non-paginated list with JOIN FETCH to avoid N+1
     @Query("SELECT DISTINCT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -58,7 +57,6 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "ORDER BY s.createdAt DESC")
     List<Shipment> findAllWithAssociationsList();
 
-    // Non-paginated list by status with JOIN FETCH
     @Query("SELECT DISTINCT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -68,8 +66,6 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "ORDER BY s.createdAt DESC")
     List<Shipment> findByStatusWithAssociationsList(@Param("status") ShipmentStatus status);
 
-    // Paginated queries - fetch users eagerly, items loaded via @BatchSize(50)
-    // NOTE: Do NOT use JOIN FETCH on collections (items) with pagination - causes in-memory pagination
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -85,7 +81,6 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             countQuery = "SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
     Page<Shipment> findByStatusWithAssociations(@Param("status") ShipmentStatus status, Pageable pageable);
 
-    // Paginated query with optional status filter (no search)
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -93,7 +88,6 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             countQuery = "SELECT COUNT(s) FROM Shipment s WHERE (:status IS NULL OR s.status = :status)")
     Page<Shipment> findByStatusPaged(@Param("status") ShipmentStatus status, Pageable pageable);
 
-    // Paginated query with status and search filters
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
@@ -104,59 +98,93 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findByStatusAndSearch(@Param("status") ShipmentStatus status, @Param("searchPattern") String searchPattern, Pageable pageable);
 
-    // Display status queries - ACTIVE: PENDING/IN_TRANSIT with no received items
+    // ACTIVE: PENDING with no receipts and carrier_status NOT in (DELIVERED, FAILED)
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (s.carrierStatus IS NULL " +
+            "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (s.carrierStatus IS NULL " +
+            "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))")
+    Page<Shipment> findActiveShipments(Pageable pageable);
+
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (s.carrierStatus IS NULL " +
+            "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED)) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (s.carrierStatus IS NULL " +
+            "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED)) " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
+    Page<Shipment> findActiveShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // AWAITING_RECEIPT: PENDING with no receipts and carrier_status = DELIVERED
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
-    Page<Shipment> findActiveShipments(@Param("statuses") List<ShipmentStatus> statuses, Pageable pageable);
+    Page<Shipment> findAwaitingReceiptShipments(Pageable pageable);
 
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
             "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
-    Page<Shipment> findActiveShipmentsWithSearch(@Param("statuses") List<ShipmentStatus> statuses, @Param("searchPattern") String searchPattern, Pageable pageable);
+    Page<Shipment> findAwaitingReceiptShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
 
-    // Display status queries - PARTIAL: PENDING/IN_TRANSIT with some received items
+    // PARTIAL: PENDING with at least one receipt
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
-    Page<Shipment> findPartialShipments(@Param("statuses") List<ShipmentStatus> statuses, Pageable pageable);
+    Page<Shipment> findPartialShipments(Pageable pageable);
 
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
-    Page<Shipment> findPartialShipmentsWithSearch(@Param("statuses") List<ShipmentStatus> statuses, @Param("searchPattern") String searchPattern, Pageable pageable);
+    Page<Shipment> findPartialShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
 
-    // Display status queries - COMPLETED: DELIVERED status
+    // COMPLETED: status = RECEIVED
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = :status",
-            countQuery = "SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status = :status")
+            countQuery = "SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
     Page<Shipment> findCompletedShipments(@Param("status") ShipmentStatus status, Pageable pageable);
 
     @Query(value = "SELECT s FROM Shipment s " +
@@ -169,30 +197,59 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findCompletedShipmentsWithSearch(@Param("status") ShipmentStatus status, @Param("searchPattern") String searchPattern, Pageable pageable);
 
-    // Count queries for each display status
+    // FAILED: carrier_status = FAILED (regardless of inventory status)
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED")
+    Page<Shipment> findFailedShipments(Pageable pageable);
+
+    @Query(value = "SELECT s FROM Shipment s " +
+            "LEFT JOIN FETCH s.createdBy " +
+            "LEFT JOIN FETCH s.receivedBy " +
+            "WHERE s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
+            countQuery = "SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED " +
+            "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
+    Page<Shipment> findFailedShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
+
+    // Counts (mirror the page queries above)
     @Query("SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
-    long countActiveShipments(@Param("statuses") List<ShipmentStatus> statuses);
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND (s.carrierStatus IS NULL " +
+            "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))")
+    long countActiveShipments();
 
     @Query("SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
+            "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+    long countAwaitingReceiptShipments();
+
+    @Query("SELECT COUNT(s) FROM Shipment s " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
-    long countPartialShipments(@Param("statuses") List<ShipmentStatus> statuses);
+    long countPartialShipments();
 
     @Query("SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
     long countCompletedShipments(@Param("status") ShipmentStatus status);
 
-    // Count overdue shipments: pending/in_transit with expectedDeliveryDate in the past
+    @Query("SELECT COUNT(s) FROM Shipment s WHERE s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED")
+    long countFailedShipments();
+
     @Query("SELECT COUNT(s) FROM Shipment s " +
-            "WHERE s.status IN :statuses " +
+            "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.expectedDeliveryDate IS NOT NULL " +
             "AND s.expectedDeliveryDate < CURRENT_DATE")
-    long countOverdueShipments(@Param("statuses") List<ShipmentStatus> statuses);
+    long countOverdueShipments();
 
     /**
-     * Find the last delivered supplier for a product.
-     * Returns [supplier_id, supplier_display_name] or null if no delivered shipments.
+     * Find the last received supplier for a product.
+     * Returns [supplier_id, supplier_display_name] or null if no received shipments.
      * Filters to active suppliers only.
      */
     @Query(value = """
@@ -201,7 +258,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
         JOIN shipment_items si ON si.shipment_id = sh.id
         JOIN suppliers s ON s.id = sh.supplier_id
         WHERE si.item_id = :productId
-          AND sh.status = 'DELIVERED'
+          AND sh.status = 'RECEIVED'
           AND s.is_active = true
         ORDER BY sh.actual_delivery_date DESC NULLS LAST
         LIMIT 1

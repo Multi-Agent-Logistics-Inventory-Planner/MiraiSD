@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ShipmentProgress } from "./shipment-progress";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { Shipment, ShipmentItem } from "@/types/api";
-import { getShipmentDisplayStatus, calculateTotalReceived } from "@/lib/shipment-utils";
+import { CarrierStatus, type Shipment, type ShipmentItem } from "@/types/api";
+import { getShipmentDisplayStatus } from "@/lib/shipment-utils";
 
 interface ShipmentCardProps {
   shipment: Shipment;
@@ -28,46 +28,55 @@ function formatCurrency(value?: number) {
   return `$${value.toFixed(2)}`;
 }
 
+function formatCarrierDeliveredAt(iso?: string | null) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function getStatusText(shipment: Shipment): { text: string; date: string } {
   const displayStatus = getShipmentDisplayStatus(shipment);
 
-  // Calculate if partial received (used as proxy for "on the way" without tracking)
-  const totalReceived = calculateTotalReceived(shipment.items);
-  const totalOrdered = shipment.items.reduce(
-    (sum, item) => sum + item.orderedQuantity,
-    0,
-  );
-  const hasPartialReceived = totalReceived > 0 && totalReceived < totalOrdered;
-
-  // Delivered
   if (displayStatus === "COMPLETED") {
     return {
-      text: "Delivered",
+      text: "Received",
       date: formatDate(
         shipment.actualDeliveryDate || shipment.expectedDeliveryDate,
       ),
     };
   }
 
-  // On the way - either IN_TRANSIT status or partial items received
-  if (shipment.status === "IN_TRANSIT" || hasPartialReceived) {
+  if (displayStatus === "AWAITING_RECEIPT") {
+    return {
+      text: "Carrier delivered - awaiting receipt",
+      date: formatCarrierDeliveredAt(shipment.carrierDeliveredAt),
+    };
+  }
+
+  if (displayStatus === "FAILED") {
+    return {
+      text: "Carrier delivery failed",
+      date: formatDate(shipment.expectedDeliveryDate || shipment.orderDate),
+    };
+  }
+
+  // PARTIAL or carrier IN_TRANSIT - both surface as "on the way"
+  if (
+    displayStatus === "PARTIAL" ||
+    shipment.carrierStatus === CarrierStatus.IN_TRANSIT
+  ) {
     return {
       text: "Order on the way",
       date: formatDate(shipment.expectedDeliveryDate || shipment.orderDate),
     };
   }
 
-  // Being packaged (PENDING status, no items received yet)
-  if (shipment.status === "PENDING") {
-    return {
-      text: "Order being packaged",
-      date: formatDate(shipment.orderDate),
-    };
-  }
-
-  // Default: Order placed
+  // ACTIVE (PENDING with no carrier signal yet)
   return {
-    text: "Order placed",
+    text: "Order being packaged",
     date: formatDate(shipment.orderDate),
   };
 }
@@ -108,7 +117,6 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
     (sum, item) => sum + item.orderedQuantity,
     0,
   );
-  const totalReceived = calculateTotalReceived(shipment.items);
 
   // Show only parent/root items for count and thumbnails (Kuji = 1 block, not parent + prizes)
   const rootItems = shipment.items.filter((item) => !item.item.parentId);
@@ -207,8 +215,7 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
         {/* Progress Tracker */}
         <ShipmentProgress
           status={shipment.status}
-          receivedQuantity={totalReceived}
-          orderedQuantity={totalOrdered}
+          carrierStatus={shipment.carrierStatus}
         />
       </div>
     </div>

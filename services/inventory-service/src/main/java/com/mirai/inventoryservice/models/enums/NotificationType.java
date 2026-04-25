@@ -9,6 +9,7 @@ public enum NotificationType {
     SHIPMENT_COMPLETED,
     SHIPMENT_DAMAGED,
     SHIPMENT_DELIVERY_FAILED,
+    PACKAGE_ARRIVED,
     DISPLAY_STALE
 }
 

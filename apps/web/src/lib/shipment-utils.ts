@@ -1,6 +1,16 @@
-import { ShipmentStatus, type Shipment, type ShipmentItem } from "@/types/api";
+import {
+  CarrierStatus,
+  ShipmentStatus,
+  type Shipment,
+  type ShipmentItem,
+} from "@/types/api";
 
-export type ShipmentDisplayStatus = "ACTIVE" | "PARTIAL" | "COMPLETED" | "FAILED";
+export type ShipmentDisplayStatus =
+  | "ACTIVE"
+  | "AWAITING_RECEIPT"
+  | "PARTIAL"
+  | "COMPLETED"
+  | "FAILED";
 
 /**
  * Calculates total received for a single shipment item.
@@ -17,7 +27,6 @@ export function calculateItemTotalReceived(item: ShipmentItem): number {
 
 /**
  * Calculates total received quantity for all items in a shipment.
- * Includes received, damaged, display, and shop quantities.
  */
 export function calculateTotalReceived(items: ShipmentItem[]): number {
   return items.reduce((sum, item) => sum + calculateItemTotalReceived(item), 0);
@@ -25,6 +34,7 @@ export function calculateTotalReceived(items: ShipmentItem[]): number {
 
 export const SHIPMENT_DISPLAY_STATUS_LABELS: Record<ShipmentDisplayStatus, string> = {
   ACTIVE: "Active",
+  AWAITING_RECEIPT: "Awaiting Receipt",
   PARTIAL: "Partial",
   COMPLETED: "Completed",
   FAILED: "Failed",
@@ -32,33 +42,39 @@ export const SHIPMENT_DISPLAY_STATUS_LABELS: Record<ShipmentDisplayStatus, strin
 
 export const SHIPMENT_DISPLAY_STATUS_COLORS: Record<ShipmentDisplayStatus, string> = {
   ACTIVE: "bg-blue-100 text-blue-700",
+  AWAITING_RECEIPT: "bg-amber-100 text-amber-800 border border-amber-300",
   PARTIAL: "bg-amber-100 text-amber-700",
   COMPLETED: "bg-green-100 text-green-700",
   FAILED: "bg-red-100 text-red-700",
 };
 
 /**
- * Derives the display status from a shipment's backend status and item receipts.
+ * Derives the display status from a shipment's inventory + carrier state.
  * Returns null for cancelled shipments (they should be hidden).
- * DELIVERY_FAILED shipments are shown in the FAILED status.
+ *
+ * Mapping:
+ *   CANCELLED                                                -> null (filtered out)
+ *   carrier_status=FAILED                                    -> FAILED
+ *   status=RECEIVED                                          -> COMPLETED
+ *   status=PENDING + carrier=DELIVERED + 0 receipts          -> AWAITING_RECEIPT
+ *   status=PENDING + any receipts                            -> PARTIAL
+ *   status=PENDING + (no carrier or pre-transit/in-transit)  -> ACTIVE
  */
 export function getShipmentDisplayStatus(shipment: Shipment): ShipmentDisplayStatus | null {
-  // Exclude cancelled shipments (intentionally cancelled)
   if (shipment.status === ShipmentStatus.CANCELLED) {
     return null;
   }
 
-  // FAILED = delivery failed (carrier issue, not intentional cancellation)
-  if (shipment.status === ShipmentStatus.DELIVERY_FAILED) {
+  // Carrier failure surfaces as FAILED regardless of inventory state
+  if (shipment.carrierStatus === CarrierStatus.FAILED) {
     return "FAILED";
   }
 
-  // COMPLETED = backend status is DELIVERED
-  if (shipment.status === ShipmentStatus.DELIVERED) {
+  if (shipment.status === ShipmentStatus.RECEIVED) {
     return "COMPLETED";
   }
 
-  // For PENDING and IN_TRANSIT, check received quantities (including damaged/display/shop)
+  // PENDING from here on
   const hasAnyReceived = shipment.items.some(
     item => calculateItemTotalReceived(item) > 0
   );
@@ -67,7 +83,10 @@ export function getShipmentDisplayStatus(shipment: Shipment): ShipmentDisplaySta
     return "PARTIAL";
   }
 
-  // No items received yet
+  if (shipment.carrierStatus === CarrierStatus.DELIVERED) {
+    return "AWAITING_RECEIPT";
+  }
+
   return "ACTIVE";
 }
 
@@ -79,7 +98,6 @@ export function filterShipmentsByDisplayStatus(
   shipments: Shipment[],
   status: ShipmentDisplayStatus | "all"
 ): Shipment[] {
-  // First exclude cancelled shipments
   const nonCancelled = shipments.filter(s => s.status !== ShipmentStatus.CANCELLED);
 
   if (status === "all") {
@@ -97,6 +115,7 @@ export function getShipmentDisplayStatusCounts(
 ): Record<ShipmentDisplayStatus, number> {
   const counts: Record<ShipmentDisplayStatus, number> = {
     ACTIVE: 0,
+    AWAITING_RECEIPT: 0,
     PARTIAL: 0,
     COMPLETED: 0,
     FAILED: 0,

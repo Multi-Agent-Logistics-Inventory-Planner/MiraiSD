@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
@@ -299,10 +300,16 @@ public class DevSeedController {
 
         // 4. Shipments (8) spread across current month
         String[] suppliers = {"Mirai Wholesale", "Japan Arcade Supply Co.", "ACE Toys Ltd", "Pacific Toy Imports"};
+        // Pairs of (inventory status, carrier status). Carrier null = no tracking.
         ShipmentStatus[] statuses = {
-            ShipmentStatus.DELIVERED, ShipmentStatus.DELIVERED, ShipmentStatus.DELIVERED,
-            ShipmentStatus.IN_TRANSIT, ShipmentStatus.IN_TRANSIT, ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.RECEIVED, ShipmentStatus.RECEIVED, ShipmentStatus.RECEIVED,
+            ShipmentStatus.PENDING, ShipmentStatus.PENDING, ShipmentStatus.PENDING,
             ShipmentStatus.PENDING, ShipmentStatus.PENDING
+        };
+        CarrierStatus[] carrierStatuses = {
+            CarrierStatus.DELIVERED, CarrierStatus.DELIVERED, CarrierStatus.DELIVERED,
+            CarrierStatus.IN_TRANSIT, CarrierStatus.IN_TRANSIT, CarrierStatus.IN_TRANSIT,
+            null, null
         };
         LocalDate today = LocalDate.now();
         LocalDate monthStart = today.withDayOfMonth(1);
@@ -313,13 +320,16 @@ public class DevSeedController {
                 orderDate = today.minusDays(8 - i);
             }
             LocalDate expectedDelivery = orderDate.plusDays(5 + random.nextInt(5));
-            LocalDate actualDelivery = statuses[i] == ShipmentStatus.DELIVERED
+            LocalDate actualDelivery = statuses[i] == ShipmentStatus.RECEIVED
                 ? orderDate.plusDays(3 + random.nextInt(5))
                 : null;
             shipments.add(Shipment.builder()
                 .shipmentNumber("DEV-SHIP-" + String.format("%03d", i + 1))
                 .supplierName(suppliers[i % suppliers.length])
                 .status(statuses[i])
+                .carrierStatus(carrierStatuses[i])
+                .carrierDeliveredAt(carrierStatuses[i] == CarrierStatus.DELIVERED
+                    ? java.time.OffsetDateTime.now().minusDays(1) : null)
                 .orderDate(orderDate)
                 .expectedDeliveryDate(expectedDelivery)
                 .actualDeliveryDate(actualDelivery)
@@ -1104,7 +1114,7 @@ public class DevSeedController {
                     case SALE, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED, SHIPMENT_DELETED -> -qty;
                     case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT, SHIPMENT_PARTIAL_RECEIPT -> qty;
                     case TRANSFER, ADJUSTMENT, SHIPMENT_EDITED -> random.nextBoolean() ? qty : -qty;
-                    case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> 0;
+                    case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP, SHIPMENT_STATUS_OVERRIDDEN -> 0;
                 };
 
                 int previousQty = BASE_STOCK_QUANTITY + random.nextInt(STOCK_QUANTITY_RANGE);
@@ -1480,30 +1490,42 @@ public class DevSeedController {
         LocalDate today = LocalDate.now();
         List<Shipment> shipments = new ArrayList<>();
 
-        // Create shipments with different statuses for testing
+        // Create shipments with different status combinations for testing
         ShipmentStatus[] statuses = {
             ShipmentStatus.PENDING,
             ShipmentStatus.PENDING,
-            ShipmentStatus.IN_TRANSIT,
-            ShipmentStatus.IN_TRANSIT,
-            ShipmentStatus.DELIVERED,
-            ShipmentStatus.DELIVERY_FAILED
+            ShipmentStatus.PENDING,
+            ShipmentStatus.PENDING,
+            ShipmentStatus.RECEIVED,
+            ShipmentStatus.PENDING
+        };
+        CarrierStatus[] carrierStatuses = {
+            null,
+            null,
+            CarrierStatus.IN_TRANSIT,
+            CarrierStatus.IN_TRANSIT,
+            CarrierStatus.DELIVERED,
+            CarrierStatus.FAILED
         };
 
         for (int i = 0; i < statuses.length; i++) {
             LocalDate orderDate = today.minusDays(10 - i);
             LocalDate expectedDelivery = orderDate.plusDays(5);
-            LocalDate actualDelivery = statuses[i] == ShipmentStatus.DELIVERED ? today.minusDays(1) : null;
+            LocalDate actualDelivery = statuses[i] == ShipmentStatus.RECEIVED ? today.minusDays(1) : null;
 
             Shipment shipment = Shipment.builder()
                 .shipmentNumber("TEST-SHIP-" + String.format("%03d", i + 1))
                 .supplierName(suppliers[i % suppliers.length])
                 .status(statuses[i])
+                .carrierStatus(carrierStatuses[i])
+                .carrierDeliveredAt(carrierStatuses[i] == CarrierStatus.DELIVERED
+                    ? java.time.OffsetDateTime.now().minusDays(1) : null)
                 .orderDate(orderDate)
                 .expectedDeliveryDate(expectedDelivery)
                 .actualDeliveryDate(actualDelivery)
                 .totalCost(BigDecimal.valueOf(100 + random.nextInt(400)))
-                .notes("Test shipment for auditing - " + statuses[i].name())
+                .notes("Test shipment for auditing - status=" + statuses[i].name()
+                    + " carrier=" + (carrierStatuses[i] == null ? "none" : carrierStatuses[i].name()))
                 .build();
 
             // Add 2-4 items per shipment
@@ -1512,10 +1534,10 @@ public class DevSeedController {
                 Product product = products.get((i * 3 + j) % products.size());
                 int orderedQty = 5 + random.nextInt(10);
                 int receivedQty = 0;
-                if (statuses[i] == ShipmentStatus.DELIVERED) {
+                if (statuses[i] == ShipmentStatus.RECEIVED) {
                     receivedQty = orderedQty;
-                } else if (statuses[i] == ShipmentStatus.IN_TRANSIT && j == 0) {
-                    // Partially received for first item on IN_TRANSIT shipments
+                } else if (carrierStatuses[i] == CarrierStatus.IN_TRANSIT && j == 0) {
+                    // Partially received for first item on in-transit shipments
                     receivedQty = orderedQty / 2;
                 }
 
@@ -1543,10 +1565,10 @@ public class DevSeedController {
             "success", true,
             "shipmentsCreated", shipments.size(),
             "statusBreakdown", Map.of(
-                "PENDING", 2,
-                "IN_TRANSIT", 2,
-                "DELIVERED", 1,
-                "DELIVERY_FAILED", 1
+                "PENDING_no_carrier", 2,
+                "PENDING_in_transit", 2,
+                "RECEIVED_delivered", 1,
+                "PENDING_failed", 1
             )
         ));
     }

@@ -103,7 +103,7 @@ export default function ShipmentsPage() {
   const shipments = shipmentsQuery.data?.content ?? [];
   const totalElements = shipmentsQuery.data?.totalElements ?? 0;
 
-  const statusCounts = statusCountsQuery.data ?? { ACTIVE: 0, PARTIAL: 0, COMPLETED: 0, FAILED: 0 };
+  const statusCounts = statusCountsQuery.data ?? { ACTIVE: 0, AWAITING_RECEIPT: 0, PARTIAL: 0, COMPLETED: 0, FAILED: 0, OVERDUE: 0 };
 
   // Reset page when tab or search changes
   const handleTabChange = (value: string) => {
@@ -210,6 +210,11 @@ export default function ShipmentsPage() {
                 <TabsTrigger value="ACTIVE" className="tabular-nums">
                   Active ({statusCounts.ACTIVE})
                 </TabsTrigger>
+                {statusCounts.AWAITING_RECEIPT > 0 && (
+                  <TabsTrigger value="AWAITING_RECEIPT" className="tabular-nums text-amber-700">
+                    Awaiting Receipt ({statusCounts.AWAITING_RECEIPT})
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="PARTIAL" className="tabular-nums">
                   Partial ({statusCounts.PARTIAL})
                 </TabsTrigger>

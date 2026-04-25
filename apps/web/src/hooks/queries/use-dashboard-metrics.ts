@@ -63,14 +63,21 @@ export function useDashboardMetrics() {
     staleTime: 60 * 1000,
   });
 
-  // Filter pending and in-transit from the single query result
+  // Filter into "pending" (no carrier signal yet) vs "in transit" (carrier reports moving).
+  // Inventory status is PENDING for both - the carrier_status field distinguishes them.
   const pendingShipments = useMemo(() =>
-    activeShipmentsQuery.data?.filter(s => s.status === ShipmentStatus.PENDING) ?? [],
+    activeShipmentsQuery.data?.filter(s =>
+      s.status === ShipmentStatus.PENDING &&
+      (s.carrierStatus == null || s.carrierStatus === "PRE_TRANSIT")
+    ) ?? [],
     [activeShipmentsQuery.data]
   );
 
   const inTransitShipments = useMemo(() =>
-    activeShipmentsQuery.data?.filter(s => s.status === ShipmentStatus.IN_TRANSIT) ?? [],
+    activeShipmentsQuery.data?.filter(s =>
+      s.status === ShipmentStatus.PENDING &&
+      s.carrierStatus === "IN_TRANSIT"
+    ) ?? [],
     [activeShipmentsQuery.data]
   );
 

@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.models.shipment;
 
 import com.mirai.inventoryservice.models.Supplier;
 import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -55,6 +56,13 @@ public class Shipment {
     @Column(nullable = false)
     @Builder.Default
     private ShipmentStatus status = ShipmentStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "carrier_status")
+    private CarrierStatus carrierStatus;
+
+    @Column(name = "carrier_delivered_at")
+    private OffsetDateTime carrierDeliveredAt;
 
     @NotNull
     @Column(name = "order_date", nullable = false)

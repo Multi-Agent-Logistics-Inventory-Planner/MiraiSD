@@ -137,6 +137,22 @@ export function ShipmentCreateDialog({
   });
 
   const items = form.watch("items");
+
+  // Per-row "has receipts" flag (edit mode): blocks ordered-quantity edits on items already received.
+  const rowHasReceipts: Record<number, boolean> = (() => {
+    if (!initialShipment) return {};
+    const rootItems = initialShipment.items.filter((i) => !i.item.parentId);
+    const map: Record<number, boolean> = {};
+    rootItems.forEach((it, index) => {
+      const total =
+        (it.receivedQuantity ?? 0) +
+        (it.damagedQuantity ?? 0) +
+        (it.displayQuantity ?? 0) +
+        (it.shopQuantity ?? 0);
+      map[index] = total > 0;
+    });
+    return map;
+  })();
   // Only fetch children for products that actually have children (Kuji products)
   const selectedKujiIds = useMemo(() => {
     return Object.values(selectedProductIds)
@@ -661,10 +677,22 @@ export function ShipmentCreateDialog({
                               <Input
                                 type="number"
                                 min={0}
+                                disabled={rowHasReceipts[index]}
+                                title={
+                                  rowHasReceipts[index]
+                                    ? "Undo this item's receipts before changing the ordered quantity."
+                                    : undefined
+                                }
                                 {...form.register(
                                   `items.${index}.orderedQuantity`,
                                 )}
                               />
+                              {rowHasReceipts[index] && (
+                                <p className="text-xs text-muted-foreground">
+                                  Undo this item&apos;s receipts to change the
+                                  ordered quantity.
+                                </p>
+                              )}
                               {form.formState.errors.items?.[index]
                                 ?.orderedQuantity?.message && (
                                 <p className="text-xs text-destructive">

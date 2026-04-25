@@ -21,6 +21,7 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.SHIPMENT_PARTIAL_RECEIPT]: "Partial Receipt",
   [StockMovementReason.SHIPMENT_EDITED]: "Shipment Edited",
   [StockMovementReason.SHIPMENT_DELETED]: "Shipment Deleted",
+  [StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN]: "Status Override",
   [StockMovementReason.SALE]: "Sale",
   [StockMovementReason.DAMAGE]: "Damage",
   [StockMovementReason.ADJUSTMENT]: "Adjustment",
