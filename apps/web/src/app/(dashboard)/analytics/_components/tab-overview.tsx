@@ -192,14 +192,16 @@ export function TabOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Sales Metrics - Total Sales + Sales Trend*/}
-      <SalesMetricsCard
-        data={salesData}
-        isLoading={salesLoading}
-        onRecomputeRollups={handleRecomputeRollups}
-        isRecomputing={recomputeMutation.isPending}
-        canRecompute={isAdmin}
-      />
+      {/* Sales Metrics - Total Sales + Sales Trend (admin-only) */}
+      {isAdmin && (
+        <SalesMetricsCard
+          data={salesData}
+          isLoading={salesLoading}
+          onRecomputeRollups={handleRecomputeRollups}
+          isRecomputing={recomputeMutation.isPending}
+          canRecompute={isAdmin}
+        />
+      )}
 
       {/* Category Demand */}
       <CategoryDemandSection />

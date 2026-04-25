@@ -89,6 +89,15 @@ public abstract class BaseIntegrationTest {
     }
 
     /**
+     * Generate an assistant manager JWT token.
+     *
+     * @return A valid assistant manager JWT token
+     */
+    protected String assistantManagerToken() {
+        return generateTestToken("assistant-manager-id", "ASSISTANT_MANAGER");
+    }
+
+    /**
      * Generate a regular user JWT token (no special permissions).
      *
      * @return A valid user JWT token
