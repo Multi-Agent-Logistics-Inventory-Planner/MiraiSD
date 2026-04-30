@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,14 @@ public class AuditLogDetailDTO {
     private Integer totalQuantityMoved;
     private String notes;
     private OffsetDateTime createdAt;
+
+    // Shipment-event fields (null for inventory-only rows)
+    private UUID shipmentId;
+    private String shipmentNumber;
+    private List<Map<String, Object>> fieldChanges;
+    private String previousStatus;
+    private String newStatus;
+    private String overrideReason;
 
     // List of all movements in this audit log
     private List<MovementDetailDTO> movements;

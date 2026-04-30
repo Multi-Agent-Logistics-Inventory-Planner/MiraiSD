@@ -41,6 +41,12 @@ public class AuditLogDTOMapper {
                 .notes(auditLog.getNotes())
                 .createdAt(auditLog.getCreatedAt())
                 .productSummary(productSummary)
+                .shipmentId(auditLog.getShipmentId())
+                .shipmentNumber(auditLog.getShipmentNumber())
+                .fieldChanges(auditLog.getFieldChanges())
+                .previousStatus(auditLog.getPreviousStatus())
+                .newStatus(auditLog.getNewStatus())
+                .overrideReason(auditLog.getOverrideReason())
                 .build();
     }
 
@@ -78,6 +84,12 @@ public class AuditLogDTOMapper {
                 .totalQuantityMoved(auditLog.getTotalQuantityMoved())
                 .notes(auditLog.getNotes())
                 .createdAt(auditLog.getCreatedAt())
+                .shipmentId(auditLog.getShipmentId())
+                .shipmentNumber(auditLog.getShipmentNumber())
+                .fieldChanges(auditLog.getFieldChanges())
+                .previousStatus(auditLog.getPreviousStatus())
+                .newStatus(auditLog.getNewStatus())
+                .overrideReason(auditLog.getOverrideReason())
                 .movements(movementDTOs)
                 .build();
     }

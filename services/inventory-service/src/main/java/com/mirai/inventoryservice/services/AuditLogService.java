@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -127,6 +128,69 @@ public class AuditLogService {
         broadcastService.broadcastAuditLogCreated();
 
         return saved;
+    }
+
+    /**
+     * Create an audit log for a shipment lifecycle event (edit, delete, status override).
+     * Has no associated stock movements; the event detail lives in the structured columns.
+     */
+    @Transactional
+    public AuditLog createShipmentEvent(
+            UUID actorId,
+            String actorName,
+            StockMovementReason reason,
+            UUID shipmentId,
+            String shipmentNumber,
+            int itemCount,
+            List<Map<String, Object>> fieldChanges,
+            String previousStatus,
+            String newStatus,
+            String overrideReason
+    ) {
+        User user = null;
+        if (actorId != null && actorName == null) {
+            user = userRepository.findById(actorId).orElse(null);
+            actorName = user != null ? user.getFullName() : null;
+        }
+
+        AuditLog auditLog = AuditLog.builder()
+                .user(user)
+                .actorName(actorName)
+                .reason(reason)
+                .itemCount(itemCount)
+                .totalQuantityMoved(0)
+                .productSummary(shipmentNumber != null ? "Shipment " + shipmentNumber : null)
+                .shipmentId(shipmentId)
+                .shipmentNumber(shipmentNumber)
+                .fieldChanges(fieldChanges)
+                .previousStatus(previousStatus)
+                .newStatus(newStatus)
+                .overrideReason(overrideReason)
+                .build();
+
+        AuditLog saved = auditLogRepository.save(auditLog);
+        log.info("Created shipment audit log: {} for reason: {} shipment: {}", saved.getId(), reason, shipmentNumber);
+
+        broadcastService.broadcastAuditLogCreated();
+
+        return saved;
+    }
+
+    /**
+     * Persist updates to an existing audit log (e.g., to finalize counts/reason after a multi-item action).
+     */
+    @Transactional
+    public AuditLog save(AuditLog auditLog) {
+        return auditLogRepository.save(auditLog);
+    }
+
+    /**
+     * Delete an audit log (used to discard a parent audit row when a multi-item action turned out
+     * to produce no actual movements — i.e. orphan cleanup, never used for normal history pruning).
+     */
+    @Transactional
+    public void delete(AuditLog auditLog) {
+        auditLogRepository.delete(auditLog);
     }
 
     /**
