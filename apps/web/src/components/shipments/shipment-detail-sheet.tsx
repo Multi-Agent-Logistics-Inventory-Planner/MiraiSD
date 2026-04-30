@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { format } from "date-fns";
 import { Package, PackageCheck, Trash2, Truck, Loader2, Pencil, Check, X, Undo2, Settings2 } from "lucide-react";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import {
   Dialog,
   DialogContent,
@@ -190,20 +190,12 @@ function ItemRow({ item }: { item: ShipmentItem }) {
         : "bg-green-50/50 dark:bg-green-950/20 border-l-green-400"
     )}>
       <div className="flex items-center gap-3">
-        {/* Product Image */}
-        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={item.item?.name || "Product"}
-              fill
-              sizes="40px"
-              className="object-cover"
-            />
-          ) : (
-            <Package className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
+        <ProductThumbnail
+          imageUrl={imageUrl}
+          alt={item.item?.name || "Product"}
+          size="md"
+          fallbackVariant="package"
+        />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{item.item.name}</p>
           {item.item.sku && <p className="text-xs text-muted-foreground font-mono">{item.item.sku}</p>}
@@ -265,19 +257,12 @@ function KujiBlockSection({ block }: { block: DetailBlock }) {
     )}>
       {/* Parent row (Kuji set) */}
       <div className="flex items-center gap-3">
-        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={parentItem.item?.name || "Kuji"}
-              fill
-              sizes="40px"
-              className="object-cover"
-            />
-          ) : (
-            <Package className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
+        <ProductThumbnail
+          imageUrl={imageUrl}
+          alt={parentItem.item?.name || "Kuji"}
+          size="md"
+          fallbackVariant="package"
+        />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{parentItem.item.name}</p>
           {parentItem.item.sku && <p className="text-xs text-muted-foreground font-mono">{parentItem.item.sku}</p>}

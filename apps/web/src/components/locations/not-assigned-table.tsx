@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import { ImageOff, Package } from "lucide-react";
+import { Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import type { LocationInventory } from "@/types/api";
 
 interface NotAssignedTableProps {
@@ -47,21 +47,12 @@ export function NotAssignedTable({
     <div>
       {items.map((item) => (
         <div key={item.id} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
-          <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-            {item.item.imageUrl ? (
-              <Image
-                src={item.item.imageUrl}
-                alt={item.item.name}
-                fill
-                sizes="(max-width: 640px) 48px, 80px"
-                className="object-cover"
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center">
-                <ImageOff className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-              </div>
-            )}
-          </div>
+          <ProductThumbnail
+            imageUrl={item.item.imageUrl}
+            alt={item.item.name}
+            size="lg"
+            fallbackVariant="icon"
+          />
           <div className="flex-1 min-w-0">
             <p className="font-medium text-xs sm:text-base truncate">{item.item.name}</p>
             <div className="flex flex-wrap gap-1 mt-1">

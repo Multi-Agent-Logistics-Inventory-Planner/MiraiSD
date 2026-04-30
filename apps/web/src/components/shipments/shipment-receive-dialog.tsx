@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Image from "next/image";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Package } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import {
   Dialog,
   DialogContent,
@@ -541,19 +541,12 @@ export function ShipmentReceiveDialog({
                     {/* Parent item header */}
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
                       <div className="flex items-start gap-3">
-                        <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
-                          {itemImageUrl ? (
-                            <Image
-                              src={itemImageUrl}
-                              alt={item.item.name}
-                              fill
-                              sizes="40px"
-                              className="object-cover"
-                            />
-                          ) : (
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
+                        <ProductThumbnail
+                          imageUrl={itemImageUrl}
+                          alt={item.item.name}
+                          size="md"
+                          fallbackVariant="package"
+                        />
                         <div>
                           <div className="font-medium">{item.item.name}</div>
                           <div className="text-xs text-muted-foreground font-mono">

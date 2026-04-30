@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Image from "next/image";
-import { Package, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import {
   Dialog,
   DialogContent,
@@ -226,19 +226,12 @@ export function ShipmentUndoItemsDialog({
                         checked={selectedItems.has(parentItem.id)}
                         onCheckedChange={() => toggleItem(parentItem.id)}
                       />
-                      <div className="relative h-10 w-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center shrink-0">
-                        {imageUrl ? (
-                          <Image
-                            src={imageUrl}
-                            alt={parentItem.item.name}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </div>
+                      <ProductThumbnail
+                        imageUrl={imageUrl}
+                        alt={parentItem.item.name}
+                        size="md"
+                        fallbackVariant="package"
+                      />
                       <label
                         htmlFor={`item-${parentItem.id}`}
                         className="flex-1 cursor-pointer"
