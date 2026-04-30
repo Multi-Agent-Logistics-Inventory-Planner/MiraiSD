@@ -1,10 +1,10 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import { useProducts } from "@/hooks/queries/use-products";
 
 /**
@@ -102,18 +102,12 @@ export function ProductPicker() {
                         isActive ? "bg-muted" : "hover:bg-muted/60"
                       }`}
                     >
-                      {p.imageUrl ? (
-                        <Image
-                          src={p.imageUrl}
-                          alt=""
-                          width={28}
-                          height={28}
-                          sizes="28px"
-                          className="h-9 w-9 flex-shrink-0 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="h-9 w-9 flex-shrink-0 rounded bg-muted-foreground/10" />
-                      )}
+                      <ProductThumbnail
+                        imageUrl={p.imageUrl}
+                        alt={p.name}
+                        size="sm"
+                        fallbackText=""
+                      />
                       <span className="flex-1 truncate">{p.name}</span>
                       <span className="truncate text-xs text-muted-foreground">
                         {p.category?.name}

@@ -16,6 +16,7 @@ const SIZE_CONFIG: Record<ThumbnailSize, { container: string; icon: string; size
 };
 
 type FallbackVariant = "text" | "icon" | "package";
+type BadgeStyle = "stack" | "quantity";
 
 interface ProductThumbnailProps {
   imageUrl: string | null | undefined;
@@ -24,6 +25,7 @@ interface ProductThumbnailProps {
   fallbackVariant?: FallbackVariant;
   fallbackText?: string;
   badge?: number;
+  badgeStyle?: BadgeStyle;
   className?: string;
 }
 
@@ -34,6 +36,7 @@ export const ProductThumbnail = memo(function ProductThumbnail({
   fallbackVariant = "text",
   fallbackText = "N/A",
   badge,
+  badgeStyle = "stack",
   className,
 }: ProductThumbnailProps) {
   const [hasError, setHasError] = useState(false);
@@ -56,35 +59,46 @@ export const ProductThumbnail = memo(function ProductThumbnail({
     }
   };
 
+  const showStackBadge =
+    badgeStyle === "stack" && badge !== undefined && badge > 1;
+  const showQuantityBadge = badgeStyle === "quantity" && badge !== undefined;
+
   return (
-    <div
-      className={cn(
-        "relative shrink-0 overflow-hidden rounded-md bg-muted",
-        config.container,
-        className
-      )}
-    >
-      {showFallback ? (
-        <div className="flex h-full w-full items-center justify-center">
-          {renderFallback()}
-        </div>
-      ) : (
-        <Image
-          src={safeImageUrl}
-          alt={alt}
-          fill
-          className="object-cover"
-          sizes={config.sizes}
-          onError={() => setHasError(true)}
-        />
-      )}
-      {badge !== undefined && badge > 1 && (
+    <div className={cn("relative shrink-0", className)}>
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-md bg-muted",
+          config.container
+        )}
+      >
+        {showFallback ? (
+          <div className="flex h-full w-full items-center justify-center">
+            {renderFallback()}
+          </div>
+        ) : (
+          <Image
+            src={safeImageUrl}
+            alt={alt}
+            fill
+            className="object-cover"
+            sizes={config.sizes}
+            quality={75}
+            onError={() => setHasError(true)}
+          />
+        )}
+      </div>
+      {showStackBadge && (
         <Badge
           variant="secondary"
           className="absolute -bottom-1 -right-1 h-4 min-w-4 px-1 text-[10px]"
         >
-          +{badge - 1}
+          +{badge! - 1}
         </Badge>
+      )}
+      {showQuantityBadge && (
+        <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-[10px] font-medium text-muted-foreground">
+          {badge}
+        </span>
       )}
     </div>
   );

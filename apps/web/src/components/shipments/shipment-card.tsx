@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
-import { MoreVertical, Package } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import { ShipmentProgress } from "./shipment-progress";
 import { usePermissions } from "@/hooks/use-permissions";
-import { CarrierStatus, type Shipment, type ShipmentItem } from "@/types/api";
+import { CarrierStatus, type Shipment } from "@/types/api";
 import { getShipmentDisplayStatus } from "@/lib/shipment-utils";
 
 interface ShipmentCardProps {
@@ -79,32 +79,6 @@ function getStatusText(shipment: Shipment): { text: string; date: string } {
     text: "Order being packaged",
     date: formatDate(shipment.orderDate),
   };
-}
-
-function ProductThumbnail({ item }: { item: ShipmentItem }) {
-  const imageUrl = item.item?.imageUrl;
-  const quantity = item.orderedQuantity;
-
-  return (
-    <div className="relative">
-      <div className="relative h-12 w-12 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={item.item?.name || "Product"}
-            fill
-            sizes="48px"
-            className="object-cover"
-          />
-        ) : (
-          <Package className="h-5 w-5 text-muted-foreground" />
-        )}
-      </div>
-      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-background border border-border text-[10px] font-medium text-muted-foreground">
-        {quantity}
-      </span>
-    </div>
-  );
 }
 
 export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
@@ -180,7 +154,15 @@ export function ShipmentCard({ shipment, onClick }: ShipmentCardProps) {
       {/* Product Images Row (only parent/root items; prizes are under parent Kuji) */}
       <div className="flex items-start gap-3 mb-4 overflow-x-auto scrollbar-none pb-1">
         {rootItems.map((item) => (
-          <ProductThumbnail key={item.id} item={item} />
+          <ProductThumbnail
+            key={item.id}
+            imageUrl={item.item?.imageUrl}
+            alt={item.item?.name || "Product"}
+            size="lg"
+            fallbackVariant="package"
+            badge={item.orderedQuantity}
+            badgeStyle="quantity"
+          />
         ))}
       </div>
 

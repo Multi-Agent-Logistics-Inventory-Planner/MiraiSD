@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
-import { ImageOff, MoreVertical, FolderOpen, ArrowUp, ArrowDown } from "lucide-react";
+import { MoreVertical, FolderOpen, ArrowUp, ArrowDown } from "lucide-react";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -158,21 +158,12 @@ export function ProductTable({
                 >
                   <TableCell className="py-2 rounded-l-lg max-w-0 overflow-hidden">
                     <div className="flex items-center gap-3 min-w-0 w-full">
-                      {row.product.imageUrl ? (
-                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                          <Image
-                            src={row.product.imageUrl}
-                            alt={row.product.name}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
-                          <ImageOff className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+                      <ProductThumbnail
+                        imageUrl={row.product.imageUrl}
+                        alt={row.product.name}
+                        size="md"
+                        fallbackVariant="icon"
+                      />
                       <span className="font-medium truncate min-w-0 flex items-center gap-1.5">
                         {row.product.name}
                         {showKujiIcon && (

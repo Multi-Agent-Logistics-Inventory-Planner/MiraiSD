@@ -75,6 +75,8 @@ export function HighestDemandCard({
               alt={product.itemName}
               fill
               className="object-contain p-4"
+              sizes="(max-width: 768px) 160px, 288px"
+              quality={75}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
