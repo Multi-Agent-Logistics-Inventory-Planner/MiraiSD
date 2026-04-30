@@ -7,6 +7,7 @@ import {
   deleteShipment,
   receiveShipment,
   undoReceiveShipmentItem,
+  undoReceiveShipmentItems,
   overrideShipmentStatus,
   type OverrideShipmentStatusRequest,
 } from "@/lib/api/shipments";
@@ -66,6 +67,18 @@ export function useUndoReceiveShipmentItemMutation() {
   return useMutation<Shipment, Error, { shipmentId: string; itemId: string }>({
     mutationFn: ({ shipmentId, itemId }) =>
       undoReceiveShipmentItem(shipmentId, itemId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["shipments"] });
+      await qc.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+}
+
+export function useUndoReceiveShipmentItemsMutation() {
+  const qc = useQueryClient();
+  return useMutation<Shipment, Error, { shipmentId: string; itemIds: string[] }>({
+    mutationFn: ({ shipmentId, itemIds }) =>
+      undoReceiveShipmentItems(shipmentId, itemIds),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["shipments"] });
       await qc.invalidateQueries({ queryKey: ["products"] });

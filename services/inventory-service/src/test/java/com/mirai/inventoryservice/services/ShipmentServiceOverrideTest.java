@@ -1,7 +1,6 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
-import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.shipment.Shipment;
@@ -9,7 +8,6 @@ import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -22,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 /**
@@ -84,12 +83,27 @@ class ShipmentServiceOverrideTest {
                 shipmentId, ShipmentStatus.RECEIVED, "missing tracking, items received", actor, "Bob");
 
         assertEquals(ShipmentStatus.RECEIVED, result.getStatus());
-        ArgumentCaptor<String> notes = ArgumentCaptor.forClass(String.class);
-        verify(auditLogService).createAuditLog(
+        verify(auditLogService).createShipmentEvent(
                 eq(actor), eq("Bob"), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
-                any(), any(), any(), any(), anyInt(), anyInt(), any(), notes.capture());
-        assertTrue(notes.getValue().contains("PENDING -> RECEIVED"));
-        assertTrue(notes.getValue().contains("missing tracking, items received"));
+                eq(shipmentId), eq("SHIP-1"), eq(1),
+                isNull(),
+                eq("PENDING"),
+                eq("RECEIVED"),
+                eq("missing tracking, items received"));
+        // The legacy createAuditLog path is no longer called for overrides.
+        verify(auditLogService, never()).createAuditLog(any(), any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), any(), any());
+    }
+
+    @Test
+    void overrideTrimsReasonWhitespace() {
+        shipmentWith(ShipmentStatus.PENDING);
+        service.overrideShipmentStatus(
+                shipmentId, ShipmentStatus.RECEIVED, "  padded reason  ", null, null);
+        verify(auditLogService).createShipmentEvent(
+                any(), any(), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
+                any(), any(), anyInt(), any(), any(), any(),
+                eq("padded reason"));
     }
 
     @Test
@@ -99,8 +113,8 @@ class ShipmentServiceOverrideTest {
                 service.overrideShipmentStatus(
                         shipmentId, ShipmentStatus.CANCELLED, "trying to cancel", null, null));
         verify(shipmentRepository, never()).save(any());
-        verify(auditLogService, never()).createAuditLog(any(), any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), any(), any());
+        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(),
+                anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -119,8 +133,8 @@ class ShipmentServiceOverrideTest {
         service.overrideShipmentStatus(
                 shipmentId, ShipmentStatus.RECEIVED, "no change", null, null);
         verify(shipmentRepository, never()).save(any());
-        verify(auditLogService, never()).createAuditLog(any(), any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), any(), any());
+        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(),
+                anyInt(), any(), any(), any(), any());
     }
 
     @Test

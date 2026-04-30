@@ -163,6 +163,20 @@ public class ShipmentController {
         return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
     }
 
+    public record UndoReceiveRequest(java.util.List<UUID> itemIds) {}
+
+    @PostMapping("/{shipmentId}/undo-receive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    public ResponseEntity<ShipmentResponseDTO> undoReceiveShipmentItems(
+            @PathVariable UUID shipmentId,
+            @RequestBody UndoReceiveRequest request,
+            Authentication authentication) {
+        ActorInfo actor = getActorInfo(authentication);
+        Shipment shipment = shipmentService.undoReceiveShipmentItems(
+                shipmentId, request.itemIds(), actor.id(), actor.name());
+        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+    }
+
     public record StatusOverrideRequest(ShipmentStatus status, String reason) {}
 
     @PatchMapping("/{id}/status")

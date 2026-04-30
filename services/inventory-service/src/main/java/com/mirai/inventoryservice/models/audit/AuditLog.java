@@ -8,10 +8,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -68,6 +71,25 @@ public class AuditLog {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "shipment_id")
+    private UUID shipmentId;
+
+    @Column(name = "shipment_number", length = 50)
+    private String shipmentNumber;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "field_changes", columnDefinition = "jsonb")
+    private List<Map<String, Object>> fieldChanges;
+
+    @Column(name = "previous_status", length = 50)
+    private String previousStatus;
+
+    @Column(name = "new_status", length = 50)
+    private String newStatus;
+
+    @Column(name = "override_reason", columnDefinition = "TEXT")
+    private String overrideReason;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

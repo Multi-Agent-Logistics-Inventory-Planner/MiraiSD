@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -30,4 +32,12 @@ public class AuditLogDTO {
 
     // Summary display field (e.g., "Product A" or "3 products")
     private String productSummary;
+
+    // Shipment-event fields (null for inventory-only rows)
+    private UUID shipmentId;
+    private String shipmentNumber;
+    private List<Map<String, Object>> fieldChanges;
+    private String previousStatus;
+    private String newStatus;
+    private String overrideReason;
 }

@@ -137,6 +137,21 @@ export async function undoReceiveShipmentItem(
 }
 
 /**
+ * Undo receipt for multiple shipment items in one transaction. Produces exactly one
+ * audit log row covering the whole batch — preferred over the per-item endpoint when
+ * the user selects multiple items at once.
+ */
+export async function undoReceiveShipmentItems(
+  shipmentId: string,
+  itemIds: string[]
+): Promise<Shipment> {
+  return apiPost<Shipment, { itemIds: string[] }>(
+    `${BASE_PATH}/${shipmentId}/undo-receive`,
+    { itemIds }
+  );
+}
+
+/**
  * Manually override a shipment's inventory status. Reason is required.
  */
 export async function overrideShipmentStatus(

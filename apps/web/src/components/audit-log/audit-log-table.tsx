@@ -12,6 +12,9 @@ import {
 } from "@/types/api";
 import { useAuditLogDetail } from "@/hooks/queries/use-audit-log";
 import { cn } from "@/lib/utils";
+import { ShipmentEditedDetail } from "./expanded-rows/shipment-edited-detail";
+import { ShipmentDeletedDetail } from "./expanded-rows/shipment-deleted-detail";
+import { ShipmentStatusOverriddenDetail } from "./expanded-rows/shipment-status-overridden-detail";
 
 const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.INITIAL_STOCK]: "Initial Stock",
@@ -135,6 +138,29 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
   if (!detail) return null;
 
   const isDisplayOperation = DISPLAY_REASONS.has(detail.reason);
+
+  // Shipment lifecycle events use structured columns instead of stock movements.
+  if (detail.reason === StockMovementReason.SHIPMENT_EDITED) {
+    return (
+      <div className="px-4 md:px-12 pb-4 pt-1">
+        <ShipmentEditedDetail detail={detail} />
+      </div>
+    );
+  }
+  if (detail.reason === StockMovementReason.SHIPMENT_DELETED) {
+    return (
+      <div className="px-4 md:px-12 pb-4 pt-1">
+        <ShipmentDeletedDetail detail={detail} />
+      </div>
+    );
+  }
+  if (detail.reason === StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN) {
+    return (
+      <div className="px-4 md:px-12 pb-4 pt-1">
+        <ShipmentStatusOverriddenDetail detail={detail} />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 md:px-12 pb-4 pt-1">

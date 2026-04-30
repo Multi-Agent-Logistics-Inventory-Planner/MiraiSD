@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -407,11 +408,13 @@ public class ShipmentService {
             shipment.setActualDeliveryDate(requestDTO.getActualDeliveryDate());
         }
 
-        // Issue 7 fix: Resolve actor ID once before the loop
+        // Resolve receiving user once up front (used for both shipment.receivedBy and the audit log actor)
+        User receivedByUser = null;
         UUID validatedActorId = null;
         if (requestDTO.getReceivedBy() != null) {
-            if (userRepository.findById(requestDTO.getReceivedBy()).isPresent()) {
-                validatedActorId = requestDTO.getReceivedBy();
+            receivedByUser = userRepository.findById(requestDTO.getReceivedBy()).orElse(null);
+            if (receivedByUser != null) {
+                validatedActorId = receivedByUser.getId();
             }
         }
 
@@ -427,6 +430,21 @@ public class ShipmentService {
         // Track what was received in this batch for audit
         List<String> receivedItemSummaries = new ArrayList<>();
         int totalReceivedInBatch = 0;
+
+        // Create the parent audit log up front; its reason / counts are finalized after the loop.
+        // All per-item stock movements get linked to this single audit log, mirroring the transfer pattern.
+        AuditLog receiveAuditLog = auditLogService.createAuditLog(
+                validatedActorId,
+                receivedByUser != null ? receivedByUser.getFullName() : null,
+                StockMovementReason.SHIPMENT_PARTIAL_RECEIPT,
+                null, null, null, null,
+                0,
+                0,
+                "Shipment " + shipment.getShipmentNumber(),
+                null
+        );
+        receiveAuditLog.setShipmentId(shipment.getId());
+        receiveAuditLog.setShipmentNumber(shipment.getShipmentNumber());
 
         for (ReceiveShipmentRequestDTO.ItemReceiptDTO receipt : requestDTO.getItemReceipts()) {
             ShipmentItem shipmentItem = shipmentItemMap.get(receipt.getShipmentItemId());
@@ -572,8 +590,7 @@ public class ShipmentService {
                             shipmentItem.getItem(),
                             allocQty,
                             validatedActorId,
-                            shipment.getShipmentNumber(),
-                            shipment.getId()
+                            receiveAuditLog
                     );
                 } else {
                     // Add to regular location inventory
@@ -582,7 +599,8 @@ public class ShipmentService {
                             locationId,
                             shipmentItem.getItem(),
                             allocQty,
-                            validatedActorId
+                            validatedActorId,
+                            receiveAuditLog
                     );
                 }
             }
@@ -642,29 +660,24 @@ public class ShipmentService {
             notificationService.createNotification(completionNotif);
         }
 
-        // Set receivedBy if provided
-        User receivedByUser = null;
-        if (requestDTO.getReceivedBy() != null) {
-            receivedByUser = userRepository.findById(requestDTO.getReceivedBy()).orElse(null);
-            if (receivedByUser != null) {
-                shipment.setReceivedBy(receivedByUser);
-            }
+        // Set receivedBy on the shipment if a receiver was provided (user already resolved up front)
+        if (receivedByUser != null) {
+            shipment.setReceivedBy(receivedByUser);
         }
 
         Shipment savedShipment = shipmentRepository.save(shipment);
 
-        // Create partial receipt audit if anything was received
-        if (!receivedItemSummaries.isEmpty()) {
-            UUID auditActorId = receivedByUser != null ? receivedByUser.getId() : validatedActorId;
-            String auditActorName = receivedByUser != null ? receivedByUser.getFullName() : null;
-            createPartialReceiptAudit(
-                    savedShipment,
-                    receivedItemSummaries,
-                    totalReceivedInBatch,
-                    allItemsFullyReceived,
-                    auditActorId,
-                    auditActorName
-            );
+        // Finalize the parent audit log: set the right reason and aggregate counts based on what
+        // actually got received. If nothing did, drop the orphan row entirely.
+        if (receivedItemSummaries.isEmpty()) {
+            auditLogService.delete(receiveAuditLog);
+        } else {
+            receiveAuditLog.setReason(allItemsFullyReceived
+                    ? StockMovementReason.SHIPMENT_RECEIPT
+                    : StockMovementReason.SHIPMENT_PARTIAL_RECEIPT);
+            receiveAuditLog.setItemCount(receivedItemSummaries.size());
+            receiveAuditLog.setTotalQuantityMoved(totalReceivedInBatch);
+            auditLogService.save(receiveAuditLog);
         }
 
         // Ensure product quantity/isActive denormalized fields stay in sync for UI reads
@@ -693,53 +706,110 @@ public class ShipmentService {
      * @throws InsufficientInventoryException if inventory has been depleted
      */
     public Shipment undoReceiveShipmentItem(UUID shipmentId, UUID itemId, UUID actorId, String actorName) {
+        return undoReceiveShipmentItems(shipmentId, List.of(itemId), actorId, actorName);
+    }
+
+    /**
+     * Reverse receipt of one or more shipment items in a single transaction. Treats the whole
+     * batch as one user action: produces exactly one parent AuditLog (reason SHIPMENT_RECEIPT_REVERSED)
+     * with N stock movement rows under it, mirroring how receiveShipment / batchTransferInventory work.
+     */
+    public Shipment undoReceiveShipmentItems(UUID shipmentId, List<UUID> itemIds, UUID actorId, String actorName) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw new IllegalArgumentException("itemIds must not be empty");
+        }
+
         Shipment shipment = getShipmentById(shipmentId);
 
-        // Find the shipment item
-        ShipmentItem shipmentItem = shipment.getItems().stream()
-                .filter(item -> item.getId().equals(itemId))
-                .findFirst()
-                .orElseThrow(() -> new ShipmentItemNotFoundException(
-                        "Shipment item " + itemId + " not found in shipment " + shipmentId));
+        // Resolve every requested shipment item up front and validate it belongs to this shipment
+        // and has something to undo. We fail the entire batch on the first invalid item — the user
+        // explicitly selected each one, so partial-failure semantics would be confusing.
+        List<ShipmentItem> targets = new ArrayList<>(itemIds.size());
+        for (UUID itemId : itemIds) {
+            ShipmentItem shipmentItem = shipment.getItems().stream()
+                    .filter(it -> it.getId().equals(itemId))
+                    .findFirst()
+                    .orElseThrow(() -> new ShipmentItemNotFoundException(
+                            "Shipment item " + itemId + " not found in shipment " + shipmentId));
 
-        // Validate item has something to undo
-        boolean hasReceivedQuantities = shipmentItem.getReceivedQuantity() > 0
-                || shipmentItem.getDamagedQuantity() > 0
-                || shipmentItem.getDisplayQuantity() > 0
-                || shipmentItem.getShopQuantity() > 0;
-        boolean hasAllocations = !shipmentItem.getAllocations().isEmpty();
-
-        if (!hasReceivedQuantities && !hasAllocations) {
-            throw new InvalidShipmentStatusException(
-                    "Shipment item has not been received yet. Nothing to undo.");
-        }
-
-        Product product = shipmentItem.getItem();
-        String shipmentNumber = shipment.getShipmentNumber();
-        Set<UUID> affectedProductIds = new java.util.HashSet<>();
-        affectedProductIds.add(product.getId());
-
-        // Reverse each allocation (same logic as undoReceiveShipment)
-        for (ShipmentItemAllocation allocation : shipmentItem.getAllocations()) {
-            LocationType locationType = allocation.getLocationType();
-            UUID locationId = allocation.getLocationId();
-            int quantity = allocation.getQuantity();
-
-            if (locationType == LocationType.NOT_ASSIGNED || locationId == null) {
-                removeFromNotAssignedInventory(product, quantity, actorId, actorName, shipmentNumber);
-            } else {
-                removeFromInventory(locationType, locationId, product, quantity, actorId, actorName, shipmentNumber);
+            boolean hasReceivedQuantities = shipmentItem.getReceivedQuantity() > 0
+                    || shipmentItem.getDamagedQuantity() > 0
+                    || shipmentItem.getDisplayQuantity() > 0
+                    || shipmentItem.getShopQuantity() > 0;
+            boolean hasAllocations = !shipmentItem.getAllocations().isEmpty();
+            if (!hasReceivedQuantities && !hasAllocations) {
+                throw new InvalidShipmentStatusException(
+                        "Shipment item " + itemId + " has not been received yet. Nothing to undo.");
             }
+            targets.add(shipmentItem);
         }
 
-        // Clear allocations (orphanRemoval will delete them)
-        shipmentItem.getAllocations().clear();
+        Set<UUID> affectedProductIds = new java.util.HashSet<>();
+        for (ShipmentItem t : targets) {
+            affectedProductIds.add(t.getItem().getId());
+        }
 
-        // Reset quantities for this item only
-        shipmentItem.setReceivedQuantity(0);
-        shipmentItem.setDamagedQuantity(0);
-        shipmentItem.setDisplayQuantity(0);
-        shipmentItem.setShopQuantity(0);
+        // Total quantity reversed across all selected items, used for the audit row's display values.
+        int totalReversed = targets.stream()
+                .flatMap(t -> t.getAllocations().stream())
+                .mapToInt(ShipmentItemAllocation::getQuantity)
+                .sum();
+
+        // Create the single parent audit log up front. Even if no allocations exist (only
+        // damaged/display/shop quantities), we still want a single audit row representing
+        // the reversal action.
+        AuditLog reverseAuditLog = auditLogService.createAuditLog(
+                actorId,
+                actorName,
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
+                null, null, null, null,
+                targets.size(),
+                totalReversed,
+                "Shipment " + shipment.getShipmentNumber(),
+                null
+        );
+        reverseAuditLog.setShipmentId(shipment.getId());
+        reverseAuditLog.setShipmentNumber(shipment.getShipmentNumber());
+        auditLogService.save(reverseAuditLog);
+
+        // Now process each item under the single parent audit log
+        for (ShipmentItem shipmentItem : targets) {
+            Product product = shipmentItem.getItem();
+
+            // Multiple partial-receives leave one allocation row per receive event, even
+            // when they target the same location. Sum them per (locationType, locationId)
+            // so the reversal emits one stock movement per location bucket — otherwise
+            // the audit log shows the same product twice (e.g. 2->1 then 1->0) for what
+            // is conceptually a single -2 reversal.
+            Map<AllocationBucketKey, Integer> bucketedQuantities = new LinkedHashMap<>();
+            for (ShipmentItemAllocation allocation : shipmentItem.getAllocations()) {
+                LocationType locationType = allocation.getLocationType();
+                UUID locationId = allocation.getLocationId();
+                AllocationBucketKey key = (locationType == LocationType.NOT_ASSIGNED || locationId == null)
+                        ? AllocationBucketKey.NOT_ASSIGNED
+                        : new AllocationBucketKey(locationType, locationId);
+                bucketedQuantities.merge(key, allocation.getQuantity(), Integer::sum);
+            }
+
+            for (Map.Entry<AllocationBucketKey, Integer> entry : bucketedQuantities.entrySet()) {
+                AllocationBucketKey key = entry.getKey();
+                int quantity = entry.getValue();
+                if (key.locationId() == null) {
+                    removeFromNotAssignedInventory(product, quantity, actorId, reverseAuditLog);
+                } else {
+                    removeFromInventory(key.locationType(), key.locationId(), product, quantity, actorId, reverseAuditLog);
+                }
+            }
+
+            // Clear allocations (orphanRemoval will delete them)
+            shipmentItem.getAllocations().clear();
+
+            // Reset quantities for this item
+            shipmentItem.setReceivedQuantity(0);
+            shipmentItem.setDamagedQuantity(0);
+            shipmentItem.setDisplayQuantity(0);
+            shipmentItem.setShopQuantity(0);
+        }
 
         // Recompute status from item math. Undo is an explicit reversal -
         // if the remaining items no longer satisfy the fully-received check, drop back to PENDING.
@@ -794,17 +864,17 @@ public class ShipmentService {
         shipment.setStatus(newStatus);
         Shipment savedShipment = shipmentRepository.save(shipment);
 
-        String notesText = String.format("Status override: %s -> %s. Reason: %s",
-                oldStatus, newStatus, reason.trim());
-        auditLogService.createAuditLog(
+        auditLogService.createShipmentEvent(
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN,
-                null, null, null, null,
+                shipment.getId(),
+                shipment.getShipmentNumber(),
                 1,
-                0,
-                "Shipment " + shipment.getShipmentNumber(),
-                notesText
+                null,
+                oldStatus.name(),
+                newStatus.name(),
+                reason.trim()
         );
 
         broadcastService.broadcastShipmentUpdated();
@@ -815,8 +885,9 @@ public class ShipmentService {
 
     /**
      * Add inventory to a location using the unified location_inventory table.
+     * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
-    private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId) {
+    private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
 
@@ -837,26 +908,12 @@ public class ShipmentService {
         LocationInventory saved = locationInventoryRepository.save(inventory);
         int currentQuantity = saved.getQuantity();
 
-        String toLocationCode = location.getLocationCode();
-        AuditLog auditLog = auditLogService.createAuditLog(
-                validatedActorId,
-                StockMovementReason.SHIPMENT_RECEIPT,
-                null,
-                null,
-                locationId,
-                toLocationCode,
-                1,
-                quantity,
-                product.getName(),
-                null
-        );
-
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
 
         StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
+                .auditLog(parentAuditLog)
                 .item(product)
                 .locationType(locationType)
                 .toLocationId(locationId)
@@ -875,8 +932,9 @@ public class ShipmentService {
 
     /**
      * Add inventory to NOT_ASSIGNED location using the unified location_inventory table.
+     * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
-    private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, String shipmentNumber, UUID shipmentId) {
+    private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {
         // Get NOT_ASSIGNED location
         Location notAssignedLocation = getNotAssignedLocation();
 
@@ -894,25 +952,12 @@ public class ShipmentService {
         LocationInventory saved = locationInventoryRepository.save(inventory);
         int currentQuantity = saved.getQuantity();
 
-        AuditLog auditLog = auditLogService.createAuditLog(
-                validatedActorId,
-                StockMovementReason.SHIPMENT_RECEIPT,
-                null,
-                null,
-                notAssignedLocation.getId(),
-                "NA",
-                1,
-                quantity,
-                product.getName(),
-                null
-        );
-
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
 
         StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
+                .auditLog(parentAuditLog)
                 .item(product)
                 .locationType(LocationType.NOT_ASSIGNED)
                 .toLocationId(notAssignedLocation.getId())
@@ -942,10 +987,11 @@ public class ShipmentService {
 
     /**
      * Remove quantity from inventory at a specific location (for undo operations).
-     * Uses the unified location_inventory table.
+     * Uses the unified location_inventory table. The caller passes the parent audit log; this method
+     * only writes a stock movement under it.
      */
     private void removeFromInventory(LocationType locationType, UUID locationId, Product product, int quantity,
-                                     UUID actorId, String actorName, String shipmentNumber) {
+                                     UUID actorId, AuditLog parentAuditLog) {
         LocationInventory inventory = locationInventoryRepository
                 .findByLocation_IdAndProduct_Id(locationId, product.getId())
                 .orElseThrow(() -> new InsufficientInventoryException(
@@ -963,29 +1009,13 @@ public class ShipmentService {
         }
 
         int newQuantity = currentQuantity - quantity;
-        String locationCode = inventory.getLocation().getLocationCode();
-
-        // Create audit log for reversal
-        AuditLog auditLog = auditLogService.createAuditLog(
-                actorId,
-                actorName,
-                StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
-                locationId,
-                locationCode,
-                null,
-                null,
-                1,
-                quantity,
-                product.getName(),
-                String.format("Reversed receipt for %s from shipment %s", product.getName(), shipmentNumber)
-        );
 
         // Create stock movement record
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("shipment_receipt_reversal", true);
 
         StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
+                .auditLog(parentAuditLog)
                 .item(product)
                 .locationType(locationType)
                 .fromLocationId(locationId)
@@ -1012,10 +1042,11 @@ public class ShipmentService {
 
     /**
      * Remove quantity from NOT_ASSIGNED inventory (for undo operations).
-     * Uses the unified location_inventory table.
+     * Uses the unified location_inventory table. The caller passes the parent audit log; this method
+     * only writes a stock movement under it.
      */
     private void removeFromNotAssignedInventory(Product product, int quantity,
-                                                UUID actorId, String actorName, String shipmentNumber) {
+                                                UUID actorId, AuditLog parentAuditLog) {
         Location notAssignedLocation = getNotAssignedLocation();
 
         LocationInventory inventory = locationInventoryRepository
@@ -1036,27 +1067,12 @@ public class ShipmentService {
 
         int newQuantity = currentQuantity - quantity;
 
-        // Create audit log
-        AuditLog auditLog = auditLogService.createAuditLog(
-                actorId,
-                actorName,
-                StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
-                notAssignedLocation.getId(),
-                "NA",
-                null,
-                null,
-                1,
-                quantity,
-                product.getName(),
-                String.format("Reversed receipt for %s from shipment %s", product.getName(), shipmentNumber)
-        );
-
         // Create stock movement
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("shipment_receipt_reversal", true);
 
         StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
+                .auditLog(parentAuditLog)
                 .item(product)
                 .locationType(LocationType.NOT_ASSIGNED)
                 .fromLocationId(notAssignedLocation.getId())
@@ -1167,7 +1183,7 @@ public class ShipmentService {
     }
 
     /**
-     * Create audit log for shipment edit, capturing all changes
+     * Create audit log for shipment edit, capturing all changes as a structured field_changes JSON array.
      */
     private void createShipmentEditAudit(
             Shipment shipment,
@@ -1176,162 +1192,140 @@ public class ShipmentService {
             UUID actorId,
             String actorName
     ) {
-        List<String> changes = new ArrayList<>();
+        List<Map<String, Object>> changes = new ArrayList<>();
 
         // Compare scalar fields
         if (!java.util.Objects.equals(before.supplierName(), after.supplierName())) {
-            changes.add("Supplier: " + nvl(before.supplierName()) + " -> " + nvl(after.supplierName()));
+            changes.add(fieldChange("supplier", before.supplierName(), after.supplierName()));
         }
         if (!java.util.Objects.equals(before.shipmentNumber(), after.shipmentNumber())) {
-            changes.add("Number: " + nvl(before.shipmentNumber()) + " -> " + nvl(after.shipmentNumber()));
+            changes.add(fieldChange("shipmentNumber", before.shipmentNumber(), after.shipmentNumber()));
         }
         if (!java.util.Objects.equals(before.status(), after.status())) {
-            changes.add("Status: " + before.status() + " -> " + after.status());
+            changes.add(fieldChange("status",
+                    before.status() != null ? before.status().name() : null,
+                    after.status() != null ? after.status().name() : null));
         }
         if (!java.util.Objects.equals(before.orderDate(), after.orderDate())) {
-            changes.add("Order Date: " + nvl(before.orderDate()) + " -> " + nvl(after.orderDate()));
+            changes.add(fieldChange("orderDate",
+                    before.orderDate() != null ? before.orderDate().toString() : null,
+                    after.orderDate() != null ? after.orderDate().toString() : null));
         }
         if (!java.util.Objects.equals(before.expectedDeliveryDate(), after.expectedDeliveryDate())) {
-            changes.add("Expected Date: " + nvl(before.expectedDeliveryDate()) + " -> " + nvl(after.expectedDeliveryDate()));
+            changes.add(fieldChange("expectedDeliveryDate",
+                    before.expectedDeliveryDate() != null ? before.expectedDeliveryDate().toString() : null,
+                    after.expectedDeliveryDate() != null ? after.expectedDeliveryDate().toString() : null));
         }
         if (!java.util.Objects.equals(before.actualDeliveryDate(), after.actualDeliveryDate())) {
-            changes.add("Actual Date: " + nvl(before.actualDeliveryDate()) + " -> " + nvl(after.actualDeliveryDate()));
+            changes.add(fieldChange("actualDeliveryDate",
+                    before.actualDeliveryDate() != null ? before.actualDeliveryDate().toString() : null,
+                    after.actualDeliveryDate() != null ? after.actualDeliveryDate().toString() : null));
         }
         if (!bigDecimalEquals(before.totalCost(), after.totalCost())) {
-            changes.add("Cost: " + nvl(before.totalCost()) + " -> " + nvl(after.totalCost()));
+            changes.add(fieldChange("totalCost",
+                    before.totalCost() != null ? before.totalCost().toPlainString() : null,
+                    after.totalCost() != null ? after.totalCost().toPlainString() : null));
         }
         if (!java.util.Objects.equals(before.trackingId(), after.trackingId())) {
-            changes.add("Tracking: " + nvl(before.trackingId()) + " -> " + nvl(after.trackingId()));
+            changes.add(fieldChange("trackingId", before.trackingId(), after.trackingId()));
         }
         if (!java.util.Objects.equals(before.notes(), after.notes())) {
-            changes.add("Notes updated");
+            // Don't reveal note contents in the audit log; just record that they changed.
+            Map<String, Object> notesEntry = new HashMap<>();
+            notesEntry.put("field", "notes");
+            notesEntry.put("changed", true);
+            changes.add(notesEntry);
         }
 
         // Compare items
         Set<UUID> beforeProductIds = before.items().stream().map(ItemSnapshot::productId).collect(Collectors.toSet());
         Set<UUID> afterProductIds = after.items().stream().map(ItemSnapshot::productId).collect(Collectors.toSet());
 
-        List<String> addedItems = after.items().stream()
+        List<Map<String, Object>> addedItems = after.items().stream()
                 .filter(item -> !beforeProductIds.contains(item.productId()))
-                .map(item -> item.productName() + " (" + item.orderedQuantity() + ")")
-                .toList();
+                .map(item -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("name", item.productName());
+                    m.put("qty", item.orderedQuantity());
+                    return m;
+                })
+                .collect(Collectors.toList());
 
-        List<String> removedItems = before.items().stream()
+        List<Map<String, Object>> removedItems = before.items().stream()
                 .filter(item -> !afterProductIds.contains(item.productId()))
-                .map(item -> item.productName() + " (" + item.orderedQuantity() + ")")
-                .toList();
+                .map(item -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("name", item.productName());
+                    m.put("qty", item.orderedQuantity());
+                    return m;
+                })
+                .collect(Collectors.toList());
 
         if (!addedItems.isEmpty()) {
-            changes.add("Added: " + String.join(", ", addedItems));
+            changes.add(fieldChange("items_added", null, addedItems));
         }
         if (!removedItems.isEmpty()) {
-            changes.add("Removed: " + String.join(", ", removedItems));
+            changes.add(fieldChange("items_removed", removedItems, null));
         }
 
-        // Only create audit if there were actual changes
         if (changes.isEmpty()) {
             return;
         }
 
-        String notesText = String.join(". ", changes);
-
-        auditLogService.createAuditLog(
+        auditLogService.createShipmentEvent(
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_EDITED,
-                null, null, null, null,
+                shipment.getId(),
+                shipment.getShipmentNumber(),
                 1,
-                0,
-                "Shipment " + shipment.getShipmentNumber(),
-                notesText
+                changes,
+                null,
+                null,
+                null
         );
     }
 
+    private static Map<String, Object> fieldChange(String field, Object from, Object to) {
+        Map<String, Object> entry = new HashMap<>();
+        entry.put("field", field);
+        entry.put("from", from);
+        entry.put("to", to);
+        return entry;
+    }
+
     /**
-     * Create audit log for shipment deletion, capturing full details
+     * Create audit log for shipment deletion, capturing full details as structured JSON.
      */
     private void createShipmentDeletionAudit(Shipment shipment, UUID actorId, String actorName) {
-        // Build summary of items being deleted
-        String itemsSummary = shipment.getItems().stream()
+        List<Map<String, Object>> deletedItems = shipment.getItems().stream()
                 .map(item -> {
-                    int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
-                    int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
-                    String name = item.getItem().getName();
-                    if (received > 0) {
-                        return name + " (ordered: " + ordered + ", received: " + received + ")";
-                    }
-                    return name + " (ordered: " + ordered + ")";
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("name", item.getItem().getName());
+                    entry.put("ordered", item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0);
+                    entry.put("received", item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0);
+                    return entry;
                 })
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.toList());
 
-        String notesText = String.format(
-                "Deleted shipment %s from %s. Items: %s",
-                shipment.getShipmentNumber(),
-                nvl(shipment.getSupplierName()),
-                itemsSummary.isEmpty() ? "none" : itemsSummary
-        );
+        List<Map<String, Object>> changes = new ArrayList<>();
+        Map<String, Object> supplierEntry = new HashMap<>();
+        supplierEntry.put("field", "supplier");
+        supplierEntry.put("value", shipment.getSupplierName());
+        changes.add(supplierEntry);
+        changes.add(fieldChange("deleted_items", null, deletedItems));
 
-        auditLogService.createAuditLog(
+        auditLogService.createShipmentEvent(
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_DELETED,
-                null, null, null, null,
+                shipment.getId(),
+                shipment.getShipmentNumber(),
                 shipment.getItems().size(),
-                0,
-                "Shipment " + shipment.getShipmentNumber() + " (deleted)",
-                notesText
-        );
-    }
-
-    /**
-     * Create audit log for partial receipt
-     */
-    private void createPartialReceiptAudit(
-            Shipment shipment,
-            List<String> receivedItemSummaries,
-            int totalReceivedInBatch,
-            boolean isComplete,
-            UUID actorId,
-            String actorName
-    ) {
-        // Build remaining items summary
-        List<String> remainingItems = new ArrayList<>();
-        for (ShipmentItem item : shipment.getItems()) {
-            int ordered = item.getOrderedQuantity() != null ? item.getOrderedQuantity() : 0;
-            int received = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : 0;
-            int damaged = item.getDamagedQuantity() != null ? item.getDamagedQuantity() : 0;
-            int display = item.getDisplayQuantity() != null ? item.getDisplayQuantity() : 0;
-            int shop = item.getShopQuantity() != null ? item.getShopQuantity() : 0;
-            int accountedFor = received + damaged + display + shop;
-            int remaining = ordered - accountedFor;
-            if (remaining > 0) {
-                remainingItems.add(item.getItem().getName() + " (" + remaining + ")");
-            }
-        }
-
-        StockMovementReason reason = isComplete
-                ? StockMovementReason.SHIPMENT_RECEIPT
-                : StockMovementReason.SHIPMENT_PARTIAL_RECEIPT;
-
-        String notesText;
-        if (isComplete) {
-            notesText = "Shipment fully received. Received: " + String.join(", ", receivedItemSummaries);
-        } else {
-            notesText = "Received: " + String.join(", ", receivedItemSummaries);
-            if (!remainingItems.isEmpty()) {
-                notesText += ". Remaining: " + String.join(", ", remainingItems);
-            }
-        }
-
-        auditLogService.createAuditLog(
-                actorId,
-                actorName,
-                reason,
-                null, null, null, null,
-                receivedItemSummaries.size(),
-                totalReceivedInBatch,
-                "Shipment " + shipment.getShipmentNumber(),
-                notesText
+                changes,
+                null,
+                null,
+                null
         );
     }
 
@@ -1347,5 +1341,9 @@ public class ShipmentService {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
         return a.compareTo(b) == 0;
+    }
+
+    private record AllocationBucketKey(LocationType locationType, UUID locationId) {
+        static final AllocationBucketKey NOT_ASSIGNED = new AllocationBucketKey(LocationType.NOT_ASSIGNED, null);
     }
 }

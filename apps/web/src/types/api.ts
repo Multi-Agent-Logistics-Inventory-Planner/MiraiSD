@@ -479,6 +479,15 @@ export interface AuditLogFilters {
   locationId?: string;
 }
 
+// Field-change entries inside audit_logs.field_changes for SHIPMENT_EDITED / SHIPMENT_DELETED
+export interface AuditLogFieldChange {
+  field: string;
+  from?: unknown;
+  to?: unknown;
+  changed?: boolean;
+  value?: unknown;
+}
+
 // New audit log types (grouped actions)
 export interface AuditLog {
   id: string;
@@ -492,6 +501,12 @@ export interface AuditLog {
   notes?: string;
   createdAt: string;
   productSummary: string;
+  shipmentId?: string;
+  shipmentNumber?: string;
+  fieldChanges?: AuditLogFieldChange[];
+  previousStatus?: string;
+  newStatus?: string;
+  overrideReason?: string;
 }
 
 export interface AuditLogMovement {
@@ -519,6 +534,12 @@ export interface AuditLogDetail {
   productSummary?: string;
   notes?: string;
   createdAt: string;
+  shipmentId?: string;
+  shipmentNumber?: string;
+  fieldChanges?: AuditLogFieldChange[];
+  previousStatus?: string;
+  newStatus?: string;
+  overrideReason?: string;
   movements: AuditLogMovement[];
 }
 

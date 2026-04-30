@@ -26,7 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { cn, prizeLetterDisplay, sortPrizes } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useUndoReceiveShipmentItemMutation } from "@/hooks/mutations/use-shipment-mutations";
+import { useUndoReceiveShipmentItemsMutation } from "@/hooks/mutations/use-shipment-mutations";
 import type { Shipment, ShipmentItem } from "@/types/api";
 
 interface ShipmentUndoItemsDialogProps {
@@ -57,7 +57,7 @@ export function ShipmentUndoItemsDialog({
   onSuccess,
 }: ShipmentUndoItemsDialogProps) {
   const { toast } = useToast();
-  const undoItemMutation = useUndoReceiveShipmentItemMutation();
+  const undoItemsMutation = useUndoReceiveShipmentItemsMutation();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -129,40 +129,31 @@ export function ShipmentUndoItemsDialog({
     if (!shipment || selectedItems.size === 0) return;
 
     setIsProcessing(true);
-    let lastUpdatedShipment: Shipment | null = null;
-    let failedCount = 0;
     const itemsToUndo = Array.from(selectedItems);
 
-    for (const itemId of itemsToUndo) {
-      try {
-        lastUpdatedShipment = await undoItemMutation.mutateAsync({
-          shipmentId: shipment.id,
-          itemId,
-        });
-      } catch (err: unknown) {
-        failedCount++;
-        const message =
-          err instanceof Error ? err.message : "Failed to undo item";
-        toast({
-          title: "Error undoing item",
-          description: message,
-          variant: "destructive",
-        });
-      }
-    }
+    try {
+      const updatedShipment = await undoItemsMutation.mutateAsync({
+        shipmentId: shipment.id,
+        itemIds: itemsToUndo,
+      });
 
-    setIsProcessing(false);
-
-    const successCount = itemsToUndo.length - failedCount;
-    if (successCount > 0) {
       toast({
-        title: `${successCount} item${successCount > 1 ? "s" : ""} reversed`,
+        title: `${itemsToUndo.length} item${itemsToUndo.length > 1 ? "s" : ""} reversed`,
         description: "Inventory has been restored for the selected items.",
       });
-      if (lastUpdatedShipment && onSuccess) {
-        onSuccess(lastUpdatedShipment);
+      if (onSuccess) {
+        onSuccess(updatedShipment);
       }
       onOpenChange(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to undo items";
+      toast({
+        title: "Error undoing items",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
   }
 
