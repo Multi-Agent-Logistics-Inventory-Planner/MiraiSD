@@ -131,6 +131,7 @@ venv.bak/
 # DOCKER
 # ============================================
 .dockerignore
+infra/docker-compose.override.yml
 
 # ============================================
 # JAVA / MAVEN / GRADLE

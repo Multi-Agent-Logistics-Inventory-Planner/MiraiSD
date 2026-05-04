@@ -42,7 +42,7 @@ public class MachineDisplayService {
     private final EntityManager entityManager;
     private final AuditLogService auditLogService;
 
-    @Value("${machine-display.stale-threshold-days:14}")
+    @Value("${machine-display.stale-threshold-days:45}")
     private int staleThresholdDays;
 
     public MachineDisplayService(

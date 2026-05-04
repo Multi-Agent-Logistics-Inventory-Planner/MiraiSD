@@ -12,7 +12,7 @@ import {
 import { LocationType, MachineDisplay } from "@/types/api";
 
 /** Displays older than this threshold are considered stale */
-export const STALE_DISPLAY_THRESHOLD_DAYS = 14;
+export const STALE_DISPLAY_THRESHOLD_DAYS = 45;
 
 /**
  * Fetch all active machine displays
