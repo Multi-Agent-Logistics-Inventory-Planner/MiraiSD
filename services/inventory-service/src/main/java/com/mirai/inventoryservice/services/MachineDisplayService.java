@@ -10,8 +10,11 @@ import com.mirai.inventoryservice.exceptions.LocationNotFoundException;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.NotificationSeverity;
+import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.storage.Location;
 import com.mirai.inventoryservice.repositories.LocationRepository;
@@ -41,6 +44,7 @@ public class MachineDisplayService {
     private final LocationRepository locationRepository;
     private final EntityManager entityManager;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     @Value("${machine-display.stale-threshold-days:45}")
     private int staleThresholdDays;
@@ -52,7 +56,8 @@ public class MachineDisplayService {
             StockMovementRepository stockMovementRepository,
             LocationRepository locationRepository,
             EntityManager entityManager,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            NotificationService notificationService) {
         this.machineDisplayRepository = machineDisplayRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
@@ -60,6 +65,7 @@ public class MachineDisplayService {
         this.locationRepository = locationRepository;
         this.entityManager = entityManager;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -123,6 +129,18 @@ public class MachineDisplayService {
                 .at(now)
                 .build();
         stockMovementRepository.save(movement);
+
+        List<String> previousNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.add(product.getName());
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SET,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
 
         return saved;
     }
@@ -218,6 +236,18 @@ public class MachineDisplayService {
                 .collect(Collectors.toList());
         stockMovementRepository.saveAll(movements);
 
+        List<String> previousNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.addAll(productNames);
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SET,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
+
         return saved;
     }
 
@@ -268,6 +298,13 @@ public class MachineDisplayService {
                         .build())
                 .collect(Collectors.toList());
         stockMovementRepository.saveAll(movements);
+
+        emitDisplayNotification(
+                NotificationType.DISPLAY_REMOVED,
+                actorId,
+                now,
+                List.of(new MachineSnapshot(machineCode, productNames, List.of()))
+        );
     }
 
     /**
@@ -281,6 +318,11 @@ public class MachineDisplayService {
         if (display.getEndedAt() != null) {
             throw new IllegalArgumentException("Display is already ended");
         }
+
+        // Snapshot the full active display list BEFORE we end this one, so the notification
+        // can show what stayed on the machine vs. what was removed.
+        List<MachineDisplay> activeBefore = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(display.getLocationType(), display.getMachineId());
 
         OffsetDateTime now = OffsetDateTime.now();
         display.setEndedAt(now);
@@ -312,6 +354,21 @@ public class MachineDisplayService {
                 .at(now)
                 .build();
         stockMovementRepository.save(movement);
+
+        List<String> previousNames = activeBefore.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        UUID removedId = display.getId();
+        List<String> currentNames = activeBefore.stream()
+                .filter(d -> !d.getId().equals(removedId))
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        emitDisplayNotification(
+                NotificationType.DISPLAY_REMOVED,
+                actorId,
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
     }
 
     /**
@@ -371,6 +428,22 @@ public class MachineDisplayService {
                 null
         );
 
+        List<String> previousNames = currentDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        // currentDisplays was queried AFTER ending the outgoing display, so it already excludes it.
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.add(incoming.getName());
+        // Reconstruct the true "previously" by adding the outgoing back in.
+        List<String> trulyPrevious = new ArrayList<>(previousNames);
+        trulyPrevious.add(outgoingProductName);
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SWAP,
+                request.getActorId(),
+                OffsetDateTime.now(),
+                List.of(new MachineSnapshot(machineCode, trulyPrevious, currentNames))
+        );
+
         return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
     }
 
@@ -397,6 +470,15 @@ public class MachineDisplayService {
         List<String> allProductNames = new ArrayList<>();
         String sourceMachineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
         String targetMachineCode = null;
+
+        // Snapshot source machine's active displays BEFORE any mutation, used to build
+        // the per-machine before/after lists in the Slack notification.
+        List<String> sourcePreviousNames = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId())
+                .stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> targetPreviousNames = null;
 
         // Mode 1: Swap with products (remove displays, add new products)
         if (request.getDisplayIdsToRemove() != null && !request.getDisplayIdsToRemove().isEmpty()) {
@@ -472,6 +554,11 @@ public class MachineDisplayService {
         // Mode 2: Machine-to-machine swap
         if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
             targetMachineCode = resolveLocationCode(request.getTargetMachineId(), request.getTargetLocationType());
+            targetPreviousNames = machineDisplayRepository
+                    .findActiveByLocationTypeAndMachineId(request.getTargetLocationType(), request.getTargetMachineId())
+                    .stream()
+                    .map(d -> d.getProduct().getName())
+                    .collect(Collectors.toList());
 
             // Move displays FROM target machine TO current machine
             if (request.getDisplayIdsFromTarget() != null && !request.getDisplayIdsFromTarget().isEmpty()) {
@@ -615,6 +702,26 @@ public class MachineDisplayService {
                             .build())
                     .collect(Collectors.toList());
             stockMovementRepository.saveAll(movements);
+
+            List<MachineSnapshot> snapshots = new ArrayList<>();
+            snapshots.add(new MachineSnapshot(
+                    sourceMachineCode,
+                    sourcePreviousNames,
+                    applyChanges(sourcePreviousNames, displayChanges, request.getMachineId())
+            ));
+            if (request.getTargetMachineId() != null && targetPreviousNames != null) {
+                snapshots.add(new MachineSnapshot(
+                        targetMachineCode,
+                        targetPreviousNames,
+                        applyChanges(targetPreviousNames, displayChanges, request.getTargetMachineId())
+                ));
+            }
+            emitDisplayNotification(
+                    NotificationType.DISPLAY_SWAP,
+                    request.getActorId(),
+                    now,
+                    snapshots
+            );
         }
 
         return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
@@ -694,6 +801,13 @@ public class MachineDisplayService {
                         .build())
                 .collect(Collectors.toList());
         stockMovementRepository.saveAll(movements);
+
+        emitDisplayNotification(
+                NotificationType.DISPLAY_RENEWED,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, productNames, productNames))
+        );
 
         return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
     }
@@ -951,6 +1065,93 @@ public class MachineDisplayService {
         if (productNames.size() == 1) return productNames.get(0);
         if (productNames.size() == 2) return productNames.get(0) + " + " + productNames.get(1);
         return productNames.get(0) + " + " + (productNames.size() - 1) + " more";
+    }
+
+    // ========= Display notification helpers =========
+
+    /**
+     * Per-machine snapshot for the Slack notification metadata.
+     * Carries the machine code plus the product display names before and after the change.
+     */
+    private record MachineSnapshot(
+            String code,
+            List<String> previously,
+            List<String> currently
+    ) {
+        Map<String, Object> toMap() {
+            Map<String, Object> map = new HashMap<>();
+            map.put("code", code);
+            map.put("previously", previously);
+            map.put("currently", currently);
+            return map;
+        }
+    }
+
+    /**
+     * Replays the recorded display changes against a starting product-name list to compute
+     * the post-mutation list for a given machine. Names without ID context can collide on
+     * duplicates, but a machine cannot host two displays of the same product simultaneously
+     * (enforced by the existing "already displayed" guards), so a name list is sufficient.
+     */
+    private List<String> applyChanges(List<String> previousNames, List<DisplayChange> changes, UUID machineId) {
+        List<String> result = new ArrayList<>(previousNames);
+        for (DisplayChange change : changes) {
+            String name = change.product().getName();
+            if (machineId.equals(change.fromMachineId())) {
+                result.remove(name);
+            }
+            if (machineId.equals(change.toMachineId())) {
+                if (!result.contains(name)) {
+                    result.add(name);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Enqueue a Slack notification describing a display change. Failures here MUST NOT
+     * roll back the surrounding display mutation — wrapped in a try/catch that swallows
+     * any exception so the caller's @Transactional commits.
+     */
+    private void emitDisplayNotification(
+            NotificationType type,
+            UUID actorId,
+            OffsetDateTime occurredAt,
+            List<MachineSnapshot> machines
+    ) {
+        try {
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("occurred_at", occurredAt.toString());
+            metadata.put("actor_name", resolveActorName(actorId));
+            metadata.put("machines", machines.stream().map(MachineSnapshot::toMap).collect(Collectors.toList()));
+
+            String separator = machines.size() > 1 ? " ↔ " : "";
+            String summary = machines.stream()
+                    .map(MachineSnapshot::code)
+                    .collect(Collectors.joining(separator));
+
+            Notification notif = Notification.builder()
+                    .type(type)
+                    .severity(NotificationSeverity.INFO)
+                    .message("Display " + actionLabel(type) + " on " + (summary.isEmpty() ? "—" : summary))
+                    .metadata(metadata)
+                    .via(List.of("slack"))
+                    .build();
+            notificationService.createNotification(notif);
+        } catch (Exception e) {
+            log.warn("Failed to enqueue display notification (type={}): {}", type, e.getMessage());
+        }
+    }
+
+    private String actionLabel(NotificationType type) {
+        return switch (type) {
+            case DISPLAY_SET -> "added";
+            case DISPLAY_REMOVED -> "removed";
+            case DISPLAY_SWAP -> "swapped";
+            case DISPLAY_RENEWED -> "renewed";
+            default -> "updated";
+        };
     }
 
 }

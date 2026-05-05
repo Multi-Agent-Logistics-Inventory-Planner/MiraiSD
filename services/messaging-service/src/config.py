@@ -53,7 +53,9 @@ APIFY_ACTOR_ID = os.getenv("APIFY_ACTOR_ID", "compass/google-maps-reviews-scrape
 GOOGLE_PLACE_URL = os.getenv("GOOGLE_PLACE_URL", "")
 REVIEW_SLACK_CHANNEL = os.getenv("REVIEW_SLACK_CHANNEL", "#piggly-review")
 REVIEW_SLACK_WEBHOOK_URL = os.getenv("REVIEW_SLACK_WEBHOOK_URL", "")
+SWAP_SLACK_CHANNEL = os.getenv("SWAP_SLACK_CHANNEL", "#machine-swap")
+SWAP_SLACK_WEBHOOK_URL = os.getenv("SWAP_SLACK_WEBHOOK_URL", "")
 REVIEW_FETCH_HOUR = int(os.getenv("REVIEW_FETCH_HOUR", "6"))
 REVIEW_MAX_REVIEWS = int(os.getenv("REVIEW_MAX_REVIEWS", "50"))
-REVIEW_TIMEZONE = os.getenv("REVIEW_TIMEZONE", "America/Chicago")
+APP_TIMEZONE = os.getenv("APP_TIMEZONE", "America/New_York")
 
