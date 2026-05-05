@@ -52,7 +52,7 @@ def daily_review_fetch_job() -> None:
 
     try:
         # Get yesterday's date in the configured timezone
-        tz = ZoneInfo(config.REVIEW_TIMEZONE)
+        tz = ZoneInfo(config.APP_TIMEZONE)
         yesterday = date.today() - timedelta(days=1)
 
         fetcher = ReviewFetcher()
@@ -151,7 +151,7 @@ def start_scheduler() -> BackgroundScheduler:
     _scheduler = BackgroundScheduler()
 
     fetch_hour = config.REVIEW_FETCH_HOUR
-    tz = ZoneInfo(config.REVIEW_TIMEZONE)
+    tz = ZoneInfo(config.APP_TIMEZONE)
 
     # Daily fetch job - runs at configured hour in configured timezone
     _scheduler.add_job(
@@ -161,7 +161,7 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
         name="Daily Review Fetch",
     )
-    logger.info("Scheduled daily review fetch at %02d:00 %s", fetch_hour, config.REVIEW_TIMEZONE)
+    logger.info("Scheduled daily review fetch at %02d:00 %s", fetch_hour, config.APP_TIMEZONE)
 
     # Daily summary job - runs 30 minutes after fetch
     summary_minute = 30
@@ -172,7 +172,7 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
         name="Daily Review Summary",
     )
-    logger.info("Scheduled daily review summary at %02d:%02d %s", fetch_hour, summary_minute, config.REVIEW_TIMEZONE)
+    logger.info("Scheduled daily review summary at %02d:%02d %s", fetch_hour, summary_minute, config.APP_TIMEZONE)
 
     # Monthly summary job - 1st of month at 8 AM
     _scheduler.add_job(
@@ -182,7 +182,7 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
         name="Monthly Review Summary",
     )
-    logger.info("Scheduled monthly review summary on 1st at 08:00 %s", config.REVIEW_TIMEZONE)
+    logger.info("Scheduled monthly review summary on 1st at 08:00 %s", config.APP_TIMEZONE)
 
     # Daily stale display check - runs at 9 AM
     _scheduler.add_job(
@@ -192,7 +192,7 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
         name="Daily Stale Display Check",
     )
-    logger.info("Scheduled daily stale display check at 09:00 %s", config.REVIEW_TIMEZONE)
+    logger.info("Scheduled daily stale display check at 09:00 %s", config.APP_TIMEZONE)
 
     _scheduler.start()
     logger.info("Review scheduler started with %d jobs", len(_scheduler.get_jobs()))

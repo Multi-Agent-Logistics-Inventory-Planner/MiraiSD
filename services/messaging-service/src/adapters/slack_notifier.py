@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -16,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 # Notification types that should be routed to the review channel
 REVIEW_NOTIFICATION_TYPES = {"REVIEW_FETCH_ERROR", "REVIEW_SUMMARY"}
+
+# Notification types that should be routed to the machine-display channel
+DISPLAY_NOTIFICATION_TYPES = {
+    "DISPLAY_SET",
+    "DISPLAY_REMOVED",
+    "DISPLAY_SWAP",
+    "DISPLAY_RENEWED",
+}
 
 
 @dataclass
@@ -37,10 +46,12 @@ class SlackNotifier:
         webhook_url: str | None = None,
         channel: str | None = None,
         review_webhook_url: str | None = None,
+        swap_webhook_url: str | None = None,
     ):
         self._webhook_url = webhook_url or config.SLACK_WEBHOOK_URL
         self._channel = channel or config.SLACK_CHANNEL
         self._review_webhook_url = review_webhook_url or config.REVIEW_SLACK_WEBHOOK_URL
+        self._swap_webhook_url = swap_webhook_url or config.SWAP_SLACK_WEBHOOK_URL
         self._enabled = config.SLACK_ENABLED
 
         # Validate webhook URLs if provided and not empty
@@ -48,6 +59,8 @@ class SlackNotifier:
             self._validate_webhook_url(self._webhook_url)
         if self._review_webhook_url:
             self._validate_webhook_url(self._review_webhook_url)
+        if self._swap_webhook_url:
+            self._validate_webhook_url(self._swap_webhook_url)
 
     def _validate_webhook_url(self, url: str) -> None:
         """Validate that webhook URL is a legitimate Slack webhook.
@@ -122,8 +135,12 @@ class SlackNotifier:
 
         notif_type = notification.get("type", "")
 
+        # Route display change notifications to the machine-swap channel
+        if notif_type in DISPLAY_NOTIFICATION_TYPES:
+            webhook = self._swap_webhook_url or self._webhook_url
+            channel = config.SWAP_SLACK_CHANNEL
         # Route review notifications to review channel
-        if notif_type in REVIEW_NOTIFICATION_TYPES:
+        elif notif_type in REVIEW_NOTIFICATION_TYPES:
             webhook = self._review_webhook_url or self._webhook_url
             channel = config.REVIEW_SLACK_CHANNEL
         else:
@@ -134,7 +151,10 @@ class SlackNotifier:
             logger.warning("No webhook URL configured, cannot send notification")
             return False
 
-        message = self._format_notification(notification, channel=channel)
+        if notif_type in DISPLAY_NOTIFICATION_TYPES:
+            message = self._format_display_notification(notification, channel=channel)
+        else:
+            message = self._format_notification(notification, channel=channel)
 
         try:
             response = requests.post(
@@ -238,6 +258,92 @@ class SlackNotifier:
         return {
             "channel": dest_channel,
             "text": f"{header}: {message[:100]}",
+            "attachments": [{"color": color, "blocks": blocks}],
+        }
+
+    def _format_occurred_at(self, raw: str) -> str:
+        """Render an ISO-8601 instant (often nanosecond precision from Java)
+        as a human-readable local time, e.g. "May 4, 2026 at 6:54 PM CDT".
+        Falls back to the raw string if parsing fails.
+        """
+        if not raw:
+            return "—"
+        try:
+            normalized = re.sub(r"(\.\d{6})\d+", r"\1", raw)
+            if normalized.endswith("Z"):
+                normalized = normalized[:-1] + "+00:00"
+            dt = datetime.fromisoformat(normalized)
+            try:
+                dt = dt.astimezone(ZoneInfo(config.APP_TIMEZONE))
+            except Exception:
+                pass
+            return dt.strftime("%b %-d, %Y at %-I:%M %p %Z").strip()
+        except Exception:
+            return raw
+
+    def _format_display_notification(
+        self, notification: dict, channel: str | None = None
+    ) -> dict:
+        """Format a machine-display change notification for Slack.
+
+        Renders one block per affected machine with Previously / Currently lines,
+        matching the UX spec the team agreed on. DISPLAY_RENEWED uses a single
+        Renewed line instead (Previously and Currently are identical for renew).
+        """
+        notif_type = notification.get("type", "DISPLAY_SET")
+        metadata = notification.get("metadata") or {}
+        machines = metadata.get("machines") or []
+        occurred_at = metadata.get("occurred_at", "")
+        actor = metadata.get("actor_name") or "—"
+        dest_channel = channel or self._channel
+
+        header_map = {
+            "DISPLAY_SET": "Display Updated — Added",
+            "DISPLAY_REMOVED": "Display Updated — Removed",
+            "DISPLAY_SWAP": "Display Swapped",
+            "DISPLAY_RENEWED": "Display Renewed",
+        }
+        header = header_map.get(notif_type, "Display Updated")
+
+        color_map = {
+            "DISPLAY_SET": "#22C55E",
+            "DISPLAY_REMOVED": "#EF4444",
+            "DISPLAY_SWAP": "#3B82F6",
+            "DISPLAY_RENEWED": "#A855F7",
+        }
+        color = color_map.get(notif_type, "#6B7280")
+
+        machine_codes = " <-> ".join(m.get("code") or "—" for m in machines) or "—"
+
+        lines = [
+            f"*Date:* {self._format_occurred_at(occurred_at)}",
+            f"*Machine:* {machine_codes}",
+            f"*By:* {actor}",
+        ]
+
+        for m in machines:
+            code = m.get("code") or "—"
+            prev = ", ".join(m.get("previously") or []) or "_(empty)_"
+            curr = ", ".join(m.get("currently") or []) or "_(empty)_"
+            if notif_type == "DISPLAY_RENEWED":
+                lines.append(f"\n*{code}*\n*Renewed:* {curr}")
+            else:
+                lines.append(f"\n*{code}*\n*Previously:* {prev}\n*Currently:* {curr}")
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": header},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "\n".join(lines)},
+            },
+        ]
+
+        return {
+            "channel": dest_channel,
+            "text": f"{header} on {machine_codes}",
             "attachments": [{"color": color, "blocks": blocks}],
         }
 
