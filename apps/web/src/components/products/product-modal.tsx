@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import {
   ImageOff,
   MapPin,
+  Maximize2,
   Monitor,
   Package,
   ArrowUpDown,
@@ -31,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
 import { KujiPrizesDialog } from "./kuji-prizes-dialog";
+import { ProductImageLightbox } from "./product-image-lightbox";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
@@ -59,6 +61,8 @@ interface ProductModalProps {
   /** Called when Transfer button is clicked, with product info and inventory entries */
   onTransferClick?: (preselectedProduct: PreselectedProductInfo) => void;
   onEditClick?: () => void;
+  /** Hide the delete button (e.g. when opened from the location detail sheet) */
+  hideDelete?: boolean;
 }
 
 export function ProductModal({
@@ -68,6 +72,7 @@ export function ProductModal({
   onAdjustClick,
   onTransferClick,
   onEditClick,
+  hideDelete = false,
 }: ProductModalProps) {
   const { toast } = useToast();
   const { data: inventoryData, isLoading: locationsLoading } =
@@ -86,6 +91,7 @@ export function ProductModal({
   const deleteProduct = useDeleteProductMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [prizesDialogOpen, setPrizesDialogOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const hasInventory = locations && locations.length > 0;
 
@@ -142,15 +148,23 @@ export function ProductModal({
         <div className="flex gap-4 sm:gap-6 mt-2 min-w-0">
           <div className="shrink-0">
             {p.imageUrl ? (
-              <div className="relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-lg bg-muted">
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                aria-label={`Expand image of ${p.name}`}
+                className="group relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-lg bg-muted cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <Image
                   src={p.imageUrl}
                   alt={p.name}
                   fill
                   sizes="(max-width: 640px) 96px, 128px"
-                  className="object-cover"
+                  className="object-cover transition-opacity group-hover:opacity-90"
                 />
-              </div>
+                <span className="pointer-events-none absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-white opacity-90 group-hover:opacity-100">
+                  <Maximize2 className="h-4 w-4" />
+                </span>
+              </button>
             ) : (
               <div className="flex h-24 w-24 sm:h-32 sm:w-32 items-center justify-center rounded-lg bg-muted">
                 <ImageOff className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
@@ -230,50 +244,54 @@ export function ProductModal({
                   Prizes
                 </Button>
               )}
-              <Button
-                size="sm"
-                className="bg-black text-white hover:bg-black/90"
-                onClick={() => {
-                  onAdjustClick?.({
-                    product: p,
-                    inventoryEntries: locations ?? [],
-                  });
-                }}
-              >
-                <ArrowUpDown className="h-4 w-4 mr-1" />
-                Adjust
-              </Button>
-              <Button
-                size="sm"
-                className="bg-black text-white hover:bg-black/90"
-                onClick={() => {
-                  if (hasInventory) {
-                    onTransferClick?.({
-                      product: p,
-                      inventoryEntries: locations,
-                    });
-                  } else {
-                    toast({
-                      title: "No inventory to transfer",
-                      description: "This product has no quantities at any location to transfer.",
-                    });
-                  }
-                }}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Transfer
-              </Button>
-              {can(Permission.PRODUCTS_UPDATE) && (
+              {onAdjustClick && (
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
-                  onClick={() => onEditClick?.()}
+                  onClick={() => {
+                    onAdjustClick({
+                      product: p,
+                      inventoryEntries: locations ?? [],
+                    });
+                  }}
+                >
+                  <ArrowUpDown className="h-4 w-4 mr-1" />
+                  Adjust
+                </Button>
+              )}
+              {onTransferClick && (
+                <Button
+                  size="sm"
+                  className="bg-black text-white hover:bg-black/90"
+                  onClick={() => {
+                    if (hasInventory) {
+                      onTransferClick({
+                        product: p,
+                        inventoryEntries: locations,
+                      });
+                    } else {
+                      toast({
+                        title: "No inventory to transfer",
+                        description: "This product has no quantities at any location to transfer.",
+                      });
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Transfer
+                </Button>
+              )}
+              {onEditClick && can(Permission.PRODUCTS_UPDATE) && (
+                <Button
+                  size="sm"
+                  className="bg-black text-white hover:bg-black/90"
+                  onClick={() => onEditClick()}
                 >
                   <Pencil className="h-4 w-4 mr-1" />
                   Edit
                 </Button>
               )}
-              {can(Permission.PRODUCTS_DELETE) && (
+              {!hideDelete && can(Permission.PRODUCTS_DELETE) && (
                 <DeleteProductDialog
                   open={deleteDialogOpen}
                   onOpenChange={setDeleteDialogOpen}
@@ -292,50 +310,54 @@ export function ProductModal({
         </div>
 
         <div className="flex sm:hidden justify-center gap-1 mt-2">
-          <Button
-            size="sm"
-            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
-            onClick={() => {
-              onAdjustClick?.({
-                product: p,
-                inventoryEntries: locations ?? [],
-              });
-            }}
-          >
-            <ArrowUpDown className="h-3 w-3 mr-0.5" />
-            Adjust
-          </Button>
-          <Button
-            size="sm"
-            className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
-            onClick={() => {
-              if (hasInventory) {
-                onTransferClick?.({
-                  product: p,
-                  inventoryEntries: locations,
-                });
-              } else {
-                toast({
-                  title: "No inventory to transfer",
-                  description: "This product has no quantities at any location to transfer.",
-                });
-              }
-            }}
-          >
-            <RefreshCw className="h-3 w-3 mr-0.5" />
-            Transfer
-          </Button>
-          {can(Permission.PRODUCTS_UPDATE) && (
+          {onAdjustClick && (
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
-              onClick={() => onEditClick?.()}
+              onClick={() => {
+                onAdjustClick({
+                  product: p,
+                  inventoryEntries: locations ?? [],
+                });
+              }}
+            >
+              <ArrowUpDown className="h-3 w-3 mr-0.5" />
+              Adjust
+            </Button>
+          )}
+          {onTransferClick && (
+            <Button
+              size="sm"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              onClick={() => {
+                if (hasInventory) {
+                  onTransferClick({
+                    product: p,
+                    inventoryEntries: locations,
+                  });
+                } else {
+                  toast({
+                    title: "No inventory to transfer",
+                    description: "This product has no quantities at any location to transfer.",
+                  });
+                }
+              }}
+            >
+              <RefreshCw className="h-3 w-3 mr-0.5" />
+              Transfer
+            </Button>
+          )}
+          {onEditClick && can(Permission.PRODUCTS_UPDATE) && (
+            <Button
+              size="sm"
+              className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              onClick={() => onEditClick()}
             >
               <Pencil className="h-3 w-3 mr-0.5" />
               Edit
             </Button>
           )}
-          {can(Permission.PRODUCTS_DELETE) && (
+          {!hideDelete && can(Permission.PRODUCTS_DELETE) && (
             <DeleteProductDialog
               open={deleteDialogOpen}
               onOpenChange={setDeleteDialogOpen}
@@ -621,6 +643,13 @@ export function ProductModal({
         categoryId={p.category.id}
       />
     )}
+
+    <ProductImageLightbox
+      open={lightboxOpen}
+      onOpenChange={setLightboxOpen}
+      imageUrl={p.imageUrl}
+      alt={p.name}
+    />
     </>
   );
 }

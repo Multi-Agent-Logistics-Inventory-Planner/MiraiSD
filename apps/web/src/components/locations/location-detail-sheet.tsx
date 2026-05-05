@@ -73,6 +73,8 @@ import { RenewDisplayDialog } from "@/components/machine-displays/renew-display-
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
+import { useProductInventory } from "@/hooks/queries/use-product-inventory";
+import { ProductModal } from "@/components/products/product-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -125,9 +127,12 @@ export function LocationDetailSheet({
 
   const inventoryQuery = useLocationInventory(locationType, locationId);
   const deleteLocation = useDeleteLocationMutation(locationType);
+  const { data: productInventory } = useProductInventory();
 
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
 
   const currentLocationSelection: LocationSelection | null = useMemo(() => {
     if (!location || !locationId) return null;
@@ -138,6 +143,11 @@ export function LocationDetailSheet({
       locationCode,
     };
   }, [location, locationId, locationType]);
+
+  const selectedProduct = useMemo(() => {
+    if (!selectedProductId || !productInventory) return null;
+    return productInventory.find((pwi) => pwi.product.id === selectedProductId) ?? null;
+  }, [selectedProductId, productInventory]);
 
   // Machine display queries (only active for machine types)
   const { data: activeDisplaysForMachine = [] } = useActiveDisplaysForMachine(
@@ -442,7 +452,16 @@ export function LocationDetailSheet({
               ))
             ) : inventory.length ? (
               inventory.map((inv) => (
-                <div key={inv.id} className="flex items-center gap-2 sm:gap-4 py-3 sm:py-4 border-b last:border-b-0">
+                <button
+                  key={inv.id}
+                  type="button"
+                  disabled={!productInventory}
+                  onClick={() => {
+                    setSelectedProductId(inv.item.id);
+                    setProductModalOpen(true);
+                  }}
+                  className="w-full text-left flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-3 sm:py-4 border-b last:border-b-0 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md transition-colors disabled:opacity-60 disabled:cursor-wait"
+                >
                   <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                     {inv.item.imageUrl ? (
                       <Image
@@ -471,7 +490,7 @@ export function LocationDetailSheet({
                     <span className="text-sm font-semibold tabular-nums">{inv.quantity}</span>
                     <span className="text-[10px] sm:text-xs text-muted-foreground">in stock</span>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
@@ -827,6 +846,13 @@ export function LocationDetailSheet({
         open={transferOpen}
         onOpenChange={setTransferOpen}
         initialSourceLocation={currentLocationSelection}
+      />
+
+      <ProductModal
+        open={productModalOpen}
+        onOpenChange={setProductModalOpen}
+        product={selectedProduct}
+        hideDelete
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
