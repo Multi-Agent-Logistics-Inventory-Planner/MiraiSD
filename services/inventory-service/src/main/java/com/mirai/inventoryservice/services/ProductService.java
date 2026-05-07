@@ -8,6 +8,8 @@ import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.Supplier;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
+import com.mirai.inventoryservice.repositories.KujiBoxRepository;
+import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
@@ -47,6 +49,8 @@ public class ProductService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final SupplierRepository supplierRepository;
     private final ShipmentRepository shipmentRepository;
+    private final KujiBoxRepository kujiBoxRepository;
+    private final KujiBoxTierRepository kujiBoxTierRepository;
 
     public ProductService(
             ProductRepository productRepository,
@@ -59,7 +63,9 @@ public class ProductService {
             MachineDisplayRepository machineDisplayRepository,
             ForecastPredictionRepository forecastPredictionRepository,
             SupplierRepository supplierRepository,
-            ShipmentRepository shipmentRepository) {
+            ShipmentRepository shipmentRepository,
+            KujiBoxRepository kujiBoxRepository,
+            KujiBoxTierRepository kujiBoxTierRepository) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.stockMovementService = stockMovementService;
@@ -71,13 +77,17 @@ public class ProductService {
         this.forecastPredictionRepository = forecastPredictionRepository;
         this.supplierRepository = supplierRepository;
         this.shipmentRepository = shipmentRepository;
+        this.kujiBoxRepository = kujiBoxRepository;
+        this.kujiBoxTierRepository = kujiBoxTierRepository;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
                                  String letter, Integer templateQuantity, String name, String description, Integer reorderPoint,
                                  Integer targetStockLevel, Integer leadTimeDays,
                                  BigDecimal unitCost, BigDecimal msrp, String imageUrl, String notes,
-                                 Integer initialStock) {
+                                 Integer initialStock,
+                                 com.mirai.inventoryservice.models.enums.KujiType kujiType,
+                                 String kujiSlackWebhookUrl) {
         // Validate parent if provided
         Product parent = null;
         Category category;
@@ -102,6 +112,11 @@ public class ProductService {
             throw new DuplicateSkuException("Product with SKU already exists: " + sku);
         }
 
+        // kuji_type and kuji_slack_webhook_url are only valid on root products
+        if (parentId != null && (kujiType != null || (kujiSlackWebhookUrl != null && !kujiSlackWebhookUrl.isBlank()))) {
+            throw new IllegalArgumentException("kujiType and kujiSlackWebhookUrl can only be set on root products.");
+        }
+
         // If initial stock is provided, product starts active; otherwise inactive
         boolean startsActive = initialStock != null && initialStock > 0;
 
@@ -109,6 +124,8 @@ public class ProductService {
                 .sku(sku)
                 .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(50, letter.trim().length())) : null)
                 .templateQuantity(templateQuantity)
+                .kujiType(kujiType)
+                .kujiSlackWebhookUrl(kujiSlackWebhookUrl != null && !kujiSlackWebhookUrl.isBlank() ? kujiSlackWebhookUrl.trim() : null)
                 .category(category)
                 .parent(parent)
                 .name(name)
@@ -197,7 +214,9 @@ public class ProductService {
                                  BigDecimal unitCost, BigDecimal msrp, String imageUrl, String notes,
                                  Boolean clearParent, Integer quantity,
                                  UUID preferredSupplierId, Boolean preferredSupplierAuto,
-                                 Boolean clearPreferredSupplier) {
+                                 Boolean clearPreferredSupplier,
+                                 com.mirai.inventoryservice.models.enums.KujiType kujiType,
+                                 String kujiSlackWebhookUrl) {
         Product product = getProductById(id);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
@@ -231,6 +250,16 @@ public class ProductService {
             product.setLetter(trimmed.isEmpty() ? null : trimmed.substring(0, Math.min(50, trimmed.length())));
         }
         if (templateQuantity != null) product.setTemplateQuantity(templateQuantity);
+        if (kujiType != null || kujiSlackWebhookUrl != null) {
+            // kuji_type and kuji_slack_webhook_url only valid on root products
+            if (product.getParentId() != null) {
+                throw new IllegalArgumentException("kujiType and kujiSlackWebhookUrl can only be set on root products.");
+            }
+            if (kujiType != null) product.setKujiType(kujiType);
+            if (kujiSlackWebhookUrl != null) {
+                product.setKujiSlackWebhookUrl(kujiSlackWebhookUrl.isBlank() ? null : kujiSlackWebhookUrl.trim());
+            }
+        }
         if (categoryId != null) {
             Category newCategory = categoryService.getCategoryById(categoryId);
             product.setCategory(newCategory);
@@ -321,12 +350,28 @@ public class ProductService {
                 deletedProductIds.add(child.getId().toString());
             }
             log.info("[DELETE] Batch deleting dependencies for {} children", childIds.size());
-            // Batch delete all child dependencies in single queries instead of N queries
+            // Batch delete all child dependencies in single queries instead of N queries.
+            // Children can also be linked_product references on kuji_box_tiers — that FK is
+            // ON DELETE SET NULL, so no service-level action is required for it.
             forecastPredictionRepository.deleteAllByItemIdIn(childIds);
             machineDisplayRepository.deleteAllByProductIdIn(childIds);
             inventoryAggregateService.deleteAllInventoryForProducts(childIds);
             stockMovementRepository.deleteAllByItemIdIn(childIds);
             productRepository.deleteAll(children);
+        }
+
+        // Delete kuji boxes that reference this product as the parent kuji.
+        // Hibernate generated its own FK on kuji_box_tiers.box_id without ON DELETE CASCADE,
+        // so a bulk JPQL DELETE on KujiBox would hit a constraint violation. Delete tiers
+        // first, then boxes. (linked_product_id on tiers is ON DELETE SET NULL, handled
+        // by the FK directly when child products are deleted.)
+        log.info("[DELETE] Deleting kuji box tiers for product id={}", id);
+        int deletedTiers = kujiBoxTierRepository.deleteByBoxProductId(id);
+        log.info("[DELETE] Deleting kuji boxes for product id={}", id);
+        int deletedBoxes = kujiBoxRepository.deleteByProductId(id);
+        if (deletedBoxes > 0 || deletedTiers > 0) {
+            log.info("[DELETE] Removed {} kuji box(es) and {} tier(s) referencing product {}",
+                    deletedBoxes, deletedTiers, id);
         }
 
         // Delete forecast predictions, machine displays, then parent's (or single product's) inventory and stock movements before deleting the product

@@ -33,7 +33,8 @@ public class ProductController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly,
             @RequestParam(required = false, defaultValue = "false") Boolean rootOnly,
-            @RequestParam(required = false, defaultValue = "false") Boolean kujiOnly) {
+            @RequestParam(required = false, defaultValue = "false") Boolean kujiOnly,
+            @RequestParam(required = false, defaultValue = "false") Boolean excludeCustomKuji) {
         List<Product> products;
 
         if (search != null && !search.isBlank()) {
@@ -52,6 +53,12 @@ public class ProductController {
             products = productService.getActiveProducts();
         } else {
             products = productService.getAllProducts();
+        }
+
+        if (Boolean.TRUE.equals(excludeCustomKuji)) {
+            products = products.stream()
+                    .filter(p -> p.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM)
+                    .toList();
         }
 
         // Batch fetch parent IDs to avoid N+1 when computing hasChildren
@@ -103,7 +110,9 @@ public class ProductController {
                 requestDTO.getMsrp(),
                 requestDTO.getImageUrl(),
                 requestDTO.getNotes(),
-                requestDTO.getInitialStock()
+                requestDTO.getInitialStock(),
+                requestDTO.getKujiType(),
+                requestDTO.getKujiSlackWebhookUrl()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(productMapper.toResponseDTO(product));
     }
@@ -135,7 +144,9 @@ public class ProductController {
                 requestDTO.getQuantity(),
                 requestDTO.getPreferredSupplierId(),
                 requestDTO.getPreferredSupplierAuto(),
-                clearPreferredSupplier
+                clearPreferredSupplier,
+                requestDTO.getKujiType(),
+                requestDTO.getKujiSlackWebhookUrl()
         );
         return ResponseEntity.ok(productMapper.toResponseDTO(product));
     }

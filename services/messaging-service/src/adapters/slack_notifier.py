@@ -26,6 +26,12 @@ DISPLAY_NOTIFICATION_TYPES = {
     "DISPLAY_RENEWED",
 }
 
+# Notification types emitted by the kuji draw flow
+KUJI_NOTIFICATION_TYPES = {
+    "KUJI_PRIZE_DRAWN",
+    "KUJI_PRIZE_DRAW_UNDONE",
+}
+
 
 @dataclass
 class AlertMessage:
@@ -47,11 +53,13 @@ class SlackNotifier:
         channel: str | None = None,
         review_webhook_url: str | None = None,
         swap_webhook_url: str | None = None,
+        kuji_webhook_url: str | None = None,
     ):
         self._webhook_url = webhook_url or config.SLACK_WEBHOOK_URL
         self._channel = channel or config.SLACK_CHANNEL
         self._review_webhook_url = review_webhook_url or config.REVIEW_SLACK_WEBHOOK_URL
         self._swap_webhook_url = swap_webhook_url or config.SWAP_SLACK_WEBHOOK_URL
+        self._kuji_webhook_url = kuji_webhook_url or config.KUJI_SLACK_WEBHOOK_URL
         self._enabled = config.SLACK_ENABLED
 
         # Validate webhook URLs if provided and not empty
@@ -61,6 +69,8 @@ class SlackNotifier:
             self._validate_webhook_url(self._review_webhook_url)
         if self._swap_webhook_url:
             self._validate_webhook_url(self._swap_webhook_url)
+        if self._kuji_webhook_url:
+            self._validate_webhook_url(self._kuji_webhook_url)
 
     def _validate_webhook_url(self, url: str) -> None:
         """Validate that webhook URL is a legitimate Slack webhook.
@@ -134,11 +144,21 @@ class SlackNotifier:
             return False
 
         notif_type = notification.get("type", "")
+        metadata = notification.get("metadata") or {}
 
         # Route display change notifications to the machine-swap channel
         if notif_type in DISPLAY_NOTIFICATION_TYPES:
             webhook = self._swap_webhook_url or self._webhook_url
             channel = config.SWAP_SLACK_CHANNEL
+        # Route kuji draw notifications to the kuji channel (with per-kuji override)
+        elif notif_type in KUJI_NOTIFICATION_TYPES:
+            per_kuji_webhook = metadata.get("kuji_slack_webhook_url") or None
+            webhook = (
+                per_kuji_webhook
+                or self._kuji_webhook_url
+                or self._webhook_url
+            )
+            channel = self._channel
         # Route review notifications to review channel
         elif notif_type in REVIEW_NOTIFICATION_TYPES:
             webhook = self._review_webhook_url or self._webhook_url
@@ -153,6 +173,10 @@ class SlackNotifier:
 
         if notif_type in DISPLAY_NOTIFICATION_TYPES:
             message = self._format_display_notification(notification, channel=channel)
+        elif notif_type == "KUJI_PRIZE_DRAWN":
+            message = self._format_kuji_draw_notification(notification, channel=channel)
+        elif notif_type == "KUJI_PRIZE_DRAW_UNDONE":
+            message = self._format_kuji_undo_notification(notification, channel=channel)
         else:
             message = self._format_notification(notification, channel=channel)
 
@@ -344,6 +368,142 @@ class SlackNotifier:
         return {
             "channel": dest_channel,
             "text": f"{header} on {machine_codes}",
+            "attachments": [{"color": color, "blocks": blocks}],
+        }
+
+    def _format_kuji_tier_lines(self, tiers: list, verb: str) -> list[str]:
+        """Format kuji tier rows as bullet lines.
+
+        Args:
+            tiers: List of tier dicts from the notification metadata.
+            verb: Either "left" (for draws) or "left" (for undos); both use "left"
+                since count_after is always the post-event remaining count.
+
+        Returns:
+            List of mrkdwn bullet strings (one per tier).
+        """
+        lines: list[str] = []
+        for tier in tiers or []:
+            qty = tier.get("quantity") or 0
+            label = tier.get("label") or "—"
+            letter = tier.get("letter")
+            linked = tier.get("linked_product_name") or "—"
+            price = tier.get("price")
+            count_after = tier.get("count_after")
+
+            if letter:
+                head = f"{qty}x {letter} — {label}"
+            else:
+                head = f"{qty}x {label}"
+
+            line = f" • {head} → {linked} ({count_after} {verb})"
+            if price is not None:
+                try:
+                    line += f" @ ${float(price):.2f}"
+                except (TypeError, ValueError):
+                    line += f" @ ${price}"
+            lines.append(line)
+        return lines
+
+    def _format_kuji_draw_notification(
+        self, notification: dict, channel: str | None = None
+    ) -> dict:
+        """Format a KUJI_PRIZE_DRAWN notification for Slack."""
+        metadata = notification.get("metadata") or {}
+        kuji_name = metadata.get("kuji_product_name") or "—"
+        box_label = metadata.get("box_label")
+        location_name = metadata.get("location_name") or "—"
+        actor = metadata.get("actor_name") or "—"
+        occurred_at = metadata.get("occurred_at", "")
+        notes = metadata.get("notes")
+        tiers = metadata.get("tiers") or []
+        total_after = metadata.get("total_count_after")
+        dest_channel = channel or self._channel
+
+        header = "Kuji Prize Drawn"
+        color = "#22C55E"  # Green
+
+        kuji_line = f"*Kuji:* {kuji_name}"
+        if box_label:
+            kuji_line += f" — Box {box_label}"
+
+        lines = [
+            kuji_line,
+            f"*Location:* {location_name}",
+            "*Prizes drawn:*",
+        ]
+        lines.extend(self._format_kuji_tier_lines(tiers, verb="left"))
+        lines.append(f"*Total slips remaining in box:* {total_after}")
+        lines.append(f"*Drawn by:* {actor}")
+        lines.append(f"*At:* {self._format_occurred_at(occurred_at)}")
+        if notes:
+            lines.append(f"*Note:* {notes}")
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": header},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "\n".join(lines)},
+            },
+        ]
+
+        return {
+            "channel": dest_channel,
+            "text": f"{header}: {kuji_name}",
+            "attachments": [{"color": color, "blocks": blocks}],
+        }
+
+    def _format_kuji_undo_notification(
+        self, notification: dict, channel: str | None = None
+    ) -> dict:
+        """Format a KUJI_PRIZE_DRAW_UNDONE notification for Slack."""
+        metadata = notification.get("metadata") or {}
+        kuji_name = metadata.get("kuji_product_name") or "—"
+        box_label = metadata.get("box_label")
+        location_name = metadata.get("location_name") or "—"
+        actor = metadata.get("actor_name") or "—"
+        occurred_at = metadata.get("occurred_at", "")
+        notes = metadata.get("notes")
+        tiers = metadata.get("tiers") or []
+        total_after = metadata.get("total_count_after")
+        dest_channel = channel or self._channel
+
+        header = "Kuji Draw Undone"
+        color = "#F59E0B"  # Amber
+
+        kuji_line = f"*Kuji:* {kuji_name}"
+        if box_label:
+            kuji_line += f" — Box {box_label}"
+
+        lines = [
+            kuji_line,
+            f"*Location:* {location_name}",
+            "*Restored prizes:*",
+        ]
+        lines.extend(self._format_kuji_tier_lines(tiers, verb="left"))
+        lines.append(f"*Total slips remaining:* {total_after}")
+        lines.append(f"*Undone by:* {actor}")
+        lines.append(f"*At:* {self._format_occurred_at(occurred_at)}")
+        if notes:
+            lines.append(f"*Note:* {notes}")
+
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": header},
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "\n".join(lines)},
+            },
+        ]
+
+        return {
+            "channel": dest_channel,
+            "text": f"{header}: {kuji_name}",
             "attachments": [{"color": color, "blocks": blocks}],
         }
 

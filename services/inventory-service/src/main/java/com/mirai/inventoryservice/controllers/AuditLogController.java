@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,6 +35,7 @@ public class AuditLogController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) UUID actorId,
             @RequestParam(required = false) StockMovementReason reason,
+            @RequestParam(required = false) List<StockMovementReason> reasons,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam(required = false) UUID productId,
@@ -43,6 +45,7 @@ public class AuditLogController {
                 .search(search)
                 .actorId(actorId)
                 .reason(reason)
+                .reasons(reasons)
                 .fromDate(fromDate)
                 .toDate(toDate)
                 .productId(productId)

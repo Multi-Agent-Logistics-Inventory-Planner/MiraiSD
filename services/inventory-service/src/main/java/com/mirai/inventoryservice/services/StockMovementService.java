@@ -47,6 +47,7 @@ public class StockMovementService {
     private final LocationRepository locationRepository;
     private final StorageLocationRepository storageLocationRepository;
     private final SiteRepository siteRepository;
+    private final KujiBoxTierRepository kujiBoxTierRepository;
     private final EntityManager entityManager;
     private final SupabaseBroadcastService broadcastService;
     private final EventOutboxService eventOutboxService;
@@ -63,6 +64,7 @@ public class StockMovementService {
             LocationRepository locationRepository,
             StorageLocationRepository storageLocationRepository,
             SiteRepository siteRepository,
+            KujiBoxTierRepository kujiBoxTierRepository,
             EntityManager entityManager,
             SupabaseBroadcastService broadcastService,
             @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
@@ -74,9 +76,40 @@ public class StockMovementService {
         this.locationRepository = locationRepository;
         this.storageLocationRepository = storageLocationRepository;
         this.siteRepository = siteRepository;
+        this.kujiBoxTierRepository = kujiBoxTierRepository;
         this.entityManager = entityManager;
         this.broadcastService = broadcastService;
         this.eventOutboxService = eventOutboxService;
+    }
+
+    /**
+     * Validates that a planned post-mutation quantity at (locationId, productId) is at least
+     * the amount allocated to OPEN kuji boxes at that location. Throws KujiAllocationViolationException
+     * with a human-readable message when violated. Safe to call for non-kuji products (returns 0).
+     */
+    public void validateKujiAllocation(UUID locationId, UUID productId, int newQuantity) {
+        if (locationId == null || productId == null) {
+            return;
+        }
+        int locked = kujiBoxTierRepository.sumAllocatedAtLocation(locationId, productId);
+        if (newQuantity < locked) {
+            throw new KujiAllocationViolationException(
+                    "Cannot reduce inventory below the amount allocated to an open kuji box at this location. "
+                            + locked + " unit(s) are locked; the change would leave " + newQuantity + ".");
+        }
+    }
+
+    /**
+     * Refuses inventory operations against CUSTOM kuji parent products. Their runtime is
+     * the open KujiBox; they don't track LocationInventory directly.
+     */
+    public void rejectIfCustomKujiParent(Product product) {
+        if (product != null
+                && product.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+            throw new InvalidInventoryOperationException(
+                    "Custom kuji parent products do not track location inventory. "
+                            + "Open a kuji box to manage prize stock instead.");
+        }
     }
 
     /**
@@ -88,6 +121,8 @@ public class StockMovementService {
         LocationInventory inventory = locationInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
 
+        rejectIfCustomKujiParent(inventory.getProduct());
+
         int currentQuantity = inventory.getQuantity();
         int newQuantity = currentQuantity + request.getQuantityChange();
 
@@ -97,6 +132,11 @@ public class StockMovementService {
                             Math.abs(request.getQuantityChange()), currentQuantity)
             );
         }
+
+        validateKujiAllocation(
+                inventory.getLocation().getId(),
+                inventory.getProduct().getId(),
+                newQuantity);
 
         if (newQuantity == 0) {
             locationInventoryRepository.delete(inventory);
@@ -255,6 +295,11 @@ public class StockMovementService {
             );
         }
 
+        validateKujiAllocation(
+                sourceInventory.getLocation().getId(),
+                sourceInventory.getProduct().getId(),
+                sourceQuantity - request.getQuantity());
+
         LocationInventory destinationInventory;
         int destinationQuantity;
         UUID destinationInventoryId = request.getDestinationInventoryId();
@@ -398,6 +443,8 @@ public class StockMovementService {
             throw new IllegalArgumentException("Quantity must be positive");
         }
 
+        rejectIfCustomKujiParent(product);
+
         Location location;
         if (locationId != null) {
             location = locationRepository.findById(locationId)
@@ -491,6 +538,8 @@ public class StockMovementService {
         String locationCode = location.getLocationCode();
         String storageLocationCode = location.getStorageLocation().getCode();
         LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
+
+        validateKujiAllocation(locationId, product.getId(), 0);
 
         locationInventoryRepository.delete(inventory);
 

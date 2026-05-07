@@ -95,6 +95,15 @@ public class AuditLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "reversed_at")
+    private OffsetDateTime reversedAt;
+
+    @Column(name = "reversed_by_log_id")
+    private UUID reversedByLogId;
+
+    @Column(name = "kuji_box_product_id")
+    private UUID kujiBoxProductId;
+
     @OneToMany(mappedBy = "auditLog", fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default

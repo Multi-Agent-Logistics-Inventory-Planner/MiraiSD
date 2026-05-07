@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.requests;
 
+import com.mirai.inventoryservice.models.enums.KujiType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,6 +34,17 @@ public class ProductRequestDTO {
     /** Quantity per kuji set for prize products. Must be >= 0 when provided. */
     @Min(value = 0, message = "Template quantity must be 0 or greater")
     private Integer templateQuantity;
+
+    /** Mark a kuji parent as PREMADE or CUSTOM. Only valid when parentId is null. */
+    private KujiType kujiType;
+
+    /** Optional per-kuji Slack webhook URL for draw notifications. Only valid when parentId is null. */
+    @Pattern(
+        regexp = "^(https://hooks\\.slack\\.com/services/[A-Za-z0-9/_-]+)?$",
+        message = "kujiSlackWebhookUrl must be a Slack webhook URL"
+    )
+    @Size(max = 500)
+    private String kujiSlackWebhookUrl;
 
     @NotBlank(message = "Name is required")
     private String name;

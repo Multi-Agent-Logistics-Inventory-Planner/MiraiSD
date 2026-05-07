@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.models.enums.KujiType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,8 @@ public class ProductResponseDTO {
     private String parentName;
     private String letter;
     private Integer templateQuantity;
+    private KujiType kujiType;
+    private String kujiSlackWebhookUrl;
     private String parentSku;
     private List<ProductSummaryDTO> children;
     private Integer totalChildStock;

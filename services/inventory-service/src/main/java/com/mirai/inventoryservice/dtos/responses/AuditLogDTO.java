@@ -40,4 +40,7 @@ public class AuditLogDTO {
     private String previousStatus;
     private String newStatus;
     private String overrideReason;
+
+    // True when this audit log has been reversed (e.g. an undone kuji draw).
+    private boolean reversed;
 }

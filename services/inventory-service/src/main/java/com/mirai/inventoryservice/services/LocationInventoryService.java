@@ -71,6 +71,8 @@ public class LocationInventoryService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found: " + productId));
 
+        stockMovementService.rejectIfCustomKujiParent(product);
+
         // Check if inventory already exists at this location for this product
         Optional<LocationInventory> existing = locationInventoryRepository
                 .findByLocation_IdAndProduct_Id(locationId, productId);
@@ -149,6 +151,10 @@ public class LocationInventoryService {
      */
     public LocationInventory updateInventoryQuantity(UUID inventoryId, Integer quantity) {
         LocationInventory inventory = getInventoryById(inventoryId);
+        stockMovementService.validateKujiAllocation(
+                inventory.getLocation().getId(),
+                inventory.getProduct().getId(),
+                quantity != null ? quantity : 0);
         inventory.setQuantity(quantity);
         return locationInventoryRepository.save(inventory);
     }

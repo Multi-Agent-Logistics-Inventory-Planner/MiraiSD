@@ -39,6 +39,7 @@ class TestSlackWebhookValidation:
             mock_config.SLACK_CHANNEL = "#test"
             mock_config.REVIEW_SLACK_WEBHOOK_URL = ""
             mock_config.SWAP_SLACK_WEBHOOK_URL = ""
+            mock_config.KUJI_SLACK_WEBHOOK_URL = ""
             mock_config.SLACK_ENABLED = False
             notifier = SlackNotifier(webhook_url=None)
             assert notifier._webhook_url == ""
@@ -50,6 +51,7 @@ class TestSlackWebhookValidation:
             mock_config.SLACK_CHANNEL = "#test"
             mock_config.REVIEW_SLACK_WEBHOOK_URL = ""
             mock_config.SWAP_SLACK_WEBHOOK_URL = ""
+            mock_config.KUJI_SLACK_WEBHOOK_URL = ""
             mock_config.SLACK_ENABLED = False
             notifier = SlackNotifier(webhook_url="")
             assert notifier._webhook_url == ""
@@ -87,9 +89,11 @@ class TestSlackWebhookValidation:
 
 SWAP_URL = "https://hooks.slack.com" + "/services/SWAP00000/SWAP11111/AbCdEfGhIjKlMnOpQrStUvWx"
 MAIN_URL = "https://hooks.slack.com" + "/services/MAIN00000/MAIN11111/AbCdEfGhIjKlMnOpQrStUvWx"
+KUJI_URL = "https://hooks.slack.com" + "/services/KUJI00000/KUJI11111/AbCdEfGhIjKlMnOpQrStUvWx"
+PER_KUJI_URL = "https://hooks.slack.com" + "/services/PERKUJI00/PERKUJI11/AbCdEfGhIjKlMnOpQrStUvWx"
 
 
-def _build_notifier(monkeypatch):
+def _build_notifier(monkeypatch, kuji_webhook_url: str = ""):
     """Construct a SlackNotifier with predictable webhooks and channels."""
     from src.adapters import slack_notifier as mod
 
@@ -99,6 +103,7 @@ def _build_notifier(monkeypatch):
     monkeypatch.setattr(mod.config, "REVIEW_SLACK_CHANNEL", "#piggly-review")
     monkeypatch.setattr(mod.config, "SWAP_SLACK_WEBHOOK_URL", SWAP_URL)
     monkeypatch.setattr(mod.config, "SWAP_SLACK_CHANNEL", "#machine-swap")
+    monkeypatch.setattr(mod.config, "KUJI_SLACK_WEBHOOK_URL", kuji_webhook_url)
     monkeypatch.setattr(mod.config, "SLACK_ENABLED", True)
     return mod.SlackNotifier()
 
@@ -224,3 +229,210 @@ class TestDisplayNotificationFormatting:
         text = payload["attachments"][0]["blocks"][1]["text"]["text"]
         assert "*Machine:* R2\n" in text or "*Machine:* R2" == text.split("\n")[1]
         assert "<->" not in text.split("\n")[1]
+
+
+# ---------------------------------------------------------------------------
+# Kuji draw notifications
+# ---------------------------------------------------------------------------
+
+
+class TestKujiNotificationFormatting:
+    """The kuji formatters render draw / undo notifications correctly."""
+
+    def test_format_kuji_draw_notification_multi_tier(self, monkeypatch):
+        notifier = _build_notifier(monkeypatch)
+        payload = notifier._format_kuji_draw_notification({
+            "type": "KUJI_PRIZE_DRAWN",
+            "metadata": {
+                "kuji_product_id": "kp-1",
+                "kuji_product_name": "Sonny Angel Kuji V1",
+                "box_id": "box-1",
+                "box_label": "Box A",
+                "location_name": "G1 / Gachapons",
+                "location_id": "loc-1",
+                "actor_name": "Amy Lam",
+                "occurred_at": "2026-05-04T18:44:00Z",
+                "tiers": [
+                    {
+                        "tier_id": "t-A",
+                        "label": "A Prize",
+                        "letter": "A",
+                        "linked_product_name": "Big Plush",
+                        "price": None,
+                        "quantity": 1,
+                        "count_after": 2,
+                    },
+                    {
+                        "tier_id": "t-B",
+                        "label": "B Prize",
+                        "letter": "B",
+                        "linked_product_name": "Mini Figure",
+                        "price": None,
+                        "quantity": 2,
+                        "count_after": 5,
+                    },
+                ],
+                "total_count_after": 7,
+            },
+        })
+
+        text = payload["attachments"][0]["blocks"][1]["text"]["text"]
+        assert "*Kuji:* Sonny Angel Kuji V1 — Box Box A" in text
+        assert "*Location:* G1 / Gachapons" in text
+        assert "*Prizes drawn:*" in text
+        assert "1x A — A Prize → Big Plush (2 left)" in text
+        assert "2x B — B Prize → Mini Figure (5 left)" in text
+        assert "*Total slips remaining in box:* 7" in text
+        assert "*Drawn by:* Amy Lam" in text
+        assert payload["attachments"][0]["color"] == "#22C55E"
+        assert payload["attachments"][0]["blocks"][0]["text"]["text"] == "Kuji Prize Drawn"
+
+    def test_format_kuji_draw_notification_unlinked_no_letter(self, monkeypatch):
+        notifier = _build_notifier(monkeypatch)
+        payload = notifier._format_kuji_draw_notification({
+            "type": "KUJI_PRIZE_DRAWN",
+            "metadata": {
+                "kuji_product_name": "Mystery Kuji",
+                "box_label": None,
+                "location_name": "G1 / Gachapons",
+                "actor_name": "Amy Lam",
+                "occurred_at": "2026-05-04T18:44:00Z",
+                "tiers": [
+                    {
+                        "label": "Last Prize",
+                        "letter": None,
+                        "linked_product_name": None,
+                        "price": None,
+                        "quantity": 1,
+                        "count_after": 0,
+                    },
+                ],
+                "total_count_after": 0,
+            },
+        })
+
+        text = payload["attachments"][0]["blocks"][1]["text"]["text"]
+        # No box label means no " — Box ..." suffix
+        assert "*Kuji:* Mystery Kuji\n" in text or text.startswith("*Kuji:* Mystery Kuji\n")
+        assert "Box " not in text.split("\n")[0]
+        # No letter -> no "L — " prefix; no linked product -> em-dash
+        assert "1x Last Prize → — (0 left)" in text
+        assert "*Total slips remaining in box:* 0" in text
+
+    def test_format_kuji_draw_notification_with_price_and_notes(self, monkeypatch):
+        notifier = _build_notifier(monkeypatch)
+        payload = notifier._format_kuji_draw_notification({
+            "type": "KUJI_PRIZE_DRAWN",
+            "metadata": {
+                "kuji_product_name": "Premium Kuji",
+                "box_label": "Box 1",
+                "location_name": "G1 / Gachapons",
+                "actor_name": "Amy Lam",
+                "occurred_at": "2026-05-04T18:44:00Z",
+                "notes": "Customer drew during event",
+                "tiers": [
+                    {
+                        "label": "Standard",
+                        "letter": "C",
+                        "linked_product_name": "Sticker Pack",
+                        "price": 5,
+                        "quantity": 1,
+                        "count_after": 9,
+                    },
+                ],
+                "total_count_after": 9,
+            },
+        })
+
+        text = payload["attachments"][0]["blocks"][1]["text"]["text"]
+        assert "@ $5.00" in text
+        assert "*Note:* Customer drew during event" in text
+
+    def test_format_kuji_undo_notification(self, monkeypatch):
+        notifier = _build_notifier(monkeypatch)
+        payload = notifier._format_kuji_undo_notification({
+            "type": "KUJI_PRIZE_DRAW_UNDONE",
+            "metadata": {
+                "kuji_product_name": "Sonny Angel Kuji V1",
+                "box_label": "Box A",
+                "location_name": "G1 / Gachapons",
+                "actor_name": "Amy Lam",
+                "occurred_at": "2026-05-04T18:44:00Z",
+                "tiers": [
+                    {
+                        "label": "A Prize",
+                        "letter": "A",
+                        "linked_product_name": "Big Plush",
+                        "price": None,
+                        "quantity": 1,
+                        "count_after": 3,
+                    },
+                ],
+                "total_count_after": 8,
+            },
+        })
+
+        text = payload["attachments"][0]["blocks"][1]["text"]["text"]
+        assert payload["attachments"][0]["blocks"][0]["text"]["text"] == "Kuji Draw Undone"
+        assert payload["attachments"][0]["color"] == "#F59E0B"
+        assert "*Restored prizes:*" in text
+        assert "1x A — A Prize → Big Plush (3 left)" in text
+        assert "*Total slips remaining:* 8" in text
+        assert "*Undone by:* Amy Lam" in text
+
+
+class TestKujiNotificationRouting:
+    """Kuji notifications must use the per-kuji webhook with config / default fallback."""
+
+    def _kuji_payload(self, per_kuji_webhook: str | None = None) -> dict:
+        return {
+            "type": "KUJI_PRIZE_DRAWN",
+            "severity": "INFO",
+            "message": "draw",
+            "metadata": {
+                "kuji_product_name": "Sonny Angel Kuji V1",
+                "kuji_slack_webhook_url": per_kuji_webhook,
+                "box_label": "Box A",
+                "location_name": "G1 / Gachapons",
+                "actor_name": "Amy Lam",
+                "occurred_at": "2026-05-04T18:44:00Z",
+                "tiers": [
+                    {
+                        "label": "A Prize",
+                        "letter": "A",
+                        "linked_product_name": "Big Plush",
+                        "price": None,
+                        "quantity": 1,
+                        "count_after": 2,
+                    },
+                ],
+                "total_count_after": 2,
+            },
+        }
+
+    def test_kuji_routing_uses_per_kuji_webhook(self, monkeypatch):
+        notifier = _build_notifier(monkeypatch, kuji_webhook_url=KUJI_URL)
+
+        with patch("src.adapters.slack_notifier.requests.post") as mock_post:
+            mock_post.return_value.raise_for_status = lambda: None
+            ok = notifier.send_notification(
+                self._kuji_payload(per_kuji_webhook=PER_KUJI_URL)
+            )
+
+        assert ok is True
+        assert mock_post.call_args.args[0] == PER_KUJI_URL
+
+    def test_kuji_routing_falls_back_to_env_then_default(self, monkeypatch):
+        # 1) No per-kuji override but KUJI_SLACK_WEBHOOK_URL set -> kuji env webhook
+        notifier = _build_notifier(monkeypatch, kuji_webhook_url=KUJI_URL)
+        with patch("src.adapters.slack_notifier.requests.post") as mock_post:
+            mock_post.return_value.raise_for_status = lambda: None
+            notifier.send_notification(self._kuji_payload(per_kuji_webhook=None))
+        assert mock_post.call_args.args[0] == KUJI_URL
+
+        # 2) No per-kuji override AND no KUJI_SLACK_WEBHOOK_URL -> falls back to default
+        notifier2 = _build_notifier(monkeypatch, kuji_webhook_url="")
+        with patch("src.adapters.slack_notifier.requests.post") as mock_post:
+            mock_post.return_value.raise_for_status = lambda: None
+            notifier2.send_notification(self._kuji_payload(per_kuji_webhook=None))
+        assert mock_post.call_args.args[0] == MAIN_URL
