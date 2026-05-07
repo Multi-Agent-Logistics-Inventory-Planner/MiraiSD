@@ -131,6 +131,11 @@ export async function getAuditLogs(
   if (filters.reason) {
     params.append("reason", filters.reason);
   }
+  if (filters.reasons && filters.reasons.length > 0) {
+    for (const r of filters.reasons) {
+      params.append("reasons", r);
+    }
+  }
   if (filters.fromDate) {
     params.append("fromDate", filters.fromDate);
   }

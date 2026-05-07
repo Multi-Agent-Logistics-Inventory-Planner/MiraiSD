@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getProductById } from "@/lib/api/products";
+import { getProductById, type GetProductsOptions } from "@/lib/api/products";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Product } from "@/types/api";
+import { KujiType, type Product } from "@/types/api";
 
 /**
  * Event types that can be broadcast from the backend
@@ -146,27 +146,51 @@ export function useRealtimeBroadcast(enabled = true) {
                 queryClient.invalidateQueries({
                   queryKey: ["products", itemId, "children"],
                 });
-                // Fetch single product and update all list caches (avoid full refetch)
+                // Fetch single product and update all list caches (avoid full refetch).
+                // Each list query carries its own filter options in queryKey[1] (e.g.
+                // {rootOnly:true}). Inserting a fresh product into every list ignores
+                // those filters — e.g. a kuji prize child would briefly appear on the
+                // root-only Products page until the next refetch removed it. So iterate
+                // the cache and respect each query's filter when deciding INSERT/keep.
                 getProductById(itemId)
                   .then((updatedProduct: Product) => {
-                    // Update all products list queries that contain this product
-                    queryClient.setQueriesData<Product[]>(
-                      { queryKey: ["products"] },
-                      (oldData) => {
-                        if (!oldData || !Array.isArray(oldData)) return oldData;
-                        const index = oldData.findIndex((p) => p.id === itemId);
-                        if (index === -1) {
-                          // Product not in list - INSERT event, add it
-                          return [...oldData, updatedProduct];
+                    const matchesFilter = (opts: GetProductsOptions): boolean => {
+                      if (opts.rootOnly && updatedProduct.parentId != null) return false;
+                      if (opts.excludeCustomKuji && updatedProduct.kujiType === KujiType.CUSTOM) return false;
+                      // kujiOnly requires hasChildren which we cannot infer reliably
+                      // for a freshly inserted product; let invalidation handle it.
+                      if (opts.kujiOnly) return false;
+                      return true;
+                    };
+                    const queries = queryClient
+                      .getQueryCache()
+                      .findAll({ queryKey: ["products"] });
+                    for (const q of queries) {
+                      // Target only ["products", opts] list caches — skip single-product
+                      // caches (["products", id]) and child summaries (["products", id, "children"]).
+                      if (q.queryKey.length !== 2) continue;
+                      const second = q.queryKey[1];
+                      if (second === null || typeof second !== "object") continue;
+                      const list = q.state.data;
+                      if (!Array.isArray(list)) continue;
+                      const opts = second as GetProductsOptions;
+                      const products = list as Product[];
+                      const index = products.findIndex((p) => p.id === itemId);
+                      if (index === -1) {
+                        if (matchesFilter(opts)) {
+                          queryClient.setQueryData<Product[]>(q.queryKey, [
+                            ...products,
+                            updatedProduct,
+                          ]);
                         }
-                        // Existing product - UPDATE in place
-                        return [
-                          ...oldData.slice(0, index),
+                      } else {
+                        queryClient.setQueryData<Product[]>(q.queryKey, [
+                          ...products.slice(0, index),
                           updatedProduct,
-                          ...oldData.slice(index + 1),
-                        ];
+                          ...products.slice(index + 1),
+                        ]);
                       }
-                    );
+                    }
                   })
                   .catch(() => {
                     // Fallback for DELETE (404) or network error

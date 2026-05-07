@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
+import { Permission } from "@/lib/rbac/permissions";
 import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
 import {
   useCategories,
@@ -35,6 +36,7 @@ import {
 } from "@/hooks/queries/use-categories";
 import {
   useCreateProductMutation,
+  useDeleteProductMutation,
   useUpdateProductMutation,
 } from "@/hooks/mutations/use-product-mutations";
 import { createInventory } from "@/lib/api/inventory";
@@ -42,11 +44,15 @@ import { LocationSelector } from "@/components/stock/location-selector";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
+import { DeleteProductDialog } from "./delete-product-dialog";
 import { PrizeTableInline, type PendingPrize } from "./prize-table-inline";
 import { SupplierAutocomplete } from "@/components/suppliers";
 import type { Product, ProductRequest, Category } from "@/types/api";
-import { LocationType } from "@/types/api";
+import { KujiType, LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
+import { buildKujiCategoryIds } from "./product-sort-utils";
+
+const SLACK_WEBHOOK_REGEX = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+$/;
 
 const NOT_ASSIGNED_LOCATION: LocationSelection = {
   locationType: LocationType.NOT_ASSIGNED,
@@ -71,6 +77,15 @@ const schema = z.object({
   preferredSupplierId: z.string().optional(),
   preferredSupplierName: z.string().optional(),
   preferredSupplierAuto: z.boolean().optional(),
+  // Kuji classification fields. "" = no value (treated as null).
+  kujiType: z.enum(["", KujiType.PREMADE, KujiType.CUSTOM]).optional(),
+  kujiSlackWebhookUrl: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || SLACK_WEBHOOK_REGEX.test(v),
+      "Must be a valid Slack webhook URL",
+    ),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -97,11 +112,13 @@ export function ProductForm({
 }: ProductFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { canViewCosts } = usePermissions();
+  const { canViewCosts, can } = usePermissions();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
+  const deleteMutation = useDeleteProductMutation();
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
   const { reset: resetImage } = imageUpload;
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
@@ -141,6 +158,8 @@ export function ProductForm({
       imageUrl: "",
       notes: "",
       isActive: true,
+      kujiType: "",
+      kujiSlackWebhookUrl: "",
     },
   });
 
@@ -171,6 +190,8 @@ export function ProductForm({
           preferredSupplierId: initialProduct.preferredSupplierId ?? "",
           preferredSupplierName: initialProduct.preferredSupplierName ?? "",
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
+          kujiType: initialProduct.kujiType ?? "",
+          kujiSlackWebhookUrl: initialProduct.kujiSlackWebhookUrl ?? "",
         });
       } else {
         // It's a root category
@@ -192,6 +213,8 @@ export function ProductForm({
           preferredSupplierId: initialProduct.preferredSupplierId ?? "",
           preferredSupplierName: initialProduct.preferredSupplierName ?? "",
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
+          kujiType: initialProduct.kujiType ?? "",
+          kujiSlackWebhookUrl: initialProduct.kujiSlackWebhookUrl ?? "",
         });
       }
       resetImage(initialProduct.imageUrl);
@@ -232,6 +255,33 @@ export function ProductForm({
       setPendingPrizes([]);
     }
   }, [rootCategoryId, categories]);
+
+  // Custom kuji has no prize children — clear any pending prizes when toggling to CUSTOM.
+  const watchedKujiTypeForReset = form.watch("kujiType");
+  useEffect(() => {
+    if (watchedKujiTypeForReset === KujiType.CUSTOM) {
+      setPendingPrizes([]);
+    }
+  }, [watchedKujiTypeForReset]);
+
+  // Compute the set of category IDs that belong to the Kuji category tree.
+  const kujiCategoryIds = useMemo(
+    () => buildKujiCategoryIds(categories ?? []),
+    [categories],
+  );
+
+  // Show kuji-type field only on root products whose selected category sits in the Kuji tree.
+  const isRootProduct = !parentId && !initialProduct?.parentId;
+  const selectedCategoryId = form.watch("categoryId");
+  const showKujiTypeField =
+    isRootProduct && !!selectedCategoryId && kujiCategoryIds.has(selectedCategoryId);
+  const watchedKujiType = form.watch("kujiType");
+
+  // CUSTOM kuji parents are templates with their own dedicated tab and lifecycle.
+  // After creation, the structural fields (category, supplier, SKU, costs, kuji type)
+  // are locked — only descriptive fields (name, image, notes, slack webhook) remain editable.
+  const isEditingCustomKuji =
+    !!initialProduct && initialProduct.kujiType === KujiType.CUSTOM;
 
   const isSaving =
     createMutation.isPending ||
@@ -284,6 +334,15 @@ export function ProductForm({
       preferredSupplierId: values.preferredSupplierId || undefined,
       preferredSupplierAuto: values.preferredSupplierAuto,
     };
+
+    // Thread kuji fields only for root products in the Kuji category tree.
+    if (showKujiTypeField) {
+      payload.kujiType = values.kujiType ? (values.kujiType as KujiType) : null;
+      payload.kujiSlackWebhookUrl =
+        values.kujiType === KujiType.CUSTOM
+          ? (values.kujiSlackWebhookUrl?.trim() || null)
+          : null;
+    }
 
     try {
       if (initialProduct) {
@@ -379,6 +438,32 @@ export function ProductForm({
     }
   }
 
+  const handleDeleteCustomKuji = () => {
+    if (!initialProduct) return;
+    deleteMutation.mutate(
+      { id: initialProduct.id },
+      {
+        onSuccess: () => {
+          toast({ title: "Custom kuji deleted", variant: "success" });
+          setDeleteDialogOpen(false);
+          onOpenChange(false);
+        },
+        onError: (err) => {
+          const message =
+            err instanceof Error ? err.message : "Something went wrong";
+          toast({
+            title: "Delete failed",
+            description: message,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const canDeleteCustomKuji =
+    isEditingCustomKuji && can(Permission.PRODUCTS_DELETE);
+
   const handleCategoryCreated = (category: Category) => {
     setRootCategoryId(category.id);
     setSubcategoryId("");
@@ -468,82 +553,40 @@ export function ProductForm({
                 />
               </div>
 
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <div className="flex items-center gap-2">
-                    <Label>Category</Label>
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      onClick={() => setManageCategoriesOpen(true)}
-                      title="Manage categories"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <Select
-                      value={rootCategoryId}
-                      onValueChange={(v) => {
-                        setRootCategoryId(v);
-                        setSubcategoryId("");
-                      }}
-                      disabled={categoriesLoading}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue
-                          placeholder={
-                            categoriesLoading ? "Loading..." : "Select"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories?.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setAddCategoryOpen(true)}
-                      title="Add new category"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {form.formState.errors.categoryId?.message ? (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.categoryId.message}
-                    </p>
-                  ) : null}
-                </div>
-
-                {/* Hide subcategory for Kuji products */}
-                {!isKujiCategory && (
+              {!isEditingCustomKuji && (
+                <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label>Subcategory</Label>
+                    <div className="flex items-center gap-2">
+                      <Label>Category</Label>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        onClick={() => setManageCategoriesOpen(true)}
+                        title="Manage categories"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <div className="flex gap-2">
                       <Select
-                        value={subcategoryId}
-                        onValueChange={(v) =>
-                          setSubcategoryId(v === "__none__" ? "" : v)
-                        }
-                        disabled={!hasChildCategories}
+                        value={rootCategoryId}
+                        onValueChange={(v) => {
+                          setRootCategoryId(v);
+                          setSubcategoryId("");
+                        }}
+                        disabled={categoriesLoading}
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue
-                            placeholder={hasChildCategories ? "Select" : "N/A"}
+                            placeholder={
+                              categoriesLoading ? "Loading..." : "Select"
+                            }
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {childCategories.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
+                          {categories?.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -552,19 +595,63 @@ export function ProductForm({
                         type="button"
                         variant="outline"
                         size="icon"
-                        onClick={() => setAddSubcategoryOpen(true)}
-                        disabled={!rootCategoryId}
-                        title="Add new subcategory"
+                        onClick={() => setAddCategoryOpen(true)}
+                        title="Add new category"
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
+                    {form.formState.errors.categoryId?.message ? (
+                      <p className="text-xs text-destructive">
+                        {form.formState.errors.categoryId.message}
+                      </p>
+                    ) : null}
                   </div>
-                )}
-              </div>
 
-              {/* Preferred Supplier - hide for child products */}
-              {!parentId && (
+                  {/* Hide subcategory for Kuji products */}
+                  {!isKujiCategory && (
+                    <div className="grid gap-2">
+                      <Label>Subcategory</Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={subcategoryId}
+                          onValueChange={(v) =>
+                            setSubcategoryId(v === "__none__" ? "" : v)
+                          }
+                          disabled={!hasChildCategories}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue
+                              placeholder={hasChildCategories ? "Select" : "N/A"}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {childCategories.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setAddSubcategoryOpen(true)}
+                          disabled={!rootCategoryId}
+                          title="Add new subcategory"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Preferred Supplier - hide for child products and CUSTOM kuji parents */}
+              {!parentId && !isEditingCustomKuji && watchedKujiType !== KujiType.CUSTOM && (
                 <div className="grid gap-2">
                   <Label>
                     Preferred Supplier{" "}
@@ -627,65 +714,142 @@ export function ProductForm({
                 </div>
               )}
 
-              <div className={canViewCosts ? "grid grid-cols-2 gap-4" : ""}>
+              {!isEditingCustomKuji && watchedKujiType !== KujiType.CUSTOM && (
+                <div className={canViewCosts ? "grid grid-cols-2 gap-4" : ""}>
+                  <div className="grid gap-2">
+                    <Label htmlFor="sku">
+                      SKU{" "}
+                      <span className="text-muted-foreground font-normal">
+                        (optional)
+                      </span>
+                    </Label>
+                    <Input
+                      id="sku"
+                      placeholder="SKU-XXX"
+                      {...form.register("sku")}
+                    />
+                    {form.formState.errors.sku?.message ? (
+                      <p className="text-xs text-destructive">
+                        {form.formState.errors.sku.message}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {canViewCosts && (
+                    <div className="space-y-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="unitCost">
+                          Unit Cost{" "}
+                          <span className="text-muted-foreground font-normal">
+                            (optional)
+                          </span>
+                        </Label>
+                        <Input
+                          id="unitCost"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...form.register("unitCost")}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="msrp">
+                          MSRP{" "}
+                          <span className="text-muted-foreground font-normal">
+                            (optional)
+                          </span>
+                        </Label>
+                        <Input
+                          id="msrp"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...form.register("msrp")}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Kuji classification — root products in the Kuji category tree.
+                  For CUSTOM kuji edit, the type itself is locked but the Slack webhook stays editable. */}
+              {showKujiTypeField && !isEditingCustomKuji && (
                 <div className="grid gap-2">
-                  <Label htmlFor="sku">
-                    SKU{" "}
+                  <Label htmlFor="kuji-type">Kuji Type</Label>
+                  <Select
+                    value={watchedKujiType ? watchedKujiType : "__none__"}
+                    onValueChange={(v) =>
+                      form.setValue(
+                        "kujiType",
+                        v === "__none__"
+                          ? ""
+                          : (v as KujiType.PREMADE | KujiType.CUSTOM),
+                        { shouldDirty: true },
+                      )
+                    }
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger id="kuji-type">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— None —</SelectItem>
+                      <SelectItem value={KujiType.PREMADE}>Premade</SelectItem>
+                      <SelectItem value={KujiType.CUSTOM}>Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {watchedKujiType === KujiType.CUSTOM && (
+                    <div className="grid gap-1 mt-2">
+                      <Label htmlFor="kuji-slack-webhook">
+                        Slack Webhook URL{" "}
+                        <span className="text-muted-foreground font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="kuji-slack-webhook"
+                        placeholder="https://hooks.slack.com/services/..."
+                        {...form.register("kujiSlackWebhookUrl")}
+                        disabled={isSaving}
+                      />
+                      {form.formState.errors.kujiSlackWebhookUrl?.message ? (
+                        <p className="text-xs text-destructive">
+                          {form.formState.errors.kujiSlackWebhookUrl.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Slack webhook stays editable on CUSTOM kuji edit even though the type itself is locked. */}
+              {isEditingCustomKuji && (
+                <div className="grid gap-1">
+                  <Label htmlFor="kuji-slack-webhook">
+                    Slack Webhook URL{" "}
                     <span className="text-muted-foreground font-normal">
                       (optional)
                     </span>
                   </Label>
                   <Input
-                    id="sku"
-                    placeholder="SKU-XXX"
-                    {...form.register("sku")}
+                    id="kuji-slack-webhook"
+                    placeholder="https://hooks.slack.com/services/..."
+                    {...form.register("kujiSlackWebhookUrl")}
+                    disabled={isSaving}
                   />
-                  {form.formState.errors.sku?.message ? (
+                  {form.formState.errors.kujiSlackWebhookUrl?.message ? (
                     <p className="text-xs text-destructive">
-                      {form.formState.errors.sku.message}
+                      {form.formState.errors.kujiSlackWebhookUrl.message}
                     </p>
                   ) : null}
                 </div>
+              )}
 
-                {canViewCosts && (
-                  <div className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="unitCost">
-                        Unit Cost{" "}
-                        <span className="text-muted-foreground font-normal">
-                          (optional)
-                        </span>
-                      </Label>
-                      <Input
-                        id="unitCost"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...form.register("unitCost")}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="msrp">
-                        MSRP{" "}
-                        <span className="text-muted-foreground font-normal">
-                          (optional)
-                        </span>
-                      </Label>
-                      <Input
-                        id="msrp"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...form.register("msrp")}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Initial stock — create mode only */}
-              {!initialProduct && (
+              {/* Initial stock — create mode only, not for CUSTOM kuji (managed per-box) */}
+              {!initialProduct && watchedKujiType !== KujiType.CUSTOM && (
                 <div className="border rounded-lg p-4 space-y-4">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <Checkbox
@@ -789,8 +953,9 @@ export function ProductForm({
                 </div>
               )}
 
-              {/* Inline prizes section for Kuji - create mode only */}
-              {!initialProduct && isKujiCategory && (
+              {/* Inline prizes section for Kuji - create mode only.
+                  Hidden for CUSTOM kuji: tiers are defined per-box, no prize children. */}
+              {!initialProduct && isKujiCategory && watchedKujiType !== KujiType.CUSTOM && (
                 <div className="border rounded-lg p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Prizes</span>
@@ -817,25 +982,39 @@ export function ProductForm({
               )}
             </div>
 
-            <DialogFooter className="px-6 py-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="dark:bg-accent/50 dark:hover:bg-accent"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSaving}
-                className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
-              >
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {initialProduct ? "Save" : "Add Product"}
-              </Button>
+            <DialogFooter className="px-6 py-4 sm:justify-between">
+              {canDeleteCustomKuji ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isSaving || deleteMutation.isPending}
+                >
+                  Delete
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex flex-col-reverse sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="dark:bg-accent/50 dark:hover:bg-accent"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="text-white bg-[#0b66c2] hover:bg-[#0a5eb3] dark:bg-[#7c3aed] dark:hover:bg-[#6d28d9] dark:text-foreground"
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {initialProduct ? "Save" : "Add Product"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -858,6 +1037,17 @@ export function ProductForm({
         open={manageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
       />
+
+      {canDeleteCustomKuji && initialProduct && (
+        <DeleteProductDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          productName={initialProduct.name}
+          isPending={deleteMutation.isPending}
+          onDelete={handleDeleteCustomKuji}
+          renderTrigger={false}
+        />
+      )}
     </>
   );
 }

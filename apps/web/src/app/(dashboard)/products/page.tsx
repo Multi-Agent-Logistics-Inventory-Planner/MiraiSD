@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ProductHeader,
   ProductFilters,
@@ -17,6 +18,7 @@ import {
 } from "@/components/products";
 import type { ProductSort } from "@/components/products";
 import type { PreselectedProductInfo } from "@/components/stock/adjust-stock-dialog";
+import { KujiType } from "@/types/api";
 
 const ProductModal = dynamic(
   () =>
@@ -46,6 +48,14 @@ const TransferStockDialog = dynamic(
   () =>
     import("@/components/stock/transfer-stock-dialog").then((m) => ({
       default: m.TransferStockDialog,
+    })),
+  { ssr: false }
+);
+
+const CustomKujiTabs = dynamic(
+  () =>
+    import("@/components/kuji").then((m) => ({
+      default: m.CustomKujiTabs,
     })),
   { ssr: false }
 );
@@ -125,10 +135,25 @@ export default function ProductsPage() {
     );
   }, [filteredItems, sort, parentNameMap]);
 
+  // Main Products tab: hide CUSTOM kuji parents. They're templates with no LocationInventory
+  // and are managed entirely from the Custom Kuji tab.
+  const productsTabItems = useMemo(
+    () =>
+      sortedItems.filter((row) => row.product.kujiType !== KujiType.CUSTOM),
+    [sortedItems],
+  );
+
   const paginatedItems = useMemo(() => {
     const start = page * PAGE_SIZE;
-    return sortedItems.slice(start, start + PAGE_SIZE);
-  }, [sortedItems, page]);
+    return productsTabItems.slice(start, start + PAGE_SIZE);
+  }, [productsTabItems, page]);
+
+  // Custom-kuji tab: filter base list (full, unpaginated) to CUSTOM kujis only.
+  const customKujiItems = useMemo(
+    () =>
+      sortedItems.filter((row) => row.product.kujiType === KujiType.CUSTOM),
+    [sortedItems],
+  );
 
   const handleFiltersChange = (next: ProductFiltersState) => {
     setFilters(next);
@@ -169,28 +194,41 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="p-2 dark:border-none">
-          <CardContent className="p-0">
-            <ProductTable
-              items={paginatedItems}
-              isLoading={list.isLoading}
-              onSelect={handleSelect}
-              parentNameMap={parentNameMap}
-              kujiCategoryIds={kujiCategoryIds}
-              sort={sort}
-              onSortChange={handleSortChange}
-            />
-          </CardContent>
-        </Card>
-      )}
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="custom-kuji">Custom Kuji</TabsTrigger>
+          </TabsList>
 
-      <ProductPagination
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalItems={filteredItems.length}
-        isLoading={list.isLoading}
-        onPageChange={setPage}
-      />
+          <TabsContent value="products" className="mt-3">
+            <Card className="p-2 dark:border-none">
+              <CardContent className="p-0">
+                <ProductTable
+                  items={paginatedItems}
+                  isLoading={list.isLoading}
+                  onSelect={handleSelect}
+                  parentNameMap={parentNameMap}
+                  kujiCategoryIds={kujiCategoryIds}
+                  sort={sort}
+                  onSortChange={handleSortChange}
+                />
+              </CardContent>
+            </Card>
+
+            <ProductPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              totalItems={productsTabItems.length}
+              isLoading={list.isLoading}
+              onPageChange={setPage}
+            />
+          </TabsContent>
+
+          <TabsContent value="custom-kuji" className="mt-3">
+            <CustomKujiTabs items={customKujiItems} />
+          </TabsContent>
+        </Tabs>
+      )}
 
       <ProductModal
         open={detailOpen}

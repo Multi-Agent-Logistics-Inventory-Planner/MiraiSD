@@ -94,7 +94,7 @@ export function ShipmentCreateDialog({
   const { canViewCosts } = usePermissions();
   const createMutation = useCreateShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
-  const productsQuery = useProducts({ rootOnly: true });
+  const productsQuery = useProducts({ rootOnly: true, excludeCustomKuji: true });
   const products = productsQuery.data ?? [];
 
   const isEditMode = !!initialShipment;

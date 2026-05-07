@@ -204,7 +204,12 @@ export function LocationDetailSheet({
 
   const code = location ? getLocationCode(locationType, location) : "";
 
-  const inventory = (inventoryQuery.data ?? []) as LocationInventory[];
+  const rawInventory = (inventoryQuery.data ?? []) as LocationInventory[];
+
+  const inventory = useMemo(
+    () => rawInventory.filter((inv) => (inv.quantity ?? 0) > 0),
+    [rawInventory],
+  );
 
   const totalQty = useMemo(() => {
     return inventory.reduce((sum, r) => sum + (r.quantity ?? 0), 0);

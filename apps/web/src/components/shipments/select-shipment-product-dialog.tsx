@@ -99,8 +99,8 @@ export function SelectShipmentProductDialog({
   excludeProductIds = [],
 }: SelectShipmentProductDialogProps) {
   const productsQuery = useQuery({
-    queryKey: ["products", { rootOnly: true }],
-    queryFn: () => getProducts(true),
+    queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
+    queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
   });
 
   const products = productsQuery.data ?? [];
