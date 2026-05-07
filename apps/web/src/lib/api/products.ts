@@ -6,10 +6,13 @@ const BASE_PATH = "/api/products";
 export interface GetProductsOptions {
   rootOnly?: boolean;
   kujiOnly?: boolean;
+  /** Exclude products with kujiType=CUSTOM. They live in the dedicated kuji tab. */
+  excludeCustomKuji?: boolean;
 }
 
 /**
- * Get all products (optionally filter to root only, or Kuji parents only)
+ * Get all products (optionally filter to root only, Kuji parents only, or
+ * exclude CUSTOM kuji parents which live in their own tab).
  */
 export async function getProducts(
   rootOnlyOrOptions: boolean | GetProductsOptions = false
@@ -21,6 +24,7 @@ export async function getProducts(
   const params = new URLSearchParams();
   if (opts.rootOnly) params.set("rootOnly", "true");
   if (opts.kujiOnly) params.set("kujiOnly", "true");
+  if (opts.excludeCustomKuji) params.set("excludeCustomKuji", "true");
   const qs = params.toString();
   return apiGet<Product[]>(`${BASE_PATH}${qs ? `?${qs}` : ""}`);
 }

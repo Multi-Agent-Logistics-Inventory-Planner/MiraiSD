@@ -20,6 +20,22 @@ public class LocationAggregateRepository {
     private EntityManager entityManager;
 
     /**
+     * Aggregate location_inventory rows per location, excluding any product whose root
+     * has kuji_type = 'CUSTOM'. Custom-kuji prizes are owned by the dedicated kuji UI,
+     * so they are omitted from machine/storage card Items/Units totals.
+     */
+    private static final String INVENTORY_SUBQUERY = """
+        SELECT li.location_id,
+               COUNT(*) FILTER (WHERE li.quantity > 0) as inventory_records,
+               COALESCE(SUM(li.quantity), 0) as total_quantity
+        FROM location_inventory li
+        JOIN products p ON p.id = li.product_id
+        LEFT JOIN products root ON root.id = p.parent_id
+        WHERE COALESCE(root.kuji_type, p.kuji_type) IS DISTINCT FROM 'CUSTOM'
+        GROUP BY li.location_id
+        """;
+
+    /**
      * Query using unified locations and storage_locations tables.
      * Excludes NOT_ASSIGNED locations from the listing.
      */
@@ -45,11 +61,7 @@ public class LocationAggregateRepository {
         FROM locations l
         JOIN storage_locations sl ON l.storage_location_id = sl.id
         LEFT JOIN (
-            SELECT location_id,
-                   COUNT(*) as inventory_records,
-                   COALESCE(SUM(quantity), 0) as total_quantity
-            FROM location_inventory
-            GROUP BY location_id
+            """ + INVENTORY_SUBQUERY + """
         ) i ON l.id = i.location_id
         LEFT JOIN (
             SELECT machine_id as location_id,
@@ -88,11 +100,7 @@ public class LocationAggregateRepository {
         FROM locations l
         JOIN storage_locations sl ON l.storage_location_id = sl.id
         LEFT JOIN (
-            SELECT location_id,
-                   COUNT(*) as inventory_records,
-                   COALESCE(SUM(quantity), 0) as total_quantity
-            FROM location_inventory
-            GROUP BY location_id
+            """ + INVENTORY_SUBQUERY + """
         ) i ON l.id = i.location_id
         LEFT JOIN (
             SELECT machine_id as location_id,

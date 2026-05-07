@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models;
 
+import com.mirai.inventoryservice.models.enums.KujiType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -55,6 +56,15 @@ public class Product {
     /** Quantity per kuji set for prize products. Used to auto-calculate ordered/received quantities. */
     @Column(name = "template_quantity")
     private Integer templateQuantity;
+
+    /** Marks a kuji parent product as PREMADE (vendor) or CUSTOM (in-house). NULL for non-kuji or undecided. Only valid on root products. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kuji_type", length = 16)
+    private KujiType kujiType;
+
+    /** Optional Slack webhook for per-kuji draw notifications. Cascades to KUJI_SLACK_WEBHOOK_URL env if null. Only valid on root products. */
+    @Column(name = "kuji_slack_webhook_url", length = 500)
+    private String kujiSlackWebhookUrl;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)

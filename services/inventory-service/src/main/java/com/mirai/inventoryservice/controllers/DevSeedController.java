@@ -264,10 +264,14 @@ public class DevSeedController {
             locations.add(location);
         }
 
-        // 4. Inventory records — mix of good / low / critical / out-of-stock
+        // 4. Inventory records — mix of good / low / critical / out-of-stock.
+        // CUSTOM kuji parents are skipped (templates with no LocationInventory).
         List<LocationInventory> inventoryRecords = new ArrayList<>();
         for (int i = 0; i < products.size(); i++) {
             Product product = products.get(i);
+            if (product.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+                continue;
+            }
             Location location = locations.get(i % locations.size());
             int reorderPoint = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
 
@@ -1111,10 +1115,10 @@ public class DevSeedController {
                 totalQuantity += qty;
 
                 int quantityChange = switch (reason) {
-                    case SALE, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED, SHIPMENT_DELETED -> -qty;
-                    case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT, SHIPMENT_PARTIAL_RECEIPT -> qty;
+                    case SALE, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED, SHIPMENT_DELETED, KUJI_PRIZE_WON -> -qty;
+                    case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT, SHIPMENT_PARTIAL_RECEIPT, KUJI_DRAW_REVERSED -> qty;
                     case TRANSFER, ADJUSTMENT, SHIPMENT_EDITED -> random.nextBoolean() ? qty : -qty;
-                    case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP, SHIPMENT_STATUS_OVERRIDDEN -> 0;
+                    case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP, SHIPMENT_STATUS_OVERRIDDEN, KUJI_SLIP_ADJUSTMENT -> 0;
                 };
 
                 int previousQty = BASE_STOCK_QUANTITY + random.nextInt(STOCK_QUANTITY_RANGE);

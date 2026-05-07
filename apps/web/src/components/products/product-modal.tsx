@@ -32,8 +32,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
 import { KujiPrizesDialog } from "./kuji-prizes-dialog";
+import { KujiBoxView } from "@/components/kuji";
 import { ProductImageLightbox } from "./product-image-lightbox";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
+import { useKujiAllocationsByProduct } from "@/hooks/queries/use-kuji-box";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
 import { useProductDisplayHistory } from "@/hooks/queries/use-machine-displays";
@@ -41,11 +43,11 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Permission } from "@/lib/rbac/permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import {
+  KujiType,
   LocationType,
   LOCATION_TYPE_LABELS,
   SHIPMENT_STATUS_LABELS,
   SHIPMENT_STATUS_VARIANTS,
-  type ProductInventoryEntry,
 } from "@/types/api";
 import { Card, CardContent } from "../ui/card";
 import { cn } from "@/lib/utils";
@@ -77,7 +79,33 @@ export function ProductModal({
   const { toast } = useToast();
   const { data: inventoryData, isLoading: locationsLoading } =
     useProductInventoryEntries(product?.product.id);
-  const locations = inventoryData?.entries;
+  const { data: kujiAllocations } = useKujiAllocationsByProduct(
+    product?.product.id,
+  );
+
+  // Quantity locked into OPEN kuji boxes per location for this product. Subtracted
+  // from each LocationInventory row so kuji-held stock isn't double-counted alongside
+  // the dedicated kuji-allocation rows below.
+  const lockedByLocation = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of kujiAllocations ?? []) {
+      map.set(a.locationId, (map.get(a.locationId) ?? 0) + (a.count ?? 0));
+    }
+    return map;
+  }, [kujiAllocations]);
+
+  const locations = useMemo(() => {
+    return (inventoryData?.entries ?? [])
+      .map((entry) => ({
+        ...entry,
+        quantity: Math.max(
+          0,
+          (entry.quantity ?? 0) -
+            (entry.locationId ? lockedByLocation.get(entry.locationId) ?? 0 : 0),
+        ),
+      }))
+      .filter((entry) => entry.quantity > 0);
+  }, [inventoryData?.entries, lockedByLocation]);
   const { data: shipments, isLoading: shipmentsLoading } =
     useShipmentsByProduct(product?.product.id);
   const { data: displayHistory, isLoading: displaysLoading } =
@@ -91,6 +119,7 @@ export function ProductModal({
   const deleteProduct = useDeleteProductMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [prizesDialogOpen, setPrizesDialogOpen] = useState(false);
+  const [kujiBoxOpen, setKujiBoxOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const hasInventory = locations && locations.length > 0;
@@ -115,6 +144,7 @@ export function ProductModal({
 
   // Check if this is a Kuji product (has children or is in Kuji category)
   const isKuji = p.hasChildren || p.category.name.toLowerCase() === "kuji" || p.category.slug?.toLowerCase() === "kuji";
+  const isCustomKuji = p.kujiType === KujiType.CUSTOM;
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
@@ -226,10 +256,14 @@ export function ProductModal({
               <Button
                 size="sm"
                 className="sm:hidden bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs mt-1"
-                onClick={() => setPrizesDialogOpen(true)}
+                onClick={() =>
+                  isCustomKuji
+                    ? setKujiBoxOpen(true)
+                    : setPrizesDialogOpen(true)
+                }
               >
                 <Trophy className="h-3 w-3 mr-0.5" />
-                Prizes
+                {isCustomKuji ? "Manage" : "Prizes"}
               </Button>
             )}
 
@@ -238,10 +272,14 @@ export function ProductModal({
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
-                  onClick={() => setPrizesDialogOpen(true)}
+                  onClick={() =>
+                    isCustomKuji
+                      ? setKujiBoxOpen(true)
+                      : setPrizesDialogOpen(true)
+                  }
                 >
                   <Trophy className="h-4 w-4 mr-1" />
-                  Prizes
+                  {isCustomKuji ? "Manage" : "Prizes"}
                 </Button>
               )}
               {onAdjustClick && (
@@ -410,7 +448,8 @@ export function ProductModal({
                           </TableRow>
                         ))}
                       </>
-                    ) : !locations || locations.length === 0 ? (
+                    ) : (!locations || locations.length === 0) &&
+                      (!kujiAllocations || kujiAllocations.length === 0) ? (
                       <TableRow>
                         <TableCell
                           colSpan={3}
@@ -423,25 +462,55 @@ export function ProductModal({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      locations.map((entry) => {
-                        const locationLabel =
-                          entry.locationType === LocationType.NOT_ASSIGNED
-                            ? "NA"
-                            : entry.locationCode || "-";
-                        return (
-                          <TableRow key={entry.inventoryId}>
-                            <TableCell className="font-mono rounded-l-lg">
-                              {locationLabel}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {LOCATION_TYPE_LABELS[entry.locationType]}
-                            </TableCell>
-                            <TableCell className="text-right font-medium rounded-r-lg">
-                              {entry.quantity.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                      <>
+                        {(locations ?? []).map((entry) => {
+                          const locationLabel =
+                            entry.locationType === LocationType.NOT_ASSIGNED
+                              ? "NA"
+                              : entry.locationCode || "-";
+                          return (
+                            <TableRow key={entry.inventoryId}>
+                              <TableCell className="font-mono rounded-l-lg">
+                                {locationLabel}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {LOCATION_TYPE_LABELS[entry.locationType]}
+                              </TableCell>
+                              <TableCell className="text-right font-medium rounded-r-lg">
+                                {entry.quantity.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {(kujiAllocations ?? []).map((alloc) => {
+                          const label = alloc.machineCode
+                            ? `${alloc.machineCode}-Display`
+                            : `${alloc.locationCode}${alloc.boxLabel ? ` (${alloc.boxLabel})` : ""}`;
+                          return (
+                            <TableRow
+                              key={alloc.tierId}
+                              className="bg-muted/30"
+                            >
+                              <TableCell className="font-mono rounded-l-lg">
+                                {label}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <span>
+                                    Kuji Display
+                                    {alloc.tierLetter
+                                      ? ` (Tier ${alloc.tierLetter})`
+                                      : ""}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium rounded-r-lg">
+                                {alloc.count.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </>
                     )}
                   </TableBody>
                 </Table>
@@ -634,13 +703,22 @@ export function ProductModal({
       </DialogContent>
     </Dialog>
 
-    {isKuji && (
+    {isKuji && !isCustomKuji && (
       <KujiPrizesDialog
         open={prizesDialogOpen}
         onOpenChange={setPrizesDialogOpen}
         productId={p.id}
         productName={p.name}
         categoryId={p.category.id}
+      />
+    )}
+
+    {isCustomKuji && (
+      <KujiBoxView
+        open={kujiBoxOpen}
+        onOpenChange={setKujiBoxOpen}
+        productId={p.id}
+        productName={p.name}
       />
     )}
 

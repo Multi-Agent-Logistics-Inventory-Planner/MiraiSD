@@ -31,7 +31,7 @@ export function BulkAssignModal({ open, onOpenChange, supplier }: BulkAssignModa
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const { data: products, isLoading } = useProducts({ rootOnly: true });
+  const { data: products, isLoading } = useProducts({ rootOnly: true, excludeCustomKuji: true });
   const bulkAssignMutation = useBulkAssignProductsMutation();
 
   // Filter products by search

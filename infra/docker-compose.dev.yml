@@ -32,7 +32,7 @@ services:
       - mirai-dev
 
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.8.0
     container_name: kafka-dev
     ports:
       - "9092:9092"

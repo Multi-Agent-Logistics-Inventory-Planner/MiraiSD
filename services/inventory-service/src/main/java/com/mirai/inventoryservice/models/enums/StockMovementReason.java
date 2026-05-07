@@ -17,6 +17,9 @@ public enum StockMovementReason {
     REMOVED,
     DISPLAY_SET,
     DISPLAY_REMOVED,
-    DISPLAY_SWAP
+    DISPLAY_SWAP,
+    KUJI_PRIZE_WON,
+    KUJI_DRAW_REVERSED,
+    KUJI_SLIP_ADJUSTMENT
 }
 

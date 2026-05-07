@@ -34,6 +34,9 @@ const REASON_LABELS: Record<StockMovementReason, string> = {
   [StockMovementReason.DISPLAY_SET]: "Display Set",
   [StockMovementReason.DISPLAY_REMOVED]: "Display Removed",
   [StockMovementReason.DISPLAY_SWAP]: "Display Swap",
+  [StockMovementReason.KUJI_PRIZE_WON]: "Kuji Prize Drawn",
+  [StockMovementReason.KUJI_DRAW_REVERSED]: "Kuji Draw Undone",
+  [StockMovementReason.KUJI_SLIP_ADJUSTMENT]: "Kuji Slip Adjustment",
 };
 
 const DISPLAY_REASONS = new Set<StockMovementReason>([

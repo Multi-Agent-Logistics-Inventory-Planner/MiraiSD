@@ -66,6 +66,9 @@ export enum StockMovementReason {
   DISPLAY_SET = "DISPLAY_SET",
   DISPLAY_REMOVED = "DISPLAY_REMOVED",
   DISPLAY_SWAP = "DISPLAY_SWAP",
+  KUJI_PRIZE_WON = "KUJI_PRIZE_WON",
+  KUJI_DRAW_REVERSED = "KUJI_DRAW_REVERSED",
+  KUJI_SLIP_ADJUSTMENT = "KUJI_SLIP_ADJUSTMENT",
 }
 
 export enum ShipmentStatus {
@@ -119,6 +122,18 @@ export enum NotificationType {
   SHIPMENT_DAMAGED = "SHIPMENT_DAMAGED",
   SHIPMENT_DELIVERY_FAILED = "SHIPMENT_DELIVERY_FAILED",
   DISPLAY_STALE = "DISPLAY_STALE",
+  KUJI_PRIZE_DRAWN = "KUJI_PRIZE_DRAWN",
+  KUJI_PRIZE_DRAW_UNDONE = "KUJI_PRIZE_DRAW_UNDONE",
+}
+
+export enum KujiType {
+  PREMADE = "PREMADE",
+  CUSTOM = "CUSTOM",
+}
+
+export enum KujiBoxStatus {
+  OPEN = "OPEN",
+  CLOSED = "CLOSED",
 }
 
 export enum NotificationSeverity {
@@ -173,6 +188,8 @@ export interface ProductSummary {
   quantity: number;
   parentId?: string | null;
   hasChildren?: boolean;
+  kujiType?: KujiType | null;
+  kujiSlackWebhookUrl?: string | null;
 }
 
 export interface Product {
@@ -207,6 +224,8 @@ export interface Product {
   quantity: number;
   imageUrl?: string;
   notes?: string;
+  kujiType?: KujiType | null;
+  kujiSlackWebhookUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +253,10 @@ export interface ProductRequest {
   preferredSupplierId?: string;
   /** True if auto-assigned from delivery, false if manually set */
   preferredSupplierAuto?: boolean;
+  /** Kuji classification (only valid when parentId is null). */
+  kujiType?: KujiType | null;
+  /** Slack webhook for kuji event notifications (only valid when kujiType=CUSTOM). */
+  kujiSlackWebhookUrl?: string | null;
 }
 
 // User types
@@ -473,6 +496,8 @@ export interface AuditLogFilters {
   search?: string;
   actorId?: string;
   reason?: StockMovementReason;
+  /** Multi-reason filter; takes precedence over `reason` server-side when non-empty. */
+  reasons?: StockMovementReason[];
   fromDate?: string;
   toDate?: string;
   productId?: string;
@@ -507,6 +532,7 @@ export interface AuditLog {
   previousStatus?: string;
   newStatus?: string;
   overrideReason?: string;
+  reversed: boolean;
 }
 
 export interface AuditLogMovement {
@@ -866,4 +892,164 @@ export interface MachineDisplayFilters {
   locationType?: LocationType;
   staleOnly?: boolean;
   thresholdDays?: number;
+}
+
+// Kuji Box types
+
+export interface KujiBoxTier {
+  id: string;
+  label: string;
+  letter?: string | null;
+  linkedProductId?: string | null;
+  linkedProductName?: string | null;
+  linkedProductImageUrl?: string | null;
+  linkedInventoryAtBoxLocation?: number | null;
+  count: number;
+  price?: number | null;
+  /** True when the linked product was created inline at open-box for this tier. */
+  autoCreatedProduct?: boolean | null;
+}
+
+export interface KujiBox {
+  id: string;
+  productId: string;
+  productName: string;
+  locationId: string;
+  locationCode?: string | null;
+  locationName?: string | null;
+  machineDisplayId?: string | null;
+  status: KujiBoxStatus;
+  label?: string | null;
+  notes?: string | null;
+  openedAt: string;
+  openedBy?: string | null;
+  openedByName?: string | null;
+  closedAt?: string | null;
+  closedBy?: string | null;
+  closedByName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tiers: KujiBoxTier[];
+  totalCount: number;
+}
+
+export interface KujiAllocationByLocation {
+  boxId: string;
+  boxLabel?: string | null;
+  tierId: string;
+  tierLabel: string;
+  tierLetter?: string | null;
+  linkedProductId: string;
+  linkedProductName: string;
+  count: number;
+  machineDisplayId?: string | null;
+  /** Location code of the machine the box is on display at, when applicable. */
+  machineCode?: string | null;
+}
+
+export interface KujiAllocationByProduct {
+  boxId: string;
+  boxLabel?: string | null;
+  locationId: string;
+  locationCode: string;
+  machineDisplayId?: string | null;
+  machineCode?: string | null;
+  tierId: string;
+  tierLabel: string;
+  tierLetter?: string | null;
+  count: number;
+}
+
+export interface AddKujiTierRequest {
+  actorId: string;
+  label: string;
+  letter?: string | null;
+  linkedProductId?: string | null;
+  sourceLocationId?: string | null;
+  count: number;
+  heldBackQuantity?: number | null;
+  price?: number | null;
+  autoCreate?: boolean | null;
+  productName?: string | null;
+  productImageUrl?: string | null;
+  productMsrp?: number | null;
+}
+
+export interface NewKujiBoxTier {
+  label: string;
+  letter?: string | null;
+  /** Existing product to link. Mutually exclusive with autoCreate. */
+  linkedProductId?: string | null;
+  /** Required when linkedProductId is set. */
+  sourceLocationId?: string | null;
+  /** Number of slips placed in the box. */
+  count: number;
+  /**
+   * Additional units to materialize at the box location that do NOT enter slips.
+   * Total = count + heldBackQuantity. Defaults to 0.
+   */
+  heldBackQuantity?: number | null;
+  price?: number | null;
+  /** When true, server creates a fresh child product under the kuji parent. */
+  autoCreate?: boolean | null;
+  /** Required when autoCreate is true. */
+  productName?: string | null;
+  productImageUrl?: string | null;
+  productMsrp?: number | null;
+}
+
+export interface OpenKujiBoxRequest {
+  productId: string;
+  locationId: string;
+  machineDisplayId?: string | null;
+  label?: string | null;
+  notes?: string | null;
+  tiers: NewKujiBoxTier[];
+  actorId: string;
+}
+
+export interface CloseKujiBoxTransferOutTarget {
+  tierId: string;
+  destinationLocationId: string;
+}
+
+export interface CloseKujiBoxRequest {
+  actorId: string;
+  transferOutTargets?: CloseKujiBoxTransferOutTarget[];
+}
+
+export interface DrawLine {
+  tierId: string;
+  quantity: number;
+}
+
+export interface RecordDrawRequest {
+  actorId: string;
+  notes?: string | null;
+  draws: DrawLine[];
+}
+
+export interface AddSlipRequest {
+  actorId: string;
+  quantity: number;
+}
+
+export interface TransferInMoreRequest {
+  actorId: string;
+  /** Null when the tier's linked product is auto-created — backend mints in place. */
+  sourceLocationId: string | null;
+  quantity: number;
+}
+
+export interface PatchKujiTierRequest {
+  actorId: string;
+  label?: string | null;
+  letter?: string | null;
+  clearLetter?: boolean | null;
+  linkedProductId?: string | null;
+  clearLinkedProduct?: boolean | null;
+  linkedProductDestinationLocationId?: string | null;
+  count?: number | null;
+  price?: number | null;
+  clearPrice?: boolean | null;
 }

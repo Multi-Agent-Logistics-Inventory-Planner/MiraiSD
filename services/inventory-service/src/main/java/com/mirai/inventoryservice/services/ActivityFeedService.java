@@ -44,6 +44,12 @@ public class ActivityFeedService {
 
             for (AuditLog auditLog : auditLogs.getContent()) {
                 for (StockMovement movement : auditLog.getMovements()) {
+                    // Kuji activity has a dedicated per-kuji session feed; skip everything kuji here so the main feed stays focused on inventory ops.
+                    if (movement.getReason() == StockMovementReason.KUJI_PRIZE_WON
+                            || movement.getReason() == StockMovementReason.KUJI_DRAW_REVERSED
+                            || movement.getReason() == StockMovementReason.KUJI_SLIP_ADJUSTMENT) {
+                        continue;
+                    }
                     String eventType = mapReasonToEventType(movement.getReason());
                     if (typeSet != null && !typeSet.contains(eventType)) continue;
 
@@ -139,6 +145,8 @@ public class ActivityFeedService {
             case TRANSFER, DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP -> "transfer";
             case ADJUSTMENT, DAMAGE, REMOVED, SHIPMENT_RECEIPT_REVERSED -> "adjustment";
             case SHIPMENT_PARTIAL_RECEIPT, SHIPMENT_EDITED, SHIPMENT_DELETED, SHIPMENT_STATUS_OVERRIDDEN -> "shipment";
+            // Kuji activity has its own per-kuji session feed; intentionally not surfaced in the main feed.
+            case KUJI_PRIZE_WON, KUJI_DRAW_REVERSED, KUJI_SLIP_ADJUSTMENT -> "kuji";
         };
     }
 
@@ -165,6 +173,9 @@ public class ActivityFeedService {
             case DISPLAY_SET -> "Set display: " + qtyStr + " of " + itemName;
             case DISPLAY_REMOVED -> "Removed from display: " + qtyStr + " of " + itemName;
             case DISPLAY_SWAP -> "Swapped display: " + qtyStr + " of " + itemName;
+            case KUJI_PRIZE_WON -> "Kuji prize drawn: " + qtyStr + " of " + itemName;
+            case KUJI_DRAW_REVERSED -> "Undid kuji draw: " + qtyStr + " of " + itemName;
+            case KUJI_SLIP_ADJUSTMENT -> "Kuji slip adjustment: " + itemName;
         };
     }
 }

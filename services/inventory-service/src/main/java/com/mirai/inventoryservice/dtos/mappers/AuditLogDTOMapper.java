@@ -47,6 +47,7 @@ public class AuditLogDTOMapper {
                 .previousStatus(auditLog.getPreviousStatus())
                 .newStatus(auditLog.getNewStatus())
                 .overrideReason(auditLog.getOverrideReason())
+                .reversed(auditLog.getReversedAt() != null)
                 .build();
     }
 

@@ -11,7 +11,7 @@ import {
 import { getLocations } from "./locations";
 
 /** Virtual ID used for NOT_ASSIGNED when no real ID is available */
-const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
+export const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
 
 /** Cached NA location ID to avoid repeated lookups */
 let cachedNALocationId: string | null = null;
@@ -20,7 +20,7 @@ let cachedNALocationId: string | null = null;
  * Get the actual NA location ID for NOT_ASSIGNED inventory operations.
  * Caches the result to avoid repeated API calls.
  */
-async function getNALocationId(): Promise<string> {
+export async function getNALocationId(): Promise<string> {
   if (cachedNALocationId) {
     return cachedNALocationId;
   }

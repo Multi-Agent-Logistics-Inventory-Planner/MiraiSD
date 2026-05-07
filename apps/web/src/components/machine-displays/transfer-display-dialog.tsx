@@ -293,10 +293,10 @@ export function TransferDisplayDialog({
   const [itemsToReceive, setItemsToReceive] = useState<Set<string>>(new Set());
   const [productsToAdd, setProductsToAdd] = useState<Set<string>>(new Set());
 
-  // Fetch products (rootOnly to exclude child products/prizes)
+  // Fetch products (rootOnly to exclude child products/prizes; excludeCustomKuji to hide kuji parents)
   const { data: products = [] } = useQuery({
-    queryKey: ["products", { rootOnly: true }],
-    queryFn: () => getProducts(true),
+    queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
+    queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
   });
 
   // Fetch all machines of the same type

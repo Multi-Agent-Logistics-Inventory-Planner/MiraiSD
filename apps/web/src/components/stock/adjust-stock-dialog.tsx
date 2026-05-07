@@ -228,6 +228,8 @@ export function AdjustStockDialog({
   const currentQtyAtLocation = selectedInventory?.quantity ?? 0;
   const sourceListCount = inventory.length;
 
+  const availableForSubtract = currentQtyAtLocation;
+
   const newQty =
     action === "subtract"
       ? currentQtyAtLocation - quantity
@@ -253,11 +255,9 @@ export function AdjustStockDialog({
       return;
     }
 
-    if (action === "subtract" && parsed > currentQtyAtLocation) {
-      setQuantity(currentQtyAtLocation);
-      setQuantityWarning(
-        `Clamped to available stock (${currentQtyAtLocation})`,
-      );
+    if (action === "subtract" && parsed > availableForSubtract) {
+      setQuantity(availableForSubtract);
+      setQuantityWarning(`Clamped to available stock (${availableForSubtract})`);
     } else {
       setQuantity(Math.max(1, parsed));
       setQuantityWarning(null);
@@ -266,7 +266,7 @@ export function AdjustStockDialog({
 
   function handleIncrement() {
     if (action === "subtract") {
-      if (quantity < currentQtyAtLocation) {
+      if (quantity < availableForSubtract) {
         setQuantity(quantity + 1);
         setQuantityWarning(null);
       }
@@ -349,7 +349,7 @@ export function AdjustStockDialog({
 
     const quantityChange = action === "subtract" ? -quantity : quantity;
 
-    if (action === "subtract" && quantity > currentQtyAtLocation) {
+    if (action === "subtract" && quantity > availableForSubtract) {
       toast({
         title: "Invalid quantity",
         description: "Cannot subtract more than available stock.",
