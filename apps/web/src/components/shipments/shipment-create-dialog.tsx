@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { z } from "zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
 import {
   Calendar as CalendarIcon,
   ChevronsUpDown,
+  Info,
   Loader2,
+  Package,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -37,16 +39,19 @@ import { getProductChildren } from "@/lib/api/products";
 import { ProductForm } from "@/components/products/product-form";
 import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import { SupplierAutocomplete } from "@/components/suppliers";
-import { useCreateShipmentMutation, useUpdateShipmentMutation } from "@/hooks/mutations/use-shipment-mutations";
+import {
+  useCreateShipmentMutation,
+  useUpdateShipmentMutation,
+} from "@/hooks/mutations/use-shipment-mutations";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   ShipmentStatus,
   type Product,
+  type ProductSummary,
   type Shipment,
   type ShipmentItemRequest,
-  type ProductSummary,
 } from "@/types/api";
 
 const itemSchema = z.object({
@@ -58,9 +63,7 @@ const itemSchema = z.object({
     .int()
     .min(0, "Quantity must be 0 or more"),
   unitCost: z.coerce.number().min(0).optional(),
-  /** Number of kuji sets - used to auto-calculate prize quantities */
   numberOfSets: z.coerce.number().int().min(0).optional(),
-  /** When Kuji is selected: quantity per prize (prizeId -> quantity) */
   prizeQuantities: z.record(z.string(), z.coerce.number().int().min(0)).optional(),
 });
 
@@ -77,6 +80,8 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+type ActiveKey = "details" | number;
 
 interface ShipmentCreateDialogProps {
   open: boolean;
@@ -99,12 +104,15 @@ export function ShipmentCreateDialog({
 
   const isEditMode = !!initialShipment;
 
-  const [productDialogIndex, setProductDialogIndex] = useState<number | null>(null);
-  // Track selected product IDs in state to ensure re-renders when products are selected
-  const [selectedProductIds, setSelectedProductIds] = useState<Record<number, string>>({});
+  const [productDialogIndex, setProductDialogIndex] = useState<number | null>(
+    null,
+  );
+  const [selectedProductIds, setSelectedProductIds] = useState<
+    Record<number, string>
+  >({});
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [activeKey, setActiveKey] = useState<ActiveKey>("details");
 
-  // Get list of already selected product IDs to exclude from selection
   const excludeProductIds = Object.values(selectedProductIds).filter(Boolean);
 
   const form = useForm<FormValues>({
@@ -138,7 +146,6 @@ export function ShipmentCreateDialog({
 
   const items = form.watch("items");
 
-  // Per-row "has receipts" flag (edit mode): blocks ordered-quantity edits on items already received.
   const rowHasReceipts: Record<number, boolean> = (() => {
     if (!initialShipment) return {};
     const rootItems = initialShipment.items.filter((i) => !i.item.parentId);
@@ -153,7 +160,7 @@ export function ShipmentCreateDialog({
     });
     return map;
   })();
-  // Only fetch children for products that actually have children (Kuji products)
+
   const selectedKujiIds = useMemo(() => {
     return Object.values(selectedProductIds)
       .filter((id): id is string => !!id)
@@ -166,7 +173,7 @@ export function ShipmentCreateDialog({
       queryFn: () => getProductChildren(id),
     })),
   });
-  // Memoize children map to prevent unnecessary recalculations
+
   const childrenByProductId = useMemo(() => {
     const result: Record<string, ProductSummary[]> = {};
     selectedKujiIds.forEach((id, i) => {
@@ -176,102 +183,99 @@ export function ShipmentCreateDialog({
     return result;
   }, [selectedKujiIds, childrenQueries]);
 
-  // Helper to check if children are loading for a specific product
   function isLoadingChildrenForProduct(productId: string): boolean {
     const idx = selectedKujiIds.indexOf(productId);
     return idx !== -1 && childrenQueries[idx]?.isLoading === true;
   }
 
-  // Reset form when dialog opens
   useEffect(() => {
-    if (open) {
-      if (initialShipment) {
-        // Edit mode: populate from existing shipment
-        // Group items by parent: root items and prizes
-        const rootItems = initialShipment.items.filter((i) => !i.item.parentId);
-        const prizesByParentId: Record<string, typeof initialShipment.items> = {};
-        initialShipment.items.forEach((i) => {
-          const pid = i.item.parentId;
-          if (pid) {
-            if (!prizesByParentId[pid]) prizesByParentId[pid] = [];
-            prizesByParentId[pid].push(i);
-          }
-        });
+    if (!open) return;
+    if (initialShipment) {
+      const rootItems = initialShipment.items.filter((i) => !i.item.parentId);
+      const prizesByParentId: Record<string, typeof initialShipment.items> = {};
+      initialShipment.items.forEach((i) => {
+        const pid = i.item.parentId;
+        if (pid) {
+          if (!prizesByParentId[pid]) prizesByParentId[pid] = [];
+          prizesByParentId[pid].push(i);
+        }
+      });
 
-        const formItems = rootItems.map((item) => {
-          const prizes = prizesByParentId[item.item.id] ?? [];
-          const prizeQuantities: Record<string, number> = {};
-          prizes.forEach((p) => {
-            prizeQuantities[p.item.id] = p.orderedQuantity;
-          });
-          return {
-            productId: item.item.id,
-            productName: item.item.name,
-            productSku: item.item.sku ?? "",
-            orderedQuantity: item.orderedQuantity,
-            unitCost: item.unitCost,
+      const formItems = rootItems.map((item) => {
+        const prizes = prizesByParentId[item.item.id] ?? [];
+        const prizeQuantities: Record<string, number> = {};
+        prizes.forEach((p) => {
+          prizeQuantities[p.item.id] = p.orderedQuantity;
+        });
+        return {
+          productId: item.item.id,
+          productName: item.item.name,
+          productSku: item.item.sku ?? "",
+          orderedQuantity: item.orderedQuantity,
+          unitCost: item.unitCost,
+          numberOfSets: undefined,
+          prizeQuantities:
+            Object.keys(prizeQuantities).length > 0 ? prizeQuantities : undefined,
+        };
+      });
+
+      const productIds: Record<number, string> = {};
+      rootItems.forEach((item, index) => {
+        productIds[index] = item.item.id;
+      });
+      setSelectedProductIds(productIds);
+
+      form.reset({
+        shipmentNumber: initialShipment.shipmentNumber,
+        supplierId: initialShipment.supplierId ?? "",
+        supplierName: initialShipment.supplierName ?? "",
+        orderDate: initialShipment.orderDate,
+        expectedDeliveryDate: initialShipment.expectedDeliveryDate ?? "",
+        trackingId: initialShipment.trackingId ?? "",
+        totalCost: initialShipment.totalCost,
+        notes: initialShipment.notes ?? "",
+        items:
+          formItems.length > 0
+            ? formItems
+            : [
+                {
+                  productId: "",
+                  productName: "",
+                  productSku: "",
+                  orderedQuantity: 1,
+                  unitCost: undefined,
+                  prizeQuantities: undefined,
+                },
+              ],
+      });
+    } else {
+      form.reset({
+        shipmentNumber: "",
+        supplierId: "",
+        supplierName: "",
+        orderDate: format(new Date(), "yyyy-MM-dd"),
+        expectedDeliveryDate: "",
+        trackingId: "",
+        totalCost: undefined,
+        notes: "",
+        items: [
+          {
+            productId: "",
+            productName: "",
+            productSku: "",
+            orderedQuantity: 1,
+            unitCost: undefined,
             numberOfSets: undefined,
-            prizeQuantities: Object.keys(prizeQuantities).length > 0 ? prizeQuantities : undefined,
-          };
-        });
-
-        // Initialize selected product IDs for children queries
-        const productIds: Record<number, string> = {};
-        rootItems.forEach((item, index) => {
-          productIds[index] = item.item.id;
-        });
-        setSelectedProductIds(productIds);
-
-        form.reset({
-          shipmentNumber: initialShipment.shipmentNumber,
-          supplierId: initialShipment.supplierId ?? "",
-          supplierName: initialShipment.supplierName ?? "",
-          orderDate: initialShipment.orderDate,
-          expectedDeliveryDate: initialShipment.expectedDeliveryDate ?? "",
-          trackingId: initialShipment.trackingId ?? "",
-          totalCost: initialShipment.totalCost,
-          notes: initialShipment.notes ?? "",
-          items: formItems.length > 0 ? formItems : [
-            {
-              productId: "",
-              productName: "",
-              productSku: "",
-              orderedQuantity: 1,
-              unitCost: undefined,
-              prizeQuantities: undefined,
-            },
-          ],
-        });
-      } else {
-        // Create mode: fresh form
-        form.reset({
-          shipmentNumber: "",
-          supplierId: "",
-          supplierName: "",
-          orderDate: format(new Date(), "yyyy-MM-dd"),
-          expectedDeliveryDate: "",
-          trackingId: "",
-          totalCost: undefined,
-          notes: "",
-          items: [
-            {
-              productId: "",
-              productName: "",
-              productSku: "",
-              orderedQuantity: 1,
-              unitCost: undefined,
-              numberOfSets: undefined,
-              prizeQuantities: undefined,
-            },
-          ],
-        });
-        // Reset selected product IDs state
-        setSelectedProductIds({});
-      }
+            prizeQuantities: undefined,
+          },
+        ],
+      });
+      setSelectedProductIds({});
     }
+    setActiveKey("details");
   }, [open, form, initialShipment]);
 
-  // When children load for a Kuji, init prizeQuantities for that item row
+  // When children load for a Kuji, init prizeQuantities for that item row.
   useEffect(() => {
     items?.forEach((item, index) => {
       const pid = item.productId;
@@ -295,29 +299,64 @@ export function ShipmentCreateDialog({
   }, [childrenByProductId, form, items]);
 
   function handleSelectProduct(index: number, product: Product) {
-    // Batch all form updates into a single setValue call to reduce re-renders
     const currentItem = form.getValues(`items.${index}`);
-    form.setValue(`items.${index}`, {
-      ...currentItem,
-      productId: product.id,
-      productName: product.name,
-      productSku: product.sku ?? "",
-      numberOfSets: undefined,
-      prizeQuantities: undefined,
-      unitCost: product.unitCost ?? currentItem.unitCost,
-    }, { shouldValidate: false });
-
-    // Update state to trigger re-render and fetch children
+    form.setValue(
+      `items.${index}`,
+      {
+        ...currentItem,
+        productId: product.id,
+        productName: product.name,
+        productSku: product.sku ?? "",
+        numberOfSets: undefined,
+        prizeQuantities: undefined,
+        unitCost: product.unitCost ?? currentItem.unitCost,
+      },
+      { shouldValidate: false },
+    );
     setSelectedProductIds((prev) => ({ ...prev, [index]: product.id }));
   }
 
+  function handleAddItem() {
+    append({
+      productId: "",
+      productName: "",
+      productSku: "",
+      orderedQuantity: 1,
+      unitCost: undefined,
+      numberOfSets: undefined,
+      prizeQuantities: undefined,
+    });
+    setActiveKey(fields.length); // new index after append
+  }
+
+  function handleRemoveItem(index: number) {
+    if (fields.length <= 1) return;
+    remove(index);
+    setSelectedProductIds((prev) => {
+      const next: Record<number, string> = {};
+      Object.keys(prev).forEach((k) => {
+        const i = Number(k);
+        if (i < index) next[i] = prev[i];
+        else if (i > index) next[i - 1] = prev[i];
+      });
+      return next;
+    });
+    if (activeKey === index) {
+      const newCount = fields.length - 1;
+      if (newCount === 0) setActiveKey("details");
+      else setActiveKey(Math.max(0, index - 1));
+    } else if (typeof activeKey === "number" && activeKey > index) {
+      setActiveKey(activeKey - 1);
+    }
+  }
+
   async function onSubmit(values: FormValues) {
-    const items: ShipmentItemRequest[] = [];
+    const shipmentItems: ShipmentItemRequest[] = [];
     for (const item of values.items) {
       if (!item.productId) continue;
       const parentQty = item.orderedQuantity ?? 0;
       if (parentQty > 0) {
-        items.push({
+        shipmentItems.push({
           itemId: item.productId,
           orderedQuantity: parentQty,
           unitCost: item.unitCost,
@@ -326,7 +365,7 @@ export function ShipmentCreateDialog({
       const prizeQuantities = item.prizeQuantities ?? {};
       for (const [prizeId, qty] of Object.entries(prizeQuantities)) {
         if (qty > 0) {
-          items.push({
+          shipmentItems.push({
             itemId: prizeId,
             orderedQuantity: qty,
             unitCost: undefined,
@@ -334,8 +373,11 @@ export function ShipmentCreateDialog({
         }
       }
     }
-    if (items.length === 0) {
-      toast({ title: "Error", description: "Add at least one item with quantity." });
+    if (shipmentItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Add at least one item with quantity.",
+      });
       return;
     }
 
@@ -351,14 +393,11 @@ export function ShipmentCreateDialog({
         totalCost: values.totalCost,
         notes: values.notes || undefined,
         createdBy: user?.personId,
-        items,
+        items: shipmentItems,
       };
 
       if (isEditMode && initialShipment) {
-        await updateMutation.mutateAsync({
-          id: initialShipment.id,
-          payload,
-        });
+        await updateMutation.mutateAsync({ id: initialShipment.id, payload });
         toast({ title: "Shipment updated successfully", variant: "success" });
       } else {
         await createMutation.mutateAsync(payload);
@@ -367,23 +406,42 @@ export function ShipmentCreateDialog({
       onOpenChange(false);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} shipment`;
+        err instanceof Error
+          ? err.message
+          : `Failed to ${isEditMode ? "update" : "create"} shipment`;
       toast({ title: "Error", description: message });
     }
   }
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-  const orderDateValue = form.watch("orderDate");
-  const expectedDeliveryDateValue = form.watch("expectedDeliveryDate");
-
-  // react-day-picker v9 passes UTC midnight dates to onSelect,
-  // so we must read UTC parts to get the correct calendar date.
-  function toDateString(date: Date): string {
-    const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(date.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+  // Surface validation errors by jumping to the offending entry.
+  function onInvalid(errs: Record<string, unknown>) {
+    const headerKeys = [
+      "shipmentNumber",
+      "supplierId",
+      "supplierName",
+      "orderDate",
+      "expectedDeliveryDate",
+      "trackingId",
+      "totalCost",
+      "notes",
+    ];
+    if (headerKeys.some((k) => k in errs)) {
+      setActiveKey("details");
+      return;
+    }
+    if (errs.items && typeof errs.items === "object") {
+      const itemErrs = errs.items as Record<string, unknown>;
+      for (const k of Object.keys(itemErrs)) {
+        const idx = Number(k);
+        if (!Number.isNaN(idx)) {
+          setActiveKey(idx);
+          return;
+        }
+      }
+    }
   }
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <>
@@ -391,7 +449,6 @@ export function ShipmentCreateDialog({
         open={addProductOpen}
         onOpenChange={setAddProductOpen}
         onProductCreated={(product) => {
-          // Add the new product as a line item in the shipment
           append({
             productId: product.id,
             productName: product.name,
@@ -401,11 +458,11 @@ export function ShipmentCreateDialog({
             numberOfSets: undefined,
             prizeQuantities: undefined,
           });
-          // Track for children query
           setSelectedProductIds((prev) => ({
             ...prev,
             [fields.length]: product.id,
           }));
+          setActiveKey(fields.length);
         }}
       />
       <SelectShipmentProductDialog
@@ -422,9 +479,11 @@ export function ShipmentCreateDialog({
         }}
       />
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="p-4 sm:p-6">
-            <DialogTitle>{isEditMode ? "Edit Shipment" : "Create New Shipment"}</DialogTitle>
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle>
+              {isEditMode ? "Edit Shipment" : "Create New Shipment"}
+            </DialogTitle>
             <DialogDescription>
               {isEditMode
                 ? "Update the shipment details below."
@@ -433,402 +492,98 @@ export function ShipmentCreateDialog({
           </DialogHeader>
 
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             className="flex flex-col flex-1 min-h-0"
           >
-            <div className="overflow-y-auto px-4 sm:px-6 pb-4 space-y-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="shipmentNumber">Shipment Name</Label>
-                  <Input
-                    id="shipmentNumber"
-                    placeholder="Enter shipment name..."
-                    readOnly={isEditMode}
-                    className={isEditMode ? "bg-muted" : undefined}
-                    {...form.register("shipmentNumber")}
-                  />
-                  {form.formState.errors.shipmentNumber?.message && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.shipmentNumber.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Supplier</Label>
-                  <SupplierAutocomplete
-                    value={form.watch("supplierId") || null}
-                    displayValue={form.watch("supplierName") || null}
-                    onChange={(supplierId, displayName) => {
-                      form.setValue("supplierId", supplierId ?? "");
-                      form.setValue("supplierName", displayName ?? "");
-                    }}
-                    placeholder="Select supplier (optional)"
+            <div className="flex flex-1 min-h-0 overflow-hidden">
+              <aside className="w-[220px] shrink-0 bg-muted/40 border-r flex flex-col overflow-hidden">
+                <div className="px-2 pt-3">
+                  <DetailsSidebarItem
+                    active={activeKey === "details"}
+                    onSelect={() => setActiveKey("details")}
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Order Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !orderDateValue && "text-muted-foreground",
-                        )}
-                      >
-                        {orderDateValue ? (
-                          format(
-                            new Date(orderDateValue + "T00:00:00"),
-                            "MM/dd/yyyy",
-                          )
-                        ) : (
-                          <span>mm/dd/yyyy</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          orderDateValue
-                            ? new Date(orderDateValue + "T00:00:00")
-                            : undefined
-                        }
-                        onSelect={(date) =>
-                          form.setValue(
-                            "orderDate",
-                            date ? toDateString(date) : "",
-                            { shouldValidate: true },
-                          )
-                        }
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {form.formState.errors.orderDate?.message && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.orderDate.message}
-                    </p>
-                  )}
-                </div>
-                <div className="grid gap-2">
-                  <Label>Expected Delivery Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !expectedDeliveryDateValue && "text-muted-foreground",
-                        )}
-                      >
-                        {expectedDeliveryDateValue ? (
-                          format(
-                            new Date(expectedDeliveryDateValue + "T00:00:00"),
-                            "MM/dd/yyyy",
-                          )
-                        ) : (
-                          <span>mm/dd/yyyy</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          expectedDeliveryDateValue
-                            ? new Date(expectedDeliveryDateValue + "T00:00:00")
-                            : undefined
-                        }
-                        onSelect={(date) =>
-                          form.setValue(
-                            "expectedDeliveryDate",
-                            date ? toDateString(date) : "",
-                            { shouldValidate: true },
-                          )
-                        }
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              <div className={canViewCosts ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : ""}>
-                <div className="grid gap-2">
-                  <Label htmlFor="trackingId">Tracking Number (optional)</Label>
-                  <Input
-                    id="trackingId"
-                    placeholder="Enter carrier tracking number..."
-                    {...form.register("trackingId")}
-                  />
-                </div>
-                {canViewCosts && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="totalCost">Total Cost</Label>
-                    <Input
-                      id="totalCost"
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      placeholder="Optional"
-                      {...form.register("totalCost")}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Items */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <Label>Items</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAddProductOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Product
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        append({
-                          productId: "",
-                          productName: "",
-                          productSku: "",
-                          orderedQuantity: 1,
-                          unitCost: undefined,
-                          numberOfSets: undefined,
-                          prizeQuantities: undefined,
-                        })
-                      }
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Item
-                    </Button>
-                  </div>
+                <div className="flex items-center px-3 pt-3 pb-1.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Products
+                  </span>
                 </div>
 
-                {form.formState.errors.items?.message && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.items.message}
-                  </p>
-                )}
-
-                <div className="space-y-3">
+                <div className="flex-1 overflow-y-auto px-2 pb-2">
                   {fields.map((field, index) => {
-                    const selectedProductId = form.watch(
-                      `items.${index}.productId`,
-                    );
-                    const selectedProduct = products.find(
-                      (p) => p.id === selectedProductId,
-                    );
-
+                    const item = items?.[index];
+                    const productId = item?.productId ?? "";
+                    const isKuji = !!childrenByProductId[productId]?.length;
                     return (
-                      <div
+                      <ProductSidebarItem
                         key={field.id}
-                        className="flex flex-col sm:flex-row sm:items-start gap-3 p-3 border rounded-lg bg-muted/30"
-                      >
-                        <div className="flex-1 space-y-3">
-                          {/* Product Selector */}
-                          <div className="grid gap-2">
-                            <Label className="text-xs">Product</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="justify-between w-full"
-                              disabled={productsQuery.isLoading}
-                              onClick={() => setProductDialogIndex(index)}
-                            >
-                              {selectedProduct
-                                ? selectedProduct.sku
-                                  ? `${selectedProduct.name} (${selectedProduct.sku})`
-                                  : selectedProduct.name
-                                : "Select product..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                            </Button>
-                            {form.formState.errors.items?.[index]?.productId
-                              ?.message && (
-                              <p className="text-xs text-destructive">
-                                {
-                                  form.formState.errors.items[index]?.productId
-                                    ?.message
-                                }
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="grid gap-2">
-                              <Label className="text-xs">
-                                {childrenByProductId[selectedProductId]?.length
-                                  ? "Total Kuji (sets)"
-                                  : "Quantity"}
-                              </Label>
-                              <Input
-                                type="number"
-                                min={0}
-                                disabled={rowHasReceipts[index]}
-                                title={
-                                  rowHasReceipts[index]
-                                    ? "Undo this item's receipts before changing the ordered quantity."
-                                    : undefined
-                                }
-                                {...form.register(
-                                  `items.${index}.orderedQuantity`,
-                                )}
-                              />
-                              {rowHasReceipts[index] && (
-                                <p className="text-xs text-muted-foreground">
-                                  Undo this item&apos;s receipts to change the
-                                  ordered quantity.
-                                </p>
-                              )}
-                              {form.formState.errors.items?.[index]
-                                ?.orderedQuantity?.message && (
-                                <p className="text-xs text-destructive">
-                                  {
-                                    form.formState.errors.items[index]
-                                      ?.orderedQuantity?.message
-                                  }
-                                </p>
-                              )}
-                            </div>
-                            {canViewCosts && (
-                              <div className="grid gap-2">
-                                <Label className="text-xs">Unit Cost</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min={0}
-                                  placeholder="Optional"
-                                  {...form.register(`items.${index}.unitCost`)}
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {isLoadingChildrenForProduct(selectedProductId) ? (
-                            <div className="space-y-2 rounded-md border p-3 bg-muted/20">
-                              <div className="flex items-center gap-3 pb-2 border-b">
-                                <Skeleton className="h-4 w-10" />
-                                <Skeleton className="h-8 w-20" />
-                              </div>
-                              <Skeleton className="h-4 w-32 mt-2" />
-                              <div className="space-y-2">
-                                <Skeleton className="h-8 w-full" />
-                                <Skeleton className="h-8 w-full" />
-                                <Skeleton className="h-8 w-full" />
-                              </div>
-                            </div>
-                          ) : childrenByProductId[selectedProductId]?.length ? (
-                            <div className="space-y-2 rounded-md border p-3 bg-muted/20">
-                              {/* Sets input for auto-calculation */}
-                              <div className="flex items-center gap-3 pb-2 border-b">
-                                <Label className="text-xs font-medium">Sets:</Label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  className="w-20 h-8"
-                                  placeholder="0"
-                                  {...form.register(`items.${index}.numberOfSets`)}
-                                  onChange={(e) => {
-                                    const sets = parseInt(e.target.value, 10) || 0;
-                                    form.setValue(`items.${index}.numberOfSets`, sets);
-                                    // Sync Total Kuji (sets) with Sets input
-                                    form.setValue(`items.${index}.orderedQuantity`, sets);
-                                    // Auto-calculate prize quantities
-                                    const children = childrenByProductId[selectedProductId] ?? [];
-                                    const newPrizeQtys: Record<string, number> = {};
-                                    children.forEach((prize) => {
-                                      const templateQty = prize.templateQuantity ?? 0;
-                                      newPrizeQtys[prize.id] = templateQty * sets;
-                                    });
-                                    form.setValue(`items.${index}.prizeQuantities`, newPrizeQtys);
-                                  }}
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                  (auto-fills prize quantities)
-                                </span>
-                              </div>
-                              <Label className="text-xs">
-                                Prize quantities (editable)
-                              </Label>
-                              <div className="grid gap-2">
-                                {sortPrizes(childrenByProductId[
-                                  selectedProductId
-                                ] ?? []).map((prize) => (
-                                  <div
-                                    key={prize.id}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <span className="text-sm font-medium min-w-0 truncate max-w-[4rem]" title={prize.letter ?? prize.name}>
-                                      {prizeLetterDisplay(prize.letter) || prize.name.slice(0, 1)}
-                                    </span>
-                                    {prize.templateQuantity && (
-                                      <span className="text-xs text-muted-foreground">
-                                        ({prize.templateQuantity}/set)
-                                      </span>
-                                    )}
-                                    <span className="text-sm text-muted-foreground flex-1 truncate">
-                                      {prize.name}
-                                    </span>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      className="w-20"
-                                      {...form.register(
-                                        `items.${index}.prizeQuantities.${prize.id}`,
-                                        { setValueAs: (v) =>
-                                          Math.max(0, parseInt(String(v), 10) || 0),
-                                        }
-                                      )}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {fields.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 self-end sm:mt-6"
-                            onClick={() => remove(index)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
+                        index={index}
+                        productName={item?.productName ?? ""}
+                        orderedQuantity={item?.orderedQuantity ?? 0}
+                        isKuji={isKuji}
+                        active={activeKey === index}
+                        canRemove={fields.length > 1}
+                        disabled={isSaving}
+                        onSelect={() => setActiveKey(index)}
+                        onRemove={() => handleRemoveItem(index)}
+                      />
                     );
                   })}
+                  {form.formState.errors.items?.message && (
+                    <p className="text-xs text-destructive px-2 py-2">
+                      {form.formState.errors.items.message}
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes (optional)</Label>
-                <Input
-                  id="notes"
-                  placeholder="Any additional notes..."
-                  {...form.register("notes")}
-                />
+                <div className="border-t flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setAddProductOpen(true)}
+                    disabled={isSaving}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors border-b"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    disabled={isSaving}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Item
+                  </button>
+                </div>
+              </aside>
+
+              <div className="flex-1 overflow-y-auto min-w-0">
+                {activeKey === "details" ? (
+                  <ShipmentDetailsPanel
+                    form={form}
+                    canViewCosts={canViewCosts}
+                    isEditMode={isEditMode}
+                  />
+                ) : typeof activeKey === "number" && fields[activeKey] ? (
+                  <ShipmentItemPanel
+                    key={fields[activeKey].id}
+                    form={form}
+                    index={activeKey}
+                    products={products}
+                    productsLoading={productsQuery.isLoading}
+                    canViewCosts={canViewCosts}
+                    rowHasReceipts={rowHasReceipts[activeKey] ?? false}
+                    childrenByProductId={childrenByProductId}
+                    isLoadingChildrenForProduct={isLoadingChildrenForProduct}
+                    onOpenProductPicker={() => setProductDialogIndex(activeKey)}
+                  />
+                ) : null}
               </div>
             </div>
 
-            <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 border-t">
+            <DialogFooter className="px-6 py-4 border-t">
               <Button
                 type="button"
                 variant="outline"
@@ -837,7 +592,11 @@ export function ShipmentCreateDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving} className="text-white bg-brand-primary hover:bg-brand-primary-hover">
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="text-white bg-brand-primary hover:bg-brand-primary-hover"
+              >
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
@@ -848,5 +607,513 @@ export function ShipmentCreateDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+interface DetailsSidebarItemProps {
+  readonly active: boolean;
+  readonly onSelect: () => void;
+}
+
+function DetailsSidebarItem({ active, onSelect }: DetailsSidebarItemProps) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={cn(
+        "group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer border border-transparent transition-colors",
+        active
+          ? "bg-background border-border shadow-sm"
+          : "hover:bg-muted/60",
+      )}
+    >
+      <div
+        className={cn(
+          "w-7 h-7 rounded-md flex items-center justify-center shrink-0",
+          active
+            ? "bg-muted text-foreground"
+            : "bg-muted/60 text-muted-foreground",
+        )}
+      >
+        <Info className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate">Shipment details</div>
+        <div className="text-[11px] text-muted-foreground truncate">
+          Name, dates, supplier
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ProductSidebarItemProps {
+  readonly index: number;
+  readonly productName: string;
+  readonly orderedQuantity: number;
+  readonly isKuji: boolean;
+  readonly active: boolean;
+  readonly canRemove: boolean;
+  readonly disabled: boolean;
+  readonly onSelect: () => void;
+  readonly onRemove: () => void;
+}
+
+function ProductSidebarItem({
+  index,
+  productName,
+  orderedQuantity,
+  isKuji,
+  active,
+  canRemove,
+  disabled,
+  onSelect,
+  onRemove,
+}: ProductSidebarItemProps) {
+  const subtitle = orderedQuantity
+    ? `${orderedQuantity} ${isKuji ? "sets" : "units"}`
+    : "No quantity set";
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={cn(
+        "group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer mb-0.5 border border-transparent transition-colors",
+        active
+          ? "bg-background border-border shadow-sm"
+          : "hover:bg-muted/60",
+      )}
+    >
+      <div
+        className={cn(
+          "w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold shrink-0",
+          active
+            ? "bg-muted text-foreground"
+            : "bg-muted/60 text-muted-foreground",
+        )}
+      >
+        {index + 1}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate">
+          {productName || "Select product…"}
+        </div>
+        <div className="text-[11px] text-muted-foreground truncate">
+          {subtitle}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        disabled={disabled || !canRemove}
+        aria-label={`Remove product ${index + 1}`}
+        className={cn(
+          "shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity",
+          (!canRemove || disabled) && "pointer-events-none opacity-0",
+        )}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+interface ShipmentDetailsPanelProps {
+  readonly form: UseFormReturn<FormValues>;
+  readonly canViewCosts: boolean;
+  readonly isEditMode: boolean;
+}
+
+function ShipmentDetailsPanel({
+  form,
+  canViewCosts,
+  isEditMode,
+}: ShipmentDetailsPanelProps) {
+  const orderDateValue = form.watch("orderDate");
+  const expectedDeliveryDateValue = form.watch("expectedDeliveryDate");
+
+  function toDateString(date: Date): string {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  return (
+    <div className="p-5 space-y-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Shipment details
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="shipmentNumber" className="text-xs">
+            Shipment Name
+          </Label>
+          <Input
+            id="shipmentNumber"
+            placeholder="Enter shipment name..."
+            readOnly={isEditMode}
+            className={isEditMode ? "bg-muted" : undefined}
+            {...form.register("shipmentNumber")}
+          />
+          {form.formState.errors.shipmentNumber?.message && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.shipmentNumber.message}
+            </p>
+          )}
+        </div>
+        <div className="grid gap-1.5">
+          <Label className="text-xs">Supplier</Label>
+          <SupplierAutocomplete
+            value={form.watch("supplierId") || null}
+            displayValue={form.watch("supplierName") || null}
+            onChange={(supplierId, displayName) => {
+              form.setValue("supplierId", supplierId ?? "");
+              form.setValue("supplierName", displayName ?? "");
+            }}
+            placeholder="Select supplier (optional)"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid gap-1.5">
+          <Label className="text-xs">Order Date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !orderDateValue && "text-muted-foreground",
+                )}
+              >
+                {orderDateValue ? (
+                  format(new Date(orderDateValue + "T00:00:00"), "MM/dd/yyyy")
+                ) : (
+                  <span>mm/dd/yyyy</span>
+                )}
+                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={
+                  orderDateValue
+                    ? new Date(orderDateValue + "T00:00:00")
+                    : undefined
+                }
+                onSelect={(date) =>
+                  form.setValue(
+                    "orderDate",
+                    date ? toDateString(date) : "",
+                    { shouldValidate: true },
+                  )
+                }
+              />
+            </PopoverContent>
+          </Popover>
+          {form.formState.errors.orderDate?.message && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.orderDate.message}
+            </p>
+          )}
+        </div>
+        <div className="grid gap-1.5">
+          <Label className="text-xs">Expected Delivery Date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !expectedDeliveryDateValue && "text-muted-foreground",
+                )}
+              >
+                {expectedDeliveryDateValue ? (
+                  format(
+                    new Date(expectedDeliveryDateValue + "T00:00:00"),
+                    "MM/dd/yyyy",
+                  )
+                ) : (
+                  <span>mm/dd/yyyy</span>
+                )}
+                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={
+                  expectedDeliveryDateValue
+                    ? new Date(expectedDeliveryDateValue + "T00:00:00")
+                    : undefined
+                }
+                onSelect={(date) =>
+                  form.setValue(
+                    "expectedDeliveryDate",
+                    date ? toDateString(date) : "",
+                    { shouldValidate: true },
+                  )
+                }
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <div
+        className={
+          canViewCosts ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : ""
+        }
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="trackingId" className="text-xs">
+            Tracking Number{" "}
+            <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <Input
+            id="trackingId"
+            placeholder="Enter carrier tracking number..."
+            {...form.register("trackingId")}
+          />
+        </div>
+        {canViewCosts && (
+          <div className="grid gap-1.5">
+            <Label htmlFor="totalCost" className="text-xs">
+              Total Cost
+            </Label>
+            <Input
+              id="totalCost"
+              type="number"
+              step="0.01"
+              min={0}
+              placeholder="Optional"
+              {...form.register("totalCost")}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label htmlFor="notes" className="text-xs">
+          Notes{" "}
+          <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Input
+          id="notes"
+          placeholder="Any additional notes..."
+          {...form.register("notes")}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface ShipmentItemPanelProps {
+  readonly form: UseFormReturn<FormValues>;
+  readonly index: number;
+  readonly products: Product[];
+  readonly productsLoading: boolean;
+  readonly canViewCosts: boolean;
+  readonly rowHasReceipts: boolean;
+  readonly childrenByProductId: Record<string, ProductSummary[]>;
+  readonly isLoadingChildrenForProduct: (productId: string) => boolean;
+  readonly onOpenProductPicker: () => void;
+}
+
+function ShipmentItemPanel({
+  form,
+  index,
+  products,
+  productsLoading,
+  canViewCosts,
+  rowHasReceipts,
+  childrenByProductId,
+  isLoadingChildrenForProduct,
+  onOpenProductPicker,
+}: ShipmentItemPanelProps) {
+  const selectedProductId = form.watch(`items.${index}.productId`);
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const hasKujiChildren = !!childrenByProductId[selectedProductId]?.length;
+
+  return (
+    <div className="p-5 space-y-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <Package className="h-3.5 w-3.5" />
+        Product
+        <span className="bg-muted rounded px-2 py-0.5 text-[11px] text-foreground">
+          {index + 1}
+        </span>
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label className="text-xs">Product</Label>
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-between w-full"
+          disabled={productsLoading}
+          onClick={onOpenProductPicker}
+        >
+          {selectedProduct
+            ? selectedProduct.sku
+              ? `${selectedProduct.name} (${selectedProduct.sku})`
+              : selectedProduct.name
+            : "Select product..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+        </Button>
+        {form.formState.errors.items?.[index]?.productId?.message && (
+          <p className="text-xs text-destructive">
+            {form.formState.errors.items[index]?.productId?.message}
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label className="text-xs">
+            {hasKujiChildren ? "Total Kuji (sets)" : "Quantity"}
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            disabled={rowHasReceipts}
+            title={
+              rowHasReceipts
+                ? "Undo this item's receipts before changing the ordered quantity."
+                : undefined
+            }
+            {...form.register(`items.${index}.orderedQuantity`)}
+          />
+          {rowHasReceipts && (
+            <p className="text-[11px] text-muted-foreground">
+              Undo this item&apos;s receipts to change the ordered quantity.
+            </p>
+          )}
+          {form.formState.errors.items?.[index]?.orderedQuantity?.message && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.items[index]?.orderedQuantity?.message}
+            </p>
+          )}
+        </div>
+        {canViewCosts && (
+          <div className="grid gap-1.5">
+            <Label className="text-xs">Unit Cost</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              placeholder="Optional"
+              {...form.register(`items.${index}.unitCost`)}
+            />
+          </div>
+        )}
+      </div>
+
+      {isLoadingChildrenForProduct(selectedProductId) ? (
+        <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+          <div className="flex items-center gap-3 pb-2 border-b">
+            <Skeleton className="h-4 w-10" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+          <Skeleton className="h-4 w-32 mt-2" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </div>
+      ) : hasKujiChildren ? (
+        <div className="space-y-2 rounded-md border p-3 bg-muted/20">
+          <div className="flex items-center gap-3 pb-2 border-b">
+            <Label className="text-xs font-medium">Sets:</Label>
+            <Input
+              type="number"
+              min={0}
+              className="w-20 h-8"
+              placeholder="0"
+              {...form.register(`items.${index}.numberOfSets`)}
+              onChange={(e) => {
+                const sets = parseInt(e.target.value, 10) || 0;
+                form.setValue(`items.${index}.numberOfSets`, sets);
+                form.setValue(`items.${index}.orderedQuantity`, sets);
+                const children = childrenByProductId[selectedProductId] ?? [];
+                const newPrizeQtys: Record<string, number> = {};
+                children.forEach((prize) => {
+                  const templateQty = prize.templateQuantity ?? 0;
+                  newPrizeQtys[prize.id] = templateQty * sets;
+                });
+                form.setValue(
+                  `items.${index}.prizeQuantities`,
+                  newPrizeQtys,
+                );
+              }}
+            />
+            <span className="text-xs text-muted-foreground">
+              (auto-fills prize quantities)
+            </span>
+          </div>
+          <Label className="text-xs">Prize quantities (editable)</Label>
+          <div className="grid gap-2">
+            {sortPrizes(childrenByProductId[selectedProductId] ?? []).map(
+              (prize) => (
+                <div key={prize.id} className="flex items-center gap-2">
+                  <span
+                    className="text-sm font-medium min-w-0 truncate max-w-[4rem]"
+                    title={prize.letter ?? prize.name}
+                  >
+                    {prizeLetterDisplay(prize.letter) ||
+                      prize.name.slice(0, 1)}
+                  </span>
+                  {prize.templateQuantity && (
+                    <span className="text-xs text-muted-foreground">
+                      ({prize.templateQuantity}/set)
+                    </span>
+                  )}
+                  <span className="text-sm text-muted-foreground flex-1 truncate">
+                    {prize.name}
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="w-20"
+                    {...form.register(
+                      `items.${index}.prizeQuantities.${prize.id}`,
+                      {
+                        setValueAs: (v) =>
+                          Math.max(0, parseInt(String(v), 10) || 0),
+                      },
+                    )}
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

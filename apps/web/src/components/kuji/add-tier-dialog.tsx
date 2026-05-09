@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Copy, Layers, Loader2, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,22 +11,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ImageUpload } from "@/components/ui/image-upload";
-import { ProductLocationSelector } from "@/components/stock/product-location-selector";
-import {
-  isUploadError,
-  uploadProductImage,
-  validateFile,
-} from "@/lib/supabase/storage";
+import { isUploadError, uploadProductImage } from "@/lib/supabase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useAddKujiTierMutation } from "@/hooks/mutations/use-kuji-box-mutations";
-import { useProducts } from "@/hooks/queries/use-products";
-import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
-import type { AddKujiTierRequest, KujiBox } from "@/types/api";
-import type { LocationSelection } from "@/types/transfer";
+import { useLastClosedKujiTiers } from "@/hooks/queries/use-kuji-box";
+import type { AddKujiTierRequest, KujiBox, Product } from "@/types/api";
+import {
+  blankTier,
+  EMPTY_LOCATION,
+  validateTier,
+  type DraftTier,
+} from "@/components/kuji/tier-draft";
+import {
+  TierPanel,
+  TierSidebarItem,
+} from "@/components/kuji/tier-draft-ui";
 
 interface AddTierDialogProps {
   readonly open: boolean;
@@ -34,91 +34,129 @@ interface AddTierDialogProps {
   readonly box: KujiBox;
 }
 
-const EMPTY_LOCATION: LocationSelection = {
-  locationType: null,
-  locationId: null,
-  locationCode: "",
-};
-
-type TierMode = "existing" | "create";
-
 export function AddTierDialog({ open, onOpenChange, box }: AddTierDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const addTier = useAddKujiTierMutation();
-  const productsQuery = useProducts({ excludeCustomKuji: true });
+  const lastTiersQuery = useLastClosedKujiTiers(open ? box.productId : null);
 
-  const [mode, setMode] = useState<TierMode>("create");
-  const [label, setLabel] = useState("");
-  const [linkedProductId, setLinkedProductId] = useState("");
-  const [source, setSource] = useState<LocationSelection>(EMPTY_LOCATION);
-  const [productName, setProductName] = useState("");
-  const [productImageFile, setProductImageFile] = useState<File | null>(null);
-  const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<
-    string | null
-  >(null);
-  const [count, setCount] = useState<number | "">(1);
-  const [heldBack, setHeldBack] = useState<number | "">("");
-  const [price, setPrice] = useState("");
+  const [tiers, setTiers] = useState<DraftTier[]>([]);
+  const [activeTempId, setActiveTempId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const inventoryQuery = useProductInventoryEntries(linkedProductId || null);
-  const availableEntries = (inventoryQuery.data?.entries ?? []).filter(
-    (e) => e.locationId !== null && e.quantity > 0,
-  );
 
   useEffect(() => {
     if (open) {
-      setMode("create");
-      setLabel("");
-      setLinkedProductId("");
-      setSource(EMPTY_LOCATION);
-      setProductName("");
-      setProductImageFile(null);
-      if (productImagePreviewUrl) {
-        URL.revokeObjectURL(productImagePreviewUrl);
-      }
-      setProductImagePreviewUrl(null);
-      setCount(1);
-      setHeldBack("");
-      setPrice("");
+      const seed = blankTier();
+      setTiers([seed]);
+      setActiveTempId(seed.tempId);
       setErrors({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  function handleLinkedProductChange(nextId: string) {
-    const product = (productsQuery.data ?? []).find((p) => p.id === nextId);
-    setLinkedProductId(nextId);
-    setSource(EMPTY_LOCATION);
-    if (product?.msrp != null) {
-      setPrice(String(product.msrp));
+  function handleCloneFromLast() {
+    const data = lastTiersQuery.data;
+    if (!data || data.length === 0) {
+      toast({
+        title: "No previous box",
+        description: "There is no closed box to clone from.",
+      });
+      return;
     }
-    setErrors({});
+    const cloned: DraftTier[] = data.map((t) => ({
+      tempId: crypto.randomUUID(),
+      label: t.label,
+      letter: t.letter ?? "",
+      mode: t.linkedProductId ? "existing" : "create",
+      linkedProductId: t.linkedProductId ?? "",
+      linkedProductDisplayName: t.linkedProductName ?? "",
+      linkedProductDisplaySku: null,
+      source: EMPTY_LOCATION,
+      productName: "",
+      productImageFile: null,
+      productImagePreviewUrl: null,
+      productImageUrl: "",
+      count: t.count,
+      heldBack: "",
+      price: t.price != null ? String(t.price) : "",
+    }));
+    setTiers(cloned);
+    setActiveTempId(cloned[0]?.tempId ?? null);
+    toast({ title: `Cloned ${data.length} tier(s)`, variant: "success" });
+  }
+
+  function handleAddTier() {
+    const next = blankTier();
+    setTiers((prev) => [...prev, next]);
+    setActiveTempId(next.tempId);
+  }
+
+  function handleRemoveTier(tempId: string) {
+    setTiers((prev) => {
+      if (prev.length <= 1) return prev;
+      const idx = prev.findIndex((t) => t.tempId === tempId);
+      const next = prev.filter((t) => t.tempId !== tempId);
+      if (activeTempId === tempId) {
+        const fallback = next[idx] ?? next[idx - 1] ?? next[0];
+        setActiveTempId(fallback?.tempId ?? null);
+      }
+      return next;
+    });
+  }
+
+  function updateTier(tempId: string, updates: Partial<DraftTier>) {
+    setTiers((prev) =>
+      prev.map((t) => (t.tempId === tempId ? { ...t, ...updates } : t)),
+    );
+    setErrors((prev) => {
+      const next: Record<string, string> = {};
+      for (const k of Object.keys(prev)) {
+        if (!k.startsWith(`tier:${tempId}:`)) {
+          next[k] = prev[k];
+        }
+      }
+      return next;
+    });
+  }
+
+  function handleLinkedProductSelect(tempId: string, product: Product) {
+    setTiers((prev) =>
+      prev.map((t) => {
+        if (t.tempId !== tempId) return t;
+        return {
+          ...t,
+          linkedProductId: product.id,
+          linkedProductDisplayName: product.name,
+          linkedProductDisplaySku: product.sku ?? null,
+          source: EMPTY_LOCATION,
+          price: product.msrp != null ? String(product.msrp) : t.price,
+        };
+      }),
+    );
+    setErrors((prev) => {
+      const next: Record<string, string> = {};
+      for (const k of Object.keys(prev)) {
+        if (!k.startsWith(`tier:${tempId}:`)) {
+          next[k] = prev[k];
+        }
+      }
+      return next;
+    });
   }
 
   function validate(): boolean {
-    const next: Record<string, string> = {};
-    if (!label.trim()) next.label = "Label is required";
-    if (count === "" || (typeof count === "number" && count < 0)) {
-      next.count = "Slips must be ≥ 0";
+    const nextErrors: Record<string, string> = {};
+    if (tiers.length === 0) {
+      nextErrors.tiers = "At least one tier is required";
     }
-    if (typeof heldBack === "number" && heldBack < 0) {
-      next.heldBack = "Held back must be ≥ 0";
+    tiers.forEach((tier) => validateTier(tier, nextErrors));
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      const firstBadTier = tiers.find((t) =>
+        Object.keys(nextErrors).some((k) => k.startsWith(`tier:${t.tempId}:`)),
+      );
+      if (firstBadTier) setActiveTempId(firstBadTier.tempId);
     }
-    if (mode === "existing") {
-      if (!linkedProductId) next.linkedProduct = "Pick a product";
-      else if (!source.locationType || !source.locationId) {
-        next.source = "Source location is required";
-      }
-    } else if (!productName.trim()) {
-      next.productName = "Prize name is required";
-    }
-    if (price && Number.isNaN(parseFloat(price))) {
-      next.price = "Price must be a number";
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
+    return Object.keys(nextErrors).length === 0;
   }
 
   async function handleSubmit() {
@@ -129,278 +167,170 @@ export function AddTierDialog({ open, onOpenChange, box }: AddTierDialogProps) {
     }
     if (!validate()) return;
 
-    let uploadedImageUrl: string | null = null;
-    if (mode === "create" && productImageFile) {
-      const result = await uploadProductImage(productImageFile);
-      if (isUploadError(result)) {
-        toast({ title: "Image upload failed", description: result.message });
+    // Upload images first so a partial submit doesn't half-create tiers.
+    const uploadedUrlByTempId = new Map<string, string>();
+    try {
+      for (const t of tiers) {
+        if (t.mode === "create" && t.productImageFile) {
+          const result = await uploadProductImage(t.productImageFile);
+          if (isUploadError(result)) {
+            toast({
+              title: "Image upload failed",
+              description: result.message,
+            });
+            return;
+          }
+          uploadedUrlByTempId.set(t.tempId, result.url);
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Image upload failed";
+      toast({ title: "Image upload failed", description: message });
+      return;
+    }
+
+    let succeeded = 0;
+    for (let i = 0; i < tiers.length; i++) {
+      const t = tiers[i];
+      const isCreate = t.mode === "create";
+      const uploadedImageUrl =
+        uploadedUrlByTempId.get(t.tempId) ?? (t.productImageUrl || null);
+      const parsedPrice = t.price === "" ? null : parseFloat(t.price);
+      const payload: AddKujiTierRequest = {
+        actorId,
+        label: t.label.trim(),
+        linkedProductId: isCreate ? null : t.linkedProductId || null,
+        sourceLocationId:
+          !isCreate && t.linkedProductId ? t.source.locationId : null,
+        count: t.count === "" ? 0 : t.count,
+        heldBackQuantity: typeof t.heldBack === "number" ? t.heldBack : 0,
+        price: parsedPrice,
+        autoCreate: isCreate,
+        productName: isCreate ? t.productName.trim() : null,
+        productImageUrl: isCreate ? uploadedImageUrl : null,
+        productMsrp: isCreate ? parsedPrice : null,
+      };
+
+      try {
+        await addTier.mutateAsync({
+          boxId: box.id,
+          productId: box.productId,
+          payload,
+        });
+        succeeded += 1;
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Failed to add tier";
+        toast({
+          title: `Add tier ${i + 1} failed`,
+          description:
+            succeeded > 0
+              ? `${succeeded} tier(s) added before this failure. ${message}`
+              : message,
+        });
+        setActiveTempId(t.tempId);
         return;
       }
-      uploadedImageUrl = result.url;
     }
 
-    const isCreate = mode === "create";
-    const parsedPrice = price === "" ? null : parseFloat(price);
-    const payload: AddKujiTierRequest = {
-      actorId,
-      label: label.trim(),
-      linkedProductId: isCreate ? null : linkedProductId || null,
-      sourceLocationId: !isCreate && linkedProductId ? source.locationId : null,
-      count: count === "" ? 0 : count,
-      heldBackQuantity: typeof heldBack === "number" ? heldBack : 0,
-      price: parsedPrice,
-      autoCreate: isCreate,
-      productName: isCreate ? productName.trim() : null,
-      productImageUrl: isCreate ? uploadedImageUrl : null,
-      productMsrp: isCreate ? parsedPrice : null,
-    };
-
-    try {
-      await addTier.mutateAsync({
-        boxId: box.id,
-        productId: box.productId,
-        payload,
-      });
-      toast({ title: "Tier added", variant: "success" });
-      onOpenChange(false);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to add tier";
-      toast({ title: "Add tier failed", description: message });
-    }
+    toast({
+      title:
+        succeeded === 1 ? "Tier added" : `${succeeded} tiers added`,
+      variant: "success",
+    });
+    onOpenChange(false);
   }
 
   const isPending = addTier.isPending;
+  const hasLastTiers = (lastTiersQuery.data?.length ?? 0) > 0;
+  const activeTier = tiers.find((t) => t.tempId === activeTempId) ?? null;
+  const activeIndex = activeTier
+    ? tiers.findIndex((t) => t.tempId === activeTier.tempId)
+    : -1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-2">
+      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle>Add Tier</DialogTitle>
           <DialogDescription>
-            Add a new prize tier to this open box.
+            Add one or more prize tiers to this open box.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
-          <div className="grid gap-2">
-            <Label>Label</Label>
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              disabled={isPending}
-            />
-            {errors.label ? (
-              <p className="text-xs text-destructive">{errors.label}</p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-1">
-            <Label className="text-xs">Prize source</Label>
-            <div className="flex gap-1 rounded-md border p-1">
-              <button
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <aside className="w-[220px] shrink-0 bg-muted/40 border-r flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Tiers
+              </span>
+              <Button
                 type="button"
-                className={`flex-1 rounded px-3 py-1 text-xs ${
-                  mode === "create"
-                    ? "bg-background font-medium"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-                onClick={() => {
-                  setMode("create");
-                  setLinkedProductId("");
-                  setSource(EMPTY_LOCATION);
-                }}
-                disabled={isPending}
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                onClick={handleCloneFromLast}
+                disabled={
+                  isPending || lastTiersQuery.isLoading || !hasLastTiers
+                }
+                title={
+                  hasLastTiers
+                    ? "Clone tiers from last closed box"
+                    : "No previous box to clone"
+                }
               >
-                Create new
-              </button>
-              <button
-                type="button"
-                className={`flex-1 rounded px-3 py-1 text-xs ${
-                  mode === "existing"
-                    ? "bg-background font-medium"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-                onClick={() => {
-                  setMode("existing");
-                  setProductName("");
-                  setProductImageFile(null);
-                  if (productImagePreviewUrl) {
-                    URL.revokeObjectURL(productImagePreviewUrl);
-                  }
-                  setProductImagePreviewUrl(null);
-                }}
-                disabled={isPending}
-              >
-                Existing product
-              </button>
+                <Copy className="h-3 w-3 mr-1" />
+                Clone last
+              </Button>
             </div>
-          </div>
 
-          {mode === "existing" ? (
-            <>
-              <div className="grid gap-2">
-                <Label>Linked Product</Label>
-                <select
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={linkedProductId}
-                  onChange={(e) => handleLinkedProductChange(e.target.value)}
+            <div className="flex-1 overflow-y-auto px-2 pb-2">
+              {tiers.map((tier, idx) => (
+                <TierSidebarItem
+                  key={tier.tempId}
+                  tier={tier}
+                  index={idx}
+                  active={tier.tempId === activeTempId}
+                  canRemove={tiers.length > 1}
                   disabled={isPending}
-                >
-                  <option value="">— Pick a product —</option>
-                  {(productsQuery.data ?? []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.linkedProduct ? (
-                  <p className="text-xs text-destructive">{errors.linkedProduct}</p>
-                ) : null}
-              </div>
-
-              {linkedProductId ? (
-                <div className="grid gap-2">
-                  <Label>Source Location (transfer-in)</Label>
-                  {inventoryQuery.isLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading locations…
-                    </div>
-                  ) : (
-                    <ProductLocationSelector
-                      inventoryEntries={availableEntries}
-                      value={source}
-                      onChange={(v) => setSource(v)}
-                      disabled={isPending}
-                    />
-                  )}
-                  {errors.source ? (
-                    <p className="text-xs text-destructive">{errors.source}</p>
-                  ) : null}
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <div className="grid gap-2">
-                <Label>Prize name</Label>
-                <Input
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  disabled={isPending}
-                  placeholder="e.g. Holographic Charizard"
+                  onSelect={() => setActiveTempId(tier.tempId)}
+                  onRemove={() => handleRemoveTier(tier.tempId)}
                 />
-                {errors.productName ? (
-                  <p className="text-xs text-destructive">{errors.productName}</p>
-                ) : null}
-              </div>
-              <div className="grid gap-2">
-                <Label>Image (optional)</Label>
-                <ImageUpload
-                  displayUrl={productImagePreviewUrl}
-                  isUploading={false}
-                  error={null}
-                  hasNewFile={productImageFile != null}
-                  onFileSelect={(file) => {
-                    if (!file) {
-                      if (productImagePreviewUrl) {
-                        URL.revokeObjectURL(productImagePreviewUrl);
-                      }
-                      setProductImageFile(null);
-                      setProductImagePreviewUrl(null);
-                      return;
-                    }
-                    const validationError = validateFile(file);
-                    if (validationError) {
-                      toast({
-                        title: "Invalid image",
-                        description: validationError.message,
-                      });
-                      return;
-                    }
-                    if (productImagePreviewUrl) {
-                      URL.revokeObjectURL(productImagePreviewUrl);
-                    }
-                    const previewUrl = URL.createObjectURL(file);
-                    setProductImageFile(file);
-                    setProductImagePreviewUrl(previewUrl);
-                  }}
-                  onClear={() => {
-                    if (productImagePreviewUrl) {
-                      URL.revokeObjectURL(productImagePreviewUrl);
-                    }
-                    setProductImageFile(null);
-                    setProductImagePreviewUrl(null);
-                  }}
-                  disabled={isPending}
-                />
-              </div>
-            </>
-          )}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Slips</Label>
-              <Input
-                type="number"
-                min={0}
-                value={count}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    setCount("");
-                    return;
-                  }
-                  const v = parseInt(raw, 10);
-                  if (!Number.isNaN(v) && v >= 0) {
-                    setCount(v);
-                  }
-                }}
-                disabled={isPending}
-              />
-              {errors.count ? (
-                <p className="text-xs text-destructive">{errors.count}</p>
+              ))}
+              {errors.tiers ? (
+                <p className="text-xs text-destructive px-2 py-2">
+                  {errors.tiers}
+                </p>
               ) : null}
             </div>
-            <div className="grid gap-2">
-              <Label>Held back (not in slips)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={heldBack}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    setHeldBack("");
-                    return;
-                  }
-                  const v = parseInt(raw, 10);
-                  if (!Number.isNaN(v) && v >= 0) {
-                    setHeldBack(v);
-                  }
-                }}
-                disabled={isPending}
-                placeholder="0"
-              />
-              {errors.heldBack ? (
-                <p className="text-xs text-destructive">{errors.heldBack}</p>
-              ) : null}
-            </div>
-          </div>
 
-          <div className="grid gap-2">
-            <Label>Price (optional)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
+            <button
+              type="button"
+              onClick={handleAddTier}
               disabled={isPending}
-            />
-            {errors.price ? (
-              <p className="text-xs text-destructive">{errors.price}</p>
-            ) : null}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 border-t text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add tier
+            </button>
+          </aside>
+
+          <div className="flex-1 overflow-y-auto min-w-0">
+            {activeTier ? (
+              <TierPanel
+                tier={activeTier}
+                index={activeIndex}
+                errors={errors}
+                isPending={isPending}
+                onUpdate={updateTier}
+                onLinkedProductSelect={handleLinkedProductSelect}
+              />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground p-8">
+                <Layers className="h-8 w-8 opacity-40" />
+                <span className="text-sm">Select a tier to configure it</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -415,10 +345,11 @@ export function AddTierDialog({ open, onOpenChange, box }: AddTierDialogProps) {
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Add tier
+            {tiers.length > 1 ? `Add ${tiers.length} tiers` : "Add tier"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
