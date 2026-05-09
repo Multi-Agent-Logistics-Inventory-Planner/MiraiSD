@@ -3,8 +3,14 @@
 import { useMemo, useState } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,10 +23,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRecordKujiDrawMutation } from "@/hooks/mutations/use-kuji-box-mutations";
 import type { DrawLine, KujiBox, KujiBoxTier } from "@/types/api";
 import { compareTiers } from "./tier-palette";
+import { TierName } from "./tier-name";
 
 interface InlineRecordDrawFormProps {
   readonly box: KujiBox;
-  readonly onClose: () => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
 }
 
 interface DraftLine {
@@ -37,8 +45,10 @@ function makeKey(): string {
 
 export function InlineRecordDrawForm({
   box,
-  onClose,
+  open,
+  onOpenChange,
 }: InlineRecordDrawFormProps) {
+  const onClose = () => onOpenChange(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const recordDraw = useRecordKujiDrawMutation();
@@ -58,7 +68,6 @@ export function InlineRecordDrawForm({
     if (!first) return [];
     return [{ key: makeKey(), tierId: first.id, quantity: 1 }];
   });
-  const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function updateLine(key: string, patch: Partial<Omit<DraftLine, "key">>) {
@@ -128,13 +137,12 @@ export function InlineRecordDrawForm({
         productId: box.productId,
         payload: {
           actorId,
-          notes: notes.trim() || null,
+          notes: null,
           draws,
         },
       });
       toast({ title: "Draw recorded", variant: "success" });
       setLines([]);
-      setNotes("");
       setError(null);
       onClose();
     } catch (err: unknown) {
@@ -148,29 +156,37 @@ export function InlineRecordDrawForm({
 
   if (drawableTiers.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-4 dark:border-none">
-        <p className="text-xs text-muted-foreground">
-          No tiers have remaining slips to draw.
-        </p>
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-          >
-            Close
-          </Button>
-        </div>
-      </div>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record a draw</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            No tiers have remaining slips to draw.
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 dark:border-none">
-      <div className="mb-3 text-sm font-medium">Record a draw</div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record a draw</DialogTitle>
+        </DialogHeader>
 
-      <div className="mb-3 space-y-2">
+        <div className="space-y-2">
         {lines.map((line) => {
           const tier = tierById.get(line.tierId);
           const max = tier?.count ?? 1;
@@ -187,7 +203,7 @@ export function InlineRecordDrawForm({
                 <SelectContent>
                   {drawableTiers.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.label} ({t.count})
+                      <TierName tier={t} className="text-sm" />
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -222,67 +238,53 @@ export function InlineRecordDrawForm({
         })}
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={addLine}
-        disabled={isPending || lines.length >= drawableTiers.length}
-        className="mb-3 w-full border-dashed"
-      >
-        <Plus className="mr-1 h-3.5 w-3.5" />
-        Add another prize
-      </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addLine}
+          disabled={isPending || lines.length >= drawableTiers.length}
+          className="w-full border-dashed"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add another prize
+        </Button>
 
-      <div className="mb-3 grid gap-1.5">
-        <Label htmlFor="inline-draw-notes" className="text-xs">
-          Notes{" "}
-          <span className="font-normal text-muted-foreground">(optional)</span>
-        </Label>
-        <textarea
-          id="inline-draw-notes"
-          className="border-input bg-background min-h-[56px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          disabled={isPending}
-          placeholder="Optional notes"
-        />
-      </div>
+        {error ? (
+          <p className="text-xs text-destructive">{error}</p>
+        ) : null}
 
-      {error ? (
-        <p className="mb-2 text-xs text-destructive">{error}</p>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-2 border-t pt-3">
-        <span className="text-xs text-muted-foreground">
-          Total draws:{" "}
-          <span className="font-medium tabular-nums text-foreground">
-            {totalDrawn}
+        <DialogFooter className="flex flex-row items-center justify-between gap-2 border-t pt-3 sm:justify-between">
+          <span className="text-xs text-muted-foreground">
+            Total draws:{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {totalDrawn}
+            </span>
           </span>
-        </span>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={isPending || totalDrawn <= 0}
-          >
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Confirm draw
-          </Button>
-        </div>
-      </div>
-    </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={isPending || totalDrawn <= 0}
+            >
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirm draw
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -8,8 +8,10 @@ interface TierNameProps {
 export function TierName({ tier, className }: TierNameProps) {
   const productName = tier.linkedProductName?.trim();
   const label = tier.label?.trim() ?? "";
-  const showProduct =
-    productName && productName.toLowerCase() !== label.toLowerCase();
+  const hasProduct =
+    !!productName && productName.toLowerCase() !== label.toLowerCase();
+  const primary = hasProduct ? productName : label;
+  const secondary = hasProduct ? label : null;
 
   return (
     <span className={className ?? "min-w-0 flex-1 truncate text-xs"}>
@@ -18,9 +20,9 @@ export function TierName({ tier, className }: TierNameProps) {
           {tier.letter}
         </span>
       ) : null}
-      <span>{label}</span>
-      {showProduct ? (
-        <span className="ml-1.5 text-muted-foreground">{productName}</span>
+      <span>{primary}</span>
+      {secondary ? (
+        <span className="ml-1.5 text-muted-foreground">{secondary}</span>
       ) : null}
     </span>
   );

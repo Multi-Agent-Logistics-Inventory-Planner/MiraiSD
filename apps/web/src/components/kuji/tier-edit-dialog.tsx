@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronsUpDown, Loader2 } from "lucide-react";
+import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePatchKujiTierMutation } from "@/hooks/mutations/use-kuji-box-mutations";
 import { useUpdateProductMutation } from "@/hooks/mutations/use-product-mutations";
-import { useProducts } from "@/hooks/queries/use-products";
 import type {
   KujiBox,
   KujiBoxTier,
@@ -56,14 +56,19 @@ export function TierEditDialog({
   const { user } = useAuth();
   const patchTier = usePatchKujiTierMutation();
   const updateProduct = useUpdateProductMutation();
-  const productsQuery = useProducts({ excludeCustomKuji: true });
-
   const isAutoCreated = Boolean(tier.autoCreatedProduct);
 
   const [label, setLabel] = useState(tier.label);
   const [linkedProductId, setLinkedProductId] = useState(
     tier.linkedProductId ?? "",
   );
+  const [linkedProductDisplayName, setLinkedProductDisplayName] = useState(
+    tier.linkedProductName ?? "",
+  );
+  const [linkedProductDisplaySku, setLinkedProductDisplaySku] = useState<
+    string | null
+  >(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [clearLinkedProduct, setClearLinkedProduct] = useState(false);
   const [price, setPrice] = useState<string>(
     tier.price != null ? String(tier.price) : "",
@@ -87,6 +92,9 @@ export function TierEditDialog({
     if (open) {
       setLabel(tier.label);
       setLinkedProductId(tier.linkedProductId ?? "");
+      setLinkedProductDisplayName(tier.linkedProductName ?? "");
+      setLinkedProductDisplaySku(null);
+      setProductPickerOpen(false);
       setClearLinkedProduct(false);
       setPrice(tier.price != null ? String(tier.price) : "");
       setClearPrice(false);
@@ -307,29 +315,29 @@ export function TierEditDialog({
             <div className="grid gap-2">
               <Label htmlFor="tier-edit-linked">Linked Product</Label>
               <div className="flex gap-2">
-                <select
+                <Button
                   id="tier-edit-linked"
-                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={linkedProductId}
-                  onChange={(e) => {
-                    setLinkedProductId(e.target.value);
-                    setClearLinkedProduct(false);
-                  }}
+                  type="button"
+                  variant="outline"
+                  className="justify-between flex-1"
                   disabled={isPending || clearLinkedProduct}
+                  onClick={() => setProductPickerOpen(true)}
                 >
-                  <option value="">— None —</option>
-                  {(productsQuery.data ?? []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  {linkedProductId
+                    ? linkedProductDisplaySku
+                      ? `${linkedProductDisplayName} (${linkedProductDisplaySku})`
+                      : linkedProductDisplayName || "—"
+                    : "Select product..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     setLinkedProductId("");
+                    setLinkedProductDisplayName("");
+                    setLinkedProductDisplaySku(null);
                     setClearLinkedProduct(true);
                   }}
                   disabled={isPending}
@@ -437,6 +445,17 @@ export function TierEditDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <SelectShipmentProductDialog
+        open={productPickerOpen}
+        onOpenChange={setProductPickerOpen}
+        onSelect={(product) => {
+          setLinkedProductId(product.id);
+          setLinkedProductDisplayName(product.name);
+          setLinkedProductDisplaySku(product.sku ?? null);
+          setClearLinkedProduct(false);
+          setProductPickerOpen(false);
+        }}
+      />
     </Dialog>
   );
 }

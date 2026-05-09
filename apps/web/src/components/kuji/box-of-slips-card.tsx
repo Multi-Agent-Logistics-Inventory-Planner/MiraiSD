@@ -118,7 +118,7 @@ export function BoxOfSlipsCard({ tiers, totalCount }: BoxOfSlipsCardProps) {
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
-        <span className="text-sm font-medium">Box of slips</span>
+        <span className="text-sm font-medium">Active Slips</span>
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
           {totalCount} slip{totalCount === 1 ? "" : "s"}
         </span>
@@ -128,20 +128,22 @@ export function BoxOfSlipsCard({ tiers, totalCount }: BoxOfSlipsCardProps) {
           Box is empty.
         </div>
       ) : (
-        <ul className="divide-y">
-          {sorted.map((tier, idx) => (
-            <li
-              key={tier.id}
-              className="flex items-center gap-3 py-2"
-            >
-              <TierThumb tier={tier} rank={idx} onExpand={setLightbox} />
-              <TierName tier={tier} />
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-                {tier.count} · {formatChance(tier.count, totalCount)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-80 overflow-y-auto pr-1">
+          <ul className="divide-y">
+            {sorted.map((tier, idx) => (
+              <li
+                key={tier.id}
+                className="flex items-center gap-3 py-2"
+              >
+                <TierThumb tier={tier} rank={idx} onExpand={setLightbox} />
+                <TierName tier={tier} />
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
+                  {tier.count} · {formatChance(tier.count, totalCount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <ProductImageLightbox
         open={lightbox !== null}

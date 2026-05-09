@@ -24,8 +24,7 @@ import { RecordDrawDialog } from "./record-draw-dialog";
 import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
 import { AddSlipDialog } from "./add-slip-dialog";
-import { TransferInMoreDialog } from "./transfer-in-more-dialog";
-import { TransferInInventoryOnlyDialog } from "./transfer-in-inventory-only-dialog";
+import { TransferInDialog } from "./transfer-in-dialog";
 import { KujiHistoryView } from "./kuji-history-view";
 
 interface KujiBoxViewProps {
@@ -60,8 +59,6 @@ export function KujiBoxView({
   const [editTierOpen, setEditTierOpen] = useState(false);
   const [addSlipOpen, setAddSlipOpen] = useState(false);
   const [transferInOpen, setTransferInOpen] = useState(false);
-  const [transferInventoryOnlyOpen, setTransferInventoryOnlyOpen] =
-    useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
 
   const box: KujiBox | null = activeQuery.data ?? null;
@@ -78,10 +75,6 @@ export function KujiBoxView({
   function handleTransferIn(tier: KujiBoxTier) {
     setActiveTier(tier);
     setTransferInOpen(true);
-  }
-  function handleTransferInventoryOnly(tier: KujiBoxTier) {
-    setActiveTier(tier);
-    setTransferInventoryOnlyOpen(true);
   }
 
   return (
@@ -265,7 +258,6 @@ export function KujiBoxView({
             onEditTier={handleEditTier}
             onAddSlip={handleAddSlip}
             onTransferIn={handleTransferIn}
-            onTransferInventoryOnly={handleTransferInventoryOnly}
           />
           {activeTier ? (
             <>
@@ -287,19 +279,10 @@ export function KujiBoxView({
                 box={box}
                 tier={activeTier}
               />
-              <TransferInMoreDialog
+              <TransferInDialog
                 open={transferInOpen}
                 onOpenChange={(o) => {
                   setTransferInOpen(o);
-                  if (!o) setActiveTier(null);
-                }}
-                box={box}
-                tier={activeTier}
-              />
-              <TransferInInventoryOnlyDialog
-                open={transferInventoryOnlyOpen}
-                onOpenChange={(o) => {
-                  setTransferInventoryOnlyOpen(o);
                   if (!o) setActiveTier(null);
                 }}
                 box={box}
