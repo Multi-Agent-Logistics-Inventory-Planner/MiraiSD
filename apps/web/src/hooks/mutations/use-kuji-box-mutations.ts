@@ -14,69 +14,58 @@ import {
   undoKujiDraw,
 } from "@/lib/api/kuji-boxes";
 import { deleteProductImage } from "@/lib/supabase/storage";
-import type {
-  AddKujiTierRequest,
-  AddSlipRequest,
-  CloseKujiBoxRequest,
-  KujiBox,
-  OpenKujiBoxRequest,
-  PatchKujiTierRequest,
-  RecordDrawRequest,
-  TransferInMoreRequest,
+import {
+  KujiBoxStatus,
+  type AddKujiTierRequest,
+  type AddSlipRequest,
+  type CloseKujiBoxRequest,
+  type KujiBox,
+  type OpenKujiBoxRequest,
+  type PatchKujiTierRequest,
+  type RecordDrawRequest,
+  type TransferInMoreRequest,
 } from "@/types/api";
 
-interface KujiInvalidateOptions {
-  /** Inventory side-effects also occurred (open/close/reopen/draw/undo/transfer-in/etc). */
-  affectsInventory?: boolean;
-}
-
 /**
- * Invalidate every cache key that may be affected by a kuji-box mutation.
- * Always invalidates the per-product `active` and `history` keys plus the
- * per-box `detail` key. When the mutation has inventory side-effects (open,
- * close, reopen, transfer-in, draw, undo, patch-tier with linked-product
- * change), it also invalidates the product, notification, and inventory keys.
+ * Apply the mutation response directly to the kuji-box query caches and
+ * invalidate the kuji-only keys not covered by the response. Cross-cutting
+ * caches (audit-logs, products, notifications, inventory) are intentionally
+ * NOT invalidated here — the backend fires Supabase realtime broadcasts
+ * (audit_log_created, inventory_updated, product_updated) at the end of every
+ * mutation, and `useRealtimeBroadcast` invalidates those keys for us. Doing
+ * both was paying for the same refetch twice.
  */
-async function invalidateKujiQueries(
+async function applyKujiMutationResponse(
   qc: QueryClient,
+  box: KujiBox,
   productId: string | null | undefined,
-  boxId: string | null | undefined,
-  options: KujiInvalidateOptions = {}
 ) {
-  if (productId) {
+  const resolvedProductId = productId ?? box.productId;
+
+  // Box detail by id always reflects the response.
+  qc.setQueryData(["kuji-box", "detail", box.id], box);
+
+  if (resolvedProductId) {
+    if (box.status === KujiBoxStatus.OPEN) {
+      // Active query expects the currently-open box for this product.
+      qc.setQueryData(["kuji-box", "active", resolvedProductId], box);
+    } else {
+      // Closed: active query should now 404; force a refetch so the hook's
+      // retry-on-non-404 logic resolves to "no active box".
+      await qc.invalidateQueries({
+        queryKey: ["kuji-box", "active", resolvedProductId],
+      });
+    }
+    // History and last-tiers are per-product summaries not returned in the
+    // mutation response; invalidate so they refetch.
     await qc.invalidateQueries({
-      queryKey: ["kuji-box", "active", productId],
+      queryKey: ["kuji-box", "history", resolvedProductId],
     });
     await qc.invalidateQueries({
-      queryKey: ["kuji-box", "history", productId],
-    });
-    await qc.invalidateQueries({
-      queryKey: ["kuji-box", "last-tiers", productId],
+      queryKey: ["kuji-box", "last-tiers", resolvedProductId],
     });
   } else {
-    // No productId — fall back to invalidating the entire kuji-box subtree.
     await qc.invalidateQueries({ queryKey: ["kuji-box"] });
-  }
-
-  if (boxId) {
-    await qc.invalidateQueries({ queryKey: ["kuji-box", "detail", boxId] });
-  }
-
-  // Audit-log queries power the kuji activity log card and the Undo Draw history
-  // list. Realtime broadcasts also invalidate these, but invalidating directly
-  // makes the refresh deterministic right after a mutation.
-  await qc.invalidateQueries({ queryKey: ["audit-logs"] });
-  await qc.invalidateQueries({ queryKey: ["audit-log"] });
-
-  if (options.affectsInventory) {
-    await qc.invalidateQueries({ queryKey: ["products"] });
-    await qc.invalidateQueries({ queryKey: ["notifications"] });
-    // Inventory views are split across multiple top-level keys in this
-    // codebase; invalidate each so kuji-driven inventory changes are visible.
-    await qc.invalidateQueries({ queryKey: ["locationInventory"] });
-    await qc.invalidateQueries({ queryKey: ["inventoryByItem"] });
-    await qc.invalidateQueries({ queryKey: ["inventoryTotals"] });
-    await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
   }
 }
 
@@ -85,9 +74,7 @@ export function useOpenKujiBoxMutation() {
   return useMutation<KujiBox, Error, OpenKujiBoxRequest>({
     mutationFn: (payload) => openKujiBox(payload),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -120,9 +107,7 @@ export function useCloseKujiBoxMutation() {
         ),
       );
 
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -138,9 +123,7 @@ export function useReopenKujiBoxMutation() {
   return useMutation<KujiBox, Error, ReopenKujiBoxVariables>({
     mutationFn: ({ boxId, actorId }) => reopenKujiBox(boxId, actorId),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -158,18 +141,7 @@ export function usePatchKujiTierMutation() {
     mutationFn: ({ boxId, tierId, payload }) =>
       patchKujiTier(boxId, tierId, payload),
     onSuccess: async (box, variables) => {
-      // Only inventory-affecting if linked product changed (which may transfer the
-      // old product's stock out via linkedProductDestinationLocationId).
-      const affectsInventory =
-        variables.payload.linkedProductId !== undefined ||
-        variables.payload.clearLinkedProduct === true ||
-        variables.payload.linkedProductDestinationLocationId !== undefined;
-      await invalidateKujiQueries(
-        qc,
-        variables.productId ?? box.productId,
-        box.id,
-        { affectsInventory }
-      );
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -187,9 +159,7 @@ export function useTransferInMoreToKujiTierMutation() {
     mutationFn: ({ boxId, tierId, payload }) =>
       transferInMoreToKujiTier(boxId, tierId, payload),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -200,9 +170,7 @@ export function useTransferInInventoryOnlyToKujiTierMutation() {
     mutationFn: ({ boxId, tierId, payload }) =>
       transferInInventoryOnlyToKujiTier(boxId, tierId, payload),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -218,9 +186,7 @@ export function useRecordKujiDrawMutation() {
   return useMutation<KujiBox, Error, RecordKujiDrawVariables>({
     mutationFn: ({ boxId, payload }) => recordKujiDraw(boxId, payload),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -238,9 +204,7 @@ export function useUndoKujiDrawMutation() {
     mutationFn: ({ boxId, auditLogId, actorId }) =>
       undoKujiDraw(boxId, auditLogId, actorId),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(qc, variables.productId ?? box.productId, box.id, {
-        affectsInventory: true,
-      });
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -258,13 +222,7 @@ export function useAddKujiSlipMutation() {
     mutationFn: ({ boxId, tierId, payload }) =>
       addKujiSlip(boxId, tierId, payload),
     onSuccess: async (box, variables) => {
-      // Adding slips does NOT change linked-product inventory.
-      await invalidateKujiQueries(
-        qc,
-        variables.productId ?? box.productId,
-        box.id,
-        { affectsInventory: false }
-      );
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }
@@ -280,12 +238,7 @@ export function useAddKujiTierMutation() {
   return useMutation<KujiBox, Error, AddKujiTierVariables>({
     mutationFn: ({ boxId, payload }) => addKujiTier(boxId, payload),
     onSuccess: async (box, variables) => {
-      await invalidateKujiQueries(
-        qc,
-        variables.productId ?? box.productId,
-        box.id,
-        { affectsInventory: true },
-      );
+      await applyKujiMutationResponse(qc, box, variables.productId);
     },
   });
 }

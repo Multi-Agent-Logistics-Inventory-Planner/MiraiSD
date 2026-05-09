@@ -231,9 +231,14 @@ public class KujiBoxService {
                                 "Linked product not found: " + tierDto.getLinkedProductId()));
             } else if (autoCreate) {
                 // Birth a child product under the kuji parent via the canonical
-                // ProductService.createProduct path so we get broadcast + validation
-                // for free. SKU is left null (children are looked up by id).
-                // Inventory is created below at the box location, not via createProduct.
+                // ProductService.createProduct path. Pass initialStock = slip + heldBack
+                // so the product starts active and Product.quantity is correct from the
+                // start (createProduct sets quantity directly for prize children without
+                // creating a LocationInventory — kuji code creates that row at the box
+                // location below).
+                int autoSlipCount = tierDto.getCount() != null ? tierDto.getCount() : 0;
+                int autoHeldBack = tierDto.getHeldBackQuantity() == null ? 0 : tierDto.getHeldBackQuantity();
+                int autoInitialStock = autoSlipCount + autoHeldBack;
                 linkedProduct = productService.createProduct(
                         null,                                       // sku
                         null,                                       // categoryId — inherits from parent
@@ -249,14 +254,16 @@ public class KujiBoxService {
                         tierDto.getProductMsrp(),                   // msrp
                         tierDto.getProductImageUrl(),               // imageUrl
                         null,                                       // notes
-                        null,                                       // initialStock — birthed at box below
+                        autoInitialStock > 0 ? autoInitialStock : null, // initialStock
                         null,                                       // kujiType
                         null                                        // kujiSlackWebhookUrl
                 );
-                // createProduct flags products inactive when no initialStock is provided.
-                // Auto-created prizes need to be drawable, so flip the flag now.
-                linkedProduct.setIsActive(true);
-                linkedProduct = productRepository.save(linkedProduct);
+                if (autoInitialStock <= 0) {
+                    // No materialized inventory (rare: 0-count tier with no held-back). Still
+                    // make it drawable since opening a tier with 0 slips is valid bookkeeping.
+                    linkedProduct.setIsActive(true);
+                    linkedProduct = productRepository.save(linkedProduct);
+                }
             }
 
             KujiBoxTier tier = KujiBoxTier.builder()
@@ -324,7 +331,8 @@ public class KujiBoxService {
                         .metadata(metadata)
                         .build();
                 stockMovementRepository.save(birth);
-                affectedProductIds.add(newChild.getId());
+                // Auto-create child: Product.quantity was already set correctly by
+                // createProduct(initialStock=totalQuantity). No syncProductTotals needed.
                 continue;
             }
 
@@ -359,10 +367,8 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -475,10 +481,8 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -566,10 +570,8 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     // ===================== Draws =====================
@@ -756,10 +758,8 @@ public class KujiBoxService {
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -963,10 +963,8 @@ public class KujiBoxService {
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     // ===================== Slip / Transfer-In More / Patch =====================
@@ -990,7 +988,10 @@ public class KujiBoxService {
         kujiBoxTierRepository.save(tier);
 
         Product parentProduct = box.getProduct();
-        AuditLog auditLog = createAuditLog(
+        // Slip adjustments don't change inventory — only the tier's slip count. The
+        // AuditLog drives the kuji session activity log; no StockMovement or outbox
+        // event is needed (and none is consumed downstream for KUJI_SLIP_ADJUSTMENT).
+        createAuditLog(
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                 box.getLocation().getId(),
@@ -1004,33 +1005,10 @@ public class KujiBoxService {
                 parentProduct.getId()
         );
 
-        Map<String, Object> metadata = baseDrawMetadata(box, tier, auditLog.getId());
-        metadata.put("action", "add_slip");
-        metadata.put("quantity", quantity);
-
-        StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
-                .item(parentProduct)
-                .locationType(LocationType.NOT_ASSIGNED)
-                .fromLocationId(null)
-                .toLocationId(null)
-                .previousQuantity(0)
-                .currentQuantity(0)
-                .quantityChange(0)
-                .reason(StockMovementReason.KUJI_SLIP_ADJUSTMENT)
-                .actorId(request.getActorId())
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
-        StockMovement saved = stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(saved);
-
         broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -1051,7 +1029,8 @@ public class KujiBoxService {
                     "Tier '" + tier.getLabel() + "' has no linked product; cannot transfer-in");
         }
 
-        if (request.getSourceLocationId() == null) {
+        boolean autoCreateMint = request.getSourceLocationId() == null;
+        if (autoCreateMint) {
             mintAutoCreatedAtBox(box, tier, request.getQuantity(), request.getActorId(), "transfer_in_more");
         } else {
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
@@ -1071,14 +1050,16 @@ public class KujiBoxService {
         tier.setCount((tier.getCount() == null ? 0 : tier.getCount()) + request.getQuantity());
         kujiBoxTierRepository.save(tier);
 
-        stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+        // Auto-create mint already updated Product.quantity in mintAutoCreatedAtBox; only
+        // call syncProductTotals for transfers that move stock across locations.
+        if (!autoCreateMint) {
+            stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+        }
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -1099,7 +1080,8 @@ public class KujiBoxService {
                     "Tier '" + tier.getLabel() + "' has no linked product; cannot transfer-in");
         }
 
-        if (request.getSourceLocationId() == null) {
+        boolean autoCreateMint = request.getSourceLocationId() == null;
+        if (autoCreateMint) {
             mintAutoCreatedAtBox(box, tier, request.getQuantity(), request.getActorId(), "transfer_in_inventory_only");
         } else {
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
@@ -1116,14 +1098,14 @@ public class KujiBoxService {
             );
         }
 
-        stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+        if (!autoCreateMint) {
+            stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+        }
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     /**
@@ -1162,6 +1144,15 @@ public class KujiBoxService {
         int prev = inv.getQuantity();
         inv.setQuantity(prev + quantity);
         locationInventoryRepository.save(inv);
+
+        // Auto-create children only ever live at this one location, so the denormalized
+        // Product.quantity equals LocationInventory.quantity. Update directly to avoid
+        // a syncProductTotals SUM query downstream.
+        child.setQuantity(prev + quantity);
+        if (!Boolean.TRUE.equals(child.getIsActive())) {
+            child.setIsActive(true);
+        }
+        productRepository.save(child);
 
         AuditLog auditLog = createAuditLog(
                 actorId,
@@ -1220,6 +1211,12 @@ public class KujiBoxService {
                     .orElseThrow(() -> new ProductNotFoundException(
                             "Linked product not found: " + request.getLinkedProductId()));
         } else if (autoCreate) {
+            // Pass initialStock = slip + heldBack so createProduct sets Product.quantity
+            // and isActive correctly from the start. Kuji code below still creates the
+            // LocationInventory row at the box location.
+            int autoSlipCount = request.getCount() != null ? request.getCount() : 0;
+            int autoHeldBack = request.getHeldBackQuantity() == null ? 0 : request.getHeldBackQuantity();
+            int autoInitialStock = autoSlipCount + autoHeldBack;
             linkedProduct = productService.createProduct(
                     null,                                       // sku
                     null,                                       // categoryId — inherits from parent
@@ -1235,13 +1232,14 @@ public class KujiBoxService {
                     request.getProductMsrp(),                   // msrp
                     request.getProductImageUrl(),               // imageUrl
                     null,                                       // notes
-                    null,                                       // initialStock — birthed at box below
+                    autoInitialStock > 0 ? autoInitialStock : null, // initialStock
                     null,                                       // kujiType
                     null                                        // kujiSlackWebhookUrl
             );
-            // createProduct flags products inactive when no initialStock is provided.
-            linkedProduct.setIsActive(true);
-            linkedProduct = productRepository.save(linkedProduct);
+            if (autoInitialStock <= 0) {
+                linkedProduct.setIsActive(true);
+                linkedProduct = productRepository.save(linkedProduct);
+            }
         }
 
         KujiBoxTier tier = KujiBoxTier.builder()
@@ -1294,7 +1292,8 @@ public class KujiBoxService {
                         .metadata(metadata)
                         .build();
                 stockMovementRepository.save(birth);
-                affectedProductIds.add(linkedProduct.getId());
+                // Auto-create child: Product.quantity was already set correctly by
+                // createProduct(initialStock=totalQuantity). No syncProductTotals needed.
             } else {
                 if (request.getSourceLocationId() == null) {
                     throw new IllegalArgumentException(
@@ -1325,10 +1324,8 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     @Transactional
@@ -1475,10 +1472,8 @@ public class KujiBoxService {
         }
         broadcastService.broadcastAuditLogCreated();
 
-        UUID boxIdForReload = box.getId();
-        KujiBox loaded = kujiBoxRepository.findByIdWithTiers(boxIdForReload)
-                .orElseThrow(() -> new IllegalStateException("Box vanished after save: " + boxIdForReload));
-        return toResponseDTO(loaded);
+        entityManager.flush();
+        return toResponseDTO(box);
     }
 
     // ===================== Read APIs =====================
@@ -1969,19 +1964,23 @@ public class KujiBoxService {
         Product product = box.getProduct();
         Location location = box.getLocation();
 
-        // Map tiers
+        // Batch the per-tier inventory lookup into a single query.
         Map<UUID, Integer> linkedInventoryByProductId = new HashMap<>();
         if (box.getTiers() != null) {
+            Set<UUID> linkedProductIds = new HashSet<>();
             for (KujiBoxTier t : box.getTiers()) {
                 if (t.getLinkedProduct() != null) {
-                    UUID pid = t.getLinkedProduct().getId();
-                    if (!linkedInventoryByProductId.containsKey(pid)) {
-                        Integer qty = locationInventoryRepository
-                                .findByLocation_IdAndProduct_Id(location.getId(), pid)
-                                .map(LocationInventory::getQuantity)
-                                .orElse(0);
-                        linkedInventoryByProductId.put(pid, qty);
-                    }
+                    linkedProductIds.add(t.getLinkedProduct().getId());
+                }
+            }
+            if (!linkedProductIds.isEmpty()) {
+                List<LocationInventory> rows = locationInventoryRepository
+                        .findByLocation_IdAndProduct_IdIn(location.getId(), linkedProductIds);
+                for (LocationInventory li : rows) {
+                    linkedInventoryByProductId.put(li.getProduct().getId(), li.getQuantity());
+                }
+                for (UUID pid : linkedProductIds) {
+                    linkedInventoryByProductId.putIfAbsent(pid, 0);
                 }
             }
         }
@@ -2014,12 +2013,20 @@ public class KujiBoxService {
                 .mapToInt(t -> t.getCount() != null ? t.getCount() : 0)
                 .sum();
 
-        String openedByName = box.getOpenedBy() != null
-                ? userRepository.findById(box.getOpenedBy()).map(User::getFullName).orElse(null)
-                : null;
-        String closedByName = box.getClosedBy() != null
-                ? userRepository.findById(box.getClosedBy()).map(User::getFullName).orElse(null)
-                : null;
+        // Batch openedBy/closedBy resolution into a single query when both are present.
+        UUID openedById = box.getOpenedBy();
+        UUID closedById = box.getClosedBy();
+        Map<UUID, String> userNamesById = new HashMap<>();
+        if (openedById != null || closedById != null) {
+            Set<UUID> userIds = new HashSet<>();
+            if (openedById != null) userIds.add(openedById);
+            if (closedById != null) userIds.add(closedById);
+            for (User u : userRepository.findAllById(userIds)) {
+                userNamesById.put(u.getId(), u.getFullName());
+            }
+        }
+        String openedByName = openedById != null ? userNamesById.get(openedById) : null;
+        String closedByName = closedById != null ? userNamesById.get(closedById) : null;
 
         String storageLocationName = null;
         try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, ArrowDownToLine, PackagePlus } from "lucide-react";
+import { Pencil, Plus, ArrowDownToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -24,7 +24,6 @@ interface TierTableProps {
   readonly canEditStructural: boolean;
   readonly onAddSlip: (tier: KujiBoxTier) => void;
   readonly onTransferIn: (tier: KujiBoxTier) => void;
-  readonly onTransferInventoryOnly: (tier: KujiBoxTier) => void;
   readonly onEditTier: (tier: KujiBoxTier) => void;
 }
 
@@ -44,7 +43,6 @@ export function TierTable({
   canEditStructural,
   onAddSlip,
   onTransferIn,
-  onTransferInventoryOnly,
   onEditTier,
 }: TierTableProps) {
   const tiers = [...box.tiers].sort(compareTiers);
@@ -148,30 +146,17 @@ export function TierTable({
                           <Plus className="h-4 w-4" />
                         </Button>
                         {tier.linkedProductId ? (
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => onTransferIn(tier)}
-                              title="Transfer-in more (inventory + slips)"
-                              aria-label={`Transfer in more to tier ${tier.label}`}
-                            >
-                              <ArrowDownToLine className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => onTransferInventoryOnly(tier)}
-                              title="Transfer inventory only (no slips)"
-                              aria-label={`Transfer inventory only to tier ${tier.label}`}
-                            >
-                              <PackagePlus className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onTransferIn(tier)}
+                            title="Transfer inventory in"
+                            aria-label={`Transfer inventory in to tier ${tier.label}`}
+                          >
+                            <ArrowDownToLine className="h-4 w-4" />
+                          </Button>
                         ) : null}
                       </div>
                     </TableCell>

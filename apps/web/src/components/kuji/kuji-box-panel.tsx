@@ -24,8 +24,7 @@ import { ReopenBoxDialog } from "./reopen-box-dialog";
 import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
 import { AddSlipDialog } from "./add-slip-dialog";
-import { TransferInMoreDialog } from "./transfer-in-more-dialog";
-import { TransferInInventoryOnlyDialog } from "./transfer-in-inventory-only-dialog";
+import { TransferInDialog } from "./transfer-in-dialog";
 import { KujiStatTile } from "./kuji-stat-tile";
 import { BoxOfSlipsCard } from "./box-of-slips-card";
 import { NotInBoxCard } from "./not-in-box-card";
@@ -85,8 +84,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
   const [editTierOpen, setEditTierOpen] = useState(false);
   const [addSlipOpen, setAddSlipOpen] = useState(false);
   const [transferInOpen, setTransferInOpen] = useState(false);
-  const [transferInventoryOnlyOpen, setTransferInventoryOnlyOpen] =
-    useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
   const [manageTiersOpen, setManageTiersOpen] = useState(false);
@@ -138,10 +135,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
   function handleTransferIn(tier: KujiBoxTier) {
     setActiveTier(tier);
     setTransferInOpen(true);
-  }
-  function handleTransferInventoryOnly(tier: KujiBoxTier) {
-    setActiveTier(tier);
-    setTransferInventoryOnlyOpen(true);
   }
 
   if (activeQuery.isLoading) {
@@ -244,12 +237,12 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
           sub="in machine"
         />
         <KujiStatTile
-          label="Slips in box"
+          label="Active Slips"
           value={stats.slips.toLocaleString()}
           sub="ready to draw"
         />
         <KujiStatTile
-          label="Not in box"
+          label="Inactive Slips"
           value={stats.notInBox.toLocaleString()}
           sub="held back"
         />
@@ -289,12 +282,7 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
           />
 
           {boxIsOpen && canDraw ? (
-            recordOpen ? (
-              <InlineRecordDrawForm
-                box={box}
-                onClose={() => setRecordOpen(false)}
-              />
-            ) : (
+            <>
               <Button
                 type="button"
                 className="w-full bg-brand-primary text-white hover:bg-brand-primary/90"
@@ -303,7 +291,12 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
                 <Plus className="mr-1 h-4 w-4" />
                 Record a draw
               </Button>
-            )
+              <InlineRecordDrawForm
+                box={box}
+                open={recordOpen}
+                onOpenChange={setRecordOpen}
+              />
+            </>
           ) : null}
 
         </>
@@ -341,7 +334,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
             onEditTier={handleEditTier}
             onAddSlip={handleAddSlip}
             onTransferIn={handleTransferIn}
-            onTransferInventoryOnly={handleTransferInventoryOnly}
           />
           {activeTier ? (
             <>
@@ -363,19 +355,10 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
                 box={box}
                 tier={activeTier}
               />
-              <TransferInMoreDialog
+              <TransferInDialog
                 open={transferInOpen}
                 onOpenChange={(o) => {
                   setTransferInOpen(o);
-                  if (!o) setActiveTier(null);
-                }}
-                box={box}
-                tier={activeTier}
-              />
-              <TransferInInventoryOnlyDialog
-                open={transferInventoryOnlyOpen}
-                onOpenChange={(o) => {
-                  setTransferInventoryOnlyOpen(o);
                   if (!o) setActiveTier(null);
                 }}
                 box={box}

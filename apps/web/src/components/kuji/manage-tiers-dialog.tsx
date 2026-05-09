@@ -22,7 +22,6 @@ interface ManageTiersDialogProps {
   readonly onEditTier: (tier: KujiBoxTier) => void;
   readonly onAddSlip: (tier: KujiBoxTier) => void;
   readonly onTransferIn: (tier: KujiBoxTier) => void;
-  readonly onTransferInventoryOnly: (tier: KujiBoxTier) => void;
 }
 
 export function ManageTiersDialog({
@@ -33,7 +32,6 @@ export function ManageTiersDialog({
   onEditTier,
   onAddSlip,
   onTransferIn,
-  onTransferInventoryOnly,
 }: ManageTiersDialogProps) {
   const [addTierOpen, setAddTierOpen] = useState(false);
   const showAddTier = canEditStructural && box.status === KujiBoxStatus.OPEN;
@@ -69,7 +67,6 @@ export function ManageTiersDialog({
               onEditTier={onEditTier}
               onAddSlip={onAddSlip}
               onTransferIn={onTransferIn}
-              onTransferInventoryOnly={onTransferInventoryOnly}
             />
           </div>
         </DialogContent>

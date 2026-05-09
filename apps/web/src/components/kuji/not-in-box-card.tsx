@@ -108,7 +108,7 @@ export function NotInBoxCard({ tiers }: NotInBoxCardProps) {
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
-        <span className="text-sm font-medium">Not in box</span>
+        <span className="text-sm font-medium">Inactive Slips</span>
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
           {totalHeld} held
         </span>
@@ -118,17 +118,19 @@ export function NotInBoxCard({ tiers }: NotInBoxCardProps) {
           All inventory is on a slip.
         </div>
       ) : (
-        <ul className="divide-y">
-          {rows.map(({ tier, held, rank }) => (
-            <li key={tier.id} className="flex items-center gap-3 py-2">
-              <TierThumb tier={tier} rank={rank} onExpand={setLightbox} />
-              <TierName tier={tier} />
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-                {held} held
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-80 overflow-y-auto pr-1">
+          <ul className="divide-y">
+            {rows.map(({ tier, held, rank }) => (
+              <li key={tier.id} className="flex items-center gap-3 py-2">
+                <TierThumb tier={tier} rank={rank} onExpand={setLightbox} />
+                <TierName tier={tier} />
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
+                  {held} held
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <ProductImageLightbox
         open={lightbox !== null}
