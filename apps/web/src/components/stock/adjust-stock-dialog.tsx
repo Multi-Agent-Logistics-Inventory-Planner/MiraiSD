@@ -93,6 +93,10 @@ export function AdjustStockDialog({
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
   const [reason, setReason] = useState<StockMovementReason>(DEFAULT_REASON_BY_ACTION["subtract"]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  // Intake metadata captured from the box/pack toggle in QuantityControls.
+  // Preserved into stock_movement.metadata for audit-log readability.
+  const [intakeUnit, setIntakeUnit] = useState<"pack" | "box">("pack");
+  const [intakeQty, setIntakeQty] = useState<number>(1);
 
   const adjustMutation = useAdjustStockMutation();
 
@@ -293,6 +297,8 @@ export function AdjustStockDialog({
     setSelectedInventoryId(null);
     setQuantity(1);
     setQuantityWarning(null);
+    setIntakeUnit("pack");
+    setIntakeQty(1);
   }
 
   function handleCategoryChange(categories: string[]) {
@@ -362,7 +368,13 @@ export function AdjustStockDialog({
       await adjustMutation.mutateAsync({
         locationType: location.locationType,
         inventoryId: selectedInventory.id,
-        payload: { quantityChange, reason, actorId },
+        payload: {
+          quantityChange,
+          reason,
+          actorId,
+          intakeUnit: intakeUnit === "box" ? "box" : undefined,
+          intakeQty: intakeUnit === "box" ? intakeQty : undefined,
+        },
         productId: selectedInventory.item.id,
       });
 
@@ -669,6 +681,10 @@ export function AdjustStockDialog({
                 onReasonChange={handleReasonChange}
                 onIncrement={handleIncrement}
                 onDecrement={handleDecrement}
+                onIntakeMetaChange={(meta) => {
+                  setIntakeUnit(meta.unit);
+                  setIntakeQty(meta.rawQty);
+                }}
               />
             </div>
           ) : hasValidLocation && isProductFilteredMode && inventoryQuery.isLoading ? (

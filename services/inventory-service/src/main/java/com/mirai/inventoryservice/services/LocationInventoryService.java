@@ -59,6 +59,12 @@ public class LocationInventoryService {
      */
     public LocationInventory addInventory(UUID locationId, UUID productId, Integer quantity,
                                           UUID actorId, StockMovementReason reason) {
+        return addInventory(locationId, productId, quantity, actorId, reason, null, null);
+    }
+
+    public LocationInventory addInventory(UUID locationId, UUID productId, Integer quantity,
+                                          UUID actorId, StockMovementReason reason,
+                                          String intakeUnit, Integer intakeQty) {
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
 
@@ -89,7 +95,7 @@ public class LocationInventoryService {
 
         UUID inventoryId = stockMovementService.createInventoryWithTracking(
                 locationType, locationId, product, quantity,
-                effectiveReason, actorId, null);
+                effectiveReason, actorId, null, intakeUnit, intakeQty);
 
         return locationInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new InventoryNotFoundException("Failed to create inventory"));

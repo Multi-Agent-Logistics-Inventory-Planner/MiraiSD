@@ -11,8 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import {
+  QuantityInput,
+  type QuantityIntakeMeta,
+} from "@/components/ui/quantity-input";
 import { ProductLocationSelector } from "@/components/stock/product-location-selector";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,7 +25,6 @@ import {
   useTransferInInventoryOnlyToKujiTierMutation,
 } from "@/hooks/mutations/use-kuji-box-mutations";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
-import { cn } from "@/lib/utils";
 import type { KujiBox, KujiBoxTier } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 
@@ -56,6 +59,12 @@ export function TransferInDialog({
   const [mode, setMode] = useState<TransferInMode>(initialMode);
   const [source, setSource] = useState<LocationSelection>(EMPTY_LOCATION);
   const [quantity, setQuantity] = useState<number | "">(1);
+  // Tracks the most recent intake-unit choice from QuantityInput's toggle so we can
+  // forward it into the audit-log metadata on submit.
+  const [intakeMeta, setIntakeMeta] = useState<QuantityIntakeMeta>({
+    unit: "pack",
+    rawQty: 1,
+  });
   const [errors, setErrors] = useState<{
     source?: string;
     quantity?: string;
@@ -66,6 +75,7 @@ export function TransferInDialog({
       setMode(initialMode);
       setSource(EMPTY_LOCATION);
       setQuantity(1);
+      setIntakeMeta({ unit: "pack", rawQty: 1 });
       setErrors({});
     }
   }, [open, initialMode]);
@@ -106,6 +116,8 @@ export function TransferInDialog({
       actorId,
       sourceLocationId: isAutoCreated ? null : source.locationId,
       quantity,
+      intakeUnit: intakeMeta.unit === "box" ? ("box" as const) : undefined,
+      intakeQty: intakeMeta.unit === "box" ? intakeMeta.rawQty : undefined,
     };
     const args = {
       boxId: box.id,
@@ -198,24 +210,18 @@ export function TransferInDialog({
 
             <div className="grid gap-2">
               <Label htmlFor="transfer-in-qty">Quantity</Label>
-              <Input
-                id="transfer-in-qty"
-                type="number"
-                min={1}
+              <QuantityInput
                 value={quantity}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    setQuantity("");
-                    return;
-                  }
-                  const v = parseInt(raw, 10);
-                  if (!Number.isNaN(v) && v >= 1) {
-                    setQuantity(v);
+                onChange={(v) => {
+                  setQuantity(v);
+                  if (v !== "") {
                     setErrors((prev) => ({ ...prev, quantity: undefined }));
                   }
                 }}
+                min={1}
                 disabled={isPending}
+                packsPerBox={tier.linkedProductPacksPerBox ?? null}
+                onIntakeMetaChange={setIntakeMeta}
               />
               {errors.quantity ? (
                 <p className="text-xs text-destructive">{errors.quantity}</p>

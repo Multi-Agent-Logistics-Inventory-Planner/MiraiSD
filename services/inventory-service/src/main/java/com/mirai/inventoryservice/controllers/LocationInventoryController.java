@@ -57,7 +57,9 @@ public class LocationInventoryController {
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
                 requestDTO.getActorId(),
-                requestDTO.getReason());
+                requestDTO.getReason(),
+                requestDTO.getIntakeUnit(),
+                requestDTO.getIntakeQty());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(locationInventoryMapper.toResponseDTO(inventory));
     }

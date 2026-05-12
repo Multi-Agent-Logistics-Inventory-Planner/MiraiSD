@@ -190,6 +190,8 @@ export interface ProductSummary {
   hasChildren?: boolean;
   kujiType?: KujiType | null;
   kujiSlackWebhookUrl?: string | null;
+  /** Packs per sealed box for TCG products. NULL when not box-packaged. */
+  packsPerBox?: number | null;
 }
 
 export interface Product {
@@ -226,6 +228,8 @@ export interface Product {
   notes?: string;
   kujiType?: KujiType | null;
   kujiSlackWebhookUrl?: string | null;
+  /** Packs per sealed box for TCG products. NULL when not box-packaged. */
+  packsPerBox?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -257,6 +261,8 @@ export interface ProductRequest {
   kujiType?: KujiType | null;
   /** Slack webhook for kuji event notifications (only valid when kujiType=CUSTOM). */
   kujiSlackWebhookUrl?: string | null;
+  /** Packs per sealed box. Only set for products in the TCG category tree. */
+  packsPerBox?: number | null;
 }
 
 // User types
@@ -325,6 +331,8 @@ export interface InventoryItem {
   letter?: string | null;
   /** Quantity per kuji set for prize products. */
   templateQuantity?: number | null;
+  /** Packs per sealed box for TCG products. NULL when not box-packaged. */
+  packsPerBox?: number | null;
 }
 
 // Unified Location Inventory type (replaces 9 type-specific inventory types)
@@ -350,6 +358,10 @@ export interface InventoryRequest {
    * Defaults to "INITIAL_STOCK" if not provided.
    */
   reason?: StockMovementReason;
+  /** Optional intake unit ("box") preserved for audit-log readability. */
+  intakeUnit?: "pack" | "box";
+  /** Raw quantity in the user's chosen unit (paired with intakeUnit). */
+  intakeQty?: number;
 }
 
 // Shipment types
@@ -428,6 +440,10 @@ export interface DestinationAllocation {
   locationType: LocationType;
   locationId?: string;
   quantity: number;
+  /** Optional intake unit ("box") preserved into resulting StockMovement metadata. */
+  intakeUnit?: "pack" | "box";
+  /** Raw quantity in the user's chosen unit. */
+  intakeQty?: number;
 }
 
 export interface ShipmentItemReceipt {
@@ -457,6 +473,10 @@ export interface StockMovementMetadata {
   notes?: string;
   transfer?: boolean;
   shipment_receipt?: boolean;
+  /** Set to "box" when the user typed quantity in box units; preserves original intent for audit log display. */
+  intake_unit?: "box";
+  /** Number of boxes the user typed (paired with intake_unit). */
+  intake_qty?: number;
 }
 
 export interface StockMovement {
@@ -546,6 +566,8 @@ export interface AuditLogMovement {
   previousQuantity?: number;
   currentQuantity?: number;
   quantityChange: number;
+  /** Original intake metadata when the user typed in box units. Used to render "+2 boxes (72 packs)". */
+  metadata?: StockMovementMetadata;
 }
 
 export interface AuditLogDetail {
@@ -574,6 +596,10 @@ export interface AdjustStockRequest {
   reason: StockMovementReason;
   actorId: string;
   notes?: string;
+  /** Optional intake unit ("pack" or "box"). When "box", audit log displays "+N boxes (M packs)". */
+  intakeUnit?: "pack" | "box";
+  /** Raw quantity in the user's chosen unit (paired with intakeUnit). */
+  intakeQty?: number;
 }
 
 export interface TransferStockRequest {
@@ -904,6 +930,8 @@ export interface KujiBoxTier {
   linkedProductName?: string | null;
   linkedProductImageUrl?: string | null;
   linkedInventoryAtBoxLocation?: number | null;
+  /** Packs-per-box of the linked product (for box/pack toggle on transfer-in). NULL when n/a. */
+  linkedProductPacksPerBox?: number | null;
   count: number;
   price?: number | null;
   /** True when the linked product was created inline at open-box for this tier. */
@@ -1039,6 +1067,10 @@ export interface TransferInMoreRequest {
   /** Null when the tier's linked product is auto-created — backend mints in place. */
   sourceLocationId: string | null;
   quantity: number;
+  /** Optional intake unit ("box") preserved on resulting kuji TRANSFER stock movements. */
+  intakeUnit?: "pack" | "box";
+  /** Raw quantity in the user's chosen unit. */
+  intakeQty?: number;
 }
 
 export interface PatchKujiTierRequest {

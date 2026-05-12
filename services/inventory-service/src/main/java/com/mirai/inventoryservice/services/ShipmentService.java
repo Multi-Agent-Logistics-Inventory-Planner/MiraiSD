@@ -590,7 +590,9 @@ public class ShipmentService {
                             shipmentItem.getItem(),
                             allocQty,
                             validatedActorId,
-                            receiveAuditLog
+                            receiveAuditLog,
+                            allocation.getIntakeUnit(),
+                            allocation.getIntakeQty()
                     );
                 } else {
                     // Add to regular location inventory
@@ -600,7 +602,9 @@ public class ShipmentService {
                             shipmentItem.getItem(),
                             allocQty,
                             validatedActorId,
-                            receiveAuditLog
+                            receiveAuditLog,
+                            allocation.getIntakeUnit(),
+                            allocation.getIntakeQty()
                     );
                 }
             }
@@ -888,6 +892,10 @@ public class ShipmentService {
      * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {
+        addToInventory(locationType, locationId, product, quantity, validatedActorId, parentAuditLog, null, null);
+    }
+
+    private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog, String intakeUnit, Integer intakeQty) {
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
 
@@ -911,6 +919,10 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
+        if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
+            metadata.put("intake_unit", "box");
+            metadata.put("intake_qty", intakeQty);
+        }
 
         StockMovement movement = StockMovement.builder()
                 .auditLog(parentAuditLog)
@@ -935,6 +947,10 @@ public class ShipmentService {
      * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
     private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {
+        addToNotAssignedInventory(product, quantity, validatedActorId, parentAuditLog, null, null);
+    }
+
+    private void addToNotAssignedInventory(Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog, String intakeUnit, Integer intakeQty) {
         // Get NOT_ASSIGNED location
         Location notAssignedLocation = getNotAssignedLocation();
 
@@ -955,6 +971,10 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("inventory_id", saved.getId().toString());
         metadata.put("shipment_receipt", true);
+        if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
+            metadata.put("intake_unit", "box");
+            metadata.put("intake_qty", intakeQty);
+        }
 
         StockMovement movement = StockMovement.builder()
                 .auditLog(parentAuditLog)

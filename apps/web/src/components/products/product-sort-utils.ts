@@ -26,20 +26,35 @@ export function buildParentNameMap(categories: readonly Category[]): Map<string,
 }
 
 /**
- * Build a set of category IDs that belong to the "Kuji" family (root + children).
+ * Build the set of category IDs whose parent (or self) matches the given root name/slug.
+ * Used to gate feature-specific UI by category family (e.g. "kuji", "tcg").
  */
-export function buildKujiCategoryIds(categories: readonly Category[]): ReadonlySet<string> {
+function buildCategoryIdsByRoot(
+  categories: readonly Category[],
+  rootKey: string,
+): ReadonlySet<string> {
+  const key = rootKey.toLowerCase();
   const ids = new Set<string>();
-  const kujiCat = categories.find(
-    (c) => c.name.toLowerCase() === "kuji" || c.slug?.toLowerCase() === "kuji"
+  const root = categories.find(
+    (c) => c.name.toLowerCase() === key || c.slug?.toLowerCase() === key,
   );
-  if (kujiCat) {
-    ids.add(kujiCat.id);
-    for (const child of kujiCat.children) {
+  if (root) {
+    ids.add(root.id);
+    for (const child of root.children) {
       ids.add(child.id);
     }
   }
   return ids;
+}
+
+/** Categories that belong to the "Kuji" family (root + children). */
+export function buildKujiCategoryIds(categories: readonly Category[]): ReadonlySet<string> {
+  return buildCategoryIdsByRoot(categories, "kuji");
+}
+
+/** Categories whose products use packs (TCG root + children — Pokemon, One Piece, etc.). */
+export function buildPackCategoryIds(categories: readonly Category[]): ReadonlySet<string> {
+  return buildCategoryIdsByRoot(categories, "tcg");
 }
 
 /**

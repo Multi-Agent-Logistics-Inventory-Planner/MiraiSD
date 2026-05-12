@@ -44,6 +44,8 @@ export function AddInventoryDialog({
   const [productId, setProductId] = useState<string>("");
   const [qty, setQty] = useState<string>("1");
   const [qtyError, setQtyError] = useState<string | null>(null);
+  const [intakeUnit, setIntakeUnit] = useState<"pack" | "box">("pack");
+  const [intakeQty, setIntakeQty] = useState<number>(1);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,6 +157,8 @@ export function AddInventoryDialog({
     setProductId("");
     setQty("1");
     setQtyError(null);
+    setIntakeUnit("pack");
+    setIntakeQty(1);
   }
 
   function handleQuantityChange(value: string) {
@@ -171,9 +175,17 @@ export function AddInventoryDialog({
     }
 
     const isUpdate = Boolean(existingItem);
-    await onSubmit({ itemId: productId, quantity }, isUpdate, existingItem?.id);
+    const payload: InventoryRequest = {
+      itemId: productId,
+      quantity,
+      intakeUnit: intakeUnit === "box" ? "box" : undefined,
+      intakeQty: intakeUnit === "box" ? intakeQty : undefined,
+    };
+    await onSubmit(payload, isUpdate, existingItem?.id);
     setProductId("");
     setQty("1");
+    setIntakeUnit("pack");
+    setIntakeQty(1);
     onOpenChange(false);
   }
 
@@ -239,6 +251,10 @@ export function AddInventoryDialog({
               onQuantityChange={handleQuantityChange}
               onClearSelection={handleClearSelection}
               disabled={Boolean(isSaving)}
+              onIntakeMetaChange={(meta) => {
+                setIntakeUnit(meta.unit);
+                setIntakeQty(meta.rawQty);
+              }}
             />
           ) : null}
         </div>
