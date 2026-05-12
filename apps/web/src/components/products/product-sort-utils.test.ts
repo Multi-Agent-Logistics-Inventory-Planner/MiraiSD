@@ -3,6 +3,7 @@ import {
   compareProducts,
   buildParentNameMap,
   buildKujiCategoryIds,
+  buildPackCategoryIds,
   isKujiProduct,
   DEFAULT_PRODUCT_SORT,
 } from "./product-sort-utils";
@@ -32,6 +33,7 @@ function makeRow(overrides: {
         parentId: null,
         displayOrder: 0,
         isActive: true,
+        usesPacks: false,
         children: [],
         createdAt: "",
         updatedAt: "",
@@ -51,6 +53,7 @@ function makeCategory(overrides: {
   id: string;
   name: string;
   slug?: string;
+  usesPacks?: boolean;
   children?: { id: string; name: string; slug?: string }[];
 }): Category {
   return {
@@ -60,6 +63,7 @@ function makeCategory(overrides: {
     parentId: null,
     displayOrder: 0,
     isActive: true,
+    usesPacks: overrides.usesPacks ?? false,
     children: (overrides.children ?? []).map((c) => ({
       id: c.id,
       name: c.name,
@@ -67,6 +71,7 @@ function makeCategory(overrides: {
       parentId: overrides.id,
       displayOrder: 0,
       isActive: true,
+      usesPacks: false,
       children: [],
       createdAt: "",
       updatedAt: "",
@@ -232,6 +237,45 @@ describe("buildKujiCategoryIds", () => {
     const categories = [makeCategory({ id: "other", name: "Toys" })];
     const ids = buildKujiCategoryIds(categories);
     expect(ids.size).toBe(0);
+  });
+});
+
+describe("buildPackCategoryIds", () => {
+  it("includes root and children for categories with usesPacks=true", () => {
+    const categories = [
+      makeCategory({
+        id: "pokemon",
+        name: "Pokemon",
+        usesPacks: true,
+        children: [
+          { id: "pokemon-booster", name: "Booster Box" },
+          { id: "pokemon-etb", name: "ETB" },
+        ],
+      }),
+      makeCategory({
+        id: "one-piece",
+        name: "One Piece",
+        usesPacks: true,
+        children: [{ id: "op-booster", name: "Booster Box" }],
+      }),
+      makeCategory({ id: "plushie", name: "Plushie" }),
+    ];
+
+    const ids = buildPackCategoryIds(categories);
+    expect(ids.has("pokemon")).toBe(true);
+    expect(ids.has("pokemon-booster")).toBe(true);
+    expect(ids.has("pokemon-etb")).toBe(true);
+    expect(ids.has("one-piece")).toBe(true);
+    expect(ids.has("op-booster")).toBe(true);
+    expect(ids.has("plushie")).toBe(false);
+  });
+
+  it("returns empty set when no category has usesPacks=true", () => {
+    const categories = [
+      makeCategory({ id: "plushie", name: "Plushie" }),
+      makeCategory({ id: "kuji", name: "Kuji" }),
+    ];
+    expect(buildPackCategoryIds(categories).size).toBe(0);
   });
 });
 

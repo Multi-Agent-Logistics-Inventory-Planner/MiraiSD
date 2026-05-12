@@ -36,6 +36,14 @@ const ProductForm = dynamic(
   { ssr: false }
 );
 
+const ManageCategoriesDialog = dynamic(
+  () =>
+    import("@/components/products/manage-categories-dialog").then((m) => ({
+      default: m.ManageCategoriesDialog,
+    })),
+  { ssr: false }
+);
+
 const AdjustStockDialog = dynamic(
   () =>
     import("@/components/stock/adjust-stock-dialog").then((m) => ({
@@ -83,6 +91,7 @@ export default function ProductsPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductWithInventory | null>(null);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustPreselectedProduct, setAdjustPreselectedProduct] =
@@ -182,6 +191,7 @@ export default function ProductsPage() {
           setEditing(null);
           setFormOpen(true);
         }}
+        onManageCategoriesClick={() => setManageCategoriesOpen(true)}
       />
 
       {list.error ? (
@@ -254,6 +264,11 @@ export default function ProductsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         initialProduct={editing?.product ?? null}
+      />
+
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onOpenChange={setManageCategoriesOpen}
       />
 
       <AdjustStockDialog

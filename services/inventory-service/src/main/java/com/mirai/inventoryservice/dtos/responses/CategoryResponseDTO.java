@@ -20,6 +20,7 @@ public class CategoryResponseDTO {
     private String slug;
     private Integer displayOrder;
     private Boolean isActive;
+    private Boolean usesPacks;
     private List<CategoryResponseDTO> children;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

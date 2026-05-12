@@ -52,9 +52,20 @@ export function buildKujiCategoryIds(categories: readonly Category[]): ReadonlyS
   return buildCategoryIdsByRoot(categories, "kuji");
 }
 
-/** Categories whose products use packs (TCG root + children — Pokemon, One Piece, etc.). */
+/**
+ * Categories whose products use packs. Driven by the `usesPacks` flag on root
+ * categories — subcategories inherit at query time.
+ */
 export function buildPackCategoryIds(categories: readonly Category[]): ReadonlySet<string> {
-  return buildCategoryIdsByRoot(categories, "tcg");
+  const ids = new Set<string>();
+  for (const root of categories) {
+    if (root.parentId !== null || !root.usesPacks) continue;
+    ids.add(root.id);
+    for (const child of root.children) {
+      ids.add(child.id);
+    }
+  }
+  return ids;
 }
 
 /**
