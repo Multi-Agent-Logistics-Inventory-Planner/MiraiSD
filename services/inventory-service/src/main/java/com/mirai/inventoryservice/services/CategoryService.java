@@ -30,13 +30,14 @@ public class CategoryService {
      * Create a root category (no parent)
      */
     public Category createCategory(String name, Integer displayOrder) {
-        return createCategory(name, null, displayOrder);
+        return createCategory(name, null, displayOrder, null);
     }
 
     /**
-     * Create a category with optional parent (subcategory if parent specified)
+     * Create a category with optional parent (subcategory if parent specified).
+     * usesPacks is honored only when creating a root category.
      */
-    public Category createCategory(String name, UUID parentId, Integer displayOrder) {
+    public Category createCategory(String name, UUID parentId, Integer displayOrder, Boolean usesPacks) {
         String slug = slugify(name);
 
         // Validate slug uniqueness within same parent scope
@@ -59,6 +60,7 @@ public class CategoryService {
                 .parent(parent)
                 .displayOrder(displayOrder != null ? displayOrder : 0)
                 .isActive(true)
+                .usesPacks(parentId == null && Boolean.TRUE.equals(usesPacks))
                 .build();
 
         return categoryRepository.save(category);
@@ -102,7 +104,7 @@ public class CategoryService {
         return categoryRepository.findAll();
     }
 
-    public Category updateCategory(UUID id, String name, Integer displayOrder) {
+    public Category updateCategory(UUID id, String name, Integer displayOrder, Boolean usesPacks) {
         Category category = getCategoryById(id);
 
         if (name != null && !name.trim().equals(category.getName())) {
@@ -125,6 +127,11 @@ public class CategoryService {
 
         if (displayOrder != null) {
             category.setDisplayOrder(displayOrder);
+        }
+
+        // usesPacks is meaningful only on root categories; ignore for subcategories.
+        if (usesPacks != null && category.getParentId() == null) {
+            category.setUsesPacks(usesPacks);
         }
 
         return categoryRepository.save(category);

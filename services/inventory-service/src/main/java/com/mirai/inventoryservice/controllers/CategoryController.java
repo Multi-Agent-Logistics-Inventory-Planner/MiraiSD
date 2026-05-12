@@ -62,7 +62,8 @@ public class CategoryController {
         Category category = categoryService.createCategory(
                 requestDTO.getName(),
                 requestDTO.getParentId(),
-                requestDTO.getDisplayOrder()
+                requestDTO.getDisplayOrder(),
+                requestDTO.getUsesPacks()
         );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(categoryMapper.toResponseDTOFlat(category));
@@ -76,7 +77,8 @@ public class CategoryController {
         Category category = categoryService.updateCategory(
                 id,
                 requestDTO.getName(),
-                requestDTO.getDisplayOrder()
+                requestDTO.getDisplayOrder(),
+                requestDTO.getUsesPacks()
         );
         // Use flat DTO - updated category doesn't need nested children
         return ResponseEntity.ok(categoryMapper.toResponseDTOFlat(category));

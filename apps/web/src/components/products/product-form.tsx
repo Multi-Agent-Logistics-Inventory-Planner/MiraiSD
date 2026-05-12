@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,13 +42,11 @@ import {
 } from "@/hooks/mutations/use-product-mutations";
 import { createInventory } from "@/lib/api/inventory";
 import { LocationSelector } from "@/components/stock/location-selector";
-import { AddCategoryDialog } from "./add-category-dialog";
-import { AddSubcategoryDialog } from "./add-subcategory-dialog";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import { DeleteProductDialog } from "./delete-product-dialog";
 import { PrizeTableInline, type PendingPrize } from "./prize-table-inline";
 import { SupplierAutocomplete } from "@/components/suppliers";
-import type { Product, ProductRequest, Category } from "@/types/api";
+import type { Product, ProductRequest } from "@/types/api";
 import { KujiType, LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 import { buildKujiCategoryIds, buildPackCategoryIds } from "./product-sort-utils";
@@ -124,8 +122,6 @@ export function ProductForm({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: categories, isLoading: categoriesLoading } = useCategories();
-  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
-  const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   // Kuji detection and inline prizes state
   const [isKujiCategory, setIsKujiCategory] = useState(false);
@@ -506,17 +502,6 @@ export function ProductForm({
   const canDeleteCustomKuji =
     isEditingCustomKuji && can(Permission.PRODUCTS_DELETE);
 
-  const handleCategoryCreated = (category: Category) => {
-    setRootCategoryId(category.id);
-    setSubcategoryId("");
-    form.setValue("categoryId", category.id, { shouldValidate: true });
-  };
-
-  const handleSubcategoryCreated = (subcategory: Category) => {
-    setSubcategoryId(subcategory.id);
-    form.setValue("categoryId", subcategory.id, { shouldValidate: true });
-  };
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -598,17 +583,7 @@ export function ProductForm({
               {!isEditingCustomKuji && (
                 <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <div className="flex items-center gap-2">
-                      <Label>Category</Label>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        onClick={() => setManageCategoriesOpen(true)}
-                        title="Manage categories"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <Label>Category</Label>
                     <div className="flex gap-2">
                       <Select
                         value={rootCategoryId}
@@ -637,8 +612,8 @@ export function ProductForm({
                         type="button"
                         variant="outline"
                         size="icon"
-                        onClick={() => setAddCategoryOpen(true)}
-                        title="Add new category"
+                        onClick={() => setManageCategoriesOpen(true)}
+                        title="Manage categories"
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -680,9 +655,8 @@ export function ProductForm({
                           type="button"
                           variant="outline"
                           size="icon"
-                          onClick={() => setAddSubcategoryOpen(true)}
-                          disabled={!rootCategoryId}
-                          title="Add new subcategory"
+                          onClick={() => setManageCategoriesOpen(true)}
+                          title="Manage categories"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -1069,19 +1043,6 @@ export function ProductForm({
           </form>
         </DialogContent>
       </Dialog>
-
-      <AddCategoryDialog
-        open={addCategoryOpen}
-        onOpenChange={setAddCategoryOpen}
-        onCategoryCreated={handleCategoryCreated}
-      />
-
-      <AddSubcategoryDialog
-        open={addSubcategoryOpen}
-        onOpenChange={setAddSubcategoryOpen}
-        initialCategoryId={rootCategoryId}
-        onSubcategoryCreated={handleSubcategoryCreated}
-      />
 
       <ManageCategoriesDialog
         open={manageCategoriesOpen}

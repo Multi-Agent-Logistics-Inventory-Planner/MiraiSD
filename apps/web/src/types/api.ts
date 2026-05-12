@@ -7,6 +7,7 @@ export interface Category {
   slug: string;
   displayOrder: number;
   isActive: boolean;
+  usesPacks: boolean;
   children: Category[];
   createdAt: string;
   updatedAt: string;
@@ -16,6 +17,7 @@ export interface CategoryRequest {
   name: string;
   parentId?: string;
   displayOrder?: number;
+  usesPacks?: boolean;
 }
 
 export enum LocationType {

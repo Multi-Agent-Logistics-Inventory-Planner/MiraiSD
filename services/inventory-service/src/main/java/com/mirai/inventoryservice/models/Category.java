@@ -60,6 +60,11 @@ public class Category {
     @Builder.Default
     private Boolean isActive = true;
 
+    // Only meaningful on root categories. Subcategories inherit at query time.
+    @Column(name = "uses_packs", nullable = false)
+    @Builder.Default
+    private Boolean usesPacks = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

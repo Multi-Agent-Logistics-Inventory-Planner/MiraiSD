@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, Settings, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ interface ProductFiltersProps {
   onChange: (next: ProductFiltersState) => void;
   categories: Category[];
   onAddClick?: () => void;
+  onManageCategoriesClick?: () => void;
 }
 
 export function ProductFilters({
@@ -45,6 +46,7 @@ export function ProductFilters({
   onChange,
   categories,
   onAddClick,
+  onManageCategoriesClick,
 }: ProductFiltersProps) {
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -159,6 +161,21 @@ export function ProductFilters({
             </div>
           </PopoverContent>
         </Popover>
+
+        {onManageCategoriesClick && (
+          <Can permission={Permission.PRODUCTS_CREATE}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onManageCategoriesClick}
+              className="shrink-0"
+              title="Manage categories"
+              aria-label="Manage categories"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Can>
+        )}
 
         {onAddClick && (
           <Can permission={Permission.PRODUCTS_CREATE}>

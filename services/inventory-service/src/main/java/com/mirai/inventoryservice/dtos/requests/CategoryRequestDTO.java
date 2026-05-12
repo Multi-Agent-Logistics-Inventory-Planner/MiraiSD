@@ -21,4 +21,6 @@ public class CategoryRequestDTO {
     private UUID parentId;
 
     private Integer displayOrder;
+
+    private Boolean usesPacks;
 }
