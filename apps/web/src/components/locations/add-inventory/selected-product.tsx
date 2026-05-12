@@ -4,19 +4,25 @@ import { useState } from "react";
 import Image from "next/image";
 import { ImageOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  QuantityInput,
+  type QuantityIntakeMeta,
+} from "@/components/ui/quantity-input";
 import type { Product, LocationInventory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface SelectedProductProps {
   product: Product;
   existingInventory?: LocationInventory;
+  /** In packs (canonical). */
   quantity: string;
   quantityError: string | null;
+  /** Receives the new value in packs as a string. */
   onQuantityChange: (value: string) => void;
   onClearSelection: () => void;
   disabled: boolean;
+  onIntakeMetaChange?: (meta: QuantityIntakeMeta) => void;
 }
 
 export function SelectedProduct({
@@ -27,12 +33,16 @@ export function SelectedProduct({
   onQuantityChange,
   onClearSelection,
   disabled,
+  onIntakeMetaChange,
 }: SelectedProductProps) {
   const [imageError, setImageError] = useState(false);
 
   const safeImageUrl = getSafeImageUrl(product.imageUrl);
   const hasImage = safeImageUrl && !imageError;
   const isUpdate = Boolean(existingInventory);
+
+  // QuantityInput holds canonical packs; bridge its number|"" API to our string state.
+  const numericValue: number | "" = quantity === "" ? "" : Number(quantity);
 
   return (
     <div className="shrink-0 space-y-4">
@@ -99,14 +109,13 @@ export function SelectedProduct({
         <Label htmlFor="add-qty">
           {isUpdate ? "New Quantity" : "Quantity"}
         </Label>
-        <Input
-          id="add-qty"
-          type="number"
+        <QuantityInput
+          value={numericValue}
+          onChange={(v) => onQuantityChange(v === "" ? "" : String(v))}
           min={1}
-          value={quantity}
-          onChange={(e) => onQuantityChange(e.target.value)}
           disabled={disabled}
-          aria-invalid={!!quantityError}
+          packsPerBox={product.packsPerBox ?? null}
+          onIntakeMetaChange={onIntakeMetaChange}
         />
         {quantityError && (
           <p className="text-xs text-destructive">{quantityError}</p>

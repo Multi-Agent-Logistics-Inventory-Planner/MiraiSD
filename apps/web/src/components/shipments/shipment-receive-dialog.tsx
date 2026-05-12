@@ -67,6 +67,10 @@ interface ItemAllocation {
   locationType: LocationType;
   locationId: string;
   quantity: number | "";
+  /** Captured from the box/pack toggle. "pack" means no special audit-log treatment. */
+  intakeUnit?: "pack" | "box";
+  /** Raw quantity the user typed in their chosen unit. */
+  intakeQty?: number;
 }
 
 interface ItemAllocations {
@@ -107,12 +111,14 @@ function AllocationRow({
   onUpdate,
   onRemove,
   canRemove,
+  packsPerBox,
 }: {
   allocation: ItemAllocation;
   maxQuantity: number;
   onUpdate: (updates: Partial<ItemAllocation>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  packsPerBox?: number | null;
 }) {
   const locationsQuery = useLocations(
     allocation.locationType === LocationType.NOT_ASSIGNED
@@ -172,6 +178,10 @@ function AllocationRow({
           onChange={(val) => onUpdate({ quantity: val })}
           min={0}
           max={maxQuantity}
+          packsPerBox={packsPerBox ?? null}
+          onIntakeMetaChange={(meta) =>
+            onUpdate({ intakeUnit: meta.unit, intakeQty: meta.rawQty })
+          }
         />
 
         {canRemove && (
@@ -409,6 +419,8 @@ export function ShipmentReceiveDialog({
               locationType: a.locationType,
               locationId: a.locationType === LocationType.NOT_ASSIGNED ? undefined : a.locationId || undefined,
               quantity: a.quantity as number, // Already filtered to be a positive number
+              intakeUnit: a.intakeUnit === "box" ? ("box" as const) : undefined,
+              intakeQty: a.intakeUnit === "box" ? a.intakeQty : undefined,
             }));
         }
 
@@ -592,6 +604,7 @@ export function ShipmentReceiveDialog({
                               onUpdate={(updates) => updateAllocation(item.id, allocation.id, updates)}
                               onRemove={() => removeAllocation(item.id, allocation.id)}
                               canRemove={allocations.length > 1}
+                              packsPerBox={item.item.packsPerBox ?? null}
                             />
                           ))}
                         </div>

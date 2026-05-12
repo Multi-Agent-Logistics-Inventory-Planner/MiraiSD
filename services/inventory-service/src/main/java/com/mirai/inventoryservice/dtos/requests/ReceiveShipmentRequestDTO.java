@@ -38,6 +38,12 @@ public class ReceiveShipmentRequestDTO {
         @NotNull(message = "Quantity is required")
         @Min(value = 1, message = "Quantity must be at least 1")
         private Integer quantity;
+
+        /** Optional intake unit ("pack" or "box") for the resulting StockMovement metadata. */
+        private String intakeUnit;
+
+        /** Raw quantity in the user's chosen unit. */
+        private Integer intakeQty;
     }
 
     @Data

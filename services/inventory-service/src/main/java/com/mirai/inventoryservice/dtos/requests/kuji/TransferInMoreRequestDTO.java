@@ -27,4 +27,10 @@ public class TransferInMoreRequestDTO {
     @NotNull
     @Min(value = 1, message = "quantity must be at least 1")
     private Integer quantity;
+
+    /** Optional intake unit ("pack" or "box") preserved on the kuji TRANSFER stock movements. */
+    private String intakeUnit;
+
+    /** Raw quantity in the user's chosen unit (e.g. 1 box → quantity=36 packs, intakeQty=1). */
+    private Integer intakeQty;
 }

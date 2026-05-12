@@ -6,6 +6,7 @@ export {
   DEFAULT_PRODUCT_SORT,
   buildParentNameMap,
   buildKujiCategoryIds,
+  buildPackCategoryIds,
   isKujiProduct,
   compareProducts,
 } from "./product-sort-utils";

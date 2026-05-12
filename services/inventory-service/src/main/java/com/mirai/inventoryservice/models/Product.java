@@ -66,6 +66,10 @@ public class Product {
     @Column(name = "kuji_slack_webhook_url", length = 500)
     private String kujiSlackWebhookUrl;
 
+    /** Packs contained in one sealed box for TCG-style products. NULL when not box-packaged. */
+    @Column(name = "packs_per_box")
+    private Integer packsPerBox;
+
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default

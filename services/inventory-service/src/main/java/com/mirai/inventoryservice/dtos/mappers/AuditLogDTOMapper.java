@@ -111,6 +111,7 @@ public class AuditLogDTOMapper {
                 .previousQuantity(movement.getPreviousQuantity())
                 .currentQuantity(movement.getCurrentQuantity())
                 .quantityChange(movement.getQuantityChange())
+                .metadata(movement.getMetadata())
                 .build();
     }
 

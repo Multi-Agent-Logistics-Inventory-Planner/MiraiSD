@@ -21,7 +21,13 @@ public class AdjustStockRequestDTO {
     private StockMovementReason reason;
 
     private UUID actorId;
-    
+
     private String notes;
+
+    /** Optional intake unit ("pack" or "box") preserved for audit-log readability. */
+    private String intakeUnit;
+
+    /** Raw quantity in the user's chosen unit (e.g. 2 when intakeUnit="box" and quantityChange=72). */
+    private Integer intakeQty;
 }
 

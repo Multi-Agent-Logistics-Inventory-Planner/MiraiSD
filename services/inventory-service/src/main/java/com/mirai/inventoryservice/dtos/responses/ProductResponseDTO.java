@@ -27,6 +27,7 @@ public class ProductResponseDTO {
     private Integer templateQuantity;
     private KujiType kujiType;
     private String kujiSlackWebhookUrl;
+    private Integer packsPerBox;
     private String parentSku;
     private List<ProductSummaryDTO> children;
     private Integer totalChildStock;

@@ -256,7 +256,8 @@ public class KujiBoxService {
                         null,                                       // notes
                         autoInitialStock > 0 ? autoInitialStock : null, // initialStock
                         null,                                       // kujiType
-                        null                                        // kujiSlackWebhookUrl
+                        null,                                       // kujiSlackWebhookUrl
+                        null                                        // packsPerBox
                 );
                 if (autoInitialStock <= 0) {
                     // No materialized inventory (rare: 0-count tier with no held-back). Still
@@ -1035,6 +1036,7 @@ public class KujiBoxService {
         } else {
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
             metadata.put("action", "transfer_in_more");
+            applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
             executeKujiTransfer(
                     request.getSourceLocationId(),
                     box.getLocation(),
@@ -1086,6 +1088,7 @@ public class KujiBoxService {
         } else {
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
             metadata.put("action", "transfer_in_inventory_only");
+            applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
             executeKujiTransfer(
                     request.getSourceLocationId(),
                     box.getLocation(),
@@ -1234,7 +1237,8 @@ public class KujiBoxService {
                     null,                                       // notes
                     autoInitialStock > 0 ? autoInitialStock : null, // initialStock
                     null,                                       // kujiType
-                    null                                        // kujiSlackWebhookUrl
+                    null,                                       // kujiSlackWebhookUrl
+                    null                                        // packsPerBox
             );
             if (autoInitialStock <= 0) {
                 linkedProduct.setIsActive(true);
@@ -1784,6 +1788,18 @@ public class KujiBoxService {
         return sb.toString();
     }
 
+    /**
+     * Mirrors StockMovementService — stamps the canonical {@code intake_unit}/{@code intake_qty}
+     * keys when the caller's request was typed in box units. Audit log readers use these
+     * to render "+2 boxes (72 packs)" instead of just "+72".
+     */
+    private static void applyIntakeMetadata(Map<String, Object> metadata, String intakeUnit, Integer intakeQty) {
+        if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
+            metadata.put("intake_unit", "box");
+            metadata.put("intake_qty", intakeQty);
+        }
+    }
+
     private Map<String, Object> baseDrawMetadata(KujiBox box, KujiBoxTier tier, UUID auditLogId) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("kuji_box_id", box.getId().toString());
@@ -2002,6 +2018,10 @@ public class KujiBoxService {
                         .linkedInventoryAtBoxLocation(
                                 t.getLinkedProduct() != null
                                         ? linkedInventoryByProductId.get(t.getLinkedProduct().getId())
+                                        : null)
+                        .linkedProductPacksPerBox(
+                                t.getLinkedProduct() != null
+                                        ? t.getLinkedProduct().getPacksPerBox()
                                         : null)
                         .count(t.getCount())
                         .price(t.getPrice())

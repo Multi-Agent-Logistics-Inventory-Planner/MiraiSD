@@ -11,6 +11,7 @@ import { QuantityControls } from "./quantity-controls";
 import { AdjustSummary } from "./adjust-summary";
 import { ReasonSelector } from "./reason-selector";
 import type { AdjustAction, NormalizedInventory } from "./types";
+import type { QuantityIntakeMeta } from "@/components/ui/quantity-input";
 
 interface SelectedProductCardProps {
   inventory: NormalizedInventory;
@@ -26,6 +27,7 @@ interface SelectedProductCardProps {
   onReasonChange: (reason: StockMovementReason) => void;
   onIncrement: () => void;
   onDecrement: () => void;
+  onIntakeMetaChange?: (meta: QuantityIntakeMeta) => void;
 }
 
 export function SelectedProductCard({
@@ -42,6 +44,7 @@ export function SelectedProductCard({
   onReasonChange,
   onIncrement,
   onDecrement,
+  onIntakeMetaChange,
 }: SelectedProductCardProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -116,6 +119,8 @@ export function SelectedProductCard({
           onQuantityChange={onQuantityChange}
           onIncrement={onIncrement}
           onDecrement={onDecrement}
+          packsPerBox={item.packsPerBox ?? null}
+          onIntakeMetaChange={onIntakeMetaChange}
         />
       </div>
 

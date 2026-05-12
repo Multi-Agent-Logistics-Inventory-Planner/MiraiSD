@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Minus, Pencil, Plus } from "lucide-react";
+import { Loader2, Pencil, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
@@ -50,7 +51,7 @@ import { SupplierAutocomplete } from "@/components/suppliers";
 import type { Product, ProductRequest, Category } from "@/types/api";
 import { KujiType, LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
-import { buildKujiCategoryIds } from "./product-sort-utils";
+import { buildKujiCategoryIds, buildPackCategoryIds } from "./product-sort-utils";
 
 const SLACK_WEBHOOK_REGEX = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+$/;
 
@@ -86,6 +87,8 @@ const schema = z.object({
       (v) => !v || SLACK_WEBHOOK_REGEX.test(v),
       "Must be a valid Slack webhook URL",
     ),
+  // Packs per sealed box. Only meaningful for products in the TCG category tree.
+  packsPerBox: z.coerce.number().int().min(1, "Must be 1 or greater").optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -138,6 +141,8 @@ export function ProductForm({
   const [locationError, setLocationError] = useState("");
   const [initialStockQty, setInitialStockQty] = useState<number | "">("");
   const [initialStockQtyError, setInitialStockQtyError] = useState("");
+  /** "pack" = stored value is the typed value; "box" = stored value is typed * packsPerBox. */
+  const [initialStockUnit, setInitialStockUnit] = useState<"pack" | "box">("pack");
   const [isAddingStock, setIsAddingStock] = useState(false);
 
   const childCategories = useChildCategories(rootCategoryId);
@@ -192,6 +197,7 @@ export function ProductForm({
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
           kujiType: initialProduct.kujiType ?? "",
           kujiSlackWebhookUrl: initialProduct.kujiSlackWebhookUrl ?? "",
+          packsPerBox: initialProduct.packsPerBox ?? undefined,
         });
       } else {
         // It's a root category
@@ -215,6 +221,7 @@ export function ProductForm({
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
           kujiType: initialProduct.kujiType ?? "",
           kujiSlackWebhookUrl: initialProduct.kujiSlackWebhookUrl ?? "",
+          packsPerBox: initialProduct.packsPerBox ?? undefined,
         });
       }
       resetImage(initialProduct.imageUrl);
@@ -230,6 +237,7 @@ export function ProductForm({
     setInitialStockLocation(NOT_ASSIGNED_LOCATION);
     setInitialStockQty("");
     setInitialStockQtyError("");
+    setInitialStockUnit("pack");
     setLocationError("");
     setPendingPrizes([]);
   }, [open, initialProduct, form, resetImage]);
@@ -270,11 +278,19 @@ export function ProductForm({
     [categories],
   );
 
+  // Categories that use the box/pack toggle (TCG tree: Pokemon, One Piece, etc.).
+  const packCategoryIds = useMemo(
+    () => buildPackCategoryIds(categories ?? []),
+    [categories],
+  );
+
   // Show kuji-type field only on root products whose selected category sits in the Kuji tree.
   const isRootProduct = !parentId && !initialProduct?.parentId;
   const selectedCategoryId = form.watch("categoryId");
   const showKujiTypeField =
     isRootProduct && !!selectedCategoryId && kujiCategoryIds.has(selectedCategoryId);
+  // Show packsPerBox field for products in the TCG tree (root or child — packs apply to leaf SKUs).
+  const showPacksPerBoxField = !!selectedCategoryId && packCategoryIds.has(selectedCategoryId);
   const watchedKujiType = form.watch("kujiType");
 
   // CUSTOM kuji parents are templates with their own dedicated tab and lifecycle.
@@ -344,6 +360,12 @@ export function ProductForm({
           : null;
     }
 
+    // Thread packsPerBox only for products in the TCG tree. Outside the tree, send null
+    // explicitly so a category change can clear a previously-set value.
+    payload.packsPerBox = showPacksPerBoxField
+      ? (values.packsPerBox ?? null)
+      : null;
+
     try {
       if (initialProduct) {
         await updateMutation.mutateAsync({ id: initialProduct.id, payload });
@@ -378,10 +400,30 @@ export function ProductForm({
           setIsAddingStock(true);
           try {
             const actorId = user?.personId || user?.id;
+            const formPpbRaw = form.watch("packsPerBox") as unknown;
+            const formPpb =
+              typeof formPpbRaw === "number"
+                ? formPpbRaw
+                : typeof formPpbRaw === "string" && formPpbRaw.trim() !== ""
+                  ? parseInt(formPpbRaw, 10)
+                  : NaN;
+            const initialIntakeQty =
+              initialStockUnit === "box" &&
+              Number.isFinite(formPpb) &&
+              formPpb > 1 &&
+              typeof initialStockQty === "number"
+                ? Math.floor(initialStockQty / formPpb)
+                : undefined;
             await createInventory(
               initialStockLocation.locationType,
               initialStockLocation.locationId,
-              { itemId: newProduct.id, quantity: initialStockQty, actorId },
+              {
+                itemId: newProduct.id,
+                quantity: initialStockQty,
+                actorId,
+                intakeUnit: initialStockUnit === "box" ? "box" : undefined,
+                intakeQty: initialIntakeQty,
+              },
             );
             toast({ title: "Initial stock added", variant: "success" });
           } catch (stockErr: unknown) {
@@ -848,6 +890,36 @@ export function ProductForm({
                 </div>
               )}
 
+              {/* Packs per sealed box — for products in the TCG category tree.
+                  Optional within the tree (singles/accessories leave it blank). */}
+              {showPacksPerBoxField && (
+                <div className="grid gap-1">
+                  <Label htmlFor="packs-per-box">
+                    Packs per box{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </Label>
+                  <Input
+                    id="packs-per-box"
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 36"
+                    {...form.register("packsPerBox")}
+                    disabled={isSaving}
+                  />
+                  {form.formState.errors.packsPerBox?.message ? (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.packsPerBox.message}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Leave blank for singles, accessories, or non-box-packaged items.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Initial stock — create mode only, not for CUSTOM kuji (managed per-box) */}
               {!initialProduct && watchedKujiType !== KujiType.CUSTOM && (
                 <div className="border rounded-lg p-4 space-y-4">
@@ -886,62 +958,40 @@ export function ProductForm({
 
                       <div className="grid gap-2">
                         <Label htmlFor="initial-stock-qty">{isKujiCategory ? "Sets" : "Quantity"}</Label>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            disabled={
-                              initialStockQty === "" ||
-                              initialStockQty <= 1 ||
-                              isSaving
-                            }
-                            onClick={() =>
-                              setInitialStockQty((q) =>
-                                q === "" ? 1 : Math.max(1, q - 1),
-                              )
-                            }
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            id="initial-stock-qty"
-                            type="number"
-                            min={1}
-                            className="text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            value={initialStockQty}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              if (raw === "") {
-                                setInitialStockQty("");
-                                setInitialStockQtyError("Quantity is required");
-                              } else {
-                                const v = parseInt(raw, 10);
-                                if (!isNaN(v) && v >= 1) {
-                                  setInitialStockQty(v);
+                        {(() => {
+                          // Form watch may return the raw HTML-input string ("36") rather than
+                          // a number while typing — coerce here so the toggle on QuantityInput
+                          // gets a live packsPerBox without waiting for resolver validation.
+                          const formPpbRaw = form.watch("packsPerBox") as unknown;
+                          const parsed =
+                            typeof formPpbRaw === "number"
+                              ? formPpbRaw
+                              : typeof formPpbRaw === "string" && formPpbRaw.trim() !== ""
+                                ? parseInt(formPpbRaw, 10)
+                                : NaN;
+                          const livePpb =
+                            showPacksPerBoxField && Number.isFinite(parsed) && parsed > 1
+                              ? parsed
+                              : null;
+                          return (
+                            <QuantityInput
+                              value={initialStockQty}
+                              onChange={(v) => {
+                                setInitialStockQty(v);
+                                if (v === "") {
+                                  setInitialStockQtyError("Quantity is required");
+                                } else {
                                   setInitialStockQtyError("");
                                 }
-                              }
-                            }}
-                            disabled={isSaving}
-                          />
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            disabled={isSaving}
-                            onClick={() => {
-                              setInitialStockQty((q) => (q === "" ? 1 : q + 1));
-                              setInitialStockQtyError("");
-                            }}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                              }}
+                              min={1}
+                              disabled={isSaving}
+                              packsPerBox={livePpb}
+                              onIntakeMetaChange={(meta) => setInitialStockUnit(meta.unit)}
+                              layout="stacked"
+                            />
+                          );
+                        })()}
                         {initialStockQtyError && (
                           <p className="text-xs text-destructive">
                             {initialStockQtyError}

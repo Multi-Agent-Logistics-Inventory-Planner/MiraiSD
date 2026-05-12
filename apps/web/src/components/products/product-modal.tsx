@@ -231,6 +231,29 @@ export function ProductModal({
                 </span>
               </div>
             )}
+            {typeof p.packsPerBox === "number" && p.packsPerBox > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs sm:text-sm">
+                  Packs per box:
+                </span>
+                <span className="text-xs sm:text-sm font-medium">
+                  {p.packsPerBox}
+                </span>
+              </div>
+            )}
+            {canViewCosts &&
+              typeof p.packsPerBox === "number" &&
+              p.packsPerBox > 0 &&
+              typeof p.msrp === "number" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs sm:text-sm">
+                    Box price:
+                  </span>
+                  <span className="text-xs sm:text-sm">
+                    {formatCurrency(p.msrp * p.packsPerBox)}
+                  </span>
+                </div>
+              )}
             {p.preferredSupplierName && (
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-xs sm:text-sm">

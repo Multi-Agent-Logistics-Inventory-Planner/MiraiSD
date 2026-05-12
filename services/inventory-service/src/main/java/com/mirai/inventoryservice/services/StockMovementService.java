@@ -168,6 +168,12 @@ public class StockMovementService {
             metadata.put("notes", request.getNotes());
         }
         metadata.put("inventory_id", inventoryId.toString());
+        // When the user entered the quantity in boxes, preserve that intent so
+        // the audit log can render "+2 boxes (72 packs)" instead of just "+72".
+        if ("box".equalsIgnoreCase(request.getIntakeUnit()) && request.getIntakeQty() != null && request.getIntakeQty() > 0) {
+            metadata.put("intake_unit", "box");
+            metadata.put("intake_qty", request.getIntakeQty());
+        }
 
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
@@ -433,12 +439,24 @@ public class StockMovementService {
     }
 
     /**
-     * Create new inventory at a location with tracking.
+     * Create new inventory at a location with tracking. Convenience overload — no intake metadata.
+     */
+    public UUID createInventoryWithTracking(LocationType locationType, UUID locationId,
+                                            Product product, int quantity,
+                                            StockMovementReason reason, UUID actorId, String notes) {
+        return createInventoryWithTracking(locationType, locationId, product, quantity, reason, actorId, notes, null, null);
+    }
+
+    /**
+     * Create new inventory at a location with tracking. Persists optional intake metadata
+     * ({@code intakeUnit="box"}, {@code intakeQty}) so the audit log can render the
+     * user's typed unit ("+2 boxes (72 packs)") instead of just the canonical pack count.
      */
     @Transactional
     public UUID createInventoryWithTracking(LocationType locationType, UUID locationId,
                                             Product product, int quantity,
-                                            StockMovementReason reason, UUID actorId, String notes) {
+                                            StockMovementReason reason, UUID actorId, String notes,
+                                            String intakeUnit, Integer intakeQty) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be positive");
         }
@@ -493,6 +511,10 @@ public class StockMovementService {
             metadata.put("notes", notes);
         }
         metadata.put("inventory_id", inventoryId.toString());
+        if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
+            metadata.put("intake_unit", "box");
+            metadata.put("intake_qty", intakeQty);
+        }
 
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)

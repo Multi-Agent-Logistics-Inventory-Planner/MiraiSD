@@ -46,6 +46,10 @@ public class ProductRequestDTO {
     @Size(max = 500)
     private String kujiSlackWebhookUrl;
 
+    /** Packs per sealed box for TCG products. NULL hides the box/pack toggle on quantity inputs. */
+    @Min(value = 1, message = "packsPerBox must be 1 or greater")
+    private Integer packsPerBox;
+
     @NotBlank(message = "Name is required")
     private String name;
 

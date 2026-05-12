@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { z } from "zod";
-import { useForm, useFieldArray, type UseFormReturn } from "react-hook-form";
+import {
+  Controller,
+  useForm,
+  useFieldArray,
+  type UseFormReturn,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
 import {
@@ -25,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -61,7 +67,8 @@ const itemSchema = z.object({
   orderedQuantity: z.coerce
     .number()
     .int()
-    .min(0, "Quantity must be 0 or more"),
+    .min(0, "Quantity must be 0 or more")
+    .optional(),
   unitCost: z.coerce.number().min(0).optional(),
   numberOfSets: z.coerce.number().int().min(0).optional(),
   prizeQuantities: z.record(z.string(), z.coerce.number().int().min(0)).optional(),
@@ -130,7 +137,7 @@ export function ShipmentCreateDialog({
           productId: "",
           productName: "",
           productSku: "",
-          orderedQuantity: 1,
+          orderedQuantity: undefined,
           unitCost: undefined,
           numberOfSets: undefined,
           prizeQuantities: undefined,
@@ -242,7 +249,7 @@ export function ShipmentCreateDialog({
                   productId: "",
                   productName: "",
                   productSku: "",
-                  orderedQuantity: 1,
+                  orderedQuantity: undefined,
                   unitCost: undefined,
                   prizeQuantities: undefined,
                 },
@@ -263,7 +270,7 @@ export function ShipmentCreateDialog({
             productId: "",
             productName: "",
             productSku: "",
-            orderedQuantity: 1,
+            orderedQuantity: undefined,
             unitCost: undefined,
             numberOfSets: undefined,
             prizeQuantities: undefined,
@@ -321,7 +328,7 @@ export function ShipmentCreateDialog({
       productId: "",
       productName: "",
       productSku: "",
-      orderedQuantity: 1,
+      orderedQuantity: undefined,
       unitCost: undefined,
       numberOfSets: undefined,
       prizeQuantities: undefined,
@@ -453,7 +460,7 @@ export function ShipmentCreateDialog({
             productId: product.id,
             productName: product.name,
             productSku: product.sku ?? "",
-            orderedQuantity: 1,
+            orderedQuantity: undefined,
             unitCost: product.unitCost ?? undefined,
             numberOfSets: undefined,
             prizeQuantities: undefined,
@@ -573,7 +580,6 @@ export function ShipmentCreateDialog({
                     index={activeKey}
                     products={products}
                     productsLoading={productsQuery.isLoading}
-                    canViewCosts={canViewCosts}
                     rowHasReceipts={rowHasReceipts[activeKey] ?? false}
                     childrenByProductId={childrenByProductId}
                     isLoadingChildrenForProduct={isLoadingChildrenForProduct}
@@ -937,7 +943,6 @@ interface ShipmentItemPanelProps {
   readonly index: number;
   readonly products: Product[];
   readonly productsLoading: boolean;
-  readonly canViewCosts: boolean;
   readonly rowHasReceipts: boolean;
   readonly childrenByProductId: Record<string, ProductSummary[]>;
   readonly isLoadingChildrenForProduct: (productId: string) => boolean;
@@ -949,7 +954,6 @@ function ShipmentItemPanel({
   index,
   products,
   productsLoading,
-  canViewCosts,
   rowHasReceipts,
   childrenByProductId,
   isLoadingChildrenForProduct,
@@ -958,6 +962,7 @@ function ShipmentItemPanel({
   const selectedProductId = form.watch(`items.${index}.productId`);
   const selectedProduct = products.find((p) => p.id === selectedProductId);
   const hasKujiChildren = !!childrenByProductId[selectedProductId]?.length;
+  const useQuantityInput = !hasKujiChildren;
 
   return (
     <div className="p-5 space-y-4">
@@ -992,11 +997,25 @@ function ShipmentItemPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="grid gap-1.5">
-          <Label className="text-xs">
-            {hasKujiChildren ? "Total Kuji (sets)" : "Quantity"}
-          </Label>
+      <div className="grid gap-1.5">
+        <Label className="text-xs">
+          {hasKujiChildren ? "Total Kuji (sets)" : "Quantity"}
+        </Label>
+        {useQuantityInput ? (
+          <Controller
+            control={form.control}
+            name={`items.${index}.orderedQuantity`}
+            render={({ field }) => (
+              <QuantityInput
+                value={field.value ?? ""}
+                onChange={(v) => field.onChange(v === "" ? undefined : v)}
+                disabled={rowHasReceipts}
+                packsPerBox={selectedProduct?.packsPerBox}
+                layout="stacked"
+              />
+            )}
+          />
+        ) : (
           <Input
             type="number"
             min={0}
@@ -1008,28 +1027,16 @@ function ShipmentItemPanel({
             }
             {...form.register(`items.${index}.orderedQuantity`)}
           />
-          {rowHasReceipts && (
-            <p className="text-[11px] text-muted-foreground">
-              Undo this item&apos;s receipts to change the ordered quantity.
-            </p>
-          )}
-          {form.formState.errors.items?.[index]?.orderedQuantity?.message && (
-            <p className="text-xs text-destructive">
-              {form.formState.errors.items[index]?.orderedQuantity?.message}
-            </p>
-          )}
-        </div>
-        {canViewCosts && (
-          <div className="grid gap-1.5">
-            <Label className="text-xs">Unit Cost</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              placeholder="Optional"
-              {...form.register(`items.${index}.unitCost`)}
-            />
-          </div>
+        )}
+        {rowHasReceipts && (
+          <p className="text-[11px] text-muted-foreground">
+            Undo this item&apos;s receipts to change the ordered quantity.
+          </p>
+        )}
+        {form.formState.errors.items?.[index]?.orderedQuantity?.message && (
+          <p className="text-xs text-destructive">
+            {form.formState.errors.items[index]?.orderedQuantity?.message}
+          </p>
         )}
       </div>
 

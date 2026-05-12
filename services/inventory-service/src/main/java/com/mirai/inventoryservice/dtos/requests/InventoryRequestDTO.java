@@ -30,5 +30,11 @@ public class InventoryRequestDTO {
      * Use RESTOCK when adding inventory via the adjust dialog.
      */
     private StockMovementReason reason;
+
+    /** Optional intake unit ("pack" or "box") preserved for audit-log readability. */
+    private String intakeUnit;
+
+    /** Raw quantity in the user's chosen unit. */
+    private Integer intakeQty;
 }
 

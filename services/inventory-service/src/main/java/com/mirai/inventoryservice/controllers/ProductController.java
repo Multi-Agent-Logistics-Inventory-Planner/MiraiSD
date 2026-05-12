@@ -112,7 +112,8 @@ public class ProductController {
                 requestDTO.getNotes(),
                 requestDTO.getInitialStock(),
                 requestDTO.getKujiType(),
-                requestDTO.getKujiSlackWebhookUrl()
+                requestDTO.getKujiSlackWebhookUrl(),
+                requestDTO.getPacksPerBox()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(productMapper.toResponseDTO(product));
     }
@@ -123,6 +124,7 @@ public class ProductController {
             @PathVariable UUID id,
             @RequestParam(required = false, defaultValue = "false") Boolean clearParent,
             @RequestParam(required = false, defaultValue = "false") Boolean clearPreferredSupplier,
+            @RequestParam(required = false, defaultValue = "false") Boolean clearPacksPerBox,
             @Valid @RequestBody ProductRequestDTO requestDTO) {
         Product product = productService.updateProduct(
                 id,
@@ -146,7 +148,9 @@ public class ProductController {
                 requestDTO.getPreferredSupplierAuto(),
                 clearPreferredSupplier,
                 requestDTO.getKujiType(),
-                requestDTO.getKujiSlackWebhookUrl()
+                requestDTO.getKujiSlackWebhookUrl(),
+                requestDTO.getPacksPerBox(),
+                clearPacksPerBox
         );
         return ResponseEntity.ok(productMapper.toResponseDTO(product));
     }

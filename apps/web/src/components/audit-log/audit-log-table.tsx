@@ -95,6 +95,31 @@ function QuantityChange({ change }: { change: number }) {
 }
 
 /**
+ * When the user typed quantity in box units, show "+2 boxes (72 packs)" instead of just "+72".
+ * Falls back to the canonical pack-count rendering when no intake metadata is present.
+ */
+function MovementQuantity({ movement }: { movement: AuditLogMovement }) {
+  const meta = movement.metadata;
+  if (meta?.intake_unit === "box" && typeof meta.intake_qty === "number" && meta.intake_qty > 0) {
+    const sign = movement.quantityChange < 0 ? "-" : "+";
+    const cls =
+      movement.quantityChange < 0
+        ? "text-red-500 font-medium tabular-nums"
+        : "text-emerald-600 font-medium tabular-nums";
+    const boxLabel = meta.intake_qty === 1 ? "box" : "boxes";
+    return (
+      <span className={cls}>
+        {sign}{meta.intake_qty} {boxLabel}
+        <span className="text-xs text-muted-foreground font-normal ml-1">
+          ({Math.abs(movement.quantityChange)} packs)
+        </span>
+      </span>
+    );
+  }
+  return <QuantityChange change={movement.quantityChange} />;
+}
+
+/**
  * For transfers, uses AuditLog-level location codes (correctly stored at write-time)
  * rather than per-movement codes which can be wrong due to a locationType mismatch.
  * Withdrawal rows show the FROM location; deposit rows show the TO location.
@@ -300,7 +325,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
               )}
             </span>
             <div className="text-center self-center">
-              <QuantityChange change={movement.quantityChange} />
+              <MovementQuantity movement={movement} />
               <p className="text-xs text-muted-foreground tabular-nums">
                 {movement.previousQuantity ?? 0} → {movement.currentQuantity ?? 0}
               </p>

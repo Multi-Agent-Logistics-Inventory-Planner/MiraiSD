@@ -56,5 +56,7 @@ public class AuditLogDetailDTO {
         private Integer previousQuantity;
         private Integer currentQuantity;
         private Integer quantityChange;
+        /** Stock movement metadata (intake_unit, intake_qty, notes, etc.). */
+        private java.util.Map<String, Object> metadata;
     }
 }

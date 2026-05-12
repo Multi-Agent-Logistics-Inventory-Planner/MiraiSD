@@ -23,4 +23,5 @@ public class ProductSummaryDTO {
     private String letter;
     private Integer templateQuantity;
     private Boolean hasChildren;
+    private Integer packsPerBox;
 }

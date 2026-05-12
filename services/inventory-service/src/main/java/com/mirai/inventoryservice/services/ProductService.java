@@ -87,7 +87,8 @@ public class ProductService {
                                  BigDecimal unitCost, BigDecimal msrp, String imageUrl, String notes,
                                  Integer initialStock,
                                  com.mirai.inventoryservice.models.enums.KujiType kujiType,
-                                 String kujiSlackWebhookUrl) {
+                                 String kujiSlackWebhookUrl,
+                                 Integer packsPerBox) {
         // Validate parent if provided
         Product parent = null;
         Category category;
@@ -126,6 +127,7 @@ public class ProductService {
                 .templateQuantity(templateQuantity)
                 .kujiType(kujiType)
                 .kujiSlackWebhookUrl(kujiSlackWebhookUrl != null && !kujiSlackWebhookUrl.isBlank() ? kujiSlackWebhookUrl.trim() : null)
+                .packsPerBox(packsPerBox)
                 .category(category)
                 .parent(parent)
                 .name(name)
@@ -216,7 +218,9 @@ public class ProductService {
                                  UUID preferredSupplierId, Boolean preferredSupplierAuto,
                                  Boolean clearPreferredSupplier,
                                  com.mirai.inventoryservice.models.enums.KujiType kujiType,
-                                 String kujiSlackWebhookUrl) {
+                                 String kujiSlackWebhookUrl,
+                                 Integer packsPerBox,
+                                 Boolean clearPacksPerBox) {
         Product product = getProductById(id);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
@@ -273,6 +277,11 @@ public class ProductService {
         if (msrp != null) product.setMsrp(msrp);
         if (imageUrl != null) product.setImageUrl(imageUrl);
         if (notes != null) product.setNotes(notes);
+        if (Boolean.TRUE.equals(clearPacksPerBox)) {
+            product.setPacksPerBox(null);
+        } else if (packsPerBox != null) {
+            product.setPacksPerBox(packsPerBox);
+        }
         // Allow direct quantity update only for prize products (products with a parent)
         if (quantity != null && product.getParentId() != null) {
             product.setQuantity(quantity);
