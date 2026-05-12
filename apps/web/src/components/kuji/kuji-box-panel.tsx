@@ -23,7 +23,6 @@ import { CloseBoxDialog } from "./close-box-dialog";
 import { ReopenBoxDialog } from "./reopen-box-dialog";
 import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
-import { AddSlipDialog } from "./add-slip-dialog";
 import { TransferInDialog } from "./transfer-in-dialog";
 import { KujiStatTile } from "./kuji-stat-tile";
 import { BoxOfSlipsCard } from "./box-of-slips-card";
@@ -82,7 +81,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
   const [reopenBoxOpen, setReopenBoxOpen] = useState(false);
   const [undoDrawOpen, setUndoDrawOpen] = useState(false);
   const [editTierOpen, setEditTierOpen] = useState(false);
-  const [addSlipOpen, setAddSlipOpen] = useState(false);
   const [transferInOpen, setTransferInOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
@@ -127,10 +125,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
   function handleEditTier(tier: KujiBoxTier) {
     setActiveTier(tier);
     setEditTierOpen(true);
-  }
-  function handleAddSlip(tier: KujiBoxTier) {
-    setActiveTier(tier);
-    setAddSlipOpen(true);
   }
   function handleTransferIn(tier: KujiBoxTier) {
     setActiveTier(tier);
@@ -332,7 +326,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
             box={box}
             canEditStructural={canStructural}
             onEditTier={handleEditTier}
-            onAddSlip={handleAddSlip}
             onTransferIn={handleTransferIn}
           />
           {activeTier ? (
@@ -341,15 +334,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
                 open={editTierOpen}
                 onOpenChange={(o) => {
                   setEditTierOpen(o);
-                  if (!o) setActiveTier(null);
-                }}
-                box={box}
-                tier={activeTier}
-              />
-              <AddSlipDialog
-                open={addSlipOpen}
-                onOpenChange={(o) => {
-                  setAddSlipOpen(o);
                   if (!o) setActiveTier(null);
                 }}
                 box={box}
