@@ -12,6 +12,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   Calendar as CalendarIcon,
   ChevronsUpDown,
   Info,
@@ -119,6 +120,12 @@ export function ShipmentCreateDialog({
   >({});
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<ActiveKey>("details");
+  const [mobileShowMenu, setMobileShowMenu] = useState(true);
+
+  function selectKey(key: ActiveKey) {
+    setActiveKey(key);
+    setMobileShowMenu(false);
+  }
 
   const excludeProductIds = Object.values(selectedProductIds).filter(Boolean);
 
@@ -280,6 +287,7 @@ export function ShipmentCreateDialog({
       setSelectedProductIds({});
     }
     setActiveKey("details");
+    setMobileShowMenu(true);
   }, [open, form, initialShipment]);
 
   // When children load for a Kuji, init prizeQuantities for that item row.
@@ -333,7 +341,7 @@ export function ShipmentCreateDialog({
       numberOfSets: undefined,
       prizeQuantities: undefined,
     });
-    setActiveKey(fields.length); // new index after append
+    selectKey(fields.length); // new index after append
   }
 
   function handleRemoveItem(index: number) {
@@ -433,7 +441,7 @@ export function ShipmentCreateDialog({
       "notes",
     ];
     if (headerKeys.some((k) => k in errs)) {
-      setActiveKey("details");
+      selectKey("details");
       return;
     }
     if (errs.items && typeof errs.items === "object") {
@@ -441,7 +449,7 @@ export function ShipmentCreateDialog({
       for (const k of Object.keys(itemErrs)) {
         const idx = Number(k);
         if (!Number.isNaN(idx)) {
-          setActiveKey(idx);
+          selectKey(idx);
           return;
         }
       }
@@ -469,7 +477,7 @@ export function ShipmentCreateDialog({
             ...prev,
             [fields.length]: product.id,
           }));
-          setActiveKey(fields.length);
+          selectKey(fields.length);
         }}
       />
       <SelectShipmentProductDialog
@@ -503,11 +511,16 @@ export function ShipmentCreateDialog({
             className="flex flex-col flex-1 min-h-0"
           >
             <div className="flex flex-1 min-h-0 overflow-hidden">
-              <aside className="w-[220px] shrink-0 bg-muted/40 border-r flex flex-col overflow-hidden">
+              <aside
+                className={cn(
+                  "w-full sm:w-[220px] shrink-0 bg-muted/40 sm:border-r flex flex-col overflow-hidden",
+                  !mobileShowMenu && "hidden sm:flex",
+                )}
+              >
                 <div className="px-2 pt-3">
                   <DetailsSidebarItem
                     active={activeKey === "details"}
-                    onSelect={() => setActiveKey("details")}
+                    onSelect={() => selectKey("details")}
                   />
                 </div>
 
@@ -532,7 +545,7 @@ export function ShipmentCreateDialog({
                         active={activeKey === index}
                         canRemove={fields.length > 1}
                         disabled={isSaving}
-                        onSelect={() => setActiveKey(index)}
+                        onSelect={() => selectKey(index)}
                         onRemove={() => handleRemoveItem(index)}
                       />
                     );
@@ -566,7 +579,22 @@ export function ShipmentCreateDialog({
                 </div>
               </aside>
 
-              <div className="flex-1 overflow-y-auto min-w-0">
+              <div
+                className={cn(
+                  "flex-1 overflow-y-auto min-w-0",
+                  mobileShowMenu && "hidden sm:block",
+                )}
+              >
+                <div className="sm:hidden border-b">
+                  <button
+                    type="button"
+                    onClick={() => setMobileShowMenu(true)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                </div>
                 {activeKey === "details" ? (
                   <ShipmentDetailsPanel
                     form={form}
