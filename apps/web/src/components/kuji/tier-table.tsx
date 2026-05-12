@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, ArrowDownToLine } from "lucide-react";
+import { Pencil, ArrowDownToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -22,7 +22,6 @@ import { compareTiers } from "./tier-palette";
 interface TierTableProps {
   readonly box: KujiBox;
   readonly canEditStructural: boolean;
-  readonly onAddSlip: (tier: KujiBoxTier) => void;
   readonly onTransferIn: (tier: KujiBoxTier) => void;
   readonly onEditTier: (tier: KujiBoxTier) => void;
 }
@@ -41,7 +40,6 @@ function formatChance(count: number, totalCount: number): string {
 export function TierTable({
   box,
   canEditStructural,
-  onAddSlip,
   onTransferIn,
   onEditTier,
 }: TierTableProps) {
@@ -56,10 +54,10 @@ export function TierTable({
           <TableRow>
             <TableHead>Label</TableHead>
             <TableHead>Linked Product</TableHead>
-            <TableHead className="text-right w-24">In box</TableHead>
+            <TableHead className="hidden md:table-cell text-right w-24">In box</TableHead>
             <TableHead className="text-right w-24">Price</TableHead>
-            <TableHead className="text-right w-20">Slips</TableHead>
-            <TableHead className="text-right w-20">Chance</TableHead>
+            <TableHead className="hidden md:table-cell text-right w-20">Slips</TableHead>
+            <TableHead className="hidden md:table-cell text-right w-20">Chance</TableHead>
             {showActions ? (
               <TableHead className="w-32 text-right">Actions</TableHead>
             ) : null}
@@ -93,7 +91,7 @@ export function TierTable({
                   <TableCell className="text-muted-foreground">
                     {tier.linkedProductName ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground">
                     {tier.linkedProductId == null
                       ? "—"
                       : inventoryInBox.toLocaleString()}
@@ -101,7 +99,7 @@ export function TierTable({
                   <TableCell className="text-right tabular-nums">
                     {formatCurrency(tier.price)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="hidden md:table-cell text-right tabular-nums">
                     {heldBack > 0 ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -117,7 +115,7 @@ export function TierTable({
                       tier.count.toLocaleString()
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground">
                     {formatChance(tier.count, box.totalCount)}
                   </TableCell>
                   {showActions ? (
@@ -139,25 +137,12 @@ export function TierTable({
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => onAddSlip(tier)}
-                          title="Add slip"
-                          aria-label={`Add slip to tier ${tier.label}`}
+                          onClick={() => onTransferIn(tier)}
+                          title="Transfer"
+                          aria-label={`Transfer for tier ${tier.label}`}
                         >
-                          <Plus className="h-4 w-4" />
+                          <ArrowDownToLine className="h-4 w-4" />
                         </Button>
-                        {tier.linkedProductId ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => onTransferIn(tier)}
-                            title="Transfer inventory in"
-                            aria-label={`Transfer inventory in to tier ${tier.label}`}
-                          >
-                            <ArrowDownToLine className="h-4 w-4" />
-                          </Button>
-                        ) : null}
                       </div>
                     </TableCell>
                   ) : null}

@@ -23,7 +23,6 @@ import { ReopenBoxDialog } from "./reopen-box-dialog";
 import { RecordDrawDialog } from "./record-draw-dialog";
 import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
-import { AddSlipDialog } from "./add-slip-dialog";
 import { TransferInDialog } from "./transfer-in-dialog";
 import { KujiHistoryView } from "./kuji-history-view";
 
@@ -57,7 +56,6 @@ export function KujiBoxView({
   const [undoDrawOpen, setUndoDrawOpen] = useState(false);
   const [manageTiersOpen, setManageTiersOpen] = useState(false);
   const [editTierOpen, setEditTierOpen] = useState(false);
-  const [addSlipOpen, setAddSlipOpen] = useState(false);
   const [transferInOpen, setTransferInOpen] = useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
 
@@ -67,10 +65,6 @@ export function KujiBoxView({
   function handleEditTier(tier: KujiBoxTier) {
     setActiveTier(tier);
     setEditTierOpen(true);
-  }
-  function handleAddSlip(tier: KujiBoxTier) {
-    setActiveTier(tier);
-    setAddSlipOpen(true);
   }
   function handleTransferIn(tier: KujiBoxTier) {
     setActiveTier(tier);
@@ -256,7 +250,6 @@ export function KujiBoxView({
             box={box}
             canEditStructural={canStructural}
             onEditTier={handleEditTier}
-            onAddSlip={handleAddSlip}
             onTransferIn={handleTransferIn}
           />
           {activeTier ? (
@@ -265,15 +258,6 @@ export function KujiBoxView({
                 open={editTierOpen}
                 onOpenChange={(o) => {
                   setEditTierOpen(o);
-                  if (!o) setActiveTier(null);
-                }}
-                box={box}
-                tier={activeTier}
-              />
-              <AddSlipDialog
-                open={addSlipOpen}
-                onOpenChange={(o) => {
-                  setAddSlipOpen(o);
                   if (!o) setActiveTier(null);
                 }}
                 box={box}
