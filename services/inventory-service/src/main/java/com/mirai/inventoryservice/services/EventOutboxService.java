@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.kafka.KafkaProducer;
+import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.EventDeadLetter;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -53,6 +54,20 @@ public class EventOutboxService {
      */
     @Transactional
     public void createStockMovementEvent(StockMovement movement) {
+        Product item = movement.getItem();
+        // Kuji prize children's inventory is a bookkeeping projection of remaining slips in the
+        // box; the parent's KUJI_PRIZE_DRAWN notification already conveys per-tier counts. Skip
+        // publishing stock-change events so the messaging-service does not raise generic
+        // OUT_OF_STOCK / LOW_STOCK alerts for them.
+        if (item.getParent() != null && item.getParent().getKujiType() != null) {
+            log.debug(
+                    "Skipping outbox event for kuji prize child: product={}, parent={}",
+                    item.getId(),
+                    item.getParent().getId()
+            );
+            return;
+        }
+
         // Build payload with resolved location codes for ML analytics
         Map<String, Object> payload = new HashMap<>();
         payload.put("product_id", movement.getItem().getId().toString());

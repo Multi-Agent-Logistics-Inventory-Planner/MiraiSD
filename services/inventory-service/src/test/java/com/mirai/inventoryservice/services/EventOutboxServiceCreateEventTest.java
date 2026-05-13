@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.kafka.KafkaProducer;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.models.enums.KujiType;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -123,6 +125,82 @@ class EventOutboxServiceCreateEventTest {
         EventOutbox second = outboxCaptor.getAllValues().get(1);
 
         assertThat(first.getEntityId()).isNotEqualTo(second.getEntityId());
+    }
+
+    @Test
+    @DisplayName("skips outbox event when item is a kuji prize child (parent has kujiType)")
+    void createStockMovementEvent_skips_forKujiPrizeChild() {
+        // Given
+        Product kujiParent = Product.builder()
+                .id(UUID.randomUUID())
+                .name("Pokemon Kuji Box")
+                .sku("KUJI-BOX-001")
+                .kujiType(KujiType.CUSTOM)
+                .build();
+        Product child = Product.builder()
+                .id(UUID.randomUUID())
+                .name("alakazam ex 151")
+                .sku("KUJI-PRIZE-001")
+                .parent(kujiParent)
+                .reorderPoint(0)
+                .build();
+        StockMovement movement = StockMovement.builder()
+                .id(7L)
+                .item(child)
+                .quantityChange(-1)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .locationType(LocationType.BOX_BIN)
+                .previousQuantity(1)
+                .currentQuantity(0)
+                .at(OffsetDateTime.now())
+                .build();
+
+        // When
+        eventOutboxService.createStockMovementEvent(movement);
+
+        // Then — outbox is never written, and we never query totals/locations for the child
+        verify(eventOutboxRepository, never()).save(any());
+        verify(stockMovementService, never()).calculateTotalInventory(any());
+        verify(stockMovementService, never()).resolveLocationCode(any(), any());
+    }
+
+    @Test
+    @DisplayName("publishes event when item has a non-kuji parent (parent.kujiType is null)")
+    void createStockMovementEvent_publishes_whenParentIsNotKuji() {
+        // Given — a parented product whose parent is not a kuji root
+        Product nonKujiParent = Product.builder()
+                .id(UUID.randomUUID())
+                .name("Some Bundle")
+                .sku("BUNDLE-001")
+                .build();
+        Product child = Product.builder()
+                .id(UUID.randomUUID())
+                .name("Bundle Child")
+                .sku("BUNDLE-CHILD-001")
+                .parent(nonKujiParent)
+                .reorderPoint(5)
+                .build();
+        StockMovement movement = StockMovement.builder()
+                .id(8L)
+                .item(child)
+                .quantityChange(-1)
+                .reason(StockMovementReason.SALE)
+                .locationType(LocationType.BOX_BIN)
+                .fromLocationId(UUID.randomUUID())
+                .toLocationId(UUID.randomUUID())
+                .previousQuantity(3)
+                .currentQuantity(2)
+                .at(OffsetDateTime.now())
+                .build();
+        when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+        when(stockMovementService.calculateTotalInventory(any())).thenReturn(2);
+        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        eventOutboxService.createStockMovementEvent(movement);
+
+        // Then — outbox was written exactly once
+        verify(eventOutboxRepository).save(any());
     }
 
     private StockMovement buildMovement(Long id) {
