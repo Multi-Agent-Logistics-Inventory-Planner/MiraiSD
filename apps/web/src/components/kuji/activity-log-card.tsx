@@ -147,10 +147,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
                     </div>
                     {hasDetail && isExpanded ? (
                       <ul className="mt-1 ml-1 space-y-0.5 text-[11px] text-muted-foreground">
-                        {(detail!.includes("\n")
-                          ? detail!.split("\n")
-                          : detail!.split(/,\s+/)
-                        ).map((line, i) => (
+                        {detail!.split("\n").map((line, i) => (
                           <li key={i} className="flex gap-1.5 break-words">
                             <span aria-hidden>•</span>
                             <span>{line}</span>

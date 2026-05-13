@@ -37,7 +37,7 @@ export function ManageTiersDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl h-[85vh] sm:h-[700px] flex flex-col gap-0 p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2 flex flex-row items-start justify-between gap-3">
             <div>
               <DialogTitle>Manage Tiers</DialogTitle>
