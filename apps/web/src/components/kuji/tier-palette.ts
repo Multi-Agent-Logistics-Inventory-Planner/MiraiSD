@@ -26,10 +26,11 @@ export function hexWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Tier sort: highest price first, nulls (priceless tiers) last, label asc tiebreak.
+// Tier sort: highest price first, nulls (priceless tiers) last, then alphabetical
+// by displayed name (linkedProductName preferred, falling back to label).
 export function compareTiers(
-  a: Pick<KujiBoxTier, "price" | "label">,
-  b: Pick<KujiBoxTier, "price" | "label">,
+  a: Pick<KujiBoxTier, "price" | "label" | "linkedProductName">,
+  b: Pick<KujiBoxTier, "price" | "label" | "linkedProductName">,
 ): number {
   const ap = a.price ?? null;
   const bp = b.price ?? null;
@@ -38,5 +39,7 @@ export function compareTiers(
     if (bp == null) return -1;
     return bp - ap;
   }
-  return (a.label ?? "").localeCompare(b.label ?? "");
+  const an = (a.linkedProductName?.trim() || a.label || "").toLowerCase();
+  const bn = (b.linkedProductName?.trim() || b.label || "").toLowerCase();
+  return an.localeCompare(bn, undefined, { sensitivity: "base" });
 }
