@@ -122,6 +122,16 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     }, 0);
   }, [recentLogs, today]);
 
+  // Total slips drawn for the current open session of the box (since openedAt).
+  const totalDrawn = useMemo(() => {
+    return recentLogs.reduce((sum, log) => {
+      const qty = log.totalQuantityMoved ?? 0;
+      if (log.reason === StockMovementReason.KUJI_PRIZE_WON) return sum + qty;
+      if (log.reason === StockMovementReason.KUJI_DRAW_REVERSED) return sum - qty;
+      return sum;
+    }, 0);
+  }, [recentLogs]);
+
   function handleEditTier(tier: KujiBoxTier) {
     setActiveTier(tier);
     setEditTierOpen(true);
@@ -224,7 +234,7 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <KujiStatTile
           label="Total prizes"
           value={stats.total.toLocaleString()}
@@ -241,9 +251,14 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
           sub="held back"
         />
         <KujiStatTile
+          label="Total drawn"
+          value={totalDrawn.toLocaleString()}
+          sub="this session"
+        />
+        <KujiStatTile
           label="Draws today"
           value={drawsToday.toLocaleString()}
-          sub="this session"
+          sub="today"
         />
       </div>
 

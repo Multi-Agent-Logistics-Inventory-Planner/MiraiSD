@@ -61,7 +61,7 @@ public class Category {
     private Boolean isActive = true;
 
     // Only meaningful on root categories. Subcategories inherit at query time.
-    @Column(name = "uses_packs", nullable = false)
+    @Column(name = "uses_packs", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     @Builder.Default
     private Boolean usesPacks = false;
 

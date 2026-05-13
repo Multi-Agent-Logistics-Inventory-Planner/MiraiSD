@@ -159,7 +159,7 @@ export function UndoDrawDialog({
                           </div>
                           {log.productSummary ? (
                             <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                              {log.productSummary}
+                              {log.productSummary.replace(/\n/g, ", ")}
                             </div>
                           ) : null}
                           {log.notes ? (
