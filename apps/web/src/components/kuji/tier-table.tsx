@@ -30,7 +30,6 @@ interface TierTableProps {
 
 interface TierGroup {
   label: string;
-  letter?: string | null;
   tiers: KujiBoxTier[];
 }
 
@@ -56,16 +55,19 @@ export function TierTable({
 
   const groups = useMemo<TierGroup[]>(() => {
     const sorted = [...box.tiers].sort(compareTiers);
-    const acc: TierGroup[] = [];
+    const byLabel = new Map<string, TierGroup>();
     for (const tier of sorted) {
-      const last = acc[acc.length - 1];
-      if (last && last.label === tier.label) {
-        last.tiers.push(tier);
+      const existing = byLabel.get(tier.label);
+      if (existing) {
+        existing.tiers.push(tier);
       } else {
-        acc.push({ label: tier.label, letter: tier.letter, tiers: [tier] });
+        byLabel.set(tier.label, {
+          label: tier.label,
+          tiers: [tier],
+        });
       }
     }
-    return acc;
+    return Array.from(byLabel.values());
   }, [box.tiers]);
 
   const [activeLabel, setActiveLabel] = useState<string>(
@@ -182,23 +184,24 @@ export function TierTable({
     >
       <div className="relative max-w-full overflow-x-auto scrollbar-none">
         <TabsList className="justify-start">
-          {groups.map((group) => (
-            <TabsTrigger
-              key={group.label}
-              value={group.label}
-              className="flex-none whitespace-nowrap"
-            >
-              {group.letter ? (
-                <span className="font-mono mr-1.5 opacity-70">
-                  {group.letter}
+          {groups.map((group) => {
+            const groupCount = group.tiers.reduce(
+              (sum, t) => sum + t.count,
+              0,
+            );
+            return (
+              <TabsTrigger
+                key={group.label}
+                value={group.label}
+                className="flex-none whitespace-nowrap"
+              >
+                {group.label}
+                <span className="ml-1.5 text-xs opacity-70">
+                  ({group.tiers.length} · {formatChance(groupCount, box.totalCount)})
                 </span>
-              ) : null}
-              {group.label}
-              <span className="ml-1.5 text-xs opacity-70">
-                ({group.tiers.length})
-              </span>
-            </TabsTrigger>
-          ))}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
       </div>
       {groups.map((group) => (
