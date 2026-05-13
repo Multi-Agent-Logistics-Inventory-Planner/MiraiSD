@@ -180,9 +180,8 @@ export function TierTable({
       onValueChange={setActiveLabel}
       className="w-full"
     >
-      <div className="relative">
-        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10" />
-        <TabsList className="flex max-w-full justify-start overflow-x-auto scrollbar-none pr-6">
+      <div className="relative max-w-full overflow-x-auto scrollbar-none">
+        <TabsList className="justify-start">
           {groups.map((group) => (
             <TabsTrigger
               key={group.label}
