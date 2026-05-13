@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,20 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useRecordKujiDrawMutation } from "@/hooks/mutations/use-kuji-box-mutations";
 import type { DrawLine, KujiBox, KujiBoxTier } from "@/types/api";
 import { compareTiers } from "./tier-palette";
-import { TierName } from "./tier-name";
+import { SelectTierDialog } from "./select-tier-dialog";
 
 interface InlineRecordDrawFormProps {
   readonly box: KujiBox;
@@ -42,6 +34,11 @@ function makeKey(): string {
   nextKey += 1;
   return `line-${nextKey}`;
 }
+
+type PickerMode =
+  | { kind: "closed" }
+  | { kind: "add" }
+  | { kind: "swap"; lineKey: string };
 
 export function InlineRecordDrawForm({
   box,
@@ -69,6 +66,7 @@ export function InlineRecordDrawForm({
     return [{ key: makeKey(), tierId: first.id, quantity: 1 }];
   });
   const [error, setError] = useState<string | null>(null);
+  const [picker, setPicker] = useState<PickerMode>({ kind: "closed" });
 
   function updateLine(key: string, patch: Partial<Omit<DraftLine, "key">>) {
     setError(null);
@@ -77,18 +75,20 @@ export function InlineRecordDrawForm({
     );
   }
 
-  function addLine() {
-    const used = new Set(lines.map((l) => l.tierId));
-    const next = drawableTiers.find((t) => !used.has(t.id)) ?? drawableTiers[0];
-    if (!next) return;
-    setLines((prev) => [
-      ...prev,
-      { key: makeKey(), tierId: next.id, quantity: 1 },
-    ]);
-  }
-
   function removeLine(key: string) {
     setLines((prev) => prev.filter((l) => l.key !== key));
+  }
+
+  function handleTierPicked(tier: KujiBoxTier) {
+    if (picker.kind === "add") {
+      setLines((prev) => [
+        ...prev,
+        { key: makeKey(), tierId: tier.id, quantity: 1 },
+      ]);
+    } else if (picker.kind === "swap") {
+      updateLine(picker.lineKey, { tierId: tier.id, quantity: 1 });
+    }
+    setPicker({ kind: "closed" });
   }
 
   const tierById = useMemo(() => {
@@ -98,6 +98,8 @@ export function InlineRecordDrawForm({
   }, [sortedTiers]);
 
   const totalDrawn = lines.reduce((sum, l) => sum + (l.quantity || 0), 0);
+
+  const usedTierIds = useMemo(() => lines.map((l) => l.tierId), [lines]);
 
   function validate(): string | null {
     if (lines.length === 0) return "Add at least one prize.";
@@ -179,112 +181,175 @@ export function InlineRecordDrawForm({
     );
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Record a draw</DialogTitle>
-        </DialogHeader>
+  const canAddMore = lines.length < drawableTiers.length;
 
-        <div className="space-y-2">
-        {lines.map((line) => {
-          const tier = tierById.get(line.tierId);
-          const max = tier?.count ?? 1;
-          return (
-            <div key={line.key} className="flex items-center gap-2">
-              <Select
-                value={line.tierId}
-                onValueChange={(v) => updateLine(line.key, { tierId: v })}
-                disabled={isPending}
-              >
-                <SelectTrigger className="flex-1 min-w-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {drawableTiers.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      <TierName tier={t} className="text-sm" />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min={1}
-                max={max}
-                className="w-20 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                value={line.quantity || ""}
-                disabled={isPending}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  updateLine(line.key, {
-                    quantity: Number.isNaN(v) ? 0 : v,
-                  });
-                }}
-              />
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record a draw</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {lines.map((line) => {
+              const tier = tierById.get(line.tierId);
+              const max = tier?.count ?? 1;
+              const qty = line.quantity || 0;
+              return (
+                <div key={line.key} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPicker({ kind: "swap", lineKey: line.key })
+                    }
+                    disabled={isPending}
+                    className="w-56 shrink-0 overflow-hidden rounded-md border px-3 py-2 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+                  >
+                    {tier ? (
+                      (() => {
+                        const productName = tier.linkedProductName?.trim();
+                        const label = tier.label?.trim() ?? "";
+                        const hasProduct =
+                          !!productName &&
+                          productName.toLowerCase() !== label.toLowerCase();
+                        const primary = hasProduct ? productName : label;
+                        const secondary = hasProduct ? label : null;
+                        return (
+                          <div className="min-w-0">
+                            <div className="truncate text-sm">
+                              {tier.letter ? (
+                                <span className="mr-1.5 font-mono text-muted-foreground">
+                                  {tier.letter}
+                                </span>
+                              ) : null}
+                              {primary}
+                            </div>
+                            {secondary ? (
+                              <div className="truncate text-xs text-muted-foreground">
+                                {secondary}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="truncate text-sm text-muted-foreground">
+                        Select prize…
+                      </div>
+                    )}
+                  </button>
+
+                  <div className="flex items-center shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-r-none border-r-0"
+                      onClick={() =>
+                        updateLine(line.key, {
+                          quantity: Math.max(1, qty - 1),
+                        })
+                      }
+                      disabled={isPending || qty <= 1}
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <div className="h-9 w-10 flex items-center justify-center border-y text-sm tabular-nums">
+                      {qty}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-l-none border-l-0"
+                      onClick={() =>
+                        updateLine(line.key, {
+                          quantity: Math.min(max, qty + 1),
+                        })
+                      }
+                      disabled={isPending || qty >= max}
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => removeLine(line.key)}
+                    disabled={isPending || lines.length <= 1}
+                    aria-label="Remove line"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPicker({ kind: "add" })}
+            disabled={isPending || !canAddMore}
+            className="w-full border-dashed"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            Add another prize
+          </Button>
+
+          {error ? (
+            <p className="text-xs text-destructive">{error}</p>
+          ) : null}
+
+          <DialogFooter className="flex flex-row items-center justify-between gap-2 border-t pt-3 sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              Total draws:{" "}
+              <span className="font-medium tabular-nums text-foreground">
+                {totalDrawn}
+              </span>
+            </span>
+            <div className="flex gap-2">
               <Button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                onClick={() => removeLine(line.key)}
-                disabled={isPending || lines.length <= 1}
-                aria-label="Remove line"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={isPending}
               >
-                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSubmit}
+                disabled={isPending || totalDrawn <= 0}
+              >
+                {isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Confirm draw
               </Button>
             </div>
-          );
-        })}
-      </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addLine}
-          disabled={isPending || lines.length >= drawableTiers.length}
-          className="w-full border-dashed"
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Add another prize
-        </Button>
-
-        {error ? (
-          <p className="text-xs text-destructive">{error}</p>
-        ) : null}
-
-        <DialogFooter className="flex flex-row items-center justify-between gap-2 border-t pt-3 sm:justify-between">
-          <span className="text-xs text-muted-foreground">
-            Total draws:{" "}
-            <span className="font-medium tabular-nums text-foreground">
-              {totalDrawn}
-            </span>
-          </span>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isPending || totalDrawn <= 0}
-            >
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              Confirm draw
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <SelectTierDialog
+        open={picker.kind !== "closed"}
+        onOpenChange={(o) => {
+          if (!o) setPicker({ kind: "closed" });
+        }}
+        tiers={sortedTiers}
+        excludeTierIds={picker.kind === "add" ? usedTierIds : []}
+        onSelect={handleTierPicked}
+      />
+    </>
   );
 }
