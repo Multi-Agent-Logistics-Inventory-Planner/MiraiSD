@@ -279,7 +279,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
       ) : isDisplayOperation ? (
         /* Fallback for display operations without movements (legacy data) */
         <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{detail.productSummary ?? "—"}</span>
+          <span className="font-medium text-foreground">{detail.productSummary?.replace(/\n/g, ", ") ?? "—"}</span>
           <span>·</span>
           <span>{REASON_LABELS[detail.reason]} on {detail.primaryFromLocationCode ?? detail.primaryToLocationCode ?? "NA"}</span>
         </div>
@@ -437,7 +437,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                     <ActionPill reason={entry.reason} />
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
-                    {entry.productSummary ?? "—"}
+                    {entry.productSummary?.replace(/\n/g, ", ") ?? "—"}
                   </p>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
@@ -477,7 +477,7 @@ export function AuditLogTable({ data, isLoading }: AuditLogTableProps) {
                 {/* Product */}
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {entry.productSummary ?? "—"}
+                    {entry.productSummary?.replace(/\n/g, ", ") ?? "—"}
                   </p>
                   {!DISPLAY_REASONS.has(entry.reason) && (
                     <p className="text-xs text-muted-foreground">

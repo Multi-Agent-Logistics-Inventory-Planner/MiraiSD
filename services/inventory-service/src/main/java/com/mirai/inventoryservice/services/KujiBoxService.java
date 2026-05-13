@@ -1740,7 +1740,7 @@ public class KujiBoxService {
                     draw.getQuantity()
             ));
         }
-        return parts.isEmpty() ? null : String.join(", ", parts);
+        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private String formatUndoSummary(List<StockMovement> originals) {
@@ -1762,7 +1762,7 @@ public class KujiBoxService {
             }
             parts.add(formatTierLine(letter, label, linkedName, qty));
         }
-        return parts.isEmpty() ? null : String.join(", ", parts);
+        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private String stringOrNull(Map<String, Object> meta, String key) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowUpFromLine, CheckCircle2, Loader2, PackagePlus, Plus, Undo2 } from "lucide-react";
 import { StockMovementReason, type AuditLog } from "@/types/api";
 
@@ -41,6 +42,17 @@ function formatSlipAdjustment(action: SlipAction, qty: number): string {
 }
 
 export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
@@ -108,28 +120,49 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
               ? log.notes?.split(": ").slice(1).join(": ") || null
               : log.productSummary || null;
 
+            const isExpanded = expanded.has(log.id);
+            const hasDetail = Boolean(detail);
+
             return (
-              <li key={log.id} className="flex items-start gap-3 py-2.5">
-                {icon}
-                <div className="min-w-0 flex-1">
-                  <div className={`text-xs ${log.reversed ? "line-through text-muted-foreground" : ""}`}>
-                    {label}
-                    {log.actorName ? (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {log.actorName}
-                      </span>
+              <li key={log.id}>
+                <button
+                  type="button"
+                  onClick={() => hasDetail && toggle(log.id)}
+                  aria-expanded={hasDetail ? isExpanded : undefined}
+                  disabled={!hasDetail}
+                  className={`flex w-full items-start gap-3 py-2.5 text-left ${
+                    hasDetail ? "cursor-pointer hover:bg-muted/40" : "cursor-default"
+                  }`}
+                >
+                  {icon}
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-xs ${log.reversed ? "line-through text-muted-foreground" : ""}`}>
+                      {label}
+                      {log.actorName ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {log.actorName}
+                        </span>
+                      ) : null}
+                    </div>
+                    {hasDetail && isExpanded ? (
+                      <ul className="mt-1 ml-1 space-y-0.5 text-[11px] text-muted-foreground">
+                        {(detail!.includes("\n")
+                          ? detail!.split("\n")
+                          : detail!.split(/,\s+/)
+                        ).map((line, i) => (
+                          <li key={i} className="flex gap-1.5 break-words">
+                            <span aria-hidden>•</span>
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
                   </div>
-                  {detail ? (
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {detail}
-                    </div>
-                  ) : null}
-                </div>
-                <span className="shrink-0 pt-0.5 text-[11px] text-muted-foreground tabular-nums">
-                  {formatTime(log.createdAt)}
-                </span>
+                  <span className="shrink-0 pt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                    {formatTime(log.createdAt)}
+                  </span>
+                </button>
               </li>
             );
           })}
