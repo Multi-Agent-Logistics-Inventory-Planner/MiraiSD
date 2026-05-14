@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, ArrowDownToLine } from "lucide-react";
+import {
+  Pencil,
+  ArrowDownToLine,
+  PauseCircle,
+  PlayCircle,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,11 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { KujiBox, KujiBoxTier } from "@/types/api";
 import { KujiBoxStatus } from "@/types/api";
 import { compareTiers } from "./tier-palette";
@@ -26,6 +27,10 @@ interface TierTableProps {
   readonly canEditStructural: boolean;
   readonly onTransferIn: (tier: KujiBoxTier) => void;
   readonly onEditTier: (tier: KujiBoxTier) => void;
+  /** Called to move 1 slip between buckets. Direction "DEACTIVATE" moves active→inactive. */
+  readonly onMoveSlip?: (tier: KujiBoxTier, direction: "ACTIVATE" | "DEACTIVATE") => void;
+  /** Called to delete a single prize from the active bucket. */
+  readonly onDeletePrize?: (tier: KujiBoxTier) => void;
 }
 
 interface TierGroup {
@@ -49,9 +54,13 @@ export function TierTable({
   canEditStructural,
   onTransferIn,
   onEditTier,
+  onMoveSlip,
+  onDeletePrize,
 }: TierTableProps) {
   const isOpen = box.status === KujiBoxStatus.OPEN;
   const showActions = canEditStructural && isOpen;
+  const showSlipActions =
+    isOpen && (onMoveSlip != null || onDeletePrize != null);
 
   const groups = useMemo<TierGroup[]>(() => {
     const sorted = [...box.tiers].sort(compareTiers);
@@ -86,11 +95,6 @@ export function TierTable({
     groups.find((g) => g.label === activeLabel) ?? groups[0];
 
   const renderTierRow = (tier: KujiBoxTier) => {
-    const inventoryInBox = tier.linkedInventoryAtBoxLocation ?? 0;
-    const heldBack =
-      tier.linkedProductId != null && inventoryInBox > tier.count
-        ? inventoryInBox - tier.count
-        : 0;
     return (
       <TableRow key={tier.id}>
         <TableCell className="max-w-0 text-muted-foreground">
@@ -101,56 +105,87 @@ export function TierTable({
             {tier.linkedProductName ?? "—"}
           </span>
         </TableCell>
-        <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground w-24">
-          {tier.linkedProductId == null
-            ? "—"
-            : inventoryInBox.toLocaleString()}
-        </TableCell>
         <TableCell className="text-right tabular-nums w-24">
           {formatCurrency(tier.price)}
         </TableCell>
         <TableCell className="hidden md:table-cell text-right tabular-nums w-20">
-          {heldBack > 0 ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-amber-600 dark:text-amber-500 cursor-help">
-                  {tier.count.toLocaleString()}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{heldBack} held back</TooltipContent>
-            </Tooltip>
-          ) : (
-            tier.count.toLocaleString()
-          )}
+          {tier.activeCount.toLocaleString()}
+        </TableCell>
+        <TableCell className="hidden md:table-cell text-right tabular-nums w-20 text-muted-foreground">
+          {tier.inactiveCount.toLocaleString()}
         </TableCell>
         <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground w-20">
-          {formatChance(tier.count, box.totalCount)}
+          {formatChance(tier.activeCount, box.totalCount)}
         </TableCell>
-        {showActions ? (
-          <TableCell className="text-right w-24">
+        {showActions || showSlipActions ? (
+          <TableCell className="text-right w-44">
             <div className="flex items-center justify-end gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => onEditTier(tier)}
-                title="Edit tier"
-                aria-label={`Edit tier ${tier.label}`}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => onTransferIn(tier)}
-                title="Transfer"
-                aria-label={`Transfer for tier ${tier.label}`}
-              >
-                <ArrowDownToLine className="h-4 w-4" />
-              </Button>
+              {showSlipActions ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onMoveSlip?.(tier, "DEACTIVATE")}
+                    disabled={tier.activeCount === 0 || !onMoveSlip}
+                    title="Deactivate one slip (move to inactive)"
+                    aria-label={`Deactivate slip in ${tier.label}`}
+                  >
+                    <PauseCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onMoveSlip?.(tier, "ACTIVATE")}
+                    disabled={tier.inactiveCount === 0 || !onMoveSlip}
+                    title="Activate one slip (move to active)"
+                    aria-label={`Activate slip in ${tier.label}`}
+                  >
+                    <PlayCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onDeletePrize?.(tier)}
+                    disabled={!onDeletePrize}
+                    title="Delete this prize (removes the tier)"
+                    aria-label={`Delete prize ${tier.label}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : null}
+              {showActions ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onEditTier(tier)}
+                    title="Edit tier"
+                    aria-label={`Edit tier ${tier.label}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => onTransferIn(tier)}
+                    title="Transfer"
+                    aria-label={`Transfer for tier ${tier.label}`}
+                  >
+                    <ArrowDownToLine className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : null}
             </div>
           </TableCell>
         ) : null}
@@ -163,12 +198,18 @@ export function TierTable({
       <TableHeader>
         <TableRow>
           <TableHead>Linked Product</TableHead>
-          <TableHead className="hidden md:table-cell text-right w-24">In box</TableHead>
           <TableHead className="text-right w-24">Price</TableHead>
-          <TableHead className="hidden md:table-cell text-right w-20">Slips</TableHead>
-          <TableHead className="hidden md:table-cell text-right w-20">Chance</TableHead>
-          {showActions ? (
-            <TableHead className="w-24 text-right">Actions</TableHead>
+          <TableHead className="hidden md:table-cell text-right w-20">
+            Active
+          </TableHead>
+          <TableHead className="hidden md:table-cell text-right w-20">
+            Inactive
+          </TableHead>
+          <TableHead className="hidden md:table-cell text-right w-20">
+            Chance
+          </TableHead>
+          {showActions || showSlipActions ? (
+            <TableHead className="w-44 text-right">Actions</TableHead>
           ) : null}
         </TableRow>
       </TableHeader>
@@ -185,8 +226,12 @@ export function TierTable({
       <div className="relative max-w-full overflow-x-auto scrollbar-none">
         <TabsList className="justify-start">
           {groups.map((group) => {
-            const groupCount = group.tiers.reduce(
-              (sum, t) => sum + t.count,
+            const groupActive = group.tiers.reduce(
+              (sum, t) => sum + t.activeCount,
+              0,
+            );
+            const groupInactive = group.tiers.reduce(
+              (sum, t) => sum + t.inactiveCount,
               0,
             );
             return (
@@ -197,7 +242,8 @@ export function TierTable({
               >
                 {group.label}
                 <span className="ml-1.5 text-xs opacity-70">
-                  ({group.tiers.length} · {formatChance(groupCount, box.totalCount)})
+                  ({group.tiers.length} · {formatChance(groupActive, box.totalCount)}
+                  {groupInactive > 0 ? ` + ${groupInactive} inactive` : ""})
                 </span>
               </TabsTrigger>
             );

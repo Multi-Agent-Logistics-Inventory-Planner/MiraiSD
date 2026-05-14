@@ -1,6 +1,5 @@
 package com.mirai.inventoryservice.dtos.requests.kuji;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,14 +12,10 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AddSlipRequestDTO {
+public class DeletePrizeRequestDTO {
     @NotNull
     private UUID actorId;
 
-    @NotNull
-    @Min(value = 1, message = "quantity must be at least 1")
-    private Integer quantity;
-
-    /** When true, the added slips land in the inactive bucket. Defaults to false. */
-    private Boolean inactive;
+    /** When true (default), decrement activeCount. When false, decrement inactiveCount. */
+    private Boolean fromActive;
 }

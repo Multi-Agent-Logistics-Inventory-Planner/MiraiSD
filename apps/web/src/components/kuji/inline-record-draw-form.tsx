@@ -56,12 +56,12 @@ export function InlineRecordDrawForm({
   );
 
   const drawableTiers = useMemo(
-    () => sortedTiers.filter((t) => t.count > 0),
+    () => sortedTiers.filter((t) => t.activeCount > 0),
     [sortedTiers],
   );
 
   const [lines, setLines] = useState<DraftLine[]>(() => {
-    const first = sortedTiers.find((t) => t.count > 0);
+    const first = sortedTiers.find((t) => t.activeCount > 0);
     if (!first) return [];
     return [{ key: makeKey(), tierId: first.id, quantity: 1 }];
   });
@@ -109,8 +109,8 @@ export function InlineRecordDrawForm({
       if (!l.quantity || l.quantity < 1) {
         return `Quantity for "${tier.label}" must be at least 1.`;
       }
-      if (l.quantity > tier.count) {
-        return `"${tier.label}" only has ${tier.count} slip${tier.count === 1 ? "" : "s"} remaining.`;
+      if (l.quantity > tier.activeCount) {
+        return `"${tier.label}" only has ${tier.activeCount} slip${tier.activeCount === 1 ? "" : "s"} remaining.`;
       }
     }
     return null;
@@ -194,7 +194,7 @@ export function InlineRecordDrawForm({
           <div className="space-y-2">
             {lines.map((line) => {
               const tier = tierById.get(line.tierId);
-              const max = tier?.count ?? 1;
+              const max = tier?.activeCount ?? 1;
               const qty = line.quantity || 0;
               return (
                 <div key={line.key} className="flex items-center gap-2">

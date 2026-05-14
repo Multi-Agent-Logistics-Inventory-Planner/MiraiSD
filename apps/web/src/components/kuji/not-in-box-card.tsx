@@ -94,10 +94,7 @@ export function NotInBoxCard({ tiers }: NotInBoxCardProps) {
       .map((tier, idx) => ({
         tier,
         rank: idx,
-        held: Math.max(
-          0,
-          (tier.linkedInventoryAtBoxLocation ?? 0) - tier.count,
-        ),
+        held: tier.inactiveCount,
       }))
       .filter((r) => r.held > 0);
   }, [tiers]);

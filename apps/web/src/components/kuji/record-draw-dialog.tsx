@@ -83,8 +83,8 @@ export function RecordDrawDialog({
         nextErrors[tier.id] = "Quantity must be ≥ 0";
         continue;
       }
-      if (qty > tier.count) {
-        nextErrors[tier.id] = `Exceeds remaining count (${tier.count})`;
+      if (qty > tier.activeCount) {
+        nextErrors[tier.id] = `Exceeds remaining count (${tier.activeCount})`;
       }
     }
     setErrors(nextErrors);
@@ -159,7 +159,7 @@ export function RecordDrawDialog({
                       {tier.label}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {tier.count.toLocaleString()} remaining
+                      {tier.activeCount.toLocaleString()} remaining
                     </div>
                     {errors[tier.id] ? (
                       <p className="text-xs text-destructive mt-1">
@@ -170,7 +170,7 @@ export function RecordDrawDialog({
                   <Input
                     type="number"
                     min={0}
-                    max={tier.count}
+                    max={tier.activeCount}
                     className="w-20 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={quantities[tier.id] ?? ""}
                     placeholder="0"

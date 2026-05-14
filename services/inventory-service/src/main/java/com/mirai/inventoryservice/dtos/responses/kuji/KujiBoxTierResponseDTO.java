@@ -19,11 +19,14 @@ public class KujiBoxTierResponseDTO {
     private UUID linkedProductId;
     private String linkedProductName;
     private String linkedProductImageUrl;
-    /** Current LocationInventory.quantity at the box's location for the linked product. Null when unlinked. */
-    private Integer linkedInventoryAtBoxLocation;
     /** packs_per_box of the linked product, exposed so the transfer-in dialog can show a pack/box toggle. */
     private Integer linkedProductPacksPerBox;
-    private Integer count;
+    /** Slips currently winnable in the box. */
+    private Integer activeCount;
+    /** Slips held back from the pool (kuji-internal). */
+    private Integer inactiveCount;
+    /** Convenience: activeCount + inactiveCount. */
+    private Integer totalCount;
     private BigDecimal price;
     /** True when the linked product was created inline at open-box for this tier. */
     private Boolean autoCreatedProduct;

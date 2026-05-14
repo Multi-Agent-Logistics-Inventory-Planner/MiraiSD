@@ -157,7 +157,7 @@ function KujiHistoryRow({ box, expanded, onToggle }: RowProps) {
                     </TableCell>
                     <TableCell>{tier.label}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {tier.count.toLocaleString()}
+                      {tier.activeCount.toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -32,8 +32,8 @@ export interface ProcessedTier {
   readonly mode: "create" | "existing";
   readonly linkedProductId: string | null;
   readonly sourceLocationId: string | null;
-  readonly count: number;
-  readonly heldBackQuantity: number;
+  readonly activeCount: number;
+  readonly inactiveCount: number;
   readonly price: number | null;
   readonly productName: string | null;
   readonly productImageUrl: string | null;
@@ -105,8 +105,8 @@ export const TierDraftEditor = forwardRef<
       productImageFile: null,
       productImagePreviewUrl: null,
       productImageUrl: "",
-      count: t.count,
-      heldBack: "",
+      count: t.activeCount,
+      heldBack: t.inactiveCount > 0 ? t.inactiveCount : "",
       price: t.price != null ? String(t.price) : "",
     }));
     setTiers(cloned);
@@ -223,8 +223,8 @@ export const TierDraftEditor = forwardRef<
             linkedProductId: isCreate ? null : t.linkedProductId || null,
             sourceLocationId:
               !isCreate && t.linkedProductId ? t.source.locationId : null,
-            count: t.count === "" ? 0 : t.count,
-            heldBackQuantity:
+            activeCount: t.count === "" ? 0 : t.count,
+            inactiveCount:
               typeof t.heldBack === "number" ? t.heldBack : 0,
             price: parsedPrice,
             productName: isCreate ? t.productName.trim() : null,

@@ -37,8 +37,26 @@ public class PatchKujiTierRequestDTO {
     /** Destination location for transferring out the old linked product. Required when linkedProductId changes and old product has inventory at the box location. */
     private UUID linkedProductDestinationLocationId;
 
-    @Min(value = 0, message = "count must be 0 or greater")
-    private Integer count;
+    @Min(value = 0, message = "activeCount must be 0 or greater")
+    private Integer activeCount;
+
+    @Min(value = 0, message = "inactiveCount must be 0 or greater")
+    private Integer inactiveCount;
+
+    /**
+     * Optional: when switching the linked product, source location for the new
+     * product's transfer-in. Required when newProductActiveCount or
+     * newProductInactiveCount is non-zero.
+     */
+    private UUID newProductSourceLocationId;
+
+    /** Optional: units of the new linked product to bring into the active bucket. */
+    @Min(value = 0, message = "newProductActiveCount must be 0 or greater")
+    private Integer newProductActiveCount;
+
+    /** Optional: units of the new linked product to bring into the inactive bucket. */
+    @Min(value = 0, message = "newProductInactiveCount must be 0 or greater")
+    private Integer newProductInactiveCount;
 
     private BigDecimal price;
 

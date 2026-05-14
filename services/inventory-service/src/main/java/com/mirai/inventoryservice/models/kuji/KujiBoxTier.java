@@ -44,7 +44,11 @@ public class KujiBoxTier {
     @Column(length = 50)
     private String letter;
 
-    /** Optional link to a stocked product. When set, draws decrement this product's LocationInventory at the box's location. */
+    /**
+     * Optional link to a stocked product. When set, open-box decrements this product's
+     * LocationInventory at the source location. Slip counts (active/inactive) live only
+     * on this tier and are not coupled to LocationInventory after open-box.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "linked_product_id")
     @ToString.Exclude
@@ -54,9 +58,16 @@ public class KujiBoxTier {
     @Column(name = "linked_product_id", insertable = false, updatable = false)
     private UUID linkedProductId;
 
+    /** Slips currently winnable / on a slip in the box. */
     @NotNull
-    @Column(nullable = false)
-    private Integer count;
+    @Column(name = "active_count", nullable = false)
+    private Integer activeCount;
+
+    /** Slips held back from the pool (kuji-internal, not on a slip). */
+    @NotNull
+    @Column(name = "inactive_count", nullable = false)
+    @Builder.Default
+    private Integer inactiveCount = 0;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal price;

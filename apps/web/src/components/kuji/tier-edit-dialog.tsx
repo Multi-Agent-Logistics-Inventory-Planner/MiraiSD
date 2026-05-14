@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { LocationSelector } from "@/components/stock/location-selector";
+import { ProductLocationSelector } from "@/components/stock/product-location-selector";
+import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import {
   isUploadError,
   uploadProductImage,
@@ -74,9 +76,17 @@ export function TierEditDialog({
     tier.price != null ? String(tier.price) : "",
   );
   const [clearPrice, setClearPrice] = useState(false);
-  const [count, setCount] = useState<number | "">(tier.count);
+  const [activeCount, setActiveCountState] = useState<number | "">(tier.activeCount);
+  const [inactiveCount, setInactiveCountState] = useState<number | "">(
+    tier.inactiveCount,
+  );
   const [linkedDest, setLinkedDest] =
     useState<LocationSelection>(EMPTY_LOCATION);
+  // Optional: bring in counts of the newly-linked product in the same save.
+  const [newProductSource, setNewProductSource] =
+    useState<LocationSelection>(EMPTY_LOCATION);
+  const [newProductActive, setNewProductActive] = useState<number | "">("");
+  const [newProductInactive, setNewProductInactive] = useState<number | "">("");
   // Auto-created product fields
   const [productName, setProductName] = useState(tier.linkedProductName ?? "");
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
@@ -98,8 +108,12 @@ export function TierEditDialog({
       setClearLinkedProduct(false);
       setPrice(tier.price != null ? String(tier.price) : "");
       setClearPrice(false);
-      setCount(tier.count);
+      setActiveCountState(tier.activeCount);
+      setInactiveCountState(tier.inactiveCount);
       setLinkedDest(EMPTY_LOCATION);
+      setNewProductSource(EMPTY_LOCATION);
+      setNewProductActive("");
+      setNewProductInactive("");
       setProductName(tier.linkedProductName ?? "");
       setProductImageFile(null);
       if (productImagePreviewUrl) {
@@ -117,11 +131,36 @@ export function TierEditDialog({
     clearLinkedProduct ||
     (linkedProductId || null) !== previousLinkedProductId;
 
-  // Show transfer-out picker when previous linked product had inventory at the box location.
+  // When the user switches (or clears) the linked product, the backend returns
+  // active+inactive slips of the OLD product to regular inventory — which needs a
+  // destination location. Only required when there are leftover slips to return.
+  const leftoverOnOldProduct = tier.activeCount + tier.inactiveCount;
   const needsDestinationForOldProduct =
-    !!previousLinkedProductId &&
-    linkedProductChanged &&
-    (tier.linkedInventoryAtBoxLocation ?? 0) > 0;
+    !!previousLinkedProductId
+    && linkedProductChanged
+    && leftoverOnOldProduct > 0;
+  // Show the optional "bring in new product" panel only when switching to a real
+  // new linked product (not clearing). Hidden for auto-created tiers — those never
+  // expose linked-product changes via this dialog.
+  const canBringInNewProduct =
+    !isAutoCreated
+    && linkedProductChanged
+    && !clearLinkedProduct
+    && !!linkedProductId;
+  const newProductActiveQty = typeof newProductActive === "number" ? newProductActive : 0;
+  const newProductInactiveQty = typeof newProductInactive === "number" ? newProductInactive : 0;
+  const newProductTotalIn = newProductActiveQty + newProductInactiveQty;
+  const needsNewProductSource = canBringInNewProduct && newProductTotalIn > 0;
+
+  // Load locations the newly-selected linked product actually lives at so the
+  // source picker only offers real candidates.
+  const newProductInventoryQuery = useProductInventoryEntries(
+    canBringInNewProduct ? linkedProductId : null,
+  );
+  const newProductAvailableEntries =
+    (newProductInventoryQuery.data?.entries ?? []).filter(
+      (e) => e.locationId !== null,
+    );
 
   async function handleSubmit() {
     const actorId = user?.personId ?? user?.id;
@@ -132,7 +171,10 @@ export function TierEditDialog({
 
     const nextErrors: Record<string, string> = {};
     if (!label.trim()) nextErrors.label = "Label is required";
-    if (count === "" || count < 0) nextErrors.count = "Count must be ≥ 0";
+    if (activeCount === "" || activeCount < 0)
+      nextErrors.activeCount = "Active count must be ≥ 0";
+    if (inactiveCount === "" || inactiveCount < 0)
+      nextErrors.inactiveCount = "Inactive count must be ≥ 0";
     if (price && Number.isNaN(parseFloat(price))) {
       nextErrors.price = "Price must be a number";
     }
@@ -143,6 +185,12 @@ export function TierEditDialog({
     if (needsDestinationForOldProduct) {
       if (!linkedDest.locationType || !linkedDest.locationId) {
         nextErrors.linkedDest = "Destination is required for previous linked inventory";
+      }
+    }
+
+    if (needsNewProductSource) {
+      if (!newProductSource.locationType || !newProductSource.locationId) {
+        nextErrors.newProductSource = "Source location is required";
       }
     }
 
@@ -205,11 +253,19 @@ export function TierEditDialog({
     } else if (price !== (tier.price != null ? String(tier.price) : "")) {
       payload.price = price === "" ? null : parseFloat(price);
     }
-    if (count !== "" && count !== tier.count) {
-      payload.count = count;
+    if (activeCount !== "" && activeCount !== tier.activeCount) {
+      payload.activeCount = activeCount;
+    }
+    if (inactiveCount !== "" && inactiveCount !== tier.inactiveCount) {
+      payload.inactiveCount = inactiveCount;
     }
     if (needsDestinationForOldProduct && linkedDest.locationId) {
       payload.linkedProductDestinationLocationId = linkedDest.locationId;
+    }
+    if (canBringInNewProduct && newProductTotalIn > 0) {
+      payload.newProductSourceLocationId = newProductSource.locationId ?? null;
+      payload.newProductActiveCount = newProductActiveQty;
+      payload.newProductInactiveCount = newProductInactiveQty;
     }
 
     try {
@@ -351,9 +407,10 @@ export function TierEditDialog({
           {needsDestinationForOldProduct ? (
             <div className="grid gap-2 border rounded-md p-3 bg-muted/40">
               <Label className="text-xs">
-                Old linked product has{" "}
-                {(tier.linkedInventoryAtBoxLocation ?? 0).toLocaleString()} units
-                at the box&apos;s location — pick a destination
+                Tier still has {leftoverOnOldProduct.toLocaleString()} slip
+                {leftoverOnOldProduct === 1 ? "" : "s"} of{" "}
+                {tier.linkedProductName ?? "the old product"}. Pick a destination to
+                return them to inventory.
               </Label>
               <LocationSelector
                 label=""
@@ -367,6 +424,101 @@ export function TierEditDialog({
               />
               {errors.linkedDest ? (
                 <p className="text-xs text-destructive">{errors.linkedDest}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canBringInNewProduct ? (
+            <div className="grid gap-2 border rounded-md p-3 bg-muted/40">
+              <Label className="text-xs">
+                Bring in the new product (optional). Leave at 0 to skip.
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label
+                    htmlFor="tier-edit-new-active"
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    New active count
+                  </Label>
+                  <Input
+                    id="tier-edit-new-active"
+                    type="number"
+                    min={0}
+                    value={newProductActive}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setNewProductActive("");
+                        return;
+                      }
+                      const v = parseInt(raw, 10);
+                      if (!Number.isNaN(v) && v >= 0) {
+                        setNewProductActive(v);
+                      }
+                    }}
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label
+                    htmlFor="tier-edit-new-inactive"
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    New inactive count
+                  </Label>
+                  <Input
+                    id="tier-edit-new-inactive"
+                    type="number"
+                    min={0}
+                    value={newProductInactive}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setNewProductInactive("");
+                        return;
+                      }
+                      const v = parseInt(raw, 10);
+                      if (!Number.isNaN(v) && v >= 0) {
+                        setNewProductInactive(v);
+                      }
+                    }}
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+              {needsNewProductSource ? (
+                <>
+                  <Label className="text-[11px] text-muted-foreground">
+                    Source for {newProductTotalIn.toLocaleString()} unit
+                    {newProductTotalIn === 1 ? "" : "s"}
+                  </Label>
+                  {newProductInventoryQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">
+                      Loading locations…
+                    </p>
+                  ) : newProductAvailableEntries.length === 0 ? (
+                    <p className="text-xs text-destructive">
+                      No locations have this product in stock. Bring it in via the
+                      regular inventory flow first.
+                    </p>
+                  ) : (
+                    <ProductLocationSelector
+                      inventoryEntries={newProductAvailableEntries}
+                      value={newProductSource}
+                      onChange={(v) => {
+                        setNewProductSource(v);
+                        setErrors((prev) => ({ ...prev, newProductSource: "" }));
+                      }}
+                      disabled={isPending}
+                    />
+                  )}
+                  {errors.newProductSource ? (
+                    <p className="text-xs text-destructive">
+                      {errors.newProductSource}
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </div>
           ) : null}
@@ -404,30 +556,59 @@ export function TierEditDialog({
             ) : null}
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="tier-edit-count">Count</Label>
-            <Input
-              id="tier-edit-count"
-              type="number"
-              min={0}
-              value={count}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === "") {
-                  setCount("");
-                  return;
-                }
-                const v = parseInt(raw, 10);
-                if (!Number.isNaN(v) && v >= 0) {
-                  setCount(v);
-                }
-              }}
-              disabled={isPending}
-            />
-            {errors.count ? (
-              <p className="text-xs text-destructive">{errors.count}</p>
-            ) : null}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="tier-edit-active-count">Active count</Label>
+              <Input
+                id="tier-edit-active-count"
+                type="number"
+                min={0}
+                value={activeCount}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setActiveCountState("");
+                    return;
+                  }
+                  const v = parseInt(raw, 10);
+                  if (!Number.isNaN(v) && v >= 0) {
+                    setActiveCountState(v);
+                  }
+                }}
+                disabled={isPending}
+              />
+              {errors.activeCount ? (
+                <p className="text-xs text-destructive">{errors.activeCount}</p>
+              ) : null}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tier-edit-inactive-count">Inactive count</Label>
+              <Input
+                id="tier-edit-inactive-count"
+                type="number"
+                min={0}
+                value={inactiveCount}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setInactiveCountState("");
+                    return;
+                  }
+                  const v = parseInt(raw, 10);
+                  if (!Number.isNaN(v) && v >= 0) {
+                    setInactiveCountState(v);
+                  }
+                }}
+                disabled={isPending}
+              />
+              {errors.inactiveCount ? (
+                <p className="text-xs text-destructive">{errors.inactiveCount}</p>
+              ) : null}
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Manual edit — audited as adjustment.
+          </p>
         </div>
 
         <DialogFooter className="px-6 py-4 border-t">

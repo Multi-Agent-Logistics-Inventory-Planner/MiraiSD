@@ -52,7 +52,7 @@ export function CloseBoxDialog({
         (t) =>
           !!t.linkedProductId &&
           !t.autoCreatedProduct &&
-          (t.linkedInventoryAtBoxLocation ?? 0) > 0,
+          (t.activeCount + t.inactiveCount) > 0,
       ),
     [box.tiers],
   );
@@ -63,7 +63,7 @@ export function CloseBoxDialog({
         (t) =>
           !!t.linkedProductId &&
           !t.autoCreatedProduct &&
-          (t.linkedInventoryAtBoxLocation ?? 0) <= 0,
+          (t.activeCount + t.inactiveCount) <= 0,
       ),
     [box.tiers],
   );
@@ -173,7 +173,7 @@ export function CloseBoxDialog({
                       {tier.label}
                     </div>
                     <div className="text-xs text-muted-foreground shrink-0">
-                      {(tier.linkedInventoryAtBoxLocation ?? 0).toLocaleString()}{" "}
+                      {(tier.activeCount + tier.inactiveCount).toLocaleString()}{" "}
                       remaining
                     </div>
                   </div>
@@ -239,7 +239,7 @@ export function CloseBoxDialog({
                     {tier.label}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {(tier.linkedInventoryAtBoxLocation ?? 0).toLocaleString()}{" "}
+                    {(tier.activeCount + tier.inactiveCount).toLocaleString()}{" "}
                     leftover
                   </span>
                 </div>

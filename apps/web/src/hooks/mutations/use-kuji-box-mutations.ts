@@ -5,6 +5,8 @@ import {
   addKujiSlip,
   addKujiTier,
   closeKujiBox,
+  deleteKujiPrize,
+  moveKujiSlips,
   openKujiBox,
   patchKujiTier,
   recordKujiDraw,
@@ -19,7 +21,9 @@ import {
   type AddKujiTierRequest,
   type AddSlipRequest,
   type CloseKujiBoxRequest,
+  type DeletePrizeRequest,
   type KujiBox,
+  type MoveSlipsRequest,
   type OpenKujiBoxRequest,
   type PatchKujiTierRequest,
   type RecordDrawRequest,
@@ -237,6 +241,42 @@ export function useAddKujiTierMutation() {
   const qc = useQueryClient();
   return useMutation<KujiBox, Error, AddKujiTierVariables>({
     mutationFn: ({ boxId, payload }) => addKujiTier(boxId, payload),
+    onSuccess: async (box, variables) => {
+      await applyKujiMutationResponse(qc, box, variables.productId);
+    },
+  });
+}
+
+interface MoveKujiSlipsVariables {
+  boxId: string;
+  tierId: string;
+  payload: MoveSlipsRequest;
+  productId?: string;
+}
+
+export function useMoveKujiSlipsMutation() {
+  const qc = useQueryClient();
+  return useMutation<KujiBox, Error, MoveKujiSlipsVariables>({
+    mutationFn: ({ boxId, tierId, payload }) =>
+      moveKujiSlips(boxId, tierId, payload),
+    onSuccess: async (box, variables) => {
+      await applyKujiMutationResponse(qc, box, variables.productId);
+    },
+  });
+}
+
+interface DeleteKujiPrizeVariables {
+  boxId: string;
+  tierId: string;
+  payload: DeletePrizeRequest;
+  productId?: string;
+}
+
+export function useDeleteKujiPrizeMutation() {
+  const qc = useQueryClient();
+  return useMutation<KujiBox, Error, DeleteKujiPrizeVariables>({
+    mutationFn: ({ boxId, tierId, payload }) =>
+      deleteKujiPrize(boxId, tierId, payload),
     onSuccess: async (box, variables) => {
       await applyKujiMutationResponse(qc, box, variables.productId);
     },

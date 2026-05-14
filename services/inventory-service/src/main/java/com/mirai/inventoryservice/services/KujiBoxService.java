@@ -2,6 +2,8 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.kuji.DeletePrizeRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.kuji.MoveSlipsRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.NewKujiBoxTierDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddKujiTierRequestDTO;
@@ -230,15 +232,9 @@ public class KujiBoxService {
                         .orElseThrow(() -> new ProductNotFoundException(
                                 "Linked product not found: " + tierDto.getLinkedProductId()));
             } else if (autoCreate) {
-                // Birth a child product under the kuji parent via the canonical
-                // ProductService.createProduct path. Pass initialStock = slip + heldBack
-                // so the product starts active and Product.quantity is correct from the
-                // start (createProduct sets quantity directly for prize children without
-                // creating a LocationInventory — kuji code creates that row at the box
-                // location below).
-                int autoSlipCount = tierDto.getCount() != null ? tierDto.getCount() : 0;
-                int autoHeldBack = tierDto.getHeldBackQuantity() == null ? 0 : tierDto.getHeldBackQuantity();
-                int autoInitialStock = autoSlipCount + autoHeldBack;
+                // Birth a child product under the kuji parent. Quantity stays 0 on the
+                // Product entity — the prize stock lives only on the tier counters
+                // (activeCount + inactiveCount). No LocationInventory row is created.
                 linkedProduct = productService.createProduct(
                         null,                                       // sku
                         null,                                       // categoryId — inherits from parent
@@ -254,17 +250,13 @@ public class KujiBoxService {
                         tierDto.getProductMsrp(),                   // msrp
                         tierDto.getProductImageUrl(),               // imageUrl
                         null,                                       // notes
-                        autoInitialStock > 0 ? autoInitialStock : null, // initialStock
+                        null,                                       // initialStock — kuji counters own this
                         null,                                       // kujiType
                         null,                                       // kujiSlackWebhookUrl
                         null                                        // packsPerBox
                 );
-                if (autoInitialStock <= 0) {
-                    // No materialized inventory (rare: 0-count tier with no held-back). Still
-                    // make it drawable since opening a tier with 0 slips is valid bookkeeping.
-                    linkedProduct.setIsActive(true);
-                    linkedProduct = productRepository.save(linkedProduct);
-                }
+                linkedProduct.setIsActive(true);
+                linkedProduct = productRepository.save(linkedProduct);
             }
 
             KujiBoxTier tier = KujiBoxTier.builder()
@@ -272,7 +264,8 @@ public class KujiBoxService {
                     .label(tierDto.getLabel())
                     .letter(tierDto.getLetter())
                     .linkedProduct(linkedProduct)
-                    .count(tierDto.getCount() != null ? tierDto.getCount() : 0)
+                    .activeCount(tierDto.getActiveCount() != null ? tierDto.getActiveCount() : 0)
+                    .inactiveCount(tierDto.getInactiveCount() != null ? tierDto.getInactiveCount() : 0)
                     .price(tierDto.getPrice())
                     .autoCreatedProduct(autoCreate)
                     .build();
@@ -295,45 +288,36 @@ public class KujiBoxService {
             if (tier.getLinkedProduct() == null) {
                 continue;
             }
-            int slipCount = tier.getCount() == null ? 0 : tier.getCount();
-            int heldBack = dto.getHeldBackQuantity() == null ? 0 : dto.getHeldBackQuantity();
+            int slipCount = tier.getActiveCount() == null ? 0 : tier.getActiveCount();
+            int heldBack = dto.getInactiveCount() == null ? 0 : dto.getInactiveCount();
             int totalQuantity = slipCount + heldBack;
             if (totalQuantity <= 0) {
                 continue;
             }
 
             if (Boolean.TRUE.equals(tier.getAutoCreatedProduct())) {
-                // Birth inventory directly at the box location.
+                // Auto-created kuji prize children don't get a LocationInventory row.
+                // Their quantity lives in the tier counters (activeCount + inactiveCount).
+                // Keep an INITIAL_STOCK audit row with quantityChange=0 for traceability.
                 Product newChild = tier.getLinkedProduct();
-                LocationInventory inv = LocationInventory.builder()
-                        .location(box.getLocation())
-                        .site(box.getLocation().getStorageLocation().getSite())
-                        .product(newChild)
-                        .quantity(totalQuantity)
-                        .build();
-                locationInventoryRepository.save(inv);
-
                 Map<String, Object> metadata = buildTierMetadata(box, tier, "open_box_auto_create");
-                if (heldBack > 0) {
-                    metadata.put("slipQuantity", slipCount);
-                    metadata.put("heldBackQuantity", heldBack);
-                }
+                metadata.put("activeCount", slipCount);
+                metadata.put("inactiveCount", heldBack);
+
                 StockMovement birth = StockMovement.builder()
                         .item(newChild)
-                        .locationType(mapLocationType(box.getLocation()))
+                        .locationType(LocationType.NOT_ASSIGNED)
                         .fromLocationId(null)
-                        .toLocationId(box.getLocation().getId())
+                        .toLocationId(null)
                         .previousQuantity(0)
-                        .currentQuantity(totalQuantity)
-                        .quantityChange(totalQuantity)
+                        .currentQuantity(0)
+                        .quantityChange(0)
                         .reason(StockMovementReason.INITIAL_STOCK)
                         .actorId(request.getActorId())
                         .at(now)
                         .metadata(metadata)
                         .build();
                 stockMovementRepository.save(birth);
-                // Auto-create child: Product.quantity was already set correctly by
-                // createProduct(initialStock=totalQuantity). No syncProductTotals needed.
                 continue;
             }
 
@@ -342,19 +326,17 @@ public class KujiBoxService {
                         "Tier '" + tier.getLabel() + "' has a linked product but no sourceLocationId");
             }
 
-            Map<String, Object> metadata = buildTierMetadata(box, tier, "open_box_transfer_in");
-            if (heldBack > 0) {
-                metadata.put("slipQuantity", slipCount);
-                metadata.put("heldBackQuantity", heldBack);
-            }
+            Map<String, Object> metadata = buildTierMetadata(box, tier, "open_box_source_removal");
+            metadata.put("activeCount", slipCount);
+            metadata.put("inactiveCount", heldBack);
 
-            executeKujiTransfer(
+            // Pull prizes from the source location into the kuji's internal counters.
+            // No deposit at the machine — kuji prize counts live only on the tier.
+            executeKujiSourceRemoval(
                     dto.getSourceLocationId(),
-                    box.getLocation(),
                     tier.getLinkedProduct(),
                     totalQuantity,
                     request.getActorId(),
-                    StockMovementReason.TRANSFER,
                     metadata,
                     box.getProduct().getId()
             );
@@ -390,71 +372,83 @@ public class KujiBoxService {
 
         Set<UUID> affectedProductIds = new HashSet<>();
         for (KujiBoxTier tier : box.getTiers()) {
-            if (tier.getLinkedProduct() == null) {
-                continue;
-            }
+            int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
+            int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
+            int leftover = active + inactive;
 
-            Optional<LocationInventory> existingOpt = locationInventoryRepository
-                    .findByLocation_IdAndProduct_Id(box.getLocation().getId(), tier.getLinkedProduct().getId());
-
-            if (Boolean.TRUE.equals(tier.getAutoCreatedProduct())) {
-                // Auto-created prize products are scoped to this one box. Zero out any
-                // leftover inventory at the box (audited via a REMOVED stock movement),
-                // soft-delete the product so it disappears from every product list, and
-                // hard-delete the image on the frontend after closeBox returns. Reopen
-                // restores isActive but does NOT replenish inventory — user runs
-                // Transfer-In More if they want stock back.
+            if (Boolean.TRUE.equals(tier.getAutoCreatedProduct())
+                    && tier.getLinkedProduct() != null) {
+                // Auto-created prize products are scoped to this one box. The kuji counters
+                // are zeroed and the product soft-deleted. No LocationInventory write —
+                // these prizes never lived in location_inventory in the decoupled model.
                 Product child = tier.getLinkedProduct();
-                if (existingOpt.isPresent() && existingOpt.get().getQuantity() > 0) {
-                    LocationInventory inv = existingOpt.get();
-                    int prev = inv.getQuantity();
+                if (leftover > 0) {
+                    Map<String, Object> metadata = buildTierMetadata(box, tier, "close_box_auto_remove");
+                    metadata.put("activeCountAtClose", active);
+                    metadata.put("inactiveCountAtClose", inactive);
                     StockMovement removal = StockMovement.builder()
                             .item(child)
-                            .locationType(mapLocationType(box.getLocation()))
-                            .fromLocationId(box.getLocation().getId())
+                            .locationType(LocationType.NOT_ASSIGNED)
+                            .fromLocationId(null)
                             .toLocationId(null)
-                            .previousQuantity(prev)
+                            .previousQuantity(0)
                             .currentQuantity(0)
-                            .quantityChange(-prev)
+                            .quantityChange(0)
                             .reason(StockMovementReason.REMOVED)
                             .actorId(request.getActorId())
                             .at(OffsetDateTime.now())
-                            .metadata(buildTierMetadata(box, tier, "close_box_auto_remove"))
+                            .metadata(metadata)
                             .build();
                     stockMovementRepository.save(removal);
-                    locationInventoryRepository.delete(inv);
                 }
+                tier.setActiveCount(0);
+                tier.setInactiveCount(0);
+                kujiBoxTierRepository.save(tier);
                 child.setIsActive(false);
                 productRepository.save(child);
                 affectedProductIds.add(child.getId());
                 continue;
             }
 
-            if (existingOpt.isEmpty() || existingOpt.get().getQuantity() <= 0) {
+            if (tier.getLinkedProduct() == null) {
+                // Free-text tier — no product to transfer; just zero the counters.
+                tier.setActiveCount(0);
+                tier.setInactiveCount(0);
+                kujiBoxTierRepository.save(tier);
                 continue;
             }
-            int qty = existingOpt.get().getQuantity();
+
+            if (leftover <= 0) {
+                continue;
+            }
             UUID destinationLocationId = destinationByTierId.get(tier.getId());
             if (destinationLocationId == null) {
                 throw new IllegalArgumentException(
                         "Tier " + tier.getLabel() + ": provide a destination for "
-                                + qty + " units of " + tier.getLinkedProduct().getName());
+                                + leftover + " units of " + tier.getLinkedProduct().getName());
             }
 
             Location destinationLocation = locationRepository.findById(destinationLocationId)
                     .orElseThrow(() -> new LocationNotFoundException(
                             "Destination location not found: " + destinationLocationId));
 
-            executeKujiTransfer(
-                    box.getLocation().getId(),
+            // Transfer the kuji's internal counter back into regular inventory. Source is
+            // synthetic (the kuji), so only the destination side gets a real LocationInventory
+            // write; the audit row carries the active/inactive split for reopen.
+            Map<String, Object> metadata = buildTierMetadata(box, tier, "close_box_return_to_inventory");
+            metadata.put("activeCountAtClose", active);
+            metadata.put("inactiveCountAtClose", inactive);
+            executeKujiCounterReturn(
                     destinationLocation,
                     tier.getLinkedProduct(),
-                    qty,
+                    leftover,
                     request.getActorId(),
-                    StockMovementReason.TRANSFER,
-                    buildTierMetadata(box, tier, "close_box_transfer_out"),
+                    metadata,
                     box.getProduct().getId()
             );
+            tier.setActiveCount(0);
+            tier.setInactiveCount(0);
+            kujiBoxTierRepository.save(tier);
             affectedProductIds.add(tier.getLinkedProduct().getId());
         }
 
@@ -501,9 +495,15 @@ public class KujiBoxService {
                             "A newer OPEN box already exists for this kuji: " + other.getId());
                 });
 
-        // Find close-time transfer-out movements: reason=TRANSFER, metadata.kuji_box_id == boxId,
-        // at >= box.closedAt, fromLocationId == box.location_id, with quantityChange < 0.
-        // We reverse each by transferring quantityChange-magnitude FROM the destination BACK TO box.location.
+        // Reverse close-box movements that went OUT to a destination.
+        //
+        // New model: close emits a TRANSFER with fromLocationId=null, toLocationId=destination,
+        // metadata.activeCountAtClose / inactiveCountAtClose. Reopen decrements the destination
+        // and restores those counts onto the tier.
+        //
+        // Legacy model (pre-decoupling): close emitted a withdrawal half with from=box.location,
+        // to=destination. Reverse those by transferring back from the destination to the box's
+        // LocationInventory. Both shapes are handled.
         OffsetDateTime closedAt = box.getClosedAt();
         Set<UUID> affectedProductIds = new HashSet<>();
         if (closedAt != null) {
@@ -513,14 +513,87 @@ public class KujiBoxService {
                 if (mv.getReason() != StockMovementReason.TRANSFER) {
                     continue;
                 }
-                if (mv.getQuantityChange() == null || mv.getQuantityChange() >= 0) {
-                    continue; // We only want the withdrawal half of each transfer pair.
-                }
-                if (mv.getFromLocationId() == null
-                        || !mv.getFromLocationId().equals(box.getLocation().getId())) {
+                if (mv.getQuantityChange() == null) {
                     continue;
                 }
-                if (mv.getToLocationId() == null) {
+
+                Map<String, Object> mvMeta = mv.getMetadata();
+                boolean isCounterReturn = mvMeta != null
+                        && Boolean.TRUE.equals(mvMeta.get("kuji_counter_return"));
+
+                if (isCounterReturn && mv.getQuantityChange() > 0
+                        && mv.getFromLocationId() == null
+                        && mv.getToLocationId() != null) {
+                    // New-model close: reverse by decrementing destination and restoring counters.
+                    int qty = mv.getQuantityChange();
+                    Location destination = locationRepository.findById(mv.getToLocationId())
+                            .orElseThrow(() -> new LocationNotFoundException(
+                                    "Reopen destination location not found: " + mv.getToLocationId()));
+                    LocationInventory inv = locationInventoryRepository
+                            .findByLocation_IdAndProduct_Id(destination.getId(), mv.getItem().getId())
+                            .orElseThrow(() -> new InventoryNotFoundException(
+                                    "Cannot reopen: destination inventory missing for "
+                                            + mv.getItem().getName()));
+                    if (inv.getQuantity() < qty) {
+                        throw new IllegalStateException(
+                                "Cannot reopen: destination has " + inv.getQuantity()
+                                        + " of " + mv.getItem().getName() + ", need " + qty);
+                    }
+                    int newQty = inv.getQuantity() - qty;
+                    if (newQty == 0) {
+                        locationInventoryRepository.delete(inv);
+                    } else {
+                        inv.setQuantity(newQty);
+                        locationInventoryRepository.save(inv);
+                    }
+
+                    // Restore tier counters from metadata.
+                    UUID tierId = extractTierIdFromMetadata(mvMeta);
+                    if (tierId != null) {
+                        KujiBoxTier tier = kujiBoxTierRepository.findById(tierId).orElse(null);
+                        if (tier != null) {
+                            int restoreActive = readQuantityFromMetadata(mvMeta, "activeCountAtClose", 0);
+                            int restoreInactive = readQuantityFromMetadata(mvMeta, "inactiveCountAtClose", 0);
+                            if (restoreActive == 0 && restoreInactive == 0) {
+                                // Older counter-return without split — put everything in active.
+                                restoreActive = qty;
+                            }
+                            tier.setActiveCount(
+                                    (tier.getActiveCount() != null ? tier.getActiveCount() : 0) + restoreActive);
+                            tier.setInactiveCount(
+                                    (tier.getInactiveCount() != null ? tier.getInactiveCount() : 0) + restoreInactive);
+                            kujiBoxTierRepository.save(tier);
+                        }
+                    }
+
+                    Map<String, Object> metadata = new HashMap<>();
+                    metadata.put("kuji_box_id", boxId.toString());
+                    metadata.put("action", "reopen_box_reverse_counter_return");
+                    metadata.put("reverses_movement_id", String.valueOf(mv.getId()));
+                    StockMovement reverse = StockMovement.builder()
+                            .item(mv.getItem())
+                            .locationType(mapLocationType(destination))
+                            .fromLocationId(destination.getId())
+                            .toLocationId(null)
+                            .previousQuantity(inv.getQuantity() + qty)
+                            .currentQuantity(newQty)
+                            .quantityChange(-qty)
+                            .reason(StockMovementReason.TRANSFER)
+                            .actorId(actorId)
+                            .at(OffsetDateTime.now())
+                            .metadata(metadata)
+                            .build();
+                    StockMovement saved = stockMovementRepository.save(reverse);
+                    eventOutboxService.createStockMovementEvent(saved);
+                    affectedProductIds.add(mv.getItem().getId());
+                    continue;
+                }
+
+                // Legacy close — only the withdrawal half (qty < 0, from=box.location) needs reversal.
+                if (mv.getQuantityChange() >= 0
+                        || mv.getFromLocationId() == null
+                        || !mv.getFromLocationId().equals(box.getLocation().getId())
+                        || mv.getToLocationId() == null) {
                     continue;
                 }
 
@@ -607,32 +680,21 @@ public class KujiBoxService {
         int totalQuantity = 0;
         for (RecordDrawRequestDTO.DrawLine draw : request.getDraws()) {
             KujiBoxTier tier = tiersById.get(draw.getTierId());
-            if (tier.getCount() == null || tier.getCount() < draw.getQuantity()) {
+            if (tier.getActiveCount() == null || tier.getActiveCount() < draw.getQuantity()) {
                 throw new IllegalArgumentException(
                         "Tier '" + tier.getLabel() + "' has only "
-                                + (tier.getCount() == null ? 0 : tier.getCount())
+                                + (tier.getActiveCount() == null ? 0 : tier.getActiveCount())
                                 + " slips remaining; cannot draw " + draw.getQuantity());
             }
-            if (tier.getLinkedProduct() != null) {
-                LocationInventory inv = locationInventoryRepository
-                        .findByLocation_IdAndProduct_Id(box.getLocation().getId(),
-                                tier.getLinkedProduct().getId())
-                        .orElse(null);
-                int available = inv != null ? inv.getQuantity() : 0;
-                if (available < draw.getQuantity()) {
-                    throw new IllegalStateException(
-                            "Out of " + tier.getLinkedProduct().getName()
-                                    + " at this box's location — Transfer-In more, "
-                                    + "or Edit Tier to change the linked product.");
-                }
-            }
+            // Active count is the only check needed — kuji prize stock lives on the tier,
+            // not in LocationInventory at the machine.
             totalQuantity += draw.getQuantity();
         }
 
         // Decrement counts (in-memory; saved when tier persists below)
         for (RecordDrawRequestDTO.DrawLine draw : request.getDraws()) {
             KujiBoxTier tier = tiersById.get(draw.getTierId());
-            tier.setCount(tier.getCount() - draw.getQuantity());
+            tier.setActiveCount(tier.getActiveCount() - draw.getQuantity());
         }
 
         // Create one parent AuditLog of reason KUJI_PRIZE_WON. The summary lists the tiers
@@ -654,7 +716,6 @@ public class KujiBoxService {
         );
 
         OffsetDateTime now = OffsetDateTime.now();
-        Set<UUID> affectedProductIds = new HashSet<>();
         List<Map<String, Object>> tierSummaries = new ArrayList<>();
 
         for (RecordDrawRequestDTO.DrawLine draw : request.getDraws()) {
@@ -666,61 +727,31 @@ public class KujiBoxService {
             if (tier.getLetter() != null) {
                 metadata.put("tier_letter", tier.getLetter());
             }
-            // Always store slip_quantity so undo can reliably restore tier counts even when
-            // quantityChange is 0 (free-text tiers).
+            // Always store slip_quantity so undo can reliably restore tier counts.
             metadata.put("slip_quantity", qty);
 
-            StockMovement movement;
-            if (tier.getLinkedProduct() != null) {
-                Product linked = tier.getLinkedProduct();
-                LocationInventory inv = locationInventoryRepository
-                        .findByLocation_IdAndProduct_Id(box.getLocation().getId(), linked.getId())
-                        .orElseThrow(() -> new InventoryNotFoundException(
-                                "LocationInventory missing for linked product after lock check: "
-                                        + linked.getId()));
-
-                int prev = inv.getQuantity();
-                int next = prev - qty;
-                if (next == 0) {
-                    locationInventoryRepository.delete(inv);
-                } else {
-                    inv.setQuantity(next);
-                    locationInventoryRepository.save(inv);
-                }
-
-                LocationType locType = mapLocationType(box.getLocation());
-                movement = StockMovement.builder()
-                        .auditLog(parentLog)
-                        .item(linked)
-                        .locationType(locType)
-                        .fromLocationId(box.getLocation().getId())
-                        .toLocationId(null)
-                        .previousQuantity(prev)
-                        .currentQuantity(next)
-                        .quantityChange(-qty)
-                        .reason(StockMovementReason.KUJI_PRIZE_WON)
-                        .actorId(request.getActorId())
-                        .at(now)
-                        .metadata(metadata)
-                        .build();
-                affectedProductIds.add(linked.getId());
-            } else {
-                // Free-text tier: emit a quantityChange=0 movement on the parent product
-                movement = StockMovement.builder()
-                        .auditLog(parentLog)
-                        .item(parentProduct)
-                        .locationType(LocationType.NOT_ASSIGNED)
-                        .fromLocationId(null)
-                        .toLocationId(null)
-                        .previousQuantity(0)
-                        .currentQuantity(0)
-                        .quantityChange(0)
-                        .reason(StockMovementReason.KUJI_PRIZE_WON)
-                        .actorId(request.getActorId())
-                        .at(now)
-                        .metadata(metadata)
-                        .build();
+            // Linked and unlinked draws emit the same structural movement: a zero-quantity
+            // KUJI_PRIZE_WON audit row with prize details in metadata. Kuji prize stock
+            // lives on the tier (activeCount), not in LocationInventory.
+            Product linked = tier.getLinkedProduct();
+            if (linked != null) {
+                metadata.put("linked_product_id", linked.getId().toString());
+                metadata.put("linked_product_name", linked.getName());
             }
+            StockMovement movement = StockMovement.builder()
+                    .auditLog(parentLog)
+                    .item(linked != null ? linked : parentProduct)
+                    .locationType(LocationType.NOT_ASSIGNED)
+                    .fromLocationId(null)
+                    .toLocationId(null)
+                    .previousQuantity(0)
+                    .currentQuantity(0)
+                    .quantityChange(0)
+                    .reason(StockMovementReason.KUJI_PRIZE_WON)
+                    .actorId(request.getActorId())
+                    .at(now)
+                    .metadata(metadata)
+                    .build();
 
             StockMovement saved = stockMovementRepository.save(movement);
             eventOutboxService.createStockMovementEvent(saved);
@@ -737,12 +768,8 @@ public class KujiBoxService {
                     tier.getLinkedProduct() != null ? tier.getLinkedProduct().getName() : null);
             line.put("price", tier.getPrice());
             line.put("quantity", qty);
-            line.put("count_after", tier.getCount());
+            line.put("count_after", tier.getActiveCount());
             tierSummaries.add(line);
-        }
-
-        if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
         }
 
         // Notification — wrap in try/catch
@@ -850,11 +877,13 @@ public class KujiBoxService {
             }
             int qty = slipCount;
 
+            // Legacy draws (pre-decoupling) may have decremented LocationInventory at the
+            // machine. Restore that side too so undo is correct for historical data. New
+            // draws emit quantityChange=0 and skip this path.
             if (mv.getQuantityChange() != null && mv.getQuantityChange() < 0
                     && mv.getItem() != null
                     && mv.getFromLocationId() != null
                     && mv.getFromLocationId().equals(box.getLocation().getId())) {
-                // Restore inventory at box.location for the linked product
                 Product linked = mv.getItem();
                 LocationInventory inv = locationInventoryRepository
                         .findByLocation_IdAndProduct_Id(box.getLocation().getId(), linked.getId())
@@ -874,64 +903,38 @@ public class KujiBoxService {
                 }
                 locationInventoryRepository.save(inv);
                 affectedProductIds.add(linked.getId());
-
-                Map<String, Object> metadata = new HashMap<>();
-                metadata.put("kuji_box_id", boxId.toString());
-                metadata.put("reverses_audit_log_id", auditLogId.toString());
-                metadata.put("reverses_movement_id", String.valueOf(mv.getId()));
-                if (tier != null) {
-                    metadata.put("kuji_box_tier_id", tier.getId().toString());
-                }
-                metadata.put("kuji_product_id", linked.getId().toString());
-
-                StockMovement reverse = StockMovement.builder()
-                        .auditLog(reverseLog)
-                        .item(linked)
-                        .locationType(mapLocationType(box.getLocation()))
-                        .fromLocationId(null)
-                        .toLocationId(box.getLocation().getId())
-                        .previousQuantity(prev)
-                        .currentQuantity(next)
-                        .quantityChange(qty)
-                        .reason(StockMovementReason.KUJI_DRAW_REVERSED)
-                        .actorId(actorId)
-                        .at(now)
-                        .metadata(metadata)
-                        .build();
-                StockMovement saved = stockMovementRepository.save(reverse);
-                eventOutboxService.createStockMovementEvent(saved);
-            } else {
-                // Free-text tier (or zero-quantity movement) — write symmetric reversal with qty=0
-                Map<String, Object> metadata = new HashMap<>();
-                metadata.put("kuji_box_id", boxId.toString());
-                metadata.put("reverses_audit_log_id", auditLogId.toString());
-                metadata.put("reverses_movement_id", String.valueOf(mv.getId()));
-                if (tier != null) {
-                    metadata.put("kuji_box_tier_id", tier.getId().toString());
-                }
-
-                StockMovement reverse = StockMovement.builder()
-                        .auditLog(reverseLog)
-                        .item(mv.getItem() != null ? mv.getItem() : parentProduct)
-                        .locationType(LocationType.NOT_ASSIGNED)
-                        .fromLocationId(null)
-                        .toLocationId(null)
-                        .previousQuantity(0)
-                        .currentQuantity(0)
-                        .quantityChange(0)
-                        .reason(StockMovementReason.KUJI_DRAW_REVERSED)
-                        .actorId(actorId)
-                        .at(now)
-                        .metadata(metadata)
-                        .build();
-                StockMovement saved = stockMovementRepository.save(reverse);
-                eventOutboxService.createStockMovementEvent(saved);
             }
+
+            // Always write a counter-only reversal audit row. Inventory restore above
+            // only fires for legacy data.
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("kuji_box_id", boxId.toString());
+            metadata.put("reverses_audit_log_id", auditLogId.toString());
+            metadata.put("reverses_movement_id", String.valueOf(mv.getId()));
+            if (tier != null) {
+                metadata.put("kuji_box_tier_id", tier.getId().toString());
+            }
+            StockMovement reverse = StockMovement.builder()
+                    .auditLog(reverseLog)
+                    .item(mv.getItem() != null ? mv.getItem() : parentProduct)
+                    .locationType(LocationType.NOT_ASSIGNED)
+                    .fromLocationId(null)
+                    .toLocationId(null)
+                    .previousQuantity(0)
+                    .currentQuantity(0)
+                    .quantityChange(0)
+                    .reason(StockMovementReason.KUJI_DRAW_REVERSED)
+                    .actorId(actorId)
+                    .at(now)
+                    .metadata(metadata)
+                    .build();
+            StockMovement saved = stockMovementRepository.save(reverse);
+            eventOutboxService.createStockMovementEvent(saved);
 
             // Restore tier slip count
             if (tier != null) {
-                Integer current = tier.getCount() != null ? tier.getCount() : 0;
-                tier.setCount(current + qty);
+                Integer current = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
+                tier.setActiveCount(current + qty);
                 kujiBoxTierRepository.save(tier);
 
                 Map<String, Object> line = new HashMap<>();
@@ -942,7 +945,7 @@ public class KujiBoxService {
                         tier.getLinkedProduct() != null ? tier.getLinkedProduct().getName() : null);
                 line.put("price", tier.getPrice());
                 line.put("quantity", qty);
-                line.put("count_after", tier.getCount());
+                line.put("count_after", tier.getActiveCount());
                 tierSummaries.add(line);
             }
         }
@@ -985,13 +988,19 @@ public class KujiBoxService {
         }
 
         int quantity = request.getQuantity();
-        tier.setCount((tier.getCount() == null ? 0 : tier.getCount()) + quantity);
+        boolean inactive = Boolean.TRUE.equals(request.getInactive());
+        if (inactive) {
+            tier.setInactiveCount((tier.getInactiveCount() == null ? 0 : tier.getInactiveCount()) + quantity);
+        } else {
+            tier.setActiveCount((tier.getActiveCount() == null ? 0 : tier.getActiveCount()) + quantity);
+        }
         kujiBoxTierRepository.save(tier);
 
         Product parentProduct = box.getProduct();
         // Slip adjustments don't change inventory — only the tier's slip count. The
         // AuditLog drives the kuji session activity log; no StockMovement or outbox
         // event is needed (and none is consumed downstream for KUJI_SLIP_ADJUSTMENT).
+        String bucketLabel = inactive ? " (inactive)" : "";
         createAuditLog(
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
@@ -1002,7 +1011,127 @@ public class KujiBoxService {
                 1,
                 quantity,
                 parentProduct.getName(),
-                "Kuji slip added: " + tier.getLabel(),
+                "Kuji slip added" + bucketLabel + ": " + tier.getLabel(),
+                parentProduct.getId()
+        );
+
+        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+
+        entityManager.flush();
+        return toResponseDTO(box);
+    }
+
+    /**
+     * Move slips between the active and inactive buckets within a single tier.
+     * Pure counter operation — no StockMovement, no LocationInventory side-effect.
+     */
+    @Transactional
+    public KujiBoxResponseDTO moveSlips(UUID boxId, UUID tierId, MoveSlipsRequestDTO request) {
+        KujiBox box = kujiBoxRepository.findByIdWithTiers(boxId)
+                .orElseThrow(() -> new IllegalArgumentException("Box not found: " + boxId));
+        if (box.getStatus() != KujiBoxStatus.OPEN) {
+            throw new IllegalStateException("Box is not OPEN: " + boxId);
+        }
+
+        KujiBoxTier tier = kujiBoxTierRepository.findByIdForUpdate(tierId)
+                .orElseThrow(() -> new IllegalArgumentException("Tier not found: " + tierId));
+        if (tier.getBox() == null || !boxId.equals(tier.getBox().getId())) {
+            throw new IllegalArgumentException("Tier does not belong to box");
+        }
+
+        int quantity = request.getQuantity();
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("quantity must be at least 1");
+        }
+
+        int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
+        int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
+        MoveSlipsRequestDTO.Direction direction = request.getDirection();
+
+        if (direction == MoveSlipsRequestDTO.Direction.DEACTIVATE) {
+            if (active < quantity) {
+                throw new IllegalArgumentException(
+                        "Tier '" + tier.getLabel() + "' has only " + active
+                                + " active slip(s); cannot deactivate " + quantity);
+            }
+            tier.setActiveCount(active - quantity);
+            tier.setInactiveCount(inactive + quantity);
+        } else { // ACTIVATE
+            if (inactive < quantity) {
+                throw new IllegalArgumentException(
+                        "Tier '" + tier.getLabel() + "' has only " + inactive
+                                + " inactive slip(s); cannot activate " + quantity);
+            }
+            tier.setActiveCount(active + quantity);
+            tier.setInactiveCount(inactive - quantity);
+        }
+        kujiBoxTierRepository.save(tier);
+
+        Product parentProduct = box.getProduct();
+        String action = direction == MoveSlipsRequestDTO.Direction.ACTIVATE ? "activate" : "deactivate";
+        createAuditLog(
+                request.getActorId(),
+                StockMovementReason.KUJI_SLIP_ADJUSTMENT,
+                box.getLocation().getId(),
+                box.getLocation().getLocationCode(),
+                null,
+                null,
+                1,
+                quantity,
+                parentProduct.getName(),
+                "Kuji slips " + action + "d: " + tier.getLabel() + " (" + quantity + ")",
+                parentProduct.getId()
+        );
+
+        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+
+        entityManager.flush();
+        return toResponseDTO(box);
+    }
+
+    /**
+     * Delete a tier entirely — zeros both active and inactive counters and removes
+     * the tier row from the box. Pure counter operation: no StockMovement, no
+     * LocationInventory side-effect. If the tier had remaining slips of a linked
+     * product that should be returned to regular inventory, do that via Edit Tier
+     * (clear/switch linked product) before calling this.
+     */
+    @Transactional
+    public KujiBoxResponseDTO deletePrize(UUID boxId, UUID tierId, DeletePrizeRequestDTO request) {
+        KujiBox box = kujiBoxRepository.findByIdWithTiers(boxId)
+                .orElseThrow(() -> new IllegalArgumentException("Box not found: " + boxId));
+        if (box.getStatus() != KujiBoxStatus.OPEN) {
+            throw new IllegalStateException("Box is not OPEN: " + boxId);
+        }
+
+        KujiBoxTier tier = kujiBoxTierRepository.findByIdForUpdate(tierId)
+                .orElseThrow(() -> new IllegalArgumentException("Tier not found: " + tierId));
+        if (tier.getBox() == null || !boxId.equals(tier.getBox().getId())) {
+            throw new IllegalArgumentException("Tier does not belong to box");
+        }
+
+        int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
+        int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
+        int total = active + inactive;
+        String tierLabel = tier.getLabel();
+
+        box.getTiers().remove(tier);
+        kujiBoxTierRepository.delete(tier);
+
+        Product parentProduct = box.getProduct();
+        String summary = "Kuji prize tier deleted: " + tierLabel
+                + " (active " + active + ", inactive " + inactive + ")";
+        createAuditLog(
+                request.getActorId(),
+                StockMovementReason.KUJI_SLIP_ADJUSTMENT,
+                box.getLocation().getId(),
+                box.getLocation().getLocationCode(),
+                null,
+                null,
+                1,
+                total,
+                parentProduct.getName(),
+                summary,
                 parentProduct.getId()
         );
 
@@ -1031,29 +1160,24 @@ public class KujiBoxService {
         }
 
         boolean autoCreateMint = request.getSourceLocationId() == null;
-        if (autoCreateMint) {
-            mintAutoCreatedAtBox(box, tier, request.getQuantity(), request.getActorId(), "transfer_in_more");
-        } else {
+        if (!autoCreateMint) {
+            // Pull from real inventory at the source — no deposit at the machine.
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
             metadata.put("action", "transfer_in_more");
             applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
-            executeKujiTransfer(
+            executeKujiSourceRemoval(
                     request.getSourceLocationId(),
-                    box.getLocation(),
                     tier.getLinkedProduct(),
                     request.getQuantity(),
                     request.getActorId(),
-                    StockMovementReason.TRANSFER,
                     metadata,
                     box.getProduct().getId()
             );
         }
-
-        tier.setCount((tier.getCount() == null ? 0 : tier.getCount()) + request.getQuantity());
+        // Either way, the tier's active counter grows.
+        tier.setActiveCount((tier.getActiveCount() == null ? 0 : tier.getActiveCount()) + request.getQuantity());
         kujiBoxTierRepository.save(tier);
 
-        // Auto-create mint already updated Product.quantity in mintAutoCreatedAtBox; only
-        // call syncProductTotals for transfers that move stock across locations.
         if (!autoCreateMint) {
             stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
         }
@@ -1083,23 +1207,22 @@ public class KujiBoxService {
         }
 
         boolean autoCreateMint = request.getSourceLocationId() == null;
-        if (autoCreateMint) {
-            mintAutoCreatedAtBox(box, tier, request.getQuantity(), request.getActorId(), "transfer_in_inventory_only");
-        } else {
+        if (!autoCreateMint) {
             Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
             metadata.put("action", "transfer_in_inventory_only");
             applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
-            executeKujiTransfer(
+            executeKujiSourceRemoval(
                     request.getSourceLocationId(),
-                    box.getLocation(),
                     tier.getLinkedProduct(),
                     request.getQuantity(),
                     request.getActorId(),
-                    StockMovementReason.TRANSFER,
                     metadata,
                     box.getProduct().getId()
             );
         }
+        // Inventory-only transfer-in lands in the inactive bucket (held back, not on a slip).
+        tier.setInactiveCount((tier.getInactiveCount() == null ? 0 : tier.getInactiveCount()) + request.getQuantity());
+        kujiBoxTierRepository.save(tier);
 
         if (!autoCreateMint) {
             stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
@@ -1214,12 +1337,7 @@ public class KujiBoxService {
                     .orElseThrow(() -> new ProductNotFoundException(
                             "Linked product not found: " + request.getLinkedProductId()));
         } else if (autoCreate) {
-            // Pass initialStock = slip + heldBack so createProduct sets Product.quantity
-            // and isActive correctly from the start. Kuji code below still creates the
-            // LocationInventory row at the box location.
-            int autoSlipCount = request.getCount() != null ? request.getCount() : 0;
-            int autoHeldBack = request.getHeldBackQuantity() == null ? 0 : request.getHeldBackQuantity();
-            int autoInitialStock = autoSlipCount + autoHeldBack;
+            // Auto-created prize: product entity only. Quantity lives in tier counters.
             linkedProduct = productService.createProduct(
                     null,                                       // sku
                     null,                                       // categoryId — inherits from parent
@@ -1235,15 +1353,13 @@ public class KujiBoxService {
                     request.getProductMsrp(),                   // msrp
                     request.getProductImageUrl(),               // imageUrl
                     null,                                       // notes
-                    autoInitialStock > 0 ? autoInitialStock : null, // initialStock
+                    null,                                       // initialStock — kuji counters own this
                     null,                                       // kujiType
                     null,                                       // kujiSlackWebhookUrl
                     null                                        // packsPerBox
             );
-            if (autoInitialStock <= 0) {
-                linkedProduct.setIsActive(true);
-                linkedProduct = productRepository.save(linkedProduct);
-            }
+            linkedProduct.setIsActive(true);
+            linkedProduct = productRepository.save(linkedProduct);
         }
 
         KujiBoxTier tier = KujiBoxTier.builder()
@@ -1251,7 +1367,8 @@ public class KujiBoxService {
                 .label(request.getLabel())
                 .letter(request.getLetter())
                 .linkedProduct(linkedProduct)
-                .count(request.getCount() != null ? request.getCount() : 0)
+                .activeCount(request.getActiveCount() != null ? request.getActiveCount() : 0)
+                .inactiveCount(request.getInactiveCount() != null ? request.getInactiveCount() : 0)
                 .price(request.getPrice())
                 .autoCreatedProduct(autoCreate)
                 .build();
@@ -1262,59 +1379,43 @@ public class KujiBoxService {
         entityManager.flush();
 
         // Materialize inventory: birth at box for auto-create, transfer-in otherwise.
-        int slipCount = tier.getCount() == null ? 0 : tier.getCount();
-        int heldBack = request.getHeldBackQuantity() == null ? 0 : request.getHeldBackQuantity();
+        int slipCount = tier.getActiveCount() == null ? 0 : tier.getActiveCount();
+        int heldBack = request.getInactiveCount() == null ? 0 : request.getInactiveCount();
         int totalQuantity = slipCount + heldBack;
 
         Set<UUID> affectedProductIds = new HashSet<>();
         if (linkedProduct != null && totalQuantity > 0) {
             if (autoCreate) {
-                LocationInventory inv = LocationInventory.builder()
-                        .location(box.getLocation())
-                        .site(box.getLocation().getStorageLocation().getSite())
-                        .product(linkedProduct)
-                        .quantity(totalQuantity)
-                        .build();
-                locationInventoryRepository.save(inv);
-
                 Map<String, Object> metadata = buildTierMetadata(box, tier, "add_tier_auto_create");
-                if (heldBack > 0) {
-                    metadata.put("slipQuantity", slipCount);
-                    metadata.put("heldBackQuantity", heldBack);
-                }
+                metadata.put("activeCount", slipCount);
+                metadata.put("inactiveCount", heldBack);
                 StockMovement birth = StockMovement.builder()
                         .item(linkedProduct)
-                        .locationType(mapLocationType(box.getLocation()))
+                        .locationType(LocationType.NOT_ASSIGNED)
                         .fromLocationId(null)
-                        .toLocationId(box.getLocation().getId())
+                        .toLocationId(null)
                         .previousQuantity(0)
-                        .currentQuantity(totalQuantity)
-                        .quantityChange(totalQuantity)
+                        .currentQuantity(0)
+                        .quantityChange(0)
                         .reason(StockMovementReason.INITIAL_STOCK)
                         .actorId(request.getActorId())
                         .at(OffsetDateTime.now())
                         .metadata(metadata)
                         .build();
                 stockMovementRepository.save(birth);
-                // Auto-create child: Product.quantity was already set correctly by
-                // createProduct(initialStock=totalQuantity). No syncProductTotals needed.
             } else {
                 if (request.getSourceLocationId() == null) {
                     throw new IllegalArgumentException(
                             "Tier '" + tier.getLabel() + "' has a linked product but no sourceLocationId");
                 }
-                Map<String, Object> metadata = buildTierMetadata(box, tier, "add_tier_transfer_in");
-                if (heldBack > 0) {
-                    metadata.put("slipQuantity", slipCount);
-                    metadata.put("heldBackQuantity", heldBack);
-                }
-                executeKujiTransfer(
+                Map<String, Object> metadata = buildTierMetadata(box, tier, "add_tier_source_removal");
+                metadata.put("activeCount", slipCount);
+                metadata.put("inactiveCount", heldBack);
+                executeKujiSourceRemoval(
                         request.getSourceLocationId(),
-                        box.getLocation(),
                         linkedProduct,
                         totalQuantity,
                         request.getActorId(),
-                        StockMovementReason.TRANSFER,
                         metadata,
                         box.getProduct().getId()
                 );
@@ -1359,37 +1460,34 @@ public class KujiBoxService {
 
         if (changeLinked) {
             Product oldLinked = tier.getLinkedProduct();
-            if (oldLinked != null) {
-                LocationInventory existing = locationInventoryRepository
-                        .findByLocation_IdAndProduct_Id(box.getLocation().getId(), oldLinked.getId())
-                        .orElse(null);
-                int qty = existing != null ? existing.getQuantity() : 0;
-                if (qty > 0) {
-                    if (request.getLinkedProductDestinationLocationId() == null) {
-                        throw new IllegalArgumentException(
-                                "Tier " + tier.getLabel() + ": provide linkedProductDestinationLocationId for "
-                                        + qty + " units of " + oldLinked.getName());
-                    }
-                    Location destination = locationRepository
-                            .findById(request.getLinkedProductDestinationLocationId())
-                            .orElseThrow(() -> new LocationNotFoundException(
-                                    "Destination location not found: "
-                                            + request.getLinkedProductDestinationLocationId()));
-
-                    Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
-                    metadata.put("action", "patch_tier_old_product_out");
-                    executeKujiTransfer(
-                            box.getLocation().getId(),
-                            destination,
-                            oldLinked,
-                            qty,
-                            request.getActorId(),
-                            StockMovementReason.TRANSFER,
-                            metadata,
-                            box.getProduct().getId()
-                    );
-                    affectedProductIds.add(oldLinked.getId());
+            int leftoverQty = (tier.getActiveCount() != null ? tier.getActiveCount() : 0)
+                    + (tier.getInactiveCount() != null ? tier.getInactiveCount() : 0);
+            if (oldLinked != null && leftoverQty > 0) {
+                if (request.getLinkedProductDestinationLocationId() == null) {
+                    throw new IllegalArgumentException(
+                            "Tier " + tier.getLabel() + ": provide linkedProductDestinationLocationId for "
+                                    + leftoverQty + " units of " + oldLinked.getName());
                 }
+                Location destination = locationRepository
+                        .findById(request.getLinkedProductDestinationLocationId())
+                        .orElseThrow(() -> new LocationNotFoundException(
+                                "Destination location not found: "
+                                        + request.getLinkedProductDestinationLocationId()));
+
+                // Counter-return: kuji's active+inactive slips become regular inventory.
+                Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
+                metadata.put("action", "patch_tier_old_product_out");
+                executeKujiCounterReturn(
+                        destination,
+                        oldLinked,
+                        leftoverQty,
+                        request.getActorId(),
+                        metadata,
+                        box.getProduct().getId()
+                );
+                tier.setActiveCount(0);
+                tier.setInactiveCount(0);
+                affectedProductIds.add(oldLinked.getId());
             }
 
             if (clearLinked) {
@@ -1401,7 +1499,46 @@ public class KujiBoxService {
                                 "Linked product not found: " + request.getLinkedProductId()));
                 tier.setLinkedProduct(newLinked);
                 changes.add("changed linked product to " + newLinked.getName());
-                // Per spec: do not auto-transfer-in. User can run Transfer-In More.
+
+                // Optional: bring in initial counts of the new product in the same operation.
+                int newActiveIn = request.getNewProductActiveCount() != null
+                        ? request.getNewProductActiveCount() : 0;
+                int newInactiveIn = request.getNewProductInactiveCount() != null
+                        ? request.getNewProductInactiveCount() : 0;
+                int newTotalIn = newActiveIn + newInactiveIn;
+                if (newTotalIn > 0) {
+                    if (request.getNewProductSourceLocationId() == null) {
+                        throw new IllegalArgumentException(
+                                "Tier " + tier.getLabel()
+                                        + ": newProductSourceLocationId is required when bringing in "
+                                        + newTotalIn + " units of " + newLinked.getName());
+                    }
+                    Map<String, Object> metadata = baseDrawMetadata(box, tier, null);
+                    metadata.put("action", "patch_tier_new_product_in");
+                    metadata.put("activeCount", newActiveIn);
+                    metadata.put("inactiveCount", newInactiveIn);
+                    executeKujiSourceRemoval(
+                            request.getNewProductSourceLocationId(),
+                            newLinked,
+                            newTotalIn,
+                            request.getActorId(),
+                            metadata,
+                            box.getProduct().getId()
+                    );
+                    tier.setActiveCount(
+                            (tier.getActiveCount() != null ? tier.getActiveCount() : 0) + newActiveIn);
+                    tier.setInactiveCount(
+                            (tier.getInactiveCount() != null ? tier.getInactiveCount() : 0) + newInactiveIn);
+                    affectedProductIds.add(newLinked.getId());
+                    if (newActiveIn > 0 && newInactiveIn > 0) {
+                        changes.add("brought in " + newActiveIn + " active and "
+                                + newInactiveIn + " inactive");
+                    } else if (newActiveIn > 0) {
+                        changes.add("brought in " + newActiveIn + " active");
+                    } else {
+                        changes.add("brought in " + newInactiveIn + " inactive");
+                    }
+                }
             }
         }
 
@@ -1417,9 +1554,16 @@ public class KujiBoxService {
             tier.setLetter(request.getLetter());
             changes.add("letter");
         }
-        if (request.getCount() != null && !request.getCount().equals(tier.getCount())) {
-            tier.setCount(request.getCount());
-            changes.add("count (manual adjustment)");
+        if (request.getActiveCount() != null && !request.getActiveCount().equals(tier.getActiveCount())) {
+            int prev = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
+            tier.setActiveCount(request.getActiveCount());
+            changes.add("active count (manual adjustment): " + prev + " → " + request.getActiveCount());
+        }
+        if (request.getInactiveCount() != null
+                && !request.getInactiveCount().equals(tier.getInactiveCount())) {
+            int prev = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
+            tier.setInactiveCount(request.getInactiveCount());
+            changes.add("inactive count (manual adjustment): " + prev + " → " + request.getInactiveCount());
         }
         if (Boolean.TRUE.equals(request.getClearPrice())) {
             tier.setPrice(null);
@@ -1433,10 +1577,12 @@ public class KujiBoxService {
 
         Product parentProduct = box.getProduct();
         if (!changes.isEmpty()) {
-            String summary = "Edited tier '" + tier.getLabel() + "': " + String.join(", ", changes);
+            // Note prefix "Kuji tier edited" lets the kuji activity log classify this
+            // entry and split the change-list into the expandable detail body.
+            String summary = "Kuji tier edited: " + tier.getLabel() + " — " + String.join(", ", changes);
             AuditLog auditLog = createAuditLog(
                     request.getActorId(),
-                    StockMovementReason.ADJUSTMENT,
+                    StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                     box.getLocation().getId(),
                     box.getLocation().getLocationCode(),
                     null,
@@ -1461,7 +1607,7 @@ public class KujiBoxService {
                     .previousQuantity(0)
                     .currentQuantity(0)
                     .quantityChange(0)
-                    .reason(StockMovementReason.ADJUSTMENT)
+                    .reason(StockMovementReason.KUJI_SLIP_ADJUSTMENT)
                     .actorId(request.getActorId())
                     .at(OffsetDateTime.now())
                     .metadata(metadata)
@@ -1538,8 +1684,11 @@ public class KujiBoxService {
                                     autoCreated || t.getLinkedProduct() == null
                                             ? null
                                             : t.getLinkedProduct().getName())
-                            .linkedInventoryAtBoxLocation(null)
-                            .count(t.getCount())
+                            .activeCount(t.getActiveCount())
+                            .inactiveCount(t.getInactiveCount() != null ? t.getInactiveCount() : 0)
+                            .totalCount(
+                                    (t.getActiveCount() != null ? t.getActiveCount() : 0)
+                                            + (t.getInactiveCount() != null ? t.getInactiveCount() : 0))
                             .price(t.getPrice())
                             .autoCreatedProduct(false)
                             .build();
@@ -1548,6 +1697,155 @@ public class KujiBoxService {
     }
 
     // ===================== Internal helpers =====================
+
+    /**
+     * Decrement source LocationInventory and emit a SALE StockMovement for the
+     * audit trail. Used when kuji prizes are pulled out of regular inventory into
+     * the kuji's internal counters — stock leaves real inventory permanently because
+     * it's being sold (via the kuji), so the SALE reason rolls it into sales analytics.
+     * There is no destination LocationInventory write because kuji counts live on
+     * the tier (activeCount/inactiveCount), not in location_inventory at the machine.
+     *
+     * Returns the source product id so callers can include it in the
+     * syncProductTotals batch.
+     */
+    private UUID executeKujiSourceRemoval(
+            UUID sourceLocationId,
+            Product product,
+            int quantity,
+            UUID actorId,
+            Map<String, Object> baseMetadata,
+            UUID kujiBoxProductId
+    ) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Removal quantity must be positive");
+        }
+
+        LocationInventory source = locationInventoryRepository
+                .findByLocation_IdAndProduct_Id(sourceLocationId, product.getId())
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Source LocationInventory not found for product " + product.getName()
+                                + " at location " + sourceLocationId));
+
+        if (source.getQuantity() < quantity) {
+            throw new InsufficientInventoryException(
+                    "Cannot remove " + quantity + " units. Source has " + source.getQuantity());
+        }
+
+        Location sourceLocation = source.getLocation();
+        int sourcePrev = source.getQuantity();
+        int newSourceQty = sourcePrev - quantity;
+
+        AuditLog auditLog = createAuditLog(
+                actorId,
+                StockMovementReason.SALE,
+                sourceLocation.getId(),
+                sourceLocation.getLocationCode(),
+                null,
+                null,
+                1,
+                quantity,
+                product.getName(),
+                null,
+                kujiBoxProductId
+        );
+
+        Map<String, Object> metadata = new HashMap<>(baseMetadata != null ? baseMetadata : new HashMap<>());
+        metadata.put("kuji_source_removal", true);
+
+        StockMovement removal = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(product)
+                .locationType(mapLocationType(sourceLocation))
+                .fromLocationId(sourceLocation.getId())
+                .toLocationId(null)
+                .previousQuantity(sourcePrev)
+                .currentQuantity(newSourceQty)
+                .quantityChange(-quantity)
+                .reason(StockMovementReason.SALE)
+                .actorId(actorId)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+
+        if (newSourceQty == 0) {
+            locationInventoryRepository.delete(source);
+        } else {
+            source.setQuantity(newSourceQty);
+            locationInventoryRepository.save(source);
+        }
+
+        StockMovement saved = stockMovementRepository.save(removal);
+        eventOutboxService.createStockMovementEvent(saved);
+
+        return product.getId();
+    }
+
+    /**
+     * Inverse of {@link #executeKujiSourceRemoval}: increment a destination LocationInventory
+     * and emit a TRANSFER StockMovement (from=null) representing kuji counter → regular
+     * inventory. Used at close-box when leftover slips are returned to a real location.
+     */
+    private void executeKujiCounterReturn(
+            Location destinationLocation,
+            Product product,
+            int quantity,
+            UUID actorId,
+            Map<String, Object> baseMetadata,
+            UUID kujiBoxProductId
+    ) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Return quantity must be positive");
+        }
+
+        LocationInventory destination = locationInventoryRepository
+                .findByLocation_IdAndProduct_Id(destinationLocation.getId(), product.getId())
+                .orElseGet(() -> locationInventoryRepository.save(LocationInventory.builder()
+                        .location(destinationLocation)
+                        .site(destinationLocation.getStorageLocation().getSite())
+                        .product(product)
+                        .quantity(0)
+                        .build()));
+
+        int destPrev = destination.getQuantity();
+        int destNext = destPrev + quantity;
+        destination.setQuantity(destNext);
+        locationInventoryRepository.save(destination);
+
+        AuditLog auditLog = createAuditLog(
+                actorId,
+                StockMovementReason.TRANSFER,
+                null,
+                null,
+                destinationLocation.getId(),
+                destinationLocation.getLocationCode(),
+                1,
+                quantity,
+                product.getName(),
+                null,
+                kujiBoxProductId
+        );
+
+        Map<String, Object> metadata = new HashMap<>(baseMetadata != null ? baseMetadata : new HashMap<>());
+        metadata.put("kuji_counter_return", true);
+
+        StockMovement deposit = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(product)
+                .locationType(mapLocationType(destinationLocation))
+                .fromLocationId(null)
+                .toLocationId(destinationLocation.getId())
+                .previousQuantity(destPrev)
+                .currentQuantity(destNext)
+                .quantityChange(quantity)
+                .reason(StockMovementReason.TRANSFER)
+                .actorId(actorId)
+                .at(OffsetDateTime.now())
+                .metadata(metadata)
+                .build();
+        StockMovement saved = stockMovementRepository.save(deposit);
+        eventOutboxService.createStockMovementEvent(saved);
+    }
 
     /**
      * Execute a transfer pair (one AuditLog with two StockMovements) from source location to
@@ -1857,7 +2155,7 @@ public class KujiBoxService {
             int totalAfter = box.getTiers() == null
                     ? 0
                     : box.getTiers().stream()
-                            .mapToInt(t -> t.getCount() != null ? t.getCount() : 0)
+                            .mapToInt(t -> t.getActiveCount() != null ? t.getActiveCount() : 0)
                             .sum();
             metadata.put("total_count_after", totalAfter);
 
@@ -1960,10 +2258,14 @@ public class KujiBoxService {
     }
 
     private int readQuantityFromMetadata(Map<String, Object> metadata, int fallback) {
+        return readQuantityFromMetadata(metadata, "slip_quantity", fallback);
+    }
+
+    private int readQuantityFromMetadata(Map<String, Object> metadata, String key, int fallback) {
         if (metadata == null) {
             return fallback;
         }
-        Object v = metadata.get("slip_quantity");
+        Object v = metadata.get(key);
         if (v == null) {
             return fallback;
         }
@@ -1980,27 +2282,6 @@ public class KujiBoxService {
         Product product = box.getProduct();
         Location location = box.getLocation();
 
-        // Batch the per-tier inventory lookup into a single query.
-        Map<UUID, Integer> linkedInventoryByProductId = new HashMap<>();
-        if (box.getTiers() != null) {
-            Set<UUID> linkedProductIds = new HashSet<>();
-            for (KujiBoxTier t : box.getTiers()) {
-                if (t.getLinkedProduct() != null) {
-                    linkedProductIds.add(t.getLinkedProduct().getId());
-                }
-            }
-            if (!linkedProductIds.isEmpty()) {
-                List<LocationInventory> rows = locationInventoryRepository
-                        .findByLocation_IdAndProduct_IdIn(location.getId(), linkedProductIds);
-                for (LocationInventory li : rows) {
-                    linkedInventoryByProductId.put(li.getProduct().getId(), li.getQuantity());
-                }
-                for (UUID pid : linkedProductIds) {
-                    linkedInventoryByProductId.putIfAbsent(pid, 0);
-                }
-            }
-        }
-
         List<KujiBoxTierResponseDTO> tiers = box.getTiers() == null
                 ? Collections.emptyList()
                 : box.getTiers().stream()
@@ -2015,22 +2296,24 @@ public class KujiBoxService {
                                 t.getLinkedProduct() != null ? t.getLinkedProduct().getName() : null)
                         .linkedProductImageUrl(
                                 t.getLinkedProduct() != null ? t.getLinkedProduct().getImageUrl() : null)
-                        .linkedInventoryAtBoxLocation(
-                                t.getLinkedProduct() != null
-                                        ? linkedInventoryByProductId.get(t.getLinkedProduct().getId())
-                                        : null)
                         .linkedProductPacksPerBox(
                                 t.getLinkedProduct() != null
                                         ? t.getLinkedProduct().getPacksPerBox()
                                         : null)
-                        .count(t.getCount())
+                        .activeCount(t.getActiveCount())
+                        .inactiveCount(t.getInactiveCount() != null ? t.getInactiveCount() : 0)
+                        .totalCount(
+                                (t.getActiveCount() != null ? t.getActiveCount() : 0)
+                                        + (t.getInactiveCount() != null ? t.getInactiveCount() : 0))
                         .price(t.getPrice())
                         .autoCreatedProduct(Boolean.TRUE.equals(t.getAutoCreatedProduct()))
                         .build())
                 .collect(Collectors.toList());
 
+        // Box-level totalCount is the sum of active slips (the winnable pool).
+        // Chance % calculations and the box header tile use this value.
         int totalCount = tiers.stream()
-                .mapToInt(t -> t.getCount() != null ? t.getCount() : 0)
+                .mapToInt(t -> t.getActiveCount() != null ? t.getActiveCount() : 0)
                 .sum();
 
         // Batch openedBy/closedBy resolution into a single query when both are present.
@@ -2107,7 +2390,9 @@ public class KujiBoxService {
                             .tierLetter(t.getLetter())
                             .linkedProductId(t.getLinkedProduct().getId())
                             .linkedProductName(t.getLinkedProduct().getName())
-                            .count(t.getCount())
+                            .count(
+                                    (t.getActiveCount() != null ? t.getActiveCount() : 0)
+                                            + (t.getInactiveCount() != null ? t.getInactiveCount() : 0))
                             .machineDisplayId(mdId)
                             .machineCode(machineCode)
                             .build();
@@ -2140,7 +2425,9 @@ public class KujiBoxService {
                             .tierId(t.getId())
                             .tierLabel(t.getLabel())
                             .tierLetter(t.getLetter())
-                            .count(t.getCount())
+                            .count(
+                                    (t.getActiveCount() != null ? t.getActiveCount() : 0)
+                                            + (t.getInactiveCount() != null ? t.getInactiveCount() : 0))
                             .build();
                 })
                 .collect(Collectors.toList());

@@ -83,20 +83,13 @@ public class StockMovementService {
     }
 
     /**
-     * Validates that a planned post-mutation quantity at (locationId, productId) is at least
-     * the amount allocated to OPEN kuji boxes at that location. Throws KujiAllocationViolationException
-     * with a human-readable message when violated. Safe to call for non-kuji products (returns 0).
+     * No-op: kuji prize counts are no longer stored in LocationInventory. Slip counts
+     * (active/inactive) live on KujiBoxTier and are decoupled from regular inventory
+     * movements, so there's nothing to lock against here. Kept as a stable signature
+     * for callers that still invoke it during adjust/transfer flows.
      */
     public void validateKujiAllocation(UUID locationId, UUID productId, int newQuantity) {
-        if (locationId == null || productId == null) {
-            return;
-        }
-        int locked = kujiBoxTierRepository.sumAllocatedAtLocation(locationId, productId);
-        if (newQuantity < locked) {
-            throw new KujiAllocationViolationException(
-                    "Cannot reduce inventory below the amount allocated to an open kuji box at this location. "
-                            + locked + " unit(s) are locked; the change would leave " + newQuantity + ".");
-        }
+        // intentionally empty
     }
 
     /**

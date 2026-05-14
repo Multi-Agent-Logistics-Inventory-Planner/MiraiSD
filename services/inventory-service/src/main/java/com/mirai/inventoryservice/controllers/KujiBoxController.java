@@ -3,6 +3,8 @@ package com.mirai.inventoryservice.controllers;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddKujiTierRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.kuji.DeletePrizeRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.kuji.MoveSlipsRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.PatchKujiTierRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.RecordDrawRequestDTO;
@@ -146,6 +148,24 @@ public class KujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody AddSlipRequestDTO request) {
         return ResponseEntity.ok(kujiBoxService.addSlip(boxId, tierId, request));
+    }
+
+    @PostMapping("/{boxId}/tiers/{tierId}/move-slips")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
+    public ResponseEntity<KujiBoxResponseDTO> moveSlips(
+            @PathVariable UUID boxId,
+            @PathVariable UUID tierId,
+            @Valid @RequestBody MoveSlipsRequestDTO request) {
+        return ResponseEntity.ok(kujiBoxService.moveSlips(boxId, tierId, request));
+    }
+
+    @PostMapping("/{boxId}/tiers/{tierId}/delete-prize")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
+    public ResponseEntity<KujiBoxResponseDTO> deletePrize(
+            @PathVariable UUID boxId,
+            @PathVariable UUID tierId,
+            @Valid @RequestBody DeletePrizeRequestDTO request) {
+        return ResponseEntity.ok(kujiBoxService.deletePrize(boxId, tierId, request));
     }
 
     // ===================== Draws =====================
