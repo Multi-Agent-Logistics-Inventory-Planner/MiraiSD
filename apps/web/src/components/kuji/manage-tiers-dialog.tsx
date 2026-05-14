@@ -9,7 +9,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  useDeleteKujiPrizeMutation,
+  useMoveKujiSlipsMutation,
+} from "@/hooks/mutations/use-kuji-box-mutations";
 import { KujiBoxStatus, type KujiBox, type KujiBoxTier } from "@/types/api";
 import { TierTable } from "./tier-table";
 import { AddTierDialog } from "./add-tier-dialog";
@@ -32,7 +48,79 @@ export function ManageTiersDialog({
   onTransferIn,
 }: ManageTiersDialogProps) {
   const [addTierOpen, setAddTierOpen] = useState(false);
+  const [tierPendingDelete, setTierPendingDelete] = useState<KujiBoxTier | null>(null);
   const showAddTier = canEditStructural && box.status === KujiBoxStatus.OPEN;
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const moveMutation = useMoveKujiSlipsMutation();
+  const deleteMutation = useDeleteKujiPrizeMutation();
+
+  function handleMoveSlip(
+    tier: KujiBoxTier,
+    direction: "ACTIVATE" | "DEACTIVATE",
+  ) {
+    const actorId = user?.personId ?? user?.id;
+    if (!actorId) return;
+    moveMutation.mutate(
+      {
+        boxId: box.id,
+        tierId: tier.id,
+        productId: box.productId,
+        payload: { actorId, quantity: 1, direction },
+      },
+      {
+        onError: (err) => {
+          toast({
+            title: "Failed to move slip",
+            description: err instanceof Error ? err.message : String(err),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  }
+
+  function handleDeletePrize(tier: KujiBoxTier) {
+    setTierPendingDelete(tier);
+  }
+
+  function confirmDelete() {
+    const actorId = user?.personId ?? user?.id;
+    const tier = tierPendingDelete;
+    if (!actorId || !tier) {
+      setTierPendingDelete(null);
+      return;
+    }
+    deleteMutation.mutate(
+      {
+        boxId: box.id,
+        tierId: tier.id,
+        productId: box.productId,
+        payload: { actorId },
+      },
+      {
+        onSuccess: () => {
+          setTierPendingDelete(null);
+          toast({
+            title: "Prize deleted",
+            description: `Tier "${tier.label}" was removed from this box.`,
+            variant: "success",
+          });
+        },
+        onError: (err) => {
+          toast({
+            title: "Failed to delete prize",
+            description: err instanceof Error ? err.message : String(err),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  }
+
+  const pendingTotal = tierPendingDelete
+    ? tierPendingDelete.activeCount + tierPendingDelete.inactiveCount
+    : 0;
 
   return (
     <>
@@ -64,6 +152,8 @@ export function ManageTiersDialog({
               canEditStructural={canEditStructural}
               onEditTier={onEditTier}
               onTransferIn={onTransferIn}
+              onMoveSlip={handleMoveSlip}
+              onDeletePrize={handleDeletePrize}
             />
           </div>
         </DialogContent>
@@ -76,6 +166,64 @@ export function ManageTiersDialog({
           box={box}
         />
       ) : null}
+
+      <AlertDialog
+        open={tierPendingDelete !== null}
+        onOpenChange={(o) => {
+          if (!o && !deleteMutation.isPending) setTierPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete prize</AlertDialogTitle>
+            <AlertDialogDescription>
+              {tierPendingDelete ? (
+                <>
+                  Delete the entire{" "}
+                  <span className="font-semibold">
+                    &quot;{tierPendingDelete.label}&quot;
+                  </span>{" "}
+                  prize from this box?
+                  {pendingTotal > 0 ? (
+                    <>
+                      {" "}
+                      This will remove {tierPendingDelete.activeCount} active and{" "}
+                      {tierPendingDelete.inactiveCount} inactive slip
+                      {pendingTotal === 1 ? "" : "s"} ({pendingTotal} total) and delete
+                      the tier row.
+                    </>
+                  ) : (
+                    <> The tier has no slips; this removes the empty row.</>
+                  )}
+                  {tierPendingDelete.linkedProductId ? (
+                    <>
+                      {" "}
+                      Linked-product inventory is <strong>not</strong> returned to
+                      regular stock — use Edit Tier &rarr; Clear linked product first
+                      if you need that.
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete prize"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

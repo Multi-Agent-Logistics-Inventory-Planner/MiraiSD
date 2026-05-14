@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpFromLine, CheckCircle2, Loader2, PackagePlus, Plus, Undo2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  PauseCircle,
+  Pencil,
+  PlayCircle,
+  Plus,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import { StockMovementReason, type AuditLog } from "@/types/api";
 
 interface ActivityLogCardProps {
@@ -17,25 +26,85 @@ function formatTime(iso: string): string {
   });
 }
 
-type SlipAction = "add_slip" | "stash" | "promote" | "unknown";
+type SlipAction =
+  | "add_slip"
+  | "add_inactive"
+  | "stash"
+  | "promote"
+  | "activate"
+  | "deactivate"
+  | "delete_active"
+  | "delete_inactive"
+  | "tier_deleted"
+  | "tier_edited"
+  | "unknown";
 
 function classifySlipAdjustment(notes?: string): SlipAction {
   if (!notes) return "unknown";
+  if (notes.startsWith("Kuji prize tier deleted")) return "tier_deleted";
+  if (notes.startsWith("Kuji tier edited")) return "tier_edited";
   if (notes.startsWith("Kuji prize stashed")) return "stash";
   if (notes.startsWith("Kuji slip promoted")) return "promote";
+  if (notes.startsWith("Kuji slips activated")) return "activate";
+  if (notes.startsWith("Kuji slips deactivated")) return "deactivate";
+  if (notes.startsWith("Kuji prize deleted from active")) return "delete_active";
+  if (notes.startsWith("Kuji prize deleted from inactive")) return "delete_inactive";
+  if (notes.startsWith("Kuji slip added (inactive)")) return "add_inactive";
   if (notes.startsWith("Kuji slip added")) return "add_slip";
   return "unknown";
 }
 
+/** Pulls the tier label (and rest of the message) out of a kuji-adjustment note. */
+function extractAdjustmentDetail(action: SlipAction, notes?: string): string | null {
+  if (!notes) return null;
+  if (action === "tier_edited") {
+    // "Kuji tier edited: <label> — <change1>, <change2>"
+    const dash = notes.indexOf(" — ");
+    const colon = notes.indexOf(": ");
+    if (dash === -1) return null;
+    const label = colon === -1 ? "" : notes.slice(colon + 2, dash);
+    const changes = notes.slice(dash + 3).split(", ");
+    return [label, ...changes].filter(Boolean).join("\n");
+  }
+  if (action === "tier_deleted") {
+    // "Kuji prize tier deleted: <label> (active N, inactive M)"
+    const colon = notes.indexOf(": ");
+    if (colon === -1) return null;
+    const rest = notes.slice(colon + 2);
+    const parenOpen = rest.indexOf(" (");
+    if (parenOpen === -1) return rest;
+    const label = rest.slice(0, parenOpen);
+    const counts = rest.slice(parenOpen + 2, -1); // "active N, inactive M"
+    return [label, counts].join("\n");
+  }
+  const colon = notes.indexOf(": ");
+  return colon === -1 ? null : notes.slice(colon + 2);
+}
+
 function formatSlipAdjustment(action: SlipAction, qty: number): string {
   const slipWord = qty === 1 ? "slip" : "slips";
+  const prizeWord = qty === 1 ? "prize" : "prizes";
   switch (action) {
     case "stash":
-      return `${qty} ${qty === 1 ? "prize" : "prizes"} stashed`;
+      return `${qty} ${prizeWord} stashed`;
     case "promote":
       return `${qty} ${slipWord} promoted from stash`;
     case "add_slip":
       return `${qty} ${slipWord} added`;
+    case "add_inactive":
+      return `${qty} ${slipWord} added to inactive`;
+    case "activate":
+      return `${qty} ${slipWord} activated`;
+    case "deactivate":
+      return `${qty} ${slipWord} deactivated`;
+    case "delete_active":
+      return `${qty} ${prizeWord} deleted from active`;
+    case "delete_inactive":
+      return `${qty} ${prizeWord} deleted from inactive`;
+    case "tier_edited":
+      return `Tier edited`;
+    case "tier_deleted":
+      return `Tier deleted`;
     default:
       return `${qty} ${slipWord} adjusted`;
   }
@@ -77,6 +146,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
           No draws recorded yet.
         </div>
       ) : (
+        <div className="max-h-80 overflow-y-auto pr-1">
         <ul className="divide-y">
           {logs.map((log) => {
             const qty = log.totalQuantityMoved ?? 0;
@@ -89,15 +159,27 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
               icon = (
                 <Undo2 className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
               );
-            } else if (slipAction === "stash") {
+            } else if (slipAction === "stash" || slipAction === "deactivate") {
               icon = (
-                <PackagePlus className="mt-1 h-3 w-3 shrink-0 text-amber-600" aria-hidden />
+                <PauseCircle className="mt-1 h-3 w-3 shrink-0 text-amber-600" aria-hidden />
               );
-            } else if (slipAction === "promote") {
+            } else if (slipAction === "promote" || slipAction === "activate") {
               icon = (
-                <ArrowUpFromLine className="mt-1 h-3 w-3 shrink-0 text-blue-600" aria-hidden />
+                <PlayCircle className="mt-1 h-3 w-3 shrink-0 text-blue-600" aria-hidden />
               );
-            } else if (slipAction === "add_slip") {
+            } else if (slipAction === "tier_edited") {
+              icon = (
+                <Pencil className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+              );
+            } else if (
+              slipAction === "delete_active"
+              || slipAction === "delete_inactive"
+              || slipAction === "tier_deleted"
+            ) {
+              icon = (
+                <Trash2 className="mt-1 h-3 w-3 shrink-0 text-rose-600" aria-hidden />
+              );
+            } else if (slipAction === "add_slip" || slipAction === "add_inactive") {
               icon = (
                 <Plus className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
               );
@@ -114,10 +196,10 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
               ? formatSlipAdjustment(slipAction, qty)
               : `${qty} ${qty === 1 ? "slip" : "slips"} ${isUndo ? "returned" : "drawn"}`;
 
-            // For adjustments the tier label lives in `notes` ("Kuji slip added: <label>");
-            // for draws/undos `productSummary` carries the tier list.
+            // For adjustments, surface the tier label and (for edits) the change-list.
+            // For draws/undos `productSummary` carries the tier list.
             const detail = isAdjustment
-              ? log.notes?.split(": ").slice(1).join(": ") || null
+              ? extractAdjustmentDetail(slipAction, log.notes)
               : log.productSummary || null;
 
             const isExpanded = expanded.has(log.id);
@@ -164,6 +246,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
             );
           })}
         </ul>
+        </div>
       )}
     </div>
   );

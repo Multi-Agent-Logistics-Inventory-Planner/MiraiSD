@@ -25,23 +25,8 @@ public interface KujiBoxTierRepository extends JpaRepository<KujiBoxTier, UUID> 
     int deleteByBoxProductId(@Param("productId") UUID productId);
 
     /**
-     * Sum of tier counts for OPEN kuji boxes at the given location whose tier links the given product.
-     * Returns 0 when no allocations exist. Drives the kuji lock invariant on
-     * adjust/transfer of LocationInventory.
-     */
-    @Query("""
-            SELECT COALESCE(SUM(t.count), 0)
-            FROM KujiBoxTier t
-            WHERE t.box.status = com.mirai.inventoryservice.models.enums.KujiBoxStatus.OPEN
-              AND t.box.location.id = :locationId
-              AND t.linkedProduct.id = :productId
-            """)
-    int sumAllocatedAtLocation(@Param("locationId") UUID locationId,
-                               @Param("productId") UUID productId);
-
-    /**
      * Tiers from OPEN boxes at a given location, with linked product set.
-     * Caller projects to DTOs.
+     * Includes tiers with any active or inactive slips. Caller projects to DTOs.
      */
     @Query("""
             SELECT t FROM KujiBoxTier t
@@ -51,7 +36,7 @@ public interface KujiBoxTierRepository extends JpaRepository<KujiBoxTier, UUID> 
             WHERE b.status = com.mirai.inventoryservice.models.enums.KujiBoxStatus.OPEN
               AND b.location.id = :locationId
               AND t.linkedProduct IS NOT NULL
-              AND t.count > 0
+              AND (t.activeCount + t.inactiveCount) > 0
             """)
     List<KujiBoxTier> findOpenAllocationsByLocation(@Param("locationId") UUID locationId);
 
@@ -65,7 +50,7 @@ public interface KujiBoxTierRepository extends JpaRepository<KujiBoxTier, UUID> 
             LEFT JOIN FETCH b.machineDisplay md
             WHERE b.status = com.mirai.inventoryservice.models.enums.KujiBoxStatus.OPEN
               AND t.linkedProduct.id = :productId
-              AND t.count > 0
+              AND (t.activeCount + t.inactiveCount) > 0
             """)
     List<KujiBoxTier> findOpenAllocationsByProduct(@Param("productId") UUID productId);
 }

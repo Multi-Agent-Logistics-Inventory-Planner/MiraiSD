@@ -41,7 +41,7 @@ export function SelectTierDialog({
   const sortedTiers = useMemo(() => {
     const excluded = new Set(excludeTierIds);
     return [...tiers]
-      .filter((t) => t.count > 0 && !excluded.has(t.id))
+      .filter((t) => t.activeCount > 0 && !excluded.has(t.id))
       .sort(compareTiers);
   }, [tiers, excludeTierIds]);
 
@@ -106,7 +106,7 @@ export function SelectTierDialog({
                     >
                       <TierName tier={tier} className="min-w-0 flex-1 truncate text-sm" />
                       <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {tier.count} left
+                        {tier.activeCount} left
                       </span>
                     </button>
                   </li>

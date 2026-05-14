@@ -110,7 +110,7 @@ export function BoxOfSlipsCard({ tiers, totalCount }: BoxOfSlipsCardProps) {
     () =>
       [...tiers]
         .sort(compareTiers)
-        .filter((t) => t.count > 0),
+        .filter((t) => t.activeCount > 0),
     [tiers],
   );
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
@@ -138,7 +138,7 @@ export function BoxOfSlipsCard({ tiers, totalCount }: BoxOfSlipsCardProps) {
                 <TierThumb tier={tier} rank={idx} onExpand={setLightbox} />
                 <TierName tier={tier} />
                 <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-                  {tier.count} · {formatChance(tier.count, totalCount)}
+                  {tier.activeCount} · {formatChance(tier.activeCount, totalCount)}
                 </span>
               </li>
             ))}

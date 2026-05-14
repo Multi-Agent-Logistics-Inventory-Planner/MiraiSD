@@ -931,10 +931,14 @@ export interface KujiBoxTier {
   linkedProductId?: string | null;
   linkedProductName?: string | null;
   linkedProductImageUrl?: string | null;
-  linkedInventoryAtBoxLocation?: number | null;
   /** Packs-per-box of the linked product (for box/pack toggle on transfer-in). NULL when n/a. */
   linkedProductPacksPerBox?: number | null;
-  count: number;
+  /** Slips currently winnable (in a slip in the box). */
+  activeCount: number;
+  /** Slips held back from the pool (kuji-internal). */
+  inactiveCount: number;
+  /** Convenience: activeCount + inactiveCount. */
+  totalCount: number;
   price?: number | null;
   /** True when the linked product was created inline at open-box for this tier. */
   autoCreatedProduct?: boolean | null;
@@ -996,8 +1000,8 @@ export interface AddKujiTierRequest {
   letter?: string | null;
   linkedProductId?: string | null;
   sourceLocationId?: string | null;
-  count: number;
-  heldBackQuantity?: number | null;
+  activeCount: number;
+  inactiveCount?: number | null;
   price?: number | null;
   autoCreate?: boolean | null;
   productName?: string | null;
@@ -1012,13 +1016,10 @@ export interface NewKujiBoxTier {
   linkedProductId?: string | null;
   /** Required when linkedProductId is set. */
   sourceLocationId?: string | null;
-  /** Number of slips placed in the box. */
-  count: number;
-  /**
-   * Additional units to materialize at the box location that do NOT enter slips.
-   * Total = count + heldBackQuantity. Defaults to 0.
-   */
-  heldBackQuantity?: number | null;
+  /** Initial active (winnable, in-slip) count. */
+  activeCount: number;
+  /** Initial inactive (held back) count. Defaults to 0. */
+  inactiveCount?: number | null;
   price?: number | null;
   /** When true, server creates a fresh child product under the kuji parent. */
   autoCreate?: boolean | null;
@@ -1062,6 +1063,22 @@ export interface RecordDrawRequest {
 export interface AddSlipRequest {
   actorId: string;
   quantity: number;
+  /** When true, added slips go into the inactive bucket. Defaults to false. */
+  inactive?: boolean;
+}
+
+export type MoveSlipsDirection = "ACTIVATE" | "DEACTIVATE";
+
+export interface MoveSlipsRequest {
+  actorId: string;
+  quantity: number;
+  direction: MoveSlipsDirection;
+}
+
+export interface DeletePrizeRequest {
+  actorId: string;
+  /** When true (default), decrement activeCount. When false, decrement inactiveCount. */
+  fromActive?: boolean;
 }
 
 export interface TransferInMoreRequest {
@@ -1083,7 +1100,14 @@ export interface PatchKujiTierRequest {
   linkedProductId?: string | null;
   clearLinkedProduct?: boolean | null;
   linkedProductDestinationLocationId?: string | null;
-  count?: number | null;
+  activeCount?: number | null;
+  inactiveCount?: number | null;
+  /** Source location when bringing in counts of a newly-linked product in the same patch. */
+  newProductSourceLocationId?: string | null;
+  /** Units of the new linked product to add to active in the same patch. */
+  newProductActiveCount?: number | null;
+  /** Units of the new linked product to add to inactive in the same patch. */
+  newProductInactiveCount?: number | null;
   price?: number | null;
   clearPrice?: boolean | null;
 }

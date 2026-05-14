@@ -148,7 +148,7 @@ class KujiBoxServiceTest {
                 .box(box)
                 .label("Tier A")
                 .linkedProduct(linkedProduct)
-                .count(INITIAL_SLIP_COUNT)
+                .activeCount(INITIAL_SLIP_COUNT)
                 .build();
 
         when(kujiBoxRepository.findByIdWithTiers(boxId)).thenReturn(Optional.of(box));
@@ -192,26 +192,29 @@ class KujiBoxServiceTest {
     }
 
     @Test
-    void transferInInventoryOnly_incrementsBoxInventoryAndLeavesSlipsAlone() {
+    void transferInInventoryOnly_addsToInactiveBucketAndDecrementsSource() {
         service.transferInInventoryOnly(boxId, tierId, request());
 
-        // Slip count is unchanged.
-        assertEquals(INITIAL_SLIP_COUNT, tier.getCount(),
-                "Slip count must not be modified by transferInInventoryOnly");
-        // The tier itself is never saved (the method does not touch tier.count).
-        verify(kujiBoxTierRepository, never()).save(any(KujiBoxTier.class));
+        // Active count unchanged; inactive bumped (transfer-in-inventory-only is the
+        // "bring held stock into the kuji without binding it to slips" path).
+        assertEquals(INITIAL_SLIP_COUNT, tier.getActiveCount(),
+                "Active count must not change");
+        assertEquals(TRANSFER_QUANTITY,
+                tier.getInactiveCount() == null ? 0 : tier.getInactiveCount(),
+                "Inactive count must be incremented by TRANSFER_QUANTITY");
+        verify(kujiBoxTierRepository, atLeastOnce()).save(any(KujiBoxTier.class));
 
-        // A stock-movement pair was written and tagged with the new action.
+        // A single REMOVED stock-movement on the source side (no deposit at the machine).
         ArgumentCaptor<StockMovement> movementCaptor = ArgumentCaptor.forClass(StockMovement.class);
-        verify(stockMovementRepository, times(2)).save(movementCaptor.capture());
-        for (StockMovement mv : movementCaptor.getAllValues()) {
-            Map<String, Object> meta = mv.getMetadata();
-            assertNotNull(meta);
-            assertEquals("transfer_in_inventory_only", meta.get("action"));
-            assertEquals(boxId.toString(), meta.get("kuji_box_id"));
-        }
-        // Inventory rows were updated.
-        verify(locationInventoryRepository, times(2)).save(any(LocationInventory.class));
+        verify(stockMovementRepository, times(1)).save(movementCaptor.capture());
+        StockMovement mv = movementCaptor.getValue();
+        Map<String, Object> meta = mv.getMetadata();
+        assertNotNull(meta);
+        assertEquals("transfer_in_inventory_only", meta.get("action"));
+        assertEquals(boxId.toString(), meta.get("kuji_box_id"));
+
+        // Only the source LocationInventory row is touched.
+        verify(locationInventoryRepository, times(1)).save(any(LocationInventory.class));
     }
 
     @Test
@@ -252,7 +255,7 @@ class KujiBoxServiceTest {
                 () -> service.transferInInventoryOnly(boxId, tierId, req));
         // No movements written when the transfer is rejected.
         verify(stockMovementRepository, never()).save(any());
-        assertEquals(INITIAL_SLIP_COUNT, tier.getCount());
+        assertEquals(INITIAL_SLIP_COUNT, tier.getActiveCount());
     }
 
     // ===================== Perf-optimization regression guards =====================
@@ -273,7 +276,7 @@ class KujiBoxServiceTest {
         service.addSlip(boxId, tierId, req);
 
         // Tier slip count incremented.
-        assertEquals(INITIAL_SLIP_COUNT + 2, tier.getCount());
+        assertEquals(INITIAL_SLIP_COUNT + 2, tier.getActiveCount());
 
         // One AuditLog with KUJI_SLIP_ADJUSTMENT reason — and nothing else.
         ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
@@ -293,33 +296,27 @@ class KujiBoxServiceTest {
     }
 
     @Test
-    void transferInMore_autoCreate_setsProductQuantityDirectlyAndSkipsSyncProductTotals() {
-        // sourceLocationId == null routes through mintAutoCreatedAtBox. The auto-create
-        // child only lives at the box, so Product.quantity is updated directly and
-        // syncProductTotals is intentionally skipped.
+    void transferInMore_autoCreate_bumpsActiveCountWithoutTouchingProductOrInventory() {
+        // sourceLocationId == null = the auto-create mint path. In the decoupled model,
+        // auto-created prizes never live in location_inventory and Product.quantity is
+        // not used as a counter; the tier's activeCount is the source of truth.
         tier.setAutoCreatedProduct(true);
         linkedProduct.setQuantity(BOX_INVENTORY);
         linkedProduct.setIsActive(true);
 
         TransferInMoreRequestDTO req = new TransferInMoreRequestDTO();
         req.setActorId(actorId);
-        req.setSourceLocationId(null); // triggers auto-create mint path
+        req.setSourceLocationId(null); // triggers auto-create branch (no source removal)
         req.setQuantity(TRANSFER_QUANTITY);
-
-        when(locationInventoryRepository.findByLocation_IdAndProduct_IdIn(
-                any(UUID.class), any(Collection.class)))
-                .thenReturn(Collections.emptyList());
-        when(productRepository.save(any(Product.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
 
         service.transferInMore(boxId, tierId, req);
 
-        // Product.quantity bumped to prev + transferred.
-        assertEquals(BOX_INVENTORY + TRANSFER_QUANTITY, linkedProduct.getQuantity());
-        // syncProductTotals NOT called — the denormalized total was already exact.
+        // Product.quantity stays put — the kuji counter is the truth.
+        assertEquals(BOX_INVENTORY, linkedProduct.getQuantity());
+        // syncProductTotals NOT called — nothing in location_inventory changed.
         verify(stockMovementService, never()).syncProductTotals(any());
-        // Tier slip count was bumped (transferInMore semantics).
-        assertEquals(INITIAL_SLIP_COUNT + TRANSFER_QUANTITY, tier.getCount());
+        // Tier active slip count was bumped.
+        assertEquals(INITIAL_SLIP_COUNT + TRANSFER_QUANTITY, tier.getActiveCount());
     }
 
     @Test
@@ -340,22 +337,19 @@ class KujiBoxServiceTest {
                 .box(box)
                 .label("Tier B")
                 .linkedProduct(otherProduct)
-                .count(2)
+                .activeCount(2)
                 .build();
         box.setTiers(new java.util.ArrayList<>(List.of(tier, secondTier)));
 
-        when(locationInventoryRepository.findByLocation_IdAndProduct_IdIn(
-                any(UUID.class), any(Collection.class)))
-                .thenReturn(Collections.emptyList());
-
         // Reset to ignore findByLocation_IdAndProduct_Id stubs from setUp; we want to
-        // assert the per-tier lookup is no longer invoked during DTO mapping.
+        // assert that DTO mapping does NOT hit LocationInventory anymore — kuji prize
+        // counts live on the tier, not on location_inventory.
         clearInvocations(locationInventoryRepository);
 
         service.addSlip(boxId, tierId, req);
 
-        verify(locationInventoryRepository, times(1))
-                .findByLocation_IdAndProduct_IdIn(eq(boxLocationId), any(Collection.class));
+        verify(locationInventoryRepository, never())
+                .findByLocation_IdAndProduct_IdIn(any(UUID.class), any(Collection.class));
         verify(locationInventoryRepository, never())
                 .findByLocation_IdAndProduct_Id(any(UUID.class), any(UUID.class));
     }

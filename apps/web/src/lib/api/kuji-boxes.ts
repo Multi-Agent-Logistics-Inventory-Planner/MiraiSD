@@ -4,10 +4,12 @@ import {
   AddKujiTierRequest,
   AddSlipRequest,
   CloseKujiBoxRequest,
+  DeletePrizeRequest,
   KujiAllocationByLocation,
   KujiAllocationByProduct,
   KujiBox,
   KujiBoxTier,
+  MoveSlipsRequest,
   OpenKujiBoxRequest,
   PatchKujiTierRequest,
   RecordDrawRequest,
@@ -243,6 +245,37 @@ export async function addKujiSlip(
 ): Promise<KujiBox> {
   return apiPost<KujiBox, AddSlipRequest>(
     `${BASE_PATH}/${boxId}/tiers/${tierId}/add-slip`,
+    req
+  );
+}
+
+/**
+ * Move slips between the active and inactive buckets within a single tier.
+ * Counter-only — no inventory side-effect.
+ */
+export async function moveKujiSlips(
+  boxId: string,
+  tierId: string,
+  req: MoveSlipsRequest
+): Promise<KujiBox> {
+  return apiPost<KujiBox, MoveSlipsRequest>(
+    `${BASE_PATH}/${boxId}/tiers/${tierId}/move-slips`,
+    req
+  );
+}
+
+/**
+ * Delete one prize from a tier (active by default, or inactive if fromActive=false).
+ * When the tier's total reaches 0 it's removed from the box.
+ * Counter-only — no inventory side-effect.
+ */
+export async function deleteKujiPrize(
+  boxId: string,
+  tierId: string,
+  req: DeletePrizeRequest
+): Promise<KujiBox> {
+  return apiPost<KujiBox, DeletePrizeRequest>(
+    `${BASE_PATH}/${boxId}/tiers/${tierId}/delete-prize`,
     req
   );
 }

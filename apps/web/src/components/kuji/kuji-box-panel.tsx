@@ -95,9 +95,8 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     let total = 0;
     let notInBox = 0;
     for (const tier of box.tiers) {
-      const inv = tier.linkedInventoryAtBoxLocation ?? 0;
-      total += Math.max(tier.count, inv);
-      notInBox += Math.max(0, inv - tier.count);
+      total += tier.activeCount + tier.inactiveCount;
+      notInBox += tier.inactiveCount;
     }
     return { total, slips: box.totalCount, notInBox };
   }, [box]);

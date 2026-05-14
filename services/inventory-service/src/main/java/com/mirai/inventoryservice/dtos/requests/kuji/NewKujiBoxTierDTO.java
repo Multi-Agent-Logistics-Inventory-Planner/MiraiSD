@@ -33,17 +33,18 @@ public class NewKujiBoxTierDTO {
     /** Source location to transfer linked product from. Required when linkedProductId is set. */
     private UUID sourceLocationId;
 
+    /** Initial active (winnable, in-slip) count for this tier. */
     @NotNull
-    @Min(value = 0, message = "count must be 0 or greater")
-    private Integer count;
+    @Min(value = 0, message = "activeCount must be 0 or greater")
+    private Integer activeCount;
 
     /**
-     * Additional units placed at the box location that do NOT enter slips. Total
-     * units transferred from source (or born at box for auto-created) = count + heldBackQuantity.
-     * Defaults to 0 when null.
+     * Initial inactive (held back, not on a slip) count for this tier. Total units
+     * decremented from source (or created for auto-created) at open-box equals
+     * activeCount + inactiveCount. Defaults to 0 when null.
      */
-    @Min(value = 0, message = "heldBackQuantity must be 0 or greater")
-    private Integer heldBackQuantity;
+    @Min(value = 0, message = "inactiveCount must be 0 or greater")
+    private Integer inactiveCount;
 
     private BigDecimal price;
 

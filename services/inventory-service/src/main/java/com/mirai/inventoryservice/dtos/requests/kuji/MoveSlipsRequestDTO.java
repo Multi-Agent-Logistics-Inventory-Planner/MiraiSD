@@ -13,7 +13,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AddSlipRequestDTO {
+public class MoveSlipsRequestDTO {
     @NotNull
     private UUID actorId;
 
@@ -21,6 +21,13 @@ public class AddSlipRequestDTO {
     @Min(value = 1, message = "quantity must be at least 1")
     private Integer quantity;
 
-    /** When true, the added slips land in the inactive bucket. Defaults to false. */
-    private Boolean inactive;
+    @NotNull
+    private Direction direction;
+
+    public enum Direction {
+        /** Move from inactive bucket to active bucket. */
+        ACTIVATE,
+        /** Move from active bucket to inactive bucket. */
+        DEACTIVATE
+    }
 }
