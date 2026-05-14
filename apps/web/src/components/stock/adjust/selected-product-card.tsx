@@ -88,7 +88,7 @@ export function SelectedProductCard({
                 src={safeImageUrl}
                 alt={item.name}
                 fill
-                sizes="56px"
+                sizes="48px"
                 className="object-cover"
                 onError={() => setImageError(true)}
               />
