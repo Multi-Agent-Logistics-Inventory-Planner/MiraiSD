@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 type ThumbnailSize = "sm" | "md" | "lg";
 
 const SIZE_CONFIG: Record<ThumbnailSize, { container: string; icon: string; sizes: string }> = {
-  sm: { container: "h-8 w-8", icon: "h-4 w-4", sizes: "32px" },
-  md: { container: "h-10 w-10", icon: "h-5 w-5", sizes: "40px" },
+  sm: { container: "h-8 w-8", icon: "h-4 w-4", sizes: "48px" },
+  md: { container: "h-10 w-10", icon: "h-5 w-5", sizes: "48px" },
   lg: { container: "h-12 w-12", icon: "h-6 w-6", sizes: "48px" },
 };
 
@@ -82,7 +82,6 @@ export const ProductThumbnail = memo(function ProductThumbnail({
             fill
             className="object-cover"
             sizes={config.sizes}
-            quality={75}
             onError={() => setHasError(true)}
           />
         )}

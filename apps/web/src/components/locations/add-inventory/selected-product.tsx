@@ -69,7 +69,7 @@ export function SelectedProduct({
               src={safeImageUrl}
               alt={product.name}
               fill
-              sizes="56px"
+              sizes="48px"
               className="object-cover"
               onError={() => setImageError(true)}
             />

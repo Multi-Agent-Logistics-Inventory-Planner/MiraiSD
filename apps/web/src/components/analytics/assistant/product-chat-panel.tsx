@@ -68,7 +68,7 @@ export function ProductChatPanel({ productId }: ProductChatPanelProps) {
             alt={data.product.name}
             width={36}
             height={36}
-            sizes="36px"
+            sizes="48px"
             className="h-9 w-9 rounded object-cover"
           />
         ) : (

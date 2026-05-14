@@ -50,7 +50,7 @@ function TierThumb({ tier, rank, onExpand }: TierThumbProps) {
           src={safeUrl}
           alt={alt}
           fill
-          sizes="40px"
+          sizes="48px"
           className="object-cover transition-opacity group-hover:opacity-90"
           onError={() => setErrored(true)}
         />

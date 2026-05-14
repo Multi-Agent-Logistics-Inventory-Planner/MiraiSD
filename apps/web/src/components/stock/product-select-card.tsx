@@ -54,7 +54,7 @@ export function ProductSelectCard({
             src={safeImageUrl}
             alt={item.name}
             fill
-            sizes="(max-width: 640px) 48px, 64px"
+            sizes="48px"
             className="object-cover"
             onError={() => setImageError(true)}
           />
