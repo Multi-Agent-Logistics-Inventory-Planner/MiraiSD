@@ -311,7 +311,3 @@ export function SelectShipmentProductDialog({
     </Dialog>
   );
 }
-nt>
-    </Dialog>
-  );
-}

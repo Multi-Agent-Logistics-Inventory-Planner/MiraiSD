@@ -995,9 +995,3 @@ export function LocationDetailSheet({
     </>
   );
 }
-.isPending}
-        onSubmit={handleRenewDisplays}
-      />
-    </>
-  );
-}

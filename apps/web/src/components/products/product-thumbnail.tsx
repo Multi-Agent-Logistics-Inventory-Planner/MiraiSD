@@ -102,7 +102,3 @@ export const ProductThumbnail = memo(function ProductThumbnail({
     </div>
   );
 });
-  )}
-    </div>
-  );
-});
