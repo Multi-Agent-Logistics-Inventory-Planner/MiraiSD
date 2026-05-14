@@ -39,7 +39,7 @@ function InventoryItemImage({ src, alt }: { src: string | undefined; alt: string
         src={safeUrl}
         alt={alt}
         fill
-        sizes="24px"
+        sizes="48px"
         className="object-cover"
         onError={() => setError(true)}
       />

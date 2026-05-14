@@ -473,7 +473,7 @@ export function LocationDetailSheet({
                         src={inv.item.imageUrl}
                         alt={inv.item.name}
                         fill
-                        sizes="(max-width: 640px) 48px, 80px"
+                        sizes="48px"
                         className="object-cover"
                       />
                     ) : (
@@ -572,7 +572,7 @@ export function LocationDetailSheet({
                           src={product.imageUrl}
                           alt={item.productName}
                           fill
-                          sizes="(max-width: 640px) 48px, 80px"
+                          sizes="48px"
                           className="object-cover"
                         />
                       ) : (
@@ -704,7 +704,7 @@ export function LocationDetailSheet({
                           src={product.imageUrl}
                           alt={item.productName}
                           fill
-                          sizes="(max-width: 640px) 48px, 80px"
+                          sizes="48px"
                           className="object-cover"
                         />
                       ) : (

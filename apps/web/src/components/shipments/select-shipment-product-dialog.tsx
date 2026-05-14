@@ -63,7 +63,7 @@ const ShipmentProductCard = memo(function ShipmentProductCard({
             src={safeImageUrl}
             alt={product.name}
             fill
-            sizes="(max-width: 640px) 48px, 64px"
+            sizes="48px"
             className="object-cover"
             onError={() => setImageError(true)}
           />

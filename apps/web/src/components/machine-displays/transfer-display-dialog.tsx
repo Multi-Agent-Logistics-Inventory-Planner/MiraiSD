@@ -103,7 +103,7 @@ function DisplayItem({ display, selected, onToggle, disabled, direction, imageUr
             src={safeImageUrl}
             alt={display.productName}
             fill
-            sizes="40px"
+            sizes="48px"
             className="object-cover"
             onError={() => setImageError(true)}
           />
@@ -166,7 +166,7 @@ function ProductItem({ product, selected, onToggle, disabled }: ProductItemProps
             src={safeImageUrl}
             alt={product.name}
             fill
-            sizes="40px"
+            sizes="48px"
             className="object-cover"
             onError={() => setImageError(true)}
           />

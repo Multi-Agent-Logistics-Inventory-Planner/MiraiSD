@@ -26,7 +26,7 @@ function DestinationItem({ inventory }: { inventory: LocationInventory }) {
             src={item.imageUrl!}
             alt={item.name}
             fill
-            sizes="32px"
+            sizes="48px"
             className="object-cover"
             onError={() => setImageError(true)}
           />

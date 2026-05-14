@@ -41,8 +41,7 @@ export function ProductImageLightbox({
               src={safeImageUrl}
               alt={alt}
               fill
-              sizes="(max-width: 640px) 100vw, 1080px"
-              quality={75}
+              unoptimized
               priority
               className="object-contain"
               onError={() => setHasError(true)}
