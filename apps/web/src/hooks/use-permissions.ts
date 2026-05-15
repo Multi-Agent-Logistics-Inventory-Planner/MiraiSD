@@ -25,6 +25,8 @@ export interface UsePermissionsResult {
   isAdmin: boolean;
   /** Whether user can view cost fields (admin-only) */
   canViewCosts: boolean;
+  /** Whether user can view MSRP (admin and assistant manager) */
+  canViewMsrp: boolean;
   /** Whether user can manage users (admin-only) */
   canManageUsers: boolean;
   /** Current user role */
@@ -53,6 +55,8 @@ export function usePermissions(): UsePermissionsResult {
       },
       isAdmin: role === UserRole.ADMIN,
       canViewCosts: role === UserRole.ADMIN,
+      canViewMsrp:
+        role === UserRole.ADMIN || role === UserRole.ASSISTANT_MANAGER,
       canManageUsers: role === UserRole.ADMIN,
       role,
     }),

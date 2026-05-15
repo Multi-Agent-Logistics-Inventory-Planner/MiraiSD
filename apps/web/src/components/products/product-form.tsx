@@ -113,7 +113,7 @@ export function ProductForm({
 }: ProductFormProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { canViewCosts, can } = usePermissions();
+  const { canViewCosts, canViewMsrp, can } = usePermissions();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
   const deleteMutation = useDeleteProductMutation();
@@ -339,7 +339,7 @@ export function ProductForm({
       targetStockLevel: values.targetStockLevel,
       leadTimeDays: values.leadTimeDays,
       unitCost: canViewCosts ? values.unitCost : undefined,
-      msrp: canViewCosts ? values.msrp : undefined,
+      msrp: canViewMsrp ? values.msrp : undefined,
       imageUrl,
       notes: values.notes || undefined,
       isActive: values.isActive,
@@ -731,7 +731,7 @@ export function ProductForm({
               )}
 
               {!isEditingCustomKuji && watchedKujiType !== KujiType.CUSTOM && (
-                <div className={canViewCosts ? "grid grid-cols-2 gap-4" : ""}>
+                <div className={canViewMsrp ? "grid grid-cols-2 gap-4" : ""}>
                   <div className="grid gap-2">
                     <Label htmlFor="sku">
                       SKU{" "}
@@ -751,23 +751,25 @@ export function ProductForm({
                     ) : null}
                   </div>
 
-                  {canViewCosts && (
+                  {canViewMsrp && (
                     <div className="space-y-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="unitCost">
-                          Unit Cost{" "}
-                          <span className="text-muted-foreground font-normal">
-                            (optional)
-                          </span>
-                        </Label>
-                        <Input
-                          id="unitCost"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...form.register("unitCost")}
-                        />
-                      </div>
+                      {canViewCosts && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="unitCost">
+                            Unit Cost{" "}
+                            <span className="text-muted-foreground font-normal">
+                              (optional)
+                            </span>
+                          </Label>
+                          <Input
+                            id="unitCost"
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...form.register("unitCost")}
+                          />
+                        </div>
+                      )}
 
                       <div className="grid gap-2">
                         <Label htmlFor="msrp">
