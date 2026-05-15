@@ -83,7 +83,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       ) : (
         <>
           {/* Mobile: stacked card rows with colored left stripe */}
-          <div className="max-h-96 overflow-y-auto md:hidden">
+          <div className="max-h-96 overflow-y-auto scrollbar-none md:hidden">
             <ul className="divide-y">
               {rows.map((r) => (
                 <PrizeRowMobile
@@ -106,7 +106,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
               <span className="text-right">Value remaining</span>
               <span className="text-right">Value paid out</span>
             </div>
-            <div className="max-h-[28rem] overflow-y-auto">
+            <div className="max-h-[28rem] overflow-y-auto scrollbar-none">
               <ul className="divide-y">
                 {rows.map((r) => (
                   <PrizeRow
