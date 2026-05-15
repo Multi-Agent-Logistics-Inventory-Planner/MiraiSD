@@ -247,10 +247,14 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               isLoading={dailyPayoutsQuery.isLoading}
               isError={dailyPayoutsQuery.isError}
             />
-            <ActivityLogCard
-              logs={recentLogs}
-              isLoading={sessionLogsQuery.isLoading}
-            />
+            <div className="relative min-h-0">
+              <div className="lg:absolute lg:inset-0">
+                <ActivityLogCard
+                  logs={recentLogs}
+                  isLoading={sessionLogsQuery.isLoading}
+                />
+              </div>
+            </div>
           </div>
 
           <PrizePoolTable tiers={box.tiers} />
