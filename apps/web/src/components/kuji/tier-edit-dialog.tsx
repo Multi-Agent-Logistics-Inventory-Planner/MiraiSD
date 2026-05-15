@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsUpDown, Loader2 } from "lucide-react";
+import { ChevronsUpDown, Loader2, Trash2 } from "lucide-react";
 import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import {
   Dialog,
@@ -11,6 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +35,10 @@ import {
 } from "@/lib/supabase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { usePatchKujiTierMutation } from "@/hooks/mutations/use-kuji-box-mutations";
+import {
+  useDeleteKujiPrizeMutation,
+  usePatchKujiTierMutation,
+} from "@/hooks/mutations/use-kuji-box-mutations";
 import { useUpdateProductMutation } from "@/hooks/mutations/use-product-mutations";
 import type {
   KujiBox,
@@ -58,7 +71,9 @@ export function TierEditDialog({
   const { user } = useAuth();
   const patchTier = usePatchKujiTierMutation();
   const updateProduct = useUpdateProductMutation();
+  const deleteMutation = useDeleteKujiPrizeMutation();
   const isAutoCreated = Boolean(tier.autoCreatedProduct);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [label, setLabel] = useState(tier.label);
   const [linkedProductId, setLinkedProductId] = useState(
@@ -284,6 +299,34 @@ export function TierEditDialog({
   }
 
   const isPending = patchTier.isPending || updateProduct.isPending;
+  const isDeleting = deleteMutation.isPending;
+  const pendingTotal = tier.activeCount + tier.inactiveCount;
+
+  async function handleDelete() {
+    const actorId = user?.personId ?? user?.id;
+    if (!actorId) {
+      toast({ title: "Sign in required" });
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync({
+        boxId: box.id,
+        tierId: tier.id,
+        productId: box.productId,
+        payload: { actorId },
+      });
+      toast({ title: "Prize deleted", variant: "success" });
+      setConfirmDelete(false);
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete prize";
+      toast({
+        title: "Delete failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -611,19 +654,38 @@ export function TierEditDialog({
           </p>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t">
+        <DialogFooter className="px-6 py-4 border-t flex flex-row items-center justify-between sm:justify-between gap-2">
           <Button
             type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isPending}
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirmDelete(true)}
+            disabled={isPending || isDeleting}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
           >
-            Cancel
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            Delete
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending || isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isPending || isDeleting}
+            >
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Save
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
       <SelectShipmentProductDialog
@@ -637,6 +699,48 @@ export function TierEditDialog({
           setProductPickerOpen(false);
         }}
       />
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete &ldquo;{tier.linkedProductName?.trim() || tier.label}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingTotal > 0 ? (
+                <>
+                  This will remove {tier.activeCount} active and{" "}
+                  {tier.inactiveCount} inactive slip
+                  {pendingTotal === 1 ? "" : "s"} ({pendingTotal} total) and
+                  delete the tier row.
+                </>
+              ) : (
+                <>The tier has no slips; this removes the empty row.</>
+              )}
+              {tier.linkedProductId ? (
+                <>
+                  {" "}
+                  Linked-product inventory is <strong>not</strong> returned to
+                  regular stock — use Clear linked product first if you need
+                  that.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

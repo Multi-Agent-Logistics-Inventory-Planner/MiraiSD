@@ -1,33 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useMoveKujiSlipsMutation } from "@/hooks/mutations/use-kuji-box-mutations";
 import {
-  useDeleteKujiPrizeMutation,
-  useMoveKujiSlipsMutation,
-} from "@/hooks/mutations/use-kuji-box-mutations";
-import { KujiBoxStatus, type KujiBox, type KujiBoxTier } from "@/types/api";
-import { TierTable } from "./tier-table";
+  KujiBoxStatus,
+  type KujiBox,
+  type KujiBoxTier,
+} from "@/types/api";
+import { compareTiers } from "./tier-palette";
+import { DialogChrome, DialogCloseButton } from "./dialog-chrome";
+import { ALL_FILTER, matchesClassFilter } from "./tier-class-chips";
+import { PrizeSearchFilter } from "./prize-search-filter";
+import { TierClassColorProvider } from "./tier-class-color-context";
+import { TierTile } from "./tier-tile";
+import { TierRow } from "./tier-row";
 import { AddTierDialog } from "./add-tier-dialog";
 
 interface ManageTiersDialogProps {
@@ -47,13 +41,48 @@ export function ManageTiersDialog({
   onEditTier,
   onTransferIn,
 }: ManageTiersDialogProps) {
-  const [addTierOpen, setAddTierOpen] = useState(false);
-  const [tierPendingDelete, setTierPendingDelete] = useState<KujiBoxTier | null>(null);
-  const showAddTier = canEditStructural && box.status === KujiBoxStatus.OPEN;
   const { toast } = useToast();
   const { user } = useAuth();
   const moveMutation = useMoveKujiSlipsMutation();
-  const deleteMutation = useDeleteKujiPrizeMutation();
+
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<string>(ALL_FILTER);
+  const [addTierOpen, setAddTierOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setFilter(ALL_FILTER);
+    }
+  }, [open]);
+
+  const showAddTier = canEditStructural && box.status === KujiBoxStatus.OPEN;
+
+  const sortedTiers = useMemo(
+    () => [...box.tiers].sort(compareTiers),
+    [box.tiers],
+  );
+
+  const totalActive = useMemo(
+    () => box.tiers.reduce((s, t) => s + t.activeCount, 0),
+    [box.tiers],
+  );
+
+  const totalInactive = useMemo(
+    () => box.tiers.reduce((s, t) => s + t.inactiveCount, 0),
+    [box.tiers],
+  );
+
+  const visibleTiers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sortedTiers.filter((t) => {
+      if (!matchesClassFilter(t, filter)) return false;
+      if (!q) return true;
+      const label = (t.label ?? "").toLowerCase();
+      const product = (t.linkedProductName ?? "").toLowerCase();
+      return label.includes(q) || product.includes(q);
+    });
+  }, [sortedTiers, query, filter]);
 
   function handleMoveSlip(
     tier: KujiBoxTier,
@@ -80,84 +109,120 @@ export function ManageTiersDialog({
     );
   }
 
-  function handleDeletePrize(tier: KujiBoxTier) {
-    setTierPendingDelete(tier);
-  }
 
-  function confirmDelete() {
-    const actorId = user?.personId ?? user?.id;
-    const tier = tierPendingDelete;
-    if (!actorId || !tier) {
-      setTierPendingDelete(null);
-      return;
-    }
-    deleteMutation.mutate(
-      {
-        boxId: box.id,
-        tierId: tier.id,
-        productId: box.productId,
-        payload: { actorId },
-      },
-      {
-        onSuccess: () => {
-          setTierPendingDelete(null);
-          toast({
-            title: "Prize deleted",
-            description: `Tier "${tier.label}" was removed from this box.`,
-            variant: "success",
-          });
-        },
-        onError: (err) => {
-          toast({
-            title: "Failed to delete prize",
-            description: err instanceof Error ? err.message : String(err),
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  }
-
-  const pendingTotal = tierPendingDelete
-    ? tierPendingDelete.activeCount + tierPendingDelete.inactiveCount
-    : 0;
+  const matchingCount = visibleTiers.length;
+  const showingMatchSuffix =
+    query.trim().length > 0 || filter !== ALL_FILTER ? "matching" : "in box";
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl h-[85vh] sm:h-[700px] flex flex-col gap-0 p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-2 flex flex-row items-start justify-between gap-3">
-            <div>
-              <DialogTitle>Manage Tiers</DialogTitle>
-              <DialogDescription>
-                Edit tier properties or transfer inventory and slips in.
-              </DialogDescription>
+      <DialogChrome
+        open={open}
+        onOpenChange={onOpenChange}
+        variant="managePrizes"
+      >
+       <TierClassColorProvider tiers={box.tiers}>
+        <DialogHeader className="px-4 sm:px-6 pt-3.5 sm:pt-5 pb-3 sm:pb-3.5 flex flex-row items-start gap-2 sm:gap-3 space-y-0">
+          <div className="flex-1 min-w-0">
+            <DialogTitle className="text-base sm:text-lg font-medium text-white">
+              Manage prizes
+            </DialogTitle>
+            <DialogDescription className="hidden sm:block text-[12.5px] text-muted-foreground mt-0.5">
+              Edit prize properties or move slips between active / inactive
+              pools.
+            </DialogDescription>
+            <div className="sm:hidden text-[11.5px] text-muted-foreground mt-0.5 tabular-nums">
+              {box.tiers.length} prizes · {totalActive} active
+              {totalInactive ? ` · ${totalInactive} held` : ""}
             </div>
-            {showAddTier ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAddTierOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add tier
-              </Button>
-            ) : null}
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
-            <TierTable
-              box={box}
-              canEditStructural={canEditStructural}
-              onEditTier={onEditTier}
-              onTransferIn={onTransferIn}
-              onMoveSlip={handleMoveSlip}
-              onDeletePrize={handleDeletePrize}
-            />
           </div>
-        </DialogContent>
-      </Dialog>
+          {showAddTier ? (
+            <button
+              type="button"
+              onClick={() => setAddTierOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-[12.5px] sm:text-[13px] font-medium text-white bg-brand-primary hover:bg-brand-primary/90 shadow-[0_4px_12px_rgba(124,58,237,0.35)] transition"
+            >
+              <Plus className="h-3 w-3" />
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add prize</span>
+            </button>
+          ) : null}
+          <DialogCloseButton onClose={() => onOpenChange(false)} />
+        </DialogHeader>
+
+        <div className="px-4 sm:px-6 pt-2.5 sm:pt-0 pb-2 sm:pb-3">
+          <PrizeSearchFilter
+            tiers={box.tiers}
+            totalActive={totalActive}
+            query={query}
+            onQueryChange={setQuery}
+            filter={filter}
+            onFilterChange={setFilter}
+          />
+        </div>
+
+        <div className="px-4 sm:px-6 pb-2 sm:pb-2.5 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>
+            {matchingCount} {matchingCount === 1 ? "prize" : "prizes"}{" "}
+            {showingMatchSuffix}
+          </span>
+          {totalInactive > 0 ? (
+            <span className="text-amber-500">
+              <span className="hidden sm:inline">
+                {totalInactive} inactive slip{totalInactive === 1 ? "" : "s"}{" "}
+                held back
+              </span>
+              <span className="sm:hidden">{totalInactive} held back</span>
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-1 pb-5">
+          {visibleTiers.length === 0 ? (
+            <div className="py-10 text-center text-[13px] text-muted-foreground">
+              No prizes match &ldquo;
+              <span className="text-foreground/80">{query}</span>&rdquo;.
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {visibleTiers.map((tier) => (
+                  <TierTile
+                    key={tier.id}
+                    mode="managePrizes"
+                    tier={tier}
+                    totalActive={totalActive}
+                    onStash={() => handleMoveSlip(tier, "DEACTIVATE")}
+                    onPromote={() => handleMoveSlip(tier, "ACTIVATE")}
+                    onAdd={() => onTransferIn(tier)}
+                    onMore={() => onEditTier(tier)}
+                    disableStash={tier.activeCount === 0}
+                    disablePromote={tier.inactiveCount === 0}
+                  />
+                ))}
+              </div>
+              <ul className="grid sm:hidden grid-cols-1 gap-1.5 list-none p-0 m-0">
+                {visibleTiers.map((tier) => (
+                  <li key={tier.id}>
+                    <TierRow
+                      mode="managePrizes"
+                      tier={tier}
+                      totalActive={totalActive}
+                      onStash={() => handleMoveSlip(tier, "DEACTIVATE")}
+                      onPromote={() => handleMoveSlip(tier, "ACTIVATE")}
+                      onAdd={() => onTransferIn(tier)}
+                      onMore={() => onEditTier(tier)}
+                      disableStash={tier.activeCount === 0}
+                      disablePromote={tier.inactiveCount === 0}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+       </TierClassColorProvider>
+      </DialogChrome>
 
       {showAddTier ? (
         <AddTierDialog
@@ -166,64 +231,6 @@ export function ManageTiersDialog({
           box={box}
         />
       ) : null}
-
-      <AlertDialog
-        open={tierPendingDelete !== null}
-        onOpenChange={(o) => {
-          if (!o && !deleteMutation.isPending) setTierPendingDelete(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete prize</AlertDialogTitle>
-            <AlertDialogDescription>
-              {tierPendingDelete ? (
-                <>
-                  Delete the entire{" "}
-                  <span className="font-semibold">
-                    &quot;{tierPendingDelete.label}&quot;
-                  </span>{" "}
-                  prize from this box?
-                  {pendingTotal > 0 ? (
-                    <>
-                      {" "}
-                      This will remove {tierPendingDelete.activeCount} active and{" "}
-                      {tierPendingDelete.inactiveCount} inactive slip
-                      {pendingTotal === 1 ? "" : "s"} ({pendingTotal} total) and delete
-                      the tier row.
-                    </>
-                  ) : (
-                    <> The tier has no slips; this removes the empty row.</>
-                  )}
-                  {tierPendingDelete.linkedProductId ? (
-                    <>
-                      {" "}
-                      Linked-product inventory is <strong>not</strong> returned to
-                      regular stock — use Edit Tier &rarr; Clear linked product first
-                      if you need that.
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                confirmDelete();
-              }}
-              disabled={deleteMutation.isPending}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete prize"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

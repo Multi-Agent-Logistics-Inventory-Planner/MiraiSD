@@ -8,7 +8,9 @@ import {
   formatMoneyDecimals,
 } from "@/lib/utils/format-money";
 import { ProductImageLightbox } from "@/components/products/product-image-lightbox";
+import { getSafeImageUrl } from "@/lib/utils/validation";
 import { compareTiers, hexWithAlpha, tierColor } from "./tier-palette";
+import { TierClassColorProvider, useTierClassColor } from "./tier-class-color-context";
 import { TierName } from "./tier-name";
 import { TierThumb, type TierThumbExpand } from "./tier-thumb";
 import { effectivePrice } from "./kuji-value-rollups";
@@ -68,6 +70,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
   const liveCount = rows.filter((r) => !r.fullyDrawn).length;
 
   return (
+    <TierClassColorProvider tiers={tiers}>
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
         <span className="text-sm font-medium">Prize pool</span>
@@ -83,7 +86,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       ) : (
         <>
           {/* Mobile: stacked card rows with colored left stripe */}
-          <div className="max-h-96 overflow-y-auto md:hidden">
+          <div className="max-h-96 overflow-y-auto scrollbar-none md:hidden">
             <ul className="divide-y">
               {rows.map((r) => (
                 <PrizeRowMobile
@@ -106,7 +109,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
               <span className="text-right">Value remaining</span>
               <span className="text-right">Value paid out</span>
             </div>
-            <div className="max-h-[28rem] overflow-y-auto">
+            <div className="max-h-[28rem] overflow-y-auto scrollbar-none">
               <ul className="divide-y">
                 {rows.map((r) => (
                   <PrizeRow
@@ -130,6 +133,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
         alt={lightbox?.alt ?? ""}
       />
     </div>
+    </TierClassColorProvider>
   );
 }
 
@@ -142,6 +146,8 @@ interface PrizeRowProps {
 function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
   const { tier, rank, price, active, held, drawn, remaining, valueDrawn } = row;
   const color = tierColor(rank);
+  const classColor = useTierClassColor(tier.label);
+  const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
   const barPct =
     maxRemaining > 0 ? Math.max(0.05, remaining / maxRemaining) : 0;
   const barWidth = remaining > 0 ? `${Math.round(barPct * 100)}%` : "0%";
@@ -151,19 +157,27 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
   return (
     <li
       className={cn(
-        "grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 py-2 text-xs",
+        "grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 min-h-[44px] py-2 text-xs",
         dim
       )}
     >
-      <TierThumb
-        tier={tier}
-        rank={rank}
-        size={28}
-        dashed={row.heldOnly || row.fullyDrawn}
-        onExpand={tier.linkedProductImageUrl ? onExpand : undefined}
-      />
+      {hasImage ? (
+        <TierThumb
+          tier={tier}
+          rank={rank}
+          size={28}
+          dashed={row.heldOnly || row.fullyDrawn}
+          onExpand={onExpand}
+        />
+      ) : (
+        <span
+          className="mx-auto h-1.5 w-1.5 rounded-full"
+          style={{ background: classColor }}
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
-        <TierName tier={tier} />
+        <TierName tier={tier} colorSecondary />
         {price == null && (
           <span className="ml-2 inline-block rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500">
             set price to include in totals
@@ -217,28 +231,42 @@ interface PrizeRowMobileProps {
 function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) {
   const { tier, rank, price, active, held, remaining, valueDrawn } = row;
   const color = tierColor(rank);
+  const classColor = useTierClassColor(tier.label);
+  const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
   const pct =
     totalRemaining > 0 ? Math.round((remaining / totalRemaining) * 100) : 0;
   const dim = row.fullyDrawn ? "opacity-60" : "";
 
   return (
-    <li className={cn("flex items-stretch gap-3 py-2.5 text-xs", dim)}>
+    <li className={cn("flex items-stretch gap-3 min-h-[52px] py-2.5 text-xs", dim)}>
       <div
         className="w-0.5 shrink-0 self-stretch rounded-full"
         style={{ background: color }}
         aria-hidden
       />
-      <TierThumb
-        tier={tier}
-        rank={rank}
-        size={36}
-        dashed={row.heldOnly || row.fullyDrawn}
-        onExpand={tier.linkedProductImageUrl ? onExpand : undefined}
-      />
+      {hasImage ? (
+        <TierThumb
+          tier={tier}
+          rank={rank}
+          size={36}
+          dashed={row.heldOnly || row.fullyDrawn}
+          onExpand={onExpand}
+        />
+      ) : (
+        <span
+          className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+          style={{ background: classColor }}
+          aria-hidden
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <TierName tier={tier} className="block truncate text-sm" />
+            <TierName
+              tier={tier}
+              className="block truncate text-sm"
+              colorSecondary
+            />
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
               {tier.letter ? <span>{tier.letter}</span> : null}
               <span>·</span>

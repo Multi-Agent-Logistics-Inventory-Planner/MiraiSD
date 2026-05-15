@@ -26,6 +26,14 @@ function formatTime(iso: string): string {
   });
 }
 
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 type SlipAction =
   | "add_slip"
   | "add_inactive"
@@ -146,7 +154,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
           No draws recorded yet.
         </div>
       ) : (
-        <div className="min-h-0 max-h-80 flex-1 overflow-y-auto pr-1 lg:max-h-none">
+        <div className="min-h-0 max-h-80 flex-1 overflow-y-auto scrollbar-none pr-1 lg:max-h-none">
         <ul className="divide-y">
           {logs.map((log) => {
             const qty = log.totalQuantityMoved ?? 0;
@@ -238,8 +246,9 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
                       </ul>
                     ) : null}
                   </div>
-                  <span className="shrink-0 pt-0.5 text-[11px] text-muted-foreground tabular-nums">
-                    {formatTime(log.createdAt)}
+                  <span className="flex shrink-0 flex-col items-end pt-0.5 text-[11px] text-muted-foreground tabular-nums leading-tight">
+                    <span>{formatDate(log.createdAt)}</span>
+                    <span>{formatTime(log.createdAt)}</span>
                   </span>
                 </button>
               </li>
