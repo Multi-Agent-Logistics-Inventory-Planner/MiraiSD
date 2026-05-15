@@ -204,7 +204,7 @@ export function InlineRecordDrawForm({
                       setPicker({ kind: "swap", lineKey: line.key })
                     }
                     disabled={isPending}
-                    className="w-56 shrink-0 overflow-hidden rounded-md border px-3 py-2 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
+                    className="min-w-0 flex-1 overflow-hidden rounded-md border px-3 py-2 text-left hover:bg-muted/50 transition-colors disabled:opacity-50"
                   >
                     {tier ? (
                       (() => {
