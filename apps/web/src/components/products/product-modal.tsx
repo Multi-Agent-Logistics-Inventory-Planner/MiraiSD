@@ -110,7 +110,7 @@ export function ProductModal({
     useShipmentsByProduct(product?.product.id);
   const { data: displayHistory, isLoading: displaysLoading } =
     useProductDisplayHistory(product?.product.id);
-  const { canViewCosts, can } = usePermissions();
+  const { canViewCosts, canViewMsrp, can } = usePermissions();
 
   const activeDisplays = useMemo(() => {
     if (!displayHistory) return [];
@@ -221,7 +221,7 @@ export function ProductModal({
                 </span>
               </div>
             )}
-            {canViewCosts && (
+            {canViewMsrp && (
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-xs sm:text-sm">
                   MSRP:
@@ -241,7 +241,7 @@ export function ProductModal({
                 </span>
               </div>
             )}
-            {canViewCosts &&
+            {canViewMsrp &&
               typeof p.packsPerBox === "number" &&
               p.packsPerBox > 0 &&
               typeof p.msrp === "number" && (
