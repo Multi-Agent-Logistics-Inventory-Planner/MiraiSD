@@ -9,6 +9,7 @@ import {
   KujiAllocationByProduct,
   KujiBox,
   KujiBoxTier,
+  KujiDailyPayoutsResponse,
   MoveSlipsRequest,
   OpenKujiBoxRequest,
   PatchKujiTierRequest,
@@ -71,6 +72,23 @@ export async function getLastClosedKujiTiers(
  */
 export async function getKujiBox(boxId: string): Promise<KujiBox> {
   return apiGet<KujiBox>(`${BASE_PATH}/${boxId}`);
+}
+
+/**
+ * Per-day net payout series for a box. tz must be a valid IANA zone id; the
+ * server bucketizes movements by that zone's calendar day.
+ */
+export async function getKujiDailyPayouts(
+  boxId: string,
+  params: { from?: string; to?: string; tz: string }
+): Promise<KujiDailyPayoutsResponse> {
+  const search = new URLSearchParams();
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  search.set("tz", params.tz);
+  return apiGet<KujiDailyPayoutsResponse>(
+    `${BASE_PATH}/${boxId}/daily-payouts?${search.toString()}`
+  );
 }
 
 /**

@@ -14,6 +14,7 @@ import com.mirai.inventoryservice.dtos.responses.kuji.KujiAllocationByLocationDT
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiAllocationByProductDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxTierResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
 import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.LocationNotFoundException;
@@ -48,6 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -695,6 +697,8 @@ public class KujiBoxService {
         for (RecordDrawRequestDTO.DrawLine draw : request.getDraws()) {
             KujiBoxTier tier = tiersById.get(draw.getTierId());
             tier.setActiveCount(tier.getActiveCount() - draw.getQuantity());
+            int currentDrawn = tier.getDrawnCount() != null ? tier.getDrawnCount() : 0;
+            tier.setDrawnCount(currentDrawn + draw.getQuantity());
         }
 
         // Create one parent AuditLog of reason KUJI_PRIZE_WON. The summary lists the tiers
@@ -935,6 +939,8 @@ public class KujiBoxService {
             if (tier != null) {
                 Integer current = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
                 tier.setActiveCount(current + qty);
+                int currentDrawn = tier.getDrawnCount() != null ? tier.getDrawnCount() : 0;
+                tier.setDrawnCount(Math.max(0, currentDrawn - qty));
                 kujiBoxTierRepository.save(tier);
 
                 Map<String, Object> line = new HashMap<>();
@@ -1643,6 +1649,76 @@ public class KujiBoxService {
         return toResponseDTO(box);
     }
 
+    /**
+     * Per-day net payout rollup for a box. Slip counts and value totals are netted
+     * across KUJI_PRIZE_WON and KUJI_DRAW_REVERSED movements bucketed by calendar day
+     * in the requested timezone. The returned series is always dense over [from, to].
+     */
+    @Transactional(readOnly = true)
+    public KujiDailyPayoutsResponseDTO getDailyPayouts(
+            UUID boxId,
+            java.time.LocalDate from,
+            java.time.LocalDate to,
+            String tz
+    ) {
+        java.time.ZoneId zone;
+        try {
+            zone = java.time.ZoneId.of(tz);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid timezone: " + tz);
+        }
+
+        KujiBox box = kujiBoxRepository.findById(boxId)
+                .orElseThrow(() -> new IllegalArgumentException("Box not found: " + boxId));
+
+        java.time.LocalDate resolvedFrom = from != null
+                ? from
+                : box.getOpenedAt().atZoneSameInstant(zone).toLocalDate();
+        java.time.LocalDate resolvedTo = to != null
+                ? to
+                : java.time.LocalDate.now(zone);
+
+        if (resolvedTo.isBefore(resolvedFrom)) {
+            throw new IllegalArgumentException(
+                    "to (" + resolvedTo + ") must be on or after from (" + resolvedFrom + ")");
+        }
+
+        List<Object[]> rows = stockMovementRepository.aggregateKujiDailyPayouts(
+                boxId, resolvedFrom, resolvedTo, zone.getId());
+
+        Map<java.time.LocalDate, KujiDailyPayoutsResponseDTO.DailyPoint> byDate = new HashMap<>();
+        for (Object[] row : rows) {
+            java.time.LocalDate date = ((java.sql.Date) row[0]).toLocalDate();
+            int slips = row[1] == null ? 0 : ((Number) row[1]).intValue();
+            BigDecimal value = row[2] == null
+                    ? BigDecimal.ZERO
+                    : ((BigDecimal) row[2]).setScale(2, java.math.RoundingMode.HALF_UP);
+            byDate.put(date, new KujiDailyPayoutsResponseDTO.DailyPoint(date, value, slips));
+        }
+
+        List<KujiDailyPayoutsResponseDTO.DailyPoint> series = new ArrayList<>();
+        BigDecimal totalValue = BigDecimal.ZERO;
+        int totalSlips = 0;
+        for (java.time.LocalDate d = resolvedFrom; !d.isAfter(resolvedTo); d = d.plusDays(1)) {
+            KujiDailyPayoutsResponseDTO.DailyPoint p = byDate.get(d);
+            if (p == null) {
+                p = new KujiDailyPayoutsResponseDTO.DailyPoint(
+                        d, BigDecimal.ZERO.setScale(2), 0);
+            }
+            series.add(p);
+            totalValue = totalValue.add(p.valueWon());
+            totalSlips += p.slipCount();
+        }
+
+        return new KujiDailyPayoutsResponseDTO(
+                boxId,
+                resolvedFrom,
+                resolvedTo,
+                zone.getId(),
+                series,
+                new KujiDailyPayoutsResponseDTO.Totals(totalValue, totalSlips));
+    }
+
     @Transactional(readOnly = true)
     public List<KujiBoxResponseDTO> getBoxHistory(UUID productId) {
         List<KujiBox> boxes = kujiBoxRepository.findByProductIdOrderByOpenedAtDesc(productId);
@@ -2302,10 +2378,13 @@ public class KujiBoxService {
                                         : null)
                         .activeCount(t.getActiveCount())
                         .inactiveCount(t.getInactiveCount() != null ? t.getInactiveCount() : 0)
+                        .drawnCount(t.getDrawnCount() != null ? t.getDrawnCount() : 0)
                         .totalCount(
                                 (t.getActiveCount() != null ? t.getActiveCount() : 0)
                                         + (t.getInactiveCount() != null ? t.getInactiveCount() : 0))
                         .price(t.getPrice())
+                        .linkedProductPrice(
+                                t.getLinkedProduct() != null ? t.getLinkedProduct().getMsrp() : null)
                         .autoCreatedProduct(Boolean.TRUE.equals(t.getAutoCreatedProduct()))
                         .build())
                 .collect(Collectors.toList());

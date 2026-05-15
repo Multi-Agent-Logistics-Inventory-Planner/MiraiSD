@@ -114,5 +114,51 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     List<Object[]> aggregateSalesByItemAndDate(
             @Param("startDate") OffsetDateTime startDate,
             @Param("endDate") OffsetDateTime endDate);
+
+    /**
+     * Aggregate KUJI draw payouts for a single box, bucketed per calendar day in the
+     * requested timezone. Slip counts come from metadata.slip_quantity (KUJI movements
+     * carry quantity_change = 0). Value is slip count multiplied by effective tier price
+     * (tier.price OR linked-product msrp). Reversals subtract on the day the reversal
+     * occurred. Returns rows only for days with activity; the service pads zeros for
+     * the dense series.
+     * Columns: bucket_date (date), slip_count (int), value_won (numeric).
+     */
+    @Query(value = """
+        SELECT
+            (sm.at AT TIME ZONE :tz)::date AS bucket_date,
+            SUM(
+                CASE
+                    WHEN sm.reason = 'KUJI_PRIZE_WON'     THEN COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                    WHEN sm.reason = 'KUJI_DRAW_REVERSED' THEN -COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                    ELSE 0
+                END
+            ) AS slip_count,
+            SUM(
+                CASE
+                    WHEN sm.reason = 'KUJI_PRIZE_WON'
+                        THEN COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                            * COALESCE(t.price, p.msrp, 0)
+                    WHEN sm.reason = 'KUJI_DRAW_REVERSED'
+                        THEN -COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                            * COALESCE(t.price, p.msrp, 0)
+                    ELSE 0
+                END
+            ) AS value_won
+        FROM stock_movements sm
+        LEFT JOIN kuji_box_tiers t ON t.id = (sm.metadata->>'kuji_box_tier_id')::uuid
+        LEFT JOIN products p ON p.id = t.linked_product_id
+        WHERE sm.reason IN ('KUJI_PRIZE_WON', 'KUJI_DRAW_REVERSED')
+          AND (sm.metadata->>'kuji_box_id')::uuid = :boxId
+          AND (sm.at AT TIME ZONE :tz)::date >= :fromDate
+          AND (sm.at AT TIME ZONE :tz)::date <= :toDate
+        GROUP BY bucket_date
+        ORDER BY bucket_date
+        """, nativeQuery = true)
+    List<Object[]> aggregateKujiDailyPayouts(
+            @Param("boxId") UUID boxId,
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate,
+            @Param("tz") String tz);
 }
 

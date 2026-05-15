@@ -13,6 +13,7 @@ import com.mirai.inventoryservice.dtos.responses.kuji.KujiAllocationByLocationDT
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiAllocationByProductDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxTierResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
 import com.mirai.inventoryservice.services.KujiBoxService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -65,6 +66,22 @@ public class KujiBoxController {
     @GetMapping("/{boxId}")
     public ResponseEntity<KujiBoxResponseDTO> getBox(@PathVariable UUID boxId) {
         return ResponseEntity.ok(kujiBoxService.getBox(boxId));
+    }
+
+    /**
+     * Per-day net payout series for a box. Defaults `from` to the box's opened-at date
+     * (in {@code tz}) and `to` to today in {@code tz}. The returned series is always dense.
+     */
+    @GetMapping("/{boxId}/daily-payouts")
+    public ResponseEntity<KujiDailyPayoutsResponseDTO> getDailyPayouts(
+            @PathVariable UUID boxId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate to,
+            @RequestParam(required = false, defaultValue = "UTC") String tz
+    ) {
+        return ResponseEntity.ok(kujiBoxService.getDailyPayouts(boxId, from, to, tz));
     }
 
     @GetMapping("/allocations/by-location/{locationId}")

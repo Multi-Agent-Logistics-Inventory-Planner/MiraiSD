@@ -1,7 +1,9 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.kuji.RecordDrawRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.TransferInMoreRequestDTO;
+import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
 import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.Site;
@@ -354,4 +356,105 @@ class KujiBoxServiceTest {
                 .findByLocation_IdAndProduct_Id(any(UUID.class), any(UUID.class));
     }
 
+    // ===================== drawnCount =====================
+
+    @Test
+    void recordDraw_incrementsDrawnCountByDrawnQuantity() {
+        tier.setDrawnCount(0);
+        RecordDrawRequestDTO req = RecordDrawRequestDTO.builder()
+                .actorId(actorId)
+                .draws(List.of(RecordDrawRequestDTO.DrawLine.builder()
+                        .tierId(tierId).quantity(3).build()))
+                .build();
+
+        service.recordDraw(boxId, req);
+
+        assertEquals(INITIAL_SLIP_COUNT - 3, tier.getActiveCount(),
+                "activeCount must decrement by drawn quantity");
+        assertEquals(3, tier.getDrawnCount(),
+                "drawnCount must increment by drawn quantity");
+    }
+
+    @Test
+    void undoDraw_decrementsDrawnCountAndClampsAtZero() {
+        // Set up: one prior draw of 2 slips already recorded.
+        tier.setActiveCount(INITIAL_SLIP_COUNT - 2);
+        tier.setDrawnCount(2);
+
+        UUID auditLogId = UUID.randomUUID();
+        AuditLog drawLog = AuditLog.builder()
+                .id(auditLogId)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .build();
+        when(auditLogRepository.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+
+        // findKujiReversalsForAuditLog uses a native query through entityManager.
+        jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
+        when(entityManager.createNativeQuery(any(String.class), eq(StockMovement.class)))
+                .thenReturn(nativeQuery);
+        when(nativeQuery.setParameter(any(String.class), any())).thenReturn(nativeQuery);
+        when(nativeQuery.getResultList()).thenReturn(Collections.emptyList());
+
+        // Original draw movement carrying slip_quantity=2 in metadata.
+        Map<String, Object> originalMeta = new java.util.HashMap<>();
+        originalMeta.put("kuji_box_id", boxId.toString());
+        originalMeta.put("kuji_box_tier_id", tierId.toString());
+        originalMeta.put("slip_quantity", 2);
+        StockMovement original = StockMovement.builder()
+                .id(42L)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .quantityChange(0)
+                .item(linkedProduct)
+                .metadata(originalMeta)
+                .build();
+        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+                .thenReturn(List.of(original));
+
+        service.undoDraw(boxId, auditLogId, actorId);
+
+        assertEquals(INITIAL_SLIP_COUNT, tier.getActiveCount(),
+                "activeCount must be restored to pre-draw value");
+        assertEquals(0, tier.getDrawnCount(),
+                "drawnCount must decrement and clamp at 0");
+    }
+
+    // ===================== daily-payouts =====================
+
+    @Test
+    void getDailyPayouts_rejectsInvalidTimezone() {
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.getDailyPayouts(boxId, null, null, "Not/A_Real_Zone"));
+        assertTrue(ex.getMessage().contains("Invalid timezone"));
+    }
+
+    @Test
+    void getDailyPayouts_padsDenseSeriesWithZeros() {
+        box.setOpenedAt(java.time.OffsetDateTime.now().minusDays(2));
+        when(kujiBoxRepository.findById(boxId)).thenReturn(Optional.of(box));
+
+        // Only one row from the aggregator: 5 slips at $10 yesterday.
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("UTC"));
+        java.time.LocalDate yesterday = today.minusDays(1);
+        Object[] row = new Object[] {
+                java.sql.Date.valueOf(yesterday),
+                Integer.valueOf(5),
+                new java.math.BigDecimal("50.00")
+        };
+        List<Object[]> rows = new java.util.ArrayList<>();
+        rows.add(row);
+        when(stockMovementRepository.aggregateKujiDailyPayouts(
+                eq(boxId), any(), any(), eq("UTC")))
+                .thenReturn(rows);
+
+        KujiDailyPayoutsResponseDTO resp = service.getDailyPayouts(
+                boxId, today.minusDays(2), today, "UTC");
+
+        assertEquals(3, resp.series().size(), "Series must be dense over [from, to]");
+        assertEquals(0, resp.series().get(0).slipCount());
+        assertEquals(5, resp.series().get(1).slipCount());
+        assertEquals(0, resp.series().get(2).slipCount());
+        assertEquals(0, new java.math.BigDecimal("50.00").compareTo(resp.total().valueWon()));
+        assertEquals(5, resp.total().slipCount());
+    }
 }
