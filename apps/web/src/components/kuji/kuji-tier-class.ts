@@ -23,6 +23,39 @@ export function tierClassColor(label: string | null | undefined): string {
   return TIER_PALETTE[idx]!;
 }
 
+// Build a collision-resolved color map for a specific set of tiers.
+// Each unique class label gets a distinct palette slot (starting from its
+// preferred hash bucket and walking forward to the next free slot). Falls
+// back to the bare hash when the palette is exhausted.
+export function buildTierClassColorMap(
+  tiers: readonly KujiBoxTier[],
+): ReadonlyMap<string, string> {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  for (const t of tiers) {
+    const key = normalizeLabel(t.label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    labels.push(key);
+  }
+  labels.sort();
+
+  const result = new Map<string, string>();
+  const used = new Set<number>();
+  for (const key of labels) {
+    const preferred = hashKey(key) % TIER_PALETTE.length;
+    let idx = preferred;
+    let attempts = 0;
+    while (used.has(idx) && attempts < TIER_PALETTE.length) {
+      idx = (idx + 1) % TIER_PALETTE.length;
+      attempts += 1;
+    }
+    used.add(idx);
+    result.set(key, TIER_PALETTE[idx]!);
+  }
+  return result;
+}
+
 export interface TierClassRollup {
   readonly key: string;
   readonly displayLabel: string;

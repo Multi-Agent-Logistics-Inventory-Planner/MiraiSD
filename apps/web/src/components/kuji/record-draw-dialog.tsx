@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
@@ -13,12 +13,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRecordKujiDrawMutation } from "@/hooks/mutations/use-kuji-box-mutations";
 import type { DrawLine, KujiBox, KujiBoxTier } from "@/types/api";
 import { compareTiers } from "./tier-palette";
-import { DialogChrome } from "./dialog-chrome";
-import {
-  TierClassChips,
-  ALL_FILTER,
-  matchesClassFilter,
-} from "./tier-class-chips";
+import { DialogChrome, DialogCloseButton } from "./dialog-chrome";
+import { ALL_FILTER, matchesClassFilter } from "./tier-class-chips";
+import { PrizeSearchFilter } from "./prize-search-filter";
+import { TierClassColorProvider } from "./tier-class-color-context";
 import { TierTile } from "./tier-tile";
 import { TierRow } from "./tier-row";
 
@@ -145,41 +143,28 @@ export function RecordDrawDialog({
 
   return (
     <DialogChrome open={open} onOpenChange={onOpenChange} variant="recordDraw">
-      <DialogHeader className="px-6 pt-5 pb-3.5">
-        <DialogTitle className="text-lg font-medium text-white">
-          Record a draw
-        </DialogTitle>
-        <DialogDescription className="text-[12.5px] text-muted-foreground mt-0.5">
-          Tap a prize to add it. Tap again to add more.
-        </DialogDescription>
+     <TierClassColorProvider tiers={box.tiers}>
+      <DialogHeader className="px-6 pt-5 pb-3.5 flex flex-row items-start gap-3 space-y-0">
+        <div className="flex-1 min-w-0">
+          <DialogTitle className="text-lg font-medium text-white">
+            Record a draw
+          </DialogTitle>
+          <DialogDescription className="text-[12.5px] text-muted-foreground mt-0.5">
+            Tap a prize to add it. Tap again to add more.
+          </DialogDescription>
+        </div>
+        <DialogCloseButton onClose={() => onOpenChange(false)} />
       </DialogHeader>
 
-      <div className="px-6 pb-3 flex items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-[9px] border border-border bg-background px-3">
-          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search prizes..."
-            className="flex-1 bg-transparent border-none outline-none text-[13px] py-2 text-foreground placeholder:text-muted-foreground"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="text-muted-foreground hover:text-foreground p-0.5"
-              aria-label="Clear search"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          ) : null}
-        </div>
-        <TierClassChips
+      <div className="px-4 sm:px-6 pb-2 sm:pb-3">
+        <PrizeSearchFilter
           tiers={box.tiers}
           totalActive={totalActive}
-          value={filter}
-          onChange={setFilter}
+          query={query}
+          onQueryChange={setQuery}
+          filter={filter}
+          onFilterChange={setFilter}
+          autoFocus
         />
       </div>
 
@@ -297,6 +282,7 @@ export function RecordDrawDialog({
           Confirm draw
         </button>
       </div>
+     </TierClassColorProvider>
     </DialogChrome>
   );
 }
