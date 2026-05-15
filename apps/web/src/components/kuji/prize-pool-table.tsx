@@ -67,7 +67,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
 
   const totalRemaining = rows.reduce((s, r) => s + r.remaining, 0);
   const maxRemaining = rows.reduce((m, r) => Math.max(m, r.remaining), 0);
-  const liveCount = rows.filter((r) => !r.fullyDrawn).length;
+  const prizesRemaining = rows.reduce((s, r) => s + r.active + r.held, 0);
 
   return (
     <TierClassColorProvider tiers={tiers}>
@@ -75,7 +75,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
         <span className="text-sm font-medium">Prize pool</span>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {liveCount} tier{liveCount === 1 ? "" : "s"} ·{" "}
+          {prizesRemaining} prize{prizesRemaining === 1 ? "" : "s"} ·{" "}
           {formatMoney(totalRemaining)} remaining
         </span>
       </div>
@@ -92,7 +92,6 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
                 <PrizeRowMobile
                   key={r.tier.id}
                   row={r}
-                  totalRemaining={totalRemaining}
                   onExpand={setLightbox}
                 />
               ))}
@@ -215,26 +214,31 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
           {row.fullyDrawn || remaining === 0 ? "—" : formatMoney(remaining)}
         </span>
       </div>
-      <span className="text-right tabular-nums text-muted-foreground">
-        {drawn === 0 ? "—" : formatMoney(valueDrawn)}
-      </span>
+      <div className="flex flex-col items-end leading-tight tabular-nums text-muted-foreground">
+        {drawn === 0 ? (
+          <span>—</span>
+        ) : (
+          <>
+            <span>{price == null ? "—" : formatMoney(valueDrawn)}</span>
+            <span className="text-[10px] opacity-70">×{drawn}</span>
+          </>
+        )}
+      </div>
     </li>
   );
 }
 
 interface PrizeRowMobileProps {
   readonly row: Row;
-  readonly totalRemaining: number;
   readonly onExpand: (state: TierThumbExpand) => void;
 }
 
-function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) {
-  const { tier, rank, price, active, held, remaining, valueDrawn } = row;
-  const color = tierColor(rank);
-  const classColor = useTierClassColor(tier.label);
+function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
+  const { tier, rank, price, active, held, drawn, remaining, valueDrawn } = row;
+  const color = useTierClassColor(tier.label);
   const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
-  const pct =
-    totalRemaining > 0 ? Math.round((remaining / totalRemaining) * 100) : 0;
+  const totalUnits = active + held + drawn;
+  const wonPct = totalUnits > 0 ? Math.round((drawn / totalUnits) * 100) : 0;
   const dim = row.fullyDrawn ? "opacity-60" : "";
 
   return (
@@ -255,7 +259,7 @@ function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) 
       ) : (
         <span
           className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-          style={{ background: classColor }}
+          style={{ background: color }}
           aria-hidden
         />
       )}
@@ -296,14 +300,25 @@ function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) 
               )}
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              {row.fullyDrawn || remaining === 0
-                ? valueDrawn > 0
-                  ? `${formatMoney(valueDrawn)} paid out`
-                  : "—"
-                : `${formatMoney(remaining)} · ${pct}%`}
+              {price == null
+                ? `— · ${wonPct}% won`
+                : row.fullyDrawn
+                  ? valueDrawn > 0
+                    ? `${formatMoney(valueDrawn)} paid out`
+                    : "—"
+                  : `${formatMoney(remaining)} · ${wonPct}% won`}
             </div>
           </div>
         </div>
+        {totalUnits > 0 && (
+          <div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-muted/40">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${wonPct}%`, background: color }}
+              aria-hidden
+            />
+          </div>
+        )}
       </div>
     </li>
   );
