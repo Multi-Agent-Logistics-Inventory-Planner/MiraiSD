@@ -67,7 +67,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
 
   const totalRemaining = rows.reduce((s, r) => s + r.remaining, 0);
   const maxRemaining = rows.reduce((m, r) => Math.max(m, r.remaining), 0);
-  const liveCount = rows.filter((r) => !r.fullyDrawn).length;
+  const prizesRemaining = rows.reduce((s, r) => s + r.active + r.held, 0);
 
   return (
     <TierClassColorProvider tiers={tiers}>
@@ -75,7 +75,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
         <span className="text-sm font-medium">Prize pool</span>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {liveCount} tier{liveCount === 1 ? "" : "s"} ·{" "}
+          {prizesRemaining} prize{prizesRemaining === 1 ? "" : "s"} ·{" "}
           {formatMoney(totalRemaining)} remaining
         </span>
       </div>
@@ -231,7 +231,6 @@ interface PrizeRowMobileProps {
 function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) {
   const { tier, rank, price, active, held, remaining, valueDrawn } = row;
   const color = tierColor(rank);
-  const classColor = useTierClassColor(tier.label);
   const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
   const pct =
     totalRemaining > 0 ? Math.round((remaining / totalRemaining) * 100) : 0;
@@ -255,7 +254,7 @@ function PrizeRowMobile({ row, totalRemaining, onExpand }: PrizeRowMobileProps) 
       ) : (
         <span
           className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-          style={{ background: classColor }}
+          style={{ background: color }}
           aria-hidden
         />
       )}
