@@ -83,16 +83,18 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       ) : (
         <>
           {/* Mobile: stacked card rows with colored left stripe */}
-          <ul className="divide-y md:hidden">
-            {rows.map((r) => (
-              <PrizeRowMobile
-                key={r.tier.id}
-                row={r}
-                totalRemaining={totalRemaining}
-                onExpand={setLightbox}
-              />
-            ))}
-          </ul>
+          <div className="max-h-96 overflow-y-auto md:hidden">
+            <ul className="divide-y">
+              {rows.map((r) => (
+                <PrizeRowMobile
+                  key={r.tier.id}
+                  row={r}
+                  totalRemaining={totalRemaining}
+                  onExpand={setLightbox}
+                />
+              ))}
+            </ul>
+          </div>
 
           {/* Desktop: full columned table */}
           <div className="hidden md:block">
@@ -104,16 +106,18 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
               <span className="text-right">Value remaining</span>
               <span className="text-right">Value paid out</span>
             </div>
-            <ul className="divide-y">
-              {rows.map((r) => (
-                <PrizeRow
-                  key={r.tier.id}
-                  row={r}
-                  maxRemaining={maxRemaining}
-                  onExpand={setLightbox}
-                />
-              ))}
-            </ul>
+            <div className="max-h-[28rem] overflow-y-auto">
+              <ul className="divide-y">
+                {rows.map((r) => (
+                  <PrizeRow
+                    key={r.tier.id}
+                    row={r}
+                    maxRemaining={maxRemaining}
+                    onExpand={setLightbox}
+                  />
+                ))}
+              </ul>
+            </div>
           </div>
         </>
       )}

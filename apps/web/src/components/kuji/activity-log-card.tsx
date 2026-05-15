@@ -123,7 +123,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
   };
 
   return (
-    <div className="rounded-xl border bg-card p-4 dark:border-none">
+    <div className="flex h-full flex-col rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
         <span className="flex items-center gap-2 text-sm font-medium">
           <CheckCircle2
@@ -146,7 +146,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
           No draws recorded yet.
         </div>
       ) : (
-        <div className="max-h-80 overflow-y-auto pr-1">
+        <div className="min-h-0 max-h-80 flex-1 overflow-y-auto pr-1 lg:max-h-none">
         <ul className="divide-y">
           {logs.map((log) => {
             const qty = log.totalQuantityMoved ?? 0;
