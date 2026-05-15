@@ -25,9 +25,13 @@ public class KujiBoxTierResponseDTO {
     private Integer activeCount;
     /** Slips held back from the pool (kuji-internal). */
     private Integer inactiveCount;
+    /** Cumulative slips drawn since the box was opened. */
+    private Integer drawnCount;
     /** Convenience: activeCount + inactiveCount. */
     private Integer totalCount;
     private BigDecimal price;
+    /** Price of the linked product, when tier.price is unset. Pure pass-through; client picks the effective price. */
+    private BigDecimal linkedProductPrice;
     /** True when the linked product was created inline at open-box for this tier. */
     private Boolean autoCreatedProduct;
 }

@@ -69,6 +69,12 @@ public class KujiBoxTier {
     @Builder.Default
     private Integer inactiveCount = 0;
 
+    /** Cumulative slips drawn in the current box session (since openedAt). */
+    @NotNull
+    @Column(name = "drawn_count", nullable = false)
+    @Builder.Default
+    private Integer drawnCount = 0;
+
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
 

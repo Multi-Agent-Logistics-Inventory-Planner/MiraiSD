@@ -937,11 +937,30 @@ export interface KujiBoxTier {
   activeCount: number;
   /** Slips held back from the pool (kuji-internal). */
   inactiveCount: number;
+  /** Cumulative slips drawn since the box was opened. */
+  drawnCount: number;
   /** Convenience: activeCount + inactiveCount. */
   totalCount: number;
   price?: number | null;
+  /** Linked product's MSRP, used as a fallback when tier.price is null. */
+  linkedProductPrice?: number | null;
   /** True when the linked product was created inline at open-box for this tier. */
   autoCreatedProduct?: boolean | null;
+}
+
+export interface KujiDailyPayoutPoint {
+  date: string;
+  valueWon: number;
+  slipCount: number;
+}
+
+export interface KujiDailyPayoutsResponse {
+  boxId: string;
+  from: string;
+  to: string;
+  tz: string;
+  series: KujiDailyPayoutPoint[];
+  total: { valueWon: number; slipCount: number };
 }
 
 export interface KujiBox {

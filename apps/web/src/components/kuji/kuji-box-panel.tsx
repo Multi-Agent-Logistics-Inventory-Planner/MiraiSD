@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActiveKujiBox } from "@/hooks/queries/use-kuji-box";
 import { useAuditLogs } from "@/hooks/queries/use-audit-log";
+import { useKujiDailyPayouts } from "@/hooks/queries/use-kuji-daily-payouts";
 import { usePermissions } from "@/hooks/use-permissions";
 import { KujiBoxStatus, StockMovementReason, UserRole } from "@/types/api";
 import type { KujiBox, KujiBoxTier } from "@/types/api";
@@ -24,11 +25,12 @@ import { ReopenBoxDialog } from "./reopen-box-dialog";
 import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
 import { TransferInDialog } from "./transfer-in-dialog";
-import { KujiStatTile } from "./kuji-stat-tile";
-import { BoxOfSlipsCard } from "./box-of-slips-card";
-import { NotInBoxCard } from "./not-in-box-card";
 import { ActivityLogCard } from "./activity-log-card";
 import { InlineRecordDrawForm } from "./inline-record-draw-form";
+import { UniformBar } from "./uniform-bar";
+import { DailyPayoutChart } from "./daily-payout-chart";
+import { PrizePoolTable } from "./prize-pool-table";
+import { computeBoxValues } from "./kuji-value-rollups";
 
 interface KujiBoxPanelProps {
   readonly productId: string;
@@ -88,19 +90,6 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
 
   const boxIsOpen = box?.status === KujiBoxStatus.OPEN;
 
-  const stats = useMemo(() => {
-    if (!box) {
-      return { total: 0, slips: 0, notInBox: 0 };
-    }
-    let total = 0;
-    let notInBox = 0;
-    for (const tier of box.tiers) {
-      total += tier.activeCount + tier.inactiveCount;
-      notInBox += tier.inactiveCount;
-    }
-    return { total, slips: box.totalCount, notInBox };
-  }, [box]);
-
   const recentLogs = useMemo(() => {
     const all = sessionLogsQuery.data?.content ?? [];
     const lo = box?.openedAt;
@@ -108,28 +97,22 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     return [...scoped].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [sessionLogsQuery.data, box?.openedAt]);
 
-  // "Draws today" = today's drawn slips minus today's reversed slips.
-  // Slip adjustments (stash/promote/add-slip) are not draws and are excluded.
-  const drawsToday = useMemo(() => {
-    return recentLogs.reduce((sum, log) => {
-      const isToday = log.createdAt.slice(0, 10) === today;
-      if (!isToday) return sum;
-      const qty = log.totalQuantityMoved ?? 0;
-      if (log.reason === StockMovementReason.KUJI_PRIZE_WON) return sum + qty;
-      if (log.reason === StockMovementReason.KUJI_DRAW_REVERSED) return sum - qty;
-      return sum;
-    }, 0);
-  }, [recentLogs, today]);
+  const valueRollups = useMemo(() => computeBoxValues(box), [box]);
 
-  // Total slips drawn for the current open session of the box (since openedAt).
-  const totalDrawn = useMemo(() => {
-    return recentLogs.reduce((sum, log) => {
-      const qty = log.totalQuantityMoved ?? 0;
-      if (log.reason === StockMovementReason.KUJI_PRIZE_WON) return sum + qty;
-      if (log.reason === StockMovementReason.KUJI_DRAW_REVERSED) return sum - qty;
-      return sum;
-    }, 0);
-  }, [recentLogs]);
+  const tz = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    [],
+  );
+  const dailyFrom = useMemo(() => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    return sevenDaysAgo.toISOString().slice(0, 10);
+  }, []);
+  const dailyPayoutsQuery = useKujiDailyPayouts(box?.id, {
+    from: dailyFrom,
+    to: today,
+    tz,
+  });
 
   function handleEditTier(tier: KujiBoxTier) {
     setActiveTier(tier);
@@ -192,9 +175,10 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               size="sm"
               variant="outline"
               onClick={() => setUndoDrawOpen(true)}
+              aria-label="Undo Draw"
             >
-              <Undo2 className="mr-1 h-4 w-4" />
-              Undo Draw
+              <Undo2 className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Undo Draw</span>
             </Button>
           ) : null}
           {boxIsOpen && canStructural ? (
@@ -203,9 +187,10 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               size="sm"
               variant="outline"
               onClick={() => setManageTiersOpen(true)}
+              aria-label="Manage Tiers"
             >
-              <ListTodo className="mr-1 h-4 w-4" />
-              Manage Tiers
+              <ListTodo className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Manage Tiers</span>
             </Button>
           ) : null}
           {boxIsOpen && canStructural ? (
@@ -214,9 +199,10 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               size="sm"
               variant="outline"
               onClick={() => setCloseBoxOpen(true)}
+              aria-label="Close Box"
             >
-              <Lock className="mr-1 h-4 w-4" />
-              Close Box
+              <Lock className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Close Box</span>
             </Button>
           ) : null}
           {box && !boxIsOpen && canStructural ? (
@@ -225,40 +211,13 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               size="sm"
               variant="outline"
               onClick={() => setReopenBoxOpen(true)}
+              aria-label="Reopen"
             >
-              <MinusCircle className="mr-1 h-4 w-4" />
-              Reopen
+              <MinusCircle className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Reopen</span>
             </Button>
           ) : null}
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        <KujiStatTile
-          label="Total prizes"
-          value={stats.total.toLocaleString()}
-          sub="in machine"
-        />
-        <KujiStatTile
-          label="Active Slips"
-          value={stats.slips.toLocaleString()}
-          sub="ready to draw"
-        />
-        <KujiStatTile
-          label="Inactive Slips"
-          value={stats.notInBox.toLocaleString()}
-          sub="held back"
-        />
-        <KujiStatTile
-          label="Total drawn"
-          value={totalDrawn.toLocaleString()}
-          sub="this session"
-        />
-        <KujiStatTile
-          label="Draws today"
-          value={drawsToday.toLocaleString()}
-          sub="today"
-        />
       </div>
 
       {!box ? (
@@ -279,15 +238,22 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <BoxOfSlipsCard tiers={box.tiers} totalCount={box.totalCount} />
-            <NotInBoxCard tiers={box.tiers} />
+          <UniformBar valueRollups={valueRollups} />
+
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1.5fr_1fr]">
+            <DailyPayoutChart
+              data={dailyPayoutsQuery.data?.series ?? []}
+              totals={dailyPayoutsQuery.data?.total}
+              isLoading={dailyPayoutsQuery.isLoading}
+              isError={dailyPayoutsQuery.isError}
+            />
+            <ActivityLogCard
+              logs={recentLogs}
+              isLoading={sessionLogsQuery.isLoading}
+            />
           </div>
 
-          <ActivityLogCard
-            logs={recentLogs}
-            isLoading={sessionLogsQuery.isLoading}
-          />
+          <PrizePoolTable tiers={box.tiers} />
 
           {boxIsOpen && canDraw ? (
             <>
