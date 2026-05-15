@@ -26,7 +26,7 @@ import { UndoDrawDialog } from "./undo-draw-dialog";
 import { TierEditDialog } from "./tier-edit-dialog";
 import { TransferInDialog } from "./transfer-in-dialog";
 import { ActivityLogCard } from "./activity-log-card";
-import { InlineRecordDrawForm } from "./inline-record-draw-form";
+import { RecordDrawDialog } from "./record-draw-dialog";
 import { UniformBar } from "./uniform-bar";
 import { DailyPayoutChart } from "./daily-payout-chart";
 import { PrizePoolTable } from "./prize-pool-table";
@@ -269,7 +269,7 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
                 <Plus className="mr-1 h-4 w-4" />
                 Record a draw
               </Button>
-              <InlineRecordDrawForm
+              <RecordDrawDialog
                 box={box}
                 open={recordOpen}
                 onOpenChange={setRecordOpen}
