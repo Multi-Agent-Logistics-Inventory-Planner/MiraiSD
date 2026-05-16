@@ -60,6 +60,7 @@ export function RecordDrawDialog({
   const visibleTiers = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sortedTiers.filter((t) => {
+      if (t.activeCount <= 0) return false;
       if (!matchesClassFilter(t, filter)) return false;
       if (!q) return true;
       const label = (t.label ?? "").toLowerCase();
