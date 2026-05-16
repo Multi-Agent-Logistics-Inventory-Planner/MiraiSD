@@ -442,7 +442,7 @@ export function LocationDetailSheet({
       ) : null}
 
       <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto [&_[data-slot=scroll-area-viewport]>div]:!block">
           <div className="pb-6 pr-3">
             {inventoryQuery.isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -465,7 +465,7 @@ export function LocationDetailSheet({
                     setSelectedProductId(inv.item.id);
                     setProductModalOpen(true);
                   }}
-                  className="w-full text-left flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-3 sm:py-4 border-b last:border-b-0 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md transition-colors disabled:opacity-60 disabled:cursor-wait"
+                  className="w-full min-w-0 text-left flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-3 sm:py-4 border-b last:border-b-0 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md transition-colors disabled:opacity-60 disabled:cursor-wait"
                 >
                   <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                     {inv.item.imageUrl ? (
@@ -549,7 +549,7 @@ export function LocationDetailSheet({
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto [&_[data-slot=scroll-area-viewport]>div]:!block">
           <div className="pb-6 pr-3 overflow-hidden">
             {activeDisplaysForMachine.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-center text-sm text-muted-foreground">
@@ -665,7 +665,7 @@ export function LocationDetailSheet({
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto">
+        <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto [&_[data-slot=scroll-area-viewport]>div]:!block">
           <div className="pb-6 pr-3 overflow-x-hidden">
             {isHistoryLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
