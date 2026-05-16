@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
+import { useCategories } from "@/hooks/queries/use-categories";
 import { useAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
 import {
   useCreateInventoryMutation,
@@ -163,29 +164,36 @@ export function AdjustStockDialog({
     return inventory.map(normalizeInventory);
   }, [inventory]);
 
-  const availableCategories = useMemo(() => {
-    const categoryMap = new Map<string, Category>();
+  const { data: allCategories } = useCategories();
+
+  const { presentRootIds, presentChildIds } = useMemo(() => {
+    const roots = new Set<string>();
+    const children = new Set<string>();
     inventory.forEach((item) => {
-      if (item.item.category) {
-        categoryMap.set(item.item.category.id, item.item.category);
+      const category = item.item.category;
+      if (!category) return;
+      if (category.parentId) {
+        roots.add(category.parentId);
+        children.add(category.id);
+      } else {
+        roots.add(category.id);
       }
     });
-    return Array.from(categoryMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    return { presentRootIds: roots, presentChildIds: children };
   }, [inventory]);
 
-  const availableChildCategories = useMemo(() => {
-    const childCategoryMap = new Map<string, Category>();
-    inventory.forEach((item) => {
-      if (item.item.category?.parentId) {
-        childCategoryMap.set(item.item.category.id, item.item.category);
-      }
-    });
-    return Array.from(childCategoryMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
+  const availableCategories = useMemo<Category[]>(() => {
+    return (allCategories ?? []).filter(
+      (c) => !c.parentId && presentRootIds.has(c.id)
     );
-  }, [inventory]);
+  }, [allCategories, presentRootIds]);
+
+  const availableChildCategories = useMemo<Category[]>(() => {
+    const selectedCategoryId = categoryFilters[0];
+    if (!selectedCategoryId) return [];
+    const selected = availableCategories.find((c) => c.id === selectedCategoryId);
+    return (selected?.children ?? []).filter((c) => presentChildIds.has(c.id));
+  }, [availableCategories, categoryFilters, presentChildIds]);
 
   const selectedInventory = useMemo(() => {
     return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
