@@ -1,21 +1,20 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { adjustStock, batchTransferStock, transferStock } from "@/lib/api/stock-movements";
+import { batchAdjustStock, batchTransferStock, transferStock } from "@/lib/api/stock-movements";
 import { getProductById } from "@/lib/api/products";
 import {
   LocationType,
-  type AdjustStockRequest,
+  type BatchAdjustStockRequest,
   type Product,
   type StockMovement,
   type TransferStockRequest,
 } from "@/types/api";
 
-interface AdjustStockVariables {
-  locationType: LocationType;
-  inventoryId: string;
-  payload: AdjustStockRequest;
-  productId?: string;
+export interface BatchAdjustVariables {
+  payload: BatchAdjustStockRequest;
+  /** Product ids touched by this batch — used to invalidate per-product query keys. */
+  productIds: string[];
 }
 
 interface TransferStockVariables {
@@ -83,13 +82,36 @@ async function invalidateStockQueries(
   }
 }
 
-export function useAdjustStockMutation() {
+export function useBatchAdjustStockMutation() {
   const qc = useQueryClient();
-  return useMutation<StockMovement, Error, AdjustStockVariables>({
-    mutationFn: ({ locationType, inventoryId, payload }) =>
-      adjustStock(locationType, inventoryId, payload),
+  return useMutation<void, Error, BatchAdjustVariables>({
+    mutationFn: ({ payload }) => batchAdjustStock(payload),
     onSuccess: async (_data, variables) => {
-      await invalidateStockQueries(qc, variables.productId, variables.locationType);
+      const { payload, productIds } = variables;
+      const uniqueProductIds = [...new Set(productIds)];
+
+      const tasks: Promise<unknown>[] = [
+        qc.invalidateQueries({
+          queryKey: ["locationInventory", payload.locationType, payload.locationId],
+        }),
+        qc.invalidateQueries({ queryKey: ["auditLogs"] }),
+        qc.invalidateQueries({ queryKey: ["auditLog"] }),
+      ];
+
+      for (const id of uniqueProductIds) {
+        tasks.push(qc.invalidateQueries({ queryKey: ["products", id] }));
+        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "with-children"] }));
+        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "children"] }));
+        tasks.push(qc.invalidateQueries({ queryKey: ["productInventoryEntries", id] }));
+        tasks.push(qc.invalidateQueries({ queryKey: ["inventoryByItem", id] }));
+        tasks.push(qc.invalidateQueries({ queryKey: ["movementHistory", id] }));
+      }
+
+      if (payload.locationType === LocationType.NOT_ASSIGNED) {
+        tasks.push(qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }));
+      }
+
+      await Promise.all(tasks);
     },
   });
 }

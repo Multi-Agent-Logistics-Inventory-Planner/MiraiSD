@@ -39,6 +39,34 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
     @Query("SELECT li FROM LocationInventory li WHERE li.location.id = :locationId AND li.product.id IN :productIds")
     List<LocationInventory> findByLocation_IdAndProduct_IdIn(@Param("locationId") UUID locationId, @Param("productIds") Collection<UUID> productIds);
 
+    /**
+     * Batch fetch LocationInventory rows by id with all associations needed for
+     * stock-movement bookkeeping eager-loaded (location, storage location, product,
+     * product.parent). Used by batch-adjust and batch-transfer to avoid N+1 lazy
+     * fetches during the validation + outbox-event loops.
+     */
+    @Query("""
+        SELECT li FROM LocationInventory li
+        JOIN FETCH li.location l
+        JOIN FETCH l.storageLocation sl
+        JOIN FETCH li.product p
+        LEFT JOIN FETCH p.parent
+        WHERE li.id IN :ids
+        """)
+    List<LocationInventory> findAllByIdWithGraph(@Param("ids") Collection<UUID> ids);
+
+    /**
+     * Sum on-hand quantity grouped by product id for the given products in one query.
+     * Returns rows of [productId UUID, totalQuantity Long]; missing products mean total = 0.
+     */
+    @Query("""
+        SELECT li.product.id, SUM(li.quantity)
+        FROM LocationInventory li
+        WHERE li.product.id IN :productIds
+        GROUP BY li.product.id
+        """)
+    List<Object[]> sumQuantitiesByProductIds(@Param("productIds") Collection<UUID> productIds);
+
     @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE li.site.id = :siteId")
     List<LocationInventory> findBySite_Id(@Param("siteId") UUID siteId);
 

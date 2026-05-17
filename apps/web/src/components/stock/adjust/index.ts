@@ -7,6 +7,7 @@ export { ReasonSelector } from "./reason-selector";
 export { AdjustmentConfirmDialog } from "./adjustment-confirm-dialog";
 export {
   type AdjustAction,
+  type CartLine,
   type NormalizedInventory,
   type ProductListProps,
   type QuantityControlsProps,
@@ -18,3 +19,6 @@ export {
   normalizeInventory,
   getNoResultsMessage,
 } from "./types";
+export { CartProductRow } from "./cart-product-row";
+export { CartSummaryStrip } from "./cart-summary-strip";
+export { CartProductList } from "./cart-product-list";

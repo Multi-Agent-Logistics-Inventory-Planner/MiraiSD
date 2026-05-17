@@ -49,11 +49,35 @@ public class EventOutboxService {
     }
 
     /**
+     * Precomputed context for outbox event creation in batch flows.
+     * Lets callers (batch-adjust, batch-transfer) supply already-resolved
+     * location codes and per-product current totals so the outbox loop
+     * does not re-fetch them per row.
+     */
+    public record StockEventContext(
+            Map<UUID, String> locationCodesById,
+            Map<UUID, Integer> currentTotalsByProductId
+    ) {
+        public static StockEventContext empty() {
+            return new StockEventContext(Map.of(), Map.of());
+        }
+    }
+
+    /**
      * Create outbox event for stock movement
      * Called by StockMovementService after saving a movement
      */
     @Transactional
     public void createStockMovementEvent(StockMovement movement) {
+        createStockMovementEvent(movement, StockEventContext.empty());
+    }
+
+    /**
+     * Batch-aware overload: looks up location codes and current totals from the
+     * provided context when present, falling back to per-row queries otherwise.
+     */
+    @Transactional
+    public void createStockMovementEvent(StockMovement movement, StockEventContext ctx) {
         Product item = movement.getItem();
         // Kuji prize children's inventory is a bookkeeping projection of remaining slips in the
         // box; the parent's KUJI_PRIZE_DRAWN notification already conveys per-tier counts. Skip
@@ -79,33 +103,19 @@ public class EventOutboxService {
         payload.put("at", movement.getAt().toString()); // YYYY-MM-DDTHH:MM:SSZ
 
         // Location codes (renamed for consistency)
-        if (movement.getFromLocationId() != null) {
-            String fromCode = stockMovementService.resolveLocationCode(
-                    movement.getFromLocationId(),
-                    movement.getLocationType()
-            );
-            payload.put("from_location_code", fromCode); // "B1", "S2", "D1", "K1", "C1", "R3", etc
-        } else {
-            payload.put("from_location_code", null);
-        }
-
-        if (movement.getToLocationId() != null) {
-            String toCode = stockMovementService.resolveLocationCode(
-                    movement.getToLocationId(),
-                    movement.getLocationType()
-            );
-            payload.put("to_location_code", toCode);
-        } else {
-            payload.put("to_location_code", null);
-        }
+        payload.put("from_location_code", resolveLocationCodeCached(movement.getFromLocationId(), movement.getLocationType(), ctx));
+        payload.put("to_location_code", resolveLocationCodeCached(movement.getToLocationId(), movement.getLocationType(), ctx));
 
         // Location-level quantities for crossing logic (from StockMovement)
         payload.put("previous_location_qty", movement.getPreviousQuantity());
         payload.put("current_location_qty", movement.getCurrentQuantity());
 
-        // Total-level quantities for crossing logic (computed in same transaction)
+        // Total-level quantities for crossing logic. Prefer the precomputed total
+        // from the batch context (one GROUP BY query covers all rows) and fall
+        // back to per-row sumQuantityByProductId for legacy single-row callers.
         UUID productId = movement.getItem().getId();
-        int currentTotal = stockMovementService.calculateTotalInventory(productId);
+        Integer ctxTotal = ctx.currentTotalsByProductId().get(productId);
+        int currentTotal = ctxTotal != null ? ctxTotal : stockMovementService.calculateTotalInventory(productId);
         int previousTotal = currentTotal - movement.getQuantityChange();
         payload.put("previous_total_qty", previousTotal);
         payload.put("current_total_qty", currentTotal);
@@ -138,6 +148,17 @@ public class EventOutboxService {
             // This is expected in race conditions - log and continue gracefully
             log.warn("Outbox event already exists for stock movement {}, skipping duplicate", movement.getId());
         }
+    }
+
+    private String resolveLocationCodeCached(UUID locationId, com.mirai.inventoryservice.models.enums.LocationType locationType, StockEventContext ctx) {
+        if (locationId == null) {
+            return locationType == com.mirai.inventoryservice.models.enums.LocationType.NOT_ASSIGNED ? "NA" : null;
+        }
+        String cached = ctx.locationCodesById().get(locationId);
+        if (cached != null) {
+            return cached;
+        }
+        return stockMovementService.resolveLocationCode(locationId, locationType);
     }
 
     /**

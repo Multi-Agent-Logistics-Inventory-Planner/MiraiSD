@@ -88,15 +88,22 @@ class StockMovementControllerSecurityIT extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("POST /api/stock-movements/{locationType}/{inventoryId}/adjust")
-    class AdjustInventoryTests {
+    @DisplayName("POST /api/stock-movements/batch-adjust")
+    class BatchAdjustInventoryTests {
 
-        private static final String ADJUST_URL = BASE_URL + "/RACK/550e8400-e29b-41d4-a716-446655440000/adjust";
+        private static final String ADJUST_URL = BASE_URL + "/batch-adjust";
         private static final String ADJUST_JSON = """
                 {
-                    "quantityChange": 5,
+                    "locationType": "RACK",
+                    "locationId": "550e8400-e29b-41d4-a716-446655440000",
+                    "actorId": "550e8400-e29b-41d4-a716-446655440099",
                     "reason": "RESTOCK",
-                    "notes": "Test adjustment"
+                    "adjustments": [
+                        {
+                            "inventoryId": "550e8400-e29b-41d4-a716-446655440001",
+                            "quantityChange": 5
+                        }
+                    ]
                 }
                 """;
 

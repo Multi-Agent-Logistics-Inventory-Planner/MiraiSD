@@ -562,32 +562,42 @@ export function LocationDetailSheet({
                   <div
                     key={item.id}
                     className={cn(
-                      "flex items-center gap-2 sm:gap-4 py-3 sm:py-4 min-w-0 overflow-hidden border-b last:border-b-0",
+                      "flex items-center gap-2 sm:gap-4 min-w-0 overflow-hidden border-b last:border-b-0",
                       item.stale && "bg-amber-50 dark:bg-amber-950/20"
                     )}
                   >
-                    <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-                      {product?.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt={item.productName}
-                          fill
-                          sizes="48px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
-                          <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 w-0">
-                      <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
-                        · {item.daysActive} days
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={!productInventory}
+                      onClick={() => {
+                        setSelectedProductId(item.productId);
+                        setProductModalOpen(true);
+                      }}
+                      className="flex-1 min-w-0 text-left flex items-center gap-2 sm:gap-4 px-2 sm:px-3 py-3 sm:py-4 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md transition-colors disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      <div className="relative h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                        {product?.imageUrl ? (
+                          <Image
+                            src={product.imageUrl}
+                            alt={item.productName}
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <Monitor className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 w-0">
+                        <p className="font-medium text-xs sm:text-base truncate">{item.productName}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 truncate">
+                          · {item.daysActive} days
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0 pr-2">
                       {item.stale && (
                         <Badge variant="secondary" className="text-amber-600 text-xs">
                           Stale

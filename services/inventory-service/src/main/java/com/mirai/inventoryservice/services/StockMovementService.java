@@ -1,7 +1,8 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
+import com.mirai.inventoryservice.dtos.requests.BatchAdjustLineDTO;
+import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
@@ -25,11 +26,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service for managing stock movements and inventory operations.
@@ -106,42 +112,59 @@ public class StockMovementService {
     }
 
     /**
-     * Adjust inventory quantity (restock, sale, damage, etc.)
-     * Creates a single stock movement record linked to an audit log
+     * Atomically adjust inventory for one or more products at a single location.
+     * Creates one StockMovement row per line, all linked to a single AuditLog
+     * with itemCount = adjustments.size() and totalQuantity = sum(|quantityChange|).
+     *
+     * Replaces the prior single-line adjustInventory; single adjusts are now a batch of 1.
      */
     @Transactional
-    public StockMovement adjustInventory(LocationType locationType, UUID inventoryId, AdjustStockRequestDTO request) {
-        LocationInventory inventory = locationInventoryRepository.findById(inventoryId)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+    public List<StockMovement> batchAdjustInventory(BatchAdjustStockRequestDTO request) {
+        List<BatchAdjustLineDTO> lines = request.getAdjustments();
 
-        rejectIfCustomKujiParent(inventory.getProduct());
+        validateBatchAdjustSigns(lines);
 
-        int currentQuantity = inventory.getQuantity();
-        int newQuantity = currentQuantity + request.getQuantityChange();
+        Map<UUID, LocationInventory> inventoryById = preloadInventories(
+                lines.stream().map(BatchAdjustLineDTO::getInventoryId).collect(Collectors.toList())
+        );
 
-        if (newQuantity < 0) {
-            throw new InsufficientInventoryException(
-                    String.format("Cannot reduce quantity by %d. Current quantity: %d",
-                            Math.abs(request.getQuantityChange()), currentQuantity)
-            );
+        // Validate ownership: every inventoryId must live at the supplied location.
+        for (BatchAdjustLineDTO line : lines) {
+            LocationInventory inv = inventoryById.get(line.getInventoryId());
+            if (inv == null) {
+                throw new InventoryNotFoundException("Inventory not found: " + line.getInventoryId());
+            }
+            if (!Objects.equals(inv.getLocation().getId(), request.getLocationId())) {
+                throw new InvalidInventoryOperationException(
+                        "Inventory " + line.getInventoryId() + " does not belong to location " + request.getLocationId());
+            }
+            rejectIfCustomKujiParent(inv.getProduct());
         }
 
-        validateKujiAllocation(
-                inventory.getLocation().getId(),
-                inventory.getProduct().getId(),
-                newQuantity);
-
-        if (newQuantity == 0) {
-            locationInventoryRepository.delete(inventory);
-        } else {
-            inventory.setQuantity(newQuantity);
-            locationInventoryRepository.save(inventory);
+        // Validate quantities (subtract cannot exceed on-hand).
+        for (BatchAdjustLineDTO line : lines) {
+            LocationInventory inv = inventoryById.get(line.getInventoryId());
+            int current = inv.getQuantity();
+            int next = current + line.getQuantityChange();
+            if (next < 0) {
+                throw new InsufficientInventoryException(
+                        String.format(
+                                "Cannot reduce inventory %s by %d. Current quantity: %d",
+                                line.getInventoryId(), Math.abs(line.getQuantityChange()), current));
+            }
+            validateKujiAllocation(inv.getLocation().getId(), inv.getProduct().getId(), next);
         }
 
-        UUID locationId = inventory.getLocation().getId();
-        String locationCode = inventory.getLocation().getLocationCode();
-        String storageLocationCode = inventory.getLocation().getStorageLocation().getCode();
+        int totalQuantity = lines.stream().mapToInt(l -> Math.abs(l.getQuantityChange())).sum();
+        LocationInventory first = inventoryById.get(lines.get(0).getInventoryId());
+        UUID locationId = first.getLocation().getId();
+        String locationCode = first.getLocation().getLocationCode();
+        String storageLocationCode = first.getLocation().getStorageLocation().getCode();
         LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
+
+        String productSummary = lines.size() == 1
+                ? first.getProduct().getName()
+                : lines.size() + " products";
 
         AuditLog auditLog = createAuditLog(
                 request.getActorId(),
@@ -150,50 +173,176 @@ public class StockMovementService {
                 null,
                 locationId,
                 locationCode,
-                1,
-                Math.abs(request.getQuantityChange()),
-                inventory.getProduct().getName(),
+                lines.size(),
+                totalQuantity,
+                productSummary,
                 request.getNotes()
         );
 
-        Map<String, Object> metadata = new HashMap<>();
-        if (request.getNotes() != null) {
-            metadata.put("notes", request.getNotes());
+        OffsetDateTime now = OffsetDateTime.now();
+        List<LocationInventory> toSave = new ArrayList<>();
+        List<LocationInventory> toDelete = new ArrayList<>();
+        List<StockMovement> movements = new ArrayList<>(lines.size());
+        Set<UUID> affectedProductIds = new HashSet<>();
+
+        for (BatchAdjustLineDTO line : lines) {
+            LocationInventory inv = inventoryById.get(line.getInventoryId());
+            int currentQuantity = inv.getQuantity();
+            int newQuantity = currentQuantity + line.getQuantityChange();
+
+            if (newQuantity == 0) {
+                toDelete.add(inv);
+            } else {
+                inv.setQuantity(newQuantity);
+                toSave.add(inv);
+            }
+
+            Map<String, Object> metadata = new HashMap<>();
+            if (request.getNotes() != null) {
+                metadata.put("notes", request.getNotes());
+            }
+            metadata.put("inventory_id", line.getInventoryId().toString());
+            if ("box".equalsIgnoreCase(line.getIntakeUnit())
+                    && line.getIntakeQty() != null && line.getIntakeQty() > 0) {
+                metadata.put("intake_unit", "box");
+                metadata.put("intake_qty", line.getIntakeQty());
+            }
+
+            movements.add(StockMovement.builder()
+                    .auditLog(auditLog)
+                    .item(inv.getProduct())
+                    .locationType(derivedLocationType)
+                    .toLocationId(locationId)
+                    .previousQuantity(currentQuantity)
+                    .currentQuantity(newQuantity)
+                    .quantityChange(line.getQuantityChange())
+                    .reason(request.getReason())
+                    .actorId(request.getActorId())
+                    .at(now)
+                    .metadata(metadata)
+                    .build());
+
+            affectedProductIds.add(inv.getProduct().getId());
         }
-        metadata.put("inventory_id", inventoryId.toString());
-        // When the user entered the quantity in boxes, preserve that intent so
-        // the audit log can render "+2 boxes (72 packs)" instead of just "+72".
-        if ("box".equalsIgnoreCase(request.getIntakeUnit()) && request.getIntakeQty() != null && request.getIntakeQty() > 0) {
-            metadata.put("intake_unit", "box");
-            metadata.put("intake_qty", request.getIntakeQty());
+
+        if (!toSave.isEmpty()) {
+            locationInventoryRepository.saveAll(toSave);
+        }
+        if (!toDelete.isEmpty()) {
+            locationInventoryRepository.deleteAll(toDelete);
         }
 
-        StockMovement movement = StockMovement.builder()
-                .auditLog(auditLog)
-                .item(inventory.getProduct())
-                .locationType(derivedLocationType)
-                .toLocationId(locationId)
-                .previousQuantity(currentQuantity)
-                .currentQuantity(newQuantity)
-                .quantityChange(request.getQuantityChange())
-                .reason(request.getReason())
-                .actorId(request.getActorId())
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
+        List<StockMovement> saved = stockMovementRepository.saveAll(movements);
 
-        StockMovement savedMovement = stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(savedMovement);
-
-        boolean productChanged = updateProductActiveStatus(savedMovement.getItem());
-
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, savedMovement.getItem().getId().toString());
-        broadcastService.broadcastAuditLogCreated(savedMovement.getItem().getId().toString());
-        if (productChanged) {
-            broadcastService.broadcastProductUpdated(List.of(savedMovement.getItem().getId().toString()));
+        // Compute current totals once for every affected product (single GROUP BY),
+        // then pass them into the outbox loop alongside the already-known location code.
+        // Avoids 1× sumQuantityByProductId + 1× entityManager.flush per outbox event.
+        entityManager.flush();
+        Map<UUID, Integer> currentTotals = sumCurrentTotalsByProductIds(affectedProductIds);
+        EventOutboxService.StockEventContext outboxCtx = new EventOutboxService.StockEventContext(
+                Map.of(locationId, locationCode),
+                currentTotals
+        );
+        for (StockMovement m : saved) {
+            eventOutboxService.createStockMovementEvent(m, outboxCtx);
         }
 
-        return savedMovement;
+        List<UUID> changedProductIds = applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
+
+        broadcastService.broadcastInventoryUpdated(storageLocationCode, null);
+        broadcastService.broadcastAuditLogCreated(null);
+        if (!changedProductIds.isEmpty()) {
+            broadcastService.broadcastProductUpdated(
+                    changedProductIds.stream().map(UUID::toString).collect(Collectors.toList()));
+        }
+
+        return saved;
+    }
+
+    /**
+     * Every line in a batch must share the same sign (all add or all subtract).
+     * Mixing signs in a single submission is rejected at the service layer.
+     */
+    private void validateBatchAdjustSigns(List<BatchAdjustLineDTO> lines) {
+        Integer signum = null;
+        for (BatchAdjustLineDTO line : lines) {
+            int q = line.getQuantityChange();
+            if (q == 0) {
+                throw new InvalidInventoryOperationException(
+                        "quantityChange must be non-zero for inventory " + line.getInventoryId());
+            }
+            int s = Integer.signum(q);
+            if (signum == null) {
+                signum = s;
+            } else if (!signum.equals(s)) {
+                throw new InvalidInventoryOperationException(
+                        "All adjustments in a batch must share the same sign (all add or all subtract)");
+            }
+        }
+    }
+
+    /**
+     * One-shot fetch of LocationInventory rows by id with location, storage location,
+     * product, and product.parent eager-loaded via JOIN FETCH. Replaces both the
+     * per-line findById loops and the lazy-fetch N+1 that followed.
+     */
+    private Map<UUID, LocationInventory> preloadInventories(Collection<UUID> inventoryIds) {
+        Map<UUID, LocationInventory> map = new LinkedHashMap<>();
+        for (LocationInventory inv : locationInventoryRepository.findAllByIdWithGraph(inventoryIds)) {
+            map.put(inv.getId(), inv);
+        }
+        return map;
+    }
+
+    /**
+     * Single GROUP BY query returning current on-hand totals per product id.
+     * Products with zero stock are present in the map with value 0 so callers
+     * can mark them inactive without an additional query.
+     */
+    private Map<UUID, Integer> sumCurrentTotalsByProductIds(Set<UUID> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Integer> totals = new HashMap<>();
+        for (UUID id : productIds) {
+            totals.put(id, 0);
+        }
+        for (Object[] row : locationInventoryRepository.sumQuantitiesByProductIds(productIds)) {
+            UUID productId = (UUID) row[0];
+            Long sum = (Long) row[1];
+            totals.put(productId, sum == null ? 0 : sum.intValue());
+        }
+        return totals;
+    }
+
+    /**
+     * Apply (quantity, isActive) updates to every affected product from the
+     * pre-computed totals map, in a single {@code findAllById} fetch and a batched
+     * write. Skips redundant sumQuantityByProductId calls that the legacy
+     * per-product helper would have run.
+     */
+    private List<UUID> applyProductActiveStatusFromTotals(Set<UUID> productIds, Map<UUID, Integer> totals) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> changed = new ArrayList<>();
+        List<Product> toSave = new ArrayList<>();
+        for (Product p : productRepository.findAllById(productIds)) {
+            int total = totals.getOrDefault(p.getId(), 0);
+            boolean shouldBeActive = total > 0;
+            boolean hasChange = !Objects.equals(p.getQuantity(), total)
+                    || !Objects.equals(p.getIsActive(), shouldBeActive);
+            if (hasChange) {
+                p.setQuantity(total);
+                p.setIsActive(shouldBeActive);
+                toSave.add(p);
+                changed.add(p.getId());
+            }
+        }
+        if (!toSave.isEmpty()) {
+            productRepository.saveAll(toSave);
+        }
+        return changed;
     }
 
     /**
@@ -226,7 +375,12 @@ public class StockMovementService {
                 request.getNotes()
         );
 
-        executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
+        Map<UUID, String> codes = new HashMap<>();
+        codes.put(sourceLocationId, sourceLocationCode);
+        if (destLocationId != null && destLocationCode != null) {
+            codes.put(destLocationId, destLocationCode);
+        }
+        executeTransfer(request, sourceInventory, sourceQuantity, auditLog, true, codes);
 
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
@@ -235,14 +389,23 @@ public class StockMovementService {
     /**
      * Transfer multiple inventory items between two locations in a single batch.
      * Creates ONE audit log entry covering all items, with itemCount = number of distinct products.
+     *
+     * Pre-loads all source LocationInventory rows in a single query and defers
+     * product active-status updates to a single sweep after the loop.
      */
     @Transactional
     public void batchTransferInventory(BatchTransferInventoryRequestDTO batchRequest) {
         List<TransferInventoryRequestDTO> transfers = batchRequest.getTransfers();
 
+        Map<UUID, LocationInventory> sourceById = preloadInventories(
+                transfers.stream().map(TransferInventoryRequestDTO::getSourceInventoryId).collect(Collectors.toList())
+        );
+
         TransferInventoryRequestDTO first = transfers.get(0);
-        LocationInventory firstSource = locationInventoryRepository.findById(first.getSourceInventoryId())
-                .orElseThrow(() -> new InventoryNotFoundException("Source inventory not found: " + first.getSourceInventoryId()));
+        LocationInventory firstSource = sourceById.get(first.getSourceInventoryId());
+        if (firstSource == null) {
+            throw new InventoryNotFoundException("Source inventory not found: " + first.getSourceInventoryId());
+        }
 
         UUID sourceLocationId = firstSource.getLocation().getId();
         String sourceLocationCode = firstSource.getLocation().getLocationCode();
@@ -269,12 +432,31 @@ public class StockMovementService {
                 first.getNotes()
         );
 
-        for (TransferInventoryRequestDTO request : transfers) {
-            LocationInventory sourceInventory = locationInventoryRepository.findById(request.getSourceInventoryId())
-                    .orElseThrow(() -> new InventoryNotFoundException("Source inventory not found: " + request.getSourceInventoryId()));
-            int sourceQuantity = sourceInventory.getQuantity();
-            executeTransfer(request, sourceInventory, sourceQuantity, auditLog);
+        Set<UUID> affectedProductIds = new HashSet<>();
+        Map<UUID, String> codes = new HashMap<>();
+        codes.put(sourceLocationId, sourceLocationCode);
+        if (destLocationId != null && destLocationCode != null) {
+            codes.put(destLocationId, destLocationCode);
         }
+
+        for (TransferInventoryRequestDTO request : transfers) {
+            LocationInventory sourceInventory = sourceById.get(request.getSourceInventoryId());
+            if (sourceInventory == null) {
+                throw new InventoryNotFoundException("Source inventory not found: " + request.getSourceInventoryId());
+            }
+            int sourceQuantity = sourceInventory.getQuantity();
+            executeTransfer(request, sourceInventory, sourceQuantity, auditLog, false, codes);
+            affectedProductIds.add(sourceInventory.getProduct().getId());
+        }
+
+        // Compute totals once for all affected products, then publish outbox-friendly
+        // updates: in the transfer path, the per-row outbox events were already
+        // created inside executeTransfer with the codes map but without precomputed
+        // totals (they fall back to per-row sumQuantityByProductId). The status
+        // update below still benefits from a single GROUP BY.
+        entityManager.flush();
+        Map<UUID, Integer> currentTotals = sumCurrentTotalsByProductIds(affectedProductIds);
+        applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
@@ -286,7 +468,8 @@ public class StockMovementService {
      */
     private void executeTransfer(TransferInventoryRequestDTO request,
                                   LocationInventory sourceInventory, int sourceQuantity,
-                                  AuditLog auditLog) {
+                                  AuditLog auditLog, boolean syncProductStatus,
+                                  Map<UUID, String> locationCodesById) {
         if (sourceQuantity < request.getQuantity()) {
             throw new InsufficientInventoryException(
                     String.format("Cannot transfer %d items. Source only has %d available.",
@@ -397,10 +580,17 @@ public class StockMovementService {
 
         StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
         StockMovement savedDeposit = stockMovementRepository.save(deposit);
-        eventOutboxService.createStockMovementEvent(savedWithdrawal);
-        eventOutboxService.createStockMovementEvent(savedDeposit);
 
-        updateProductActiveStatus(sourceInventory.getProduct());
+        EventOutboxService.StockEventContext outboxCtx =
+                locationCodesById == null || locationCodesById.isEmpty()
+                        ? EventOutboxService.StockEventContext.empty()
+                        : new EventOutboxService.StockEventContext(locationCodesById, Map.of());
+        eventOutboxService.createStockMovementEvent(savedWithdrawal, outboxCtx);
+        eventOutboxService.createStockMovementEvent(savedDeposit, outboxCtx);
+
+        if (syncProductStatus) {
+            updateProductActiveStatus(sourceInventory.getProduct());
+        }
     }
 
     /**

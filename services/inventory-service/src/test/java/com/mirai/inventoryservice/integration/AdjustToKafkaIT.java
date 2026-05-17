@@ -7,6 +7,7 @@ import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.models.storage.Location;
 import com.mirai.inventoryservice.models.storage.StorageLocation;
+import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
@@ -14,6 +15,7 @@ import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.repositories.LocationRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.SiteRepository;
+import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.StorageLocationRepository;
 import com.mirai.inventoryservice.services.EventOutboxService;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -78,6 +80,9 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @Autowired
     private EventOutboxService eventOutboxService;
 
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
+
     private LocationInventory testInventory;
     private Product testProduct;
 
@@ -131,19 +136,16 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     void cleanup() {
         eventOutboxRepository.deleteAll();
         eventDeadLetterRepository.deleteAll();
+        stockMovementRepository.deleteAll();
         locationInventoryRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("POST /adjust creates outbox record with correct payload fields")
+    @DisplayName("POST /batch-adjust creates outbox record with correct payload fields")
     void adjustCreatesOutboxRecord() throws Exception {
-        String requestBody = objectMapper.writeValueAsString(Map.of(
-                "quantityChange", -3,
-                "reason", "SALE",
-                "actorId", UUID.randomUUID().toString()
-        ));
+        String requestBody = batchAdjustJson(-3, "SALE", UUID.randomUUID().toString());
 
-        mockMvc.perform(post("/api/stock-movements/BOX_BIN/{inventoryId}/adjust", testInventory.getId())
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
                         .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -191,12 +193,9 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @DisplayName("publishPendingEvents sends message to Kafka and marks outbox as published")
     void outboxPublishesToKafka() throws Exception {
         // First create an adjustment to generate an outbox event
-        String requestBody = objectMapper.writeValueAsString(Map.of(
-                "quantityChange", -2,
-                "reason", "SALE"
-        ));
+        String requestBody = batchAdjustJson(-2, "SALE", null);
 
-        mockMvc.perform(post("/api/stock-movements/BOX_BIN/{inventoryId}/adjust", testInventory.getId())
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
                         .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -252,12 +251,9 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @Test
     @DisplayName("Outbox records quantities correctly for sale adjustment")
     void outboxRecordsQuantitiesCorrectly() throws Exception {
-        String requestBody = objectMapper.writeValueAsString(Map.of(
-                "quantityChange", -5,
-                "reason", "SALE"
-        ));
+        String requestBody = batchAdjustJson(-5, "SALE", null);
 
-        mockMvc.perform(post("/api/stock-movements/BOX_BIN/{inventoryId}/adjust", testInventory.getId())
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
                         .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -279,14 +275,90 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     }
 
     @Test
-    @DisplayName("Restock adjustment produces positive quantity_change in outbox")
-    void restockAdjustmentPositiveQuantity() throws Exception {
+    @DisplayName("Multi-line batch creates one outbox event per line sharing one audit_log_id")
+    void multiLineBatchSharesAuditLog() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 6);
+        Category category = categoryRepository.save(Category.builder().name("Cat2 " + suffix).build());
+        Product secondProduct = productRepository.save(Product.builder()
+                .name("Second Product")
+                .sku("TST-MULTI-" + suffix)
+                .category(category)
+                .quantity(30)
+                .reorderPoint(5)
+                .build());
+        LocationInventory secondInventory = locationInventoryRepository.save(LocationInventory.builder()
+                .location(testInventory.getLocation())
+                .site(testInventory.getSite())
+                .product(secondProduct)
+                .quantity(15)
+                .build());
+
+        Map<String, Object> lineA = Map.of(
+                "inventoryId", testInventory.getId().toString(),
+                "quantityChange", -3
+        );
+        Map<String, Object> lineB = Map.of(
+                "inventoryId", secondInventory.getId().toString(),
+                "quantityChange", -7
+        );
         String requestBody = objectMapper.writeValueAsString(Map.of(
-                "quantityChange", 10,
-                "reason", "RESTOCK"
+                "locationType", "BOX_BIN",
+                "locationId", testInventory.getLocation().getId().toString(),
+                "reason", "SALE",
+                "adjustments", List.of(lineA, lineB)
         ));
 
-        mockMvc.perform(post("/api/stock-movements/BOX_BIN/{inventoryId}/adjust", testInventory.getId())
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        List<EventOutbox> outboxEvents = eventOutboxRepository.findByPublishedAtIsNullOrderByCreatedAtAsc();
+        assertThat(outboxEvents).hasSize(2);
+
+        // Both StockMovement rows must share the same audit_log row to prove atomic batching.
+        List<StockMovement> movements = stockMovementRepository.findAll();
+        assertThat(movements).hasSize(2);
+        UUID firstAuditLogId = movements.get(0).getAuditLog().getId();
+        UUID secondAuditLogId = movements.get(1).getAuditLog().getId();
+        assertThat(firstAuditLogId).isNotNull();
+        assertThat(firstAuditLogId).isEqualTo(secondAuditLogId);
+    }
+
+    @Test
+    @DisplayName("Mixed-sign batch is rejected as bad request")
+    void mixedSignBatchRejected() throws Exception {
+        Map<String, Object> add = Map.of(
+                "inventoryId", testInventory.getId().toString(),
+                "quantityChange", 3
+        );
+        Map<String, Object> subtract = Map.of(
+                "inventoryId", testInventory.getId().toString(),
+                "quantityChange", -1
+        );
+        String requestBody = objectMapper.writeValueAsString(Map.of(
+                "locationType", "BOX_BIN",
+                "locationId", testInventory.getLocation().getId().toString(),
+                "reason", "ADJUSTMENT",
+                "adjustments", List.of(add, subtract)
+        ));
+
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        assertThat(eventOutboxRepository.findByPublishedAtIsNullOrderByCreatedAtAsc()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Restock adjustment produces positive quantity_change in outbox")
+    void restockAdjustmentPositiveQuantity() throws Exception {
+        String requestBody = batchAdjustJson(10, "RESTOCK", null);
+
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
                         .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -299,6 +371,26 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         assertThat(payload.get("reason")).isEqualTo("restock");
         assertThat(payload.get("current_location_qty")).isEqualTo(30);
         assertThat(payload.get("previous_location_qty")).isEqualTo(20);
+    }
+
+    /**
+     * Build a batch-adjust request body wrapping a single line, for parity with the
+     * pre-batch tests that exercised the now-removed single adjust endpoint.
+     */
+    private String batchAdjustJson(int quantityChange, String reason, String actorId) throws Exception {
+        Map<String, Object> line = new java.util.HashMap<>();
+        line.put("inventoryId", testInventory.getId().toString());
+        line.put("quantityChange", quantityChange);
+
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("locationType", "BOX_BIN");
+        body.put("locationId", testInventory.getLocation().getId().toString());
+        body.put("reason", reason);
+        body.put("adjustments", List.of(line));
+        if (actorId != null) {
+            body.put("actorId", actorId);
+        }
+        return objectMapper.writeValueAsString(body);
     }
 
     /**
