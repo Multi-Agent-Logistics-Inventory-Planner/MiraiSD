@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -63,6 +64,7 @@ import {
 import {
   useSetMachineDisplayBatchMutation,
   useClearDisplayByIdMutation,
+  useBatchClearDisplaysMutation,
   useBatchSwapDisplayMutation,
   useRenewDisplayMutation,
   useDeleteDisplayHistoryMutation,
@@ -174,6 +176,7 @@ export function LocationDetailSheet({
 
   const setDisplayBatchMutation = useSetMachineDisplayBatchMutation();
   const clearDisplayMutation = useClearDisplayByIdMutation();
+  const batchClearDisplaysMutation = useBatchClearDisplaysMutation();
   const batchSwapMutation = useBatchSwapDisplayMutation();
   const renewDisplayMutation = useRenewDisplayMutation();
   const deleteHistoryMutation = useDeleteDisplayHistoryMutation();
@@ -186,6 +189,8 @@ export function LocationDetailSheet({
   const [isTransferring, setIsTransferring] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [productToClear, setProductToClear] = useState<MachineDisplay | null>(null);
+  const [selectedDisplayIds, setSelectedDisplayIds] = useState<Set<string>>(new Set());
+  const [bulkClearDialogOpen, setBulkClearDialogOpen] = useState(false);
   const [historyDeleteDialogOpen, setHistoryDeleteDialogOpen] = useState(false);
   const [historyToDelete, setHistoryToDelete] = useState<MachineDisplay | null>(null);
 
@@ -199,6 +204,7 @@ export function LocationDetailSheet({
         setActiveTab(isDisplayOnly ? "display" : "products");
       }
       setHistoryPage(0);
+      setSelectedDisplayIds(new Set());
     }
   }, [open, locationId, isDisplayOnly, defaultTab]);
 
@@ -310,6 +316,41 @@ export function LocationDetailSheet({
     }
     setClearDialogOpen(false);
     setProductToClear(null);
+  }
+
+  function toggleDisplaySelection(displayId: string) {
+    setSelectedDisplayIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(displayId)) {
+        next.delete(displayId);
+      } else {
+        next.add(displayId);
+      }
+      return next;
+    });
+  }
+
+  async function handleConfirmBulkClear() {
+    const ids = Array.from(selectedDisplayIds);
+    if (ids.length === 0) return;
+    try {
+      await batchClearDisplaysMutation.mutateAsync({
+        displayIds: ids,
+        actorId: user?.personId,
+      });
+      toast({
+        title: "Products removed",
+        description: `Removed ${ids.length} product(s) from display.`,
+      });
+      setSelectedDisplayIds(new Set());
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to remove products from display.",
+        variant: "destructive",
+      });
+    }
+    setBulkClearDialogOpen(false);
   }
 
   async function handleSwapWithProducts(
@@ -548,6 +589,33 @@ export function LocationDetailSheet({
         </div>
       </div>
 
+      {selectedDisplayIds.size > 0 && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 mb-2 border border-primary/30 bg-primary/5 rounded-md">
+          <p className="text-xs sm:text-sm font-medium">
+            {selectedDisplayIds.size} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8"
+              onClick={() => setSelectedDisplayIds(new Set())}
+            >
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8"
+              onClick={() => setBulkClearDialogOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Remove selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full **:data-[slot=scroll-area-viewport]:overscroll-auto [&_[data-slot=scroll-area-viewport]>div]:!block">
           <div className="pb-6 pr-3 overflow-hidden">
@@ -558,14 +626,23 @@ export function LocationDetailSheet({
             ) : (
               activeDisplaysForMachine.map((item) => {
                 const product = products.find((p) => p.id === item.productId);
+                const isSelected = selectedDisplayIds.has(item.id);
                 return (
                   <div
                     key={item.id}
                     className={cn(
                       "flex items-center gap-2 sm:gap-4 min-w-0 overflow-hidden border-b last:border-b-0",
-                      item.stale && "bg-amber-50 dark:bg-amber-950/20"
+                      item.stale && "bg-amber-50 dark:bg-amber-950/20",
+                      isSelected && "bg-primary/5"
                     )}
                   >
+                    <div className="pl-2 sm:pl-3 flex items-center">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleDisplaySelection(item.id)}
+                        aria-label={`Select ${item.productName}`}
+                      />
+                    </div>
                     <button
                       type="button"
                       disabled={!productInventory}
@@ -945,6 +1022,28 @@ export function LocationDetailSheet({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmClear}>
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkClearDialogOpen} onOpenChange={setBulkClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedDisplayIds.size} Product(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove {selectedDisplayIds.size} product(s) from the display
+              in a single action. The history will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmBulkClear}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={batchClearDisplaysMutation.isPending}
+            >
+              {batchClearDisplaysMutation.isPending ? "Removing..." : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

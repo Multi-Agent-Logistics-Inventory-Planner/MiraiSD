@@ -158,11 +158,11 @@ class MachineDisplayServiceNotificationTest {
         MachineDisplay removedDisplay = display(machineId, removed);
         MachineDisplay stayingDisplay = display(machineId, staying);
 
-        when(machineDisplayRepository.findByIdWithProduct(removedDisplay.getId()))
-                .thenReturn(Optional.of(removedDisplay));
+        when(machineDisplayRepository.findAllByIdInWithProduct(List.of(removedDisplay.getId())))
+                .thenReturn(List.of(removedDisplay));
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
                 .thenReturn(List.of(removedDisplay, stayingDisplay));
-        when(machineDisplayRepository.save(any(MachineDisplay.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(machineDisplayRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.clearDisplayById(removedDisplay.getId(), actorId);
 
@@ -191,11 +191,11 @@ class MachineDisplayServiceNotificationTest {
                 .thenReturn(List.of(sourceDisplayP1));
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, targetMachineId))
                 .thenReturn(List.of(targetDisplayP2));
-        when(machineDisplayRepository.findByIdWithProduct(sourceDisplayP1.getId()))
-                .thenReturn(Optional.of(sourceDisplayP1));
-        when(machineDisplayRepository.findByIdWithProduct(targetDisplayP2.getId()))
-                .thenReturn(Optional.of(targetDisplayP2));
-        when(machineDisplayRepository.save(any(MachineDisplay.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(machineDisplayRepository.findAllByIdInWithProduct(List.of(sourceDisplayP1.getId())))
+                .thenReturn(List.of(sourceDisplayP1));
+        when(machineDisplayRepository.findAllByIdInWithProduct(List.of(targetDisplayP2.getId())))
+                .thenReturn(List.of(targetDisplayP2));
+        when(machineDisplayRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         BatchDisplaySwapRequestDTO req = BatchDisplaySwapRequestDTO.builder()
                 .locationType(LocationType.SINGLE_CLAW_MACHINE)

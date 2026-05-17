@@ -28,6 +28,14 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
     Optional<MachineDisplay> findByIdWithProduct(@Param("id") UUID id);
 
     /**
+     * Batch variant of findByIdWithProduct - loads displays + products in a single query.
+     * Used by batch operations to avoid N+1 lookups inside loops.
+     */
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.id IN :ids")
+    List<MachineDisplay> findAllByIdInWithProduct(@Param("ids") Collection<UUID> ids);
+
+    /**
      * Find the current active display for a machine (where ended_at is null)
      * @deprecated Use findActiveByLocationTypeAndMachineId for multiple products support
      */

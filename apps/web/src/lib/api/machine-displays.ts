@@ -16,6 +16,15 @@ export interface SwapMachineDisplayRequest {
 }
 
 /**
+ * Batch clear displays request - removes multiple displays from the same machine
+ * in a single transaction, producing one audit log and one notification.
+ */
+export interface BatchClearDisplaysRequest {
+  displayIds: string[];
+  actorId?: string;
+}
+
+/**
  * Renew display request - ends current displays and creates new ones
  * with fresh startedAt timestamps for the same products.
  * Used when restocking the same product to reset tracking.
@@ -222,6 +231,19 @@ export async function batchSwapDisplay(
 ): Promise<MachineDisplay[]> {
   return apiPost<MachineDisplay[], BatchDisplaySwapRequest>(
     "/api/machine-displays/batch-swap",
+    data
+  );
+}
+
+/**
+ * Batch-clear multiple displays on the same machine in one transaction.
+ * Returns the remaining active displays for the machine.
+ */
+export async function batchClearDisplays(
+  data: BatchClearDisplaysRequest
+): Promise<MachineDisplay[]> {
+  return apiPost<MachineDisplay[], BatchClearDisplaysRequest>(
+    "/api/machine-displays/batch-clear",
     data
   );
 }

@@ -6,10 +6,12 @@ import {
   clearDisplayById,
   swapMachineDisplay,
   batchSwapDisplay,
+  batchClearDisplays,
   renewDisplays,
   deleteDisplayHistory,
   type SwapMachineDisplayRequest,
   type BatchDisplaySwapRequest,
+  type BatchClearDisplaysRequest,
   type RenewDisplayRequest,
 } from "@/lib/api/machine-displays";
 import { SetMachineDisplayRequest, SetMachineDisplayBatchRequest, MachineDisplay, LocationType } from "@/types/api";
@@ -103,6 +105,21 @@ export function useBatchSwapDisplayMutation() {
 
   return useMutation<MachineDisplay[], Error, BatchDisplaySwapRequest>({
     mutationFn: batchSwapDisplay,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
+    },
+  });
+}
+
+/**
+ * Mutation to batch-clear multiple displays on a machine in one transaction.
+ * Produces a single DISPLAY_REMOVED audit log entry for all cleared products.
+ */
+export function useBatchClearDisplaysMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<MachineDisplay[], Error, BatchClearDisplaysRequest>({
+    mutationFn: batchClearDisplays,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["machine-displays"] });
     },
