@@ -1,9 +1,10 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { Suspense, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/hooks/use-auth"
+import { useTabParam } from "@/hooks/use-tab-param"
 import { UserRole } from "@/types/api"
 import { AnalyticsTab } from "@/types/analytics"
 import {
@@ -13,16 +14,14 @@ import {
   TabAssistant,
 } from "./_components"
 
-const ADMIN_ONLY_TABS = new Set([
+const ANALYTICS_TAB_VALUES = [
+  AnalyticsTab.OVERVIEW,
+  AnalyticsTab.PREDICTIONS,
   AnalyticsTab.ASSISTANT,
-])
+] as const
 
 // Old tab values that should redirect to overview
 const DEPRECATED_TABS = ["insights", "demand-leaders", "legacy", "notifications"]
-
-function isValidTab(value: string | null): value is AnalyticsTab {
-  return Object.values(AnalyticsTab).includes(value as AnalyticsTab)
-}
 
 function AnalyticsContent() {
   const router = useRouter()
@@ -39,40 +38,28 @@ function AnalyticsContent() {
     }
   }, [tabParam, router])
 
-  const currentTab = isValidTab(tabParam) ? tabParam : AnalyticsTab.OVERVIEW
-
-  // Track which tabs have been visited (lazy mount - only mount on first visit)
-  const [mountedTabs, setMountedTabs] = useState<Set<AnalyticsTab>>(
-    () => new Set([currentTab]),
-  )
-
-  useEffect(() => {
-    setMountedTabs((prev) => {
-      if (prev.has(currentTab)) return prev
-      return new Set([...prev, currentTab])
-    })
-  }, [currentTab])
-
-  const handleTabChange = (tab: AnalyticsTab) => {
-    router.push(`/analytics?tab=${tab}`)
-  }
+  const { value, setValue, mountedValues } = useTabParam<AnalyticsTab>({
+    values: ANALYTICS_TAB_VALUES,
+    defaultValue: AnalyticsTab.OVERVIEW,
+  })
+  const currentTab = value ?? AnalyticsTab.OVERVIEW
 
   return (
     <div className="flex-1 space-y-4">
       <AnalyticsTabs
         value={currentTab}
-        onValueChange={handleTabChange}
+        onValueChange={setValue}
         isAdmin={isAdmin}
       />
       <div className={currentTab !== AnalyticsTab.OVERVIEW ? "hidden" : undefined}>
-        {mountedTabs.has(AnalyticsTab.OVERVIEW) && <TabOverview />}
+        {mountedValues.has(AnalyticsTab.OVERVIEW) && <TabOverview />}
       </div>
       <div className={currentTab !== AnalyticsTab.PREDICTIONS ? "hidden" : undefined}>
-        {mountedTabs.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
+        {mountedValues.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
       </div>
       {isAdmin && (
         <div className={currentTab !== AnalyticsTab.ASSISTANT ? "hidden" : undefined}>
-          {mountedTabs.has(AnalyticsTab.ASSISTANT) && <TabAssistant />}
+          {mountedValues.has(AnalyticsTab.ASSISTANT) && <TabAssistant />}
         </div>
       )}
     </div>
