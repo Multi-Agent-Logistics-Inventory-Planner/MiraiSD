@@ -593,15 +593,23 @@ export interface AuditLogDetail {
   movements: AuditLogMovement[];
 }
 
-export interface AdjustStockRequest {
+export interface BatchAdjustLine {
+  inventoryId: string;
+  /** Signed quantity change. Sign must agree across all lines in a batch. */
   quantityChange: number;
-  reason: StockMovementReason;
-  actorId: string;
-  notes?: string;
   /** Optional intake unit ("pack" or "box"). When "box", audit log displays "+N boxes (M packs)". */
   intakeUnit?: "pack" | "box";
   /** Raw quantity in the user's chosen unit (paired with intakeUnit). */
   intakeQty?: number;
+}
+
+export interface BatchAdjustStockRequest {
+  locationType: LocationType;
+  locationId: string;
+  adjustments: BatchAdjustLine[];
+  reason: StockMovementReason;
+  actorId?: string;
+  notes?: string;
 }
 
 export interface TransferStockRequest {

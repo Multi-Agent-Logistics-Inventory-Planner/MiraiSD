@@ -1,6 +1,5 @@
 package com.mirai.inventoryservice.dtos.requests;
 
-import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,21 +12,17 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AdjustStockRequestDTO {
+public class BatchAdjustLineDTO {
+
+    @NotNull(message = "Inventory id is required")
+    private UUID inventoryId;
+
     @NotNull(message = "Quantity change is required")
     private Integer quantityChange;
-
-    @NotNull(message = "Reason is required")
-    private StockMovementReason reason;
-
-    private UUID actorId;
-
-    private String notes;
 
     /** Optional intake unit ("pack" or "box") preserved for audit-log readability. */
     private String intakeUnit;
 
-    /** Raw quantity in the user's chosen unit (e.g. 2 when intakeUnit="box" and quantityChange=72). */
+    /** Raw quantity in the user's chosen unit. */
     private Integer intakeQty;
 }
-

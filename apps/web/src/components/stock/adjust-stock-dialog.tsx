@@ -16,6 +16,7 @@ import {
   type Category,
   LocationType,
   StockMovementReason,
+  type BatchAdjustLine,
 } from "@/types/api";
 import { DEFAULT_REASON_BY_ACTION } from "./adjust/types";
 import { useToast } from "@/hooks/use-toast";
@@ -23,13 +24,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import { useCategories } from "@/hooks/queries/use-categories";
-import { useAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
+import { useBatchAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
 import {
   useCreateInventoryMutation,
   useUpdateInventoryMutation,
 } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
-import type { InventoryRequest, ProductInventoryEntry, Product } from "@/types/api";
+import type {
+  InventoryRequest,
+  ProductInventoryEntry,
+  Product,
+} from "@/types/api";
+import { cn } from "@/lib/utils";
 import { parseQuantityInput } from "@/lib/utils/validation";
 import { LocationSelector } from "./location-selector";
 import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
@@ -39,15 +45,15 @@ import {
   SelectedProductCard,
   ProductFilterHeader,
   AdjustmentConfirmDialog,
+  CartProductList,
+  CartSummaryStrip,
   type AdjustAction,
+  type CartLine,
   type NormalizedInventory,
   normalizeInventory,
 } from "./adjust";
 import { ProductLocationSelector } from "./product-location-selector";
 
-/**
- * Minimal product info needed for the preselected product mode.
- */
 export interface PreselectedProductInfo {
   product: Pick<Product, "id" | "name" | "sku" | "imageUrl" | "category">;
   inventoryEntries: ProductInventoryEntry[];
@@ -56,9 +62,7 @@ export interface PreselectedProductInfo {
 interface AdjustStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** When provided, pre-selects this location when the dialog opens (e.g. from location detail or NA page). */
   initialLocation?: LocationSelection | null;
-  /** When provided, shows only locations where this product exists and pre-selects the product. */
   preselectedProduct?: PreselectedProductInfo | null;
 }
 
@@ -67,6 +71,17 @@ const EMPTY_LOCATION: LocationSelection = {
   locationId: null,
   locationCode: "",
 };
+
+/**
+ * Best-effort extraction of an inventory UUID from a backend error message so
+ * the offending row can be highlighted in the cart on failure.
+ */
+function parseFailedInventoryId(message: string): string | null {
+  const match = message.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+  return match ? match[0] : null;
+}
 
 export function AdjustStockDialog({
   open,
@@ -78,32 +93,37 @@ export function AdjustStockDialog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Product-filtered mode: when a product is preselected, we show only its locations
   const isProductFilteredMode = Boolean(preselectedProduct);
 
   const [location, setLocation] = useState<LocationSelection>(EMPTY_LOCATION);
-  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
-    null,
-  );
   const [addInventoryDialogOpen, setAddInventoryDialogOpen] = useState(false);
   const [action, setAction] = useState<AdjustAction>("subtract");
-  const [quantity, setQuantity] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
-  const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
-  const [reason, setReason] = useState<StockMovementReason>(DEFAULT_REASON_BY_ACTION["subtract"]);
+  const [reason, setReason] = useState<StockMovementReason>(
+    DEFAULT_REASON_BY_ACTION["subtract"]
+  );
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  // Intake metadata captured from the box/pack toggle in QuantityControls.
-  // Preserved into stock_movement.metadata for audit-log readability.
+  const [failedInventoryId, setFailedInventoryId] = useState<string | null>(null);
+
+  // Cart-mode state (multi-product batch).
+  const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
+
+  // Single-mode state (preselectedProduct path). Mirrors prior single-product UX.
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
+    null
+  );
+  const [quantity, setQuantity] = useState(1);
+  const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
   const [intakeUnit, setIntakeUnit] = useState<"pack" | "box">("pack");
   const [intakeQty, setIntakeQty] = useState<number>(1);
 
-  const adjustMutation = useAdjustStockMutation();
+  const batchAdjustMutation = useBatchAdjustStockMutation();
 
   const inventoryQuery = useLocationInventory(
     location.locationType ?? undefined,
-    location.locationId ?? undefined,
+    location.locationId ?? undefined
   );
 
   const createInventoryMutation = useCreateInventoryMutation(
@@ -118,16 +138,20 @@ export function AdjustStockDialog({
   useEffect(() => {
     if (!open) {
       setLocation(EMPTY_LOCATION);
-      setSelectedInventoryId(null);
       setAddInventoryDialogOpen(false);
       setAction("subtract");
-      setQuantity(1);
       setSearchQuery("");
       setCategoryFilters([]);
       setChildCategoryFilters([]);
-      setQuantityWarning(null);
       setReason(DEFAULT_REASON_BY_ACTION["subtract"]);
       setConfirmDialogOpen(false);
+      setFailedInventoryId(null);
+      setCart(new Map());
+      setSelectedInventoryId(null);
+      setQuantity(1);
+      setQuantityWarning(null);
+      setIntakeUnit("pack");
+      setIntakeQty(1);
     } else if (initialLocationProp && initialLocationProp.locationType != null) {
       setLocation({
         locationType: initialLocationProp.locationType,
@@ -135,19 +159,23 @@ export function AdjustStockDialog({
         locationCode: initialLocationProp.locationCode ?? "",
       });
     }
-    // Note: preselectedProduct mode doesn't auto-select location - user picks from filtered list
   }, [open, initialLocationProp]);
 
+  // Reset per-line state when the location changes.
   useEffect(() => {
     if (location.locationId) {
+      setCart(new Map());
       setSelectedInventoryId(null);
       setAddInventoryDialogOpen(false);
       setQuantity(1);
       setQuantityWarning(null);
+      setFailedInventoryId(null);
     }
   }, [location.locationId]);
 
+  // Action toggle clears the cart and single-mode selection.
   useEffect(() => {
+    setCart(new Map());
     setSelectedInventoryId(null);
     setAddInventoryDialogOpen(false);
     setQuantity(1);
@@ -156,13 +184,15 @@ export function AdjustStockDialog({
     setCategoryFilters([]);
     setChildCategoryFilters([]);
     setReason(DEFAULT_REASON_BY_ACTION[action]);
+    setFailedInventoryId(null);
   }, [action]);
 
   const inventory = inventoryQuery.data ?? [];
 
-  const normalizedInventory: NormalizedInventory[] = useMemo(() => {
-    return inventory.map(normalizeInventory);
-  }, [inventory]);
+  const normalizedInventory: NormalizedInventory[] = useMemo(
+    () => inventory.map(normalizeInventory),
+    [inventory]
+  );
 
   const { data: allCategories } = useCategories();
 
@@ -182,11 +212,13 @@ export function AdjustStockDialog({
     return { presentRootIds: roots, presentChildIds: children };
   }, [inventory]);
 
-  const availableCategories = useMemo<Category[]>(() => {
-    return (allCategories ?? []).filter(
-      (c) => !c.parentId && presentRootIds.has(c.id)
-    );
-  }, [allCategories, presentRootIds]);
+  const availableCategories = useMemo<Category[]>(
+    () =>
+      (allCategories ?? []).filter(
+        (c) => !c.parentId && presentRootIds.has(c.id)
+      ),
+    [allCategories, presentRootIds]
+  );
 
   const availableChildCategories = useMemo<Category[]>(() => {
     const selectedCategoryId = categoryFilters[0];
@@ -195,24 +227,18 @@ export function AdjustStockDialog({
     return (selected?.children ?? []).filter((c) => presentChildIds.has(c.id));
   }, [availableCategories, categoryFilters, presentChildIds]);
 
-  const selectedInventory = useMemo(() => {
-    return inventory.find((inv) => inv.id === selectedInventoryId) ?? null;
-  }, [inventory, selectedInventoryId]);
+  // ----- Single-mode (preselectedProduct) helpers -----
 
-  // Handle product removal when quantity reaches 0 (e.g., after subtracting all stock)
-  useEffect(() => {
-    if (selectedInventoryId && inventory.length > 0) {
-      const stillExists = inventory.some((inv) => inv.id === selectedInventoryId);
-      if (!stillExists) {
-        // Product was removed (quantity reached 0), clear selection
-        setSelectedInventoryId(null);
-        setQuantity(1);
-        setQuantityWarning(null);
-      }
-    }
-  }, [inventory, selectedInventoryId]);
+  const selectedInventory = useMemo(
+    () => inventory.find((inv) => inv.id === selectedInventoryId) ?? null,
+    [inventory, selectedInventoryId]
+  );
 
-  // Auto-select the preselected product when location inventory loads
+  const currentQtyAtLocation = selectedInventory?.quantity ?? 0;
+
+  const availableForSubtract = currentQtyAtLocation;
+
+  // Auto-select the preselected product when location inventory loads (single mode).
   useEffect(() => {
     if (
       isProductFilteredMode &&
@@ -221,7 +247,6 @@ export function AdjustStockDialog({
       inventory.length > 0 &&
       !selectedInventoryId
     ) {
-      // Find the inventory entry for the preselected product at this location
       const matchingInventory = inventory.find(
         (inv) => inv.item.id === preselectedProduct.product.id
       );
@@ -229,84 +254,145 @@ export function AdjustStockDialog({
         setSelectedInventoryId(matchingInventory.id);
       }
     }
-  }, [isProductFilteredMode, preselectedProduct, location.locationId, inventory, selectedInventoryId]);
+  }, [
+    isProductFilteredMode,
+    preselectedProduct,
+    location.locationId,
+    inventory,
+    selectedInventoryId,
+  ]);
+
+  // Clear single-mode selection if the inventory disappeared (e.g. drained to 0).
+  useEffect(() => {
+    if (selectedInventoryId && inventory.length > 0) {
+      const stillExists = inventory.some((inv) => inv.id === selectedInventoryId);
+      if (!stillExists) {
+        setSelectedInventoryId(null);
+        setQuantity(1);
+        setQuantityWarning(null);
+      }
+    }
+  }, [inventory, selectedInventoryId]);
+
+  // ----- Submission shared logic -----
 
   const hasValidLocation = Boolean(location.locationId);
-  const isAdjusting = adjustMutation.isPending;
+  const isAdjusting = batchAdjustMutation.isPending;
   const isSavingInventory =
     createInventoryMutation.isPending || updateInventoryMutation.isPending;
 
-  const hasSelectedProduct = Boolean(selectedInventory);
-  const currentQtyAtLocation = selectedInventory?.quantity ?? 0;
-  const sourceListCount = inventory.length;
+  const locationLabel = location.locationType
+    ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
+    : "";
 
-  const availableForSubtract = currentQtyAtLocation;
+  /** Build batch payload from cart entries (cart mode). */
+  const cartLines = useMemo<BatchAdjustLine[]>(() => {
+    const out: BatchAdjustLine[] = [];
+    for (const line of cart.values()) {
+      const signed = action === "subtract" ? -line.quantity : line.quantity;
+      out.push({
+        inventoryId: line.inventoryId,
+        quantityChange: signed,
+        intakeUnit: line.intakeUnit === "box" ? "box" : undefined,
+        intakeQty: line.intakeUnit === "box" ? line.intakeQty : undefined,
+      });
+    }
+    return out;
+  }, [cart, action]);
 
-  const newQty =
-    action === "subtract"
-      ? currentQtyAtLocation - quantity
-      : currentQtyAtLocation + quantity;
+  const cartTotalQuantity = useMemo(
+    () => [...cart.values()].reduce((sum, l) => sum + l.quantity, 0),
+    [cart]
+  );
 
-  const canSubmit =
-    hasValidLocation &&
-    hasSelectedProduct &&
-    quantity >= 1 &&
-    newQty >= 0 &&
-    !isAdjusting;
+  async function submitBatch(
+    adjustments: BatchAdjustLine[],
+    productIds: string[]
+  ) {
+    const actorId = user?.personId || user?.id;
+    if (!actorId) {
+      toast({ title: "Missing user", description: "Please sign in again." });
+      return false;
+    }
+    if (!location.locationType || !location.locationId) {
+      toast({
+        title: "Missing selection",
+        description: "Select a location.",
+      });
+      return false;
+    }
+    if (adjustments.length === 0) {
+      toast({ title: "Nothing to adjust", description: "Stage at least one product." });
+      return false;
+    }
 
-  const selectedNormalizedItem: NormalizedInventory | null = useMemo(() => {
-    return selectedInventory ? normalizeInventory(selectedInventory) : null;
-  }, [selectedInventory]);
+    try {
+      await batchAdjustMutation.mutateAsync({
+        payload: {
+          locationType: location.locationType,
+          locationId: location.locationId,
+          adjustments,
+          reason,
+          actorId,
+        },
+        productIds,
+      });
 
-  function handleQuantityChange(value: string) {
-    const parsed = parseQuantityInput(value);
+      await queryClient.invalidateQueries({
+        queryKey: [
+          "locationInventory",
+          location.locationType,
+          location.locationId,
+        ],
+      });
 
-    if (parsed === null) {
-      setQuantity(0);
-      setQuantityWarning(null);
+      toast({ title: "Stock adjusted", variant: "success" });
+      setFailedInventoryId(null);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Adjustment failed";
+      const culprit = parseFailedInventoryId(message);
+      setFailedInventoryId(culprit);
+      toast({
+        title: "Adjustment failed",
+        description: message,
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+
+  function requireConfirmThenSubmit(submit: () => Promise<void>) {
+    if (action === "subtract" && reason === StockMovementReason.ADJUSTMENT) {
+      setConfirmDialogOpen(true);
+      // The confirm handlers will retry the submission.
+      pendingSubmitRef.current = submit;
       return;
     }
-
-    if (action === "subtract" && parsed > availableForSubtract) {
-      setQuantity(availableForSubtract);
-      setQuantityWarning(`Clamped to available stock (${availableForSubtract})`);
-    } else {
-      setQuantity(Math.max(1, parsed));
-      setQuantityWarning(null);
-    }
+    void submit();
   }
 
-  function handleIncrement() {
-    if (action === "subtract") {
-      if (quantity < availableForSubtract) {
-        setQuantity(quantity + 1);
-        setQuantityWarning(null);
-      }
-    } else {
-      setQuantity(quantity + 1);
-      setQuantityWarning(null);
-    }
+  const pendingSubmitRef = useMemo(
+    () => ({ current: null as null | (() => Promise<void>) }),
+    []
+  );
+
+  function handleConfirmAdjustment() {
+    setConfirmDialogOpen(false);
+    const fn = pendingSubmitRef.current;
+    pendingSubmitRef.current = null;
+    if (fn) void fn();
   }
 
-  function handleDecrement() {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
-      setQuantityWarning(null);
-    }
+  function handleCancelAdjustment() {
+    setConfirmDialogOpen(false);
+    pendingSubmitRef.current = null;
   }
 
   function handleActionChange(value: string) {
     if (value === "add" || value === "subtract") {
       setAction(value);
     }
-  }
-
-  function handleClearSelection() {
-    setSelectedInventoryId(null);
-    setQuantity(1);
-    setQuantityWarning(null);
-    setIntakeUnit("pack");
-    setIntakeQty(1);
   }
 
   function handleCategoryChange(categories: string[]) {
@@ -320,25 +406,158 @@ export function AdjustStockDialog({
     setSearchQuery("");
   }
 
-  function handleReasonChange(newReason: StockMovementReason) {
-    if (action === "subtract" && newReason === StockMovementReason.ADJUSTMENT) {
-      setConfirmDialogOpen(true);
-      return;
+  // ----- Cart-mode handlers -----
+
+  function clampLineQuantity(value: number, currentStock: number): number {
+    if (action === "subtract") {
+      return Math.max(1, Math.min(value, currentStock));
     }
+    return Math.max(1, value);
+  }
+
+  function handleStage(id: string, currentStock: number) {
+    setFailedInventoryId(null);
+    setCart((prev) => {
+      const next = new Map(prev);
+      if (!next.has(id)) {
+        next.set(id, {
+          inventoryId: id,
+          quantity: clampLineQuantity(1, currentStock),
+          intakeUnit: "pack",
+          intakeQty: 1,
+        });
+      }
+      return next;
+    });
+  }
+
+  function handleUnstage(id: string) {
+    setCart((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function handleLineQuantityChange(id: string, value: string) {
+    const parsed = parseQuantityInput(value);
+    const inv = inventory.find((i) => i.id === id);
+    const stock = inv?.quantity ?? 0;
+
+    setCart((prev) => {
+      const line = prev.get(id);
+      if (!line) return prev;
+      const newQty =
+        parsed === null ? 1 : clampLineQuantity(parsed, stock);
+      const next = new Map(prev);
+      next.set(id, { ...line, quantity: newQty });
+      return next;
+    });
+  }
+
+  function handleLineIncrement(id: string) {
+    const inv = inventory.find((i) => i.id === id);
+    const stock = inv?.quantity ?? 0;
+    setCart((prev) => {
+      const line = prev.get(id);
+      if (!line) return prev;
+      const newQty = clampLineQuantity(line.quantity + 1, stock);
+      const next = new Map(prev);
+      next.set(id, { ...line, quantity: newQty });
+      return next;
+    });
+  }
+
+  function handleLineDecrement(id: string) {
+    setCart((prev) => {
+      const line = prev.get(id);
+      if (!line || line.quantity <= 1) return prev;
+      const next = new Map(prev);
+      next.set(id, { ...line, quantity: line.quantity - 1 });
+      return next;
+    });
+  }
+
+  function handleLineIntakeChange(
+    id: string,
+    meta: { unit: "pack" | "box"; rawQty: number }
+  ) {
+    setCart((prev) => {
+      const line = prev.get(id);
+      if (!line) return prev;
+      const next = new Map(prev);
+      next.set(id, { ...line, intakeUnit: meta.unit, intakeQty: meta.rawQty });
+      return next;
+    });
+  }
+
+  function handleCartReasonChange(newReason: StockMovementReason) {
     setReason(newReason);
   }
 
-  function handleConfirmAdjustment() {
-    setReason(StockMovementReason.ADJUSTMENT);
-    setConfirmDialogOpen(false);
+  async function handleCartSubmit() {
+    if (cartLines.length === 0) return;
+    const productIds = [...cart.keys()]
+      .map((id) => inventory.find((inv) => inv.id === id)?.item.id)
+      .filter((id): id is string => Boolean(id));
+
+    const doSubmit = async () => {
+      const ok = await submitBatch(cartLines, productIds);
+      if (ok) {
+        setCart(new Map());
+        onOpenChange(false);
+      }
+    };
+
+    requireConfirmThenSubmit(doSubmit);
   }
 
-  function handleCancelAdjustment() {
-    setReason(StockMovementReason.SALE);
-    setConfirmDialogOpen(false);
+  // ----- Single-mode handlers (preselectedProduct) -----
+
+  function handleSingleQuantityChange(value: string) {
+    const parsed = parseQuantityInput(value);
+    if (parsed === null) {
+      setQuantity(0);
+      setQuantityWarning(null);
+      return;
+    }
+    if (action === "subtract" && parsed > availableForSubtract) {
+      setQuantity(availableForSubtract);
+      setQuantityWarning(`Clamped to available stock (${availableForSubtract})`);
+    } else {
+      setQuantity(Math.max(1, parsed));
+      setQuantityWarning(null);
+    }
   }
 
-  function handleProductSelect(id: string, itemQuantity: number) {
+  function handleSingleIncrement() {
+    if (action === "subtract") {
+      if (quantity < availableForSubtract) {
+        setQuantity(quantity + 1);
+        setQuantityWarning(null);
+      }
+    } else {
+      setQuantity(quantity + 1);
+      setQuantityWarning(null);
+    }
+  }
+
+  function handleSingleDecrement() {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+      setQuantityWarning(null);
+    }
+  }
+
+  function handleClearSingleSelection() {
+    setSelectedInventoryId(null);
+    setQuantity(1);
+    setQuantityWarning(null);
+    setIntakeUnit("pack");
+    setIntakeQty(1);
+  }
+
+  function handleSingleProductSelect(id: string, itemQuantity: number) {
     setSelectedInventoryId(id);
     if (action === "subtract" && quantity > itemQuantity) {
       setQuantity(Math.max(1, itemQuantity));
@@ -346,23 +565,12 @@ export function AdjustStockDialog({
     setQuantityWarning(null);
   }
 
-  async function handleSubmit() {
-    const actorId = user?.personId || user?.id;
-    if (!actorId) {
-      toast({ title: "Missing user", description: "Please sign in again." });
-      return;
-    }
+  function handleSingleReasonChange(newReason: StockMovementReason) {
+    setReason(newReason);
+  }
 
-    if (!location.locationType || !location.locationId || !selectedInventory) {
-      toast({
-        title: "Missing selection",
-        description: "Select a location and product.",
-      });
-      return;
-    }
-
-    const quantityChange = action === "subtract" ? -quantity : quantity;
-
+  async function handleSingleSubmit() {
+    if (!selectedInventory) return;
     if (action === "subtract" && quantity > availableForSubtract) {
       toast({
         title: "Invalid quantity",
@@ -371,39 +579,30 @@ export function AdjustStockDialog({
       });
       return;
     }
-
-    try {
-      await adjustMutation.mutateAsync({
-        locationType: location.locationType,
+    const adjustments: BatchAdjustLine[] = [
+      {
         inventoryId: selectedInventory.id,
-        payload: {
-          quantityChange,
-          reason,
-          actorId,
-          intakeUnit: intakeUnit === "box" ? "box" : undefined,
-          intakeQty: intakeUnit === "box" ? intakeQty : undefined,
-        },
-        productId: selectedInventory.item.id,
-      });
+        quantityChange: action === "subtract" ? -quantity : quantity,
+        intakeUnit: intakeUnit === "box" ? "box" : undefined,
+        intakeQty: intakeUnit === "box" ? intakeQty : undefined,
+      },
+    ];
+    const productIds = [selectedInventory.item.id];
 
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "locationInventory",
-          location.locationType,
-          location.locationId,
-        ],
-      });
+    const doSubmit = async () => {
+      const ok = await submitBatch(adjustments, productIds);
+      if (ok) {
+        // Match prior UX: stay on dialog, reset selection so user can adjust another product.
+        setSelectedInventoryId(null);
+        setQuantity(1);
+        setQuantityWarning(null);
+      }
+    };
 
-      toast({ title: "Stock adjusted", variant: "success" });
-      // Reset to product list view, keep location selected
-      setSelectedInventoryId(null);
-      setQuantity(1);
-      setQuantityWarning(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Adjustment failed";
-      toast({ title: "Adjustment failed", description: message });
-    }
+    requireConfirmThenSubmit(doSubmit);
   }
+
+  // ----- Add-new-inventory (preselectedProduct, location empty) -----
 
   async function handleAddNewInventory(
     payload: InventoryRequest,
@@ -411,8 +610,6 @@ export function AdjustStockDialog({
     inventoryId?: string
   ) {
     const actorId = user?.personId || user?.id;
-
-    // Add RESTOCK reason and actorId for audit tracking when adding inventory via adjust dialog
     const enrichedPayload: InventoryRequest = {
       ...payload,
       actorId,
@@ -421,34 +618,41 @@ export function AdjustStockDialog({
 
     try {
       if (isUpdate && inventoryId) {
-        await updateInventoryMutation.mutateAsync({ inventoryId, payload: enrichedPayload });
+        await updateInventoryMutation.mutateAsync({
+          inventoryId,
+          payload: enrichedPayload,
+        });
       } else {
         await createInventoryMutation.mutateAsync(enrichedPayload);
       }
       toast({ title: "Inventory added successfully", variant: "success" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save inventory";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      const message =
+        err instanceof Error ? err.message : "Failed to save inventory";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
     }
   }
 
-  // Handler for adding preselected product directly to location (without opening AddInventoryDialog)
   async function handleAddPreselectedProduct() {
     if (!preselectedProduct || !location.locationType || !location.locationId) {
       return;
     }
-
     const actorId = user?.personId || user?.id;
     if (!actorId) {
       toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
-
     if (quantity < 1) {
-      toast({ title: "Invalid quantity", description: "Quantity must be at least 1." });
+      toast({
+        title: "Invalid quantity",
+        description: "Quantity must be at least 1.",
+      });
       return;
     }
-
     const payload: InventoryRequest = {
       itemId: preselectedProduct.product.id,
       quantity,
@@ -458,7 +662,6 @@ export function AdjustStockDialog({
 
     try {
       await createInventoryMutation.mutateAsync(payload);
-
       await queryClient.invalidateQueries({
         queryKey: [
           "locationInventory",
@@ -469,19 +672,31 @@ export function AdjustStockDialog({
       await queryClient.invalidateQueries({
         queryKey: ["productInventoryEntries", preselectedProduct.product.id],
       });
-
       toast({ title: "Product added to location", variant: "success" });
       setQuantity(1);
       onOpenChange(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to add product";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      const message =
+        err instanceof Error ? err.message : "Failed to add product";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
     }
   }
 
-  const locationLabel = location.locationType
-    ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
-    : "";
+  // ----- Render -----
+
+  const cartItemCount = cart.size;
+  const cartCanSubmit =
+    hasValidLocation && cartItemCount > 0 && !isAdjusting;
+  const singleCanSubmit =
+    hasValidLocation &&
+    Boolean(selectedInventory) &&
+    quantity >= 1 &&
+    (action === "add" || quantity <= availableForSubtract) &&
+    !isAdjusting;
 
   const listTitle =
     action === "subtract"
@@ -500,9 +715,8 @@ export function AdjustStockDialog({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6">
-          {/* Location selector and action toggle */}
+          {/* Location + action header */}
           <div className="shrink-0 bg-[#f0eee6] dark:bg-[#1f1e1d] py-4 px-5 rounded-xl mt-4 flex gap-4 sm:gap-16">
-            {/* Location section */}
             <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-1.5">
                 <Label>Location</Label>
@@ -517,7 +731,9 @@ export function AdjustStockDialog({
                     />
                   )}
               </div>
-              {isProductFilteredMode && preselectedProduct && preselectedProduct.inventoryEntries.length > 0 ? (
+              {isProductFilteredMode &&
+              preselectedProduct &&
+              preselectedProduct.inventoryEntries.length > 0 ? (
                 <ProductLocationSelector
                   inventoryEntries={preselectedProduct.inventoryEntries}
                   value={location}
@@ -534,7 +750,6 @@ export function AdjustStockDialog({
                 />
               )}
             </div>
-            {/* Action section */}
             <div className="shrink-0 space-y-2">
               <Label>Action</Label>
               <ToggleGroup
@@ -565,13 +780,13 @@ export function AdjustStockDialog({
             </div>
           </div>
 
-          {/* Products section */}
-          {/* Product-filtered mode with no existing inventory - show add form */}
+          {/* Body */}
           {hasValidLocation &&
-            isProductFilteredMode &&
-            preselectedProduct &&
-            preselectedProduct.inventoryEntries.length === 0 &&
-            !inventoryQuery.isLoading ? (
+          isProductFilteredMode &&
+          preselectedProduct &&
+          preselectedProduct.inventoryEntries.length === 0 &&
+          !inventoryQuery.isLoading ? (
+            // Preselected product not yet at this location → add form.
             <div className="flex-1 flex flex-col items-center justify-center rounded-md border border-dashed p-6 text-center mt-4 gap-4">
               <div className="text-sm text-muted-foreground">
                 <p className="font-medium text-foreground mb-1">
@@ -582,14 +797,16 @@ export function AdjustStockDialog({
               {action === "add" ? (
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">Quantity:</Label>
+                    <Label className="text-sm text-muted-foreground">
+                      Quantity:
+                    </Label>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={handleDecrement}
+                        onClick={handleSingleDecrement}
                         disabled={quantity <= 1 || isSavingInventory}
                       >
                         <Minus className="h-4 w-4" />
@@ -598,7 +815,7 @@ export function AdjustStockDialog({
                         type="text"
                         inputMode="numeric"
                         value={quantity}
-                        onChange={(e) => handleQuantityChange(e.target.value)}
+                        onChange={(e) => handleSingleQuantityChange(e.target.value)}
                         className="h-8 w-16 text-center border rounded-md text-sm"
                         disabled={isSavingInventory}
                       />
@@ -607,7 +824,7 @@ export function AdjustStockDialog({
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={handleIncrement}
+                        onClick={handleSingleIncrement}
                         disabled={isSavingInventory}
                       >
                         <Plus className="h-4 w-4" />
@@ -633,29 +850,80 @@ export function AdjustStockDialog({
                 </p>
               )}
             </div>
-          ) : hasValidLocation && !hasSelectedProduct && !isProductFilteredMode ? (
+          ) : hasValidLocation && isProductFilteredMode ? (
+            // Single-product UX: pick the one product, single quantity, reason.
+            selectedInventory ? (
+              <div className="flex-1 min-h-0 overflow-y-auto mt-4">
+                <SelectedProductCard
+                  inventory={normalizeInventory(selectedInventory)}
+                  existingQuantityAtLocation={currentQtyAtLocation}
+                  action={action}
+                  quantity={quantity}
+                  reason={reason}
+                  quantityWarning={quantityWarning}
+                  locationLabel={locationLabel}
+                  disabled={isAdjusting}
+                  onClearSelection={handleClearSingleSelection}
+                  onQuantityChange={handleSingleQuantityChange}
+                  onReasonChange={handleSingleReasonChange}
+                  onIncrement={handleSingleIncrement}
+                  onDecrement={handleSingleDecrement}
+                  onIntakeMetaChange={(meta) => {
+                    setIntakeUnit(meta.unit);
+                    setIntakeQty(meta.rawQty);
+                  }}
+                />
+              </div>
+            ) : inventoryQuery.isLoading ? (
+              <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
+                {/* Inventory loaded but auto-select hasn't fired yet — fall back to a list. */}
+                <ProductList
+                  items={normalizedInventory}
+                  selectedId={selectedInventoryId}
+                  onSelect={handleSingleProductSelect}
+                  isLoading={false}
+                  disabled={isAdjusting}
+                  emptyMessage="No inventory at this location"
+                  noResultsMessage="No products found"
+                  searchQuery={searchQuery}
+                  categoryFilters={categoryFilters}
+                  childCategoryFilters={childCategoryFilters}
+                  availableCategories={availableCategories}
+                  availableChildCategories={availableChildCategories}
+                />
+              </div>
+            )
+          ) : hasValidLocation ? (
+            // Cart-mode: multi-product staging.
             <div className="flex-1 min-h-0 flex flex-col mt-4">
               <ProductFilterHeader
                 title={listTitle}
-                itemCount={sourceListCount}
+                itemCount={inventory.length}
                 searchQuery={searchQuery}
                 categoryFilters={categoryFilters}
                 childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
                 availableChildCategories={availableChildCategories}
                 disabled={isAdjusting}
-                showFilters={sourceListCount > 0 || action === "add"}
+                showFilters={inventory.length > 0 || action === "add"}
                 onSearchChange={setSearchQuery}
                 onCategoryChange={handleCategoryChange}
                 onChildCategoryChange={setChildCategoryFilters}
                 onClearFilters={handleClearFilters}
-                onAddClick={action === "add" ? () => setAddInventoryDialogOpen(true) : undefined}
+                onAddClick={
+                  action === "add" ? () => setAddInventoryDialogOpen(true) : undefined
+                }
               />
 
-              <ProductList
+              <CartProductList
                 items={normalizedInventory}
-                selectedId={selectedInventoryId}
-                onSelect={handleProductSelect}
+                cart={cart}
+                failedInventoryId={failedInventoryId}
+                action={action}
                 isLoading={inventoryQuery.isLoading}
                 disabled={isAdjusting}
                 emptyMessage={
@@ -669,35 +937,13 @@ export function AdjustStockDialog({
                 childCategoryFilters={childCategoryFilters}
                 availableCategories={availableCategories}
                 availableChildCategories={availableChildCategories}
+                onStage={handleStage}
+                onUnstage={handleUnstage}
+                onLineQuantityChange={handleLineQuantityChange}
+                onLineIncrement={handleLineIncrement}
+                onLineDecrement={handleLineDecrement}
+                onLineIntakeChange={handleLineIntakeChange}
               />
-            </div>
-          ) : hasValidLocation &&
-            hasSelectedProduct &&
-            selectedNormalizedItem ? (
-            <div className="flex-1 min-h-0 overflow-y-auto mt-4">
-              <SelectedProductCard
-                inventory={selectedNormalizedItem}
-                existingQuantityAtLocation={currentQtyAtLocation}
-                action={action}
-                quantity={quantity}
-                reason={reason}
-                quantityWarning={quantityWarning}
-                locationLabel={locationLabel}
-                disabled={isAdjusting}
-                onClearSelection={handleClearSelection}
-                onQuantityChange={handleQuantityChange}
-                onReasonChange={handleReasonChange}
-                onIncrement={handleIncrement}
-                onDecrement={handleDecrement}
-                onIntakeMetaChange={(meta) => {
-                  setIntakeUnit(meta.unit);
-                  setIntakeQty(meta.rawQty);
-                }}
-              />
-            </div>
-          ) : hasValidLocation && isProductFilteredMode && inventoryQuery.isLoading ? (
-            <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
-              <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center mt-4">
@@ -708,8 +954,19 @@ export function AdjustStockDialog({
           )}
         </div>
 
-        {/* Footer buttons */}
+        {/* Footer */}
         <div className="shrink-0 border-t bg-background">
+          {/* Cart summary strip (cart-mode only). */}
+          {!isProductFilteredMode && hasValidLocation && (
+            <CartSummaryStrip
+              itemCount={cartItemCount}
+              totalQuantity={cartTotalQuantity}
+              action={action}
+              reason={reason}
+              disabled={isAdjusting}
+              onReasonChange={handleCartReasonChange}
+            />
+          )}
           <DialogFooter className="px-6 py-4">
             <Button
               type="button"
@@ -722,18 +979,23 @@ export function AdjustStockDialog({
             </Button>
             <Button
               type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className={`min-h-11 sm:min-h-9 border ${
+              onClick={isProductFilteredMode ? handleSingleSubmit : handleCartSubmit}
+              disabled={
+                isProductFilteredMode ? !singleCanSubmit : !cartCanSubmit
+              }
+              className={cn(
+                "min-h-11 sm:min-h-9 border",
                 action === "subtract"
                   ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-amber-700 dark:hover:bg-amber-800"
                   : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
-              }`}
+              )}
             >
               {isAdjusting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              Adjust Stock
+              {isProductFilteredMode
+                ? "Adjust Stock"
+                : `Adjust Stock${cartItemCount > 0 ? ` (${cartItemCount})` : ""}`}
             </Button>
           </DialogFooter>
         </div>

@@ -2,14 +2,13 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.mappers.AuditLogMapper;
 import com.mirai.inventoryservice.dtos.mappers.StockMovementMapper;
-import com.mirai.inventoryservice.dtos.requests.AdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
+import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.StockMovementResponseDTO;
 import com.mirai.inventoryservice.models.audit.StockMovement;
-import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.services.StockMovementService;
 import jakarta.validation.Valid;
@@ -44,14 +43,11 @@ public class StockMovementController {
         this.auditLogMapper = auditLogMapper;
     }
 
-    @PostMapping("/{locationType}/{inventoryId}/adjust")
-    public ResponseEntity<StockMovementResponseDTO> adjustInventory(
-            @PathVariable LocationType locationType,
-            @PathVariable UUID inventoryId,
-            @Valid @RequestBody AdjustStockRequestDTO requestDTO) {
-        StockMovement movement = stockMovementService.adjustInventory(locationType, inventoryId, requestDTO);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(stockMovementMapper.toResponseDTO(movement));
+    @PostMapping("/batch-adjust")
+    public ResponseEntity<Void> batchAdjustInventory(
+            @Valid @RequestBody BatchAdjustStockRequestDTO requestDTO) {
+        stockMovementService.batchAdjustInventory(requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/transfer")

@@ -88,6 +88,18 @@ export interface ProductListProps {
   availableChildCategories: Category[];
 }
 
+/**
+ * A staged adjustment line in the cart-mode dialog.
+ * Persists per-product quantity and intake metadata until the batch submits.
+ */
+export interface CartLine {
+  inventoryId: string;
+  /** Always stored as a positive integer; the dialog applies the action sign at submit. */
+  quantity: number;
+  intakeUnit: "pack" | "box";
+  intakeQty: number;
+}
+
 export interface QuantityControlsProps {
   quantity: number;
   maxQuantity: number;

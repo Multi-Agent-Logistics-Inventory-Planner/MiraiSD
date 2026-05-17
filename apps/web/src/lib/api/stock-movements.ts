@@ -1,8 +1,7 @@
 import { apiGet, apiPost } from "./client";
 import {
-  LocationType,
   StockMovement,
-  AdjustStockRequest,
+  BatchAdjustStockRequest,
   TransferStockRequest,
   BatchTransferStockRequest,
   PaginatedResponse,
@@ -13,18 +12,14 @@ import {
 } from "@/types/api";
 
 /**
- * Adjust stock quantity for an inventory item
- * @param locationType - The type of storage location
- * @param inventoryId - The inventory record ID
- * @param data - Adjustment details (quantity change, reason, actor, notes)
+ * Adjust stock for one or more inventory items at a single location, atomically.
+ * Single-item adjustments are submitted as a batch of one.
  */
-export async function adjustStock(
-  locationType: LocationType,
-  inventoryId: string,
-  data: AdjustStockRequest
-): Promise<StockMovement> {
-  return apiPost<StockMovement, AdjustStockRequest>(
-    `/api/stock-movements/${locationType}/${inventoryId}/adjust`,
+export async function batchAdjustStock(
+  data: BatchAdjustStockRequest
+): Promise<void> {
+  return apiPost<void, BatchAdjustStockRequest>(
+    "/api/stock-movements/batch-adjust",
     data
   );
 }
