@@ -505,7 +505,6 @@ export function AdjustStockDialog({
       const ok = await submitBatch(cartLines, productIds);
       if (ok) {
         setCart(new Map());
-        onOpenChange(false);
       }
     };
 

@@ -40,7 +40,7 @@ export async function getNALocationId(): Promise<string> {
 /**
  * Resolve location ID, handling the NOT_ASSIGNED virtual ID case.
  */
-async function resolveLocationId(
+export async function resolveLocationId(
   locationType: LocationType,
   locationId: string
 ): Promise<string> {

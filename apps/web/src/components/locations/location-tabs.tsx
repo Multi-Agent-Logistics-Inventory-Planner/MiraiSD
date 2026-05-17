@@ -61,9 +61,17 @@ export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
     return new Set(storageLocations?.map((sl) => sl.code) ?? []);
   }, [storageLocations]);
 
-  // Filter tabs to only show those with existing storage locations
+  // Filter tabs to only show those with existing storage locations, sorted alphabetically by label
+  // (with NOT_ASSIGNED pinned to the end)
   const availableTabs = useMemo(() => {
-    return LOCATION_TAB_CONFIG.filter((config) => existingCodes.has(config.code));
+    return LOCATION_TAB_CONFIG
+      .filter((config) => existingCodes.has(config.code))
+      .slice()
+      .sort((a, b) => {
+        if (a.type === LocationType.NOT_ASSIGNED) return 1;
+        if (b.type === LocationType.NOT_ASSIGNED) return -1;
+        return a.label.localeCompare(b.label);
+      });
   }, [existingCodes]);
 
   if (isLoading) {

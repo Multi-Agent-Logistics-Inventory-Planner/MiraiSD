@@ -10,6 +10,7 @@ import {
   AuditLog,
   AuditLogDetail,
 } from "@/types/api";
+import { resolveLocationId } from "./inventory";
 
 /**
  * Adjust stock for one or more inventory items at a single location, atomically.
@@ -18,9 +19,10 @@ import {
 export async function batchAdjustStock(
   data: BatchAdjustStockRequest
 ): Promise<void> {
+  const locationId = await resolveLocationId(data.locationType, data.locationId);
   return apiPost<void, BatchAdjustStockRequest>(
     "/api/stock-movements/batch-adjust",
-    data
+    { ...data, locationId }
   );
 }
 
