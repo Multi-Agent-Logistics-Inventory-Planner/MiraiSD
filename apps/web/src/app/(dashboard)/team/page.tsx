@@ -1,46 +1,28 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { TeamTab } from "@/types/team";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { TeamTabs, TabMembers, TabReviews } from "./_components";
 
-function isValidTab(value: string | null): value is TeamTab {
-  return Object.values(TeamTab).includes(value as TeamTab);
-}
+const TEAM_TAB_VALUES = [TeamTab.MEMBERS, TeamTab.REVIEWS] as const;
 
 function TeamContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
-
-  const currentTab = isValidTab(tabParam) ? tabParam : TeamTab.MEMBERS;
-
-  // Track which tabs have been visited (lazy mount - only mount on first visit)
-  const [mountedTabs, setMountedTabs] = useState<Set<TeamTab>>(
-    () => new Set([currentTab])
-  );
-
-  useEffect(() => {
-    setMountedTabs((prev) => {
-      if (prev.has(currentTab)) return prev;
-      return new Set([...prev, currentTab]);
-    });
-  }, [currentTab]);
-
-  const handleTabChange = (tab: TeamTab) => {
-    router.push(`/team?tab=${tab}`);
-  };
+  const { value, setValue, mountedValues } = useTabParam<TeamTab>({
+    values: TEAM_TAB_VALUES,
+    defaultValue: TeamTab.MEMBERS,
+  });
+  const currentTab = value ?? TeamTab.MEMBERS;
 
   return (
     <div className="flex-1 space-y-4">
-      <TeamTabs value={currentTab} onValueChange={handleTabChange} />
+      <TeamTabs value={currentTab} onValueChange={setValue} />
       <div className={currentTab !== TeamTab.MEMBERS ? "hidden" : undefined}>
-        {mountedTabs.has(TeamTab.MEMBERS) && <TabMembers />}
+        {mountedValues.has(TeamTab.MEMBERS) && <TabMembers />}
       </div>
       <div className={currentTab !== TeamTab.REVIEWS ? "hidden" : undefined}>
-        {mountedTabs.has(TeamTab.REVIEWS) && <TabReviews />}
+        {mountedValues.has(TeamTab.REVIEWS) && <TabReviews />}
       </div>
     </div>
   );

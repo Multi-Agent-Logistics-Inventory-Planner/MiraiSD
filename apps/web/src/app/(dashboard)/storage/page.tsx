@@ -1,17 +1,14 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { Suspense, useMemo, useState, useEffect } from "react";
 import { Plus, ArrowUpDown, RefreshCw } from "lucide-react";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Can, Permission } from "@/components/rbac";
-import {
-  LocationType,
-  STORAGE_LOCATION_CODES,
-  type Location,
-} from "@/types/api";
+import { LocationType, type Location } from "@/types/api";
 import { toStorageLocation } from "@/lib/location-utils";
 import { naturalSortCompare } from "@/lib/utils";
 import { LocationTabs, LOCATION_TAB_CONFIG } from "@/components/locations/location-tabs";
@@ -33,9 +30,23 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 24;
 
+const LOCATION_TYPE_VALUES = Object.values(LocationType) as readonly LocationType[];
+
 export default function LocationsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LocationsContent />
+    </Suspense>
+  );
+}
+
+function LocationsContent() {
   const { toast } = useToast();
-  const [locationType, setLocationType] = useState<LocationType | null>(null);
+  const { value: locationType, setValue: setLocationType } = useTabParam<LocationType>({
+    values: LOCATION_TYPE_VALUES,
+    defaultValue: null,
+    paramName: "type",
+  });
   const [search, setSearch] = useState("");
   const [locationPage, setLocationPage] = useState(1);
   const [notAssignedPage, setNotAssignedPage] = useState(1);
@@ -43,10 +54,9 @@ export default function LocationsPage() {
   // Fetch available storage locations to determine initial tab
   const { data: storageLocations } = useStorageLocations();
 
-  // Set initial tab to first available storage location
+  // Set initial tab to first available storage location when no URL param is set
   useEffect(() => {
     if (storageLocations && storageLocations.length > 0 && locationType === null) {
-      // Find the first matching LocationType from available storage locations
       const firstAvailable = LOCATION_TAB_CONFIG.find((config) =>
         storageLocations.some((sl) => sl.code === config.code)
       );
@@ -54,7 +64,7 @@ export default function LocationsPage() {
         setLocationType(firstAvailable.type);
       }
     }
-  }, [storageLocations, locationType]);
+  }, [storageLocations, locationType, setLocationType]);
 
   const isNotAssigned = locationType === LocationType.NOT_ASSIGNED;
 

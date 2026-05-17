@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useTabParam } from "@/hooks/use-tab-param";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,15 +64,43 @@ import type { SortOption } from "@/components/shipments/shipment-filters";
 const PAGE_SIZE = 5;
 
 type PageView = "shipments" | "suppliers";
+const PAGE_VIEW_VALUES = ["shipments", "suppliers"] as const;
+const SHIPMENT_STATUS_VALUES = [
+  "ACTIVE",
+  "AWAITING_RECEIPT",
+  "PARTIAL",
+  "COMPLETED",
+  "FAILED",
+] as const satisfies readonly ShipmentDisplayStatus[];
 
 export default function ShipmentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShipmentsContent />
+    </Suspense>
+  );
+}
+
+function ShipmentsContent() {
   const { toast } = useToast();
   const deleteMutation = useDeleteShipmentMutation();
   const updateMutation = useUpdateShipmentMutation();
 
-  const [pageView, setPageView] = useState<PageView>("shipments");
+  const { value: pageViewValue, setValue: setPageView } = useTabParam<PageView>({
+    values: PAGE_VIEW_VALUES,
+    defaultValue: "shipments",
+    paramName: "view",
+  });
+  const pageView = pageViewValue ?? "shipments";
+
+  const { value: statusValue, setValue: setStatus } = useTabParam<ShipmentDisplayStatus>({
+    values: SHIPMENT_STATUS_VALUES,
+    defaultValue: "ACTIVE",
+    paramName: "status",
+  });
+  const activeTab: ShipmentDisplayStatus = statusValue ?? "ACTIVE";
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<ShipmentDisplayStatus>("ACTIVE");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [page, setPage] = useState(0);
 
@@ -107,7 +136,7 @@ export default function ShipmentsPage() {
 
   // Reset page when tab or search changes
   const handleTabChange = (value: string) => {
-    setActiveTab(value as ShipmentDisplayStatus);
+    setStatus(value as ShipmentDisplayStatus);
     setPage(0);
   };
 

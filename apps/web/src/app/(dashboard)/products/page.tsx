@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTabParam } from "@/hooks/use-tab-param";
 import {
   ProductHeader,
   ProductFilters,
@@ -75,7 +76,24 @@ import { useCategories } from "@/hooks/queries/use-categories";
 
 const PAGE_SIZE = 20;
 
+type ProductsTab = "products" | "custom-kuji";
+const PRODUCTS_TAB_VALUES = ["products", "custom-kuji"] as const;
+
 export default function ProductsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProductsContent />
+    </Suspense>
+  );
+}
+
+function ProductsContent() {
+  const { value: tabValue, setValue: setTab } = useTabParam<ProductsTab>({
+    values: PRODUCTS_TAB_VALUES,
+    defaultValue: "products",
+  });
+  const currentTab = tabValue ?? "products";
+
   // Show only root products (no parent) by default
   const list = useProductInventory(true);
   const { data: categories } = useCategories();
@@ -204,7 +222,11 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="products" className="w-full">
+        <Tabs
+          value={currentTab}
+          onValueChange={(v) => setTab(v as ProductsTab)}
+          className="w-full"
+        >
           <TabsList>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="custom-kuji">Custom Kuji</TabsTrigger>

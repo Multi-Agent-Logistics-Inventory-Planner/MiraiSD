@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.controllers;
 
+import com.mirai.inventoryservice.dtos.requests.BatchClearDisplaysRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
@@ -78,6 +79,16 @@ public class MachineDisplayController {
             @Valid @RequestBody BatchDisplaySwapRequestDTO request) {
         List<MachineDisplayDTO> updatedDisplays = machineDisplayService.batchSwapDisplay(request);
         return ResponseEntity.ok(updatedDisplays);
+    }
+
+    /**
+     * Batch-clear multiple displays on the same machine in one transaction.
+     * Single audit log + single notification, regardless of how many displays are cleared.
+     */
+    @PostMapping("/batch-clear")
+    public ResponseEntity<List<MachineDisplayDTO>> batchClearDisplays(
+            @Valid @RequestBody BatchClearDisplaysRequestDTO request) {
+        return ResponseEntity.ok(machineDisplayService.batchClearDisplays(request));
     }
 
     /**
