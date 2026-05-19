@@ -564,9 +564,9 @@ public class ShipmentService {
                 notificationService.createNotification(damageNotif);
             }
 
-            // PREMADE kuji prize children are tracking-only: setReceivedQuantity above is the
-            // source of truth. Skip allocation rows and location_inventory writes for them.
-            boolean isPremadeChild = isPremadeChild(shipmentItem.getItem());
+            // Kuji prize children (non-CUSTOM parent) are tracking-only: setReceivedQuantity
+            // above is the source of truth. Skip allocation rows and location_inventory writes.
+            boolean isKujiPrizeChild = isKujiPrizeChild(shipmentItem.getItem());
 
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
@@ -575,7 +575,7 @@ public class ShipmentService {
                     continue;
                 }
 
-                if (isPremadeChild) {
+                if (isKujiPrizeChild) {
                     continue;
                 }
 
@@ -900,10 +900,16 @@ public class ShipmentService {
      * Add inventory to a location using the unified location_inventory table.
      * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
-    private boolean isPremadeChild(Product product) {
+    /**
+     * True for kuji prize children whose parent is non-CUSTOM (PREMADE or untagged). The
+     * PREMADE column tag is operationally unused, so vendor-shipped kuji parents usually
+     * have kuji_type=NULL. CUSTOM-parented children are exempt -- KujiBoxService manages
+     * their lifecycle via tier counters and transient location_inventory rows.
+     */
+    private boolean isKujiPrizeChild(Product product) {
         if (product == null) return false;
         Product parent = product.getParent();
-        return parent != null && parent.getKujiType() == KujiType.PREMADE;
+        return parent != null && parent.getKujiType() != KujiType.CUSTOM;
     }
 
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {

@@ -112,16 +112,20 @@ public class StockMovementService {
     }
 
     /**
-     * Refuses inventory operations against PREMADE kuji prize children. Their per-prize
-     * counts live on shipment_items.received_quantity; they do not have location_inventory rows.
+     * Refuses inventory operations against kuji prize children whose parent is non-CUSTOM
+     * (i.e., PREMADE or untagged -- the PREMADE column tag is operationally unused in this
+     * codebase, so vendor-shipped kuji parents typically have kuji_type=NULL). Their
+     * per-prize counts live on shipment_items.received_quantity; they do not have
+     * location_inventory rows. CUSTOM-parented children are exempt because KujiBoxService
+     * writes transient location_inventory rows for them during close-box round-trip flows.
      */
-    public void rejectIfPremadeChild(Product product) {
+    public void rejectIfKujiPrizeChild(Product product) {
         if (product == null) return;
         Product parent = product.getParent();
         if (parent != null
-                && parent.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.PREMADE) {
+                && parent.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
             throw new InvalidInventoryOperationException(
-                    "PREMADE kuji prize children do not track location inventory. "
+                    "Kuji prize children do not track location inventory. "
                             + "Edit the shipment item to correct received counts.");
         }
     }
@@ -154,7 +158,7 @@ public class StockMovementService {
                         "Inventory " + line.getInventoryId() + " does not belong to location " + request.getLocationId());
             }
             rejectIfCustomKujiParent(inv.getProduct());
-            rejectIfPremadeChild(inv.getProduct());
+            rejectIfKujiPrizeChild(inv.getProduct());
         }
 
         // Validate quantities (subtract cannot exceed on-hand).
@@ -498,7 +502,7 @@ public class StockMovementService {
                 sourceInventory.getProduct().getId(),
                 sourceQuantity - request.getQuantity());
 
-        rejectIfPremadeChild(sourceInventory.getProduct());
+        rejectIfKujiPrizeChild(sourceInventory.getProduct());
 
         LocationInventory destinationInventory;
         int destinationQuantity;
@@ -663,7 +667,7 @@ public class StockMovementService {
         }
 
         rejectIfCustomKujiParent(product);
-        rejectIfPremadeChild(product);
+        rejectIfKujiPrizeChild(product);
 
         Location location;
         if (locationId != null) {
