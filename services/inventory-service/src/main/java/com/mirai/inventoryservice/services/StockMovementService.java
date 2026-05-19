@@ -112,6 +112,25 @@ public class StockMovementService {
     }
 
     /**
+     * Refuses inventory operations against kuji prize children whose parent is non-CUSTOM
+     * (i.e., PREMADE or untagged -- the PREMADE column tag is operationally unused in this
+     * codebase, so vendor-shipped kuji parents typically have kuji_type=NULL). Their
+     * per-prize counts live on shipment_items.received_quantity; they do not have
+     * location_inventory rows. CUSTOM-parented children are exempt because KujiBoxService
+     * writes transient location_inventory rows for them during close-box round-trip flows.
+     */
+    public void rejectIfKujiPrizeChild(Product product) {
+        if (product == null) return;
+        Product parent = product.getParent();
+        if (parent != null
+                && parent.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+            throw new InvalidInventoryOperationException(
+                    "Kuji prize children do not track location inventory. "
+                            + "Edit the shipment item to correct received counts.");
+        }
+    }
+
+    /**
      * Atomically adjust inventory for one or more products at a single location.
      * Creates one StockMovement row per line, all linked to a single AuditLog
      * with itemCount = adjustments.size() and totalQuantity = sum(|quantityChange|).
@@ -139,6 +158,7 @@ public class StockMovementService {
                         "Inventory " + line.getInventoryId() + " does not belong to location " + request.getLocationId());
             }
             rejectIfCustomKujiParent(inv.getProduct());
+            rejectIfKujiPrizeChild(inv.getProduct());
         }
 
         // Validate quantities (subtract cannot exceed on-hand).
@@ -482,6 +502,8 @@ public class StockMovementService {
                 sourceInventory.getProduct().getId(),
                 sourceQuantity - request.getQuantity());
 
+        rejectIfKujiPrizeChild(sourceInventory.getProduct());
+
         LocationInventory destinationInventory;
         int destinationQuantity;
         UUID destinationInventoryId = request.getDestinationInventoryId();
@@ -645,6 +667,7 @@ public class StockMovementService {
         }
 
         rejectIfCustomKujiParent(product);
+        rejectIfKujiPrizeChild(product);
 
         Location location;
         if (locationId != null) {
