@@ -20,9 +20,9 @@ public class LocationAggregateRepository {
     private EntityManager entityManager;
 
     /**
-     * Aggregate location_inventory rows per location, excluding any product whose root
-     * has kuji_type = 'CUSTOM'. Custom-kuji prizes are owned by the dedicated kuji UI,
-     * so they are omitted from machine/storage card Items/Units totals.
+     * Aggregate location_inventory rows per location, excluding child products and CUSTOM
+     * kuji parents. Matches LocationInventoryRepository.findByLocation_Id so rack-card
+     * counts agree with the rack-dialog contents.
      */
     private static final String INVENTORY_SUBQUERY = """
         SELECT li.location_id,
@@ -30,8 +30,8 @@ public class LocationAggregateRepository {
                COALESCE(SUM(li.quantity), 0) as total_quantity
         FROM location_inventory li
         JOIN products p ON p.id = li.product_id
-        LEFT JOIN products root ON root.id = p.parent_id
-        WHERE COALESCE(root.kuji_type, p.kuji_type) IS DISTINCT FROM 'CUSTOM'
+        WHERE p.parent_id IS NULL
+          AND p.kuji_type IS DISTINCT FROM 'CUSTOM'
         GROUP BY li.location_id
         """;
 

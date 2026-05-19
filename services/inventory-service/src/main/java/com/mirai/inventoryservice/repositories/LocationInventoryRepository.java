@@ -15,18 +15,20 @@ import java.util.UUID;
 @Repository
 public interface LocationInventoryRepository extends JpaRepository<LocationInventory, UUID> {
     /**
-     * Lists displayable inventory at a location. Excludes products whose root has
-     * kuji_type = CUSTOM so custom-kuji prizes only appear in the dedicated kuji UI.
+     * Lists displayable inventory at a location. Excludes:
+     *  - child products (parent IS NOT NULL): kuji prize children, PREMADE (tracking-only)
+     *    and CUSTOM (managed in the dedicated kuji UI), never appear as stockable rack items.
+     *  - CUSTOM kuji parents: their lifecycle lives on KujiBox; convention is no
+     *    location_inventory row, but the filter defends against stray ones.
      */
     @Query("""
         SELECT li FROM LocationInventory li
         JOIN FETCH li.location l
         JOIN FETCH l.storageLocation sl
         JOIN FETCH li.product p
-        LEFT JOIN p.parent parent
         WHERE li.location.id = :locationId
+          AND p.parent IS NULL
           AND (p.kujiType IS NULL OR p.kujiType <> com.mirai.inventoryservice.models.enums.KujiType.CUSTOM)
-          AND (parent IS NULL OR parent.kujiType IS NULL OR parent.kujiType <> com.mirai.inventoryservice.models.enums.KujiType.CUSTOM)
         """)
     List<LocationInventory> findByLocation_Id(@Param("locationId") UUID locationId);
 

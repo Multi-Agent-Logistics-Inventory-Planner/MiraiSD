@@ -17,6 +17,7 @@ import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.KujiType;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
@@ -563,10 +564,18 @@ public class ShipmentService {
                 notificationService.createNotification(damageNotif);
             }
 
+            // PREMADE kuji prize children are tracking-only: setReceivedQuantity above is the
+            // source of truth. Skip allocation rows and location_inventory writes for them.
+            boolean isPremadeChild = isPremadeChild(shipmentItem.getItem());
+
             // Process each allocation
             for (ReceiveShipmentRequestDTO.DestinationAllocationDTO allocation : allocations) {
                 Integer allocQty = allocation.getQuantity();
                 if (allocQty == null || allocQty <= 0) {
+                    continue;
+                }
+
+                if (isPremadeChild) {
                     continue;
                 }
 
@@ -891,6 +900,12 @@ public class ShipmentService {
      * Add inventory to a location using the unified location_inventory table.
      * The caller passes the parent audit log; this method only writes a stock movement under it.
      */
+    private boolean isPremadeChild(Product product) {
+        if (product == null) return false;
+        Product parent = product.getParent();
+        return parent != null && parent.getKujiType() == KujiType.PREMADE;
+    }
+
     private void addToInventory(LocationType locationType, UUID locationId, Product product, int quantity, UUID validatedActorId, AuditLog parentAuditLog) {
         addToInventory(locationType, locationId, product, quantity, validatedActorId, parentAuditLog, null, null);
     }

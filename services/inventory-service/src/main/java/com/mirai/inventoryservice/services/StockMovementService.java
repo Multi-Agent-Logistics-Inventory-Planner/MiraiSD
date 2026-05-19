@@ -112,6 +112,21 @@ public class StockMovementService {
     }
 
     /**
+     * Refuses inventory operations against PREMADE kuji prize children. Their per-prize
+     * counts live on shipment_items.received_quantity; they do not have location_inventory rows.
+     */
+    public void rejectIfPremadeChild(Product product) {
+        if (product == null) return;
+        Product parent = product.getParent();
+        if (parent != null
+                && parent.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.PREMADE) {
+            throw new InvalidInventoryOperationException(
+                    "PREMADE kuji prize children do not track location inventory. "
+                            + "Edit the shipment item to correct received counts.");
+        }
+    }
+
+    /**
      * Atomically adjust inventory for one or more products at a single location.
      * Creates one StockMovement row per line, all linked to a single AuditLog
      * with itemCount = adjustments.size() and totalQuantity = sum(|quantityChange|).
@@ -139,6 +154,7 @@ public class StockMovementService {
                         "Inventory " + line.getInventoryId() + " does not belong to location " + request.getLocationId());
             }
             rejectIfCustomKujiParent(inv.getProduct());
+            rejectIfPremadeChild(inv.getProduct());
         }
 
         // Validate quantities (subtract cannot exceed on-hand).
@@ -482,6 +498,8 @@ public class StockMovementService {
                 sourceInventory.getProduct().getId(),
                 sourceQuantity - request.getQuantity());
 
+        rejectIfPremadeChild(sourceInventory.getProduct());
+
         LocationInventory destinationInventory;
         int destinationQuantity;
         UUID destinationInventoryId = request.getDestinationInventoryId();
@@ -645,6 +663,7 @@ public class StockMovementService {
         }
 
         rejectIfCustomKujiParent(product);
+        rejectIfPremadeChild(product);
 
         Location location;
         if (locationId != null) {

@@ -1,24 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { LocationType, type LocationInventory, DISPLAY_ONLY_LOCATION_TYPES } from "@/types/api";
+import { LocationType, DISPLAY_ONLY_LOCATION_TYPES } from "@/types/api";
 import { getLocationInventory, getStorageLocationInventory } from "@/lib/api/inventory";
 import { getStorageLocationByCode } from "@/lib/api/locations";
-
-/** Virtual ID used for NOT_ASSIGNED when no real ID is available */
-const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
-
-/** Filter inventory to root products only (exclude child/prize products from storage view). */
-function filterToRootProducts<T extends { item: { parentId?: string | null } }>(
-  items: T[]
-): T[] {
-  return items.filter((x) => !x.item.parentId);
-}
 
 /**
  * Hook to fetch inventory for a location.
  * Uses the unified /api/locations/{locationId}/inventory endpoint.
- * Returns only root products (excludes Kuji prizes) so storage operations apply to parents.
+ * Backend already excludes child/prize products (parent_id IS NULL filter),
+ * so consumers receive root products only.
  *
  * For NOT_ASSIGNED, automatically looks up the storage location ID.
  */
@@ -34,20 +25,14 @@ export function useLocationInventory(
       ? ["notAssignedInventory"]
       : ["locationInventory", locationType, locationId],
     queryFn: async () => {
-      let data: LocationInventory[];
-
       if (isNotAssigned) {
-        // For NOT_ASSIGNED, look up the storage location ID
         const storageLocation = await getStorageLocationByCode("NOT_ASSIGNED");
-        data = await getStorageLocationInventory(storageLocation.id);
-      } else {
-        if (!locationId) {
-          return [];
-        }
-        data = await getLocationInventory(locationId);
+        return getStorageLocationInventory(storageLocation.id);
       }
-
-      return filterToRootProducts(data);
+      if (!locationId) {
+        return [];
+      }
+      return getLocationInventory(locationId);
     },
     enabled: !isDisplayOnly && Boolean(locationType) && (isNotAssigned || Boolean(locationId)),
   });
