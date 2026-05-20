@@ -5,6 +5,7 @@ import com.mirai.inventoryservice.dtos.responses.LootboxBalanceResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.PlayLootboxResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -84,6 +86,12 @@ public class LootboxController {
     public ResponseEntity<List<CoinHistoryEntryDTO>> getMyHistory(Authentication auth) {
         UUID userId = resolveUserId(auth);
         return ResponseEntity.ok(lootboxService.getUserHistory(userId));
+    }
+
+    @GetMapping("/recent")
+    public ResponseEntity<List<RecentLootboxPlayResponseDTO>> getRecentPlays(
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(lootboxService.listRecentPlays(limit));
     }
 
     private UUID resolveUserId(Authentication auth) {

@@ -5,6 +5,7 @@ import com.mirai.inventoryservice.dtos.responses.CoinHistoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
 import com.mirai.inventoryservice.exceptions.LootboxException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.lootbox.CoinAdjustment;
@@ -231,6 +232,46 @@ public class LootboxService {
 
         entries.sort(Comparator.comparing(CoinHistoryEntryDTO::at).reversed());
         return entries;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecentLootboxPlayResponseDTO> listRecentPlays(int limit) {
+        int cap = Math.max(1, Math.min(limit, 50));
+        return lootboxPlayRepository.findTop50ByOrderByPlayedAtDesc().stream()
+                .limit(cap)
+                .map(LootboxService::toRecentPlayDto)
+                .toList();
+    }
+
+    public static RecentLootboxPlayResponseDTO toRecentPlayDto(LootboxPlay play) {
+        LootboxPrize prize = play.getPrize();
+        LootboxTier tier = prize != null ? prize.getTier() : null;
+        User user = play.getUser();
+        return RecentLootboxPlayResponseDTO.builder()
+                .id(play.getId())
+                .prizeId(prize != null ? prize.getId() : null)
+                .prizeName(play.getPrizeNameSnapshot())
+                .prizeImageUrl(play.getPrizeImageUrlSnapshot())
+                .tierName(play.getPrizeTierNameSnapshot())
+                .tierColor(tier != null ? tier.getDisplayColor() : null)
+                .userDisplay(toFirstNameLastInitial(user != null ? user.getFullName() : null))
+                .playedAt(play.getPlayedAt())
+                .build();
+    }
+
+    /**
+     * "John Doe" -> "John D.", "Cher" -> "Cher", null/blank -> "Someone".
+     * Keeps the ticker public-safe without leaking full last names.
+     */
+    static String toFirstNameLastInitial(String fullName) {
+        if (fullName == null) return "Someone";
+        String trimmed = fullName.trim();
+        if (trimmed.isEmpty()) return "Someone";
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length == 1) return parts[0];
+        String last = parts[parts.length - 1];
+        if (last.isEmpty()) return parts[0];
+        return parts[0] + " " + Character.toUpperCase(last.charAt(0)) + ".";
     }
 
     public static LootboxTierResponseDTO toTierDto(LootboxTier tier, List<LootboxPrize> prizes) {

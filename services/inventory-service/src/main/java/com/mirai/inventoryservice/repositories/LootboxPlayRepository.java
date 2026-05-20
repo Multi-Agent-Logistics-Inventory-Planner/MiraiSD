@@ -23,4 +23,6 @@ public interface LootboxPlayRepository extends JpaRepository<LootboxPlay, UUID> 
     Optional<LootboxPlay> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
 
     Page<LootboxPlay> findByStatusOrderByPlayedAtDesc(String status, Pageable pageable);
+
+    List<LootboxPlay> findTop50ByOrderByPlayedAtDesc();
 }

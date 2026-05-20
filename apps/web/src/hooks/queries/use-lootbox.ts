@@ -8,6 +8,7 @@ import {
   getMyHistory,
   getMyPrizes,
   getPendingRedemptions,
+  getRecentPlays,
   getUserProfile,
 } from "@/lib/api/lootbox";
 
@@ -17,6 +18,7 @@ export const lootboxKeys = {
   adminCatalog: ["lootbox", "admin", "catalog"] as const,
   myPrizes: ["lootbox", "my-prizes"] as const,
   myHistory: ["lootbox", "my-history"] as const,
+  recent: (limit: number) => ["lootbox", "recent", limit] as const,
   pending: (page: number, size: number) =>
     ["lootbox", "admin", "pending", page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
@@ -59,6 +61,15 @@ export function useMyCoinHistory() {
     queryKey: lootboxKeys.myHistory,
     queryFn: getMyHistory,
     staleTime: 30 * 1000,
+  });
+}
+
+export function useRecentLootboxPlays(limit = 20) {
+  return useQuery({
+    queryKey: lootboxKeys.recent(limit),
+    queryFn: () => getRecentPlays(limit),
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
   });
 }
 

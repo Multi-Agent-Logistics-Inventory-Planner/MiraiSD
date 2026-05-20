@@ -9,6 +9,7 @@ import type {
   LootboxTier,
   PageResponse,
   PlayLootboxResponse,
+  RecentLootboxPlay,
   UpsertPrizeRequest,
   UpsertTierRequest,
   UserCoinProfile,
@@ -44,6 +45,10 @@ export function getMyPrizes(): Promise<LootboxPlay[]> {
 
 export function getMyHistory(): Promise<CoinHistoryEntry[]> {
   return apiGet<CoinHistoryEntry[]>(`${BASE}/my-history`);
+}
+
+export function getRecentPlays(limit = 20): Promise<RecentLootboxPlay[]> {
+  return apiGet<RecentLootboxPlay[]>(`${BASE}/recent?limit=${limit}`);
 }
 
 // ---------- Admin ----------

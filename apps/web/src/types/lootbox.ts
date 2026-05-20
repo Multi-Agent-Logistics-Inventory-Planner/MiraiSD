@@ -50,6 +50,17 @@ export interface PlayLootboxResponse {
   newBalance: number;
 }
 
+export interface RecentLootboxPlay {
+  id: string;
+  prizeId: string;
+  prizeName: string;
+  prizeImageUrl: string | null;
+  tierName: string;
+  tierColor: string | null;
+  userDisplay: string;
+  playedAt: string;
+}
+
 export type CoinHistoryKind = "REVIEW_CREDIT" | "PLAY" | "ADJUSTMENT";
 
 export interface CoinHistoryEntry {

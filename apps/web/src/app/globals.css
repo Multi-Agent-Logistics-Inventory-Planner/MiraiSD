@@ -68,6 +68,8 @@ body::-webkit-scrollbar {
   --table-header-foreground: #71717a;
   --brand-primary: #0b66c2;
   --brand-primary-hover: #0a5eb3;
+  --brand-primary-light: #6d96cc;
+  --background-deep: #f4f3ee;
 }
 
 .dark {
@@ -116,6 +118,8 @@ body::-webkit-scrollbar {
   --table-header-foreground: #a1a1aa;
   --brand-primary: #7c3aed;
   --brand-primary-hover: #6d28d9;
+  --brand-primary-light: #a78bfa;
+  --background-deep: #1f1f1d;
 }
 
 @theme inline {
@@ -170,6 +174,8 @@ body::-webkit-scrollbar {
   --color-table-header-foreground: var(--table-header-foreground);
   --color-brand-primary: var(--brand-primary);
   --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-primary-light: var(--brand-primary-light);
+  --color-background-deep: var(--background-deep);
   --width-border: 0.5px;
 }
 

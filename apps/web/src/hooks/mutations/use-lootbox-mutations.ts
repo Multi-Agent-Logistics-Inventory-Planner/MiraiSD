@@ -39,6 +39,7 @@ export function usePlayLootboxMutation() {
         qc.invalidateQueries({ queryKey: lootboxKeys.balance }),
         qc.invalidateQueries({ queryKey: lootboxKeys.myPrizes }),
         qc.invalidateQueries({ queryKey: lootboxKeys.myHistory }),
+        qc.invalidateQueries({ queryKey: ["lootbox", "recent"] }),
       ]);
     },
   });
