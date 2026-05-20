@@ -31,7 +31,7 @@ public class Shipment {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "shipment_number", unique = true)
+    @Column(name = "shipment_number")
     private String shipmentNumber;
 
     @Column(name = "supplier_name")

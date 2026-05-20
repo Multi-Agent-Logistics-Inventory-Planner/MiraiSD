@@ -58,7 +58,7 @@ public class TrackingService {
 
             // Try to find associated shipment in your system
             Optional<Shipment> shipmentOpt = shipmentRepository
-                .findByShipmentNumber(request.trackingNumber());
+                .findFirstByTrackingIdOrderByCreatedAtDesc(request.trackingNumber());
 
             // Map to response DTO
             return mapToResponseDTO(tracker, shipmentOpt.orElse(null));
@@ -84,7 +84,7 @@ public class TrackingService {
             }
 
             Optional<Shipment> shipmentOpt = shipmentRepository
-                .findByShipmentNumber(trackingNumber);
+                .findFirstByTrackingIdOrderByCreatedAtDesc(trackingNumber);
 
             return mapToResponseDTO(tracker, shipmentOpt.orElse(null));
 
