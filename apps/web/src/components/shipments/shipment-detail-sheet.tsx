@@ -471,6 +471,11 @@ export function ShipmentDetailSheet({
               </button>
             </Can>
           </DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {shipment.supplierName
+              ? `${shipment.supplierName} · Ordered ${formatDate(shipment.orderDate)}`
+              : `Ordered ${formatDate(shipment.orderDate)}`}
+          </p>
           {showAwaitingReceiptNote && (
             <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
               Carrier delivered{" "}
