@@ -136,7 +136,7 @@ public class EasyPostWebhookService {
 
         Optional<Shipment> shipmentOpt = shipmentRepository.findByEasypostTrackerId(trackerId);
         if (shipmentOpt.isEmpty() && trackingCode != null) {
-            shipmentOpt = shipmentRepository.findByTrackingId(trackingCode);
+            shipmentOpt = shipmentRepository.findFirstByTrackingIdOrderByCreatedAtDesc(trackingCode);
         }
 
         if (shipmentOpt.isEmpty()) {
