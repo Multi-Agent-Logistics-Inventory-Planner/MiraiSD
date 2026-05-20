@@ -3,12 +3,20 @@
 import { useMemo, useState } from "react";
 import type { KujiDailyPayoutPoint } from "@/types/api";
 import { formatMoney } from "@/lib/utils/format-money";
+import { cn } from "@/lib/utils";
+
+export type DailyPayoutRange = "week" | "all";
 
 interface DailyPayoutChartProps {
   readonly data: readonly KujiDailyPayoutPoint[];
   readonly totals?: { valueWon: number; slipCount: number };
   readonly isLoading?: boolean;
   readonly isError?: boolean;
+  readonly selectedDate?: string | null;
+  readonly onSelectDate?: (date: string | null) => void;
+  readonly range?: DailyPayoutRange;
+  readonly onRangeChange?: (range: DailyPayoutRange) => void;
+  readonly canExpandRange?: boolean;
 }
 
 interface ChartRow {
@@ -31,6 +39,11 @@ export function DailyPayoutChart({
   totals,
   isLoading,
   isError,
+  selectedDate = null,
+  onSelectDate,
+  range = "week",
+  onRangeChange,
+  canExpandRange = false,
 }: DailyPayoutChartProps) {
   const [todayIso] = useState(() => new Date().toISOString().slice(0, 10));
   const [yesterdayIso] = useState(
@@ -57,21 +70,62 @@ export function DailyPayoutChart({
     [rows],
   );
 
+  const isClickable = typeof onSelectDate === "function";
+  const subtitle = range === "all" ? "All time" : `Last ${rows.length || 7} days`;
+
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium">Value paid out per day</div>
           <div className="text-[11px] text-muted-foreground tabular-nums">
-            Last 7 days · {formatMoney(total)} total
+            {subtitle} · {formatMoney(total)} total
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
-            Avg / day
-          </div>
-          <div className="text-sm font-medium tabular-nums">
-            {formatMoney(avg)}
+        <div className="flex items-center gap-3">
+          {canExpandRange && onRangeChange ? (
+            <div
+              role="tablist"
+              aria-label="Date range"
+              className="flex items-center rounded-md border bg-background p-0.5 text-[11px]"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={range === "week"}
+                onClick={() => onRangeChange("week")}
+                className={cn(
+                  "rounded-sm px-2 py-0.5 tabular-nums",
+                  range === "week"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                7d
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={range === "all"}
+                onClick={() => onRangeChange("all")}
+                className={cn(
+                  "rounded-sm px-2 py-0.5",
+                  range === "all"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                All time
+              </button>
+            </div>
+          ) : null}
+          <div className="text-right">
+            <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+              Avg / day
+            </div>
+            <div className="text-sm font-medium tabular-nums">
+              {formatMoney(avg)}
+            </div>
           </div>
         </div>
       </div>
@@ -103,10 +157,37 @@ export function DailyPayoutChart({
               const denom = max > 0 ? max : 1;
               const heightPct = (r.valueWon / denom) * 100;
               const minHeight = r.valueWon > 0 ? 2 : 0;
+              const isSelected = selectedDate === r.date;
+              const hasSelection = selectedDate !== null && selectedDate !== undefined;
+              const dimmed = hasSelection && !isSelected;
+              const barBg = isSelected
+                ? "var(--brand-primary)"
+                : r.isToday
+                  ? "color-mix(in oklab, var(--brand-primary) 25%, transparent)"
+                  : r.isYesterday
+                    ? "var(--brand-primary)"
+                    : "color-mix(in oklab, var(--brand-primary) 65%, transparent)";
+              const barBorder = r.isToday && !isSelected
+                ? "1px dashed color-mix(in oklab, var(--brand-primary) 60%, transparent)"
+                : "none";
               return (
-                <div
+                <button
                   key={r.date}
-                  className="relative z-10 flex flex-1 flex-col items-center justify-end gap-1.5"
+                  type="button"
+                  disabled={!isClickable}
+                  onClick={() => {
+                    if (!isClickable) return;
+                    onSelectDate(isSelected ? null : r.date);
+                  }}
+                  aria-pressed={isClickable ? isSelected : undefined}
+                  aria-label={`${r.label} — ${formatMoney(r.valueWon)} paid out, ${r.slipCount} ${r.slipCount === 1 ? "draw" : "draws"}`}
+                  className={cn(
+                    "relative z-10 flex flex-1 flex-col items-center justify-end gap-1.5",
+                    isClickable && "cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40",
+                    !isClickable && "cursor-default",
+                    dimmed && "opacity-40 hover:opacity-70",
+                    "transition-opacity",
+                  )}
                 >
                   <div
                     className="text-[11px] tabular-nums"
@@ -115,7 +196,9 @@ export function DailyPayoutChart({
                     {r.valueWon > 0 ? (
                       <span
                         className={
-                          r.isToday ? "text-foreground" : "text-muted-foreground"
+                          isSelected || r.isToday
+                            ? "text-foreground"
+                            : "text-muted-foreground"
                         }
                       >
                         {formatMoney(r.valueWon)}
@@ -132,24 +215,28 @@ export function DailyPayoutChart({
                       className="w-full rounded-t-md"
                       style={{
                         height: `${Math.max(heightPct, minHeight)}%`,
-                        background: r.isToday
-                          ? "color-mix(in oklab, var(--brand-primary) 25%, transparent)"
-                          : r.isYesterday
-                            ? "var(--brand-primary)"
-                            : "color-mix(in oklab, var(--brand-primary) 65%, transparent)",
-                        border: r.isToday
-                          ? "1px dashed color-mix(in oklab, var(--brand-primary) 60%, transparent)"
+                        background: barBg,
+                        border: barBorder,
+                        boxShadow: isSelected
+                          ? "0 0 0 2px color-mix(in oklab, var(--brand-primary) 60%, transparent)"
                           : "none",
                       }}
                     />
                   </div>
-                  <div className="text-[10.5px] text-muted-foreground">
+                  <div
+                    className={cn(
+                      "text-[10.5px]",
+                      isSelected
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
                     {r.label}
                   </div>
                   <div className="text-[10px] tabular-nums text-muted-foreground/60">
                     {r.slipCount} {r.slipCount === 1 ? "draw" : "draws"}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

@@ -1017,7 +1017,7 @@ public class KujiBoxService {
                 1,
                 quantity,
                 parentProduct.getName(),
-                "Kuji slip added" + bucketLabel + ": " + tier.getLabel(),
+                "Kuji slip added" + bucketLabel + ": " + tierAuditHeader(tier),
                 parentProduct.getId()
         );
 
@@ -1085,7 +1085,7 @@ public class KujiBoxService {
                 1,
                 quantity,
                 parentProduct.getName(),
-                "Kuji slips " + action + "d: " + tier.getLabel() + " (" + quantity + ")",
+                "Kuji slips " + action + "d: " + tierAuditHeader(tier) + " (" + quantity + ")",
                 parentProduct.getId()
         );
 
@@ -1119,13 +1119,13 @@ public class KujiBoxService {
         int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
         int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
         int total = active + inactive;
-        String tierLabel = tier.getLabel();
+        String tierHeader = tierAuditHeader(tier);
 
         box.getTiers().remove(tier);
         kujiBoxTierRepository.delete(tier);
 
         Product parentProduct = box.getProduct();
-        String summary = "Kuji prize tier deleted: " + tierLabel
+        String summary = "Kuji prize tier deleted: " + tierHeader
                 + " (active " + active + ", inactive " + inactive + ")";
         createAuditLog(
                 request.getActorId(),
@@ -1435,6 +1435,24 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
+        Product parentProduct = box.getProduct();
+        String summary = "Kuji prize tier added: " + tierAuditHeader(tier)
+                + " (active " + slipCount + ", inactive " + heldBack + ")";
+        createAuditLog(
+                request.getActorId(),
+                StockMovementReason.KUJI_SLIP_ADJUSTMENT,
+                box.getLocation().getId(),
+                box.getLocation().getLocationCode(),
+                null,
+                null,
+                1,
+                totalQuantity,
+                parentProduct.getName(),
+                summary,
+                parentProduct.getId()
+        );
+        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+
         entityManager.flush();
         return toResponseDTO(box);
     }
@@ -1550,15 +1568,17 @@ public class KujiBoxService {
 
         // Other patches
         if (request.getLabel() != null && !request.getLabel().equals(tier.getLabel())) {
+            String prev = tier.getLabel();
             tier.setLabel(request.getLabel());
-            changes.add("label");
+            changes.add("label: \"" + (prev != null ? prev : "") + "\" → \"" + request.getLabel() + "\"");
         }
+        // Letter is not user-editable in any kuji flow today, so changes here
+        // are not surfaced in the activity log. The assignment is kept so the
+        // API contract stays intact for future callers.
         if (Boolean.TRUE.equals(request.getClearLetter())) {
             tier.setLetter(null);
-            changes.add("cleared letter");
         } else if (request.getLetter() != null && !request.getLetter().equals(tier.getLetter())) {
             tier.setLetter(request.getLetter());
-            changes.add("letter");
         }
         if (request.getActiveCount() != null && !request.getActiveCount().equals(tier.getActiveCount())) {
             int prev = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
@@ -1572,11 +1592,14 @@ public class KujiBoxService {
             changes.add("inactive count (manual adjustment): " + prev + " → " + request.getInactiveCount());
         }
         if (Boolean.TRUE.equals(request.getClearPrice())) {
+            BigDecimal prev = tier.getPrice();
             tier.setPrice(null);
-            changes.add("cleared price");
+            changes.add(prev != null ? "cleared price (was " + prev.toPlainString() + ")" : "cleared price");
         } else if (request.getPrice() != null && !request.getPrice().equals(tier.getPrice())) {
+            BigDecimal prev = tier.getPrice();
             tier.setPrice(request.getPrice());
-            changes.add("price");
+            changes.add("price: " + (prev != null ? prev.toPlainString() : "—")
+                    + " → " + request.getPrice().toPlainString());
         }
 
         kujiBoxTierRepository.save(tier);
@@ -1585,7 +1608,7 @@ public class KujiBoxService {
         if (!changes.isEmpty()) {
             // Note prefix "Kuji tier edited" lets the kuji activity log classify this
             // entry and split the change-list into the expandable detail body.
-            String summary = "Kuji tier edited: " + tier.getLabel() + " — " + String.join(", ", changes);
+            String summary = "Kuji tier edited: " + tierAuditHeader(tier) + " — " + String.join(", ", changes);
             AuditLog auditLog = createAuditLog(
                     request.getActorId(),
                     StockMovementReason.KUJI_SLIP_ADJUSTMENT,
@@ -2137,6 +2160,18 @@ public class KujiBoxService {
             parts.add(formatTierLine(letter, label, linkedName, qty));
         }
         return parts.isEmpty() ? null : String.join("\n", parts);
+    }
+
+    /**
+     * Header for kuji audit notes that name a tier: "<prize name> · <label>" when a
+     * linked product is set, else just the label. Used so activity-log readers can
+     * see which prize an adjustment hit, not only its position label.
+     */
+    private String tierAuditHeader(KujiBoxTier tier) {
+        String label = tier.getLabel();
+        Product linked = tier.getLinkedProduct();
+        if (linked == null) return label;
+        return linked.getName() + " · " + label;
     }
 
     private String stringOrNull(Map<String, Object> meta, String key) {

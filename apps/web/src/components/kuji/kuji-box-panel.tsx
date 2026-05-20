@@ -28,7 +28,7 @@ import { TransferInDialog } from "./transfer-in-dialog";
 import { ActivityLogCard } from "./activity-log-card";
 import { RecordDrawDialog } from "./record-draw-dialog";
 import { UniformBar } from "./uniform-bar";
-import { DailyPayoutChart } from "./daily-payout-chart";
+import { DailyPayoutChart, type DailyPayoutRange } from "./daily-payout-chart";
 import { PrizePoolTable } from "./prize-pool-table";
 import { computeBoxValues } from "./kuji-value-rollups";
 
@@ -78,6 +78,8 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     100,
   );
 
+  const [payoutRange, setPayoutRange] = useState<DailyPayoutRange>("week");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [openBoxOpen, setOpenBoxOpen] = useState(false);
   const [closeBoxOpen, setCloseBoxOpen] = useState(false);
   const [reopenBoxOpen, setReopenBoxOpen] = useState(false);
@@ -94,8 +96,11 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     const all = sessionLogsQuery.data?.content ?? [];
     const lo = box?.openedAt;
     const scoped = lo ? all.filter((log) => log.createdAt >= lo) : all;
-    return [...scoped].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [sessionLogsQuery.data, box?.openedAt]);
+    const byDay = selectedDate
+      ? scoped.filter((log) => log.createdAt.slice(0, 10) === selectedDate)
+      : scoped;
+    return [...byDay].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [sessionLogsQuery.data, box?.openedAt, selectedDate]);
 
   const valueRollups = useMemo(() => computeBoxValues(box), [box]);
 
@@ -103,16 +108,33 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     [],
   );
-  const dailyFrom = useMemo(() => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    return sevenDaysAgo.toISOString().slice(0, 10);
+  const sevenDaysAgoIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
   }, []);
+  const boxOpenedDay = box?.openedAt.slice(0, 10) ?? null;
+  // Show the range toggle only once the box has been open longer than the
+  // default 7-day window — otherwise "All time" and "Last 7 days" overlap.
+  const canExpandRange = Boolean(
+    boxOpenedDay && boxOpenedDay < sevenDaysAgoIso,
+  );
+  const dailyFrom =
+    payoutRange === "all" && boxOpenedDay
+      ? boxOpenedDay
+      : sevenDaysAgoIso;
   const dailyPayoutsQuery = useKujiDailyPayouts(box?.id, {
     from: dailyFrom,
     to: today,
     tz,
   });
+
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDate) return null;
+    const d = new Date(`${selectedDate}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return selectedDate;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }, [selectedDate]);
 
   function handleEditTier(tier: KujiBoxTier) {
     setActiveTier(tier);
@@ -246,12 +268,22 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               totals={dailyPayoutsQuery.data?.total}
               isLoading={dailyPayoutsQuery.isLoading}
               isError={dailyPayoutsQuery.isError}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              range={payoutRange}
+              onRangeChange={(r) => {
+                setPayoutRange(r);
+                setSelectedDate(null);
+              }}
+              canExpandRange={canExpandRange}
             />
             <div className="relative min-h-0">
               <div className="lg:absolute lg:inset-0">
                 <ActivityLogCard
                   logs={recentLogs}
                   isLoading={sessionLogsQuery.isLoading}
+                  activeDateLabel={selectedDateLabel}
+                  onClearDateFilter={() => setSelectedDate(null)}
                 />
               </div>
             </div>

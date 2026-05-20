@@ -10,12 +10,15 @@ import {
   Plus,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import { StockMovementReason, type AuditLog } from "@/types/api";
 
 interface ActivityLogCardProps {
   readonly logs: readonly AuditLog[];
   readonly isLoading: boolean;
+  readonly activeDateLabel?: string | null;
+  readonly onClearDateFilter?: () => void;
 }
 
 function formatTime(iso: string): string {
@@ -43,12 +46,14 @@ type SlipAction =
   | "deactivate"
   | "delete_active"
   | "delete_inactive"
+  | "tier_added"
   | "tier_deleted"
   | "tier_edited"
   | "unknown";
 
 function classifySlipAdjustment(notes?: string): SlipAction {
   if (!notes) return "unknown";
+  if (notes.startsWith("Kuji prize tier added")) return "tier_added";
   if (notes.startsWith("Kuji prize tier deleted")) return "tier_deleted";
   if (notes.startsWith("Kuji tier edited")) return "tier_edited";
   if (notes.startsWith("Kuji prize stashed")) return "stash";
@@ -74,8 +79,8 @@ function extractAdjustmentDetail(action: SlipAction, notes?: string): string | n
     const changes = notes.slice(dash + 3).split(", ");
     return [label, ...changes].filter(Boolean).join("\n");
   }
-  if (action === "tier_deleted") {
-    // "Kuji prize tier deleted: <label> (active N, inactive M)"
+  if (action === "tier_deleted" || action === "tier_added") {
+    // "Kuji prize tier <added|deleted>: <label> (active N, inactive M)"
     const colon = notes.indexOf(": ");
     if (colon === -1) return null;
     const rest = notes.slice(colon + 2);
@@ -111,6 +116,8 @@ function formatSlipAdjustment(action: SlipAction, qty: number): string {
       return `${qty} ${prizeWord} deleted from inactive`;
     case "tier_edited":
       return `Tier edited`;
+    case "tier_added":
+      return `Tier added`;
     case "tier_deleted":
       return `Tier deleted`;
     default:
@@ -118,7 +125,12 @@ function formatSlipAdjustment(action: SlipAction, qty: number): string {
   }
 }
 
-export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
+export function ActivityLogCard({
+  logs,
+  isLoading,
+  activeDateLabel,
+  onClearDateFilter,
+}: ActivityLogCardProps) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
   const toggle = (id: string) => {
@@ -130,9 +142,11 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
     });
   };
 
+  const isFiltered = Boolean(activeDateLabel);
+
   return (
     <div className="flex h-full flex-col rounded-xl border bg-card p-4 dark:border-none">
-      <div className="mb-3 flex items-center justify-between border-b pb-2.5">
+      <div className="mb-3 flex items-center justify-between gap-2 border-b pb-2.5">
         <span className="flex items-center gap-2 text-sm font-medium">
           <CheckCircle2
             className="h-4 w-4 text-muted-foreground"
@@ -140,9 +154,22 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
           />
           Activity log
         </span>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
-          {logs.length} {logs.length === 1 ? "event" : "events"}
-        </span>
+        <div className="flex items-center gap-2">
+          {isFiltered && onClearDateFilter ? (
+            <button
+              type="button"
+              onClick={onClearDateFilter}
+              className="flex items-center gap-1 rounded-full bg-brand-primary/15 px-2 py-0.5 text-[11px] text-brand-primary hover:bg-brand-primary/25"
+              aria-label={`Clear date filter for ${activeDateLabel}`}
+            >
+              <span className="tabular-nums">{activeDateLabel}</span>
+              <X className="h-3 w-3" aria-hidden />
+            </button>
+          ) : null}
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums">
+            {logs.length} {logs.length === 1 ? "event" : "events"}
+          </span>
+        </div>
       </div>
 
       {isLoading ? (
@@ -151,7 +178,7 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
         </div>
       ) : logs.length === 0 ? (
         <div className="py-6 text-center text-xs text-muted-foreground">
-          No draws recorded yet.
+          {isFiltered ? "No activity on this day." : "No draws recorded yet."}
         </div>
       ) : (
         <div className="min-h-0 max-h-80 flex-1 overflow-y-auto scrollbar-none pr-1 lg:max-h-none">
@@ -186,6 +213,10 @@ export function ActivityLogCard({ logs, isLoading }: ActivityLogCardProps) {
             ) {
               icon = (
                 <Trash2 className="mt-1 h-3 w-3 shrink-0 text-rose-600" aria-hidden />
+              );
+            } else if (slipAction === "tier_added") {
+              icon = (
+                <Plus className="mt-1 h-3 w-3 shrink-0 text-emerald-600" aria-hidden />
               );
             } else if (slipAction === "add_slip" || slipAction === "add_inactive") {
               icon = (
