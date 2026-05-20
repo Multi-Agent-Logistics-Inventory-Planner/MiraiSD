@@ -58,10 +58,22 @@ export function ManageTiersDialog({
 
   const showAddTier = canEditStructural && box.status === KujiBoxStatus.OPEN;
 
-  const sortedTiers = useMemo(
-    () => [...box.tiers].sort(compareTiers),
-    [box.tiers],
-  );
+  // Group ordering on top of compareTiers: drawable (active > 0) first,
+  // then held-only, then fully empty. Within each group the existing
+  // price-desc + alphabetical order is preserved.
+  const sortedTiers = useMemo(() => {
+    const groupRank = (t: KujiBoxTier) => {
+      if (t.activeCount > 0) return 0;
+      if (t.inactiveCount > 0) return 1;
+      return 2;
+    };
+    return [...box.tiers].sort((a, b) => {
+      const ga = groupRank(a);
+      const gb = groupRank(b);
+      if (ga !== gb) return ga - gb;
+      return compareTiers(a, b);
+    });
+  }, [box.tiers]);
 
   const totalActive = useMemo(
     () => box.tiers.reduce((s, t) => s + t.activeCount, 0),

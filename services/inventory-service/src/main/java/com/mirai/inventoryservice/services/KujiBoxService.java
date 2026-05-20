@@ -1017,7 +1017,7 @@ public class KujiBoxService {
                 1,
                 quantity,
                 parentProduct.getName(),
-                "Kuji slip added" + bucketLabel + ": " + tier.getLabel(),
+                "Kuji slip added" + bucketLabel + ": " + tierAuditHeader(tier),
                 parentProduct.getId()
         );
 
@@ -1085,7 +1085,7 @@ public class KujiBoxService {
                 1,
                 quantity,
                 parentProduct.getName(),
-                "Kuji slips " + action + "d: " + tier.getLabel() + " (" + quantity + ")",
+                "Kuji slips " + action + "d: " + tierAuditHeader(tier) + " (" + quantity + ")",
                 parentProduct.getId()
         );
 
@@ -1119,13 +1119,13 @@ public class KujiBoxService {
         int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
         int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
         int total = active + inactive;
-        String tierLabel = tier.getLabel();
+        String tierHeader = tierAuditHeader(tier);
 
         box.getTiers().remove(tier);
         kujiBoxTierRepository.delete(tier);
 
         Product parentProduct = box.getProduct();
-        String summary = "Kuji prize tier deleted: " + tierLabel
+        String summary = "Kuji prize tier deleted: " + tierHeader
                 + " (active " + active + ", inactive " + inactive + ")";
         createAuditLog(
                 request.getActorId(),
@@ -1585,7 +1585,7 @@ public class KujiBoxService {
         if (!changes.isEmpty()) {
             // Note prefix "Kuji tier edited" lets the kuji activity log classify this
             // entry and split the change-list into the expandable detail body.
-            String summary = "Kuji tier edited: " + tier.getLabel() + " — " + String.join(", ", changes);
+            String summary = "Kuji tier edited: " + tierAuditHeader(tier) + " — " + String.join(", ", changes);
             AuditLog auditLog = createAuditLog(
                     request.getActorId(),
                     StockMovementReason.KUJI_SLIP_ADJUSTMENT,
@@ -2137,6 +2137,18 @@ public class KujiBoxService {
             parts.add(formatTierLine(letter, label, linkedName, qty));
         }
         return parts.isEmpty() ? null : String.join("\n", parts);
+    }
+
+    /**
+     * Header for kuji audit notes that name a tier: "<prize name> · <label>" when a
+     * linked product is set, else just the label. Used so activity-log readers can
+     * see which prize an adjustment hit, not only its position label.
+     */
+    private String tierAuditHeader(KujiBoxTier tier) {
+        String label = tier.getLabel();
+        Product linked = tier.getLinkedProduct();
+        if (linked == null) return label;
+        return linked.getName() + " · " + label;
     }
 
     private String stringOrNull(Map<String, Object> meta, String key) {

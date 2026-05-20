@@ -28,7 +28,10 @@ interface Row {
   drawn: number;
   remaining: number;
   valueDrawn: number;
-  fullyDrawn: boolean;
+  /** Nothing left in the box (active + held === 0). Matches the Record-a-draw
+   *  dialog's eligibility test — these rows are no longer winnable, whether
+   *  they were drawn away or simply never had units allocated. */
+  empty: boolean;
   heldOnly: boolean;
 }
 
@@ -54,12 +57,12 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
         drawn,
         remaining,
         valueDrawn,
-        fullyDrawn: active === 0 && held === 0 && drawn > 0,
+        empty: active === 0 && held === 0,
         heldOnly: active === 0 && held > 0,
       };
     });
     list.sort((a, b) => {
-      if (a.fullyDrawn !== b.fullyDrawn) return a.fullyDrawn ? 1 : -1;
+      if (a.empty !== b.empty) return a.empty ? 1 : -1;
       return b.remaining - a.remaining;
     });
     return list;
@@ -151,7 +154,7 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
     maxRemaining > 0 ? Math.max(0.05, remaining / maxRemaining) : 0;
   const barWidth = remaining > 0 ? `${Math.round(barPct * 100)}%` : "0%";
 
-  const dim = row.fullyDrawn ? "opacity-60" : "";
+  const dim = row.empty ? "opacity-60" : "";
 
   return (
     <li
@@ -165,7 +168,7 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
           tier={tier}
           rank={rank}
           size={28}
-          dashed={row.heldOnly || row.fullyDrawn}
+          dashed={row.heldOnly || row.empty}
           onExpand={onExpand}
         />
       ) : (
@@ -187,7 +190,7 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
         {price == null ? "—" : formatMoneyDecimals(price)}
       </span>
       <span className="text-right tabular-nums">
-        {row.fullyDrawn ? (
+        {row.empty ? (
           "—"
         ) : (
           <>
@@ -199,7 +202,7 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
         )}
       </span>
       <div className="flex items-center justify-end gap-2">
-        {!row.fullyDrawn && remaining > 0 && (
+        {!row.empty && remaining > 0 && (
           <div
             className="h-1.5 rounded-full"
             style={{
@@ -211,7 +214,7 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
           />
         )}
         <span className="tabular-nums">
-          {row.fullyDrawn || remaining === 0 ? "—" : formatMoney(remaining)}
+          {row.empty || remaining === 0 ? "—" : formatMoney(remaining)}
         </span>
       </div>
       <div className="flex flex-col items-end leading-tight tabular-nums text-muted-foreground">
@@ -239,7 +242,7 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
   const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
   const totalUnits = active + held + drawn;
   const wonPct = totalUnits > 0 ? Math.round((drawn / totalUnits) * 100) : 0;
-  const dim = row.fullyDrawn ? "opacity-60" : "";
+  const dim = row.empty ? "opacity-60" : "";
 
   return (
     <li className={cn("flex items-stretch gap-3 min-h-[52px] py-2.5 text-xs", dim)}>
@@ -253,7 +256,7 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
           tier={tier}
           rank={rank}
           size={36}
-          dashed={row.heldOnly || row.fullyDrawn}
+          dashed={row.heldOnly || row.empty}
           onExpand={onExpand}
         />
       ) : (
@@ -286,7 +289,7 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
           </div>
           <div className="text-right tabular-nums">
             <div className="text-base font-medium leading-none">
-              {row.fullyDrawn ? (
+              {row.empty ? (
                 "—"
               ) : (
                 <>
@@ -302,7 +305,7 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
             <div className="mt-1 text-[11px] text-muted-foreground">
               {price == null
                 ? `— · ${wonPct}% won`
-                : row.fullyDrawn
+                : row.empty
                   ? valueDrawn > 0
                     ? `${formatMoney(valueDrawn)} paid out`
                     : "—"
