@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Dev-only seed: ensures one ADMIN user exists (for the no-auth fallback in the lootbox
@@ -33,7 +32,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LootboxDevSeed {
 
-    private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final String DEV_ADMIN_EMAIL = "dev-admin@local.test";
 
     private final UserRepository userRepository;
@@ -50,7 +48,6 @@ public class LootboxDevSeed {
     private void seedDevAdminUser() {
         if (userRepository.findByEmail(DEV_ADMIN_EMAIL).isPresent()) return;
         User user = User.builder()
-                .id(DEV_ADMIN_ID)
                 .fullName("Dev Admin")
                 .email(DEV_ADMIN_EMAIL)
                 .role(UserRole.ADMIN)
