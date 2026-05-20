@@ -46,12 +46,14 @@ type SlipAction =
   | "deactivate"
   | "delete_active"
   | "delete_inactive"
+  | "tier_added"
   | "tier_deleted"
   | "tier_edited"
   | "unknown";
 
 function classifySlipAdjustment(notes?: string): SlipAction {
   if (!notes) return "unknown";
+  if (notes.startsWith("Kuji prize tier added")) return "tier_added";
   if (notes.startsWith("Kuji prize tier deleted")) return "tier_deleted";
   if (notes.startsWith("Kuji tier edited")) return "tier_edited";
   if (notes.startsWith("Kuji prize stashed")) return "stash";
@@ -77,8 +79,8 @@ function extractAdjustmentDetail(action: SlipAction, notes?: string): string | n
     const changes = notes.slice(dash + 3).split(", ");
     return [label, ...changes].filter(Boolean).join("\n");
   }
-  if (action === "tier_deleted") {
-    // "Kuji prize tier deleted: <label> (active N, inactive M)"
+  if (action === "tier_deleted" || action === "tier_added") {
+    // "Kuji prize tier <added|deleted>: <label> (active N, inactive M)"
     const colon = notes.indexOf(": ");
     if (colon === -1) return null;
     const rest = notes.slice(colon + 2);
@@ -114,6 +116,8 @@ function formatSlipAdjustment(action: SlipAction, qty: number): string {
       return `${qty} ${prizeWord} deleted from inactive`;
     case "tier_edited":
       return `Tier edited`;
+    case "tier_added":
+      return `Tier added`;
     case "tier_deleted":
       return `Tier deleted`;
     default:
@@ -209,6 +213,10 @@ export function ActivityLogCard({
             ) {
               icon = (
                 <Trash2 className="mt-1 h-3 w-3 shrink-0 text-rose-600" aria-hidden />
+              );
+            } else if (slipAction === "tier_added") {
+              icon = (
+                <Plus className="mt-1 h-3 w-3 shrink-0 text-emerald-600" aria-hidden />
               );
             } else if (slipAction === "add_slip" || slipAction === "add_inactive") {
               icon = (

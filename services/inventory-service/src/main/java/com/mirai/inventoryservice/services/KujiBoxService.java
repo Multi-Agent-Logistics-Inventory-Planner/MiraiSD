@@ -1435,6 +1435,24 @@ public class KujiBoxService {
             broadcastService.broadcastAuditLogCreated();
         }
 
+        Product parentProduct = box.getProduct();
+        String summary = "Kuji prize tier added: " + tierAuditHeader(tier)
+                + " (active " + slipCount + ", inactive " + heldBack + ")";
+        createAuditLog(
+                request.getActorId(),
+                StockMovementReason.KUJI_SLIP_ADJUSTMENT,
+                box.getLocation().getId(),
+                box.getLocation().getLocationCode(),
+                null,
+                null,
+                1,
+                totalQuantity,
+                parentProduct.getName(),
+                summary,
+                parentProduct.getId()
+        );
+        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+
         entityManager.flush();
         return toResponseDTO(box);
     }
@@ -1550,15 +1568,17 @@ public class KujiBoxService {
 
         // Other patches
         if (request.getLabel() != null && !request.getLabel().equals(tier.getLabel())) {
+            String prev = tier.getLabel();
             tier.setLabel(request.getLabel());
-            changes.add("label");
+            changes.add("label: \"" + (prev != null ? prev : "") + "\" → \"" + request.getLabel() + "\"");
         }
+        // Letter is not user-editable in any kuji flow today, so changes here
+        // are not surfaced in the activity log. The assignment is kept so the
+        // API contract stays intact for future callers.
         if (Boolean.TRUE.equals(request.getClearLetter())) {
             tier.setLetter(null);
-            changes.add("cleared letter");
         } else if (request.getLetter() != null && !request.getLetter().equals(tier.getLetter())) {
             tier.setLetter(request.getLetter());
-            changes.add("letter");
         }
         if (request.getActiveCount() != null && !request.getActiveCount().equals(tier.getActiveCount())) {
             int prev = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
@@ -1572,11 +1592,14 @@ public class KujiBoxService {
             changes.add("inactive count (manual adjustment): " + prev + " → " + request.getInactiveCount());
         }
         if (Boolean.TRUE.equals(request.getClearPrice())) {
+            BigDecimal prev = tier.getPrice();
             tier.setPrice(null);
-            changes.add("cleared price");
+            changes.add(prev != null ? "cleared price (was " + prev.toPlainString() + ")" : "cleared price");
         } else if (request.getPrice() != null && !request.getPrice().equals(tier.getPrice())) {
+            BigDecimal prev = tier.getPrice();
             tier.setPrice(request.getPrice());
-            changes.add("price");
+            changes.add("price: " + (prev != null ? prev.toPlainString() : "—")
+                    + " → " + request.getPrice().toPlainString());
         }
 
         kujiBoxTierRepository.save(tier);

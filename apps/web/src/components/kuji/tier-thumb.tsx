@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Maximize2 } from "lucide-react";
 import type { KujiBoxTier } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 import { hexWithAlpha, tierColor } from "./tier-palette";
@@ -45,21 +44,14 @@ export function TierThumb({
       : { boxShadow: `inset 0 0 0 1px ${color}` };
 
     const inner = (
-      <>
-        <Image
-          src={safeUrl}
-          alt={alt}
-          fill
-          sizes={`${size * 2}px`}
-          className="object-cover transition-opacity group-hover:opacity-90"
-          onError={() => setErrored(true)}
-        />
-        {interactive && (
-          <span className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-white opacity-90 group-hover:opacity-100">
-            <Maximize2 className="h-2.5 w-2.5" />
-          </span>
-        )}
-      </>
+      <Image
+        src={safeUrl}
+        alt={alt}
+        fill
+        sizes={`${size * 2}px`}
+        className="object-cover transition-opacity group-hover:opacity-90"
+        onError={() => setErrored(true)}
+      />
     );
 
     if (interactive) {
