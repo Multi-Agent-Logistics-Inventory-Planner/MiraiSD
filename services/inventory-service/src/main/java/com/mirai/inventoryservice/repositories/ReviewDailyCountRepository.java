@@ -70,6 +70,21 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
             "ORDER BY SUM(c.reviewCount) DESC")
     List<Object[]> getAllTimeTotalsByUser();
 
+    /** Review credits for the lootbox feature: SUM(reviewCount) on/after the launch date. */
+    @Query("SELECT COALESCE(SUM(c.reviewCount), 0) " +
+            "FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId AND c.date >= :sinceDate")
+    long sumReviewCountByUserSince(@Param("userId") UUID userId,
+                                   @Param("sinceDate") LocalDate sinceDate);
+
+    /** Per-day review credits for the lootbox history view (newest first). */
+    @Query("SELECT c.date, c.reviewCount " +
+            "FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId AND c.date >= :sinceDate " +
+            "ORDER BY c.date DESC")
+    List<Object[]> findDailyCreditsByUserSince(@Param("userId") UUID userId,
+                                               @Param("sinceDate") LocalDate sinceDate);
+
     /** This user's all-time rank (1-based) without loading all users' totals. */
     @Query(value = "SELECT 1 + COALESCE(COUNT(*), 0) FROM (" +
             "SELECT c.user_id, SUM(c.review_count) AS total FROM review_daily_counts c " +

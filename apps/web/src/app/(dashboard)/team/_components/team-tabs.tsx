@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, Star } from "lucide-react";
+import { Users, Star, Gift } from "lucide-react";
 import {
   ScrollableTabs,
   type TabConfig,
@@ -17,6 +17,11 @@ const TEAM_TABS: TabConfig<TeamTab>[] = [
     value: TeamTab.REVIEWS,
     label: "Reviews",
     icon: Star,
+  },
+  {
+    value: TeamTab.LOOTBOX,
+    label: "Lootbox",
+    icon: Gift,
   },
 ];
 
