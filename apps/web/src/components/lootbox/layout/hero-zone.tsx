@@ -2,6 +2,7 @@
 
 import { Coins } from "lucide-react";
 import { CrateIllustration } from "@/components/lootbox/crate-illustration";
+import { CrateCarousel } from "@/components/lootbox/layout/crate-carousel";
 import { Reel } from "@/components/lootbox/reel/reel";
 import { WinFlash } from "@/components/lootbox/reel/win-flash";
 import {
@@ -15,6 +16,8 @@ import type { Lootbox, LootboxPlay, LootboxPrize } from "@/types/lootbox";
 
 interface HeroZoneProps {
   readonly crate: Lootbox | null;
+  readonly crates: readonly Lootbox[];
+  readonly onSelectCrate: (id: string) => void;
   readonly prizes: readonly LootboxPrize[];
   readonly tierCount: number;
   readonly phase: ReelPhase;
@@ -36,6 +39,8 @@ interface HeroZoneProps {
 export function HeroZone(props: HeroZoneProps) {
   const {
     crate,
+    crates,
+    onSelectCrate,
     prizes,
     tierCount,
     phase,
@@ -58,11 +63,16 @@ export function HeroZone(props: HeroZoneProps) {
   const cost = crate?.cost ?? 1;
   const crateName = crate?.name ?? "Mirai Mystery Crate";
   const crateDescription = crate?.description ?? null;
+  const showCarousel = crates.length > 1;
+  const isEmpty = !!crate && prizes.length === 0;
 
-  const canOpen = !!crate && balance >= cost && phase === "idle" && !isOpening;
-  const buttonLabel =
-    !crate
-      ? "Loading…"
+  const canOpen =
+    !!crate && !isEmpty && balance >= cost && phase === "idle" && !isOpening;
+
+  const buttonLabel = !crate
+    ? "Loading…"
+    : isEmpty
+      ? "Coming soon"
       : balance < cost
         ? "Out of coins"
         : isOpening
@@ -72,6 +82,8 @@ export function HeroZone(props: HeroZoneProps) {
             : phase === "won"
               ? "You won!"
               : `Open Lootbox · ${cost} coin${cost === 1 ? "" : "s"}`;
+
+  const useGradientButton = !isEmpty && (canOpen || isOpening || phase !== "idle");
 
   const winTierColor = resolveTierColor(
     prizes.find((p) => p.id === lastWin?.prizeId)?.tierColor ?? null
@@ -86,27 +98,37 @@ export function HeroZone(props: HeroZoneProps) {
           "radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.10), transparent 60%), var(--card)",
       }}
     >
-      <div className="pointer-events-none absolute left-[28px] top-[22px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="pointer-events-none absolute left-[28px] top-[22px] hidden font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
         {crate?.endsAt ? "Limited time" : "Crate"}
       </div>
-      <div className="pointer-events-none absolute right-[28px] top-[22px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="pointer-events-none absolute right-[28px] top-[22px] hidden font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
         <span className="tabular-nums">{prizes.length}</span> prize
         {prizes.length === 1 ? "" : "s"} · <span className="tabular-nums">{tierCount}</span> tier
         {tierCount === 1 ? "" : "s"}
       </div>
 
       <div className="mt-2 flex flex-col items-center gap-3.5">
+        {showCarousel ? (
+          <CrateCarousel
+            crates={crates}
+            selectedId={crate?.id ?? null}
+            onSelect={onSelectCrate}
+          />
+        ) : (
+          <>
+            <h1 className="m-0 text-[28px] font-semibold tracking-[-0.4px] text-foreground">
+              {crateName}
+            </h1>
+            <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <span>
+                {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
+              </span>
+              <span className="opacity-60">·</span>
+              <span>{crateDescription ?? "weighted server-side"}</span>
+            </div>
+          </>
+        )}
         <CrateIllustration size={140} tint="#a78bfa" />
-        <h1 className="m-0 text-[28px] font-semibold tracking-[-0.4px] text-foreground">
-          {crateName}
-        </h1>
-        <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          <span>
-            {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
-          </span>
-          <span className="opacity-60">·</span>
-          <span>{crateDescription ?? "weighted server-side"}</span>
-        </div>
       </div>
 
       <div className="mx-auto mt-8 max-w-[920px]">
@@ -132,7 +154,7 @@ export function HeroZone(props: HeroZoneProps) {
           onClick={onOpen}
           className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-3.5 text-[15px] font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:text-muted-foreground"
           style={
-            canOpen || isOpening || phase !== "idle"
+            useGradientButton
               ? {
                   background: "linear-gradient(180deg, #9d6cff 0%, #7c3aed 100%)",
                   border: "1px solid rgba(255,255,255,0.12)",

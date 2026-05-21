@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useLootboxBalance,
   useLootboxCatalog,
@@ -16,12 +17,9 @@ import { LootboxHeader } from "@/components/lootbox/layout/lootbox-header";
 import { DropsTicker } from "@/components/lootbox/layout/drops-ticker";
 import { HeroZone } from "@/components/lootbox/layout/hero-zone";
 import { PrizeGrid } from "@/components/lootbox/layout/prize-grid";
-import { CrateSelector } from "@/components/lootbox/layout/crate-selector";
 import { MyPrizesList } from "@/components/lootbox/my-prizes-list";
 import { CoinHistoryPanel } from "@/components/lootbox/coin-history-panel";
-import { AdminRedemptionDialog } from "@/components/lootbox/admin-redemption-dialog";
-import { AdminPrizeManagerDialog } from "@/components/lootbox/admin-prize-manager-dialog";
-import { AdminAdjustmentDialog } from "@/components/lootbox/admin-adjustment-dialog";
+import { AdminModal } from "@/components/lootbox/admin/admin-modal";
 import {
   REEL_DIM_DESKTOP,
   REEL_DIM_MOBILE,
@@ -54,12 +52,13 @@ export function TabLootbox() {
   const recentQuery = useRecentLootboxPlays(20);
   const playMutation = usePlayLootboxMutation();
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const crateParam = searchParams.get("crate");
+
   const [lastWin, setLastWin] = useState<LootboxPlay | null>(null);
-  const [redemptionOpen, setRedemptionOpen] = useState(false);
-  const [prizeManagerOpen, setPrizeManagerOpen] = useState(false);
-  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<LootboxTab>("pool");
-  const [pickedCrateId, setPickedCrateId] = useState<string | null>(null);
 
   const balance = balanceQuery.data?.balance ?? 0;
   const crates = useMemo<Lootbox[]>(
@@ -67,11 +66,12 @@ export function TabLootbox() {
     [catalogQuery.data]
   );
 
-  // Derived default selection: user's pick if still open, otherwise the first open crate.
-  // Computed during render so no useEffect / setState sync dance is needed.
+  // Active crate is driven by ?crate=<id>; fall back to the first available crate
+  // when the param is missing or stale. Rendered without setState to avoid an
+  // update-during-render bounce.
   const selectedCrateId =
-    pickedCrateId && crates.some((c) => c.id === pickedCrateId)
-      ? pickedCrateId
+    crateParam && crates.some((c) => c.id === crateParam)
+      ? crateParam
       : crates[0]?.id ?? null;
 
   const selectedCrate: Lootbox | null = useMemo(
@@ -89,8 +89,6 @@ export function TabLootbox() {
       }))
     );
     if (lastWin && !base.some((p) => p.id === lastWin.prizeId)) {
-      // Server rolled a prize not in the cached crate (e.g. just activated). Use the
-      // play snapshot so the reel card and lookups don't fall back to the "—" placeholder.
       base.push({
         id: lastWin.prizeId,
         name: lastWin.prizeName,
@@ -119,6 +117,22 @@ export function TabLootbox() {
     cardGap: reelDim.gap,
     spinMs: REEL_SPIN_MS,
   });
+
+  // Reset reel + win state whenever the active crate changes so a stale modal
+  // from a previous crate doesn't carry across the flip.
+  useEffect(() => {
+    setLastWin(null);
+    reel.reset();
+    // reel.reset has a stable identity (closure over refs); intentionally
+    // depend only on the active crate id to fire exactly once per flip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCrateId]);
+
+  const handleSelectCrate = (id: string) => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    params.set("crate", id);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
 
   const openedToday = useMemo(() => {
     const entries = historyQuery.data ?? [];
@@ -155,8 +169,6 @@ export function TabLootbox() {
     }
     try {
       const result = await playMutation.mutateAsync({ crateId: selectedCrate.id });
-      // Set the winner first so allPrizes includes it via fallback before reel.open
-      // reads byId in the render after setStrip.
       setLastWin(result.play);
       reel.open(result.play.prizeId);
     } catch (err) {
@@ -187,21 +199,13 @@ export function TabLootbox() {
         balance={balance}
         openedToday={openedToday}
         isAdmin={isAdmin}
-        onManagePrizes={() => setPrizeManagerOpen(true)}
-        onAdjustCoins={() => setAdjustOpen(true)}
-        onRedemptionQueue={() => setRedemptionOpen(true)}
+        onOpenAdmin={() => setAdminOpen(true)}
       />
-
-      {crates.length > 1 ? (
-        <CrateSelector
-          crates={crates}
-          selectedId={selectedCrateId}
-          onSelect={setPickedCrateId}
-        />
-      ) : null}
 
       <HeroZone
         crate={selectedCrate}
+        crates={crates}
+        onSelectCrate={handleSelectCrate}
         prizes={allPrizes}
         tierCount={tierCount}
         phase={reel.phase}
@@ -247,11 +251,7 @@ export function TabLootbox() {
       </Tabs>
 
       {isAdmin ? (
-        <>
-          <AdminRedemptionDialog open={redemptionOpen} onOpenChange={setRedemptionOpen} />
-          <AdminPrizeManagerDialog open={prizeManagerOpen} onOpenChange={setPrizeManagerOpen} />
-          <AdminAdjustmentDialog open={adjustOpen} onOpenChange={setAdjustOpen} />
-        </>
+        <AdminModal open={adminOpen} onOpenChange={setAdminOpen} />
       ) : null}
     </div>
   );

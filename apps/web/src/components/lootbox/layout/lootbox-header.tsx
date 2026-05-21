@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Boxes, Coins, Inbox, Settings, Sliders, Wrench } from "lucide-react";
+import { Coins, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -10,25 +9,18 @@ import {
 } from "@/components/ui/popover";
 import { useLootboxWalletBreakdown } from "@/hooks/queries/use-lootbox";
 
-export interface LootboxHeaderActions {
-  readonly onManagePrizes: () => void;
-  readonly onAdjustCoins: () => void;
-  readonly onRedemptionQueue: () => void;
-}
-
-interface LootboxHeaderProps extends LootboxHeaderActions {
+interface LootboxHeaderProps {
   readonly balance: number;
   readonly openedToday: number;
   readonly isAdmin: boolean;
+  readonly onOpenAdmin: () => void;
 }
 
 export function LootboxHeader({
   balance,
   openedToday,
   isAdmin,
-  onManagePrizes,
-  onAdjustCoins,
-  onRedemptionQueue,
+  onOpenAdmin,
 }: LootboxHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -40,32 +32,10 @@ export function LootboxHeader({
       </div>
 
       {isAdmin ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button variant="outline" size="sm" onClick={onManagePrizes}>
-            <Settings className="h-4 w-4" />
-            Manage prizes
-          </Button>
-          <Button variant="outline" size="sm" onClick={onAdjustCoins}>
-            <Sliders className="h-4 w-4" />
-            Adjust coins
-          </Button>
-          <Button variant="outline" size="sm" onClick={onRedemptionQueue}>
-            <Inbox className="h-4 w-4" />
-            Redemption queue
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/team/lootbox-admin/crates">
-              <Boxes className="h-4 w-4" />
-              Crates
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/team/lootbox-admin/coin-config">
-              <Wrench className="h-4 w-4" />
-              Coin rate
-            </Link>
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={onOpenAdmin}>
+          <Sliders className="h-4 w-4" />
+          Admin
+        </Button>
       ) : null}
     </div>
   );
