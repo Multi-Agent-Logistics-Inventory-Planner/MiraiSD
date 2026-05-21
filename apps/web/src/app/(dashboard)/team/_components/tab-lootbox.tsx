@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useLootboxBalance,
   useLootboxCatalog,
@@ -11,9 +11,9 @@ import {
 import { usePlayLootboxMutation } from "@/hooks/mutations/use-lootbox-mutations";
 import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LootboxHeader } from "@/components/lootbox/layout/lootbox-header";
 import { DropsTicker } from "@/components/lootbox/layout/drops-ticker";
-import { DropRatesSheet } from "@/components/lootbox/layout/drop-rates-sheet";
 import { HeroZone } from "@/components/lootbox/layout/hero-zone";
 import { PrizeGrid } from "@/components/lootbox/layout/prize-grid";
 import { MyPrizesList } from "@/components/lootbox/my-prizes-list";
@@ -29,6 +29,8 @@ import {
 import type { LootboxPlay, LootboxPrize } from "@/types/lootbox";
 
 const REEL_SPIN_MS = 5600;
+
+type LootboxTab = "pool" | "mine" | "history";
 
 function useIsDesktop(): boolean {
   const [isDesktop, setIsDesktop] = useState(true);
@@ -52,11 +54,10 @@ export function TabLootbox() {
   const playMutation = usePlayLootboxMutation();
 
   const [lastWin, setLastWin] = useState<LootboxPlay | null>(null);
-  const [dropRatesOpen, setDropRatesOpen] = useState(false);
   const [redemptionOpen, setRedemptionOpen] = useState(false);
   const [prizeManagerOpen, setPrizeManagerOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const historyAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [activeTab, setActiveTab] = useState<LootboxTab>("pool");
 
   const balance = balanceQuery.data?.balance ?? 0;
 
@@ -85,6 +86,11 @@ export function TabLootbox() {
     }
     return base;
   }, [catalogQuery.data, lastWin]);
+
+  const tierCount = useMemo(
+    () => (catalogQuery.data ?? []).filter((t) => t.active).length,
+    [catalogQuery.data]
+  );
 
   const isDesktop = useIsDesktop();
   const reelDim = isDesktop ? REEL_DIM_DESKTOP : REEL_DIM_MOBILE;
@@ -143,29 +149,22 @@ export function TabLootbox() {
     }, 50);
   };
 
-  const handleHistory = () => {
-    historyAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const isOpening = playMutation.isPending;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <LootboxHeader
         balance={balance}
         openedToday={openedToday}
         isAdmin={isAdmin}
-        onHistory={handleHistory}
-        onDropRates={() => setDropRatesOpen(true)}
         onManagePrizes={() => setPrizeManagerOpen(true)}
         onAdjustCoins={() => setAdjustOpen(true)}
         onRedemptionQueue={() => setRedemptionOpen(true)}
       />
 
-      <DropsTicker drops={recentQuery.data} isLoading={recentQuery.isLoading} />
-
       <HeroZone
         prizes={allPrizes}
+        tierCount={tierCount}
         phase={reel.phase}
         strip={reel.strip}
         translate={reel.translate}
@@ -176,25 +175,34 @@ export function TabLootbox() {
         isDesktop={isDesktop}
         lastWin={lastWin}
         balance={balance}
-        openedToday={openedToday}
         isOpening={isOpening}
         onOpen={triggerOpen}
         onKeep={handleKeep}
         onOpenAgain={handleOpenAgain}
       />
 
-      <PrizeGrid tiers={catalogQuery.data} isLoading={catalogQuery.isLoading} />
+      <DropsTicker drops={recentQuery.data} isLoading={recentQuery.isLoading} />
 
-      <div ref={historyAnchorRef} className="grid gap-4 lg:grid-cols-2">
-        <MyPrizesList prizes={prizesQuery.data} isLoading={prizesQuery.isLoading} />
-        <CoinHistoryPanel history={historyQuery.data} isLoading={historyQuery.isLoading} />
-      </div>
-
-      <DropRatesSheet
-        open={dropRatesOpen}
-        onOpenChange={setDropRatesOpen}
-        tiers={catalogQuery.data}
-      />
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as LootboxTab)}
+        className="mt-2 gap-0"
+      >
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-border bg-transparent p-0 text-muted-foreground dark:bg-transparent">
+          <LootboxTabTrigger value="pool">Prize pool</LootboxTabTrigger>
+          <LootboxTabTrigger value="mine">My prizes</LootboxTabTrigger>
+          <LootboxTabTrigger value="history">Coin history</LootboxTabTrigger>
+        </TabsList>
+        <TabsContent value="pool" className="mt-6">
+          <PrizeGrid tiers={catalogQuery.data} isLoading={catalogQuery.isLoading} />
+        </TabsContent>
+        <TabsContent value="mine" className="mt-6">
+          <MyPrizesList prizes={prizesQuery.data} isLoading={prizesQuery.isLoading} />
+        </TabsContent>
+        <TabsContent value="history" className="mt-6">
+          <CoinHistoryPanel history={historyQuery.data} isLoading={historyQuery.isLoading} />
+        </TabsContent>
+      </Tabs>
 
       {isAdmin ? (
         <>
@@ -204,5 +212,22 @@ export function TabLootbox() {
         </>
       ) : null}
     </div>
+  );
+}
+
+function LootboxTabTrigger({
+  value,
+  children,
+}: {
+  readonly value: LootboxTab;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="-mb-px h-auto flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-brand-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:!text-foreground data-[state=active]:shadow-none"
+    >
+      {children}
+    </TabsTrigger>
   );
 }

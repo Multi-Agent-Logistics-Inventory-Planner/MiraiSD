@@ -25,10 +25,17 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2">
-      <div className="flex shrink-0 items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.18em] text-brand-primary">
+      <div
+        className="inline-flex shrink-0 items-center gap-2 rounded-full px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.18em]"
+        style={{
+          color: "#bda1ff",
+          backgroundColor: "rgba(139,92,246,0.10)",
+          border: "1px solid rgba(139,92,246,0.25)",
+        }}
+      >
         <span
-          className="inline-block h-1.5 w-1.5 rounded-full bg-brand-primary"
-          style={{ boxShadow: "0 0 6px currentColor" }}
+          className="inline-block h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: "#a87bff", boxShadow: "0 0 8px #a87bff" }}
         />
         Live · team drops
       </div>
@@ -54,10 +61,10 @@ function DropChip({ drop, now }: { readonly drop: RecentLootboxPlay; readonly no
   const color = resolveTierColor(drop.tierColor);
   return (
     <div
-      className="flex shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-2.5"
+      className="flex shrink-0 items-center gap-2 rounded-md py-1 pl-1 pr-2.5"
       style={{
-        backgroundColor: hexWithAlpha(color, 0.1),
-        border: `0.5px solid ${hexWithAlpha(color, 0.38)}`,
+        backgroundColor: hexWithAlpha(color, 0.08),
+        boxShadow: `inset 0 0 0 1px ${hexWithAlpha(color, 0.32)}`,
       }}
     >
       <div
