@@ -2,9 +2,11 @@ package com.mirai.inventoryservice.config;
 
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPrize;
 import com.mirai.inventoryservice.models.lootbox.LootboxTier;
+import com.mirai.inventoryservice.repositories.CoinEconomyConfigRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
 import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
@@ -40,6 +42,7 @@ public class LootboxDevSeed {
     private final LootboxRepository lootboxRepository;
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
+    private final CoinEconomyConfigRepository coinEconomyConfigRepository;
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
@@ -47,6 +50,7 @@ public class LootboxDevSeed {
         seedDevAdminUser();
         seedDefaultCrate();
         seedTestCrate();
+        seedCoinEconomyConfig();
     }
 
     private void seedDevAdminUser() {
@@ -111,6 +115,15 @@ public class LootboxDevSeed {
 
         log.info("[dev-seed] inserted dev test crate ({}), 2 tiers, 2 prizes",
                 crate.getId());
+    }
+
+    private void seedCoinEconomyConfig() {
+        if (coinEconomyConfigRepository.existsById(CoinEconomyConfig.SINGLETON_ID)) return;
+        coinEconomyConfigRepository.save(CoinEconomyConfig.builder()
+                .id(CoinEconomyConfig.SINGLETON_ID)
+                .reviewCoinRate(1)
+                .build());
+        log.info("[dev-seed] inserted coin_economy_config singleton (rate=1)");
     }
 
     private LootboxTier saveTier(Lootbox crate, String name, String pct, String color, int sortOrder) {

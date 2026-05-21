@@ -1,6 +1,7 @@
 "use client";
 
-import { Coins, Inbox, Settings, Sliders } from "lucide-react";
+import Link from "next/link";
+import { Boxes, Coins, Inbox, Settings, Sliders, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -51,6 +52,18 @@ export function LootboxHeader({
           <Button variant="outline" size="sm" onClick={onRedemptionQueue}>
             <Inbox className="h-4 w-4" />
             Redemption queue
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/team/lootbox-admin/crates">
+              <Boxes className="h-4 w-4" />
+              Crates
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/team/lootbox-admin/coin-config">
+              <Wrench className="h-4 w-4" />
+              Coin rate
+            </Link>
           </Button>
         </div>
       ) : null}
