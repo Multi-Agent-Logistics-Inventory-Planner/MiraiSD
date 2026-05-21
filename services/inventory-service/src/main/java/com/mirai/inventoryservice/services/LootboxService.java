@@ -1,12 +1,13 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.config.LootboxConfig;
 import com.mirai.inventoryservice.dtos.responses.CoinHistoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.WalletBreakdownResponseDTO;
+import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.exceptions.LootboxException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.lootbox.CoinAdjustment;
@@ -54,24 +55,44 @@ public class LootboxService {
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
     private final UserRepository userRepository;
-    private final LootboxConfig lootboxConfig;
     private final Random lootboxRandom;
 
     @PersistenceContext
     private EntityManager em;
 
-    public record BalanceBreakdown(long balance, long reviewCredits, long totalAdjustments, long totalSpent) {}
+    public record BalanceBreakdown(
+            long balance,
+            long reviewCredits,
+            long totalAdjustments,
+            long totalSpent,
+            long totalExpired) {}
 
     public record PlayResult(LootboxPlay play, long newBalance) {}
 
+    /**
+     * Balance formula with 90-day expiry support:
+     *
+     *   balance = MAX(0, total_earned - MAX(total_spent, total_expired))
+     *
+     * Why MAX(spent, expired): spending and expiry both consume earnings, but the same
+     * earning can only be consumed once. Whichever is larger dictates how much is gone;
+     * the remainder is still spendable. This makes fresh earnings spendable even after
+     * old coins lapsed unspent — solves the "phantom debt" trap a naive subtraction has.
+     */
     @Transactional(readOnly = true)
     public BalanceBreakdown computeBalance(UUID userId) {
-        long reviewCredits = reviewDailyCountRepository.sumReviewCountByUserSince(
-                userId, lootboxConfig.getLaunchDate());
-        long totalAdjustments = coinAdjustmentRepository.sumDeltaByUserId(userId);
-        long totalSpent = lootboxPlayRepository.sumCostByUserId(userId);
-        long balance = reviewCredits + totalAdjustments - totalSpent;
-        return new BalanceBreakdown(balance, reviewCredits, totalAdjustments, totalSpent);
+        long totalReviewCredits = reviewDailyCountRepository.sumReviewCountByUserId(userId);
+        long totalAdjustments   = coinAdjustmentRepository.sumDeltaByUserId(userId);
+        long totalSpent         = lootboxPlayRepository.sumCostByUserId(userId);
+        long expiredReview      = reviewDailyCountRepository.sumExpiredReviewCountByUserId(userId, LocalDate.now());
+        long expiredAdjustments = coinAdjustmentRepository.sumExpiredDeltaByUserId(userId, OffsetDateTime.now());
+
+        long totalEarned  = totalReviewCredits + totalAdjustments;
+        long totalExpired = expiredReview + expiredAdjustments;
+        long raw          = totalEarned - Math.max(totalSpent, totalExpired);
+        long balance      = Math.max(0L, raw);
+
+        return new BalanceBreakdown(balance, totalReviewCredits, totalAdjustments, totalSpent, totalExpired);
     }
 
     /**
@@ -250,16 +271,23 @@ public class LootboxService {
     @Transactional(readOnly = true)
     public List<CoinHistoryEntryDTO> getUserHistory(UUID userId) {
         List<CoinHistoryEntryDTO> entries = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        OffsetDateTime now = OffsetDateTime.now();
 
-        LocalDate launch = lootboxConfig.getLaunchDate();
-        for (Object[] row : reviewDailyCountRepository.findDailyCreditsByUserSince(userId, launch)) {
+        for (Object[] row : reviewDailyCountRepository.findDailyCreditsByUser(userId)) {
             LocalDate date = (LocalDate) row[0];
             int count = ((Number) row[1]).intValue();
+            LocalDate expiresOn = (LocalDate) row[2];
+            boolean expired = expiresOn != null && !expiresOn.isAfter(today);
             entries.add(CoinHistoryEntryDTO.builder()
                     .kind("REVIEW_CREDIT")
                     .at(date.atStartOfDay().atOffset(ZoneOffset.UTC))
                     .delta(count)
                     .label(count + " review" + (count == 1 ? "" : "s"))
+                    .expired(expired)
+                    .expiresAt(expiresOn != null
+                            ? expiresOn.atStartOfDay().atOffset(ZoneOffset.UTC)
+                            : null)
                     .build());
         }
 
@@ -278,17 +306,62 @@ public class LootboxService {
         }
 
         for (CoinAdjustment a : coinAdjustmentRepository.findByUserIdOrderByCreatedAtDesc(userId)) {
+            OffsetDateTime expiresOn = a.getExpiresAt();
+            boolean expired = expiresOn != null && !expiresOn.isAfter(now);
             entries.add(CoinHistoryEntryDTO.builder()
                     .kind("ADJUSTMENT")
                     .at(a.getCreatedAt())
                     .delta(a.getDelta())
                     .label(a.getReason())
                     .refId(a.getId())
+                    .expired(expired)
+                    .expiresAt(expiresOn)
                     .build());
         }
 
         entries.sort(Comparator.comparing(CoinHistoryEntryDTO::at).reversed());
         return entries;
+    }
+
+    /**
+     * Wallet breakdown for the "expiring soon" UI: groups upcoming expirations within
+     * the next 30 days by date and surfaces the earliest expiry. Excludes plays (which
+     * never expire) and rows that are already expired (they no longer count toward balance).
+     */
+    @Transactional(readOnly = true)
+    public WalletBreakdownResponseDTO getWalletBreakdown(UUID userId) {
+        LocalDate today = LocalDate.now();
+        LocalDate until = today.plusDays(30);
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime untilDt = until.atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        Map<LocalDate, Integer> byDate = new java.util.TreeMap<>();
+
+        for (ReviewDailyCount c : reviewDailyCountRepository.findExpiringSoon(userId, today, until)) {
+            byDate.merge(c.getExpiresAt(), c.getReviewCount(), Integer::sum);
+        }
+        for (CoinAdjustment a : coinAdjustmentRepository.findExpiringSoon(userId, now, untilDt)) {
+            LocalDate day = a.getExpiresAt().toLocalDate();
+            byDate.merge(day, a.getDelta(), Integer::sum);
+        }
+
+        List<WalletBreakdownResponseDTO.ExpirationBucket> buckets = new ArrayList<>();
+        for (Map.Entry<LocalDate, Integer> e : byDate.entrySet()) {
+            // Skip net-zero buckets (e.g. a +5 grant and -5 debit landing on the same day).
+            if (e.getValue() <= 0) continue;
+            buckets.add(WalletBreakdownResponseDTO.ExpirationBucket.builder()
+                    .amount(e.getValue())
+                    .expiresOn(e.getKey())
+                    .build());
+        }
+
+        long balance = computeBalance(userId).balance();
+        LocalDate nextExpiry = buckets.isEmpty() ? null : buckets.get(0).expiresOn();
+        return WalletBreakdownResponseDTO.builder()
+                .total(balance)
+                .expiringSoon(buckets)
+                .nextExpiryDate(nextExpiry)
+                .build();
     }
 
     @Transactional(readOnly = true)

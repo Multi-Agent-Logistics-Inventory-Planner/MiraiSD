@@ -54,4 +54,8 @@ public class CoinAdjustment {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
+
+    /** Generated column: created_at + 90 days. Read-only — DO NOT set via builder. */
+    @Column(name = "expires_at", insertable = false, updatable = false)
+    private OffsetDateTime expiresAt;
 }

@@ -16,6 +16,7 @@ import type {
   UpsertPrizeRequest,
   UpsertTierRequest,
   UserCoinProfile,
+  WalletBreakdown,
 } from "@/types/lootbox";
 
 const BASE = "/api/lootbox";
@@ -25,6 +26,10 @@ const ADMIN = `${BASE}/admin`;
 
 export function getBalance(): Promise<LootboxBalance> {
   return apiGet<LootboxBalance>(`${BASE}/balance`);
+}
+
+export function getWalletBreakdown(): Promise<WalletBreakdown> {
+  return apiGet<WalletBreakdown>(`${BASE}/wallet/breakdown`);
 }
 
 /** Player-facing catalog: open crates only, with active tiers + prizes inside. */

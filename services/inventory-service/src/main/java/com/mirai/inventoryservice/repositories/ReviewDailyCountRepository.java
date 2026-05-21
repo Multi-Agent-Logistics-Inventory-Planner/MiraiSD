@@ -70,20 +70,34 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
             "ORDER BY SUM(c.reviewCount) DESC")
     List<Object[]> getAllTimeTotalsByUser();
 
-    /** Review credits for the lootbox feature: SUM(reviewCount) on/after the launch date. */
+    /** Lifetime review-coin credits for a user, regardless of expiry. */
     @Query("SELECT COALESCE(SUM(c.reviewCount), 0) " +
             "FROM ReviewDailyCount c " +
-            "WHERE c.user.id = :userId AND c.date >= :sinceDate")
-    long sumReviewCountByUserSince(@Param("userId") UUID userId,
-                                   @Param("sinceDate") LocalDate sinceDate);
+            "WHERE c.user.id = :userId")
+    long sumReviewCountByUserId(@Param("userId") UUID userId);
 
-    /** Per-day review credits for the lootbox history view (newest first). */
-    @Query("SELECT c.date, c.reviewCount " +
+    /** Sum of review credits whose expires_at is at or before `today` — the "expired" pool. */
+    @Query("SELECT COALESCE(SUM(c.reviewCount), 0) " +
             "FROM ReviewDailyCount c " +
-            "WHERE c.user.id = :userId AND c.date >= :sinceDate " +
+            "WHERE c.user.id = :userId AND c.expiresAt <= :today")
+    long sumExpiredReviewCountByUserId(@Param("userId") UUID userId,
+                                       @Param("today") LocalDate today);
+
+    /** Daily review credit rows for the user's history view (newest first), every row included. */
+    @Query("SELECT c.date, c.reviewCount, c.expiresAt " +
+            "FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId " +
             "ORDER BY c.date DESC")
-    List<Object[]> findDailyCreditsByUserSince(@Param("userId") UUID userId,
-                                               @Param("sinceDate") LocalDate sinceDate);
+    List<Object[]> findDailyCreditsByUser(@Param("userId") UUID userId);
+
+    /** Rows whose expires_at is between (today, today + windowDays] for the "expiring soon" UI. */
+    @Query("SELECT c FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId " +
+            "  AND c.expiresAt > :today AND c.expiresAt <= :until " +
+            "ORDER BY c.expiresAt ASC")
+    List<ReviewDailyCount> findExpiringSoon(@Param("userId") UUID userId,
+                                            @Param("today") LocalDate today,
+                                            @Param("until") LocalDate until);
 
     /** This user's all-time rank (1-based) without loading all users' totals. */
     @Query(value = "SELECT 1 + COALESCE(COUNT(*), 0) FROM (" +

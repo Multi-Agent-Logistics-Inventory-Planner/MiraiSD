@@ -7,5 +7,6 @@ public record LootboxBalanceResponseDTO(
         long balance,
         long reviewCredits,
         long totalAdjustments,
-        long totalSpent
+        long totalSpent,
+        long totalExpired
 ) {}

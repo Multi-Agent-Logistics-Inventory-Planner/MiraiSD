@@ -15,5 +15,9 @@ public record CoinHistoryEntryDTO(
         OffsetDateTime at,
         int delta,
         String label,
-        UUID refId
+        UUID refId,
+        /** True when this earning row's expires_at is at or before "now"; null for PLAY rows. */
+        Boolean expired,
+        /** When this earning expires (or expired). Null for PLAY rows. */
+        OffsetDateTime expiresAt
 ) {}

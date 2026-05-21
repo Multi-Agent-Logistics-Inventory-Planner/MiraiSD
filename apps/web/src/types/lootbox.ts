@@ -3,6 +3,14 @@ export interface LootboxBalance {
   reviewCredits: number;
   totalAdjustments: number;
   totalSpent: number;
+  totalExpired: number;
+}
+
+/** Upcoming expirations bucketed by date — drives the "X coins expire on Y" UI. */
+export interface WalletBreakdown {
+  total: number;
+  expiringSoon: Array<{ amount: number; expiresOn: string }>;
+  nextExpiryDate: string | null;
 }
 
 export interface LootboxPrize {
@@ -122,6 +130,10 @@ export interface CoinHistoryEntry {
   delta: number;
   label: string;
   refId: string | null;
+  /** Whether this earning row has already expired. Null for PLAY rows. */
+  expired: boolean | null;
+  /** When this earning expires (or expired). Null for PLAY rows. */
+  expiresAt: string | null;
 }
 
 export interface CoinAdjustment {

@@ -7,6 +7,7 @@ import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.PlayLootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.WalletBreakdownResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
@@ -51,7 +52,14 @@ public class LootboxController {
                 .reviewCredits(bb.reviewCredits())
                 .totalAdjustments(bb.totalAdjustments())
                 .totalSpent(bb.totalSpent())
+                .totalExpired(bb.totalExpired())
                 .build());
+    }
+
+    @GetMapping("/wallet/breakdown")
+    public ResponseEntity<WalletBreakdownResponseDTO> getWalletBreakdown(Authentication auth) {
+        UUID userId = resolveUserId(auth);
+        return ResponseEntity.ok(lootboxService.getWalletBreakdown(userId));
     }
 
     @GetMapping("/catalog")

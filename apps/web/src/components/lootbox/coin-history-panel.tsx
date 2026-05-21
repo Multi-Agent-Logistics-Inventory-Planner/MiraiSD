@@ -51,15 +51,31 @@ export function CoinHistoryPanel({ history, isLoading }: CoinHistoryPanelProps) 
                 className="py-2 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0 space-y-0.5">
-                  <div className="text-sm truncate">{entry.label}</div>
+                  <div
+                    className={cn(
+                      "text-sm truncate",
+                      entry.expired ? "line-through text-muted-foreground" : undefined
+                    )}
+                  >
+                    {entry.label}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {kindLabel(entry.kind)} • {formatDate(entry.at)}
+                    {entry.expired ? (
+                      <span className="ml-1 text-rose-500/80">· expired</span>
+                    ) : entry.expiresAt ? (
+                      <span className="ml-1">· expires {formatDate(entry.expiresAt)}</span>
+                    ) : null}
                   </div>
                 </div>
                 <div
                   className={cn(
                     "text-sm font-medium tabular-nums",
-                    entry.delta > 0 ? "text-emerald-600" : "text-rose-600"
+                    entry.expired
+                      ? "text-muted-foreground line-through"
+                      : entry.delta > 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
                   )}
                 >
                   {entry.delta > 0 ? `+${entry.delta}` : entry.delta}

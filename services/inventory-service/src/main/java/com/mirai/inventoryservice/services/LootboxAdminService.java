@@ -443,6 +443,7 @@ public class LootboxAdminService {
                         .reviewCredits(bb.reviewCredits())
                         .totalAdjustments(bb.totalAdjustments())
                         .totalSpent(bb.totalSpent())
+                        .totalExpired(bb.totalExpired())
                         .build())
                 .plays(plays)
                 .adjustments(adjustments)
