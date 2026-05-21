@@ -69,6 +69,7 @@ class ReviewKafkaProducer:
         rating: int,
         reviewer_name: str,
         published_at: str,
+        coin_rate: int = 1,
     ) -> str:
         """Publish a review event to Kafka.
 
@@ -78,6 +79,10 @@ class ReviewKafkaProducer:
             rating: Star rating (1-5).
             reviewer_name: Name of reviewer.
             published_at: ISO timestamp when review was published.
+            coin_rate: Review-to-coin rate captured at the start of the fetch batch.
+                Travels with the event so consumer-side processing applies the rate
+                that was active when the review was ingested, not whatever the
+                admin set later. Omitting defaults to 1 (backward-compat).
 
         Returns:
             Event ID of the published event.
@@ -98,6 +103,7 @@ class ReviewKafkaProducer:
                 "rating": rating,
                 "reviewer_name": reviewer_name,
                 "published_at": published_at,
+                "coin_rate": int(coin_rate),
             },
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -146,6 +152,7 @@ class ReviewKafkaProducer:
                     rating=review["rating"],
                     reviewer_name=review["reviewer_name"],
                     published_at=review["published_at"],
+                    coin_rate=review.get("coin_rate", 1),
                 )
                 event_ids.append(event_id)
             except Exception as e:

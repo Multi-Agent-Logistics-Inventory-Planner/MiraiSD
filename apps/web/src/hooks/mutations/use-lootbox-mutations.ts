@@ -12,6 +12,7 @@ import {
   deleteTier,
   markRedeemed,
   playLootbox,
+  updateCoinEconomyConfig,
   updateCrate,
   updatePrize,
   updateTier,
@@ -20,11 +21,13 @@ import {
 import type {
   CoinAdjustment,
   CoinAdjustmentRequest,
+  CoinEconomyConfig,
   LootboxAdmin,
   LootboxPlay,
   LootboxPrize,
   LootboxTier,
   PlayLootboxResponse,
+  UpdateCoinEconomyConfigRequest,
   UpsertLootboxRequest,
   UpsertPrizeRequest,
   UpsertTierRequest,
@@ -166,6 +169,16 @@ export function useDeletePrizeMutation() {
     mutationFn: ({ id }) => deletePrize(id),
     onSuccess: async () => {
       await invalidateAllLootbox(qc);
+    },
+  });
+}
+
+export function useUpdateCoinEconomyConfigMutation() {
+  const qc = useQueryClient();
+  return useMutation<CoinEconomyConfig, Error, UpdateCoinEconomyConfigRequest>({
+    mutationFn: (body) => updateCoinEconomyConfig(body),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: lootboxKeys.coinEconomyConfig });
     },
   });
 }

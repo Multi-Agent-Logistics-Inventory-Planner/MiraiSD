@@ -81,10 +81,12 @@ public class LootboxService {
      */
     @Transactional(readOnly = true)
     public BalanceBreakdown computeBalance(UUID userId) {
-        long totalReviewCredits = reviewDailyCountRepository.sumReviewCountByUserId(userId);
+        // Sums coins_awarded (locked in per row at write time) so rate changes
+        // never retroactively re-price already-earned credits.
+        long totalReviewCredits = reviewDailyCountRepository.sumCoinsAwardedByUserId(userId);
         long totalAdjustments   = coinAdjustmentRepository.sumDeltaByUserId(userId);
         long totalSpent         = lootboxPlayRepository.sumCostByUserId(userId);
-        long expiredReview      = reviewDailyCountRepository.sumExpiredReviewCountByUserId(userId, LocalDate.now());
+        long expiredReview      = reviewDailyCountRepository.sumExpiredCoinsAwardedByUserId(userId, LocalDate.now());
         long expiredAdjustments = coinAdjustmentRepository.sumExpiredDeltaByUserId(userId, OffsetDateTime.now());
 
         long totalEarned  = totalReviewCredits + totalAdjustments;
@@ -276,14 +278,21 @@ public class LootboxService {
 
         for (Object[] row : reviewDailyCountRepository.findDailyCreditsByUser(userId)) {
             LocalDate date = (LocalDate) row[0];
-            int count = ((Number) row[1]).intValue();
-            LocalDate expiresOn = (LocalDate) row[2];
+            int reviewCount = ((Number) row[1]).intValue();
+            int coinsAwarded = ((Number) row[2]).intValue();
+            LocalDate expiresOn = (LocalDate) row[3];
             boolean expired = expiresOn != null && !expiresOn.isAfter(today);
+            String reviewsLabel = reviewCount + " review" + (reviewCount == 1 ? "" : "s");
+            // Surface coins separately so the UI can show "3 reviews (+6 coins)" when
+            // a rate change makes per-row coin yield differ from the review count.
+            String label = coinsAwarded == reviewCount
+                    ? reviewsLabel
+                    : reviewsLabel + " (+" + coinsAwarded + " coins)";
             entries.add(CoinHistoryEntryDTO.builder()
                     .kind("REVIEW_CREDIT")
                     .at(date.atStartOfDay().atOffset(ZoneOffset.UTC))
-                    .delta(count)
-                    .label(count + " review" + (count == 1 ? "" : "s"))
+                    .delta(coinsAwarded)
+                    .label(label)
                     .expired(expired)
                     .expiresAt(expiresOn != null
                             ? expiresOn.atStartOfDay().atOffset(ZoneOffset.UTC)
@@ -338,7 +347,7 @@ public class LootboxService {
         Map<LocalDate, Integer> byDate = new java.util.TreeMap<>();
 
         for (ReviewDailyCount c : reviewDailyCountRepository.findExpiringSoon(userId, today, until)) {
-            byDate.merge(c.getExpiresAt(), c.getReviewCount(), Integer::sum);
+            byDate.merge(c.getExpiresAt(), c.getCoinsAwarded(), Integer::sum);
         }
         for (CoinAdjustment a : coinAdjustmentRepository.findExpiringSoon(userId, now, untilDt)) {
             LocalDate day = a.getExpiresAt().toLocalDate();

@@ -5,6 +5,7 @@ import {
   getAdminCatalog,
   getBalance,
   getCatalog,
+  getCoinEconomyConfig,
   getMyHistory,
   getMyPrizes,
   getPendingRedemptions,
@@ -26,6 +27,7 @@ export const lootboxKeys = {
   pending: (page: number, size: number) =>
     ["lootbox", "admin", "pending", page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
+  coinEconomyConfig: ["lootbox", "admin", "coin-config"] as const,
 };
 
 export function useLootboxWalletBreakdown() {
@@ -98,6 +100,14 @@ export function useAdminPendingPrizes(page = 0, size = 20) {
     queryKey: lootboxKeys.pending(page, size),
     queryFn: () => getPendingRedemptions(page, size),
     staleTime: 30 * 1000,
+  });
+}
+
+export function useCoinEconomyConfig() {
+  return useQuery({
+    queryKey: lootboxKeys.coinEconomyConfig,
+    queryFn: getCoinEconomyConfig,
+    staleTime: 60 * 1000,
   });
 }
 

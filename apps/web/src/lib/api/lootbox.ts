@@ -1,7 +1,8 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from "./client";
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from "./client";
 import type {
   CoinAdjustment,
   CoinAdjustmentRequest,
+  CoinEconomyConfig,
   CoinHistoryEntry,
   Lootbox,
   LootboxAdmin,
@@ -12,6 +13,7 @@ import type {
   PageResponse,
   PlayLootboxResponse,
   RecentLootboxPlay,
+  UpdateCoinEconomyConfigRequest,
   UpsertLootboxRequest,
   UpsertPrizeRequest,
   UpsertTierRequest,
@@ -144,4 +146,19 @@ export function adjustCoins(body: CoinAdjustmentRequest): Promise<CoinAdjustment
 
 export function getUserProfile(userId: string): Promise<UserCoinProfile> {
   return apiGet<UserCoinProfile>(`${ADMIN}/users/${userId}`);
+}
+
+// ----- Coin economy config -----
+
+export function getCoinEconomyConfig(): Promise<CoinEconomyConfig> {
+  return apiGet<CoinEconomyConfig>(`${ADMIN}/coin-config`);
+}
+
+export function updateCoinEconomyConfig(
+  body: UpdateCoinEconomyConfigRequest
+): Promise<CoinEconomyConfig> {
+  return apiPut<CoinEconomyConfig, UpdateCoinEconomyConfigRequest>(
+    `${ADMIN}/coin-config`,
+    body
+  );
 }

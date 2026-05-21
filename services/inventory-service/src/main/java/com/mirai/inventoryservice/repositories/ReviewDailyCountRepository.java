@@ -70,21 +70,28 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
             "ORDER BY SUM(c.reviewCount) DESC")
     List<Object[]> getAllTimeTotalsByUser();
 
-    /** Lifetime review-coin credits for a user, regardless of expiry. */
-    @Query("SELECT COALESCE(SUM(c.reviewCount), 0) " +
+    /**
+     * Lifetime coins granted from review credits for a user, regardless of expiry.
+     * Sums coins_awarded (immutable per row) so rate changes never re-price history.
+     */
+    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0) " +
             "FROM ReviewDailyCount c " +
             "WHERE c.user.id = :userId")
-    long sumReviewCountByUserId(@Param("userId") UUID userId);
+    long sumCoinsAwardedByUserId(@Param("userId") UUID userId);
 
-    /** Sum of review credits whose expires_at is at or before `today` — the "expired" pool. */
-    @Query("SELECT COALESCE(SUM(c.reviewCount), 0) " +
+    /** Sum of coins_awarded whose expires_at is at or before `today` — the "expired" pool. */
+    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0) " +
             "FROM ReviewDailyCount c " +
             "WHERE c.user.id = :userId AND c.expiresAt <= :today")
-    long sumExpiredReviewCountByUserId(@Param("userId") UUID userId,
-                                       @Param("today") LocalDate today);
+    long sumExpiredCoinsAwardedByUserId(@Param("userId") UUID userId,
+                                        @Param("today") LocalDate today);
 
-    /** Daily review credit rows for the user's history view (newest first), every row included. */
-    @Query("SELECT c.date, c.reviewCount, c.expiresAt " +
+    /**
+     * Daily review credit rows for the user's history view (newest first), every row
+     * included. Returns [date, reviewCount, coinsAwarded, expiresAt] so the UI can
+     * label the row with both the review count and the coins they earned.
+     */
+    @Query("SELECT c.date, c.reviewCount, c.coinsAwarded, c.expiresAt " +
             "FROM ReviewDailyCount c " +
             "WHERE c.user.id = :userId " +
             "ORDER BY c.date DESC")

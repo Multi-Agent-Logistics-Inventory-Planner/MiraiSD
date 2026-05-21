@@ -23,6 +23,9 @@ class ReviewEvent:
     rating: int
     reviewer_name: str
     published_at: str
+    # Rate snapshotted at fetch time. Defaults to 1 for events produced before the
+    # field existed (or for tests/manual emits that don't bother setting it).
+    coin_rate: int = 1
 
 
 class ReviewProcessor:
@@ -140,8 +143,8 @@ class ReviewProcessor:
                 review_date,
             )
 
-            # Update daily count
-            self._repo.increment_daily_count(employee, review_date)
+            # Update daily count, applying the rate that traveled with this event
+            self._repo.increment_daily_count(employee, review_date, rate=event.coin_rate)
             return True
 
         # review_id is None means duplicate (external_id already exists)
@@ -190,6 +193,7 @@ class ReviewProcessor:
                 rating=payload.get("rating", 0),
                 reviewer_name=payload.get("reviewer_name", ""),
                 published_at=payload.get("published_at", ""),
+                coin_rate=int(payload.get("coin_rate", 1)),
             )
         except Exception as e:
             logger.warning("Failed to parse review event: %s", e)

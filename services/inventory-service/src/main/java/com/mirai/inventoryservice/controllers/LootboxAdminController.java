@@ -2,10 +2,12 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.lootbox.BulkUpdateTierProbabilitiesRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.CoinAdjustmentRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.lootbox.UpdateCoinEconomyConfigRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertPrizeRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertTierRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinAdjustmentResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.CoinEconomyConfigResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxAdminResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
@@ -15,7 +17,9 @@ import com.mirai.inventoryservice.dtos.responses.UserCoinProfileResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.services.CoinEconomyService;
 import com.mirai.inventoryservice.services.LootboxAdminService;
 import com.mirai.inventoryservice.services.LootboxService;
 import jakarta.validation.Valid;
@@ -41,8 +45,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LootboxAdminController {
 
+    private static final String COIN_RATE_HINT =
+            "Changes take effect at the next 6 AM ET review fetch. Existing balances are unchanged.";
+
     private final LootboxAdminService lootboxAdminService;
     private final LootboxService lootboxService;
+    private final CoinEconomyService coinEconomyService;
     private final UserRepository userRepository;
 
     @GetMapping("/catalog")
@@ -148,6 +156,33 @@ public class LootboxAdminController {
         UUID adminId = resolveUserId(auth);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(lootboxAdminService.createAdjustment(req, adminId));
+    }
+
+    // ----- Coin economy config -----
+
+    @GetMapping("/coin-config")
+    public ResponseEntity<CoinEconomyConfigResponseDTO> getCoinConfig() {
+        return ResponseEntity.ok(toConfigDto(coinEconomyService.getConfig()));
+    }
+
+    @PutMapping("/coin-config")
+    public ResponseEntity<CoinEconomyConfigResponseDTO> updateCoinConfig(
+            @Valid @RequestBody UpdateCoinEconomyConfigRequestDTO req,
+            Authentication auth) {
+        UUID adminId = resolveUserId(auth);
+        CoinEconomyConfig updated = coinEconomyService.setReviewRate(req.reviewCoinRate(), adminId);
+        return ResponseEntity.ok(toConfigDto(updated));
+    }
+
+    private CoinEconomyConfigResponseDTO toConfigDto(CoinEconomyConfig config) {
+        User updatedBy = config.getUpdatedBy();
+        return CoinEconomyConfigResponseDTO.builder()
+                .reviewCoinRate(config.getReviewCoinRate())
+                .updatedAt(config.getUpdatedAt())
+                .updatedByUserId(updatedBy != null ? updatedBy.getId() : null)
+                .updatedByName(updatedBy != null ? updatedBy.getFullName() : null)
+                .nextFetchHint(COIN_RATE_HINT)
+                .build();
     }
 
     // ----- User profile -----

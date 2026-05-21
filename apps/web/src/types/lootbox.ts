@@ -190,3 +190,20 @@ export interface CoinAdjustmentRequest {
   delta: number;
   reason: string;
 }
+
+/**
+ * Singleton coin-economy config (review-to-coin rate + last-changed metadata).
+ * `nextFetchHint` is a pre-baked explanation the backend owns so the UI doesn't
+ * have to know about the 6 AM batch schedule.
+ */
+export interface CoinEconomyConfig {
+  reviewCoinRate: number;
+  updatedAt: string;
+  updatedByUserId: string | null;
+  updatedByName: string | null;
+  nextFetchHint: string;
+}
+
+export interface UpdateCoinEconomyConfigRequest {
+  reviewCoinRate: number;
+}

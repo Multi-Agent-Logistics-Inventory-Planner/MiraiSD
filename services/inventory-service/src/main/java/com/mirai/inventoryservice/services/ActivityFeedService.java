@@ -147,6 +147,8 @@ public class ActivityFeedService {
             case SHIPMENT_PARTIAL_RECEIPT, SHIPMENT_EDITED, SHIPMENT_DELETED, SHIPMENT_STATUS_OVERRIDDEN -> "shipment";
             // Kuji activity has its own per-kuji session feed; intentionally not surfaced in the main feed.
             case KUJI_PRIZE_WON, KUJI_DRAW_REVERSED, KUJI_SLIP_ADJUSTMENT -> "kuji";
+            // Coin-economy config changes are admin audit-only, not a stock movement.
+            case COIN_RATE_CHANGED -> "config";
         };
     }
 
@@ -176,6 +178,9 @@ public class ActivityFeedService {
             case KUJI_PRIZE_WON -> "Kuji prize drawn: " + qtyStr + " of " + itemName;
             case KUJI_DRAW_REVERSED -> "Undid kuji draw: " + qtyStr + " of " + itemName;
             case KUJI_SLIP_ADJUSTMENT -> "Kuji slip adjustment: " + itemName;
+            // Coin-economy audit entries never carry stock_movements; this branch is
+            // unreachable from movement-driven titles but the switch must be exhaustive.
+            case COIN_RATE_CHANGED -> "Coin rate change";
         };
     }
 }
