@@ -38,7 +38,13 @@ interface AdminPrizeManagerDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function TierProbabilityEditor({ tiers }: { tiers: LootboxTier[] }) {
+function TierProbabilityEditor({
+  lootboxId,
+  tiers,
+}: {
+  lootboxId: string;
+  tiers: LootboxTier[];
+}) {
   const bulkUpdate = useBulkUpdateTierProbabilitiesMutation();
   // Track only user-edited values as an overlay. Unedited tiers show their canonical
   // probability_pct from the server. Reset on save by clearing all overrides.
@@ -65,7 +71,7 @@ function TierProbabilityEditor({ tiers }: { tiers: LootboxTier[] }) {
       .filter((c) => Number.isFinite(c.probabilityPct));
     if (payload.length === 0) return;
     try {
-      await bulkUpdate.mutateAsync({ tiers: payload });
+      await bulkUpdate.mutateAsync({ lootboxId, tiers: payload });
       setEdits({});
       toast({ title: `Updated ${payload.length} tier(s).`, variant: "success" });
     } catch (err) {
@@ -472,7 +478,11 @@ export function AdminPrizeManagerDialog({
   onOpenChange,
 }: AdminPrizeManagerDialogProps) {
   const catalogQuery = useLootboxAdminCatalog();
-  const tiers = catalogQuery.data ?? [];
+  const crates = catalogQuery.data ?? [];
+  const [selectedCrateId, setSelectedCrateId] = useState<string>("");
+  const activeCrateId = selectedCrateId || crates[0]?.id || "";
+  const activeCrate = crates.find((c) => c.id === activeCrateId);
+  const tiers = activeCrate?.tiers ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -486,45 +496,66 @@ export function AdminPrizeManagerDialog({
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
           </div>
+        ) : crates.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No crates configured yet.</p>
         ) : (
           <div className="space-y-6">
-            <TierProbabilityEditor tiers={tiers} />
-            <div className="space-y-2">
-              <h4 className="font-medium">Prizes</h4>
-              {tiers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tiers configured yet.</p>
-              ) : (
-                tiers.map((tier) => (
-                  <div key={tier.id} className="border rounded-md p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge
-                        variant="secondary"
-                        style={
-                          tier.displayColor
-                            ? { backgroundColor: tier.displayColor, color: "white" }
-                            : undefined
-                        }
-                      >
-                        {tier.name}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {Number(tier.probabilityPct).toFixed(2)}%
-                      </span>
-                    </div>
-                    {tier.prizes.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No prizes in this tier.</p>
-                    ) : (
-                      <ul className="divide-y">
-                        {tier.prizes.map((p) => (
-                          <PrizeRow key={p.id} prize={p} tiers={tiers} />
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))
-              )}
+            <div className="space-y-1.5">
+              <Label>Crate</Label>
+              <Select value={activeCrateId} onValueChange={setSelectedCrateId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {crates.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {tiers.length > 0 && <NewPrizeForm tiers={tiers} />}
+            {activeCrate ? (
+              <>
+                <TierProbabilityEditor lootboxId={activeCrate.id} tiers={tiers} />
+                <div className="space-y-2">
+                  <h4 className="font-medium">Prizes</h4>
+                  {tiers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No tiers configured yet.</p>
+                  ) : (
+                    tiers.map((tier) => (
+                      <div key={tier.id} className="border rounded-md p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge
+                            variant="secondary"
+                            style={
+                              tier.displayColor
+                                ? { backgroundColor: tier.displayColor, color: "white" }
+                                : undefined
+                            }
+                          >
+                            {tier.name}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {Number(tier.probabilityPct).toFixed(2)}%
+                          </span>
+                        </div>
+                        {tier.prizes.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No prizes in this tier.</p>
+                        ) : (
+                          <ul className="divide-y">
+                            {tier.prizes.map((p) => (
+                              <PrizeRow key={p.id} prize={p} tiers={tiers} />
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                {tiers.length > 0 && <NewPrizeForm tiers={tiers} />}
+              </>
+            ) : null}
           </div>
         )}
       </DialogContent>

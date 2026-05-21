@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record BulkUpdateTierProbabilitiesRequestDTO(
+        @NotNull UUID lootboxId,
         @NotEmpty @Valid List<TierProbability> tiers
 ) {
     public record TierProbability(

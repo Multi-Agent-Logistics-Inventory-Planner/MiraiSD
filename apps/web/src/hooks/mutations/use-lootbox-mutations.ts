@@ -4,12 +4,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   adjustCoins,
   bulkUpdateTierProbabilities,
+  createCrate,
   createPrize,
   createTier,
+  deleteCrate,
   deletePrize,
   deleteTier,
   markRedeemed,
   playLootbox,
+  updateCrate,
   updatePrize,
   updateTier,
   type BulkUpdateTierProbabilitiesRequest,
@@ -17,10 +20,12 @@ import {
 import type {
   CoinAdjustment,
   CoinAdjustmentRequest,
+  LootboxAdmin,
   LootboxPlay,
   LootboxPrize,
   LootboxTier,
   PlayLootboxResponse,
+  UpsertLootboxRequest,
   UpsertPrizeRequest,
   UpsertTierRequest,
 } from "@/types/lootbox";
@@ -32,8 +37,8 @@ function invalidateAllLootbox(qc: ReturnType<typeof useQueryClient>) {
 
 export function usePlayLootboxMutation() {
   const qc = useQueryClient();
-  return useMutation<PlayLootboxResponse, Error, void>({
-    mutationFn: () => playLootbox(),
+  return useMutation<PlayLootboxResponse, Error, { crateId: string }>({
+    mutationFn: ({ crateId }) => playLootbox(crateId),
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: lootboxKeys.balance }),
@@ -41,6 +46,36 @@ export function usePlayLootboxMutation() {
         qc.invalidateQueries({ queryKey: lootboxKeys.myHistory }),
         qc.invalidateQueries({ queryKey: ["lootbox", "recent"] }),
       ]);
+    },
+  });
+}
+
+export function useCreateCrateMutation() {
+  const qc = useQueryClient();
+  return useMutation<LootboxAdmin, Error, UpsertLootboxRequest>({
+    mutationFn: (body) => createCrate(body),
+    onSuccess: async () => {
+      await invalidateAllLootbox(qc);
+    },
+  });
+}
+
+export function useUpdateCrateMutation() {
+  const qc = useQueryClient();
+  return useMutation<LootboxAdmin, Error, { id: string; body: UpsertLootboxRequest }>({
+    mutationFn: ({ id, body }) => updateCrate(id, body),
+    onSuccess: async () => {
+      await invalidateAllLootbox(qc);
+    },
+  });
+}
+
+export function useDeleteCrateMutation() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: ({ id }) => deleteCrate(id),
+    onSuccess: async () => {
+      await invalidateAllLootbox(qc);
     },
   });
 }

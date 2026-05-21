@@ -10,12 +10,14 @@ import {
   getPendingRedemptions,
   getRecentPlays,
   getUserProfile,
+  listCrates,
 } from "@/lib/api/lootbox";
 
 export const lootboxKeys = {
   balance: ["lootbox", "balance"] as const,
   catalog: ["lootbox", "catalog"] as const,
   adminCatalog: ["lootbox", "admin", "catalog"] as const,
+  adminCrates: ["lootbox", "admin", "crates"] as const,
   myPrizes: ["lootbox", "my-prizes"] as const,
   myHistory: ["lootbox", "my-history"] as const,
   recent: (limit: number) => ["lootbox", "recent", limit] as const,
@@ -23,6 +25,14 @@ export const lootboxKeys = {
     ["lootbox", "admin", "pending", page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
 };
+
+export function useLootboxAdminCrates() {
+  return useQuery({
+    queryKey: lootboxKeys.adminCrates,
+    queryFn: listCrates,
+    staleTime: 30 * 1000,
+  });
+}
 
 export function useLootboxBalance() {
   return useQuery({

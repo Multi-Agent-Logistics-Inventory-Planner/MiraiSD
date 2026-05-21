@@ -2,11 +2,14 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.lootbox.BulkUpdateTierProbabilitiesRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.CoinAdjustmentRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertPrizeRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertTierRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinAdjustmentResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.LootboxAdminResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserCoinProfileResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
@@ -43,8 +46,33 @@ public class LootboxAdminController {
     private final UserRepository userRepository;
 
     @GetMapping("/catalog")
-    public ResponseEntity<List<LootboxTierResponseDTO>> getFullCatalog() {
-        return ResponseEntity.ok(lootboxService.getCatalog(false));
+    public ResponseEntity<List<LootboxResponseDTO>> getFullCatalog() {
+        return ResponseEntity.ok(lootboxService.getAdminCatalog());
+    }
+
+    // ----- Crate CRUD -----
+
+    @GetMapping("/crates")
+    public ResponseEntity<List<LootboxAdminResponseDTO>> listCrates() {
+        return ResponseEntity.ok(lootboxAdminService.listCrates());
+    }
+
+    @PostMapping("/crates")
+    public ResponseEntity<LootboxAdminResponseDTO> createCrate(@Valid @RequestBody UpsertLootboxRequestDTO req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(lootboxAdminService.createCrate(req));
+    }
+
+    @PatchMapping("/crates/{id}")
+    public ResponseEntity<LootboxAdminResponseDTO> updateCrate(
+            @PathVariable UUID id,
+            @RequestBody UpsertLootboxRequestDTO req) {
+        return ResponseEntity.ok(lootboxAdminService.updateCrate(id, req));
+    }
+
+    @DeleteMapping("/crates/{id}")
+    public ResponseEntity<Void> deleteCrate(@PathVariable UUID id) {
+        lootboxAdminService.deleteCrate(id);
+        return ResponseEntity.noContent().build();
     }
 
     // ----- Tier CRUD -----

@@ -34,6 +34,17 @@ public class LootboxPlay {
     @Column(name = "user_id", insertable = false, updatable = false)
     private UUID userId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lootbox_id")
+    @ToString.Exclude
+    private Lootbox lootbox;
+
+    @Column(name = "lootbox_id", insertable = false, updatable = false)
+    private UUID lootboxId;
+
+    @Column(name = "lootbox_name_snapshot")
+    private String lootboxNameSnapshot;
+
     @NotNull
     @Column(nullable = false)
     @Builder.Default

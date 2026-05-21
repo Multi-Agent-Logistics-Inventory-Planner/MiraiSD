@@ -11,9 +11,10 @@ import {
   type ReelStripCard,
 } from "@/components/lootbox/reel/use-reel";
 import { resolveTierColor } from "@/components/lootbox/tier-helpers";
-import type { LootboxPlay, LootboxPrize } from "@/types/lootbox";
+import type { Lootbox, LootboxPlay, LootboxPrize } from "@/types/lootbox";
 
 interface HeroZoneProps {
+  readonly crate: Lootbox | null;
   readonly prizes: readonly LootboxPrize[];
   readonly tierCount: number;
   readonly phase: ReelPhase;
@@ -34,6 +35,7 @@ interface HeroZoneProps {
 
 export function HeroZone(props: HeroZoneProps) {
   const {
+    crate,
     prizes,
     tierCount,
     phase,
@@ -53,18 +55,23 @@ export function HeroZone(props: HeroZoneProps) {
   } = props;
 
   const dim = isDesktop ? REEL_DIM_DESKTOP : REEL_DIM_MOBILE;
+  const cost = crate?.cost ?? 1;
+  const crateName = crate?.name ?? "Mirai Mystery Crate";
+  const crateDescription = crate?.description ?? null;
 
-  const canOpen = balance >= 1 && phase === "idle" && !isOpening;
+  const canOpen = !!crate && balance >= cost && phase === "idle" && !isOpening;
   const buttonLabel =
-    balance < 1
-      ? "Out of coins"
-      : isOpening
-        ? "Opening…"
-        : phase === "spinning"
-          ? "Unboxing…"
-          : phase === "won"
-            ? "You won!"
-            : "Open Lootbox · 1 coin";
+    !crate
+      ? "Loading…"
+      : balance < cost
+        ? "Out of coins"
+        : isOpening
+          ? "Opening…"
+          : phase === "spinning"
+            ? "Unboxing…"
+            : phase === "won"
+              ? "You won!"
+              : `Open Lootbox · ${cost} coin${cost === 1 ? "" : "s"}`;
 
   const winTierColor = resolveTierColor(
     prizes.find((p) => p.id === lastWin?.prizeId)?.tierColor ?? null
@@ -80,7 +87,7 @@ export function HeroZone(props: HeroZoneProps) {
       }}
     >
       <div className="pointer-events-none absolute left-[28px] top-[22px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-        Crate · Vol. I
+        {crate?.endsAt ? "Limited time" : "Crate"}
       </div>
       <div className="pointer-events-none absolute right-[28px] top-[22px] font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
         <span className="tabular-nums">{prizes.length}</span> prize
@@ -91,12 +98,14 @@ export function HeroZone(props: HeroZoneProps) {
       <div className="mt-2 flex flex-col items-center gap-3.5">
         <CrateIllustration size={140} tint="#a78bfa" />
         <h1 className="m-0 text-[28px] font-semibold tracking-[-0.4px] text-foreground">
-          Mirai Mystery Crate
+          {crateName}
         </h1>
         <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          <span>1 coin per open</span>
+          <span>
+            {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
+          </span>
           <span className="opacity-60">·</span>
-          <span>weighted server-side</span>
+          <span>{crateDescription ?? "weighted server-side"}</span>
         </div>
       </div>
 

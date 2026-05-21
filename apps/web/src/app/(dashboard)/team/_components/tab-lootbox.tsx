@@ -16,6 +16,7 @@ import { LootboxHeader } from "@/components/lootbox/layout/lootbox-header";
 import { DropsTicker } from "@/components/lootbox/layout/drops-ticker";
 import { HeroZone } from "@/components/lootbox/layout/hero-zone";
 import { PrizeGrid } from "@/components/lootbox/layout/prize-grid";
+import { CrateSelector } from "@/components/lootbox/layout/crate-selector";
 import { MyPrizesList } from "@/components/lootbox/my-prizes-list";
 import { CoinHistoryPanel } from "@/components/lootbox/coin-history-panel";
 import { AdminRedemptionDialog } from "@/components/lootbox/admin-redemption-dialog";
@@ -26,7 +27,7 @@ import {
   REEL_DIM_MOBILE,
   useReel,
 } from "@/components/lootbox/reel/use-reel";
-import type { LootboxPlay, LootboxPrize } from "@/types/lootbox";
+import type { Lootbox, LootboxPlay, LootboxPrize } from "@/types/lootbox";
 
 const REEL_SPIN_MS = 5600;
 
@@ -58,11 +59,28 @@ export function TabLootbox() {
   const [prizeManagerOpen, setPrizeManagerOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<LootboxTab>("pool");
+  const [pickedCrateId, setPickedCrateId] = useState<string | null>(null);
 
   const balance = balanceQuery.data?.balance ?? 0;
+  const crates = useMemo<Lootbox[]>(
+    () => catalogQuery.data ?? [],
+    [catalogQuery.data]
+  );
+
+  // Derived default selection: user's pick if still open, otherwise the first open crate.
+  // Computed during render so no useEffect / setState sync dance is needed.
+  const selectedCrateId =
+    pickedCrateId && crates.some((c) => c.id === pickedCrateId)
+      ? pickedCrateId
+      : crates[0]?.id ?? null;
+
+  const selectedCrate: Lootbox | null = useMemo(
+    () => crates.find((c) => c.id === selectedCrateId) ?? null,
+    [crates, selectedCrateId]
+  );
 
   const allPrizes: LootboxPrize[] = useMemo(() => {
-    const tiers = catalogQuery.data ?? [];
+    const tiers = selectedCrate?.tiers ?? [];
     const base = tiers.flatMap((t) =>
       t.prizes.map((p) => ({
         ...p,
@@ -71,7 +89,7 @@ export function TabLootbox() {
       }))
     );
     if (lastWin && !base.some((p) => p.id === lastWin.prizeId)) {
-      // Server rolled a prize not in the cached catalog (e.g. just activated). Use the
+      // Server rolled a prize not in the cached crate (e.g. just activated). Use the
       // play snapshot so the reel card and lookups don't fall back to the "—" placeholder.
       base.push({
         id: lastWin.prizeId,
@@ -85,11 +103,11 @@ export function TabLootbox() {
       });
     }
     return base;
-  }, [catalogQuery.data, lastWin]);
+  }, [selectedCrate, lastWin]);
 
   const tierCount = useMemo(
-    () => (catalogQuery.data ?? []).filter((t) => t.active).length,
-    [catalogQuery.data]
+    () => (selectedCrate?.tiers ?? []).filter((t) => t.active).length,
+    [selectedCrate]
   );
 
   const isDesktop = useIsDesktop();
@@ -111,20 +129,32 @@ export function TabLootbox() {
     ).length;
   }, [historyQuery.data]);
 
+  const cost = selectedCrate?.cost ?? 1;
+
   const triggerOpen = async () => {
-    if (allPrizes.length === 0) {
+    if (!selectedCrate) {
       toast({
-        title: "No prizes configured",
-        description: "Ask an admin to add prizes before opening the lootbox.",
+        title: "No crate selected",
+        description: "Pick a crate to open.",
       });
       return;
     }
-    if (balance < 1) {
-      toast({ title: "Out of coins", description: "Earn more coins to open the lootbox." });
+    if (allPrizes.length === 0) {
+      toast({
+        title: "No prizes configured",
+        description: "Ask an admin to add prizes before opening this crate.",
+      });
+      return;
+    }
+    if (balance < cost) {
+      toast({
+        title: "Out of coins",
+        description: `Need ${cost} coin${cost === 1 ? "" : "s"} to open this crate.`,
+      });
       return;
     }
     try {
-      const result = await playMutation.mutateAsync();
+      const result = await playMutation.mutateAsync({ crateId: selectedCrate.id });
       // Set the winner first so allPrizes includes it via fallback before reel.open
       // reads byId in the render after setStrip.
       setLastWin(result.play);
@@ -162,7 +192,16 @@ export function TabLootbox() {
         onRedemptionQueue={() => setRedemptionOpen(true)}
       />
 
+      {crates.length > 1 ? (
+        <CrateSelector
+          crates={crates}
+          selectedId={selectedCrateId}
+          onSelect={setPickedCrateId}
+        />
+      ) : null}
+
       <HeroZone
+        crate={selectedCrate}
         prizes={allPrizes}
         tierCount={tierCount}
         phase={reel.phase}
@@ -194,7 +233,10 @@ export function TabLootbox() {
           <LootboxTabTrigger value="history">Coin history</LootboxTabTrigger>
         </TabsList>
         <TabsContent value="pool" className="mt-6">
-          <PrizeGrid tiers={catalogQuery.data} isLoading={catalogQuery.isLoading} />
+          <PrizeGrid
+            tiers={selectedCrate?.tiers}
+            isLoading={catalogQuery.isLoading}
+          />
         </TabsContent>
         <TabsContent value="mine" className="mt-6">
           <MyPrizesList prizes={prizesQuery.data} isLoading={prizesQuery.isLoading} />

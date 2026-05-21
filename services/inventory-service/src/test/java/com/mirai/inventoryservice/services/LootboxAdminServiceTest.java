@@ -1,13 +1,16 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.lootbox.BulkUpdateTierProbabilitiesRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertPrizeRequestDTO;
 import com.mirai.inventoryservice.exceptions.LootboxException;
+import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPrize;
 import com.mirai.inventoryservice.models.lootbox.LootboxTier;
 import com.mirai.inventoryservice.repositories.CoinAdjustmentRepository;
 import com.mirai.inventoryservice.repositories.LootboxPlayRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
+import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,10 +38,14 @@ import static org.mockito.Mockito.when;
  * Covers the invariant that tier active-state stays in sync with its probability and with
  * the active-state of its prizes — the bug that surfaced as "active tiers sum to 50, not 100"
  * when an inactive tier still appeared in the admin editor.
+ *
+ * All tiers in these tests belong to a single test crate, since the sum-to-100 rule is now
+ * enforced per-crate.
  */
 @ExtendWith(MockitoExtension.class)
 class LootboxAdminServiceTest {
 
+    @Mock private LootboxRepository lootboxRepository;
     @Mock private LootboxTierRepository lootboxTierRepository;
     @Mock private LootboxPrizeRepository lootboxPrizeRepository;
     @Mock private LootboxPlayRepository lootboxPlayRepository;
@@ -47,6 +55,7 @@ class LootboxAdminServiceTest {
 
     @InjectMocks private LootboxAdminService adminService;
 
+    private Lootbox crate;
     private LootboxTier common;
     private LootboxTier rare;
     private LootboxTier epic;
@@ -54,33 +63,40 @@ class LootboxAdminServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Snapshot of the stuck state from the screenshot: COMMON inactive at 0%, the other
-        // three active and summing to 100.
+        crate = Lootbox.builder()
+                .id(UUID.randomUUID())
+                .name("Test Crate")
+                .cost(1)
+                .active(true)
+                .sortOrder(0)
+                .build();
+
+        // Snapshot of the stuck state: COMMON inactive at 0%, the other three active and summing to 100.
         common = tier("COMMON", new BigDecimal("0.00"), false);
         rare = tier("RARE", new BigDecimal("80.00"), true);
         epic = tier("EPIC", new BigDecimal("16.00"), true);
         legendary = tier("LEGENDARY", new BigDecimal("4.00"), true);
 
-        lenient().when(lootboxTierRepository.findAll())
+        lenient().when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId()))
                 .thenReturn(List.of(common, rare, epic, legendary));
-        lenient().when(lootboxService.getCatalog(false)).thenReturn(List.of());
     }
 
     @Test
     @DisplayName("bulkUpdate flips an inactive tier to active when it receives prob > 0")
     void bulkUpdateActivatesTierGivenProbability() {
-        // Every tier in this scenario has at least one active prize.
         when(lootboxPrizeRepository.countActiveByTierId(any())).thenReturn(1L);
         wireTierLookups();
-        // After applying the changes, the active sum will be 100, so the invariant passes.
-        when(lootboxService.sumActiveTierProbabilities()).thenReturn(new BigDecimal("100.00"));
+        when(lootboxService.sumActiveTierProbabilities(crate.getId()))
+                .thenReturn(new BigDecimal("100.00"));
 
-        adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(List.of(
-                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(common.getId(), new BigDecimal("50.00")),
-                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(rare.getId(), new BigDecimal("30.00")),
-                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(epic.getId(), new BigDecimal("16.00")),
-                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(legendary.getId(), new BigDecimal("4.00"))
-        )));
+        adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(
+                crate.getId(),
+                List.of(
+                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(common.getId(),    new BigDecimal("50.00")),
+                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(rare.getId(),      new BigDecimal("30.00")),
+                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(epic.getId(),      new BigDecimal("16.00")),
+                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(legendary.getId(), new BigDecimal("4.00"))
+                )));
 
         assertTrue(common.getActive(), "COMMON should auto-activate once it carries weight");
         assertEquals(new BigDecimal("50.00"), common.getProbabilityPct());
@@ -93,10 +109,12 @@ class LootboxAdminServiceTest {
         wireTierLookups();
 
         LootboxException ex = assertThrows(LootboxException.class, () ->
-                adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(List.of(
-                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(
-                                common.getId(), new BigDecimal("50.00"))
-                ))));
+                adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(
+                        crate.getId(),
+                        List.of(
+                                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(
+                                        common.getId(), new BigDecimal("50.00"))
+                        ))));
         assertTrue(ex.getMessage().contains("COMMON"));
     }
 
@@ -104,11 +122,14 @@ class LootboxAdminServiceTest {
     @DisplayName("bulkUpdate deactivates a tier when its probability drops to 0")
     void bulkUpdateDeactivatesTierAtZero() {
         wireTierLookups();
-        when(lootboxService.sumActiveTierProbabilities()).thenReturn(new BigDecimal("100.00"));
+        when(lootboxService.sumActiveTierProbabilities(crate.getId()))
+                .thenReturn(new BigDecimal("100.00"));
 
-        adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(List.of(
-                new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(rare.getId(), BigDecimal.ZERO)
-        )));
+        adminService.bulkUpdateTierProbabilities(new BulkUpdateTierProbabilitiesRequestDTO(
+                crate.getId(),
+                List.of(
+                        new BulkUpdateTierProbabilitiesRequestDTO.TierProbability(rare.getId(), BigDecimal.ZERO)
+                )));
 
         assertEquals(false, rare.getActive(), "RARE should auto-deactivate once it carries no weight");
     }
@@ -141,14 +162,74 @@ class LootboxAdminServiceTest {
         lenient().when(lootboxTierRepository.findById(legendary.getId())).thenReturn(Optional.of(legendary));
     }
 
-    private static LootboxTier tier(String name, BigDecimal prob, boolean active) {
-        LootboxTier t = LootboxTier.builder()
+    private LootboxTier tier(String name, BigDecimal prob, boolean active) {
+        return LootboxTier.builder()
                 .id(UUID.randomUUID())
+                .lootbox(crate)
                 .name(name)
                 .probabilityPct(prob)
                 .sortOrder(0)
                 .active(active)
                 .build();
-        return t;
+    }
+
+    // ----- Crate CRUD invariants -----
+
+    @Test
+    @DisplayName("createCrate accepts NULL window as unbounded")
+    void createCrateAcceptsNullWindow() {
+        when(lootboxRepository.save(any())).thenAnswer(inv -> {
+            Lootbox c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+        when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(any())).thenReturn(List.of());
+
+        var dto = adminService.createCrate(new UpsertLootboxRequestDTO(
+                "Holiday Crate", "Festive", null, 3,
+                null, null, true, null, 0));
+
+        assertEquals("Holiday Crate", dto.name());
+        assertEquals(3, dto.cost());
+    }
+
+    @Test
+    @DisplayName("createCrate rejects end <= start")
+    void createCrateRejectsEndBeforeStart() {
+        OffsetDateTime start = OffsetDateTime.parse("2026-12-01T00:00:00-05:00");
+        OffsetDateTime end   = OffsetDateTime.parse("2026-11-30T23:59:59-05:00");
+
+        LootboxException ex = assertThrows(LootboxException.class, () ->
+                adminService.createCrate(new UpsertLootboxRequestDTO(
+                        "Bad Crate", null, null, 1, start, end, true, null, 0)));
+        assertTrue(ex.getMessage().contains("ends_at"));
+    }
+
+    @Test
+    @DisplayName("createCrate accepts cost = 0 (free-spin promo)")
+    void createCrateAcceptsZeroCost() {
+        when(lootboxRepository.save(any())).thenAnswer(inv -> {
+            Lootbox c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+        when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(any())).thenReturn(List.of());
+
+        var dto = adminService.createCrate(new UpsertLootboxRequestDTO(
+                "Free Spin Crate", null, null, 0, null, null, true, null, 0));
+        assertEquals(0, dto.cost());
+    }
+
+    @Test
+    @DisplayName("deleteCrate refuses to delete a crate with recorded plays")
+    void deleteCrateRefusesWhenPlaysExist() {
+        UUID crateId = UUID.randomUUID();
+        Lootbox crateWithPlays = Lootbox.builder().id(crateId).name("Old").cost(1).active(true).build();
+        when(lootboxRepository.findById(crateId)).thenReturn(Optional.of(crateWithPlays));
+        when(lootboxPlayRepository.countByLootboxId(crateId)).thenReturn(5L);
+
+        LootboxException ex = assertThrows(LootboxException.class,
+                () -> adminService.deleteCrate(crateId));
+        assertTrue(ex.getMessage().contains("5"));
     }
 }

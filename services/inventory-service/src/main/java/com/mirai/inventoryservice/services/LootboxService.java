@@ -4,17 +4,20 @@ import com.mirai.inventoryservice.config.LootboxConfig;
 import com.mirai.inventoryservice.dtos.responses.CoinHistoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
 import com.mirai.inventoryservice.exceptions.LootboxException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.lootbox.CoinAdjustment;
+import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPlay;
 import com.mirai.inventoryservice.models.lootbox.LootboxPrize;
 import com.mirai.inventoryservice.models.lootbox.LootboxTier;
 import com.mirai.inventoryservice.repositories.CoinAdjustmentRepository;
 import com.mirai.inventoryservice.repositories.LootboxPlayRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
+import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
@@ -47,6 +50,7 @@ public class LootboxService {
     private final ReviewDailyCountRepository reviewDailyCountRepository;
     private final CoinAdjustmentRepository coinAdjustmentRepository;
     private final LootboxPlayRepository lootboxPlayRepository;
+    private final LootboxRepository lootboxRepository;
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
     private final UserRepository userRepository;
@@ -71,11 +75,11 @@ public class LootboxService {
     }
 
     /**
-     * Atomic play: balance check, weighted roll, persist play row. Caller is responsible
-     * for the surrounding @Transactional boundary and idempotency cache.
+     * Atomic play against a specific crate: validate crate is open, balance check vs.
+     * crate.cost, weighted roll within that crate, persist play row.
      */
     @Transactional
-    public PlayResult play(UUID userId, String idempotencyKey) {
+    public PlayResult play(UUID userId, UUID crateId, String idempotencyKey) {
         // Per-user serialization without needing an existing row to lock.
         // hashtext(uuid::text) collapses into a 32-bit int suitable for pg_advisory_xact_lock.
         em.createNativeQuery("SELECT pg_advisory_xact_lock(hashtext(:k))")
@@ -93,18 +97,26 @@ public class LootboxService {
             }
         }
 
+        OffsetDateTime now = OffsetDateTime.now();
+        Lootbox crate = lootboxRepository.findByIdOpen(crateId, now)
+                .orElseThrow(() -> new LootboxException(
+                        "CRATE_UNAVAILABLE: crate is not currently open for play."));
+
+        int cost = crate.getCost() == null ? 1 : crate.getCost();
         BalanceBreakdown bb = computeBalance(userId);
-        if (bb.balance() < 1) {
+        if (bb.balance() < cost) {
             throw new LootboxException("INSUFFICIENT_BALANCE: not enough Pito Coins to play.");
         }
 
-        LootboxPrize prize = rollPrize();
+        LootboxPrize prize = rollPrize(crate.getId());
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new LootboxException("User not found: " + userId));
 
         LootboxPlay play = LootboxPlay.builder()
                 .user(user)
-                .cost(1)
+                .lootbox(crate)
+                .lootboxNameSnapshot(crate.getName())
+                .cost(cost)
                 .prize(prize)
                 .prizeNameSnapshot(prize.getName())
                 .prizeDescriptionSnapshot(prize.getDescription())
@@ -115,26 +127,26 @@ public class LootboxService {
                 .build();
         lootboxPlayRepository.save(play);
 
-        return new PlayResult(play, bb.balance() - 1);
+        return new PlayResult(play, bb.balance() - cost);
     }
 
     /**
-     * Weighted random pick over active tiers (and active prizes within them).
+     * Weighted random pick over a crate's active tiers (and active prizes within them).
      * Probabilities of rollable tiers are normalized to sum to 1.0; empty/inactive tiers
      * are silently skipped so they don't "eat" rolls.
      */
     @Transactional(readOnly = true)
-    public LootboxPrize rollPrize() {
-        List<LootboxTier> rollable = lootboxTierRepository.findRollableTiers();
+    public LootboxPrize rollPrize(UUID crateId) {
+        List<LootboxTier> rollable = lootboxTierRepository.findRollableTiersByLootbox(crateId);
         if (rollable.isEmpty()) {
-            throw new LootboxException("No prizes are currently available to roll.");
+            throw new LootboxException("No prizes are currently available to roll for this crate.");
         }
 
         double total = rollable.stream()
                 .mapToDouble(t -> t.getProbabilityPct().doubleValue())
                 .sum();
         if (total <= 0.0) {
-            throw new LootboxException("Active tier probabilities sum to zero.");
+            throw new LootboxException("Active tier probabilities for this crate sum to zero.");
         }
 
         double pick = lootboxRandom.nextDouble() * total;
@@ -150,20 +162,20 @@ public class LootboxService {
 
         List<LootboxPrize> prizes = lootboxPrizeRepository.findActiveByTierId(chosenTier.getId());
         if (prizes.isEmpty()) {
-            // findRollableTiers should guarantee this can't happen, but defend against
-            // a race where a prize was deactivated between query and now.
+            // findRollableTiersByLootbox should guarantee this can't happen, but defend
+            // against a race where a prize was deactivated between query and now.
             throw new LootboxException("Selected tier has no active prizes.");
         }
         return prizes.get(lootboxRandom.nextInt(prizes.size()));
     }
 
     /**
-     * Sum of active tier probabilities, rounded to 2dp. Service-layer invariant guard:
-     * active tier %s should always equal 100 (within a small epsilon for rounding).
+     * Sum of active tier probabilities WITHIN a crate, rounded to 2dp.
+     * Service-layer invariant guard: per-crate sum must equal 100 to activate the crate.
      */
     @Transactional(readOnly = true)
-    public BigDecimal sumActiveTierProbabilities() {
-        return lootboxTierRepository.findAll().stream()
+    public BigDecimal sumActiveTierProbabilities(UUID crateId) {
+        return lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crateId).stream()
                 .filter(LootboxTier::getActive)
                 .map(LootboxTier::getProbabilityPct)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -172,18 +184,60 @@ public class LootboxService {
 
     // ----- Read-side mapping helpers used by both user + admin controllers -----
 
+    /**
+     * Player-facing catalog: only crates currently open, with their active tiers + prizes.
+     */
     @Transactional(readOnly = true)
-    public List<LootboxTierResponseDTO> getCatalog(boolean activeOnly) {
-        List<LootboxTier> tiers = lootboxTierRepository.findAllByOrderBySortOrderAscNameAsc();
-        List<LootboxPrize> prizes = activeOnly
-                ? lootboxPrizeRepository.findAllActiveWithTier()
-                : lootboxPrizeRepository.findAllWithTier();
-        Map<UUID, List<LootboxPrize>> byTier = prizes.stream()
+    public List<LootboxResponseDTO> getCatalog() {
+        OffsetDateTime now = OffsetDateTime.now();
+        List<Lootbox> open = lootboxRepository.findOpen(now);
+        if (open.isEmpty()) return List.of();
+
+        List<LootboxPrize> activePrizes = lootboxPrizeRepository.findAllActiveWithTier();
+        Map<UUID, List<LootboxPrize>> prizesByTier = activePrizes.stream()
                 .collect(Collectors.groupingBy(p -> p.getTier().getId()));
-        return tiers.stream()
-                .filter(t -> !activeOnly || t.getActive())
-                .map(t -> toTierDto(t, byTier.getOrDefault(t.getId(), List.of())))
+
+        return open.stream()
+                .map(crate -> toLootboxDto(crate, prizesByTier))
                 .toList();
+    }
+
+    /**
+     * Admin catalog: ALL crates (including inactive / out-of-window) with ALL tiers and
+     * prizes (active or not). Used by the admin UI to manage the full picture.
+     */
+    @Transactional(readOnly = true)
+    public List<LootboxResponseDTO> getAdminCatalog() {
+        List<Lootbox> all = lootboxRepository.findAllByOrderBySortOrderAscNameAsc();
+        if (all.isEmpty()) return List.of();
+
+        List<LootboxPrize> allPrizes = lootboxPrizeRepository.findAllWithTier();
+        Map<UUID, List<LootboxPrize>> prizesByTier = allPrizes.stream()
+                .collect(Collectors.groupingBy(p -> p.getTier().getId()));
+
+        return all.stream()
+                .map(crate -> toAdminLootboxDto(crate, prizesByTier))
+                .toList();
+    }
+
+    /** Admin variant: shows ALL tiers and ALL prizes (no active filter). */
+    public LootboxResponseDTO toAdminLootboxDto(Lootbox crate, Map<UUID, List<LootboxPrize>> prizesByTier) {
+        List<LootboxTier> tiers = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+        List<LootboxTierResponseDTO> tierDtos = tiers.stream()
+                .map(t -> toTierDto(t, prizesByTier.getOrDefault(t.getId(), List.of())))
+                .toList();
+        return LootboxResponseDTO.builder()
+                .id(crate.getId())
+                .name(crate.getName())
+                .description(crate.getDescription())
+                .imageUrl(crate.getImageUrl())
+                .cost(crate.getCost())
+                .startsAt(crate.getStartsAt())
+                .endsAt(crate.getEndsAt())
+                .sortOrder(crate.getSortOrder())
+                .tiers(tierDtos)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -210,11 +264,14 @@ public class LootboxService {
         }
 
         for (LootboxPlay p : lootboxPlayRepository.findByUserIdOrderByPlayedAtDesc(userId)) {
+            String crateLabel = p.getLootboxNameSnapshot() != null
+                    ? p.getLootboxNameSnapshot() + ": "
+                    : "Lootbox: ";
             entries.add(CoinHistoryEntryDTO.builder()
                     .kind("PLAY")
                     .at(p.getPlayedAt())
                     .delta(-p.getCost())
-                    .label("Lootbox: " + p.getPrizeNameSnapshot()
+                    .label(crateLabel + p.getPrizeNameSnapshot()
                             + " (" + p.getPrizeTierNameSnapshot() + ")")
                     .refId(p.getId())
                     .build());
@@ -272,6 +329,30 @@ public class LootboxService {
         String last = parts[parts.length - 1];
         if (last.isEmpty()) return parts[0];
         return parts[0] + " " + Character.toUpperCase(last.charAt(0)) + ".";
+    }
+
+    /**
+     * Builds the player-facing crate DTO using a prebuilt map of active prizes by tier.
+     * Tiers are filtered to active-only since this is the player view.
+     */
+    public LootboxResponseDTO toLootboxDto(Lootbox crate, Map<UUID, List<LootboxPrize>> activePrizesByTier) {
+        List<LootboxTier> tiers = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+        List<LootboxTierResponseDTO> tierDtos = tiers.stream()
+                .filter(LootboxTier::getActive)
+                .map(t -> toTierDto(t, activePrizesByTier.getOrDefault(t.getId(), List.of())))
+                .toList();
+        return LootboxResponseDTO.builder()
+                .id(crate.getId())
+                .name(crate.getName())
+                .description(crate.getDescription())
+                .imageUrl(crate.getImageUrl())
+                .cost(crate.getCost())
+                .startsAt(crate.getStartsAt())
+                .endsAt(crate.getEndsAt())
+                .sortOrder(crate.getSortOrder())
+                .tiers(tierDtos)
+                .build();
     }
 
     public static LootboxTierResponseDTO toTierDto(LootboxTier tier, List<LootboxPrize> prizes) {

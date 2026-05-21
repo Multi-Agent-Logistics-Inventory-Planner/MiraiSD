@@ -26,6 +26,59 @@ export interface LootboxTier {
   prizes: LootboxPrize[];
 }
 
+/**
+ * A crate ("Lootbox") groups tiers + prizes. Player-facing catalog returns only crates
+ * currently open; admin catalog returns all crates with all tiers/prizes.
+ */
+export interface Lootbox {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  cost: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  sortOrder: number;
+  tiers: LootboxTier[];
+}
+
+/**
+ * Admin-shaped crate row: includes active flag, forward-compat siteId, and counts.
+ * Used by the /admin/crates list and create/edit forms.
+ */
+export interface LootboxAdmin {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  cost: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  active: boolean;
+  siteId: string | null;
+  sortOrder: number;
+  tierCount: number;
+  prizeCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertLootboxRequest {
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  cost?: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  active?: boolean;
+  siteId?: string | null;
+  sortOrder?: number;
+}
+
+export interface PlayLootboxRequest {
+  crateId: string;
+}
+
 export type LootboxPlayStatus = "WON" | "REDEEMED";
 
 export interface LootboxPlay {
@@ -99,7 +152,12 @@ export interface PageResponse<T> {
   size: number;
 }
 
+/**
+ * `lootboxId` is required at create-time and ignored on patch updates (tiers can't be
+ * moved between crates without a dedicated reparent endpoint).
+ */
 export interface UpsertTierRequest {
+  lootboxId?: string;
   name: string;
   probabilityPct: number;
   displayColor?: string | null;

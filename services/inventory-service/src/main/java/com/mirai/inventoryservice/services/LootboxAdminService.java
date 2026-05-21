@@ -2,9 +2,11 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.requests.lootbox.BulkUpdateTierProbabilitiesRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.CoinAdjustmentRequestDTO;
+import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertPrizeRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertTierRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinAdjustmentResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.LootboxAdminResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
@@ -13,12 +15,14 @@ import com.mirai.inventoryservice.exceptions.LootboxException;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.lootbox.CoinAdjustment;
+import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPlay;
 import com.mirai.inventoryservice.models.lootbox.LootboxPrize;
 import com.mirai.inventoryservice.models.lootbox.LootboxTier;
 import com.mirai.inventoryservice.repositories.CoinAdjustmentRepository;
 import com.mirai.inventoryservice.repositories.LootboxPlayRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
+import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -37,9 +41,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Admin operations: tier/prize CRUD with the sum-to-100 invariant + auto-rebalance
- * when the last active prize in a tier is deactivated, redemption queue, and signed
- * coin adjustments with a balance >= 0 floor.
+ * Admin operations: crate CRUD, tier/prize CRUD with per-crate sum-to-100 invariant +
+ * auto-rebalance when the last active prize in a tier is deactivated, redemption queue,
+ * and signed coin adjustments with a balance >= 0 floor.
+ *
+ * Per-crate semantics: every tier belongs to exactly one crate, and the sum-to-100
+ * probability rule is enforced WITHIN that crate. Two crates' tier probabilities are
+ * fully independent.
  */
 @Slf4j
 @Service
@@ -49,6 +57,7 @@ public class LootboxAdminService {
     private static final BigDecimal TOTAL = new BigDecimal("100.00");
     private static final BigDecimal EPSILON = new BigDecimal("0.05");
 
+    private final LootboxRepository lootboxRepository;
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
     private final LootboxPlayRepository lootboxPlayRepository;
@@ -56,14 +65,95 @@ public class LootboxAdminService {
     private final UserRepository userRepository;
     private final LootboxService lootboxService;
 
+    // ----- Crate (Lootbox) CRUD -----
+
+    @Transactional(readOnly = true)
+    public List<LootboxAdminResponseDTO> listCrates() {
+        List<Lootbox> crates = lootboxRepository.findAllByOrderBySortOrderAscNameAsc();
+        return crates.stream().map(this::toCrateAdminDto).toList();
+    }
+
+    @Transactional
+    public LootboxAdminResponseDTO createCrate(UpsertLootboxRequestDTO req) {
+        validateWindow(req.startsAt(), req.endsAt());
+        Lootbox crate = Lootbox.builder()
+                .name(req.name())
+                .description(req.description())
+                .imageUrl(req.imageUrl())
+                .cost(req.cost() != null ? req.cost() : 1)
+                .startsAt(req.startsAt())
+                .endsAt(req.endsAt())
+                .active(req.active() != null ? req.active() : true)
+                .siteId(req.siteId())
+                .sortOrder(req.sortOrder() != null ? req.sortOrder() : 0)
+                .build();
+        lootboxRepository.save(crate);
+        return toCrateAdminDto(crate);
+    }
+
+    @Transactional
+    public LootboxAdminResponseDTO updateCrate(UUID id, UpsertLootboxRequestDTO req) {
+        Lootbox crate = lootboxRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Crate not found: " + id));
+        if (req.name() != null) crate.setName(req.name());
+        if (req.description() != null) crate.setDescription(req.description());
+        if (req.imageUrl() != null) crate.setImageUrl(req.imageUrl());
+        if (req.cost() != null) crate.setCost(req.cost());
+        if (req.startsAt() != null || req.endsAt() != null) {
+            OffsetDateTime startsAt = req.startsAt() != null ? req.startsAt() : crate.getStartsAt();
+            OffsetDateTime endsAt   = req.endsAt()   != null ? req.endsAt()   : crate.getEndsAt();
+            validateWindow(startsAt, endsAt);
+            crate.setStartsAt(startsAt);
+            crate.setEndsAt(endsAt);
+        }
+        if (req.active() != null) {
+            if (req.active()) assertCrateProbabilitiesSumIs100(id);
+            crate.setActive(req.active());
+        }
+        if (req.siteId() != null) crate.setSiteId(req.siteId());
+        if (req.sortOrder() != null) crate.setSortOrder(req.sortOrder());
+        lootboxRepository.save(crate);
+        return toCrateAdminDto(crate);
+    }
+
+    @Transactional
+    public void deleteCrate(UUID id) {
+        Lootbox crate = lootboxRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Crate not found: " + id));
+        long playCount = lootboxPlayRepository.countByLootboxId(id);
+        if (playCount > 0) {
+            throw new LootboxException(
+                    "Cannot delete crate with " + playCount + " play(s) recorded; deactivate it instead.");
+        }
+        // No plays reference it; safe to hard-delete tiers + prizes + crate.
+        List<LootboxTier> tiers = lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(id);
+        for (LootboxTier t : tiers) {
+            lootboxPrizeRepository.deleteAll(lootboxPrizeRepository.findActiveByTierId(t.getId()));
+        }
+        lootboxTierRepository.deleteAll(tiers);
+        lootboxRepository.delete(crate);
+    }
+
+    private void validateWindow(OffsetDateTime startsAt, OffsetDateTime endsAt) {
+        if (startsAt != null && endsAt != null && !endsAt.isAfter(startsAt)) {
+            throw new LootboxException("Crate ends_at must be after starts_at.");
+        }
+    }
+
     // ----- Tier CRUD -----
 
     @Transactional
     public LootboxTierResponseDTO createTier(UpsertTierRequestDTO req) {
-        lootboxTierRepository.findByName(req.name()).ifPresent(t -> {
-            throw new LootboxException("Tier already exists: " + req.name());
+        if (req.lootboxId() == null) {
+            throw new LootboxException("lootboxId is required when creating a tier.");
+        }
+        Lootbox crate = lootboxRepository.findById(req.lootboxId())
+                .orElseThrow(() -> new EntityNotFoundException("Crate not found: " + req.lootboxId()));
+        lootboxTierRepository.findByLootboxIdAndName(req.lootboxId(), req.name()).ifPresent(t -> {
+            throw new LootboxException("Tier already exists in this crate: " + req.name());
         });
         LootboxTier tier = LootboxTier.builder()
+                .lootbox(crate)
                 .name(req.name())
                 .probabilityPct(req.probabilityPct())
                 .displayColor(req.displayColor())
@@ -71,7 +161,7 @@ public class LootboxAdminService {
                 .active(req.active() != null ? req.active() : true)
                 .build();
         lootboxTierRepository.save(tier);
-        assertActiveSumIs100();
+        assertCrateProbabilitiesSumIs100(req.lootboxId());
         return LootboxService.toTierDto(tier, List.of());
     }
 
@@ -79,6 +169,7 @@ public class LootboxAdminService {
     public LootboxTierResponseDTO updateTier(UUID id, UpsertTierRequestDTO req) {
         LootboxTier tier = lootboxTierRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tier not found: " + id));
+        UUID crateId = tier.getLootbox().getId();
         if (req.name() != null) tier.setName(req.name());
         if (req.probabilityPct() != null) tier.setProbabilityPct(req.probabilityPct());
         if (req.displayColor() != null) tier.setDisplayColor(req.displayColor());
@@ -90,26 +181,30 @@ public class LootboxAdminService {
             tier.setActive(req.active());
         }
         lootboxTierRepository.save(tier);
-        assertActiveSumIs100();
+        assertCrateProbabilitiesSumIs100(crateId);
         List<LootboxPrize> prizes = lootboxPrizeRepository.findActiveByTierId(id);
         return LootboxService.toTierDto(tier, prizes);
     }
 
     /**
-     * Apply a batch of tier probability changes in a single transaction. Only validates
-     * the sum-to-100 invariant once at the end, so callers can shift weight between tiers
-     * (e.g. 70->50 + 20->40) without tripping the per-tier guard.
+     * Apply a batch of tier probability changes WITHIN a single crate, in one transaction.
+     * Validates the per-crate sum-to-100 invariant once at the end so admins can shift
+     * weight between tiers (e.g. 70->50 + 20->40) without tripping the per-tier guard.
      *
-     * Treats probability as the source of truth for tier active state: prob > 0 implies
-     * the tier is live (requires at least one active prize), prob == 0 deactivates. This
-     * lets admins re-activate a tier purely by redistributing weight to it.
+     * Probability is the source of truth for tier active state within the batch: prob > 0
+     * implies the tier is live (requires at least one active prize), prob == 0 deactivates.
      */
     @Transactional
     public List<LootboxTierResponseDTO> bulkUpdateTierProbabilities(
             BulkUpdateTierProbabilitiesRequestDTO req) {
+        UUID crateId = req.lootboxId();
         for (BulkUpdateTierProbabilitiesRequestDTO.TierProbability change : req.tiers()) {
             LootboxTier tier = lootboxTierRepository.findById(change.id())
                     .orElseThrow(() -> new EntityNotFoundException("Tier not found: " + change.id()));
+            if (!tier.getLootbox().getId().equals(crateId)) {
+                throw new LootboxException(
+                        "Tier " + tier.getName() + " does not belong to crate " + crateId);
+            }
             boolean wantsActive = change.probabilityPct().compareTo(BigDecimal.ZERO) > 0;
             if (wantsActive && lootboxPrizeRepository.countActiveByTierId(tier.getId()) == 0) {
                 throw new LootboxException(
@@ -119,14 +214,19 @@ public class LootboxAdminService {
             tier.setActive(wantsActive);
         }
         lootboxTierRepository.flush();
-        assertActiveSumIs100();
-        return lootboxService.getCatalog(false);
+        assertCrateProbabilitiesSumIs100(crateId);
+
+        List<LootboxTier> tiers = lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crateId);
+        return tiers.stream()
+                .map(t -> LootboxService.toTierDto(t, lootboxPrizeRepository.findActiveByTierId(t.getId())))
+                .toList();
     }
 
     @Transactional
     public void deleteTier(UUID id) {
         LootboxTier tier = lootboxTierRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tier not found: " + id));
+        UUID crateId = tier.getLootbox().getId();
         if (lootboxPrizeRepository.countActiveByTierId(id) > 0) {
             throw new LootboxException("Cannot delete a tier with active prizes; deactivate prizes first.");
         }
@@ -134,7 +234,7 @@ public class LootboxAdminService {
         tier.setActive(false);
         tier.setProbabilityPct(BigDecimal.ZERO);
         lootboxTierRepository.save(tier);
-        rebalanceActiveTiers();
+        rebalanceActiveTiers(crateId);
     }
 
     // ----- Prize CRUD -----
@@ -173,13 +273,9 @@ public class LootboxAdminService {
         if (req.active() != null) prize.setActive(req.active());
         lootboxPrizeRepository.save(prize);
 
-        // If we just made the prize inactive (or moved it out) and its old tier now has zero
-        // active prizes, deactivate the tier and rebalance the rest.
         if (wasActive && (!prize.getActive() || !prize.getTier().getId().equals(oldTierId))) {
             maybeDeactivateTier(oldTierId);
         }
-        // Symmetric: if the prize is now active and its (current) tier is inactive, re-activate
-        // the tier so admins can redistribute weight to it without it silently being skipped.
         if (prize.getActive()) {
             maybeReactivateTier(prize.getTier());
         }
@@ -198,9 +294,8 @@ public class LootboxAdminService {
     }
 
     /**
-     * Counterpart to {@link #maybeDeactivateTier}: when an inactive tier gains an active
-     * prize, mark it active so it's visible to the sum-to-100 invariant. Probability is
-     * left at 0 (set when it was deactivated) — the admin redistributes weight explicitly.
+     * When an inactive tier gains an active prize, mark it active so it's visible to the
+     * sum-to-100 invariant. Probability stays at 0 — admin redistributes weight explicitly.
      */
     private void maybeReactivateTier(LootboxTier tier) {
         if (tier.getActive()) return;
@@ -212,19 +307,21 @@ public class LootboxAdminService {
         if (lootboxPrizeRepository.countActiveByTierId(tierId) > 0) return;
         LootboxTier tier = lootboxTierRepository.findById(tierId).orElse(null);
         if (tier == null || !tier.getActive()) return;
+        UUID crateId = tier.getLootbox().getId();
         tier.setActive(false);
         tier.setProbabilityPct(BigDecimal.ZERO);
         lootboxTierRepository.save(tier);
-        rebalanceActiveTiers();
+        rebalanceActiveTiers(crateId);
     }
 
     /**
-     * Proportionally redistribute probabilities across active tiers so they sum to 100.
-     * If no active tiers remain, leaves the state alone (the next roll will fail; admin
-     * must add a prize + activate a tier to recover).
+     * Proportionally redistribute probabilities across active tiers of a crate so they sum
+     * to 100. If no active tiers remain in the crate, leaves the state alone (next roll
+     * fails; admin must add a prize + activate a tier to recover).
      */
-    private void rebalanceActiveTiers() {
-        List<LootboxTier> active = lootboxTierRepository.findAll().stream()
+    private void rebalanceActiveTiers(UUID crateId) {
+        List<LootboxTier> active = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crateId).stream()
                 .filter(LootboxTier::getActive)
                 .toList();
         if (active.isEmpty()) return;
@@ -234,7 +331,6 @@ public class LootboxAdminService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (sum.compareTo(BigDecimal.ZERO) == 0) {
-            // Edge case: all active tier %s collapsed to 0. Split evenly.
             BigDecimal each = TOTAL.divide(new BigDecimal(active.size()), 2, RoundingMode.HALF_UP);
             for (LootboxTier t : active) t.setProbabilityPct(each);
         } else {
@@ -245,7 +341,6 @@ public class LootboxAdminService {
                 t.setProbabilityPct(scaled);
             }
         }
-        // Fix rounding drift: nudge the largest-share tier so the sum is exactly 100.
         BigDecimal newSum = active.stream()
                 .map(LootboxTier::getProbabilityPct)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -259,14 +354,15 @@ public class LootboxAdminService {
         lootboxTierRepository.saveAll(active);
     }
 
-    private void assertActiveSumIs100() {
-        BigDecimal sum = lootboxService.sumActiveTierProbabilities();
-        // Allow inactive-only state (e.g. mid-setup) to skip the check.
-        boolean hasActive = lootboxTierRepository.findAll().stream().anyMatch(LootboxTier::getActive);
+    private void assertCrateProbabilitiesSumIs100(UUID crateId) {
+        BigDecimal sum = lootboxService.sumActiveTierProbabilities(crateId);
+        boolean hasActive = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crateId).stream()
+                .anyMatch(LootboxTier::getActive);
         if (!hasActive) return;
         if (sum.subtract(TOTAL).abs().compareTo(EPSILON) > 0) {
             throw new LootboxException(
-                    "Active tier probabilities must sum to 100.00 (currently " + sum + ").");
+                    "Active tier probabilities for this crate must sum to 100.00 (currently " + sum + ").");
         }
     }
 
@@ -365,6 +461,32 @@ public class LootboxAdminService {
                 .grantedByUserId(admin != null ? admin.getId() : null)
                 .grantedByName(admin != null ? admin.getFullName() : null)
                 .createdAt(a.getCreatedAt())
+                .build();
+    }
+
+    private LootboxAdminResponseDTO toCrateAdminDto(Lootbox crate) {
+        List<LootboxTier> tiers = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+        int tierCount = tiers.size();
+        int prizeCount = 0;
+        for (LootboxTier t : tiers) {
+            prizeCount += lootboxPrizeRepository.findActiveByTierId(t.getId()).size();
+        }
+        return LootboxAdminResponseDTO.builder()
+                .id(crate.getId())
+                .name(crate.getName())
+                .description(crate.getDescription())
+                .imageUrl(crate.getImageUrl())
+                .cost(crate.getCost())
+                .startsAt(crate.getStartsAt())
+                .endsAt(crate.getEndsAt())
+                .active(crate.getActive())
+                .siteId(crate.getSiteId())
+                .sortOrder(crate.getSortOrder())
+                .tierCount(tierCount)
+                .prizeCount(prizeCount)
+                .createdAt(crate.getCreatedAt())
+                .updatedAt(crate.getUpdatedAt())
                 .build();
     }
 }

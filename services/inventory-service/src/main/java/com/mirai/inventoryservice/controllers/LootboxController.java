@@ -1,9 +1,10 @@
 package com.mirai.inventoryservice.controllers;
 
+import com.mirai.inventoryservice.dtos.requests.lootbox.PlayLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinHistoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxBalanceResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
-import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.PlayLootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
@@ -12,6 +13,7 @@ import com.mirai.inventoryservice.models.enums.UserRole;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import com.mirai.inventoryservice.services.IdempotencyService;
 import com.mirai.inventoryservice.services.LootboxService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,13 +55,14 @@ public class LootboxController {
     }
 
     @GetMapping("/catalog")
-    public ResponseEntity<List<LootboxTierResponseDTO>> getCatalog() {
-        return ResponseEntity.ok(lootboxService.getCatalog(true));
+    public ResponseEntity<List<LootboxResponseDTO>> getCatalog() {
+        return ResponseEntity.ok(lootboxService.getCatalog());
     }
 
     @PostMapping("/play")
     public ResponseEntity<PlayLootboxResponseDTO> play(
             Authentication auth,
+            @Valid @RequestBody PlayLootboxRequestDTO body,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         UUID userId = resolveUserId(auth);
 
@@ -67,7 +71,7 @@ public class LootboxController {
             return ResponseEntity.ok(cached.get());
         }
 
-        LootboxService.PlayResult result = lootboxService.play(userId, idempotencyKey);
+        LootboxService.PlayResult result = lootboxService.play(userId, body.crateId(), idempotencyKey);
         PlayLootboxResponseDTO response = PlayLootboxResponseDTO.builder()
                 .play(LootboxService.toPlayDto(result.play()))
                 .newBalance(result.newBalance())

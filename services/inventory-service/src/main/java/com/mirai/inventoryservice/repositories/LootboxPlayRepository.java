@@ -18,6 +18,9 @@ public interface LootboxPlayRepository extends JpaRepository<LootboxPlay, UUID> 
     @Query("SELECT COALESCE(SUM(p.cost), 0) FROM LootboxPlay p WHERE p.user.id = :userId")
     long sumCostByUserId(@Param("userId") UUID userId);
 
+    @Query("SELECT COUNT(p) FROM LootboxPlay p WHERE p.lootbox.id = :lootboxId")
+    long countByLootboxId(@Param("lootboxId") UUID lootboxId);
+
     List<LootboxPlay> findByUserIdOrderByPlayedAtDesc(UUID userId);
 
     Optional<LootboxPlay> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);

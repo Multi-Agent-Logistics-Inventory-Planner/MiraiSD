@@ -1,65 +1,65 @@
 package com.mirai.inventoryservice.models.lootbox;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "lootbox_tiers",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"lootbox_id", "name"}))
+@Table(name = "lootboxes")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LootboxTier {
+public class Lootbox {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lootbox_id", nullable = false)
-    @ToString.Exclude
-    private Lootbox lootbox;
-
-    @Column(name = "lootbox_id", insertable = false, updatable = false)
-    private UUID lootboxId;
 
     @NotBlank
     @Column(nullable = false)
     private String name;
 
-    @NotNull
-    @DecimalMin("0.00")
-    @DecimalMax("100.00")
-    @Column(name = "probability_pct", nullable = false, precision = 5, scale = 2)
-    private BigDecimal probabilityPct;
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
-    @Column(name = "display_color")
-    private String displayColor;
+    @Column(name = "image_url")
+    private String imageUrl;
 
     @NotNull
-    @Column(name = "sort_order", nullable = false)
+    @PositiveOrZero
+    @Column(nullable = false)
     @Builder.Default
-    private Integer sortOrder = 0;
+    private Integer cost = 1;
+
+    @Column(name = "starts_at")
+    private OffsetDateTime startsAt;
+
+    @Column(name = "ends_at")
+    private OffsetDateTime endsAt;
 
     @NotNull
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;
+
+    /** Forward-compat hedge; not yet wired to any FK or query. */
+    @Column(name = "site_id")
+    private UUID siteId;
+
+    @NotNull
+    @Column(name = "sort_order", nullable = false)
+    @Builder.Default
+    private Integer sortOrder = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
