@@ -27,7 +27,7 @@ export function LootboxHeader({
       <div className="flex flex-wrap items-center gap-3.5">
         <CoinBalanceBadge balance={balance} />
         <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          Season 01 · <span className="tabular-nums">{openedToday}</span> opened today
+          <span className="tabular-nums">{openedToday}</span> opened today
         </span>
       </div>
 

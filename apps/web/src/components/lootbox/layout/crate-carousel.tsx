@@ -144,7 +144,7 @@ function CarouselArrow({
       disabled={disabled}
       aria-label={direction === "prev" ? "Previous crate" : "Next crate"}
       className={cn(
-        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-opacity",
+        "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-card text-foreground transition-opacity",
         "hover:bg-card/80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-card"
       )}
     >

@@ -37,7 +37,7 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
           className="inline-block h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: "#a87bff", boxShadow: "0 0 8px #a87bff" }}
         />
-        Live · team drops
+        Crate Opens
       </div>
 
       <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
@@ -50,9 +50,6 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
         )}
       </div>
 
-      <div className="shrink-0 font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
-        Last {drops?.length ?? 0} drops
-      </div>
     </div>
   );
 }

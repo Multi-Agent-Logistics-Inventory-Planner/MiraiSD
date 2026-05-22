@@ -64,7 +64,7 @@ export function CratePrizesSection({ tiers }: CratePrizesSectionProps) {
 
       {tiers.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-6 text-center text-[13px] text-muted-foreground">
-          No tiers configured yet. Add tiers (via the legacy admin) before adding prizes.
+          No tiers yet. Create a tier above, then add prizes.
         </p>
       ) : totalPrizes === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-6 text-center text-[13px] text-muted-foreground">

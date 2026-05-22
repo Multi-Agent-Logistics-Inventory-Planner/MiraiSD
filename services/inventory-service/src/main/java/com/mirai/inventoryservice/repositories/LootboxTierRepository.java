@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,12 @@ public interface LootboxTierRepository extends JpaRepository<LootboxTier, UUID> 
     Optional<LootboxTier> findByLootboxIdAndName(UUID lootboxId, String name);
 
     List<LootboxTier> findByLootboxIdOrderBySortOrderAscNameAsc(UUID lootboxId);
+
+    /**
+     * Batch lookup for the admin "list crates" path so a single query loads tiers across
+     * many crates instead of one-per-crate.
+     */
+    List<LootboxTier> findByLootboxIdInOrderBySortOrderAscNameAsc(Collection<UUID> lootboxIds);
 
     List<LootboxTier> findAllByOrderBySortOrderAscNameAsc();
 

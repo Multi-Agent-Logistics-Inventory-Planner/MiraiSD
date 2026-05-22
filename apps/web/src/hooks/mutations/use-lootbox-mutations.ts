@@ -1,6 +1,10 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type QueryKey,
+} from "@tanstack/react-query";
 import {
   adjustCoins,
   bulkUpdateTierProbabilities,
@@ -34,20 +38,31 @@ import type {
 } from "@/types/lootbox";
 import { lootboxKeys } from "@/hooks/queries/use-lootbox";
 
-function invalidateAllLootbox(qc: ReturnType<typeof useQueryClient>) {
-  return qc.invalidateQueries({ queryKey: ["lootbox"] });
-}
+type QC = ReturnType<typeof useQueryClient>;
+
+const invalidate = (qc: QC, keys: readonly QueryKey[]) =>
+  Promise.all(keys.map((key) => qc.invalidateQueries({ queryKey: key })));
+
+// Crates/tiers/prizes all alter the admin catalog (full tree), the admin crate-list
+// rail (tier/prize counts), and the player-facing catalog (visible tiers/prizes).
+// Centralised so the three mutation families don't drift apart.
+const CATALOG_KEYS: readonly QueryKey[] = [
+  lootboxKeys.adminCatalog,
+  lootboxKeys.catalog,
+  lootboxKeys.adminCrates,
+];
 
 export function usePlayLootboxMutation() {
   const qc = useQueryClient();
   return useMutation<PlayLootboxResponse, Error, { crateId: string }>({
     mutationFn: ({ crateId }) => playLootbox(crateId),
     onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: lootboxKeys.balance }),
-        qc.invalidateQueries({ queryKey: lootboxKeys.myPrizes }),
-        qc.invalidateQueries({ queryKey: lootboxKeys.myHistory }),
-        qc.invalidateQueries({ queryKey: ["lootbox", "recent"] }),
+      await invalidate(qc, [
+        lootboxKeys.balance,
+        lootboxKeys.walletBreakdown,
+        lootboxKeys.myPrizes,
+        lootboxKeys.myHistory,
+        ["lootbox", "recent"],
       ]);
     },
   });
@@ -58,7 +73,7 @@ export function useCreateCrateMutation() {
   return useMutation<LootboxAdmin, Error, UpsertLootboxRequest>({
     mutationFn: (body) => createCrate(body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -68,7 +83,7 @@ export function useUpdateCrateMutation() {
   return useMutation<LootboxAdmin, Error, { id: string; body: UpsertLootboxRequest }>({
     mutationFn: ({ id, body }) => updateCrate(id, body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -78,7 +93,7 @@ export function useDeleteCrateMutation() {
   return useMutation<void, Error, { id: string }>({
     mutationFn: ({ id }) => deleteCrate(id),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -87,8 +102,13 @@ export function useMarkRedeemedMutation() {
   const qc = useQueryClient();
   return useMutation<LootboxPlay, Error, { playId: string }>({
     mutationFn: ({ playId }) => markRedeemed(playId),
-    onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+    onSuccess: async (data) => {
+      // Pending queue shrinks; the redeemed user's admin profile now shows the
+      // prize as redeemed. Prefix invalidation hits every cached `pending(page,size)` key.
+      await invalidate(qc, [
+        ["lootbox", "admin", "pending"],
+        lootboxKeys.userProfile(data.userId),
+      ]);
     },
   });
 }
@@ -97,8 +117,16 @@ export function useAdjustCoinsMutation() {
   const qc = useQueryClient();
   return useMutation<CoinAdjustment, Error, CoinAdjustmentRequest>({
     mutationFn: (body) => adjustCoins(body),
-    onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+    onSuccess: async (_data, variables) => {
+      // The target user's admin profile is the primary view that changes.
+      // balance/walletBreakdown/myHistory are the admin's own caches — only matter
+      // if the admin is adjusting themselves, but cheap insurance to invalidate them.
+      await invalidate(qc, [
+        lootboxKeys.userProfile(variables.userId),
+        lootboxKeys.balance,
+        lootboxKeys.walletBreakdown,
+        lootboxKeys.myHistory,
+      ]);
     },
   });
 }
@@ -108,7 +136,7 @@ export function useCreateTierMutation() {
   return useMutation<LootboxTier, Error, UpsertTierRequest>({
     mutationFn: (body) => createTier(body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -118,7 +146,7 @@ export function useUpdateTierMutation() {
   return useMutation<LootboxTier, Error, { id: string; body: UpsertTierRequest }>({
     mutationFn: ({ id, body }) => updateTier(id, body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -128,7 +156,7 @@ export function useBulkUpdateTierProbabilitiesMutation() {
   return useMutation<LootboxTier[], Error, BulkUpdateTierProbabilitiesRequest>({
     mutationFn: (body) => bulkUpdateTierProbabilities(body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -138,7 +166,7 @@ export function useDeleteTierMutation() {
   return useMutation<void, Error, { id: string }>({
     mutationFn: ({ id }) => deleteTier(id),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -148,7 +176,7 @@ export function useCreatePrizeMutation() {
   return useMutation<LootboxPrize, Error, UpsertPrizeRequest>({
     mutationFn: (body) => createPrize(body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -158,7 +186,7 @@ export function useUpdatePrizeMutation() {
   return useMutation<LootboxPrize, Error, { id: string; body: UpsertPrizeRequest }>({
     mutationFn: ({ id, body }) => updatePrize(id, body),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }
@@ -168,7 +196,7 @@ export function useDeletePrizeMutation() {
   return useMutation<void, Error, { id: string }>({
     mutationFn: ({ id }) => deletePrize(id),
     onSuccess: async () => {
-      await invalidateAllLootbox(qc);
+      await invalidate(qc, CATALOG_KEYS);
     },
   });
 }

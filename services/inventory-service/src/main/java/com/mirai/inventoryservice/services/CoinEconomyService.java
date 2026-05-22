@@ -2,11 +2,8 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.LootboxException;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
-import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.CoinEconomyConfigRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -15,14 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * Reads and writes the singleton coin-economy config. The setter persists the
- * change AND inserts an audit_logs entry (reason = COIN_RATE_CHANGED) so admins
- * can see who flipped the rate and when — no parallel history table needed.
+ * Reads and writes the singleton coin-economy config. The "who changed it and
+ * when" is captured on the config row itself (updated_by + updated_at); we
+ * intentionally do not emit an audit_logs entry — coin-rate adjustments aren't
+ * meaningful to the main inventory audit feed.
  *
  * Mid-batch rate changes are not a concern in Java (single SELECT per balance
  * compute is fine); the Python messaging-service is the only place that
@@ -34,7 +30,6 @@ import java.util.UUID;
 public class CoinEconomyService {
 
     private final CoinEconomyConfigRepository coinEconomyConfigRepository;
-    private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
 
     /** Returns the current review-to-coin rate. */
@@ -50,8 +45,8 @@ public class CoinEconomyService {
     }
 
     /**
-     * Update the review-to-coin rate. Writes an audit_logs row capturing the
-     * before/after value in field_changes and bumps updated_at + updated_by.
+     * Update the review-to-coin rate. Persists the new value plus updated_by /
+     * updated_at on the singleton row.
      */
     @Transactional
     public CoinEconomyConfig setReviewRate(int newRate, UUID updatedByUserId) {
@@ -69,22 +64,6 @@ public class CoinEconomyService {
         config.setReviewCoinRate(newRate);
         config.setUpdatedBy(admin);
         coinEconomyConfigRepository.save(config);
-
-        List<Map<String, Object>> fieldChanges = List.of(Map.of(
-                "field", "review_coin_rate",
-                "previous", previousRate,
-                "new", newRate
-        ));
-        AuditLog entry = AuditLog.builder()
-                .user(admin)
-                .actorName(admin.getFullName())
-                .reason(StockMovementReason.COIN_RATE_CHANGED)
-                .itemCount(0)
-                .totalQuantityMoved(0)
-                .productSummary("Review coin rate: " + previousRate + " -> " + newRate)
-                .fieldChanges(fieldChanges)
-                .build();
-        auditLogRepository.save(entry);
 
         log.info("Coin rate changed by user {} ({}): {} -> {}",
                 admin.getId(), admin.getFullName(), previousRate, newRate);

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +33,7 @@ import {
   useBulkUpdateTierProbabilitiesMutation,
   useCreateCrateMutation,
   useDeleteCrateMutation,
+  useDeleteTierMutation,
   useUpdateCrateMutation,
 } from "@/hooks/mutations/use-lootbox-mutations";
 import { CrateListRail } from "@/components/lootbox/admin/crates/crate-list-rail";
@@ -40,6 +41,7 @@ import {
   TierWeightsEditor,
   tierWeightSum,
 } from "@/components/lootbox/admin/crates/tier-weights-editor";
+import { NewTierSheet } from "@/components/lootbox/admin/crates/new-tier-sheet";
 import { CratePrizesSection } from "@/components/lootbox/admin/crates/crate-prizes-section";
 import { TimePickerButton } from "@/components/lootbox/admin/crates/time-picker-button";
 import type { Lootbox, LootboxAdmin, LootboxTier } from "@/types/lootbox";
@@ -97,7 +99,16 @@ export function CratesAndPrizesTab() {
 
   const activeAdmin = crates.find((c) => c.id === activeCrateId) ?? null;
   const activeCatalog = catalog.find((c) => c.id === activeCrateId) ?? null;
-  const activeTiers: readonly LootboxTier[] = activeCatalog?.tiers ?? [];
+  // Soft-deleted tiers/prizes (active=false) stay in the DB for past-play snapshot
+  // integrity, but the admin view treats them as gone. Filter them out at the
+  // source so every downstream count/list reflects "what's actually live".
+  const activeTiers: readonly LootboxTier[] = useMemo(
+    () =>
+      (activeCatalog?.tiers ?? [])
+        .filter((t) => t.active)
+        .map((t) => ({ ...t, prizes: t.prizes.filter((p) => p.active) })),
+    [activeCatalog]
+  );
 
   const createMut = useCreateCrateMutation();
   const handleNew = async () => {
@@ -164,6 +175,9 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
   const [endsTime, setEndsTime] = useState<string>(initialEnds.time);
   const [weightEdits, setWeightEdits] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isAddingTier, setIsAddingTier] = useState(false);
+  const [tierPendingDelete, setTierPendingDelete] =
+    useState<LootboxTier | null>(null);
 
   const weightSum = tierWeightSum(tiers, weightEdits);
   const weightSumOk = Math.abs(weightSum - 100) < 0.05;
@@ -171,6 +185,32 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
   const updateMut = useUpdateCrateMutation();
   const deleteMut = useDeleteCrateMutation();
   const bulkUpdateWeights = useBulkUpdateTierProbabilitiesMutation();
+  const deleteTierMut = useDeleteTierMutation();
+
+  const deleteDisabledTierIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tiers) {
+      if (t.prizes.some((p) => p.active)) set.add(t.id);
+    }
+    if (deleteTierMut.isPending && tierPendingDelete) {
+      set.add(tierPendingDelete.id);
+    }
+    return set;
+  }, [tiers, deleteTierMut.isPending, tierPendingDelete]);
+
+  const handleDeleteTier = async () => {
+    if (!tierPendingDelete) return;
+    const tier = tierPendingDelete;
+    try {
+      await deleteTierMut.mutateAsync({ id: tier.id });
+      toast({ title: `Deleted tier "${tier.name}".`, variant: "success" });
+      setTierPendingDelete(null);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete tier.";
+      toast({ title: "Couldn't delete tier", description: message });
+    }
+  };
 
   const trimmedName = name.trim();
   const numericCost = Number.parseInt(cost, 10);
@@ -356,17 +396,44 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
             ) : null}
           </Section>
 
-          {tiers.length > 0 ? (
-            <TierWeightsEditor
-              tiers={tiers}
-              edits={weightEdits}
-              onEditsChange={setWeightEdits}
-            />
-          ) : (
-            <p className="rounded-xl border border-dashed border-border p-4 text-[13px] text-muted-foreground">
-              No tiers defined for this crate yet.
-            </p>
-          )}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
+                Tiers · <span className="tabular-nums">{tiers.length}</span>
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddingTier(true)}
+                disabled={isAddingTier}
+              >
+                <Plus className="h-4 w-4" />
+                Add tier
+              </Button>
+            </div>
+
+            {isAddingTier ? (
+              <NewTierSheet
+                lootboxId={admin.id}
+                existingTiers={tiers}
+                onClose={() => setIsAddingTier(false)}
+              />
+            ) : null}
+
+            {tiers.length > 0 ? (
+              <TierWeightsEditor
+                tiers={tiers}
+                edits={weightEdits}
+                onEditsChange={setWeightEdits}
+                onDeleteTier={setTierPendingDelete}
+                deleteDisabledFor={deleteDisabledTierIds}
+              />
+            ) : (
+              <p className="rounded-xl border border-dashed border-border p-4 text-[13px] text-muted-foreground">
+                No tiers yet. Click <span className="font-medium">Add tier</span> to create one.
+              </p>
+            )}
+          </div>
 
           <CratePrizesSection tiers={tiers} />
         </div>
@@ -420,6 +487,38 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
               className="bg-rose-500 text-white hover:bg-rose-500/90"
             >
               {deleteMut.isPending ? "Deleting…" : "Delete crate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={tierPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTierPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete tier {tierPendingDelete?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The tier is deactivated and its weight redistributed across the
+              remaining active tiers. Prizes in this tier stay on record but
+              become unavailable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTierMut.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTier}
+              disabled={deleteTierMut.isPending}
+              className="bg-rose-500 text-white hover:bg-rose-500/90"
+            >
+              {deleteTierMut.isPending ? "Deleting…" : "Delete tier"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -18,7 +18,6 @@ import { DropsTicker } from "@/components/lootbox/layout/drops-ticker";
 import { HeroZone } from "@/components/lootbox/layout/hero-zone";
 import { PrizeGrid } from "@/components/lootbox/layout/prize-grid";
 import { MyPrizesList } from "@/components/lootbox/my-prizes-list";
-import { CoinHistoryPanel } from "@/components/lootbox/coin-history-panel";
 import { AdminModal } from "@/components/lootbox/admin/admin-modal";
 import {
   REEL_DIM_DESKTOP,
@@ -29,7 +28,7 @@ import type { Lootbox, LootboxPlay, LootboxPrize } from "@/types/lootbox";
 
 const REEL_SPIN_MS = 5600;
 
-type LootboxTab = "pool" | "mine" | "history";
+type LootboxTab = "pool" | "mine";
 
 function useIsDesktop(): boolean {
   const [isDesktop, setIsDesktop] = useState(true);
@@ -234,7 +233,6 @@ export function TabLootbox() {
         <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-border bg-transparent p-0 text-muted-foreground dark:bg-transparent">
           <LootboxTabTrigger value="pool">Prize pool</LootboxTabTrigger>
           <LootboxTabTrigger value="mine">My prizes</LootboxTabTrigger>
-          <LootboxTabTrigger value="history">Coin history</LootboxTabTrigger>
         </TabsList>
         <TabsContent value="pool" className="mt-6">
           <PrizeGrid
@@ -244,9 +242,6 @@ export function TabLootbox() {
         </TabsContent>
         <TabsContent value="mine" className="mt-6">
           <MyPrizesList prizes={prizesQuery.data} isLoading={prizesQuery.isLoading} />
-        </TabsContent>
-        <TabsContent value="history" className="mt-6">
-          <CoinHistoryPanel history={historyQuery.data} isLoading={historyQuery.isLoading} />
         </TabsContent>
       </Tabs>
 

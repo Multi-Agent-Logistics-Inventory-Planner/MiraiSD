@@ -71,20 +71,19 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
     List<Object[]> getAllTimeTotalsByUser();
 
     /**
-     * Lifetime coins granted from review credits for a user, regardless of expiry.
+     * Combined lifetime + expired review-credit sums in one round-trip, for
+     * `LootboxService.computeBalance`. Returns a single-row list of
+     * `[totalAwarded: Long, expiredAwarded: Long]`. Wrapped in `List<Object[]>` to match
+     * how Hibernate hands back multi-column aggregate projections in this codebase
+     * (see `getAllTimeStatsByUser`).
      * Sums coins_awarded (immutable per row) so rate changes never re-price history.
      */
-    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0) " +
+    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0), " +
+            "COALESCE(SUM(CASE WHEN c.expiresAt <= :today THEN c.coinsAwarded ELSE 0 END), 0) " +
             "FROM ReviewDailyCount c " +
             "WHERE c.user.id = :userId")
-    long sumCoinsAwardedByUserId(@Param("userId") UUID userId);
-
-    /** Sum of coins_awarded whose expires_at is at or before `today` — the "expired" pool. */
-    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0) " +
-            "FROM ReviewDailyCount c " +
-            "WHERE c.user.id = :userId AND c.expiresAt <= :today")
-    long sumExpiredCoinsAwardedByUserId(@Param("userId") UUID userId,
-                                        @Param("today") LocalDate today);
+    List<Object[]> sumCoinTotalsByUserId(@Param("userId") UUID userId,
+                                         @Param("today") LocalDate today);
 
     /**
      * Daily review credit rows for the user's history view (newest first), every row

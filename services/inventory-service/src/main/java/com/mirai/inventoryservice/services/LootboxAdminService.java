@@ -37,8 +37,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Admin operations: crate CRUD, tier/prize CRUD with per-crate sum-to-100 invariant +
@@ -70,7 +74,44 @@ public class LootboxAdminService {
     @Transactional(readOnly = true)
     public List<LootboxAdminResponseDTO> listCrates() {
         List<Lootbox> crates = lootboxRepository.findAllByOrderBySortOrderAscNameAsc();
-        return crates.stream().map(this::toCrateAdminDto).toList();
+        if (crates.isEmpty()) return List.of();
+
+        // Batch: one query for all tiers across all crates, one grouped-count query for
+        // their active prizes. Replaces a 1 + C + C*T pattern with 1 + 1 + 1.
+        List<UUID> crateIds = crates.stream().map(Lootbox::getId).toList();
+        List<LootboxTier> allTiers = lootboxTierRepository
+                .findByLootboxIdInOrderBySortOrderAscNameAsc(crateIds);
+        Map<UUID, List<LootboxTier>> tiersByCrate = allTiers.stream()
+                .collect(Collectors.groupingBy(LootboxTier::getLootboxId));
+        Map<UUID, Long> prizeCountByTier = activePrizeCountsByTierId(allTiers);
+
+        return crates.stream()
+                .map(c -> toCrateAdminDto(
+                        c,
+                        tiersByCrate.getOrDefault(c.getId(), List.of()),
+                        prizeCountByTier))
+                .toList();
+    }
+
+    /**
+     * Single-crate convenience for create/update paths: loads the crate's tiers + grouped
+     * active-prize counts in two queries, then delegates. Same shape as `listCrates`
+     * scaled down — kept here so the per-crate paths don't drift back to the N+1 pattern.
+     */
+    private LootboxAdminResponseDTO toCrateAdminDto(Lootbox crate) {
+        List<LootboxTier> tiers = lootboxTierRepository
+                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+        return toCrateAdminDto(crate, tiers, activePrizeCountsByTierId(tiers));
+    }
+
+    private Map<UUID, Long> activePrizeCountsByTierId(List<LootboxTier> tiers) {
+        if (tiers.isEmpty()) return Collections.emptyMap();
+        List<UUID> tierIds = tiers.stream().map(LootboxTier::getId).toList();
+        Map<UUID, Long> counts = new HashMap<>();
+        for (Object[] row : lootboxPrizeRepository.countActiveGroupedByTierIds(tierIds)) {
+            counts.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        return counts;
     }
 
     @Transactional
@@ -370,8 +411,21 @@ public class LootboxAdminService {
 
     @Transactional(readOnly = true)
     public Page<LootboxPlayResponseDTO> getPendingRedemptions(Pageable pageable) {
+        return getPlaysByStatus("WON", pageable);
+    }
+
+    /**
+     * Paginated plays by status. Powers the redemption queue's Pending vs Redeemed
+     * tabs; reject any value outside the documented set so a typo'd query param
+     * doesn't silently return zero rows.
+     */
+    @Transactional(readOnly = true)
+    public Page<LootboxPlayResponseDTO> getPlaysByStatus(String status, Pageable pageable) {
+        if (!"WON".equals(status) && !"REDEEMED".equals(status)) {
+            throw new LootboxException("Unsupported status: " + status);
+        }
         return lootboxPlayRepository
-                .findByStatusOrderByPlayedAtDesc("WON", pageable)
+                .findByStatusOrderByPlayedAtDesc(status, pageable)
                 .map(LootboxService::toPlayDto);
     }
 
@@ -465,13 +519,13 @@ public class LootboxAdminService {
                 .build();
     }
 
-    private LootboxAdminResponseDTO toCrateAdminDto(Lootbox crate) {
-        List<LootboxTier> tiers = lootboxTierRepository
-                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
-        int tierCount = tiers.size();
+    private LootboxAdminResponseDTO toCrateAdminDto(
+            Lootbox crate,
+            List<LootboxTier> tiers,
+            Map<UUID, Long> prizeCountByTier) {
         int prizeCount = 0;
         for (LootboxTier t : tiers) {
-            prizeCount += lootboxPrizeRepository.findActiveByTierId(t.getId()).size();
+            prizeCount += prizeCountByTier.getOrDefault(t.getId(), 0L).intValue();
         }
         return LootboxAdminResponseDTO.builder()
                 .id(crate.getId())
@@ -484,7 +538,7 @@ public class LootboxAdminService {
                 .active(crate.getActive())
                 .siteId(crate.getSiteId())
                 .sortOrder(crate.getSortOrder())
-                .tierCount(tierCount)
+                .tierCount(tiers.size())
                 .prizeCount(prizeCount)
                 .createdAt(crate.getCreatedAt())
                 .updatedAt(crate.getUpdatedAt())

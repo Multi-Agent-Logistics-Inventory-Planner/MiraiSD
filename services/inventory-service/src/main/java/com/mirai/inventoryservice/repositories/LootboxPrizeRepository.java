@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +18,16 @@ public interface LootboxPrizeRepository extends JpaRepository<LootboxPrize, UUID
 
     @Query("SELECT COUNT(p) FROM LootboxPrize p WHERE p.tier.id = :tierId AND p.active = true")
     long countActiveByTierId(@Param("tierId") UUID tierId);
+
+    /**
+     * Batched active-prize count per tier — pairs with `findByLootboxIdIn...` to populate
+     * the admin "list crates" view without one COUNT query per tier. Returns rows of
+     * `[tierId: UUID, count: Long]`; tiers with zero active prizes are absent.
+     */
+    @Query("SELECT p.tier.id, COUNT(p) FROM LootboxPrize p " +
+            "WHERE p.tier.id IN :tierIds AND p.active = true " +
+            "GROUP BY p.tier.id")
+    List<Object[]> countActiveGroupedByTierIds(@Param("tierIds") Collection<UUID> tierIds);
 
     @Query("""
             SELECT p FROM LootboxPrize p

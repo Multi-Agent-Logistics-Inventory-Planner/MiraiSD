@@ -32,7 +32,7 @@ export function CrateListRail({
           type="button"
           onClick={onNew}
           disabled={isCreating}
-          className="inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-brand-primary transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-brand-primary transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-3 w-3" />
           New
@@ -57,7 +57,7 @@ export function CrateListRail({
               type="button"
               onClick={() => onSelect(c.id)}
               className={cn(
-                "rounded-lg border px-3 py-2.5 text-left transition-colors",
+                "cursor-pointer rounded-lg border px-3 py-2.5 text-left transition-colors",
                 c.id === activeCrateId
                   ? "border-brand-primary/30 bg-brand-primary/10"
                   : "border-transparent bg-transparent hover:bg-card/60",

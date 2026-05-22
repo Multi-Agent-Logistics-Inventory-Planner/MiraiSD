@@ -131,9 +131,12 @@ export function deletePrize(id: string): Promise<void> {
 
 export function getPendingRedemptions(
   page = 0,
-  size = 20
+  size = 20,
+  status: "WON" | "REDEEMED" = "WON"
 ): Promise<PageResponse<LootboxPlay>> {
-  return apiGet<PageResponse<LootboxPlay>>(`${ADMIN}/pending?page=${page}&size=${size}`);
+  return apiGet<PageResponse<LootboxPlay>>(
+    `${ADMIN}/pending?page=${page}&size=${size}&status=${status}`
+  );
 }
 
 export function markRedeemed(playId: string): Promise<LootboxPlay> {

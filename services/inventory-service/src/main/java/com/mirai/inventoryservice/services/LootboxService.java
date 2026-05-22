@@ -26,6 +26,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,13 +82,19 @@ public class LootboxService {
      */
     @Transactional(readOnly = true)
     public BalanceBreakdown computeBalance(UUID userId) {
-        // Sums coins_awarded (locked in per row at write time) so rate changes
-        // never retroactively re-price already-earned credits.
-        long totalReviewCredits = reviewDailyCountRepository.sumCoinsAwardedByUserId(userId);
-        long totalAdjustments   = coinAdjustmentRepository.sumDeltaByUserId(userId);
+        // 3 round-trips: combined lifetime+expired sums per source, then the spent sum.
+        // Sums coins_awarded (locked in per row at write time) so rate changes never
+        // retroactively re-price already-earned credits.
+        Object[] reviewTotals = firstRow(
+                reviewDailyCountRepository.sumCoinTotalsByUserId(userId, LocalDate.now()));
+        Object[] adjustmentTotals = firstRow(
+                coinAdjustmentRepository.sumAdjustmentTotalsByUserId(userId, OffsetDateTime.now()));
+
+        long totalReviewCredits = ((Number) reviewTotals[0]).longValue();
+        long expiredReview      = ((Number) reviewTotals[1]).longValue();
+        long totalAdjustments   = ((Number) adjustmentTotals[0]).longValue();
+        long expiredAdjustments = ((Number) adjustmentTotals[1]).longValue();
         long totalSpent         = lootboxPlayRepository.sumCostByUserId(userId);
-        long expiredReview      = reviewDailyCountRepository.sumExpiredCoinsAwardedByUserId(userId, LocalDate.now());
-        long expiredAdjustments = coinAdjustmentRepository.sumExpiredDeltaByUserId(userId, OffsetDateTime.now());
 
         long totalEarned  = totalReviewCredits + totalAdjustments;
         long totalExpired = expiredReview + expiredAdjustments;
@@ -95,6 +102,11 @@ public class LootboxService {
         long balance      = Math.max(0L, raw);
 
         return new BalanceBreakdown(balance, totalReviewCredits, totalAdjustments, totalSpent, totalExpired);
+    }
+
+    /** COALESCE in the query guarantees a row, but defend against an empty result anyway. */
+    private static Object[] firstRow(List<Object[]> rows) {
+        return rows.isEmpty() ? new Object[]{0L, 0L} : rows.get(0);
     }
 
     /**
@@ -220,8 +232,13 @@ public class LootboxService {
         Map<UUID, List<LootboxPrize>> prizesByTier = activePrizes.stream()
                 .collect(Collectors.groupingBy(p -> p.getTier().getId()));
 
+        Map<UUID, List<LootboxTier>> tiersByCrate = loadTiersByCrate(open);
+
         return open.stream()
-                .map(crate -> toLootboxDto(crate, prizesByTier))
+                .map(crate -> toLootboxDto(
+                        crate,
+                        tiersByCrate.getOrDefault(crate.getId(), List.of()),
+                        prizesByTier))
                 .toList();
     }
 
@@ -238,15 +255,28 @@ public class LootboxService {
         Map<UUID, List<LootboxPrize>> prizesByTier = allPrizes.stream()
                 .collect(Collectors.groupingBy(p -> p.getTier().getId()));
 
+        Map<UUID, List<LootboxTier>> tiersByCrate = loadTiersByCrate(all);
+
         return all.stream()
-                .map(crate -> toAdminLootboxDto(crate, prizesByTier))
+                .map(crate -> toAdminLootboxDto(
+                        crate,
+                        tiersByCrate.getOrDefault(crate.getId(), List.of()),
+                        prizesByTier))
                 .toList();
     }
 
+    private Map<UUID, List<LootboxTier>> loadTiersByCrate(List<Lootbox> crates) {
+        List<UUID> crateIds = crates.stream().map(Lootbox::getId).toList();
+        return lootboxTierRepository
+                .findByLootboxIdInOrderBySortOrderAscNameAsc(crateIds).stream()
+                .collect(Collectors.groupingBy(LootboxTier::getLootboxId));
+    }
+
     /** Admin variant: shows ALL tiers and ALL prizes (no active filter). */
-    public LootboxResponseDTO toAdminLootboxDto(Lootbox crate, Map<UUID, List<LootboxPrize>> prizesByTier) {
-        List<LootboxTier> tiers = lootboxTierRepository
-                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+    public LootboxResponseDTO toAdminLootboxDto(
+            Lootbox crate,
+            List<LootboxTier> tiers,
+            Map<UUID, List<LootboxPrize>> prizesByTier) {
         List<LootboxTierResponseDTO> tierDtos = tiers.stream()
                 .map(t -> toTierDto(t, prizesByTier.getOrDefault(t.getId(), List.of())))
                 .toList();
@@ -376,8 +406,8 @@ public class LootboxService {
     @Transactional(readOnly = true)
     public List<RecentLootboxPlayResponseDTO> listRecentPlays(int limit) {
         int cap = Math.max(1, Math.min(limit, 50));
-        return lootboxPlayRepository.findTop50ByOrderByPlayedAtDesc().stream()
-                .limit(cap)
+        return lootboxPlayRepository
+                .findRecentPlaysWithAssociations(PageRequest.of(0, cap)).stream()
                 .map(LootboxService::toRecentPlayDto)
                 .toList();
     }
@@ -417,9 +447,10 @@ public class LootboxService {
      * Builds the player-facing crate DTO using a prebuilt map of active prizes by tier.
      * Tiers are filtered to active-only since this is the player view.
      */
-    public LootboxResponseDTO toLootboxDto(Lootbox crate, Map<UUID, List<LootboxPrize>> activePrizesByTier) {
-        List<LootboxTier> tiers = lootboxTierRepository
-                .findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId());
+    public LootboxResponseDTO toLootboxDto(
+            Lootbox crate,
+            List<LootboxTier> tiers,
+            Map<UUID, List<LootboxPrize>> activePrizesByTier) {
         List<LootboxTierResponseDTO> tierDtos = tiers.stream()
                 .filter(LootboxTier::getActive)
                 .map(t -> toTierDto(t, activePrizesByTier.getOrDefault(t.getId(), List.of())))

@@ -24,8 +24,8 @@ export const lootboxKeys = {
   myPrizes: ["lootbox", "my-prizes"] as const,
   myHistory: ["lootbox", "my-history"] as const,
   recent: (limit: number) => ["lootbox", "recent", limit] as const,
-  pending: (page: number, size: number) =>
-    ["lootbox", "admin", "pending", page, size] as const,
+  pending: (status: "WON" | "REDEEMED", page: number, size: number) =>
+    ["lootbox", "admin", "pending", status, page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
   coinEconomyConfig: ["lootbox", "admin", "coin-config"] as const,
 };
@@ -42,7 +42,7 @@ export function useLootboxAdminCrates() {
   return useQuery({
     queryKey: lootboxKeys.adminCrates,
     queryFn: listCrates,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -50,7 +50,7 @@ export function useLootboxBalance() {
   return useQuery({
     queryKey: lootboxKeys.balance,
     queryFn: getBalance,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -66,7 +66,7 @@ export function useLootboxAdminCatalog() {
   return useQuery({
     queryKey: lootboxKeys.adminCatalog,
     queryFn: getAdminCatalog,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -74,7 +74,7 @@ export function useMyPrizes() {
   return useQuery({
     queryKey: lootboxKeys.myPrizes,
     queryFn: getMyPrizes,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -82,23 +82,29 @@ export function useMyCoinHistory() {
   return useQuery({
     queryKey: lootboxKeys.myHistory,
     queryFn: getMyHistory,
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
 export function useRecentLootboxPlays(limit = 20) {
+  // No refetchInterval: usePlayLootboxMutation invalidates this key on every spin,
+  // and default focus/mount refetch (subject to the 60s staleness dedupe) surfaces
+  // other players' drops without a per-tab background poll.
   return useQuery({
     queryKey: lootboxKeys.recent(limit),
     queryFn: () => getRecentPlays(limit),
-    staleTime: 30 * 1000,
-    refetchInterval: 30 * 1000,
+    staleTime: 60 * 1000,
   });
 }
 
-export function useAdminPendingPrizes(page = 0, size = 20) {
+export function useAdminPendingPrizes(
+  page = 0,
+  size = 20,
+  status: "WON" | "REDEEMED" = "WON"
+) {
   return useQuery({
-    queryKey: lootboxKeys.pending(page, size),
-    queryFn: () => getPendingRedemptions(page, size),
+    queryKey: lootboxKeys.pending(status, page, size),
+    queryFn: () => getPendingRedemptions(page, size, status),
     staleTime: 30 * 1000,
   });
 }

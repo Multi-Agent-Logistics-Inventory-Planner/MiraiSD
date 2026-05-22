@@ -81,7 +81,7 @@ export function HeroZone(props: HeroZoneProps) {
             ? "Unboxing…"
             : phase === "won"
               ? "You won!"
-              : `Open Lootbox · ${cost} coin${cost === 1 ? "" : "s"}`;
+              : `Open · ${cost} coin${cost === 1 ? "" : "s"}`;
 
   const useGradientButton = !isEmpty && (canOpen || isOpening || phase !== "idle");
 
@@ -152,7 +152,7 @@ export function HeroZone(props: HeroZoneProps) {
           type="button"
           disabled={!canOpen}
           onClick={onOpen}
-          className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-3.5 text-[15px] font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:text-muted-foreground"
+          className="cursor-pointer inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-3.5 text-[15px] font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:text-muted-foreground"
           style={
             useGradientButton
               ? {

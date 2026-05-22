@@ -4,11 +4,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { useAdminPendingPrizes } from "@/hooks/queries/use-lootbox";
 import { useMarkRedeemedMutation } from "@/hooks/mutations/use-lootbox-mutations";
+import type { LootboxPlay } from "@/types/lootbox";
 
 const PAGE_SIZE = 10;
+
+type StatusTab = "WON" | "REDEEMED";
 
 function formatDate(value: string): string {
   try {
@@ -19,17 +23,23 @@ function formatDate(value: string): string {
 }
 
 /**
- * Lists pending prize redemptions with a paginated table. Lifted out of the
- * previous AdminRedemptionDialog so the same queue mechanic lives in the unified
- * admin modal's third tab.
+ * Two-tab redemption queue: Pending (status=WON, with a Mark-redeemed action) and
+ * Redeemed (status=REDEEMED, read-only with redeemer + timestamp). Same backend
+ * endpoint, parameterised by `status`.
  */
 export function RedemptionQueueTab() {
+  const [status, setStatus] = useState<StatusTab>("WON");
   const [page, setPage] = useState(0);
-  const pendingQuery = useAdminPendingPrizes(page, PAGE_SIZE);
+  const query = useAdminPendingPrizes(page, PAGE_SIZE, status);
   const redeemMutation = useMarkRedeemedMutation();
 
-  const rows = pendingQuery.data?.content ?? [];
-  const totalPages = pendingQuery.data?.totalPages ?? 0;
+  const rows = query.data?.content ?? [];
+  const totalPages = query.data?.totalPages ?? 0;
+
+  const handleStatusChange = (value: string) => {
+    setStatus(value as StatusTab);
+    setPage(0);
+  };
 
   const handleRedeem = async (playId: string) => {
     try {
@@ -41,18 +51,30 @@ export function RedemptionQueueTab() {
     }
   };
 
+  const emptyCopy =
+    status === "WON"
+      ? "No prizes are pending redemption."
+      : "No prizes have been redeemed yet.";
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-0.5">
         <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-          Pending redemptions
+          Redemption queue
         </span>
         <p className="text-[13px] text-muted-foreground">
-          Prizes won by team members waiting on you to hand them over.
+          Prizes won by team members — pending handover or already redeemed.
         </p>
       </div>
 
-      {pendingQuery.isLoading ? (
+      <Tabs value={status} onValueChange={handleStatusChange}>
+        <TabsList>
+          <TabsTrigger value="WON" className="cursor-pointer">Pending</TabsTrigger>
+          <TabsTrigger value="REDEEMED" className="cursor-pointer">Redeemed</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {query.isLoading ? (
         <div className="space-y-2">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
@@ -60,33 +82,18 @@ export function RedemptionQueueTab() {
         </div>
       ) : rows.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
-          No prizes are pending redemption.
+          {emptyCopy}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border bg-card/40">
           {rows.map((p) => (
-            <li
+            <PlayRow
               key={p.id}
-              className="flex items-center justify-between gap-3 px-4 py-3"
-            >
-              <div className="min-w-0 space-y-1">
-                <div className="truncate text-sm font-medium text-foreground">
-                  {p.userName}{" "}
-                  <span className="text-muted-foreground">won</span> {p.prizeName}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary">{p.prizeTierName}</Badge>
-                  <span className="font-mono">{formatDate(p.playedAt)}</span>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => handleRedeem(p.id)}
-                disabled={redeemMutation.isPending}
-              >
-                Mark redeemed
-              </Button>
-            </li>
+              play={p}
+              status={status}
+              onRedeem={handleRedeem}
+              redeemPending={redeemMutation.isPending}
+            />
           ))}
         </ul>
       )}
@@ -115,5 +122,49 @@ export function RedemptionQueueTab() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function PlayRow({
+  play,
+  status,
+  onRedeem,
+  redeemPending,
+}: {
+  readonly play: LootboxPlay;
+  readonly status: StatusTab;
+  readonly onRedeem: (playId: string) => void;
+  readonly redeemPending: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0 space-y-1">
+        <div className="truncate text-sm font-medium text-foreground">
+          {play.userName}{" "}
+          <span className="text-muted-foreground">won</span> {play.prizeName}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary">{play.prizeTierName}</Badge>
+          <span className="font-mono">{formatDate(play.playedAt)}</span>
+          {status === "REDEEMED" && play.redeemedAt ? (
+            <span className="font-mono">
+              · Redeemed by {play.redeemedByName ?? "admin"} on{" "}
+              {formatDate(play.redeemedAt)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {status === "WON" ? (
+        <Button
+          size="sm"
+          onClick={() => onRedeem(play.id)}
+          disabled={redeemPending}
+        >
+          Mark redeemed
+        </Button>
+      ) : (
+        <Badge variant="secondary">Redeemed</Badge>
+      )}
+    </li>
   );
 }

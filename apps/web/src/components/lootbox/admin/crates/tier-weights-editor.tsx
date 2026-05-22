@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import type { LootboxTier } from "@/types/lootbox";
@@ -9,6 +10,10 @@ interface TierWeightsEditorProps {
   /** Externally-controlled override map: tier.id → percentage string. */
   readonly edits: Readonly<Record<string, string>>;
   readonly onEditsChange: (edits: Record<string, string>) => void;
+  /** Renders a delete button per row when provided. Parent owns the confirm + mutation. */
+  readonly onDeleteTier?: (tier: LootboxTier) => void;
+  /** Disables the delete button for tiers whose id appears here (e.g. has active prizes, mutation pending). */
+  readonly deleteDisabledFor?: ReadonlySet<string>;
 }
 
 export function tierWeightSum(
@@ -30,6 +35,8 @@ export function TierWeightsEditor({
   tiers,
   edits,
   onEditsChange,
+  onDeleteTier,
+  deleteDisabledFor,
 }: TierWeightsEditorProps) {
   const valueFor = (t: LootboxTier) =>
     edits[t.id] ?? Number(t.probabilityPct).toFixed(2);
@@ -57,39 +64,63 @@ export function TierWeightsEditor({
         </span>
       </div>
       <ul className="space-y-2">
-        {tiers.map((t) => (
-          <li
-            key={t.id}
-            className="grid grid-cols-[120px_1fr_80px] items-center gap-3.5"
-          >
-            <span
-              className="inline-flex justify-center rounded-full px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.06em]"
-              style={{
-                backgroundColor: t.displayColor ?? "#8a8a93",
-                color: pickContrastText(t.displayColor),
-              }}
+        {tiers.map((t) => {
+          const deleteDisabled = deleteDisabledFor?.has(t.id) ?? false;
+          return (
+            <li
+              key={t.id}
+              className={cn(
+                "grid items-center gap-3.5",
+                onDeleteTier
+                  ? "grid-cols-[120px_1fr_70px_30px]"
+                  : "grid-cols-[120px_1fr_80px]"
+              )}
             >
-              {t.name}
-            </span>
-            <div className="relative">
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={valueFor(t)}
-                onChange={(e) => setEdit(t.id, e.target.value)}
-                className="pr-7 font-mono tabular-nums"
-              />
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] text-muted-foreground">
-                %
+              <span
+                className="inline-flex justify-center rounded-full px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.06em]"
+                style={{
+                  backgroundColor: t.displayColor ?? "#8a8a93",
+                  color: pickContrastText(t.displayColor),
+                }}
+              >
+                {t.name}
               </span>
-            </div>
-            <span className="text-right font-mono text-[11px] text-muted-foreground">
-              {t.prizes.length} prize{t.prizes.length === 1 ? "" : "s"}
-            </span>
-          </li>
-        ))}
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={valueFor(t)}
+                  onChange={(e) => setEdit(t.id, e.target.value)}
+                  className="pr-7 font-mono tabular-nums"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] text-muted-foreground">
+                  %
+                </span>
+              </div>
+              <span className="text-right font-mono text-[11px] text-muted-foreground">
+                {t.prizes.length} prize{t.prizes.length === 1 ? "" : "s"}
+              </span>
+              {onDeleteTier ? (
+                <button
+                  type="button"
+                  onClick={() => onDeleteTier(t)}
+                  disabled={deleteDisabled}
+                  aria-label={`Delete tier ${t.name}`}
+                  title={
+                    deleteDisabled
+                      ? "Deactivate this tier's prizes before deleting."
+                      : `Delete tier ${t.name}`
+                  }
+                  className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-card/80 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
