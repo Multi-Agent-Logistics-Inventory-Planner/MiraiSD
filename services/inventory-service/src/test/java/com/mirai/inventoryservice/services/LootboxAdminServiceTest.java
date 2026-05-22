@@ -32,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -218,6 +220,75 @@ class LootboxAdminServiceTest {
         var dto = adminService.createCrate(new UpsertLootboxRequestDTO(
                 "Free Spin Crate", null, null, 0, null, null, true, null, 0));
         assertEquals(0, dto.cost());
+    }
+
+    // ----- Tier / Prize hard-delete (V45: FK CASCADE on tier_id, SET NULL on plays.prize_id) -----
+
+    @Test
+    @DisplayName("deleteTier hard-deletes the tier row (no soft-delete fallback)")
+    void deleteTierHardDeletes() {
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        lenient().when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId()))
+                .thenReturn(List.of(common, epic, legendary));
+
+        adminService.deleteTier(rare.getId());
+
+        verify(lootboxTierRepository).delete(rare);
+        verify(lootboxTierRepository, never()).save(rare);
+        assertTrue(rare.getActive(), "deleteTier should not flip active before delete — the row is going away");
+    }
+
+    @Test
+    @DisplayName("deleteTier no longer rejects tiers with active prizes (FK cascade handles it)")
+    void deleteTierAllowsTierWithActivePrizes() {
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        lenient().when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId()))
+                .thenReturn(List.of(common, epic, legendary));
+
+        adminService.deleteTier(rare.getId());
+
+        verify(lootboxTierRepository).delete(rare);
+    }
+
+    @Test
+    @DisplayName("deletePrize hard-deletes the prize row (no soft-delete fallback)")
+    void deletePrizeHardDeletes() {
+        LootboxPrize prize = LootboxPrize.builder()
+                .id(UUID.randomUUID())
+                .tier(rare)
+                .name("Coffee Voucher")
+                .active(true)
+                .build();
+        when(lootboxPrizeRepository.findById(prize.getId())).thenReturn(Optional.of(prize));
+        when(lootboxPrizeRepository.countActiveByTierId(rare.getId())).thenReturn(1L);
+
+        adminService.deletePrize(prize.getId());
+
+        verify(lootboxPrizeRepository).delete(prize);
+        verify(lootboxPrizeRepository, never()).save(prize);
+        assertTrue(prize.getActive(), "deletePrize should not flip active before delete — the row is going away");
+    }
+
+    @Test
+    @DisplayName("deletePrize deactivates its tier when no active prizes remain")
+    void deletePrizeDeactivatesEmptyTier() {
+        rare.setActive(true);
+        LootboxPrize prize = LootboxPrize.builder()
+                .id(UUID.randomUUID())
+                .tier(rare)
+                .name("Coffee Voucher")
+                .active(true)
+                .build();
+        when(lootboxPrizeRepository.findById(prize.getId())).thenReturn(Optional.of(prize));
+        when(lootboxPrizeRepository.countActiveByTierId(rare.getId())).thenReturn(0L);
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        lenient().when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId()))
+                .thenReturn(List.of(common, rare, epic, legendary));
+
+        adminService.deletePrize(prize.getId());
+
+        verify(lootboxPrizeRepository).delete(prize);
+        assertEquals(false, rare.getActive(), "tier with no active prizes should auto-deactivate");
     }
 
     @Test

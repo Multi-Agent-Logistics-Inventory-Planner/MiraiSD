@@ -50,9 +50,13 @@ public class LootboxPlay {
     @Builder.Default
     private Integer cost = 1;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prize_id", nullable = false)
+    // Flyway owns the FK (V46: ON DELETE SET NULL). NO_CONSTRAINT stops Hibernate's
+    // ddl-auto=update from recreating the constraint with default NO_ACTION semantics
+    // on dev restart, which silently breaks hard-delete of prizes.
+    @JoinColumn(
+            name = "prize_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     private LootboxPrize prize;
 

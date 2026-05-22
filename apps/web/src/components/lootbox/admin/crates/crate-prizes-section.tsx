@@ -105,7 +105,7 @@ function PrizeCard({
   const handleDelete = async () => {
     try {
       await deletePrize.mutateAsync({ id: prize.id });
-      toast({ title: `Deactivated ${prize.name}.`, variant: "success" });
+      toast({ title: `Deleted ${prize.name}.`, variant: "success" });
       setConfirmDelete(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete prize.";
@@ -137,8 +137,20 @@ function PrizeCard({
     );
   }
 
+  // A prize on a 0%-weight tier can't be rolled even if `prize.active` is true,
+  // so we surface that as "Inactive" at the row level: faded card + Inactive
+  // badge. The toggle still reflects the underlying `prize.active` flag, but
+  // when the tier is inactive the badge is non-interactive (re-activating the
+  // prize wouldn't change the effective state until the tier gets weight).
+  const tierInactive = !tier.active;
+  const effectivelyInactive = tierInactive || !prize.active;
   return (
-    <li className="rounded-xl border border-border bg-card/40 p-3.5">
+    <li
+      className={cn(
+        "rounded-xl border border-border bg-card/40 p-3.5",
+        effectivelyInactive && "opacity-65"
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <span
           className="inline-flex justify-center rounded-full px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.06em]"
@@ -168,14 +180,23 @@ function PrizeCard({
           <button
             type="button"
             onClick={handleToggleActive}
+            disabled={tierInactive}
+            title={
+              tierInactive
+                ? "Tier has 0% weight — give the tier probability before toggling prize state."
+                : prize.active
+                  ? "Click to deactivate this prize."
+                  : "Click to activate this prize."
+            }
             className={cn(
               "inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.06em] transition-colors",
-              prize.active
-                ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15"
-                : "bg-card text-muted-foreground hover:bg-card/80"
+              effectivelyInactive
+                ? "bg-card text-muted-foreground hover:bg-card/80"
+                : "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15",
+              tierInactive && "cursor-not-allowed"
             )}
           >
-            {prize.active ? "Active" : "Inactive"}
+            {effectivelyInactive ? "Inactive" : "Active"}
           </button>
           <button
             type="button"
@@ -201,8 +222,8 @@ function PrizeCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {prize.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The prize will be removed from this crate. Past wins still keep
-              their reference.
+              Permanently removes the prize from this crate. Past wins keep
+              their name and image from the snapshot taken at spin time.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

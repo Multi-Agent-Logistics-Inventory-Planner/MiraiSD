@@ -87,7 +87,10 @@ export function TabLootbox() {
         tierName: p.tierName ?? t.name,
       }))
     );
-    if (lastWin && !base.some((p) => p.id === lastWin.prizeId)) {
+    if (
+      lastWin?.prizeId &&
+      !base.some((p) => p.id === lastWin.prizeId)
+    ) {
       base.push({
         id: lastWin.prizeId,
         name: lastWin.prizeName,
@@ -169,7 +172,7 @@ export function TabLootbox() {
     try {
       const result = await playMutation.mutateAsync({ crateId: selectedCrate.id });
       setLastWin(result.play);
-      reel.open(result.play.prizeId);
+      if (result.play.prizeId) reel.open(result.play.prizeId);
     } catch (err) {
       reel.reset();
       const message = err instanceof Error ? err.message : "Failed to open lootbox.";

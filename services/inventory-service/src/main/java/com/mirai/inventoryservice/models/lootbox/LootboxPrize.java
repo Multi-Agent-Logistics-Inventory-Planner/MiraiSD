@@ -30,7 +30,13 @@ public class LootboxPrize {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tier_id", nullable = false)
+    // Flyway owns the FK (V46: ON DELETE CASCADE). NO_CONSTRAINT stops Hibernate's
+    // ddl-auto=update from recreating the constraint with default NO_ACTION semantics
+    // on dev restart, which silently breaks hard-delete of tiers.
+    @JoinColumn(
+            name = "tier_id",
+            nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     private LootboxTier tier;
 

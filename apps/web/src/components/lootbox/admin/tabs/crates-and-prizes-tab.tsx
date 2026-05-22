@@ -99,16 +99,19 @@ export function CratesAndPrizesTab() {
 
   const activeAdmin = crates.find((c) => c.id === activeCrateId) ?? null;
   const activeCatalog = catalog.find((c) => c.id === activeCrateId) ?? null;
-  // Soft-deleted tiers/prizes (active=false) stay in the DB for past-play snapshot
-  // integrity, but the admin view treats them as gone. Filter them out at the
-  // source so every downstream count/list reflects "what's actually live".
-  const activeTiers: readonly LootboxTier[] = useMemo(
-    () =>
-      (activeCatalog?.tiers ?? [])
-        .filter((t) => t.active)
-        .map((t) => ({ ...t, prizes: t.prizes.filter((p) => p.active) })),
-    [activeCatalog]
-  );
+  // Show every tier (and every prize within it), including ones the admin has parked
+  // at 0% / `active=false`. Inactive rows render faded with an "Inactive" badge so
+  // they can be reactivated (give weight + active prize) or hard-deleted from the
+  // same view — hiding them used to be safe because they couldn't be removed, but
+  // V45's FK SET NULL/CASCADE makes hard-delete the explicit purge path.
+  const allTiers: readonly LootboxTier[] = useMemo(() => {
+    const tiers = activeCatalog?.tiers ?? [];
+    // Active first, inactive at the bottom; preserve sort_order within each group.
+    return [...tiers].sort((a, b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      return 0;
+    });
+  }, [activeCatalog]);
 
   const createMut = useCreateCrateMutation();
   const handleNew = async () => {
@@ -147,7 +150,7 @@ export function CratesAndPrizesTab() {
           <CrateConfigForm
             key={activeAdmin.id}
             admin={activeAdmin}
-            tiers={activeTiers}
+            tiers={allTiers}
           />
         ) : (
           <p className="p-4 text-sm text-muted-foreground sm:p-6">
@@ -189,14 +192,11 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
 
   const deleteDisabledTierIds = useMemo(() => {
     const set = new Set<string>();
-    for (const t of tiers) {
-      if (t.prizes.some((p) => p.active)) set.add(t.id);
-    }
     if (deleteTierMut.isPending && tierPendingDelete) {
       set.add(tierPendingDelete.id);
     }
     return set;
-  }, [tiers, deleteTierMut.isPending, tierPendingDelete]);
+  }, [deleteTierMut.isPending, tierPendingDelete]);
 
   const handleDeleteTier = async () => {
     if (!tierPendingDelete) return;
@@ -504,9 +504,9 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
               Delete tier {tierPendingDelete?.name}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              The tier is deactivated and its weight redistributed across the
-              remaining active tiers. Prizes in this tier stay on record but
-              become unavailable.
+              Permanently removes the tier and all of its prizes. Past wins keep
+              their name, image, and tier label from the snapshot taken at spin
+              time. Remaining tiers are rebalanced to sum to 100%.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

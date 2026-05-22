@@ -268,13 +268,9 @@ public class LootboxAdminService {
         LootboxTier tier = lootboxTierRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Tier not found: " + id));
         UUID crateId = tier.getLootbox().getId();
-        if (lootboxPrizeRepository.countActiveByTierId(id) > 0) {
-            throw new LootboxException("Cannot delete a tier with active prizes; deactivate prizes first.");
-        }
-        // Soft-delete by deactivation; hard-deleting would break FK on lootbox_plays / prizes.
-        tier.setActive(false);
-        tier.setProbabilityPct(BigDecimal.ZERO);
-        lootboxTierRepository.save(tier);
+        // Hard-delete: FK cascade (V45) wipes this tier's prizes; SET NULL on
+        // lootbox_plays.prize_id preserves play history via snapshot columns.
+        lootboxTierRepository.delete(tier);
         rebalanceActiveTiers(crateId);
     }
 
@@ -329,8 +325,9 @@ public class LootboxAdminService {
         LootboxPrize prize = lootboxPrizeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Prize not found: " + id));
         UUID tierId = prize.getTier().getId();
-        prize.setActive(false);
-        lootboxPrizeRepository.save(prize);
+        // Hard-delete: SET NULL on lootbox_plays.prize_id (V45) preserves play history
+        // via the prizeNameSnapshot / prizeTierNameSnapshot columns on LootboxPlay.
+        lootboxPrizeRepository.delete(prize);
         maybeDeactivateTier(tierId);
     }
 

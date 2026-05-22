@@ -93,7 +93,7 @@ export interface LootboxPlay {
   id: string;
   userId: string;
   userName: string;
-  prizeId: string;
+  prizeId: string | null;
   prizeName: string;
   prizeDescription: string | null;
   prizeImageUrl: string | null;
@@ -113,7 +113,7 @@ export interface PlayLootboxResponse {
 
 export interface RecentLootboxPlay {
   id: string;
-  prizeId: string;
+  prizeId: string | null;
   prizeName: string;
   prizeImageUrl: string | null;
   tierName: string;
