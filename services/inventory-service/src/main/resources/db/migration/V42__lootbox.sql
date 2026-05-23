@@ -98,8 +98,9 @@ CREATE INDEX ix_lootbox_plays_status_played ON lootbox_plays(status, played_at D
 CREATE INDEX ix_lootbox_plays_lootbox       ON lootbox_plays(lootbox_id) WHERE lootbox_id IS NOT NULL;
 
 -- Coin expiry: 90 days after the earning timestamp.
--- Generated columns mean we never write expires_at directly — Postgres computes it on
--- INSERT/UPDATE from the row's earn timestamp. No trigger, no app-side discipline.
+-- Defaulted at INSERT (created_at is never updated, so a column default is equivalent
+-- to a generated column here). GENERATED ALWAYS can't be used because timestamptz +
+-- day-interval is not immutable (depends on session TZ across DST).
 CREATE TABLE coin_adjustments (
     id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id            UUID        NOT NULL REFERENCES users(id),
@@ -107,7 +108,7 @@ CREATE TABLE coin_adjustments (
     reason             TEXT        NOT NULL CHECK (length(reason) > 0),
     granted_by_user_id UUID        NOT NULL REFERENCES users(id),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at         TIMESTAMPTZ GENERATED ALWAYS AS (created_at + INTERVAL '90 days') STORED
+    expires_at         TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '90 days')
 );
 CREATE INDEX ix_coin_adjustments_user         ON coin_adjustments(user_id, created_at DESC);
 CREATE INDEX ix_coin_adjustments_user_expires ON coin_adjustments(user_id, expires_at);
