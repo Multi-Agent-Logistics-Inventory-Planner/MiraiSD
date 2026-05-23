@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -233,13 +234,32 @@ export function TabLootbox() {
                 Admin
               </Button>
             </div>
-            <p className="py-16 text-center text-sm text-muted-foreground">
+            <p className="pt-16 text-center text-sm text-muted-foreground">
               Nothing here — create a crate using Admin button.
             </p>
+            <div className="relative mx-auto w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
+              <Image
+                src="/dont-mess-up.jpg"
+                alt="Nothing here"
+                fill
+                className="object-contain"
+                sizes="(max-width: 640px) 280px, 320px"
+                priority
+              />
+            </div>
             <AdminModal open={adminOpen} onOpenChange={setAdminOpen} />
           </>
         ) : (
-          <p>pizza</p>
+          <div className="relative mx-auto w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
+            <Image
+              src="/dont-mess-up.jpg"
+              alt="Nothing here"
+              fill
+              className="object-contain"
+              sizes="(max-width: 640px) 280px, 320px"
+              priority
+            />
+          </div>
         )}
       </div>
     );

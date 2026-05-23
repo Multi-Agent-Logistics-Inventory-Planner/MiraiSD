@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { ProductThumbnail } from "@/components/products/product-thumbnail";
 import {
@@ -333,7 +334,7 @@ export function ShipmentUndoItemsDialog({
                 </p>
               </div>
             </AlertDialogDescription>
-            {/* <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
+            <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-square overflow-hidden rounded-lg border border-border">
               <Image
                 src="/dont-mess-up.jpg"
                 alt="Warning"
@@ -342,7 +343,7 @@ export function ShipmentUndoItemsDialog({
                 sizes="(max-width: 640px) 280px, 320px"
                 priority
               />
-            </div> */}
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
             <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
