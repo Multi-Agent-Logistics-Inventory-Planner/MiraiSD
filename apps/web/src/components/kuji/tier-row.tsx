@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Plus, MoreHorizontal, ArrowDown, ArrowUp } from "lucide-react";
+import { Minus, Plus, ArrowDown, ArrowUp } from "lucide-react";
 import type { KujiBoxTier } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,6 @@ interface ManagePrizeRowProps extends BaseProps {
   readonly onStash: () => void;
   readonly onPromote: () => void;
   readonly onAdd: () => void;
-  readonly onMore: () => void;
   readonly disableStash?: boolean;
   readonly disablePromote?: boolean;
   readonly disableAdd?: boolean;
@@ -183,7 +182,6 @@ function ManagePrizeRow({
   onStash,
   onPromote,
   onAdd,
-  onMore,
   disableStash,
   disablePromote,
   disableAdd,
@@ -274,9 +272,6 @@ function ManagePrizeRow({
           accentColor={stripe}
         >
           <Plus className="h-4 w-4" strokeWidth={1.75} />
-        </RowAction>
-        <RowAction onClick={onMore} label="" title="More">
-          <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
         </RowAction>
       </div>
     </div>

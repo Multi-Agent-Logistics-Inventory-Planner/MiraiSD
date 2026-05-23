@@ -742,6 +742,9 @@ public class KujiBoxService {
                 metadata.put("linked_product_id", linked.getId().toString());
                 metadata.put("linked_product_name", linked.getName());
             }
+            // Snapshot the per-slip price so the daily-payout chart and activity log
+            // stay fixed if a tier's price or its linked product's msrp is edited later.
+            metadata.put("unit_value", resolveUnitValue(tier, linked));
             StockMovement movement = StockMovement.builder()
                     .auditLog(parentLog)
                     .item(linked != null ? linked : parentProduct)
@@ -917,6 +920,13 @@ public class KujiBoxService {
             metadata.put("reverses_movement_id", String.valueOf(mv.getId()));
             if (tier != null) {
                 metadata.put("kuji_box_tier_id", tier.getId().toString());
+            }
+            // Mirror the original draw's snapshotted unit value so the daily-payout
+            // aggregation subtracts the same amount it originally added — even if the
+            // tier's live price was edited between draw and undo.
+            BigDecimal snappedUnitValue = readUnitValueFromMetadata(mv.getMetadata());
+            if (snappedUnitValue != null) {
+                metadata.put("unit_value", snappedUnitValue);
             }
             StockMovement reverse = StockMovement.builder()
                     .auditLog(reverseLog)
@@ -2134,7 +2144,8 @@ public class KujiBoxService {
                     tier.getLetter(),
                     tier.getLabel(),
                     tier.getLinkedProduct() != null ? tier.getLinkedProduct().getName() : null,
-                    draw.getQuantity()
+                    draw.getQuantity(),
+                    resolveUnitValue(tier, tier.getLinkedProduct())
             ));
         }
         return parts.isEmpty() ? null : String.join("\n", parts);
@@ -2157,7 +2168,9 @@ public class KujiBoxService {
                     && mv.getItem() != null) {
                 linkedName = mv.getItem().getName();
             }
-            parts.add(formatTierLine(letter, label, linkedName, qty));
+            // Legacy rows (pre-snapshot feature) don't carry unit_value — passing null
+            // suppresses the price suffix entirely so we don't show a misleading "$0".
+            parts.add(formatTierLine(letter, label, linkedName, qty, readUnitValueFromMetadata(meta)));
         }
         return parts.isEmpty() ? null : String.join("\n", parts);
     }
@@ -2180,20 +2193,66 @@ public class KujiBoxService {
         return v != null ? v.toString() : null;
     }
 
-    private String formatTierLine(String letter, String label, String linkedProductName, int qty) {
-        String head;
-        if (letter != null && !letter.isBlank()) {
-            head = letter;
-        } else if (label != null && !label.isBlank()) {
-            head = label;
-        } else {
-            head = "Prize";
+    /**
+     * Per-slip value used for the daily-payout chart and activity-log price suffix.
+     * Falls back tier.price → linked product.msrp → 0, and is stamped into stock-movement
+     * metadata at draw time so historical totals stay fixed if prices change later.
+     */
+    private static BigDecimal resolveUnitValue(KujiBoxTier tier, Product linked) {
+        if (tier != null && tier.getPrice() != null) return tier.getPrice();
+        if (linked != null && linked.getMsrp() != null) return linked.getMsrp();
+        return BigDecimal.ZERO;
+    }
+
+    private static BigDecimal readUnitValueFromMetadata(Map<String, Object> meta) {
+        if (meta == null) return null;
+        Object raw = meta.get("unit_value");
+        if (raw == null) return null;
+        if (raw instanceof BigDecimal bd) return bd;
+        if (raw instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        try {
+            return new BigDecimal(raw.toString());
+        } catch (NumberFormatException ex) {
+            return null;
         }
-        StringBuilder sb = new StringBuilder(head);
+    }
+
+    private String formatTierLine(
+            String letter,
+            String label,
+            String linkedProductName,
+            int qty,
+            BigDecimal unitValue
+    ) {
+        // Prize name (linked product) leads when present so the reader sees what was
+        // awarded first, with the tier label as secondary context in parens. When no
+        // linked product exists, fall back to the tier letter/label as the head.
+        String tierTag;
+        if (letter != null && !letter.isBlank()) {
+            tierTag = letter;
+        } else if (label != null && !label.isBlank()) {
+            tierTag = label;
+        } else {
+            tierTag = "Prize";
+        }
+        StringBuilder sb = new StringBuilder();
         if (linkedProductName != null && !linkedProductName.isBlank()) {
-            sb.append(" (").append(linkedProductName).append(")");
+            sb.append(linkedProductName).append(" (").append(tierTag).append(")");
+        } else {
+            sb.append(tierTag);
         }
         sb.append(" × ").append(qty);
+        // Snapshot-based price suffix. Present-positive shows the line total; present-zero
+        // surfaces an explicit "Not set" so admins notice missing tier prices; absent (legacy
+        // rows from before the snapshot feature) appends nothing.
+        if (unitValue != null) {
+            if (unitValue.signum() > 0) {
+                BigDecimal total = unitValue.multiply(BigDecimal.valueOf(qty));
+                sb.append(" — ").append(String.format("$%,.2f", total));
+            } else {
+                sb.append(" — Not set");
+            }
+        }
         return sb.toString();
     }
 

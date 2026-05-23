@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, MoreHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import type { KujiBoxTier } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/utils/format-money";
@@ -27,7 +27,6 @@ interface ManagePrizeTileProps extends BaseProps {
   readonly onStash: () => void;
   readonly onPromote: () => void;
   readonly onAdd: () => void;
-  readonly onMore: () => void;
   readonly disableStash?: boolean;
   readonly disablePromote?: boolean;
   readonly disableAdd?: boolean;
@@ -190,7 +189,6 @@ function ManagePrizeTile({
   onStash,
   onPromote,
   onAdd,
-  onMore,
   disableStash,
   disablePromote,
   disableAdd,
@@ -234,13 +232,14 @@ function ManagePrizeTile({
         </div>
       </button>
 
-      <div className="px-3 py-2 grid grid-cols-3 gap-1 items-baseline">
+      <div className="px-3 py-2 grid grid-cols-4 gap-1 items-baseline">
         <Stat value={tier.activeCount} label="active" emphasized />
         <Stat
           value={tier.inactiveCount}
-          label="inactive"
+          label="stash"
           amber={tier.inactiveCount > 0}
         />
+        <Stat value={tier.drawnCount} label="won" />
         <Stat
           value={formatChance(tier.activeCount, totalActive)}
           label="chance"
@@ -267,9 +266,6 @@ function ManagePrizeTile({
           accentColor={stripe}
         >
           <Plus className="h-3 w-3" />
-        </FlatActionBtn>
-        <FlatActionBtn onClick={onMore} label="" title="More">
-          <MoreHorizontal className="h-3.5 w-3.5" />
         </FlatActionBtn>
       </div>
     </div>
