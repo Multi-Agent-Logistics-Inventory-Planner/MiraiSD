@@ -4,10 +4,15 @@
 -- ============================================
 -- 1. CREATE CATEGORIES TABLE
 -- ============================================
+-- Slug uniqueness is scoped to parent: composite UNIQUE(parent_id, slug) for
+-- subcategories (added by Hibernate from the JPA entity) plus a partial
+-- unique index for root categories below. A global UNIQUE(slug) would block
+-- a root category and a subcategory from sharing a name.
 CREATE TABLE IF NOT EXISTS public.categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parent_id UUID REFERENCES public.categories(id) ON DELETE RESTRICT,
     name VARCHAR(100) NOT NULL,
-    slug VARCHAR(100) NOT NULL UNIQUE,
+    slug VARCHAR(100) NOT NULL,
     display_order INTEGER DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -17,6 +22,12 @@ CREATE TABLE IF NOT EXISTS public.categories (
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON public.categories(slug);
 CREATE INDEX IF NOT EXISTS idx_categories_active ON public.categories(is_active) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_categories_display_order ON public.categories(display_order);
+CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON public.categories(parent_id);
+
+-- Composite UNIQUE(parent_id, slug) does not enforce uniqueness among root
+-- categories because PostgreSQL treats NULL parent_id values as distinct.
+CREATE UNIQUE INDEX IF NOT EXISTS categories_root_slug_unique
+    ON public.categories(slug) WHERE parent_id IS NULL;
 
 -- ============================================
 -- 2. CREATE SUBCATEGORIES TABLE
@@ -49,7 +60,7 @@ INSERT INTO public.categories (name, slug, display_order) VALUES
     ('Gundam', 'gundam', 7),
     ('Kuji', 'kuji', 8),
     ('Miscellaneous', 'miscellaneous', 9)
-ON CONFLICT (slug) DO UPDATE SET
+ON CONFLICT (slug) WHERE parent_id IS NULL DO UPDATE SET
     name = EXCLUDED.name,
     display_order = EXCLUDED.display_order,
     updated_at = NOW();

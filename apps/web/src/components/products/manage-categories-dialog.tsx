@@ -17,9 +17,17 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCategories } from "@/hooks/queries/use-categories";
 import {
@@ -56,6 +64,12 @@ export function ManageCategoriesDialog({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<"category" | "subcategory">(
+    "category",
+  );
+  const [createName, setCreateName] = useState("");
+  const [createParentId, setCreateParentId] = useState<string>("");
 
   const q = filter.trim().toLowerCase();
   const filteredCategories = useMemo(() => {
@@ -162,39 +176,47 @@ export function ManageCategoriesDialog({
     }
   };
 
-  const handleAddCategory = async () => {
-    try {
-      const created = await createMutation.mutateAsync({
-        name: "New category",
-      });
-      setFilter("");
-      setEditingId(created.id);
-      setEditingName(created.name);
-      setConfirmDeleteId(null);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to create category";
-      toast({
-        title: "Cannot create",
-        description: message,
-        variant: "destructive",
-      });
-    }
+  const openCreateDialog = () => {
+    setCreateKind("category");
+    setCreateName("");
+    setCreateParentId(categories?.[0]?.id ?? "");
+    setCreateOpen(true);
   };
 
-  const handleAddSubcategory = async (parent: Category) => {
+  const handleCreateSubmit = async () => {
+    const trimmed = createName.trim();
+    if (!trimmed) return;
+    if (createKind === "subcategory" && !createParentId) {
+      toast({
+        title: "Pick a parent category",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const created = await createMutation.mutateAsync({
-        name: "New subcategory",
-        parentId: parent.id,
+        name: trimmed,
+        ...(createKind === "subcategory"
+          ? { parentId: createParentId }
+          : {}),
       });
-      setExpandedIds((prev) => new Set(prev).add(parent.id));
-      setEditingId(created.id);
-      setEditingName(created.name);
+      setFilter("");
       setConfirmDeleteId(null);
+      if (createKind === "subcategory") {
+        setExpandedIds((prev) => new Set(prev).add(createParentId));
+      }
+      toast({
+        title: `${createKind === "subcategory" ? "Subcategory" : "Category"} created`,
+        description: `"${created.name}" has been added.`,
+        variant: "success",
+      });
+      setCreateOpen(false);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Failed to create subcategory";
+        err instanceof Error
+          ? err.message
+          : `Failed to create ${createKind}`;
       toast({
         title: "Cannot create",
         description: message,
@@ -533,28 +555,10 @@ export function ManageCategoriesDialog({
               return (
                 <div key={category.id} className="flex flex-col gap-[2px]">
                   {renderCategoryRow(category)}
-                  {isExpanded && (
-                    <>
-                      {visibleSubs.map((sub) => (
-                        <div key={sub.id}>{renderSubcategoryRow(sub)}</div>
-                      ))}
-                      {!q && (
-                        <button
-                          type="button"
-                          className="ml-[14px] flex items-center gap-[5px] self-start rounded-[7px] border border-dashed border-border/60 px-[10px] py-[5px] pl-[24px] text-[12px] text-muted-foreground/70 transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground disabled:opacity-50"
-                          onClick={() => handleAddSubcategory(category)}
-                          disabled={createMutation.isPending}
-                        >
-                          {createMutation.isPending ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Plus className="h-3 w-3" />
-                          )}
-                          Add subcategory
-                        </button>
-                      )}
-                    </>
-                  )}
+                  {isExpanded &&
+                    visibleSubs.map((sub) => (
+                      <div key={sub.id}>{renderSubcategoryRow(sub)}</div>
+                    ))}
                 </div>
               );
             })
@@ -564,19 +568,120 @@ export function ManageCategoriesDialog({
         <div className="border-t px-[18px] pb-[16px] pt-[10px]">
           <button
             type="button"
-            onClick={handleAddCategory}
-            disabled={createMutation.isPending}
+            onClick={openCreateDialog}
             className="flex w-full items-center justify-center gap-[6px] rounded-[10px] border bg-muted/40 px-[14px] py-[9px] text-[13px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground disabled:opacity-50"
           >
-            {createMutation.isPending ? (
-              <Loader2 className="h-[14px] w-[14px] animate-spin" />
-            ) : (
-              <Plus className="h-[14px] w-[14px]" />
-            )}
+            <Plus className="h-[14px] w-[14px]" />
             Add category
           </button>
         </div>
       </DialogContent>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="w-full rounded-[20px] p-0 sm:max-w-[400px]">
+          <DialogHeader className="space-y-[3px] border-b px-[18px] pb-[14px] pt-[18px]">
+            <DialogTitle className="text-[16px] font-medium leading-tight tracking-[-0.01em]">
+              New {createKind}
+            </DialogTitle>
+            <DialogDescription className="text-[12px] leading-[1.5]">
+              Choose a type and give it a name.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-[14px] px-[18px] py-[14px]">
+            <div className="flex flex-col gap-[6px]">
+              <span className="text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                Type
+              </span>
+              <div className="inline-flex rounded-[10px] border bg-muted/40 p-[3px]">
+                {(["category", "subcategory"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setCreateKind(kind)}
+                    className={`flex-1 rounded-[7px] px-[10px] py-[6px] text-[12.5px] capitalize transition-colors ${
+                      createKind === kind
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {kind}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {createKind === "subcategory" && (
+              <div className="flex flex-col gap-[6px]">
+                <span className="text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Parent category
+                </span>
+                <Select
+                  value={createParentId}
+                  onValueChange={setCreateParentId}
+                >
+                  <SelectTrigger className="w-full text-[13px]">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(categories ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-[6px]">
+              <span className="text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                Name
+              </span>
+              <input
+                autoFocus
+                type="text"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateSubmit();
+                }}
+                placeholder={`e.g. ${
+                  createKind === "subcategory" ? "Foil singles" : "Singles"
+                }`}
+                className="w-full rounded-[10px] border bg-muted/40 px-3 py-[8px] text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-ring focus:bg-muted/60"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex-row justify-end gap-[8px] border-t px-[18px] py-[12px] sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(false)}
+              className="rounded-[10px] border px-[14px] py-[7px] text-[13px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateSubmit}
+              disabled={
+                createMutation.isPending ||
+                !createName.trim() ||
+                (createKind === "subcategory" && !createParentId)
+              }
+              className="inline-flex items-center gap-[6px] rounded-[10px] bg-foreground px-[14px] py-[7px] text-[13px] text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {createMutation.isPending ? (
+                <Loader2 className="h-[13px] w-[13px] animate-spin" />
+              ) : (
+                <Plus className="h-[13px] w-[13px]" />
+              )}
+              Create
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
