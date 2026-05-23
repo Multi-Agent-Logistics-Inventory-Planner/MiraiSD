@@ -28,40 +28,40 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         List<User> users = userService.getAllUsers();
         return ResponseEntity.ok(userMapper.toResponseDTOList(users));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable UUID id) {
         User user = userService.getUserById(id);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @GetMapping("/{id}/last-audit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<OffsetDateTime> getLastAudit(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.getLastAuditDate(id).orElse(null));
     }
 
     @GetMapping("/last-audits")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Map<UUID, OffsetDateTime>> getAllLastAudits() {
         return ResponseEntity.ok(userService.getAllLastAuditDates());
     }
 
     @GetMapping("/email/{email}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<UserResponseDTO> getUserByEmail(@PathVariable String email) {
         User user = userService.getUserByEmail(email);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
     }
 
     @GetMapping("/name/{fullName}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<UserResponseDTO> getUserByFullName(@PathVariable String fullName) {
         User user = userService.getUserByFullName(fullName);
         return ResponseEntity.ok(userMapper.toResponseDTO(user));

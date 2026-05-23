@@ -107,6 +107,10 @@ public class InvitationService {
         }
 
         invitationRepository.delete(invitation);
+
+        // Delete the orphan Supabase auth user so a future re-invite can't inherit
+        // stale raw_user_meta_data (e.g. a leftover role=ADMIN from a canceled admin invite).
+        supabaseAdminService.deleteUserByEmail(email);
     }
 
     public void markInvitationAccepted(String email) {
