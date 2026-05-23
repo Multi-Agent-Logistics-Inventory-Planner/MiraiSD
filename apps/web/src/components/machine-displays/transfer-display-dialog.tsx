@@ -30,7 +30,7 @@ import {
   LocationType,
   MachineDisplay,
   Location,
-  Product,
+  ProductListItem,
 } from "@/types/api";
 import { useQuery } from "@tanstack/react-query";
 import { useLocationsOnly } from "@/hooks/queries/use-locations";
@@ -136,7 +136,7 @@ function DisplayItem({ display, selected, onToggle, disabled, direction, imageUr
 }
 
 interface ProductItemProps {
-  product: Product;
+  product: ProductListItem;
   selected: boolean;
   onToggle: () => void;
   disabled?: boolean;

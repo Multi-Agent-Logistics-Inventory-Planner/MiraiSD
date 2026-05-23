@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.dtos.responses.ProductListItemDTO;
 import com.mirai.inventoryservice.exceptions.DuplicateSkuException;
 import com.mirai.inventoryservice.exceptions.ProductInUseException;
 import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
@@ -493,5 +494,57 @@ public class ProductService {
      */
     public Set<UUID> getParentProductIds() {
         return new HashSet<>(productRepository.findAllParentIds());
+    }
+
+    // ==================== Slim List-Item Methods (egress optimization) ====================
+    // Return projected ProductListItemDTO directly instead of full Product entities.
+    // Fills in hasChildren via a single parentIds batch lookup (existing findAllParentIds).
+
+    private List<ProductListItemDTO> withHasChildren(List<ProductListItemDTO> items) {
+        Set<UUID> parentIds = getParentProductIds();
+        for (ProductListItemDTO item : items) {
+            item.setHasChildren(parentIds.contains(item.getId()));
+        }
+        return items;
+    }
+
+    public List<ProductListItemDTO> getAllProductsAsListItems() {
+        return withHasChildren(productRepository.findAllAsListItems());
+    }
+
+    public List<ProductListItemDTO> getActiveProductsAsListItems() {
+        return withHasChildren(productRepository.findActiveAsListItems());
+    }
+
+    public List<ProductListItemDTO> getProductsByCategoryAsListItems(UUID categoryId) {
+        return withHasChildren(productRepository.findByCategoryIdAsListItems(categoryId));
+    }
+
+    public List<ProductListItemDTO> getActiveProductsByCategoryAsListItems(UUID categoryId) {
+        return withHasChildren(productRepository.findByCategoryIdActiveAsListItems(categoryId));
+    }
+
+    public List<ProductListItemDTO> searchProductsAsListItems(String query) {
+        return withHasChildren(productRepository.searchAsListItems(query));
+    }
+
+    public List<ProductListItemDTO> getRootProductsAsListItems() {
+        return withHasChildren(productRepository.findRootAsListItems());
+    }
+
+    public List<ProductListItemDTO> getActiveRootProductsAsListItems() {
+        return withHasChildren(productRepository.findRootActiveAsListItems());
+    }
+
+    public List<ProductListItemDTO> getRootKujiProductsAsListItems() {
+        return withHasChildren(productRepository.findRootKujiAsListItems());
+    }
+
+    public List<ProductListItemDTO> getChildProductsAsListItems(UUID parentId) {
+        return withHasChildren(productRepository.findByParentIdAsListItems(parentId));
+    }
+
+    public List<ProductListItemDTO> getActiveChildProductsAsListItems(UUID parentId) {
+        return withHasChildren(productRepository.findByParentIdActiveAsListItems(parentId));
     }
 }

@@ -16,20 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
-import type { MachineDisplay, Product } from "@/types/api";
+import type { MachineDisplay, ProductListItem } from "@/types/api";
 
 interface RenewDisplayDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentDisplays: MachineDisplay[];
-  products: Product[];
+  products: ProductListItem[];
   isSaving?: boolean;
   onSubmit: (displayIds: string[]) => Promise<void> | void;
 }
 
 interface DisplayItemCardProps {
   display: MachineDisplay;
-  product?: Product;
+  product?: ProductListItem;
   selected: boolean;
   onToggle: () => void;
   disabled?: boolean;

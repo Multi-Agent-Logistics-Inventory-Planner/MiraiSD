@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
 import { ProductList, SelectedProduct } from "./add-inventory";
 import { getProducts } from "@/lib/api/products";
-import type { Product, LocationType, InventoryRequest, LocationInventory, Category } from "@/types/api";
+import type { ProductListItem, LocationType, InventoryRequest, LocationInventory, Category } from "@/types/api";
 
 interface AddInventoryDialogProps {
   open: boolean;
@@ -52,7 +52,7 @@ export function AddInventoryDialog({
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [childCategoryFilters, setChildCategoryFilters] = useState<string[]>([]);
 
-  const selected: Product | undefined = useMemo(
+  const selected: ProductListItem | undefined = useMemo(
     () => products.find((p) => p.id === productId),
     [products, productId]
   );

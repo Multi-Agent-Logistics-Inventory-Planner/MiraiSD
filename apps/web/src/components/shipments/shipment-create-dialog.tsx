@@ -55,8 +55,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
   ShipmentStatus,
-  type Product,
-  type ProductSummary,
+  type ProductListItem,
   type Shipment,
   type ShipmentItemRequest,
 } from "@/types/api";
@@ -189,7 +188,7 @@ export function ShipmentCreateDialog({
   });
 
   const childrenByProductId = useMemo(() => {
-    const result: Record<string, ProductSummary[]> = {};
+    const result: Record<string, ProductListItem[]> = {};
     selectedKujiIds.forEach((id, i) => {
       const data = childrenQueries[i]?.data;
       if (data?.length) result[id] = data;
@@ -313,7 +312,7 @@ export function ShipmentCreateDialog({
     });
   }, [childrenByProductId, form, items]);
 
-  function handleSelectProduct(index: number, product: Product) {
+  function handleSelectProduct(index: number, product: ProductListItem) {
     const currentItem = form.getValues(`items.${index}`);
     form.setValue(
       `items.${index}`,
@@ -969,10 +968,10 @@ function ShipmentDetailsPanel({
 interface ShipmentItemPanelProps {
   readonly form: UseFormReturn<FormValues>;
   readonly index: number;
-  readonly products: Product[];
+  readonly products: ProductListItem[];
   readonly productsLoading: boolean;
   readonly rowHasReceipts: boolean;
-  readonly childrenByProductId: Record<string, ProductSummary[]>;
+  readonly childrenByProductId: Record<string, ProductListItem[]>;
   readonly isLoadingChildrenForProduct: (productId: string) => boolean;
   readonly onOpenProductPicker: () => void;
 }

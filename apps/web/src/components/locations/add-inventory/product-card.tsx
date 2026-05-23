@@ -4,12 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 import { Check, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface ProductCardProps {
-  product: Product;
+  product: ProductListItem;
   existingQuantity?: number;
   selected: boolean;
   onSelect: () => void;

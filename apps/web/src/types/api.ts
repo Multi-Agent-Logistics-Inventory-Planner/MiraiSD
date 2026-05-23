@@ -196,6 +196,39 @@ export interface ProductSummary {
   packsPerBox?: number | null;
 }
 
+/**
+ * Slim Product DTO returned by list endpoints (GET /api/products, /{id}/children).
+ * Carries everything the list views read; drops detail-only fields
+ * (description, notes, parentName, parentSku, children, totalChildStock, createdAt).
+ * For full details fetch a single product via GET /api/products/{id}.
+ */
+export interface ProductListItem {
+  id: string;
+  sku?: string | null;
+  name: string;
+  imageUrl?: string;
+  isActive: boolean;
+  quantity: number;
+  letter?: string | null;
+  templateQuantity?: number | null;
+  /** Packs per sealed box for TCG products. NULL when not box-packaged. */
+  packsPerBox?: number | null;
+  parentId?: string | null;
+  kujiType?: KujiType | null;
+  kujiSlackWebhookUrl?: string | null;
+  reorderPoint?: number;
+  targetStockLevel?: number;
+  leadTimeDays?: number;
+  unitCost?: number;
+  msrp?: number;
+  preferredSupplierId?: string | null;
+  preferredSupplierName?: string | null;
+  preferredSupplierAuto?: boolean;
+  category: Category;
+  hasChildren?: boolean;
+  updatedAt: string;
+}
+
 export interface Product {
   id: string;
   sku?: string | null;

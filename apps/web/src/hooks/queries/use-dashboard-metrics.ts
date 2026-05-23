@@ -16,7 +16,7 @@ import { getPerformanceMetrics } from "@/lib/api/analytics";
 import { getShipmentsPaged } from "@/lib/api/shipments";
 import { getLocationsWithCounts } from "@/lib/api/locations";
 import { ShipmentStatus, NotificationSeverity } from "@/types/api";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import type {
   DashboardMetrics,
   ActionRequiredItem,
@@ -132,7 +132,7 @@ export function useDashboardMetrics() {
     }
 
     // Build product lookup map
-    const productMap = new Map<string, Product>();
+    const productMap = new Map<string, ProductListItem>();
     for (const p of products) {
       productMap.set(p.id, p);
     }

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import type { DashboardStats, StockLevelItem, StockStatus, CategoryData } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getAuditLogLast30Days } from "@/lib/api/dashboard";
@@ -32,7 +32,7 @@ function toRelativeTime(isoOrDateLike: string | undefined): string {
 }
 
 function buildStockLevelItem(
-  product: Product,
+  product: ProductListItem,
   quantity: number,
   lastUpdatedAt: string | undefined,
   daysToStockout?: number

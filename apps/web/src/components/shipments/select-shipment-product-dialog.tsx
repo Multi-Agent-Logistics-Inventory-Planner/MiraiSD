@@ -19,18 +19,18 @@ import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-he
 import { getProducts } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
-import type { Product, Category } from "@/types/api";
+import type { ProductListItem, Category } from "@/types/api";
 
 interface SelectShipmentProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (product: Product) => void;
+  onSelect: (product: ProductListItem) => void;
   excludeProductIds?: string[];
 }
 
 interface ShipmentProductCardProps {
-  product: Product;
-  onSelect: (product: Product) => void;
+  product: ProductListItem;
+  onSelect: (product: ProductListItem) => void;
   disabled?: boolean;
 }
 
@@ -206,7 +206,7 @@ export function SelectShipmentProductDialog({
     setChildCategoryFilters([]);
   }
 
-  const handleProductSelect = useCallback((product: Product) => {
+  const handleProductSelect = useCallback((product: ProductListItem) => {
     onSelect(product);
     onOpenChange(false);
   }, [onSelect, onOpenChange]);

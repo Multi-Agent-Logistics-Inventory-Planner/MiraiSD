@@ -2,13 +2,13 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getInventoryTotals } from "@/lib/api/inventory";
 
 export interface ProductWithInventory {
-  product: Product;
+  product: ProductListItem;
   totalQuantity: number;
   lastUpdatedAt?: string;
   status: StockStatus;

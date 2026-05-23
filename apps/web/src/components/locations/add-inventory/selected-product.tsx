@@ -9,11 +9,11 @@ import {
   QuantityInput,
   type QuantityIntakeMeta,
 } from "@/components/ui/quantity-input";
-import type { Product, LocationInventory } from "@/types/api";
+import type { ProductListItem, LocationInventory } from "@/types/api";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface SelectedProductProps {
-  product: Product;
+  product: ProductListItem;
   existingInventory?: LocationInventory;
   /** In packs (canonical). */
   quantity: string;

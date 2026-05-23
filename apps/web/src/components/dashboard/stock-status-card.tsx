@@ -7,10 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Settings2 } from "lucide-react";
 import Link from "next/link";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 
 interface StockStatusCardProps {
-  products: Product[];
+  products: ProductListItem[];
   isLoading?: boolean;
 }
 
@@ -21,7 +21,7 @@ interface StockStatusData {
   pattern: "solid" | "dots" | "diagonal" | "solid-dark";
 }
 
-function computeStockStatus(products: Product[]): StockStatusData[] {
+function computeStockStatus(products: ProductListItem[]): StockStatusData[] {
   let inStock = 0;
   let lowStock = 0;
   let outOfStock = 0;

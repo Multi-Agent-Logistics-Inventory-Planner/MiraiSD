@@ -40,6 +40,7 @@ import {
   useDeleteProductMutation,
   useUpdateProductMutation,
 } from "@/hooks/mutations/use-product-mutations";
+import { useProduct } from "@/hooks/queries/use-products";
 import { createInventory } from "@/lib/api/inventory";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
@@ -94,7 +95,8 @@ type FormValues = z.infer<typeof schema>;
 interface ProductFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialProduct?: Product | null;
+  /** Product id to edit. The form fetches full detail itself. Null/undefined = create mode. */
+  initialProductId?: string | null;
   /** Parent product ID for creating child products (e.g., Kuji prizes) */
   parentId?: string | null;
   /** Parent product name for display */
@@ -106,11 +108,14 @@ interface ProductFormProps {
 export function ProductForm({
   open,
   onOpenChange,
-  initialProduct,
+  initialProductId,
   parentId,
   parentName,
   onProductCreated,
 }: ProductFormProps) {
+  // Fetch full product detail when editing. List endpoints return slim DTOs,
+  // so the form owns its detail fetch rather than trusting a passed-in object.
+  const { data: initialProduct = null } = useProduct(initialProductId ?? null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { canViewCosts, canViewMsrp, can } = usePermissions();

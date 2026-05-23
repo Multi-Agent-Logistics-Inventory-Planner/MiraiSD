@@ -285,7 +285,7 @@ function ProductsContent() {
       <ProductForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        initialProduct={editing?.product ?? null}
+        initialProductId={editing?.product?.id ?? null}
       />
 
       <ManageCategoriesDialog
