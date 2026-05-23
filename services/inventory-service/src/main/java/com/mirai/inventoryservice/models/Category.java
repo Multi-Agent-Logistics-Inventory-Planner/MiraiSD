@@ -38,7 +38,7 @@ public class Category {
     @Column(name = "parent_id", insertable = false, updatable = false)
     private UUID parentId;
 
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     @ToString.Exclude
