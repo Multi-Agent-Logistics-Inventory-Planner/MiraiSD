@@ -8,6 +8,7 @@ from datetime import date, datetime
 from ..adapters.apify_client import ApifyClient, ApifyClientError
 from ..adapters.kafka_producer import ReviewKafkaProducer
 from ..adapters.slack_notifier import SlackNotifier
+from ..adapters.supabase_repo import SupabaseRepo
 from .. import config
 
 logger = logging.getLogger(__name__)
@@ -24,15 +25,18 @@ class ReviewFetcher:
         apify_client: ApifyClient | None = None,
         kafka_producer: ReviewKafkaProducer | None = None,
         slack_notifier: SlackNotifier | None = None,
+        repo: SupabaseRepo | None = None,
     ):
         self._apify = apify_client or ApifyClient()
         self._producer = kafka_producer or ReviewKafkaProducer()
         self._slack = slack_notifier or SlackNotifier()
+        self._repo = repo or SupabaseRepo()
 
     def fetch_and_publish_daily(
         self,
         target_date: date | None = None,
         prefetched_reviews: list | None = None,
+        coin_rate: int | None = None,
     ) -> int:
         """Fetch today's reviews from Apify and publish to Kafka.
 
@@ -77,6 +81,12 @@ class ReviewFetcher:
                 logger.info("No 5-star reviews found for %s", target_str)
                 return 0
 
+            # Snapshot the rate once for this batch (or use the caller-supplied value).
+            # The rate travels on each Kafka event so the consumer applies the rate
+            # that was active at ingest, not whatever the admin may have set since.
+            rate = coin_rate if coin_rate is not None else self._repo.get_review_coin_rate()
+            logger.info("Using review-to-coin rate %d for batch %s", rate, target_str)
+
             # Publish to Kafka
             self._producer.start()
             event_ids = self._producer.publish_batch([
@@ -86,6 +96,7 @@ class ReviewFetcher:
                     "rating": r.rating,
                     "reviewer_name": r.reviewer_name,
                     "published_at": r.published_at,
+                    "coin_rate": rate,
                 }
                 for r in filtered
             ])
@@ -103,7 +114,7 @@ class ReviewFetcher:
             self._send_failure_alert(str(e))
             raise
 
-    def fetch_and_publish_backfill(self, days: int = 7) -> int:
+    def fetch_and_publish_backfill(self, days: int = 7, coin_rate: int | None = None) -> int:
         """Backfill reviews for the past N days.
 
         Useful if daily fetches were missed. Fetches reviews once from Apify
@@ -111,6 +122,9 @@ class ReviewFetcher:
 
         Args:
             days: Number of days to backfill.
+            coin_rate: Optional override for the review-to-coin rate. When omitted,
+                snapshots the current rate from the DB once and reuses it across
+                all days in the backfill (the spirit of "read once per batch").
 
         Returns:
             Total number of reviews published.
@@ -119,6 +133,7 @@ class ReviewFetcher:
 
         total = 0
         today = date.today()
+        rate = coin_rate if coin_rate is not None else self._repo.get_review_coin_rate()
 
         # Fetch all reviews once from Apify
         logger.info("Fetching reviews from Apify for %d-day backfill", days)
@@ -139,6 +154,7 @@ class ReviewFetcher:
                 count = self.fetch_and_publish_daily(
                     target_date=target,
                     prefetched_reviews=all_reviews,
+                    coin_rate=rate,
                 )
                 total += count
             except Exception as e:

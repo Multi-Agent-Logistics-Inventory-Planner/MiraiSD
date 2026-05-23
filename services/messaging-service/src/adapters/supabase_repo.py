@@ -552,14 +552,18 @@ class SupabaseRepo:
             logger.error("Failed to create review: %s", e)
             return None
 
-    def increment_daily_count(self, employee_name: str, review_date) -> bool:
+    def increment_daily_count(self, employee_name: str, review_date, rate: int = 1) -> bool:
         """Increment daily review count for a user.
 
-        Uses UPSERT to create or increment the count.
+        Uses UPSERT to create or increment review_count + coins_awarded together.
+        `rate` is the review-to-coin multiplier captured at the start of the batch
+        (see scheduler) and applied per row. Storing coins_awarded means a future
+        rate change cannot retroactively re-price past activity.
 
         Args:
             employee_name: User's full name.
             review_date: Date of the review.
+            rate: Coins to add per review. Defaults to 1.
 
         Returns:
             True if successful, False on error.
@@ -570,10 +574,12 @@ class SupabaseRepo:
             return False
 
         query = text("""
-            INSERT INTO review_daily_counts (id, user_id, date, review_count)
-            VALUES (gen_random_uuid(), :user_id, :date, 1)
+            INSERT INTO review_daily_counts (id, user_id, date, review_count, coins_awarded)
+            VALUES (gen_random_uuid(), :user_id, :date, 1, :rate)
             ON CONFLICT (user_id, date)
-            DO UPDATE SET review_count = review_daily_counts.review_count + 1
+            DO UPDATE SET
+                review_count  = review_daily_counts.review_count + 1,
+                coins_awarded = review_daily_counts.coins_awarded + :rate
         """)
 
         try:
@@ -581,12 +587,35 @@ class SupabaseRepo:
                 conn.execute(query, {
                     "user_id": uuid.UUID(user_id),
                     "date": review_date,
+                    "rate": int(rate),
                 })
                 conn.commit()
                 return True
         except Exception as e:
             logger.error("Failed to increment daily count: %s", e)
             return False
+
+    def get_review_coin_rate(self) -> int:
+        """Read the singleton review-to-coin rate from coin_economy_config.
+
+        Called once per daily fetch batch in the scheduler so a rate change
+        cannot split a single batch across two rates. Falls back to 1 if the
+        config row is missing (defensive — V44 inserts it).
+        """
+        query = text("""
+            SELECT review_coin_rate FROM coin_economy_config WHERE id = 1
+        """)
+        try:
+            with self._engine.connect() as conn:
+                result = conn.execute(query)
+                row = result.fetchone()
+                if row is None:
+                    logger.warning("coin_economy_config row missing, defaulting rate to 1")
+                    return 1
+                return int(row.review_coin_rate)
+        except Exception as e:
+            logger.error("Failed to read review_coin_rate: %s", e)
+            return 1
 
     def get_daily_counts(self, target_date) -> list[tuple[str, int]]:
         """Get review counts for a specific date.

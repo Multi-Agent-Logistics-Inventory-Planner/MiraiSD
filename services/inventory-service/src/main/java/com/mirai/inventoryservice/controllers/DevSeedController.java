@@ -1119,6 +1119,8 @@ public class DevSeedController {
                     case RESTOCK, RETURN, INITIAL_STOCK, SHIPMENT_RECEIPT, SHIPMENT_PARTIAL_RECEIPT, KUJI_DRAW_REVERSED -> qty;
                     case TRANSFER, ADJUSTMENT, SHIPMENT_EDITED -> random.nextBoolean() ? qty : -qty;
                     case DISPLAY_SET, DISPLAY_REMOVED, DISPLAY_SWAP, SHIPMENT_STATUS_OVERRIDDEN, KUJI_SLIP_ADJUSTMENT -> 0;
+                    // Coin-economy audit-only reason: never seeded as a stock movement.
+                    case COIN_RATE_CHANGED -> 0;
                 };
 
                 int previousQty = BASE_STOCK_QUANTITY + random.nextInt(STOCK_QUANTITY_RANGE);

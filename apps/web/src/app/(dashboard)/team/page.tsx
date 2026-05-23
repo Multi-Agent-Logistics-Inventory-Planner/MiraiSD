@@ -4,9 +4,9 @@ import { Suspense } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { TeamTab } from "@/types/team";
 import { useTabParam } from "@/hooks/use-tab-param";
-import { TeamTabs, TabMembers, TabReviews } from "./_components";
+import { TeamTabs, TabMembers, TabReviews, TabLootbox } from "./_components";
 
-const TEAM_TAB_VALUES = [TeamTab.MEMBERS, TeamTab.REVIEWS] as const;
+const TEAM_TAB_VALUES = [TeamTab.MEMBERS, TeamTab.REVIEWS, TeamTab.LOOTBOX] as const;
 
 function TeamContent() {
   const { value, setValue, mountedValues } = useTabParam<TeamTab>({
@@ -23,6 +23,9 @@ function TeamContent() {
       </div>
       <div className={currentTab !== TeamTab.REVIEWS ? "hidden" : undefined}>
         {mountedValues.has(TeamTab.REVIEWS) && <TabReviews />}
+      </div>
+      <div className={currentTab !== TeamTab.LOOTBOX ? "hidden" : undefined}>
+        {mountedValues.has(TeamTab.LOOTBOX) && <TabLootbox />}
       </div>
     </div>
   );

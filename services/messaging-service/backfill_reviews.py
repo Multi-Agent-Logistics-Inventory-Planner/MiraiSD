@@ -179,6 +179,7 @@ def preview_reviews_by_date(reviews, start_date: date, end_date: date):
 def backfill_direct_to_db(
     reviews,
     by_date: dict[date, list],
+    rate: int | None = None,
 ) -> dict[date, int]:
     """Write reviews directly to database, bypassing Kafka.
 
@@ -194,6 +195,10 @@ def backfill_direct_to_db(
     print("=" * 60)
 
     repo = SupabaseRepo()
+    # Snapshot the rate once for the whole direct-write batch so all backfilled rows
+    # are priced consistently (matches the Kafka path's batch semantics).
+    effective_rate = rate if rate is not None else repo.get_review_coin_rate()
+    print(f"Using review-to-coin rate: {effective_rate}")
     results: dict[date, int] = {}
 
     for d in sorted(by_date.keys()):
@@ -216,8 +221,8 @@ def backfill_direct_to_db(
             )
 
             if review_id:
-                # Update daily count
-                repo.increment_daily_count(employee, review_date)
+                # Update daily count + coins_awarded with the snapshotted rate
+                repo.increment_daily_count(employee, review_date, rate=effective_rate)
                 count += 1
 
         if count > 0:
@@ -234,6 +239,7 @@ def backfill_date_range(
     max_reviews: int = 1000,
     dry_run: bool = False,
     direct: bool = False,
+    rate: int | None = None,
 ) -> dict[date, int]:
     """Backfill reviews for a date range.
 
@@ -317,18 +323,21 @@ def backfill_date_range(
 
     # Direct mode: write straight to database
     if direct:
-        results = backfill_direct_to_db(reviews, by_date)
+        results = backfill_direct_to_db(reviews, by_date, rate=rate)
         print("\n" + "=" * 60)
         print(f"DONE: Stored {sum(results.values())} reviews across {len(results)} days")
         print("=" * 60)
         return results
 
-    # Kafka mode: publish to Kafka for worker to process
+    # Kafka mode: publish to Kafka for worker to process. Snapshot the rate once
+    # here so every day in this backfill carries the same value through Kafka.
     print("\n" + "=" * 60)
     print("PUBLISHING TO KAFKA")
     print("=" * 60)
 
     fetcher = ReviewFetcher()
+    effective_rate = rate if rate is not None else fetcher._repo.get_review_coin_rate()
+    print(f"Using review-to-coin rate: {effective_rate}")
     results: dict[date, int] = {}
     current = start_date
 
@@ -337,6 +346,7 @@ def backfill_date_range(
             count = fetcher.fetch_and_publish_daily(
                 target_date=current,
                 prefetched_reviews=reviews,
+                coin_rate=effective_rate,
             )
             if count > 0:
                 print(f"  {current}: {count} reviews published")
@@ -413,6 +423,12 @@ Examples:
         action="store_true",
         help="Skip confirmation prompt",
     )
+    parser.add_argument(
+        "--rate", "-r",
+        type=int,
+        default=None,
+        help="Review-to-coin rate to apply (default: read current value from coin_economy_config)",
+    )
 
     args = parser.parse_args()
 
@@ -449,6 +465,9 @@ Examples:
             print("Aborted.")
             return 1
 
+    if args.rate is not None and args.rate < 0:
+        parser.error("--rate must be >= 0")
+
     # Run backfill
     results = backfill_date_range(
         start_date=start_date,
@@ -456,6 +475,7 @@ Examples:
         max_reviews=args.max_reviews,
         dry_run=args.dry_run,
         direct=args.direct,
+        rate=args.rate,
     )
 
     return 0

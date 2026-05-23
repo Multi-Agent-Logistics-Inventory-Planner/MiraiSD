@@ -70,6 +70,41 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
             "ORDER BY SUM(c.reviewCount) DESC")
     List<Object[]> getAllTimeTotalsByUser();
 
+    /**
+     * Combined lifetime + expired review-credit sums in one round-trip, for
+     * `LootboxService.computeBalance`. Returns a single-row list of
+     * `[totalAwarded: Long, expiredAwarded: Long]`. Wrapped in `List<Object[]>` to match
+     * how Hibernate hands back multi-column aggregate projections in this codebase
+     * (see `getAllTimeStatsByUser`).
+     * Sums coins_awarded (immutable per row) so rate changes never re-price history.
+     */
+    @Query("SELECT COALESCE(SUM(c.coinsAwarded), 0), " +
+            "COALESCE(SUM(CASE WHEN c.expiresAt <= :today THEN c.coinsAwarded ELSE 0 END), 0) " +
+            "FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId")
+    List<Object[]> sumCoinTotalsByUserId(@Param("userId") UUID userId,
+                                         @Param("today") LocalDate today);
+
+    /**
+     * Daily review credit rows for the user's history view (newest first), every row
+     * included. Returns [date, reviewCount, coinsAwarded, expiresAt] so the UI can
+     * label the row with both the review count and the coins they earned.
+     */
+    @Query("SELECT c.date, c.reviewCount, c.coinsAwarded, c.expiresAt " +
+            "FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId " +
+            "ORDER BY c.date DESC")
+    List<Object[]> findDailyCreditsByUser(@Param("userId") UUID userId);
+
+    /** Rows whose expires_at is between (today, today + windowDays] for the "expiring soon" UI. */
+    @Query("SELECT c FROM ReviewDailyCount c " +
+            "WHERE c.user.id = :userId " +
+            "  AND c.expiresAt > :today AND c.expiresAt <= :until " +
+            "ORDER BY c.expiresAt ASC")
+    List<ReviewDailyCount> findExpiringSoon(@Param("userId") UUID userId,
+                                            @Param("today") LocalDate today,
+                                            @Param("until") LocalDate until);
+
     /** This user's all-time rank (1-based) without loading all users' totals. */
     @Query(value = "SELECT 1 + COALESCE(COUNT(*), 0) FROM (" +
             "SELECT c.user_id, SUM(c.review_count) AS total FROM review_daily_counts c " +

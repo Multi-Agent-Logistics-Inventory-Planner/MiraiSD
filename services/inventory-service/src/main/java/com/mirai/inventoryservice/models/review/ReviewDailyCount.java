@@ -42,7 +42,20 @@ public class ReviewDailyCount {
     @Builder.Default
     private Integer reviewCount = 0;
 
+    /**
+     * Coins granted by this row's reviews. Captured at write time using the rate active
+     * at the start of the batch — so a later rate change can't retroactively re-price
+     * past activity. The balance formula sums this, not review_count.
+     */
+    @Column(name = "coins_awarded")
+    @Builder.Default
+    private Integer coinsAwarded = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
+
+    /** Generated column: date + 90 days. Read-only — DO NOT set via builder. */
+    @Column(name = "expires_at", insertable = false, updatable = false)
+    private LocalDate expiresAt;
 }
