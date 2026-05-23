@@ -291,12 +291,13 @@ class MessagingWorker:
                 logger.exception("Failed to deliver notification %s: %s", notif["id"], e)
                 failed_ids.append(notif["id"])
 
-        # Now update database in batch (single connection usage)
-        for notif_id in delivered_ids:
-            self._repo.mark_as_delivered(notif_id)
-
-        for notif_id in failed_ids:
-            self._repo.release_claim(notif_id)
+        # Bulk-update in two round trips (one per outcome) instead of one per id.
+        # During Slack outages, failed_ids can be a full batch (10) — collapsing
+        # the per-id loop avoids 10x the pooler chatter on the failure path.
+        if delivered_ids:
+            self._repo.mark_as_delivered_bulk(delivered_ids)
+        if failed_ids:
+            self._repo.release_claims_bulk(failed_ids)
 
     def _process_event(self, event: NormalizedEvent) -> None:
         """Process a single inventory change event.

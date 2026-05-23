@@ -39,8 +39,10 @@ ALERT_DEBOUNCE_SECONDS = float(os.getenv("ALERT_DEBOUNCE_SECONDS", "300.0"))  # 
 LOCATION_LOW_STOCK_THRESHOLD = int(os.getenv("LOCATION_LOW_STOCK_THRESHOLD", "5"))
 LOCATION_LOW_STOCK_RECOVERY = int(os.getenv("LOCATION_LOW_STOCK_RECOVERY", "7"))  # threshold + 2 for hysteresis
 
-# Notification polling interval for Slack delivery (seconds)
-NOTIFICATION_POLL_INTERVAL = float(os.getenv("NOTIFICATION_POLL_INTERVAL", "5.0"))
+# Notification polling interval for Slack delivery (seconds).
+# Bumped from 5s -> 15s to cut Supabase pooler egress. ~3x reduction on
+# UPDATE notifications churn; alerts are background, latency floor is fine.
+NOTIFICATION_POLL_INTERVAL = float(os.getenv("NOTIFICATION_POLL_INTERVAL", "15.0"))
 
 # API settings (optional health endpoint)
 API_HOST = os.getenv("API_HOST", "0.0.0.0")

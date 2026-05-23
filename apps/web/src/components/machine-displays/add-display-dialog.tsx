@@ -19,7 +19,7 @@ import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-he
 import { getProducts } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
-import type { Product, Category, MachineDisplay } from "@/types/api";
+import type { ProductListItem, Category, MachineDisplay } from "@/types/api";
 
 interface AddDisplayDialogProps {
   open: boolean;
@@ -30,7 +30,7 @@ interface AddDisplayDialogProps {
 }
 
 interface DisplayProductCardProps {
-  product: Product;
+  product: ProductListItem;
   selected: boolean;
   onToggle: () => void;
   disabled?: boolean;

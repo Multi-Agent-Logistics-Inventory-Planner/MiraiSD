@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { isUploadError, uploadProductImage } from "@/lib/supabase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useLastClosedKujiTiers } from "@/hooks/queries/use-kuji-box";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import {
   blankTier,
   EMPTY_LOCATION,
@@ -151,7 +151,7 @@ export const TierDraftEditor = forwardRef<
     clearTierErrors(tempId);
   }
 
-  function handleLinkedProductSelect(tempId: string, product: Product) {
+  function handleLinkedProductSelect(tempId: string, product: ProductListItem) {
     setTiers((prev) =>
       prev.map((t) => {
         if (t.tempId !== tempId) return t;

@@ -97,7 +97,7 @@ export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
       <ProductForm
         open={editOpen}
         onOpenChange={setEditOpen}
-        initialProduct={current.product}
+        initialProductId={current.product.id}
       />
       <KujiHistoryDialog
         open={historyOpen}

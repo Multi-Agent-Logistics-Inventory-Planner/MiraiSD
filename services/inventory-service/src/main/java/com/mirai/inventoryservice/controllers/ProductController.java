@@ -2,9 +2,10 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.mappers.ProductMapper;
 import com.mirai.inventoryservice.dtos.requests.ProductRequestDTO;
+import com.mirai.inventoryservice.dtos.responses.ProductListItemDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductResponseDTO;
-import com.mirai.inventoryservice.dtos.responses.ProductSummaryDTO;
 import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.models.enums.KujiType;
 import com.mirai.inventoryservice.services.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -13,7 +14,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -28,42 +28,40 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductResponseDTO>> getAllProducts(
+    public ResponseEntity<List<ProductListItemDTO>> getAllProducts(
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly,
             @RequestParam(required = false, defaultValue = "false") Boolean rootOnly,
             @RequestParam(required = false, defaultValue = "false") Boolean kujiOnly,
             @RequestParam(required = false, defaultValue = "false") Boolean excludeCustomKuji) {
-        List<Product> products;
+        List<ProductListItemDTO> products;
 
         if (search != null && !search.isBlank()) {
-            products = productService.searchProducts(search);
+            products = productService.searchProductsAsListItems(search);
         } else if (rootOnly && Boolean.TRUE.equals(kujiOnly)) {
-            products = productService.getRootKujiProducts();
+            products = productService.getRootKujiProductsAsListItems();
         } else if (rootOnly && activeOnly) {
-            products = productService.getActiveRootProducts();
+            products = productService.getActiveRootProductsAsListItems();
         } else if (rootOnly) {
-            products = productService.getRootProducts();
+            products = productService.getRootProductsAsListItems();
         } else if (categoryId != null && activeOnly) {
-            products = productService.getActiveProductsByCategory(categoryId);
+            products = productService.getActiveProductsByCategoryAsListItems(categoryId);
         } else if (categoryId != null) {
-            products = productService.getProductsByCategory(categoryId);
+            products = productService.getProductsByCategoryAsListItems(categoryId);
         } else if (activeOnly) {
-            products = productService.getActiveProducts();
+            products = productService.getActiveProductsAsListItems();
         } else {
-            products = productService.getAllProducts();
+            products = productService.getAllProductsAsListItems();
         }
 
         if (Boolean.TRUE.equals(excludeCustomKuji)) {
             products = products.stream()
-                    .filter(p -> p.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM)
+                    .filter(p -> p.getKujiType() != KujiType.CUSTOM)
                     .toList();
         }
 
-        // Batch fetch parent IDs to avoid N+1 when computing hasChildren
-        Set<UUID> parentIds = productService.getParentProductIds();
-        return ResponseEntity.ok(productMapper.toResponseDTOList(products, parentIds));
+        return ResponseEntity.ok(products);
     }
 
     @GetMapping("/{id}")
@@ -192,12 +190,12 @@ public class ProductController {
      * Get children of a product
      */
     @GetMapping("/{id}/children")
-    public ResponseEntity<List<ProductSummaryDTO>> getProductChildren(
+    public ResponseEntity<List<ProductListItemDTO>> getProductChildren(
             @PathVariable UUID id,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
-        List<Product> children = activeOnly
-                ? productService.getActiveChildProducts(id)
-                : productService.getChildProducts(id);
-        return ResponseEntity.ok(productMapper.toSummaryDTOList(children));
+        List<ProductListItemDTO> children = activeOnly
+                ? productService.getActiveChildProductsAsListItems(id)
+                : productService.getChildProductsAsListItems(id);
+        return ResponseEntity.ok(children);
     }
 }

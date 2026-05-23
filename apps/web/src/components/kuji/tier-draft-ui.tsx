@@ -11,7 +11,7 @@ import { SelectShipmentProductDialog } from "@/components/shipments/select-shipm
 import { cn } from "@/lib/utils";
 import { validateFile } from "@/lib/supabase/storage";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
-import type { Product } from "@/types/api";
+import type { ProductListItem } from "@/types/api";
 import { EMPTY_LOCATION, type DraftTier } from "@/components/kuji/tier-draft";
 
 export interface TierSidebarItemProps {
@@ -103,7 +103,7 @@ export interface TierPanelProps {
   readonly errors: Record<string, string>;
   readonly isPending: boolean;
   readonly onUpdate: (tempId: string, updates: Partial<DraftTier>) => void;
-  readonly onLinkedProductSelect: (tempId: string, product: Product) => void;
+  readonly onLinkedProductSelect: (tempId: string, product: ProductListItem) => void;
 }
 
 export function TierPanel({

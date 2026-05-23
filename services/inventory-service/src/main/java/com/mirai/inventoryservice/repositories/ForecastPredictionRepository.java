@@ -23,8 +23,19 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
     // Find all predictions for a specific inventory item
     List<ForecastPrediction> findByItemIdOrderByComputedAtDesc(UUID itemId);
 
-    // Find only the latest prediction per item (paginated)
-    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+    // Column list explicitly excluding the heavy `features` JSONB column for forecast-only
+    // callers (ForecastService + ProductReportBundleService never read features).
+    // We project `NULL AS features` so Hibernate's entity result-set mapper still finds
+    // a column by that name and hydrates `features = null` instead of erroring out.
+    // Methods that DO need features (AnalyticsService.extractFeatures, AnalyticsSeedService,
+    // DevSeedController) continue to use findAllLatest below, which still SELECTs fp.*.
+    String FORECAST_COLS_NO_FEATURES =
+            "fp.id, fp.item_id, fp.horizon_days, fp.avg_daily_delta, fp.days_to_stockout, "
+                    + "fp.suggested_reorder_qty, fp.suggested_order_date, fp.confidence, "
+                    + "fp.computed_at, NULL AS features";
+
+    // Find only the latest prediction per item (paginated). `features` is null on returned entities.
+    @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at",
@@ -32,7 +43,8 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     Page<ForecastPrediction> findLatestPerItem(Pageable pageable);
 
-    // Find only the latest prediction per item (non-paginated, for analytics)
+    // Find only the latest prediction per item (non-paginated). Keeps fp.* because
+    // AnalyticsService callers consume `features` here.
     @Query(value = "SELECT fp.* FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
@@ -40,8 +52,9 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findAllLatest();
 
-    // Find latest predictions limited to N items, ordered by urgency (days to stockout)
-    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+    // Find latest predictions limited to N items, ordered by urgency (days to stockout).
+    // `features` is null on returned entities.
+    @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
@@ -50,8 +63,8 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findAllLatestLimited(@Param("limit") int limit);
 
-    // Find latest prediction per item, filtered to a set of item IDs
-    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+    // Find latest prediction per item, filtered to a set of item IDs. `features` is null.
+    @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
@@ -59,8 +72,8 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findLatestByItemIds(@Param("itemIds") List<UUID> itemIds);
 
-    // Find at-risk items using only the latest prediction per item
-    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+    // Find at-risk items using only the latest prediction per item. `features` is null.
+    @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
@@ -80,8 +93,9 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
     // Delete predictions with suggested order date before the given date (overdue cleanup)
     int deleteBySuggestedOrderDateBefore(LocalDate date);
 
-    // Find the item with highest demand (lowest avgDailyDelta) using only the latest prediction per item
-    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+    // Find the item with highest demand (lowest avgDailyDelta) using only the latest prediction per item.
+    // `features` is null on the returned entity.
+    @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "

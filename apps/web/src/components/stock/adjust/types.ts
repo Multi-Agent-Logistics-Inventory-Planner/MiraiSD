@@ -56,7 +56,9 @@ export function createNormalizedInventory(
       imageUrl: product.imageUrl,
     },
     quantity: totalQuantity,
-    createdAt: product.createdAt,
+    // List endpoints only return updatedAt; fall back to the same value for createdAt
+    // since this normalized record is consumed as a stock-display row, not an audit object.
+    createdAt: product.updatedAt,
     updatedAt: product.updatedAt,
   };
 }

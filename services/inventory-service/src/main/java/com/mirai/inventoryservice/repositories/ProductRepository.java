@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.repositories;
 
+import com.mirai.inventoryservice.dtos.responses.ProductListItemDTO;
 import com.mirai.inventoryservice.models.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -105,4 +106,59 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     // Count products by preferred supplier
     @Query("SELECT COUNT(p) FROM Product p WHERE p.preferredSupplier.id = :supplierId")
     long countByPreferredSupplierId(@Param("supplierId") UUID supplierId);
+
+    // ==================== Slim Projection Queries (list endpoints) ====================
+    // Project flat columns into ProductListItemDTO. No JOIN FETCH — Hibernate does
+    // not hydrate Product/Category/Supplier entities, just the named columns.
+    // Drops description, notes, parent entity, children, createdAt to cut pooler egress.
+
+    String LIST_ITEM_SELECT = "SELECT new com.mirai.inventoryservice.dtos.responses.ProductListItemDTO("
+            + "p.id, p.sku, p.name, p.imageUrl, p.isActive, "
+            + "p.quantity, p.letter, p.templateQuantity, p.packsPerBox, "
+            + "p.parentId, p.kujiType, p.kujiSlackWebhookUrl, "
+            + "p.reorderPoint, p.targetStockLevel, p.leadTimeDays, "
+            + "p.unitCost, p.msrp, "
+            + "p.preferredSupplierId, s.displayName, p.preferredSupplierAuto, "
+            + "p.updatedAt, "
+            + "c.id, c.name, c.parentId, c.slug, c.displayOrder, c.isActive, c.usesPacks"
+            + ") "
+            + "FROM Product p "
+            + "LEFT JOIN p.category c "
+            + "LEFT JOIN p.preferredSupplier s ";
+
+    @Query(LIST_ITEM_SELECT)
+    List<ProductListItemDTO> findAllAsListItems();
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.isActive = true")
+    List<ProductListItemDTO> findActiveAsListItems();
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.category.id = :categoryId")
+    List<ProductListItemDTO> findByCategoryIdAsListItems(@Param("categoryId") UUID categoryId);
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.category.id = :categoryId AND p.isActive = true")
+    List<ProductListItemDTO> findByCategoryIdActiveAsListItems(@Param("categoryId") UUID categoryId);
+
+    @Query(LIST_ITEM_SELECT
+            + "WHERE p.isActive = true AND ("
+            + "LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR "
+            + "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')))")
+    List<ProductListItemDTO> searchAsListItems(@Param("query") String query);
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.parent IS NULL ORDER BY p.name")
+    List<ProductListItemDTO> findRootAsListItems();
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.parent IS NULL AND p.isActive = true ORDER BY p.name")
+    List<ProductListItemDTO> findRootActiveAsListItems();
+
+    @Query(LIST_ITEM_SELECT
+            + "WHERE p.parent IS NULL "
+            + "AND EXISTS (SELECT 1 FROM Product ch WHERE ch.parent.id = p.id) "
+            + "ORDER BY p.name")
+    List<ProductListItemDTO> findRootKujiAsListItems();
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.parent.id = :parentId ORDER BY p.sku")
+    List<ProductListItemDTO> findByParentIdAsListItems(@Param("parentId") UUID parentId);
+
+    @Query(LIST_ITEM_SELECT + "WHERE p.parent.id = :parentId AND p.isActive = true ORDER BY p.sku")
+    List<ProductListItemDTO> findByParentIdActiveAsListItems(@Param("parentId") UUID parentId);
 }

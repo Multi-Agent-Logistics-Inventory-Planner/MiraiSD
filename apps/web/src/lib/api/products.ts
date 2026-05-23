@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./client";
-import { Product, ProductRequest, ProductSummary } from "@/types/api";
+import { Product, ProductListItem, ProductRequest } from "@/types/api";
 
 const BASE_PATH = "/api/products";
 
@@ -16,7 +16,7 @@ export interface GetProductsOptions {
  */
 export async function getProducts(
   rootOnlyOrOptions: boolean | GetProductsOptions = false
-): Promise<Product[]> {
+): Promise<ProductListItem[]> {
   const opts: GetProductsOptions =
     typeof rootOnlyOrOptions === "boolean"
       ? { rootOnly: rootOnlyOrOptions }
@@ -26,7 +26,7 @@ export async function getProducts(
   if (opts.kujiOnly) params.set("kujiOnly", "true");
   if (opts.excludeCustomKuji) params.set("excludeCustomKuji", "true");
   const qs = params.toString();
-  return apiGet<Product[]>(`${BASE_PATH}${qs ? `?${qs}` : ""}`);
+  return apiGet<ProductListItem[]>(`${BASE_PATH}${qs ? `?${qs}` : ""}`);
 }
 
 /**
@@ -39,8 +39,8 @@ export async function getProductWithChildren(id: string): Promise<Product> {
 /**
  * Get children of a product
  */
-export async function getProductChildren(id: string): Promise<ProductSummary[]> {
-  return apiGet<ProductSummary[]>(`${BASE_PATH}/${id}/children`);
+export async function getProductChildren(id: string): Promise<ProductListItem[]> {
+  return apiGet<ProductListItem[]>(`${BASE_PATH}/${id}/children`);
 }
 
 /**
