@@ -165,7 +165,6 @@ export function RecordDrawDialog({
           onQueryChange={setQuery}
           filter={filter}
           onFilterChange={setFilter}
-          autoFocus
         />
       </div>
 

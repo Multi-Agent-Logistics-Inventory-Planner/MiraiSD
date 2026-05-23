@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ListTodo,
   Loader2,
@@ -89,6 +89,9 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
   const [recordOpen, setRecordOpen] = useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
   const [manageTiersOpen, setManageTiersOpen] = useState(false);
+  // Timestamp of the last inner-modal close, used to suppress mobile ghost-click
+  // bleed-through onto the outer Manage Tiers close button.
+  const innerCloseAt = useRef<number>(0);
 
   const boxIsOpen = box?.status === KujiBoxStatus.OPEN;
 
@@ -338,7 +341,14 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
           />
           <ManageTiersDialog
             open={manageTiersOpen}
-            onOpenChange={setManageTiersOpen}
+            onOpenChange={(o) => {
+              // Mobile ghost-click guard: when the stacked Edit Tier or Transfer-In
+              // modal closes, a synthesized click can land on the outer Manage Tiers
+              // X right below the inner X. Ignore close requests within a short window
+              // after either inner modal closes.
+              if (!o && Date.now() - innerCloseAt.current < 350) return;
+              setManageTiersOpen(o);
+            }}
             box={box}
             canEditStructural={canStructural}
             onEditTier={handleEditTier}
@@ -349,6 +359,7 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               <TierEditDialog
                 open={editTierOpen}
                 onOpenChange={(o) => {
+                  if (!o) innerCloseAt.current = Date.now();
                   setEditTierOpen(o);
                   if (!o) setActiveTier(null);
                 }}
@@ -358,6 +369,7 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
               <TransferInDialog
                 open={transferInOpen}
                 onOpenChange={(o) => {
+                  if (!o) innerCloseAt.current = Date.now();
                   setTransferInOpen(o);
                   if (!o) setActiveTier(null);
                 }}

@@ -204,10 +204,10 @@ export function ManageTiersDialog({
                     mode="managePrizes"
                     tier={tier}
                     totalActive={totalActive}
+                    onBodyClick={() => onEditTier(tier)}
                     onStash={() => handleMoveSlip(tier, "DEACTIVATE")}
                     onPromote={() => handleMoveSlip(tier, "ACTIVATE")}
                     onAdd={() => onTransferIn(tier)}
-                    onMore={() => onEditTier(tier)}
                     disableStash={tier.activeCount === 0}
                     disablePromote={tier.inactiveCount === 0}
                   />
@@ -220,10 +220,10 @@ export function ManageTiersDialog({
                       mode="managePrizes"
                       tier={tier}
                       totalActive={totalActive}
+                      onBodyClick={() => onEditTier(tier)}
                       onStash={() => handleMoveSlip(tier, "DEACTIVATE")}
                       onPromote={() => handleMoveSlip(tier, "ACTIVATE")}
                       onAdd={() => onTransferIn(tier)}
-                      onMore={() => onEditTier(tier)}
                       disableStash={tier.activeCount === 0}
                       disablePromote={tier.inactiveCount === 0}
                     />

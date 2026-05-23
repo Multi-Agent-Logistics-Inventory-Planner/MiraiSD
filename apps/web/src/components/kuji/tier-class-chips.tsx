@@ -48,7 +48,7 @@ export function TierClassChips({
         >
           <span className="capitalize">All</span>
           <span className="text-[10.5px] tabular-nums text-muted-foreground">
-            {tiers.length}
+            {totalActive}
           </span>
         </PillChip>
 
@@ -78,7 +78,7 @@ export function TierClassChips({
                     : "rgba(255,255,255,0.4)",
                 }}
               >
-                {r.count}
+                {r.active}
               </span>
               <span
                 className="text-[10.5px] tabular-nums pl-1.5 ml-0.5 border-l"

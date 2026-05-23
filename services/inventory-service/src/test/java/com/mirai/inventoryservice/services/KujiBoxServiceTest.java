@@ -428,6 +428,163 @@ class KujiBoxServiceTest {
         assertTrue(ex.getMessage().contains("Invalid timezone"));
     }
 
+    // ===================== unit_value snapshot =====================
+
+    @Test
+    void recordDraw_snapshotsTierPriceAsUnitValueInMetadata() {
+        tier.setPrice(new java.math.BigDecimal("50.00"));
+        RecordDrawRequestDTO req = RecordDrawRequestDTO.builder()
+                .actorId(actorId)
+                .draws(List.of(RecordDrawRequestDTO.DrawLine.builder()
+                        .tierId(tierId).quantity(1).build()))
+                .build();
+
+        service.recordDraw(boxId, req);
+
+        StockMovement saved = captureSavedDrawMovement();
+        java.math.BigDecimal unitValue = (java.math.BigDecimal) saved.getMetadata().get("unit_value");
+        assertNotNull(unitValue, "unit_value must be stamped into metadata");
+        assertEquals(0, new java.math.BigDecimal("50.00").compareTo(unitValue),
+                "unit_value should equal tier.price at draw time");
+    }
+
+    @Test
+    void recordDraw_fallsBackToLinkedProductMsrpWhenTierPriceIsNull() {
+        tier.setPrice(null);
+        linkedProduct.setMsrp(new java.math.BigDecimal("30.00"));
+        RecordDrawRequestDTO req = RecordDrawRequestDTO.builder()
+                .actorId(actorId)
+                .draws(List.of(RecordDrawRequestDTO.DrawLine.builder()
+                        .tierId(tierId).quantity(1).build()))
+                .build();
+
+        service.recordDraw(boxId, req);
+
+        StockMovement saved = captureSavedDrawMovement();
+        java.math.BigDecimal unitValue = (java.math.BigDecimal) saved.getMetadata().get("unit_value");
+        assertNotNull(unitValue);
+        assertEquals(0, new java.math.BigDecimal("30.00").compareTo(unitValue),
+                "unit_value should fall back to linked product MSRP when tier price is null");
+    }
+
+    @Test
+    void recordDraw_locksInZeroWhenNeitherTierPriceNorMsrpSet() {
+        tier.setPrice(null);
+        linkedProduct.setMsrp(null);
+        RecordDrawRequestDTO req = RecordDrawRequestDTO.builder()
+                .actorId(actorId)
+                .draws(List.of(RecordDrawRequestDTO.DrawLine.builder()
+                        .tierId(tierId).quantity(1).build()))
+                .build();
+
+        service.recordDraw(boxId, req);
+
+        StockMovement saved = captureSavedDrawMovement();
+        assertTrue(saved.getMetadata().containsKey("unit_value"),
+                "unit_value key must be present even when value is 0");
+        java.math.BigDecimal unitValue = (java.math.BigDecimal) saved.getMetadata().get("unit_value");
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(unitValue),
+                "unit_value should lock in 0 when no price is configured");
+    }
+
+    @Test
+    void undoDraw_copiesSnapshotUnitValueIgnoringLiveTierPrice() {
+        tier.setActiveCount(INITIAL_SLIP_COUNT - 1);
+        tier.setDrawnCount(1);
+        // Live tier price has drifted since the draw — undo must use the snapshot.
+        tier.setPrice(new java.math.BigDecimal("80.00"));
+
+        UUID auditLogId = UUID.randomUUID();
+        AuditLog drawLog = AuditLog.builder()
+                .id(auditLogId)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .build();
+        when(auditLogRepository.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+
+        jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
+        when(entityManager.createNativeQuery(any(String.class), eq(StockMovement.class)))
+                .thenReturn(nativeQuery);
+        when(nativeQuery.setParameter(any(String.class), any())).thenReturn(nativeQuery);
+        when(nativeQuery.getResultList()).thenReturn(Collections.emptyList());
+
+        Map<String, Object> originalMeta = new java.util.HashMap<>();
+        originalMeta.put("kuji_box_id", boxId.toString());
+        originalMeta.put("kuji_box_tier_id", tierId.toString());
+        originalMeta.put("slip_quantity", 1);
+        originalMeta.put("unit_value", new java.math.BigDecimal("50.00"));
+        StockMovement original = StockMovement.builder()
+                .id(42L)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .quantityChange(0)
+                .item(linkedProduct)
+                .metadata(originalMeta)
+                .build();
+        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+                .thenReturn(List.of(original));
+
+        service.undoDraw(boxId, auditLogId, actorId);
+
+        StockMovement reversal = captureSavedMovementByReason(StockMovementReason.KUJI_DRAW_REVERSED);
+        java.math.BigDecimal unitValue = (java.math.BigDecimal) reversal.getMetadata().get("unit_value");
+        assertNotNull(unitValue, "reversal must carry the original snapshot");
+        assertEquals(0, new java.math.BigDecimal("50.00").compareTo(unitValue),
+                "reversal unit_value must mirror the draw snapshot, not the mutated live price");
+    }
+
+    @Test
+    void undoDraw_legacyOriginalWithoutSnapshotOmitsUnitValueOnReversal() {
+        tier.setActiveCount(INITIAL_SLIP_COUNT - 1);
+        tier.setDrawnCount(1);
+
+        UUID auditLogId = UUID.randomUUID();
+        AuditLog drawLog = AuditLog.builder()
+                .id(auditLogId)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .build();
+        when(auditLogRepository.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+
+        jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
+        when(entityManager.createNativeQuery(any(String.class), eq(StockMovement.class)))
+                .thenReturn(nativeQuery);
+        when(nativeQuery.setParameter(any(String.class), any())).thenReturn(nativeQuery);
+        when(nativeQuery.getResultList()).thenReturn(Collections.emptyList());
+
+        Map<String, Object> originalMeta = new java.util.HashMap<>();
+        originalMeta.put("kuji_box_id", boxId.toString());
+        originalMeta.put("kuji_box_tier_id", tierId.toString());
+        originalMeta.put("slip_quantity", 1);
+        // No unit_value key — simulates a legacy draw recorded before this feature.
+        StockMovement original = StockMovement.builder()
+                .id(43L)
+                .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .quantityChange(0)
+                .item(linkedProduct)
+                .metadata(originalMeta)
+                .build();
+        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+                .thenReturn(List.of(original));
+
+        service.undoDraw(boxId, auditLogId, actorId);
+
+        StockMovement reversal = captureSavedMovementByReason(StockMovementReason.KUJI_DRAW_REVERSED);
+        assertFalse(reversal.getMetadata().containsKey("unit_value"),
+                "legacy original without snapshot must leave reversal metadata unit_value-free; "
+                        + "aggregation SQL falls back to the live join via COALESCE");
+    }
+
+    private StockMovement captureSavedDrawMovement() {
+        return captureSavedMovementByReason(StockMovementReason.KUJI_PRIZE_WON);
+    }
+
+    private StockMovement captureSavedMovementByReason(StockMovementReason reason) {
+        ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues().stream()
+                .filter(m -> m.getReason() == reason)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No saved StockMovement with reason " + reason));
+    }
+
     @Test
     void getDailyPayouts_padsDenseSeriesWithZeros() {
         box.setOpenedAt(java.time.OffsetDateTime.now().minusDays(2));

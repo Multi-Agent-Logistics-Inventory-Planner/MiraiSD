@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ListTodo, Loader2, Lock, MinusCircle, PackageOpen, Undo2 } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +58,9 @@ export function KujiBoxView({
   const [editTierOpen, setEditTierOpen] = useState(false);
   const [transferInOpen, setTransferInOpen] = useState(false);
   const [activeTier, setActiveTier] = useState<KujiBoxTier | null>(null);
+  // Timestamp of the last inner-modal close, used to suppress mobile ghost-click
+  // bleed-through onto the outer Manage Tiers close button.
+  const innerCloseAt = useRef<number>(0);
 
   const box: KujiBox | null = activeQuery.data ?? null;
   const boxIsOpen = box?.status === KujiBoxStatus.OPEN;
@@ -246,7 +249,13 @@ export function KujiBoxView({
           />
           <ManageTiersDialog
             open={manageTiersOpen}
-            onOpenChange={setManageTiersOpen}
+            onOpenChange={(o) => {
+              // Mobile ghost-click guard: when a stacked inner modal closes, a
+              // synthesized click can land on the outer X right below the inner X.
+              // Ignore close requests within a short window after either inner modal closes.
+              if (!o && Date.now() - innerCloseAt.current < 350) return;
+              setManageTiersOpen(o);
+            }}
             box={box}
             canEditStructural={canStructural}
             onEditTier={handleEditTier}
@@ -257,6 +266,7 @@ export function KujiBoxView({
               <TierEditDialog
                 open={editTierOpen}
                 onOpenChange={(o) => {
+                  if (!o) innerCloseAt.current = Date.now();
                   setEditTierOpen(o);
                   if (!o) setActiveTier(null);
                 }}
@@ -266,6 +276,7 @@ export function KujiBoxView({
               <TransferInDialog
                 open={transferInOpen}
                 onOpenChange={(o) => {
+                  if (!o) innerCloseAt.current = Date.now();
                   setTransferInOpen(o);
                   if (!o) setActiveTier(null);
                 }}

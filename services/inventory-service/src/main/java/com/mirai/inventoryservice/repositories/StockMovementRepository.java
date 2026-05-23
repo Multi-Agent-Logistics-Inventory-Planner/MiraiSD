@@ -118,10 +118,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     /**
      * Aggregate KUJI draw payouts for a single box, bucketed per calendar day in the
      * requested timezone. Slip counts come from metadata.slip_quantity (KUJI movements
-     * carry quantity_change = 0). Value is slip count multiplied by effective tier price
-     * (tier.price OR linked-product msrp). Reversals subtract on the day the reversal
-     * occurred. Returns rows only for days with activity; the service pads zeros for
-     * the dense series.
+     * carry quantity_change = 0). Value is slip count multiplied by the per-slip price,
+     * preferring the snapshot stamped into metadata at draw time (metadata.unit_value)
+     * and falling back to the live tier.price → linked-product.msrp join for legacy
+     * rows. Reversals subtract on the day the reversal occurred. Returns rows only for
+     * days with activity; the service pads zeros for the dense series.
      * Columns: bucket_date (date), slip_count (int), value_won (numeric).
      */
     @Query(value = """
@@ -138,10 +139,10 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
                 CASE
                     WHEN sm.reason = 'KUJI_PRIZE_WON'
                         THEN COALESCE((sm.metadata->>'slip_quantity')::int, 0)
-                            * COALESCE(t.price, p.msrp, 0)
+                            * COALESCE((sm.metadata->>'unit_value')::numeric, t.price, p.msrp, 0)
                     WHEN sm.reason = 'KUJI_DRAW_REVERSED'
                         THEN -COALESCE((sm.metadata->>'slip_quantity')::int, 0)
-                            * COALESCE(t.price, p.msrp, 0)
+                            * COALESCE((sm.metadata->>'unit_value')::numeric, t.price, p.msrp, 0)
                     ELSE 0
                 END
             ) AS value_won
