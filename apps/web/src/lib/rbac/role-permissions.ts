@@ -97,6 +97,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
     // Machine Displays - full access for employees to manage displays
     Permission.MACHINE_DISPLAYS_VIEW,
     Permission.MACHINE_DISPLAYS_MANAGE,
+
+    // Team - view only (admin actions stay gated by canManageUsers / isAdmin in the UI)
+    Permission.TEAM_VIEW,
   ]),
 };
 
