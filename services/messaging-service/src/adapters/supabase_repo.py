@@ -428,6 +428,74 @@ class SupabaseRepo:
             logger.error("Failed to release notification claim: %s", e)
             return False
 
+    def mark_as_delivered_bulk(self, notification_ids: list[str]) -> bool:
+        """Mark multiple notifications as delivered in a single round trip.
+
+        Args:
+            notification_ids: List of UUIDs (as strings) of delivered notifications
+
+        Returns:
+            True if updated, False on error
+        """
+        if not notification_ids:
+            return True
+
+        query = text("""
+            UPDATE notifications
+            SET delivered_at = NOW(),
+                delivery_status = 'delivered'
+            WHERE id = ANY(:ids)
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(
+                    query,
+                    {"ids": [uuid.UUID(nid) for nid in notification_ids]},
+                )
+                conn.commit()
+                logger.debug(
+                    "Marked %d notifications as delivered", len(notification_ids)
+                )
+                return True
+        except Exception as e:
+            logger.error("Failed to bulk-mark notifications as delivered: %s", e)
+            return False
+
+    def release_claims_bulk(self, notification_ids: list[str]) -> bool:
+        """Release multiple claimed notifications back to pending in a single round trip.
+
+        Args:
+            notification_ids: List of UUIDs (as strings) of failed deliveries
+
+        Returns:
+            True if updated, False on error
+        """
+        if not notification_ids:
+            return True
+
+        query = text("""
+            UPDATE notifications
+            SET delivery_status = 'pending',
+                delivery_attempts = COALESCE(delivery_attempts, 0) + 1
+            WHERE id = ANY(:ids)
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                conn.execute(
+                    query,
+                    {"ids": [uuid.UUID(nid) for nid in notification_ids]},
+                )
+                conn.commit()
+                logger.debug(
+                    "Released claim on %d notifications", len(notification_ids)
+                )
+                return True
+        except Exception as e:
+            logger.error("Failed to bulk-release notification claims: %s", e)
+            return False
+
     # -------------------------------------------------------------------------
     # Review tracking methods (using users table)
     # -------------------------------------------------------------------------
