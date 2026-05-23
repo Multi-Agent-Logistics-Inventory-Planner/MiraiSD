@@ -18,7 +18,7 @@ export function HistoryTab() {
           History
         </span>
         <p className="text-[13px] text-muted-foreground">
-          Your coin activity. A team-wide audit log is coming in a follow-up.
+          Coin Activity Displayed Here.
         </p>
       </div>
       <CoinHistoryPanel

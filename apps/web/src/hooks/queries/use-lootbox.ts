@@ -23,7 +23,8 @@ export const lootboxKeys = {
   adminCrates: ["lootbox", "admin", "crates"] as const,
   myPrizes: ["lootbox", "my-prizes"] as const,
   myHistory: ["lootbox", "my-history"] as const,
-  recent: (limit: number) => ["lootbox", "recent", limit] as const,
+  recent: (limit: number, crateId?: string) =>
+    ["lootbox", "recent", limit, crateId ?? null] as const,
   pending: (status: "WON" | "REDEEMED", page: number, size: number) =>
     ["lootbox", "admin", "pending", status, page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
@@ -86,13 +87,13 @@ export function useMyCoinHistory() {
   });
 }
 
-export function useRecentLootboxPlays(limit = 20) {
+export function useRecentLootboxPlays(limit = 20, crateId?: string) {
   // No refetchInterval: usePlayLootboxMutation invalidates this key on every spin,
   // and default focus/mount refetch (subject to the 60s staleness dedupe) surfaces
   // other players' drops without a per-tab background poll.
   return useQuery({
-    queryKey: lootboxKeys.recent(limit),
-    queryFn: () => getRecentPlays(limit),
+    queryKey: lootboxKeys.recent(limit, crateId),
+    queryFn: () => getRecentPlays(limit, crateId),
     staleTime: 60 * 1000,
   });
 }

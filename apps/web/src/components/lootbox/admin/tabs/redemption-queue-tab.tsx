@@ -63,7 +63,7 @@ export function RedemptionQueueTab() {
           Redemption queue
         </span>
         <p className="text-[13px] text-muted-foreground">
-          Prizes won by team members — pending handover or already redeemed.
+          Prizes won by team members.
         </p>
       </div>
 

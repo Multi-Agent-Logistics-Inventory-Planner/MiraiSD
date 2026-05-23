@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -55,7 +54,10 @@ class LootboxAdminServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private LootboxService lootboxService;
 
-    @InjectMocks private LootboxAdminService adminService;
+    // Use a real tier-lifecycle helper backed by the mocked repos so the side effects
+    // it produces (tier active toggle + rebalance) are observable in assertions.
+    private LootboxTierLifecycle tierLifecycle;
+    private LootboxAdminService adminService;
 
     private Lootbox crate;
     private LootboxTier common;
@@ -65,6 +67,12 @@ class LootboxAdminServiceTest {
 
     @BeforeEach
     void setUp() {
+        tierLifecycle = new LootboxTierLifecycle(lootboxTierRepository, lootboxPrizeRepository);
+        adminService = new LootboxAdminService(
+                lootboxRepository, lootboxTierRepository, lootboxPrizeRepository,
+                lootboxPlayRepository, coinAdjustmentRepository, userRepository,
+                lootboxService, tierLifecycle);
+
         crate = Lootbox.builder()
                 .id(UUID.randomUUID())
                 .name("Test Crate")
@@ -150,7 +158,7 @@ class LootboxAdminServiceTest {
         when(lootboxTierRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService.updatePrize(prize.getId(), new UpsertPrizeRequestDTO(
-                common.getId(), "Pito Sticker", null, null, true));
+                common.getId(), "Pito Sticker", null, null, true, null));
 
         assertTrue(common.getActive(), "Reactivating the only prize should reactivate its tier");
         // Probability stays at 0 — admin still has to redistribute weight.
@@ -302,5 +310,101 @@ class LootboxAdminServiceTest {
         LootboxException ex = assertThrows(LootboxException.class,
                 () -> adminService.deleteCrate(crateId));
         assertTrue(ex.getMessage().contains("5"));
+    }
+
+    // ----- Per-prize quantity / stock (V46) -----
+
+    @Test
+    @DisplayName("createPrize with quantity = 0 starts the prize as inactive (pre-depleted)")
+    void createPrizeWithZeroQuantityStartsInactive() {
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        when(lootboxPrizeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var dto = adminService.createPrize(new UpsertPrizeRequestDTO(
+                rare.getId(), "Coffee Voucher", null, null, true, 0));
+
+        assertEquals(0, dto.quantity());
+        assertEquals(false, dto.active(), "quantity=0 at create time should pre-deplete the prize");
+    }
+
+    @Test
+    @DisplayName("createPrize carries a positive quantity through onto the persisted prize")
+    void createPrizePositiveQuantity() {
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        when(lootboxPrizeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var dto = adminService.createPrize(new UpsertPrizeRequestDTO(
+                rare.getId(), "Limited Voucher", null, null, true, 5));
+
+        assertEquals(5, dto.quantity());
+        assertTrue(dto.active());
+    }
+
+    @Test
+    @DisplayName("updatePrize: setting quantity to 0 retires a depleted prize and deactivates its tier")
+    void updatePrizeQuantityZeroRetiresAndDeactivatesTier() {
+        rare.setActive(true);
+        LootboxPrize prize = LootboxPrize.builder()
+                .id(UUID.randomUUID())
+                .tier(rare)
+                .name("Coffee Voucher")
+                .active(true)
+                .quantity(1)
+                .build();
+        when(lootboxPrizeRepository.findById(prize.getId())).thenReturn(Optional.of(prize));
+        when(lootboxPrizeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(lootboxPrizeRepository.countActiveByTierId(rare.getId())).thenReturn(0L);
+        when(lootboxTierRepository.findById(rare.getId())).thenReturn(Optional.of(rare));
+        lenient().when(lootboxTierRepository.findByLootboxIdOrderBySortOrderAscNameAsc(crate.getId()))
+                .thenReturn(List.of(common, rare, epic, legendary));
+
+        adminService.updatePrize(prize.getId(), new UpsertPrizeRequestDTO(
+                rare.getId(), "Coffee Voucher", null, null, null, 0));
+
+        assertEquals(0, prize.getQuantity());
+        assertEquals(false, prize.getActive(), "quantity=0 should auto-retire the prize");
+        assertEquals(false, rare.getActive(), "tier with no active prizes should auto-deactivate");
+    }
+
+    @Test
+    @DisplayName("updatePrize: restocking a depleted prize (quantity > 0) reactivates it")
+    void updatePrizeRestockReactivates() {
+        LootboxPrize prize = LootboxPrize.builder()
+                .id(UUID.randomUUID())
+                .tier(common)
+                .name("Sticker")
+                .active(false)
+                .quantity(0)
+                .build();
+        when(lootboxPrizeRepository.findById(prize.getId())).thenReturn(Optional.of(prize));
+        when(lootboxPrizeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(lootboxTierRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService.updatePrize(prize.getId(), new UpsertPrizeRequestDTO(
+                common.getId(), "Sticker", null, null, null, 3));
+
+        assertEquals(3, prize.getQuantity());
+        assertTrue(prize.getActive(), "Restocking should auto-reactivate the prize");
+        assertTrue(common.getActive(), "Tier should auto-reactivate when its sole prize comes back");
+    }
+
+    @Test
+    @DisplayName("updatePrize: lowering a positive quantity does not toggle active state")
+    void updatePrizeLowerNonZeroKeepsActive() {
+        LootboxPrize prize = LootboxPrize.builder()
+                .id(UUID.randomUUID())
+                .tier(rare)
+                .name("Voucher")
+                .active(true)
+                .quantity(5)
+                .build();
+        when(lootboxPrizeRepository.findById(prize.getId())).thenReturn(Optional.of(prize));
+        when(lootboxPrizeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService.updatePrize(prize.getId(), new UpsertPrizeRequestDTO(
+                rare.getId(), "Voucher", null, null, null, 2));
+
+        assertEquals(2, prize.getQuantity());
+        assertTrue(prize.getActive(), "Lowering to a positive quantity should not retire the prize");
     }
 }

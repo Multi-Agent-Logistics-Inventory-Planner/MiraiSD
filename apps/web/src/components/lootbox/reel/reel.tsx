@@ -48,36 +48,52 @@ export function Reel({
         : "Ready to open.";
 
   return (
+    <div className="relative w-full">
+      {/* Center pointers — two CSS triangles flanking the strip, no connecting line.
+          Sit outside the overflow-hidden viewport so they never clip and don't
+          introduce vertical scrolling. Matches refs/design_handoff_lootbox_v2/
+          reference/option-a.jsx:95-109. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
+        style={{
+          top: -8,
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderTop: "8px solid var(--brand-primary)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
+        style={{
+          bottom: -8,
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderBottom: "8px solid var(--brand-primary)",
+        }}
+      />
+      {/* Glowing vertical line connecting the two pointer triangles. Sits on the
+          wrapper (not the viewport) so it can render full-height without being
+          clipped by the strip's overflow-hidden, and renders above the cards. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 bottom-0 z-30 w-px -translate-x-1/2 bg-brand-primary"
+        style={{ boxShadow: "0 0 6px var(--brand-primary)" }}
+      />
+
     <div
       ref={viewportRef}
       role="status"
       aria-live="polite"
-      className="relative w-full overflow-hidden rounded-lg border border-border bg-background-deep"
+      className="relative w-full overflow-hidden"
       style={{ height }}
     >
       <span className="sr-only">{announce}</span>
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center justify-between py-0.5"
-      >
-        <span
-          className="text-[11px] leading-none text-brand-primary"
-          style={{ filter: "drop-shadow(0 0 4px var(--brand-primary))" }}
-        >
-          ▼
-        </span>
-        <span
-          className="w-px flex-1 bg-brand-primary"
-          style={{ boxShadow: "0 0 6px var(--brand-primary)" }}
-        />
-        <span
-          className="text-[11px] leading-none text-brand-primary"
-          style={{ filter: "drop-shadow(0 0 4px var(--brand-primary))" }}
-        >
-          ▲
-        </span>
-      </div>
 
       <div
         className="flex h-full items-center will-change-transform"
@@ -110,6 +126,7 @@ export function Reel({
               />
             ))}
       </div>
+    </div>
     </div>
   );
 }

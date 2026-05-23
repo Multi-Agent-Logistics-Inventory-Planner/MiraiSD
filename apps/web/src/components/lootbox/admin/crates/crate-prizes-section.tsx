@@ -39,7 +39,19 @@ interface CratePrizesSectionProps {
 
 export function CratePrizesSection({ tiers }: CratePrizesSectionProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const [tabValue, setTabValue] = useState<string>("all");
   const totalPrizes = tiers.reduce((sum, t) => sum + t.prizes.length, 0);
+
+  // If the previously-selected tier was deleted out from under us, snap back to "All".
+  const effectiveTab =
+    tabValue === "all" || tiers.some((t) => t.id === tabValue) ? tabValue : "all";
+
+  const visibleEntries: { readonly tier: LootboxTier; readonly prize: LootboxPrize }[] =
+    tiers.flatMap((tier) =>
+      tier.prizes
+        .filter(() => effectiveTab === "all" || effectiveTab === tier.id)
+        .map((prize) => ({ tier, prize }))
+    );
 
   return (
     <div className="space-y-3">
@@ -58,6 +70,15 @@ export function CratePrizesSection({ tiers }: CratePrizesSectionProps) {
         </Button>
       </div>
 
+      {tiers.length > 0 ? (
+        <TierTabs
+          tiers={tiers}
+          value={effectiveTab}
+          onValueChange={setTabValue}
+          totalPrizes={totalPrizes}
+        />
+      ) : null}
+
       {isAdding ? (
         <NewPrizeSheet tiers={tiers} onClose={() => setIsAdding(false)} />
       ) : null}
@@ -70,21 +91,111 @@ export function CratePrizesSection({ tiers }: CratePrizesSectionProps) {
         <p className="rounded-xl border border-dashed border-border p-6 text-center text-[13px] text-muted-foreground">
           No prizes yet. Click <span className="font-medium">Add prize</span> to create one.
         </p>
+      ) : visibleEntries.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-[13px] text-muted-foreground">
+          No prizes in this tier yet.
+        </p>
       ) : (
         <ul className="space-y-2">
-          {tiers.flatMap((tier) =>
-            tier.prizes.map((prize) => (
-              <PrizeCard
-                key={prize.id}
-                prize={prize}
-                tier={tier}
-                tiers={tiers}
-              />
-            ))
-          )}
+          {visibleEntries.map(({ tier, prize }) => (
+            <PrizeCard
+              key={prize.id}
+              prize={prize}
+              tier={tier}
+              tiers={tiers}
+            />
+          ))}
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Pill-button tab strip for switching between "All" and each tier. Mirrors the styling
+ * of ScrollableTabs (the custom-kuji tier strip) but renders the tier color as a dot
+ * and inlines the tier weight so admins can see prob distribution at a glance.
+ */
+function TierTabs({
+  tiers,
+  value,
+  onValueChange,
+  totalPrizes,
+}: {
+  readonly tiers: readonly LootboxTier[];
+  readonly value: string;
+  readonly onValueChange: (v: string) => void;
+  readonly totalPrizes: number;
+}) {
+  return (
+    <div className="relative">
+      <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10" />
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 pr-6">
+        <TierTabButton
+          active={value === "all"}
+          color={null}
+          label="All"
+          suffix={`${totalPrizes}`}
+          onClick={() => onValueChange("all")}
+        />
+        {tiers.map((t) => (
+          <TierTabButton
+            key={t.id}
+            active={value === t.id}
+            color={t.displayColor}
+            label={t.name}
+            suffix={`${Number(t.probabilityPct).toFixed(2)}%`}
+            onClick={() => onValueChange(t.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TierTabButton({
+  active,
+  color,
+  label,
+  suffix,
+  onClick,
+}: {
+  readonly active: boolean;
+  readonly color: string | null;
+  readonly label: string;
+  readonly suffix: string;
+  readonly onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? "default" : "outline"}
+      size="sm"
+      onClick={onClick}
+      className={cn(
+        "shrink-0 gap-2",
+        active
+          ? "bg-brand-primary text-white hover:bg-brand-primary/90"
+          : "bg-[#e1e1e1] dark:bg-[#30302e] border-none dark:text-[#9b9b9a]"
+      )}
+    >
+      {color ? (
+        <span
+          aria-hidden
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+      ) : null}
+      <span>{label}</span>
+      <span
+        className={cn(
+          "font-mono text-[10.5px] tabular-nums",
+          active ? "text-white/80" : "text-muted-foreground"
+        )}
+      >
+        {suffix}
+      </span>
+    </Button>
   );
 }
 
@@ -144,6 +255,14 @@ function PrizeCard({
   // prize wouldn't change the effective state until the tier gets weight).
   const tierInactive = !tier.active;
   const effectivelyInactive = tierInactive || !prize.active;
+  // Per-prize odds: prizes within a tier are uniformly drawn, so each active prize
+  // gets an equal share of its tier's weight. Inactive/sold-out prizes (active=false)
+  // are excluded from the divisor and show 0%.
+  const activeSiblingCount = tier.prizes.filter((p) => p.active).length;
+  const prizePct =
+    prize.active && !tierInactive && activeSiblingCount > 0
+      ? Number(tier.probabilityPct) / activeSiblingCount
+      : 0;
   return (
     <li
       className={cn(
@@ -161,9 +280,15 @@ function PrizeCard({
         >
           {tier.name}
         </span>
-        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-          {Number(tier.probabilityPct).toFixed(2)}%
-        </span>
+        <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span title="Per-prize probability (tier weight ÷ active siblings)">
+            {prizePct.toFixed(2)}%
+          </span>
+          <span className="opacity-60">·</span>
+          <span title="Tier weight">
+            tier {Number(tier.probabilityPct).toFixed(2)}%
+          </span>
+        </div>
       </div>
       <div className="mt-2.5 flex items-center justify-between gap-3">
         <div className="min-w-0 space-y-0.5">
@@ -177,6 +302,7 @@ function PrizeCard({
           ) : null}
         </div>
         <div className="flex items-center gap-1.5">
+          <QuantityBadge quantity={prize.quantity} />
           <button
             type="button"
             onClick={handleToggleActive}
@@ -256,12 +382,20 @@ function PrizeEditForm({
   const [tierId, setTierId] = useState(prize.tierId);
   const [name, setName] = useState(prize.name);
   const [description, setDescription] = useState(prize.description ?? "");
+  const [quantityInput, setQuantityInput] = useState(
+    prize.quantity === null ? "" : String(prize.quantity)
+  );
   const updatePrize = useUpdatePrizeMutation();
   const imageUpload = useImageUpload(prize.imageUrl);
 
   const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
+    const quantity = parseQuantityInput(quantityInput);
+    if (quantity === "invalid") {
+      toast({ title: "Quantity must be a non-negative whole number." });
+      return;
+    }
     try {
       const imageUrl = await imageUpload.upload();
       await updatePrize.mutateAsync({
@@ -272,6 +406,7 @@ function PrizeEditForm({
           description: description.trim() ? description.trim() : null,
           imageUrl: imageUrl ?? null,
           active: prize.active,
+          quantity,
         },
       });
       toast({ title: `Updated ${trimmed}.`, variant: "success" });
@@ -313,6 +448,18 @@ function PrizeEditForm({
         />
       </div>
       <div className="space-y-1.5">
+        <Label>Stock (blank = unlimited; 0 = sold out)</Label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={quantityInput}
+          onChange={(e) => setQuantityInput(e.target.value)}
+          placeholder="Unlimited"
+        />
+      </div>
+      <div className="space-y-1.5">
         <Label>Image</Label>
         <ImageUpload
           displayUrl={imageUpload.displayUrl}
@@ -350,11 +497,17 @@ function NewPrizeSheet({
   const tierId = selectedTierId || tiers[0]?.id || "";
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [quantityInput, setQuantityInput] = useState("");
   const createPrize = useCreatePrizeMutation();
   const imageUpload = useImageUpload();
 
   const submit = async () => {
     if (!tierId || !name.trim()) return;
+    const quantity = parseQuantityInput(quantityInput);
+    if (quantity === "invalid") {
+      toast({ title: "Quantity must be a non-negative whole number." });
+      return;
+    }
     try {
       const imageUrl = await imageUpload.upload();
       await createPrize.mutateAsync({
@@ -362,6 +515,7 @@ function NewPrizeSheet({
         name: name.trim(),
         description: description.trim() || undefined,
         imageUrl: imageUrl ?? undefined,
+        quantity: quantity ?? undefined,
       });
       toast({ title: "Prize added.", variant: "success" });
       onClose();
@@ -406,6 +560,18 @@ function NewPrizeSheet({
           />
         </div>
         <div className="space-y-1.5">
+          <Label>Stock (blank = unlimited)</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={quantityInput}
+            onChange={(e) => setQuantityInput(e.target.value)}
+            placeholder="Unlimited"
+          />
+        </div>
+        <div className="space-y-1.5">
           <Label>Image (optional)</Label>
           <ImageUpload
             displayUrl={imageUpload.displayUrl}
@@ -430,6 +596,35 @@ function NewPrizeSheet({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Form input parser: blank string -> null (unlimited / no change), valid non-negative
+ * integer -> number, anything else -> "invalid" sentinel for callers to toast on.
+ */
+function parseQuantityInput(raw: string): number | null | "invalid" {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  if (!/^\d+$/.test(trimmed)) return "invalid";
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return "invalid";
+  return n;
+}
+
+function QuantityBadge({ quantity }: { readonly quantity: number | null }) {
+  if (quantity === null) return null;
+  if (quantity === 0) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-rose-500">
+        WON out
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-amber-500">
+      {quantity} left
+    </span>
   );
 }
 

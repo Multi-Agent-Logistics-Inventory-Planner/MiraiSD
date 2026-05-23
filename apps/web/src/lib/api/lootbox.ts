@@ -60,8 +60,13 @@ export function getMyHistory(): Promise<CoinHistoryEntry[]> {
   return apiGet<CoinHistoryEntry[]>(`${BASE}/my-history`);
 }
 
-export function getRecentPlays(limit = 20): Promise<RecentLootboxPlay[]> {
-  return apiGet<RecentLootboxPlay[]>(`${BASE}/recent?limit=${limit}`);
+export function getRecentPlays(
+  limit = 20,
+  crateId?: string
+): Promise<RecentLootboxPlay[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (crateId) qs.set("crateId", crateId);
+  return apiGet<RecentLootboxPlay[]>(`${BASE}/recent?${qs.toString()}`);
 }
 
 // ---------- Admin ----------

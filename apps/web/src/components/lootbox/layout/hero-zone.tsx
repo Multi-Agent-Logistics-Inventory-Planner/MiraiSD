@@ -64,7 +64,11 @@ export function HeroZone(props: HeroZoneProps) {
   const crateName = crate?.name ?? "Mirai Mystery Crate";
   const crateDescription = crate?.description ?? null;
   const showCarousel = crates.length > 1;
-  const isEmpty = !!crate && prizes.length === 0;
+  // Crate is "empty" for spin purposes when it has no rollable prizes — either
+  // truly no prizes at all OR every remaining prize is sold-out (active=false,
+  // quantity=0, kept in the catalog for SOLD OUT display only).
+  const isEmpty =
+    !!crate && !prizes.some((p) => p.active);
 
   const canOpen =
     !!crate && !isEmpty && balance >= cost && phase === "idle" && !isOpening;
@@ -72,7 +76,7 @@ export function HeroZone(props: HeroZoneProps) {
   const buttonLabel = !crate
     ? "Loading…"
     : isEmpty
-      ? "Coming soon"
+      ? "Inactive"
       : balance < cost
         ? "Out of coins"
         : isOpening
@@ -95,7 +99,7 @@ export function HeroZone(props: HeroZoneProps) {
       className="relative overflow-hidden rounded-2xl border border-border px-6 pb-8 pt-10 sm:px-10"
       style={{
         background:
-          "radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.10), transparent 60%), var(--card)",
+          "radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.10), transparent 60%), var(--table-header)",
       }}
     >
       <div className="pointer-events-none absolute left-[28px] top-[22px] hidden font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
@@ -131,7 +135,10 @@ export function HeroZone(props: HeroZoneProps) {
         <CrateIllustration size={140} tint="#a78bfa" />
       </div>
 
-      <div className="mx-auto mt-8 max-w-[920px]">
+      {/* Reel viewport: width = exactly N*cardW + (N-1)*gap (6 cards × 144 + 5 × 12
+          = 924), so the strip fills it edge-to-edge with the pointer at the centre.
+          mx-auto keeps it centred within the hero card. */}
+      <div className="mx-auto mt-8 w-full max-w-[924px]">
         <Reel
           phase={phase}
           strip={strip}

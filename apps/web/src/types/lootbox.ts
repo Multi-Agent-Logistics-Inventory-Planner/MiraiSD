@@ -22,6 +22,8 @@ export interface LootboxPrize {
   tierName: string;
   tierColor: string | null;
   active: boolean;
+  /** null = unlimited stock. 0 = sold out. >0 = copies remaining. */
+  quantity: number | null;
 }
 
 export interface LootboxTier {
@@ -183,6 +185,11 @@ export interface UpsertPrizeRequest {
   description?: string | null;
   imageUrl?: string | null;
   active?: boolean;
+  /**
+   * null/omitted = leave unchanged (or "unlimited" on create). A number sets the cap;
+   * 0 retires the prize, >0 (re)activates it. Cannot be cleared back to null via update.
+   */
+  quantity?: number | null;
 }
 
 export interface CoinAdjustmentRequest {

@@ -102,8 +102,9 @@ public class LootboxController {
 
     @GetMapping("/recent")
     public ResponseEntity<List<RecentLootboxPlayResponseDTO>> getRecentPlays(
-            @RequestParam(defaultValue = "20") int limit) {
-        return ResponseEntity.ok(lootboxService.listRecentPlays(limit));
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) UUID crateId) {
+        return ResponseEntity.ok(lootboxService.listRecentPlays(limit, crateId));
     }
 
     private UUID resolveUserId(Authentication auth) {

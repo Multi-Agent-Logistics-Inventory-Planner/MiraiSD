@@ -34,6 +34,7 @@ import {
   useCreateCrateMutation,
   useDeleteCrateMutation,
   useDeleteTierMutation,
+  useReorderCratesMutation,
   useUpdateCrateMutation,
 } from "@/hooks/mutations/use-lootbox-mutations";
 import { CrateListRail } from "@/components/lootbox/admin/crates/crate-list-rail";
@@ -113,6 +114,21 @@ export function CratesAndPrizesTab() {
     });
   }, [activeCatalog]);
 
+  const reorderMut = useReorderCratesMutation();
+  const handleMove = async (crateId: string, direction: -1 | 1) => {
+    const idx = crates.findIndex((c) => c.id === crateId);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= crates.length) return;
+    const next = [...crates];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    try {
+      await reorderMut.mutateAsync({ ordered: next });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reorder crates.";
+      toast({ title: "Couldn't reorder crates", description: message });
+    }
+  };
+
   const createMut = useCreateCrateMutation();
   const handleNew = async () => {
     try {
@@ -136,8 +152,10 @@ export function CratesAndPrizesTab() {
         activeCrateId={activeCrateId}
         onSelect={setPickedCrateId}
         onNew={handleNew}
+        onMove={handleMove}
         isLoading={cratesQuery.isLoading}
         isCreating={createMut.isPending}
+        isReordering={reorderMut.isPending}
       />
       <div className="flex min-h-0 flex-col">
         {cratesQuery.isLoading || catalogQuery.isLoading ? (
@@ -240,20 +258,8 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
   const handleSave = async () => {
     if (!canSave) return;
     try {
-      await updateMut.mutateAsync({
-        id: admin.id,
-        body: {
-          name: trimmedName,
-          description: description.trim() ? description.trim() : null,
-          imageUrl: admin.imageUrl,
-          cost: numericCost,
-          startsAt: admin.startsAt,
-          endsAt: endsIso,
-          active,
-          siteId: admin.siteId,
-          sortOrder: admin.sortOrder,
-        },
-      });
+      // Apply staged tier-weight edits FIRST so the per-crate sum-to-100 invariant
+      // is satisfied before updateCrate checks it (active=true rejects on sum != 100).
       if (hasWeightEdits) {
         const payload = tiers
           .filter((t) => t.id in weightEdits)
@@ -269,6 +275,20 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
           });
         }
       }
+      await updateMut.mutateAsync({
+        id: admin.id,
+        body: {
+          name: trimmedName,
+          description: description.trim() ? description.trim() : null,
+          imageUrl: admin.imageUrl,
+          cost: numericCost,
+          startsAt: admin.startsAt,
+          endsAt: endsIso,
+          active,
+          siteId: admin.siteId,
+          sortOrder: admin.sortOrder,
+        },
+      });
       setWeightEdits({});
       toast({ title: "Crate saved.", variant: "success" });
     } catch (err) {

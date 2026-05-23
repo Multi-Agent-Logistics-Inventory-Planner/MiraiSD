@@ -38,4 +38,15 @@ public interface LootboxPlayRepository extends JpaRepository<LootboxPlay, UUID> 
             ORDER BY p.playedAt DESC
             """)
     List<LootboxPlay> findRecentPlaysWithAssociations(Pageable pageable);
+
+    @Query("""
+            SELECT p FROM LootboxPlay p
+            JOIN FETCH p.user
+            JOIN FETCH p.prize pr
+            JOIN FETCH pr.tier
+            WHERE p.lootbox.id = :crateId
+            ORDER BY p.playedAt DESC
+            """)
+    List<LootboxPlay> findRecentPlaysByCrateWithAssociations(
+            @Param("crateId") UUID crateId, Pageable pageable);
 }

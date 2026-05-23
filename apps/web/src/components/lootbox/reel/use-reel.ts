@@ -38,8 +38,12 @@ const MOUNT_DELAY_MS = 30;
 
 // Shared by useReel (stride math) and HeroZone (Reel render size). Both MUST
 // use the same values or the strip will land off-center from the pointer.
-export const REEL_DIM_DESKTOP = { cardW: 128, gap: 8, height: 192 } as const;
-export const REEL_DIM_MOBILE = { cardW: 86, gap: 6, height: 132 } as const;
+// Sized to the v2 design handoff: 6 cards visible, flex:1 in a 924px container with
+// gap 12. (924 - 5*12) / 6 = 144 ≈ cardW. Reel container width = exactly N*cardW +
+// (N-1)*gap so the cards span the viewport edge-to-edge with the centre pointer
+// landing in the middle of the strip.
+export const REEL_DIM_DESKTOP = { cardW: 144, gap: 12, height: 144 } as const;
+export const REEL_DIM_MOBILE = { cardW: 86, gap: 6, height: 86 } as const;
 
 // Mirrors the V4 prototype's useReel (refs/design_handoff_loot_crate/desktop.jsx).
 // The strip is built once at open() with the winner at winnerIdx; translate goes

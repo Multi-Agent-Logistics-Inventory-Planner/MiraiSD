@@ -13,5 +13,6 @@ public record LootboxPrizeResponseDTO(
         UUID tierId,
         String tierName,
         String tierColor,
-        boolean active
+        boolean active,
+        Integer quantity
 ) {}

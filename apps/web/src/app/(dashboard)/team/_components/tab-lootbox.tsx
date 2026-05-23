@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Sliders } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   useLootboxBalance,
   useLootboxCatalog,
@@ -48,7 +51,6 @@ export function TabLootbox() {
   const catalogQuery = useLootboxCatalog();
   const prizesQuery = useMyPrizes();
   const historyQuery = useMyCoinHistory();
-  const recentQuery = useRecentLootboxPlays(20);
   const playMutation = usePlayLootboxMutation();
 
   const router = useRouter();
@@ -78,6 +80,10 @@ export function TabLootbox() {
     [crates, selectedCrateId]
   );
 
+  // Filter the drops ticker to the currently-selected crate so the strip only
+  // shows opens for the crate the player is looking at.
+  const recentQuery = useRecentLootboxPlays(20, selectedCrateId ?? undefined);
+
   const allPrizes: LootboxPrize[] = useMemo(() => {
     const tiers = selectedCrate?.tiers ?? [];
     const base = tiers.flatMap((t) =>
@@ -100,6 +106,7 @@ export function TabLootbox() {
         tierName: lastWin.prizeTierName,
         tierColor: null,
         active: true,
+        quantity: null,
       });
     }
     return base;
@@ -119,6 +126,26 @@ export function TabLootbox() {
     cardGap: reelDim.gap,
     spinMs: REEL_SPIN_MS,
   });
+
+  // Suppress the user's own most-recent play from the Crate Opens ticker until the
+  // reel reveal lands, so the strip can't spoil the spin. lastWin.id is set the
+  // moment the play API resolves (before the spin animation finishes), so without
+  // this filter the ticker would show the prize a few hundred ms ahead of the reel.
+  const visibleDrops = useMemo(() => {
+    const all = recentQuery.data ?? [];
+    const hideId = reel.phase !== "won" ? lastWin?.id : null;
+    return hideId ? all.filter((d) => d.id !== hideId) : all;
+  }, [recentQuery.data, reel.phase, lastWin]);
+
+  // Defer the ticker refetch until AFTER the reveal so the play mutation's onSuccess
+  // can't race the reel — invalidating mid-spin would briefly flash the just-won
+  // prize into the ticker before the suppression filter latches.
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (reel.phase === "won") {
+      void qc.invalidateQueries({ queryKey: ["lootbox", "recent"] });
+    }
+  }, [reel.phase, qc]);
 
   // Reset reel + win state whenever the active crate changes so a stale modal
   // from a previous crate doesn't carry across the flip.
@@ -195,6 +222,29 @@ export function TabLootbox() {
 
   const isOpening = playMutation.isPending;
 
+  if (!catalogQuery.isLoading && crates.length === 0) {
+    return (
+      <div className="flex flex-col gap-5">
+        {isAdmin ? (
+          <>
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setAdminOpen(true)}>
+                <Sliders className="h-4 w-4" />
+                Admin
+              </Button>
+            </div>
+            <p className="py-16 text-center text-sm text-muted-foreground">
+              Nothing here — create a crate using Admin button.
+            </p>
+            <AdminModal open={adminOpen} onOpenChange={setAdminOpen} />
+          </>
+        ) : (
+          <p>pizza</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <LootboxHeader
@@ -202,6 +252,11 @@ export function TabLootbox() {
         openedToday={openedToday}
         isAdmin={isAdmin}
         onOpenAdmin={() => setAdminOpen(true)}
+      />
+
+      <DropsTicker
+        drops={visibleDrops}
+        isLoading={recentQuery.isLoading}
       />
 
       <HeroZone
@@ -225,8 +280,6 @@ export function TabLootbox() {
         onKeep={handleKeep}
         onOpenAgain={handleOpenAgain}
       />
-
-      <DropsTicker drops={recentQuery.data} isLoading={recentQuery.isLoading} />
 
       <Tabs
         value={activeTab}

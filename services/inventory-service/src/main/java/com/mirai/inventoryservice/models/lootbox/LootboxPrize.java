@@ -58,6 +58,10 @@ public class LootboxPrize {
     @Builder.Default
     private Boolean active = true;
 
+    // null = unlimited stock. Decremented atomically by LootboxService on each win.
+    @Column(name = "quantity")
+    private Integer quantity;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

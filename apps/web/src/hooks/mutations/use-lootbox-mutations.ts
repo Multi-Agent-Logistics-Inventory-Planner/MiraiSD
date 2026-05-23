@@ -57,12 +57,15 @@ export function usePlayLootboxMutation() {
   return useMutation<PlayLootboxResponse, Error, { crateId: string }>({
     mutationFn: ({ crateId }) => playLootbox(crateId),
     onSuccess: async () => {
+      // NOTE: ["lootbox","recent"] is intentionally NOT invalidated here. If we did,
+      // the ticker would refetch and reveal the user's prize BEFORE the spin reel
+      // finishes (a visible flicker spoiler). The page-level handler invalidates
+      // the recent ticker once the reel phase transitions to "won".
       await invalidate(qc, [
         lootboxKeys.balance,
         lootboxKeys.walletBreakdown,
         lootboxKeys.myPrizes,
         lootboxKeys.myHistory,
-        ["lootbox", "recent"],
       ]);
     },
   });
@@ -82,6 +85,41 @@ export function useUpdateCrateMutation() {
   const qc = useQueryClient();
   return useMutation<LootboxAdmin, Error, { id: string; body: UpsertLootboxRequest }>({
     mutationFn: ({ id, body }) => updateCrate(id, body),
+    onSuccess: async () => {
+      await invalidate(qc, CATALOG_KEYS);
+    },
+  });
+}
+
+/**
+ * Reorder crates by renumbering sortOrder = array-index for every crate in `ordered`.
+ * Always renumbers the full set so the move is unambiguous even when crates share
+ * their default sortOrder (0). One catalog invalidation at the end, not N.
+ *
+ * Each crate's full update body must be passed so the backend's @NotBlank name
+ * validation on UpsertLootboxRequestDTO is satisfied (the create + update endpoints
+ * share that DTO).
+ */
+export function useReorderCratesMutation() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { ordered: readonly LootboxAdmin[] }>({
+    mutationFn: async ({ ordered }) => {
+      await Promise.all(
+        ordered.map((c, idx) =>
+          updateCrate(c.id, {
+            name: c.name,
+            description: c.description,
+            imageUrl: c.imageUrl,
+            cost: c.cost,
+            startsAt: c.startsAt,
+            endsAt: c.endsAt,
+            active: c.active,
+            siteId: c.siteId,
+            sortOrder: idx,
+          })
+        )
+      );
+    },
     onSuccess: async () => {
       await invalidate(qc, CATALOG_KEYS);
     },

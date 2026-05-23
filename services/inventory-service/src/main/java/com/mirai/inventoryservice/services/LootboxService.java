@@ -37,10 +37,12 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -56,6 +58,7 @@ public class LootboxService {
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
     private final UserRepository userRepository;
+    private final LootboxTierLifecycle tierLifecycle;
     private final Random lootboxRandom;
 
     @PersistenceContext
@@ -143,7 +146,7 @@ public class LootboxService {
             throw new LootboxException("INSUFFICIENT_BALANCE: not enough Pito Coins to play.");
         }
 
-        LootboxPrize prize = rollPrize(crate.getId());
+        LootboxPrize prize = rollAndClaimPrize(crate);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new LootboxException("User not found: " + userId));
 
@@ -166,13 +169,63 @@ public class LootboxService {
     }
 
     /**
+     * Roll-and-claim loop for cap-aware prize selection. Limited prizes (quantity != null)
+     * are claimed via an atomic decrement; if the row was already depleted (returns 0),
+     * we add it to the exclude set and re-roll. Unlimited prizes (quantity == null) are
+     * accepted immediately.
+     *
+     * If every prize in the crate ends up excluded (the exclude-set fully covers the
+     * rollable pool), rollPrize throws and we auto-close the crate so subsequent players
+     * don't hit the same dead-end. The exception propagates uncharged because the play
+     * row is saved only AFTER this method returns a prize.
+     */
+    private LootboxPrize rollAndClaimPrize(Lootbox crate) {
+        Set<UUID> exclude = new HashSet<>();
+        while (true) {
+            LootboxPrize candidate;
+            try {
+                candidate = rollPrize(crate.getId(), exclude);
+            } catch (LootboxException ex) {
+                // Nothing left to award in this crate — close it so the next player sees
+                // "unavailable" up front rather than hitting the same dead-end.
+                crate.setActive(false);
+                lootboxRepository.save(crate);
+                throw ex;
+            }
+            if (candidate.getQuantity() == null) {
+                return candidate;
+            }
+            int rows = lootboxPrizeRepository.decrementQuantity(candidate.getId());
+            if (rows == 1) {
+                // If this took the last copy, the SQL UPDATE also flipped active=false;
+                // poke the tier-lifecycle helper so the tier deactivates + rebalances
+                // when no active prizes remain. The helper is a no-op if any are left.
+                tierLifecycle.maybeDeactivateTier(candidate.getTier().getId());
+                return candidate;
+            }
+            // Lost the race or already depleted — drop it from contention and try again.
+            exclude.add(candidate.getId());
+        }
+    }
+
+    public LootboxPrize rollPrize(UUID crateId) {
+        return rollPrize(crateId, Set.of());
+    }
+
+    /**
      * Weighted random pick over a crate's active tiers (and active prizes within them).
      * Probabilities of rollable tiers are normalized to sum to 1.0; empty/inactive tiers
      * are silently skipped so they don't "eat" rolls.
+     *
+     * `excludePrizeIds` is consulted to skip prizes whose stock was already depleted
+     * during this play's roll loop (see rollAndClaimPrize). A tier becomes unrollable
+     * for this attempt if every one of its active prizes is in the exclude set.
      */
     @Transactional(readOnly = true)
-    public LootboxPrize rollPrize(UUID crateId) {
-        List<LootboxTier> rollable = lootboxTierRepository.findRollableTiersByLootbox(crateId);
+    public LootboxPrize rollPrize(UUID crateId, Set<UUID> excludePrizeIds) {
+        List<LootboxTier> rollable = lootboxTierRepository.findRollableTiersByLootbox(crateId).stream()
+                .filter(t -> hasRollablePrize(t.getId(), excludePrizeIds))
+                .toList();
         if (rollable.isEmpty()) {
             throw new LootboxException("No prizes are currently available to roll for this crate.");
         }
@@ -195,13 +248,19 @@ public class LootboxService {
             }
         }
 
-        List<LootboxPrize> prizes = lootboxPrizeRepository.findActiveByTierId(chosenTier.getId());
+        List<LootboxPrize> prizes = lootboxPrizeRepository.findActiveByTierId(chosenTier.getId()).stream()
+                .filter(p -> !excludePrizeIds.contains(p.getId()))
+                .toList();
         if (prizes.isEmpty()) {
-            // findRollableTiersByLootbox should guarantee this can't happen, but defend
-            // against a race where a prize was deactivated between query and now.
             throw new LootboxException("Selected tier has no active prizes.");
         }
         return prizes.get(lootboxRandom.nextInt(prizes.size()));
+    }
+
+    private boolean hasRollablePrize(UUID tierId, Set<UUID> excludePrizeIds) {
+        if (excludePrizeIds.isEmpty()) return true;
+        return lootboxPrizeRepository.findActiveByTierId(tierId).stream()
+                .anyMatch(p -> !excludePrizeIds.contains(p.getId()));
     }
 
     /**
@@ -228,8 +287,10 @@ public class LootboxService {
         List<Lootbox> open = lootboxRepository.findOpen(now);
         if (open.isEmpty()) return List.of();
 
-        List<LootboxPrize> activePrizes = lootboxPrizeRepository.findAllActiveWithTier();
-        Map<UUID, List<LootboxPrize>> prizesByTier = activePrizes.stream()
+        // Include depleted (quantity = 0) prizes so the player UI can render "SOLD OUT"
+        // cards alongside still-rollable ones.
+        List<LootboxPrize> visiblePrizes = lootboxPrizeRepository.findAllActiveOrSoldOutWithTier();
+        Map<UUID, List<LootboxPrize>> prizesByTier = visiblePrizes.stream()
                 .collect(Collectors.groupingBy(p -> p.getTier().getId()));
 
         Map<UUID, List<LootboxTier>> tiersByCrate = loadTiersByCrate(open);
@@ -404,10 +465,12 @@ public class LootboxService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecentLootboxPlayResponseDTO> listRecentPlays(int limit) {
+    public List<RecentLootboxPlayResponseDTO> listRecentPlays(int limit, UUID crateId) {
         int cap = Math.max(1, Math.min(limit, 50));
-        return lootboxPlayRepository
-                .findRecentPlaysWithAssociations(PageRequest.of(0, cap)).stream()
+        List<LootboxPlay> plays = crateId == null
+                ? lootboxPlayRepository.findRecentPlaysWithAssociations(PageRequest.of(0, cap))
+                : lootboxPlayRepository.findRecentPlaysByCrateWithAssociations(crateId, PageRequest.of(0, cap));
+        return plays.stream()
                 .map(LootboxService::toRecentPlayDto)
                 .toList();
     }
@@ -444,15 +507,22 @@ public class LootboxService {
     }
 
     /**
-     * Builds the player-facing crate DTO using a prebuilt map of active prizes by tier.
-     * Tiers are filtered to active-only since this is the player view.
+     * Builds the player-facing crate DTO using a prebuilt map of active/sold-out prizes
+     * by tier. Tiers are shown if they're either active OR have at least one sold-out
+     * prize — the latter keeps the "SOLD OUT" cards visible after a tier's last prize
+     * auto-deactivated the tier on depletion. Tiers with no visible prizes (manually
+     * inactive, never depleted) stay hidden.
      */
     public LootboxResponseDTO toLootboxDto(
             Lootbox crate,
             List<LootboxTier> tiers,
             Map<UUID, List<LootboxPrize>> activePrizesByTier) {
         List<LootboxTierResponseDTO> tierDtos = tiers.stream()
-                .filter(LootboxTier::getActive)
+                .filter(t -> {
+                    if (t.getActive()) return true;
+                    return activePrizesByTier.getOrDefault(t.getId(), List.of()).stream()
+                            .anyMatch(p -> p.getQuantity() != null && p.getQuantity() == 0);
+                })
                 .map(t -> toTierDto(t, activePrizesByTier.getOrDefault(t.getId(), List.of())))
                 .toList();
         return LootboxResponseDTO.builder()
@@ -490,6 +560,7 @@ public class LootboxService {
                 .tierName(tier.getName())
                 .tierColor(tier.getDisplayColor())
                 .active(prize.getActive())
+                .quantity(prize.getQuantity())
                 .build();
     }
 

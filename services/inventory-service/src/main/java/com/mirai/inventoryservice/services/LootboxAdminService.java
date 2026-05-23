@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,6 +67,7 @@ public class LootboxAdminService {
     private final CoinAdjustmentRepository coinAdjustmentRepository;
     private final UserRepository userRepository;
     private final LootboxService lootboxService;
+    private final LootboxTierLifecycle tierLifecycle;
 
     // ----- Crate (Lootbox) CRUD -----
 
@@ -271,7 +271,7 @@ public class LootboxAdminService {
         // Hard-delete: FK cascade (V45) wipes this tier's prizes; SET NULL on
         // lootbox_plays.prize_id preserves play history via snapshot columns.
         lootboxTierRepository.delete(tier);
-        rebalanceActiveTiers(crateId);
+        tierLifecycle.rebalanceActiveTiers(crateId);
     }
 
     // ----- Prize CRUD -----
@@ -280,15 +280,20 @@ public class LootboxAdminService {
     public LootboxPrizeResponseDTO createPrize(UpsertPrizeRequestDTO req) {
         LootboxTier tier = lootboxTierRepository.findById(req.tierId())
                 .orElseThrow(() -> new EntityNotFoundException("Tier not found: " + req.tierId()));
+        // A prize created with quantity == 0 starts depleted (inactive); otherwise
+        // active defaults to true and the tier reactivates below if it was dormant.
+        boolean active = req.active() != null ? req.active() : true;
+        if (req.quantity() != null && req.quantity() == 0) active = false;
         LootboxPrize prize = LootboxPrize.builder()
                 .tier(tier)
                 .name(req.name())
                 .description(req.description())
                 .imageUrl(req.imageUrl())
-                .active(req.active() != null ? req.active() : true)
+                .active(active)
+                .quantity(req.quantity())
                 .build();
         lootboxPrizeRepository.save(prize);
-        if (prize.getActive()) maybeReactivateTier(tier);
+        if (prize.getActive()) tierLifecycle.maybeReactivateTier(tier);
         return LootboxService.toPrizeDto(prize, tier);
     }
 
@@ -308,13 +313,27 @@ public class LootboxAdminService {
         if (req.description() != null) prize.setDescription(req.description());
         if (req.imageUrl() != null) prize.setImageUrl(req.imageUrl());
         if (req.active() != null) prize.setActive(req.active());
+
+        // Quantity edits: restocking (>0) auto-reactivates a depleted prize; setting to 0
+        // retires it. Crossing the 0-boundary in either direction is what triggers the
+        // active toggle so admins don't have to flip two switches.
+        if (req.quantity() != null) {
+            int newQty = req.quantity();
+            prize.setQuantity(newQty);
+            if (newQty == 0) {
+                prize.setActive(false);
+            } else if (newQty > 0 && !prize.getActive()) {
+                prize.setActive(true);
+            }
+        }
+
         lootboxPrizeRepository.save(prize);
 
         if (wasActive && (!prize.getActive() || !prize.getTier().getId().equals(oldTierId))) {
-            maybeDeactivateTier(oldTierId);
+            tierLifecycle.maybeDeactivateTier(oldTierId);
         }
         if (prize.getActive()) {
-            maybeReactivateTier(prize.getTier());
+            tierLifecycle.maybeReactivateTier(prize.getTier());
         }
 
         return LootboxService.toPrizeDto(prize, prize.getTier());
@@ -328,68 +347,7 @@ public class LootboxAdminService {
         // Hard-delete: SET NULL on lootbox_plays.prize_id (V45) preserves play history
         // via the prizeNameSnapshot / prizeTierNameSnapshot columns on LootboxPlay.
         lootboxPrizeRepository.delete(prize);
-        maybeDeactivateTier(tierId);
-    }
-
-    /**
-     * When an inactive tier gains an active prize, mark it active so it's visible to the
-     * sum-to-100 invariant. Probability stays at 0 — admin redistributes weight explicitly.
-     */
-    private void maybeReactivateTier(LootboxTier tier) {
-        if (tier.getActive()) return;
-        tier.setActive(true);
-        lootboxTierRepository.save(tier);
-    }
-
-    private void maybeDeactivateTier(UUID tierId) {
-        if (lootboxPrizeRepository.countActiveByTierId(tierId) > 0) return;
-        LootboxTier tier = lootboxTierRepository.findById(tierId).orElse(null);
-        if (tier == null || !tier.getActive()) return;
-        UUID crateId = tier.getLootbox().getId();
-        tier.setActive(false);
-        tier.setProbabilityPct(BigDecimal.ZERO);
-        lootboxTierRepository.save(tier);
-        rebalanceActiveTiers(crateId);
-    }
-
-    /**
-     * Proportionally redistribute probabilities across active tiers of a crate so they sum
-     * to 100. If no active tiers remain in the crate, leaves the state alone (next roll
-     * fails; admin must add a prize + activate a tier to recover).
-     */
-    private void rebalanceActiveTiers(UUID crateId) {
-        List<LootboxTier> active = lootboxTierRepository
-                .findByLootboxIdOrderBySortOrderAscNameAsc(crateId).stream()
-                .filter(LootboxTier::getActive)
-                .toList();
-        if (active.isEmpty()) return;
-
-        BigDecimal sum = active.stream()
-                .map(LootboxTier::getProbabilityPct)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (sum.compareTo(BigDecimal.ZERO) == 0) {
-            BigDecimal each = TOTAL.divide(new BigDecimal(active.size()), 2, RoundingMode.HALF_UP);
-            for (LootboxTier t : active) t.setProbabilityPct(each);
-        } else {
-            for (LootboxTier t : active) {
-                BigDecimal scaled = t.getProbabilityPct()
-                        .multiply(TOTAL)
-                        .divide(sum, 2, RoundingMode.HALF_UP);
-                t.setProbabilityPct(scaled);
-            }
-        }
-        BigDecimal newSum = active.stream()
-                .map(LootboxTier::getProbabilityPct)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal drift = TOTAL.subtract(newSum);
-        if (drift.compareTo(BigDecimal.ZERO) != 0) {
-            LootboxTier largest = active.stream()
-                    .max((a, b) -> a.getProbabilityPct().compareTo(b.getProbabilityPct()))
-                    .orElse(active.get(0));
-            largest.setProbabilityPct(largest.getProbabilityPct().add(drift));
-        }
-        lootboxTierRepository.saveAll(active);
+        tierLifecycle.maybeDeactivateTier(tierId);
     }
 
     private void assertCrateProbabilitiesSumIs100(UUID crateId) {

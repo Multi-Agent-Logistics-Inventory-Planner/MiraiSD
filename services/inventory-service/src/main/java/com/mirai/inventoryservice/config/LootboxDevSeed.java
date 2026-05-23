@@ -48,8 +48,8 @@ public class LootboxDevSeed {
     @Transactional
     public void seed() {
         seedDevAdminUser();
-        seedDefaultCrate();
-        seedTestCrate();
+        // seedDefaultCrate();
+        // seedTestCrate();
         seedCoinEconomyConfig();
     }
 
