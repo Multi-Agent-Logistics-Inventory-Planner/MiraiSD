@@ -57,8 +57,8 @@ export function WinFlash({
               alt={play.prizeName}
               width={96}
               height={96}
+              sizes="96px"
               className="h-full w-full object-cover"
-              unoptimized
             />
           ) : (
             <Gift className="h-12 w-12" style={{ color }} />

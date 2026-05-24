@@ -96,7 +96,15 @@ export function Reel({
       <span className="sr-only">{announce}</span>
 
       <div
-        className="flex h-full items-center will-change-transform"
+        className={
+          // Idle skeleton row is wider than mobile viewports, so left-align makes
+          // the pointer land off-centre on small screens. Centre while idle; once
+          // the real strip mounts, the spin math (translate from 0 to target)
+          // assumes left-aligned start, so justify-start is required.
+          strip.length === 0
+            ? "flex h-full items-center justify-center will-change-transform"
+            : "flex h-full items-center will-change-transform"
+        }
         style={{
           gap: cardGap,
           transform: `translate3d(${translate}px, 0, 0)`,

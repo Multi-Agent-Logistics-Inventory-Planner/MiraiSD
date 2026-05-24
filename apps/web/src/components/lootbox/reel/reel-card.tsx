@@ -38,8 +38,8 @@ export function ReelCard({ prize, width, height, highlight }: ReelCardProps) {
             alt={prize?.name ?? "Prize"}
             width={48}
             height={48}
+            sizes="96px"
             className="h-full w-full object-cover"
-            unoptimized
           />
         ) : (
           <Gift className="h-6 w-6" style={{ color }} />
