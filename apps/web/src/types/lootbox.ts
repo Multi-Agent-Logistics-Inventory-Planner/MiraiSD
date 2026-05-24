@@ -214,3 +214,33 @@ export interface CoinEconomyConfig {
 export interface UpdateCoinEconomyConfigRequest {
   reviewCoinRate: number;
 }
+
+/** Top-of-screen KPIs for the admin Coins tab. */
+export interface CoinStats {
+  circulation: number;
+  holders: number;
+  granted7d: number;
+}
+
+/** One row of the admin Coins-tab player table. */
+export interface PlayerCoinRow {
+  userId: string;
+  fullName: string;
+  email: string;
+  balance: number;
+  /** Most recent coin movement (any source). Null if the user has never had one. */
+  lastChangeDelta: number | null;
+  lastChangeAt: string | null;
+}
+
+/** Cross-user coin event for the admin "Recent activity" feed. */
+export interface AdminCoinActivity {
+  id: string;
+  userId: string;
+  userName: string;
+  delta: number;
+  reason: string;
+  occurredAt: string;
+  /** "ADJUSTMENT" or "PLAY". Review credits are excluded server-side. */
+  kind: "ADJUSTMENT" | "PLAY";
+}

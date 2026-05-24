@@ -1,9 +1,11 @@
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from "./client";
 import type {
+  AdminCoinActivity,
   CoinAdjustment,
   CoinAdjustmentRequest,
   CoinEconomyConfig,
   CoinHistoryEntry,
+  CoinStats,
   Lootbox,
   LootboxAdmin,
   LootboxBalance,
@@ -11,6 +13,7 @@ import type {
   LootboxPrize,
   LootboxTier,
   PageResponse,
+  PlayerCoinRow,
   PlayLootboxResponse,
   RecentLootboxPlay,
   UpdateCoinEconomyConfigRequest,
@@ -169,4 +172,23 @@ export function updateCoinEconomyConfig(
     `${ADMIN}/coin-config`,
     body
   );
+}
+
+// ----- Coins-tab dashboard -----
+
+export function getCoinStats(): Promise<CoinStats> {
+  return apiGet<CoinStats>(`${ADMIN}/coin-stats`);
+}
+
+export function getPlayerCoinRows(search?: string): Promise<PlayerCoinRow[]> {
+  const qs = new URLSearchParams();
+  if (search && search.trim().length > 0) qs.set("search", search.trim());
+  const suffix = qs.toString();
+  return apiGet<PlayerCoinRow[]>(
+    suffix ? `${ADMIN}/players?${suffix}` : `${ADMIN}/players`
+  );
+}
+
+export function getAdminCoinActivity(limit = 20): Promise<AdminCoinActivity[]> {
+  return apiGet<AdminCoinActivity[]>(`${ADMIN}/activity?limit=${limit}`);
 }

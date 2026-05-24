@@ -65,7 +65,7 @@ export function AdminModal({ open, onOpenChange }: AdminModalProps) {
             <CratesAndPrizesTab />
           </TabsContent>
           <TabsContent value="coins" className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-            <CoinsTab />
+            <CoinsTab onViewAllActivity={() => setActiveTab("history")} />
           </TabsContent>
           <TabsContent value="queue" className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
             <RedemptionQueueTab />

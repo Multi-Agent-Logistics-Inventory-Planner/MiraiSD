@@ -3,12 +3,15 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   getAdminCatalog,
+  getAdminCoinActivity,
   getBalance,
   getCatalog,
   getCoinEconomyConfig,
+  getCoinStats,
   getMyHistory,
   getMyPrizes,
   getPendingRedemptions,
+  getPlayerCoinRows,
   getRecentPlays,
   getUserProfile,
   getWalletBreakdown,
@@ -29,6 +32,9 @@ export const lootboxKeys = {
     ["lootbox", "admin", "pending", status, page, size] as const,
   userProfile: (userId: string) => ["lootbox", "admin", "user", userId] as const,
   coinEconomyConfig: ["lootbox", "admin", "coin-config"] as const,
+  coinStats: ["lootbox", "admin", "coin-stats"] as const,
+  players: (search: string) => ["lootbox", "admin", "players", search] as const,
+  activity: (limit: number) => ["lootbox", "admin", "activity", limit] as const,
 };
 
 export function useLootboxWalletBreakdown() {
@@ -115,6 +121,35 @@ export function useCoinEconomyConfig() {
     queryKey: lootboxKeys.coinEconomyConfig,
     queryFn: getCoinEconomyConfig,
     staleTime: 60 * 1000,
+  });
+}
+
+export function useCoinStats() {
+  return useQuery({
+    queryKey: lootboxKeys.coinStats,
+    queryFn: getCoinStats,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Player-balance rows for the admin Coins tab. `search` is part of the cache key
+ * even though current scale filters client-side — when the server starts honoring
+ * `?search=`, each search term will get its own cache entry without code changes.
+ */
+export function usePlayerCoinRows(search: string = "") {
+  return useQuery({
+    queryKey: lootboxKeys.players(search),
+    queryFn: () => getPlayerCoinRows(search || undefined),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useAdminCoinActivity(limit = 20) {
+  return useQuery({
+    queryKey: lootboxKeys.activity(limit),
+    queryFn: () => getAdminCoinActivity(limit),
+    staleTime: 30 * 1000,
   });
 }
 
