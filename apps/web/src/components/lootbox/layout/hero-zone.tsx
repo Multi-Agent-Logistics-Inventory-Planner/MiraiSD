@@ -78,7 +78,7 @@ export function HeroZone(props: HeroZoneProps) {
     : isEmpty
       ? "Inactive"
       : balance < cost
-        ? "Out of coins"
+        ? `Out of coins · ${cost} coin${cost === 1 ? "" : "s"}`
         : isOpening
           ? "Opening…"
           : phase === "spinning"
@@ -124,11 +124,7 @@ export function HeroZone(props: HeroZoneProps) {
           </h1>
         )}
         <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          <span>
-            {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
-          </span>
-          <span className="opacity-60">·</span>
-          <span>{crateDescription ?? "weighted server-side"}</span>
+          <span>{crateDescription}</span>
         </div>
         <CrateIllustration size={140} tint="#a78bfa" />
       </div>
