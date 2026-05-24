@@ -74,8 +74,8 @@ function DropChip({ drop, now }: { readonly drop: RecentLootboxPlay; readonly no
             alt={drop.prizeName}
             width={22}
             height={22}
+            sizes="48px"
             className="h-full w-full object-cover"
-            unoptimized
           />
         ) : (
           <Gift className="h-3 w-3" style={{ color }} />

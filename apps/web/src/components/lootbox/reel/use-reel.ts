@@ -28,6 +28,8 @@ export interface UseReelReturn {
   readonly spinMs: number;
   readonly viewportRef: React.RefObject<HTMLDivElement | null>;
   readonly open: (winnerPrizeId: string) => void;
+  readonly openOptimistic: () => void;
+  readonly reconcileWinner: (winnerPrizeId: string) => void;
   readonly reset: () => void;
 }
 
@@ -91,7 +93,12 @@ export function useReel({
     setWinnerPrizeId(null);
   }, [clearTimers]);
 
-  const open = useCallback(
+  // Internal strip builder. `wid` is the prize to land at winnerIdx; in optimistic
+  // mode this is a random placeholder that gets swapped via reconcileWinner once
+  // the server returns the real prize. The 3-card no-repeat guard around winnerIdx
+  // still works with a placeholder because the user can't see the winner card
+  // until late in the spin (it's far off-screen scrolling toward centre).
+  const buildAndStartSpin = useCallback(
     (wid: string) => {
       clearTimers();
       const ids = prizeIdsRef.current;
@@ -104,7 +111,6 @@ export function useReel({
           items.push({ key: `w${i}-${seed}`, prizeId: wid });
           continue;
         }
-        // Never repeat the winner within 3 cards of the marker.
         let id: string;
         let tries = 0;
         do {
@@ -142,6 +148,41 @@ export function useReel({
     [cardWidth, clearTimers, spinMs, stride, stripLength, winnerIdx]
   );
 
+  const open = useCallback(
+    (wid: string) => buildAndStartSpin(wid),
+    [buildAndStartSpin]
+  );
+
+  // Begin the spin animation immediately with a random placeholder winner — used
+  // when we want to mask server latency. The caller MUST follow up with
+  // reconcileWinner() once the server returns the real prize id, well before the
+  // spin animation lands at the centre (spinMs = 5600ms, server typically <1s,
+  // so there is comfortable headroom).
+  const openOptimistic = useCallback(() => {
+    const ids = prizeIdsRef.current;
+    if (ids.length === 0) return;
+    const placeholder = ids[Math.floor(Math.random() * ids.length)]!;
+    buildAndStartSpin(placeholder);
+  }, [buildAndStartSpin]);
+
+  // Swap the placeholder card at winnerIdx for the real winner, atomically with
+  // the winnerPrizeId state used by the WinFlash. Called by tab-lootbox after the
+  // play mutation resolves. No-op if we already have the right winner or the
+  // spin is over.
+  const reconcileWinner = useCallback(
+    (realWinnerId: string) => {
+      setStrip((current) => {
+        const card = current[winnerIdx];
+        if (!card || card.prizeId === realWinnerId) return current;
+        const next = current.slice();
+        next[winnerIdx] = { ...card, prizeId: realWinnerId };
+        return next;
+      });
+      setWinnerPrizeId(realWinnerId);
+    },
+    [winnerIdx]
+  );
+
   useEffect(() => clearTimers, [clearTimers]);
 
   return {
@@ -153,6 +194,8 @@ export function useReel({
     spinMs,
     viewportRef,
     open,
+    openOptimistic,
+    reconcileWinner,
     reset,
   };
 }

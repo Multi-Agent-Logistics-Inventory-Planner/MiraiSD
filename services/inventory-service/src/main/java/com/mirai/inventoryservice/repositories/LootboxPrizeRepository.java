@@ -17,6 +17,21 @@ public interface LootboxPrizeRepository extends JpaRepository<LootboxPrize, UUID
     @Query("SELECT p FROM LootboxPrize p WHERE p.tier.id = :tierId AND p.active = true")
     List<LootboxPrize> findActiveByTierId(@Param("tierId") UUID tierId);
 
+    /**
+     * Single-query fetch of every active prize in an active tier of a crate, with the
+     * tier eagerly loaded so downstream snapshot reads (prize.getTier().getName())
+     * don't trigger a lazy SELECT. Used by the play roll path to avoid the per-tier
+     * N+1 plus the post-pick redundant tier-prize fetch.
+     */
+    @Query("""
+            SELECT p FROM LootboxPrize p
+            JOIN FETCH p.tier t
+            WHERE t.lootbox.id = :crateId
+              AND t.active = true
+              AND p.active = true
+            """)
+    List<LootboxPrize> findActiveByLootboxId(@Param("crateId") UUID crateId);
+
     @Query("SELECT COUNT(p) FROM LootboxPrize p WHERE p.tier.id = :tierId AND p.active = true")
     long countActiveByTierId(@Param("tierId") UUID tierId);
 

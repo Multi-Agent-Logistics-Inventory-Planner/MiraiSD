@@ -24,12 +24,6 @@ public class ReviewDailyCount {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // Legacy relationship - kept for backward compatibility during migration
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "employee_id")
-    private ReviewEmployee employee;
-
-    // New relationship - daily counts linked to users
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;

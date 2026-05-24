@@ -21,7 +21,6 @@ import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
 import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +56,6 @@ public class LootboxService {
     private final LootboxRepository lootboxRepository;
     private final LootboxTierRepository lootboxTierRepository;
     private final LootboxPrizeRepository lootboxPrizeRepository;
-    private final UserRepository userRepository;
     private final LootboxTierLifecycle tierLifecycle;
     private final Random lootboxRandom;
 
@@ -85,19 +83,36 @@ public class LootboxService {
      */
     @Transactional(readOnly = true)
     public BalanceBreakdown computeBalance(UUID userId) {
-        // 3 round-trips: combined lifetime+expired sums per source, then the spent sum.
+        // Single round-trip across three tables. Each sub-aggregate is an indexed
+        // scan (ix_review_daily_counts_user_expires, ix_coin_adjustments_user_expires,
+        // ix_lootbox_plays_user_played per V42), so Postgres plans this as 5 cheap
+        // index lookups in one query. Replaces 3 separate roundtrips — the win is
+        // network latency on Supabase, not query work.
         // Sums coins_awarded (locked in per row at write time) so rate changes never
         // retroactively re-price already-earned credits.
-        Object[] reviewTotals = firstRow(
-                reviewDailyCountRepository.sumCoinTotalsByUserId(userId, LocalDate.now()));
-        Object[] adjustmentTotals = firstRow(
-                coinAdjustmentRepository.sumAdjustmentTotalsByUserId(userId, OffsetDateTime.now()));
+        Object[] row = (Object[]) em.createNativeQuery("""
+                SELECT
+                  COALESCE((SELECT SUM(coins_awarded) FROM review_daily_counts
+                            WHERE user_id = :userId), 0) AS total_reviews,
+                  COALESCE((SELECT SUM(coins_awarded) FROM review_daily_counts
+                            WHERE user_id = :userId AND expires_at <= :today), 0) AS expired_reviews,
+                  COALESCE((SELECT SUM(delta) FROM coin_adjustments
+                            WHERE user_id = :userId), 0) AS total_adjustments,
+                  COALESCE((SELECT SUM(delta) FROM coin_adjustments
+                            WHERE user_id = :userId AND expires_at <= :now), 0) AS expired_adjustments,
+                  COALESCE((SELECT SUM(cost) FROM lootbox_plays
+                            WHERE user_id = :userId), 0) AS total_spent
+                """)
+                .setParameter("userId", userId)
+                .setParameter("today", LocalDate.now())
+                .setParameter("now", OffsetDateTime.now())
+                .getSingleResult();
 
-        long totalReviewCredits = ((Number) reviewTotals[0]).longValue();
-        long expiredReview      = ((Number) reviewTotals[1]).longValue();
-        long totalAdjustments   = ((Number) adjustmentTotals[0]).longValue();
-        long expiredAdjustments = ((Number) adjustmentTotals[1]).longValue();
-        long totalSpent         = lootboxPlayRepository.sumCostByUserId(userId);
+        long totalReviewCredits = ((Number) row[0]).longValue();
+        long expiredReview      = ((Number) row[1]).longValue();
+        long totalAdjustments   = ((Number) row[2]).longValue();
+        long expiredAdjustments = ((Number) row[3]).longValue();
+        long totalSpent         = ((Number) row[4]).longValue();
 
         long totalEarned  = totalReviewCredits + totalAdjustments;
         long totalExpired = expiredReview + expiredAdjustments;
@@ -105,11 +120,6 @@ public class LootboxService {
         long balance      = Math.max(0L, raw);
 
         return new BalanceBreakdown(balance, totalReviewCredits, totalAdjustments, totalSpent, totalExpired);
-    }
-
-    /** COALESCE in the query guarantees a row, but defend against an empty result anyway. */
-    private static Object[] firstRow(List<Object[]> rows) {
-        return rows.isEmpty() ? new Object[]{0L, 0L} : rows.get(0);
     }
 
     /**
@@ -147,8 +157,9 @@ public class LootboxService {
         }
 
         LootboxPrize prize = rollAndClaimPrize(crate);
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new LootboxException("User not found: " + userId));
+        // Reference proxy: Hibernate emits user_id on the LootboxPlay INSERT without a
+        // SELECT round-trip. Safe because we never call accessors on the proxy.
+        User user = em.getReference(User.class, userId);
 
         LootboxPlay play = LootboxPlay.builder()
                 .user(user)
@@ -180,11 +191,22 @@ public class LootboxService {
      * row is saved only AFTER this method returns a prize.
      */
     private LootboxPrize rollAndClaimPrize(Lootbox crate) {
+        UUID crateId = crate.getId();
+        // Fetch the rollable pool once up front. Tiers and the per-tier active-prize
+        // lists are reused across retries: a depleted prize only adds an id to the
+        // in-memory exclude set, so we never re-query during the retry loop. The
+        // stale-snapshot tradeoff (admin reactivating prizes mid-play) is acceptable —
+        // the atomic decrementQuantity remains the source of truth for stock.
+        List<LootboxTier> tiers = lootboxTierRepository.findRollableTiersByLootbox(crateId);
+        Map<UUID, List<LootboxPrize>> prizesByTier = lootboxPrizeRepository
+                .findActiveByLootboxId(crateId).stream()
+                .collect(Collectors.groupingBy(p -> p.getTier().getId()));
+
         Set<UUID> exclude = new HashSet<>();
         while (true) {
             LootboxPrize candidate;
             try {
-                candidate = rollPrize(crate.getId(), exclude);
+                candidate = pickPrize(tiers, prizesByTier, exclude);
             } catch (LootboxException ex) {
                 // Nothing left to award in this crate — close it so the next player sees
                 // "unavailable" up front rather than hitting the same dead-end.
@@ -223,8 +245,19 @@ public class LootboxService {
      */
     @Transactional(readOnly = true)
     public LootboxPrize rollPrize(UUID crateId, Set<UUID> excludePrizeIds) {
-        List<LootboxTier> rollable = lootboxTierRepository.findRollableTiersByLootbox(crateId).stream()
-                .filter(t -> hasRollablePrize(t.getId(), excludePrizeIds))
+        List<LootboxTier> tiers = lootboxTierRepository.findRollableTiersByLootbox(crateId);
+        Map<UUID, List<LootboxPrize>> prizesByTier = lootboxPrizeRepository
+                .findActiveByLootboxId(crateId).stream()
+                .collect(Collectors.groupingBy(p -> p.getTier().getId()));
+        return pickPrize(tiers, prizesByTier, excludePrizeIds);
+    }
+
+    private LootboxPrize pickPrize(
+            List<LootboxTier> tiers,
+            Map<UUID, List<LootboxPrize>> prizesByTier,
+            Set<UUID> excludePrizeIds) {
+        List<LootboxTier> rollable = tiers.stream()
+                .filter(t -> hasRollablePrize(prizesByTier.get(t.getId()), excludePrizeIds))
                 .toList();
         if (rollable.isEmpty()) {
             throw new LootboxException("No prizes are currently available to roll for this crate.");
@@ -248,7 +281,7 @@ public class LootboxService {
             }
         }
 
-        List<LootboxPrize> prizes = lootboxPrizeRepository.findActiveByTierId(chosenTier.getId()).stream()
+        List<LootboxPrize> prizes = prizesByTier.getOrDefault(chosenTier.getId(), List.of()).stream()
                 .filter(p -> !excludePrizeIds.contains(p.getId()))
                 .toList();
         if (prizes.isEmpty()) {
@@ -257,10 +290,10 @@ public class LootboxService {
         return prizes.get(lootboxRandom.nextInt(prizes.size()));
     }
 
-    private boolean hasRollablePrize(UUID tierId, Set<UUID> excludePrizeIds) {
+    private boolean hasRollablePrize(List<LootboxPrize> tierPrizes, Set<UUID> excludePrizeIds) {
+        if (tierPrizes == null || tierPrizes.isEmpty()) return false;
         if (excludePrizeIds.isEmpty()) return true;
-        return lootboxPrizeRepository.findActiveByTierId(tierId).stream()
-                .anyMatch(p -> !excludePrizeIds.contains(p.getId()));
+        return tierPrizes.stream().anyMatch(p -> !excludePrizeIds.contains(p.getId()));
     }
 
     /**

@@ -197,10 +197,14 @@ export function TabLootbox() {
       });
       return;
     }
+    // Start the reel spinning immediately with a placeholder; the real winner
+    // is swapped in below once the server returns. Hides backend latency
+    // (typically <1s) behind the existing 5.6s spin animation.
+    reel.openOptimistic();
     try {
       const result = await playMutation.mutateAsync({ crateId: selectedCrate.id });
       setLastWin(result.play);
-      if (result.play.prizeId) reel.open(result.play.prizeId);
+      if (result.play.prizeId) reel.reconcileWinner(result.play.prizeId);
     } catch (err) {
       reel.reset();
       const message = err instanceof Error ? err.message : "Failed to open lootbox.";

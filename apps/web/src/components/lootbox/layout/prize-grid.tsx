@@ -146,8 +146,8 @@ function PrizeCard({
             alt={prize.name}
             width={32}
             height={32}
+            sizes="48px"
             className="h-full w-full object-cover"
-            unoptimized
           />
         ) : (
           <Gift className="h-4 w-4" />
