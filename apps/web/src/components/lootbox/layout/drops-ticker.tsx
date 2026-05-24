@@ -44,7 +44,7 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
         {isLoading ? (
           <span className="text-[11px] text-muted-foreground">Loading…</span>
         ) : !drops || drops.length === 0 ? (
-          <span className="text-[11px] text-muted-foreground">No Opens Yet</span>
+          <span className="text-[11px] text-muted-foreground">No Wins</span>
         ) : (
           drops.map((drop) => <DropChip key={drop.id} drop={drop} now={now} />)
         )}
