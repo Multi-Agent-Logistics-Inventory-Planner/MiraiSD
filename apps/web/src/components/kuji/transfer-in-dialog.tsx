@@ -286,13 +286,10 @@ export function TransferInDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={handleSubmit}
             disabled={isPending}
+            className="w-full sm:w-auto"
           >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {submitLabel}
           </Button>

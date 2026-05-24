@@ -966,16 +966,7 @@ export function AdjustStockDialog({
               onReasonChange={handleCartReasonChange}
             />
           )}
-          <DialogFooter className="px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isAdjusting}
-              className="min-h-11 sm:min-h-9 dark:bg-accent/50 dark:hover:bg-accent"
-            >
-              Cancel
-            </Button>
+          <DialogFooter className="px-6 py-3">
             <Button
               type="button"
               onClick={isProductFilteredMode ? handleSingleSubmit : handleCartSubmit}
@@ -983,7 +974,7 @@ export function AdjustStockDialog({
                 isProductFilteredMode ? !singleCanSubmit : !cartCanSubmit
               }
               className={cn(
-                "min-h-11 sm:min-h-9 border",
+                "min-h-11 sm:min-h-9 border w-full sm:w-auto",
                 action === "subtract"
                   ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-amber-700 dark:hover:bg-amber-800"
                   : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"

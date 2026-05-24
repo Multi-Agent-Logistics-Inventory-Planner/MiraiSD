@@ -822,16 +822,13 @@ export function TransferDisplayDialog({
               Back
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
           {(step === "select-items" || step === "select-products") && (
-            <Button type="button" onClick={handleTransfer} disabled={!canTransfer}>
+            <Button
+              type="button"
+              onClick={handleTransfer}
+              disabled={!canTransfer}
+              className="w-full sm:w-auto"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
