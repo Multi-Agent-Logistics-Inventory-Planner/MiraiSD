@@ -37,7 +37,7 @@ export function AdminModal({ open, onOpenChange }: AdminModalProps) {
           "flex h-[min(820px,88vh)] w-[min(1040px,92vw)] max-w-[1040px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1040px]"
         )}
       >
-        <DialogTitle className="sr-only">Lootbox admin console</DialogTitle>
+        <DialogTitle className="sr-only">Box admin console</DialogTitle>
         <div className="flex flex-none items-center justify-between border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-0.5">
             <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -55,7 +55,7 @@ export function AdminModal({ open, onOpenChange }: AdminModalProps) {
         >
           <div className="flex-none overflow-x-auto border-b border-border">
             <TabsList className="h-auto w-max justify-start gap-1 rounded-none border-none bg-transparent px-4 py-0 text-muted-foreground dark:bg-transparent">
-              <AdminTabTrigger value="prizes">Crates & Prizes</AdminTabTrigger>
+              <AdminTabTrigger value="prizes">Boxes & Prizes</AdminTabTrigger>
               <AdminTabTrigger value="coins">Coins</AdminTabTrigger>
               <AdminTabTrigger value="queue">Redemption queue</AdminTabTrigger>
               <AdminTabTrigger value="history">History</AdminTabTrigger>

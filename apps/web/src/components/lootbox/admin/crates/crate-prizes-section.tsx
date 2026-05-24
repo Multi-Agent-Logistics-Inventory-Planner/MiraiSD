@@ -348,7 +348,7 @@ function PrizeCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {prize.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Permanently removes the prize from this crate. Past wins keep
+              Permanently removes the prize from this box. Past wins keep
               their name and image from the snapshot taken at spin time.
             </AlertDialogDescription>
           </AlertDialogHeader>

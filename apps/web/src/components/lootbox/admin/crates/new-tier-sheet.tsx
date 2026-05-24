@@ -80,7 +80,7 @@ export function NewTierSheet({
             />
             {duplicate ? (
               <p className="font-mono text-[11px] text-rose-400">
-                A tier with this name already exists in this crate.
+                A tier with this name already exists in this box.
               </p>
             ) : null}
           </div>

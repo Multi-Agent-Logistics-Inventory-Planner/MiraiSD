@@ -37,14 +37,14 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
           className="inline-block h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: "#a87bff", boxShadow: "0 0 8px #a87bff" }}
         />
-        Crate Opens
+        Recent Wins
       </div>
 
       <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
         {isLoading ? (
           <span className="text-[11px] text-muted-foreground">Loading…</span>
         ) : !drops || drops.length === 0 ? (
-          <span className="text-[11px] text-muted-foreground">No Opens Yet</span>
+          <span className="text-[11px] text-muted-foreground">No Wins</span>
         ) : (
           drops.map((drop) => <DropChip key={drop.id} drop={drop} now={now} />)
         )}

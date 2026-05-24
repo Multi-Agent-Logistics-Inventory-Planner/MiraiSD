@@ -20,7 +20,7 @@ const TEAM_TABS: TabConfig<TeamTab>[] = [
   },
   {
     value: TeamTab.LOOTBOX,
-    label: "Lootbox",
+    label: "Rewards",
     icon: Gift,
   },
 ];

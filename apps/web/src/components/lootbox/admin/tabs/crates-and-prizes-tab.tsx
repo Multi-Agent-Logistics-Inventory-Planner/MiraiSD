@@ -124,8 +124,8 @@ export function CratesAndPrizesTab() {
     try {
       await reorderMut.mutateAsync({ ordered: next });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to reorder crates.";
-      toast({ title: "Couldn't reorder crates", description: message });
+      const message = err instanceof Error ? err.message : "Failed to reorder boxes.";
+      toast({ title: "Couldn't reorder boxes", description: message });
     }
   };
 
@@ -133,15 +133,15 @@ export function CratesAndPrizesTab() {
   const handleNew = async () => {
     try {
       const created = await createMut.mutateAsync({
-        name: "New crate",
+        name: "New box",
         cost: 1,
         active: false,
       });
       setPickedCrateId(created.id);
-      toast({ title: "Draft crate created.", variant: "success" });
+      toast({ title: "Draft box created.", variant: "success" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create crate.";
-      toast({ title: "Couldn't create crate", description: message });
+      const message = err instanceof Error ? err.message : "Failed to create box.";
+      toast({ title: "Couldn't create box", description: message });
     }
   };
 
@@ -290,10 +290,10 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
         },
       });
       setWeightEdits({});
-      toast({ title: "Crate saved.", variant: "success" });
+      toast({ title: "Box saved.", variant: "success" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save crate.";
-      toast({ title: "Couldn't save crate", description: message });
+      const message = err instanceof Error ? err.message : "Failed to save box.";
+      toast({ title: "Couldn't save box", description: message });
     }
   };
 
@@ -303,8 +303,8 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
       toast({ title: `Deleted ${admin.name}.`, variant: "success" });
       setConfirmDelete(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to delete crate.";
-      toast({ title: "Couldn't delete crate", description: message });
+      const message = err instanceof Error ? err.message : "Failed to delete box.";
+      toast({ title: "Couldn't delete box", description: message });
     }
   };
 
@@ -492,8 +492,8 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {admin.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the crate and all of its tiers and prizes.
-              Crates with recorded plays can&apos;t be deleted — deactivate them
+              This permanently removes the box and all of its tiers and prizes.
+              Boxes with recorded plays can&apos;t be deleted — deactivate them
               instead.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -506,7 +506,7 @@ function CrateConfigForm({ admin, tiers }: CrateConfigFormProps) {
               disabled={deleteMut.isPending}
               className="bg-rose-500 text-white hover:bg-rose-500/90"
             >
-              {deleteMut.isPending ? "Deleting…" : "Delete crate"}
+              {deleteMut.isPending ? "Deleting…" : "Delete box"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

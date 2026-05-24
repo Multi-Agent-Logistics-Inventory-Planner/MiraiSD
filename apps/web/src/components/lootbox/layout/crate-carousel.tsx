@@ -92,7 +92,7 @@ export function CrateCarousel({ crates, selectedId, onSelect }: CrateCarouselPro
 
       <div className="flex min-w-0 max-w-[360px] flex-1 flex-col items-center gap-3 sm:min-w-[280px] sm:max-w-[480px] sm:flex-initial">
         <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-          Crate <span className="tabular-nums">{safeIdx + 1}</span> of{" "}
+          Box <span className="tabular-nums">{safeIdx + 1}</span> of{" "}
           <span className="tabular-nums">{total}</span>
         </span>
         <span
@@ -142,7 +142,7 @@ function CarouselArrow({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={direction === "prev" ? "Previous crate" : "Next crate"}
+      aria-label={direction === "prev" ? "Previous box" : "Next box"}
       className={cn(
         "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-card text-foreground transition-opacity",
         "hover:bg-card/80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-card"
