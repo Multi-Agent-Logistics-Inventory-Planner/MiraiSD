@@ -159,11 +159,16 @@ export function useAdjustCoinsMutation() {
       // The target user's admin profile is the primary view that changes.
       // balance/walletBreakdown/myHistory are the admin's own caches — only matter
       // if the admin is adjusting themselves, but cheap insurance to invalidate them.
+      // The three coin-dashboard keys cover the admin Coins-tab stat strip, player
+      // table, and recent activity feed — all three shift after any adjustment.
       await invalidate(qc, [
         lootboxKeys.userProfile(variables.userId),
         lootboxKeys.balance,
         lootboxKeys.walletBreakdown,
         lootboxKeys.myHistory,
+        lootboxKeys.coinStats,
+        ["lootbox", "admin", "players"],
+        ["lootbox", "admin", "activity"],
       ]);
     },
   });

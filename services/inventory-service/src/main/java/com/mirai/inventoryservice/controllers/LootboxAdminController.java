@@ -6,19 +6,23 @@ import com.mirai.inventoryservice.dtos.requests.lootbox.UpdateCoinEconomyConfigR
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertLootboxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertPrizeRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.lootbox.UpsertTierRequestDTO;
+import com.mirai.inventoryservice.dtos.responses.AdminCoinActivityDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinAdjustmentResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.CoinEconomyConfigResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.CoinStatsResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxAdminResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxPrizeResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
+import com.mirai.inventoryservice.dtos.responses.PlayerCoinRowDTO;
 import com.mirai.inventoryservice.dtos.responses.UserCoinProfileResponseDTO;
 import com.mirai.inventoryservice.exceptions.UserNotFoundException;
 import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.UserRole;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.services.CoinAdminDashboardService;
 import com.mirai.inventoryservice.services.CoinEconomyService;
 import com.mirai.inventoryservice.services.LootboxAdminService;
 import com.mirai.inventoryservice.services.LootboxService;
@@ -51,6 +55,7 @@ public class LootboxAdminController {
     private final LootboxAdminService lootboxAdminService;
     private final LootboxService lootboxService;
     private final CoinEconomyService coinEconomyService;
+    private final CoinAdminDashboardService coinAdminDashboardService;
     private final UserRepository userRepository;
 
     @GetMapping("/catalog")
@@ -191,6 +196,27 @@ public class LootboxAdminController {
     @GetMapping("/users/{userId}")
     public ResponseEntity<UserCoinProfileResponseDTO> getUserProfile(@PathVariable UUID userId) {
         return ResponseEntity.ok(lootboxAdminService.getUserProfile(userId));
+    }
+
+    // ----- Coins-tab dashboard -----
+
+    @GetMapping("/coin-stats")
+    public ResponseEntity<CoinStatsResponseDTO> getCoinStats() {
+        return ResponseEntity.ok(coinAdminDashboardService.getStats());
+    }
+
+    @GetMapping("/players")
+    public ResponseEntity<List<PlayerCoinRowDTO>> getPlayers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return ResponseEntity.ok(coinAdminDashboardService.getPlayers(search, limit, offset));
+    }
+
+    @GetMapping("/activity")
+    public ResponseEntity<List<AdminCoinActivityDTO>> getActivity(
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(coinAdminDashboardService.getRecentActivity(limit));
     }
 
     private UUID resolveUserId(Authentication auth) {
