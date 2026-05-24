@@ -30,7 +30,7 @@ export function CrateListRail({
     <div className="flex max-h-[40vh] min-h-0 flex-col gap-2 border-b border-border p-3 md:max-h-none md:h-full md:border-b-0 md:border-r">
       <div className="flex items-center justify-between px-1 pb-1">
         <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-          Crates · <span className="tabular-nums">{crates.length}</span>
+          Boxes · <span className="tabular-nums">{crates.length}</span>
         </span>
         <button
           type="button"
@@ -52,7 +52,7 @@ export function CrateListRail({
           </>
         ) : crates.length === 0 ? (
           <p className="px-2 py-4 text-[12px] text-muted-foreground">
-            No crates yet. Create one to get started.
+            No boxes yet. Create one to get started.
           </p>
         ) : (
           crates.map((c, idx) => {

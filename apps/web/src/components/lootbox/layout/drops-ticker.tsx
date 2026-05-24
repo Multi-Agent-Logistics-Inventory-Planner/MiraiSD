@@ -37,7 +37,7 @@ export function DropsTicker({ drops, isLoading }: DropsTickerProps) {
           className="inline-block h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: "#a87bff", boxShadow: "0 0 8px #a87bff" }}
         />
-        Crate Opens
+        Recent Wins
       </div>
 
       <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">

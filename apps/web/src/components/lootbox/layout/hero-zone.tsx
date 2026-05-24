@@ -61,7 +61,7 @@ export function HeroZone(props: HeroZoneProps) {
 
   const dim = isDesktop ? REEL_DIM_DESKTOP : REEL_DIM_MOBILE;
   const cost = crate?.cost ?? 1;
-  const crateName = crate?.name ?? "Mirai Mystery Crate";
+  const crateName = crate?.name ?? "Mirai Mystery Box";
   const crateDescription = crate?.description ?? null;
   const showCarousel = crates.length > 1;
   // Crate is "empty" for spin purposes when it has no rollable prizes — either
@@ -103,7 +103,7 @@ export function HeroZone(props: HeroZoneProps) {
       }}
     >
       <div className="pointer-events-none absolute left-[28px] top-[22px] hidden font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-        {crate?.endsAt ? "Limited time" : "Crate"}
+        {crate?.endsAt ? "Limited time" : "Box"}
       </div>
       <div className="pointer-events-none absolute right-[28px] top-[22px] hidden font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
         <span className="tabular-nums">{prizes.length}</span> prize
@@ -119,19 +119,17 @@ export function HeroZone(props: HeroZoneProps) {
             onSelect={onSelectCrate}
           />
         ) : (
-          <>
-            <h1 className="m-0 text-[28px] font-semibold tracking-[-0.4px] text-foreground">
-              {crateName}
-            </h1>
-            <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-              <span>
-                {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
-              </span>
-              <span className="opacity-60">·</span>
-              <span>{crateDescription ?? "weighted server-side"}</span>
-            </div>
-          </>
+          <h1 className="m-0 text-[28px] font-semibold tracking-[-0.4px] text-foreground">
+            {crateName}
+          </h1>
         )}
+        <div className="inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+          <span>
+            {cost === 0 ? "Free spin" : `${cost} coin${cost === 1 ? "" : "s"} per open`}
+          </span>
+          <span className="opacity-60">·</span>
+          <span>{crateDescription ?? "weighted server-side"}</span>
+        </div>
         <CrateIllustration size={140} tint="#a78bfa" />
       </div>
 

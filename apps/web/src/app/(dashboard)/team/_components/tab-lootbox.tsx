@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LootboxHeader } from "@/components/lootbox/layout/lootbox-header";
 import { DropsTicker } from "@/components/lootbox/layout/drops-ticker";
 import { HeroZone } from "@/components/lootbox/layout/hero-zone";
+import { HeroZoneSkeleton } from "@/components/lootbox/layout/hero-zone-skeleton";
 import { PrizeGrid } from "@/components/lootbox/layout/prize-grid";
 import { MyPrizesList } from "@/components/lootbox/my-prizes-list";
 import { AdminModal } from "@/components/lootbox/admin/admin-modal";
@@ -178,22 +179,22 @@ export function TabLootbox() {
   const triggerOpen = async () => {
     if (!selectedCrate) {
       toast({
-        title: "No crate selected",
-        description: "Pick a crate to open.",
+        title: "No box selected",
+        description: "Pick a box to open.",
       });
       return;
     }
     if (allPrizes.length === 0) {
       toast({
         title: "No prizes configured",
-        description: "Ask an admin to add prizes before opening this crate.",
+        description: "Ask an admin to add prizes before opening this box.",
       });
       return;
     }
     if (balance < cost) {
       toast({
         title: "Out of coins",
-        description: `Need ${cost} coin${cost === 1 ? "" : "s"} to open this crate.`,
+        description: `Need ${cost} coin${cost === 1 ? "" : "s"} to open this box.`,
       });
       return;
     }
@@ -207,8 +208,8 @@ export function TabLootbox() {
       if (result.play.prizeId) reel.reconcileWinner(result.play.prizeId);
     } catch (err) {
       reel.reset();
-      const message = err instanceof Error ? err.message : "Failed to open lootbox.";
-      toast({ title: "Couldn't open lootbox", description: message });
+      const message = err instanceof Error ? err.message : "Failed to open box.";
+      toast({ title: "Couldn't open box", description: message });
     }
   };
 
@@ -283,6 +284,9 @@ export function TabLootbox() {
         isLoading={recentQuery.isLoading}
       />
 
+      {catalogQuery.isLoading && !selectedCrate ? (
+        <HeroZoneSkeleton isDesktop={isDesktop} />
+      ) : (
       <HeroZone
         crate={selectedCrate}
         crates={crates}
@@ -304,6 +308,7 @@ export function TabLootbox() {
         onKeep={handleKeep}
         onOpenAgain={handleOpenAgain}
       />
+      )}
 
       <Tabs
         value={activeTab}
