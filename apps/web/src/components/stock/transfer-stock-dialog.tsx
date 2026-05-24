@@ -465,21 +465,12 @@ export function TransferStockDialog({
           </div>
 
           {/* Footer buttons */}
-          <DialogFooter className="px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isTransferring}
-              className="min-h-11 sm:min-h-9 dark:bg-accent/50 dark:hover:bg-accent"
-            >
-              Cancel
-            </Button>
+          <DialogFooter className="px-6 py-3">
             <Button
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="min-h-11 sm:min-h-9"
+              className="min-h-11 sm:min-h-9 w-full sm:w-auto"
             >
               {isTransferring ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

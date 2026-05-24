@@ -233,7 +233,7 @@ export function RecordDrawDialog({
         )}
       </div>
 
-      <div className="px-6 py-3.5 border-t border-border flex items-center gap-3">
+      <div className="px-6 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] border-t border-border flex items-center gap-3">
         <div className="flex-1 text-[12.5px] text-muted-foreground">
           {totalSlips > 0 ? (
             <>

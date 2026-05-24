@@ -37,7 +37,7 @@ export function DialogChrome({
         }}
         className={cn(
           "w-[calc(100%-2rem)] max-w-none sm:max-w-none md:max-w-none",
-          "h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] sm:max-h-[90vh]",
+          "h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] sm:max-h-[90vh]",
           "flex flex-col gap-0 p-0 overflow-hidden rounded-2xl bg-card",
           SIZE_BY_VARIANT[variant],
           className,
