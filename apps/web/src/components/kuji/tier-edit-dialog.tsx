@@ -29,10 +29,11 @@ import { LocationSelector } from "@/components/stock/location-selector";
 import { ProductLocationSelector } from "@/components/stock/product-location-selector";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import {
+  deleteProductImage,
   isUploadError,
   uploadProductImage,
   validateFile,
-} from "@/lib/supabase/storage";
+} from "@/lib/storage/images";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -214,9 +215,13 @@ export function TierEditDialog({
 
     // Auto-created prize: persist product changes (name/image) before tier patch.
     if (isAutoCreated && tier.linkedProductId) {
+      const oldImageUrl = tier.linkedProductImageUrl ?? "";
       const nameChanged = productName.trim() !== (tier.linkedProductName ?? "");
-      const imageChanged = productImageFile != null
-        || productImageUrl !== (tier.linkedProductImageUrl ?? "");
+      const isReplacingImage = productImageFile != null && Boolean(oldImageUrl);
+      const isClearingImage =
+        !productImageFile && !productImageUrl && Boolean(oldImageUrl);
+      const imageChanged =
+        productImageFile != null || productImageUrl !== oldImageUrl;
 
       if (nameChanged || imageChanged) {
         let nextImageUrl: string | undefined = productImageUrl || undefined;
@@ -230,6 +235,10 @@ export function TierEditDialog({
             return;
           }
           nextImageUrl = result.url;
+        } else if (isClearingImage) {
+          // Send empty string so the backend's `if (imageUrl != null)` patch
+          // path actually overwrites the existing value.
+          nextImageUrl = "";
         }
 
         const productPayload: ProductRequest = {
@@ -242,6 +251,9 @@ export function TierEditDialog({
             id: tier.linkedProductId,
             payload: productPayload,
           });
+          if (isReplacingImage || isClearingImage) {
+            deleteProductImage(oldImageUrl).catch(() => null);
+          }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Failed to update prize";
           toast({ title: "Update failed", description: message });
@@ -308,6 +320,7 @@ export function TierEditDialog({
       toast({ title: "Sign in required" });
       return;
     }
+    const oldImageUrl = tier.linkedProductImageUrl ?? "";
     try {
       await deleteMutation.mutateAsync({
         boxId: box.id,
@@ -315,6 +328,9 @@ export function TierEditDialog({
         productId: box.productId,
         payload: { actorId },
       });
+      if (oldImageUrl) {
+        deleteProductImage(oldImageUrl).catch(() => null);
+      }
       toast({ title: "Prize deleted", variant: "success" });
       setConfirmDelete(false);
       onOpenChange(false);

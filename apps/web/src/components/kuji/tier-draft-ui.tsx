@@ -9,7 +9,7 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { ProductLocationSelector } from "@/components/stock/product-location-selector";
 import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import { cn } from "@/lib/utils";
-import { validateFile } from "@/lib/supabase/storage";
+import { validateFile } from "@/lib/storage/images";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import type { ProductListItem } from "@/types/api";
 import { EMPTY_LOCATION, type DraftTier } from "@/components/kuji/tier-draft";

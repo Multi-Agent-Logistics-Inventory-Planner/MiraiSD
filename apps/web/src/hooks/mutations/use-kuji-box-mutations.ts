@@ -15,7 +15,7 @@ import {
   transferInMoreToKujiTier,
   undoKujiDraw,
 } from "@/lib/api/kuji-boxes";
-import { deleteProductImage } from "@/lib/supabase/storage";
+import { deleteProductImage } from "@/lib/storage/images";
 import {
   KujiBoxStatus,
   type AddKujiTierRequest,

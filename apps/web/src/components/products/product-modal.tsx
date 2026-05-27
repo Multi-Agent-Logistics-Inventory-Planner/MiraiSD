@@ -31,6 +31,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteProductDialog } from "./delete-product-dialog";
+import { deleteProductImage } from "@/lib/storage/images";
+import { getProductChildren } from "@/lib/api/products";
 import { KujiPrizesDialog } from "./kuji-prizes-dialog";
 import { KujiBoxView } from "@/components/kuji";
 import { ProductImageLightbox } from "./product-image-lightbox";
@@ -128,11 +130,30 @@ export function ProductModal({
     return null;
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    const imageUrls: string[] = [];
+    if (product.product.imageUrl) imageUrls.push(product.product.imageUrl);
+
+    // Kuji parent delete cascades to child products on the backend. Capture
+    // children's image URLs upfront so we can sweep R2 after the delete succeeds.
+    if (product.product.hasChildren) {
+      try {
+        const children = await getProductChildren(product.product.id);
+        for (const child of children) {
+          if (child.imageUrl) imageUrls.push(child.imageUrl);
+        }
+      } catch {
+        // Non-fatal: parent delete proceeds; missed orphans get reclaimed later.
+      }
+    }
+
     deleteProduct.mutate(
       { id: product.product.id },
       {
         onSuccess: () => {
+          for (const url of imageUrls) {
+            deleteProductImage(url).catch(() => null);
+          }
           setDeleteDialogOpen(false);
           onOpenChange(false);
         },
