@@ -1,6 +1,3 @@
-import { getSupabaseClient } from "@/lib/supabase";
-
-const BUCKET_NAME = "product-images";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const WEBP_MAX_EDGE = 1600;
@@ -116,7 +113,6 @@ export async function uploadProductImage(
     return validationError;
   }
 
-  // Validate file content matches declared MIME type
   const validMagic = await validateMagicNumber(file);
   if (!validMagic) {
     return {
@@ -125,17 +121,6 @@ export async function uploadProductImage(
     };
   }
 
-  const client = getSupabaseClient();
-  if (!client) {
-    return {
-      message: "Supabase client not available",
-      code: "NO_CLIENT",
-    };
-  }
-
-  // Re-encode to WebP and downscale to reduce storage + egress.
-  // Falls back to the original file if the browser lacks OffscreenCanvas
-  // or the conversion fails for any reason.
   const webpBlob = await convertToWebp(file);
   const uploadBody: Blob = webpBlob ?? file;
   const uploadContentType = webpBlob ? "image/webp" : file.type;
@@ -144,59 +129,45 @@ export async function uploadProductImage(
     ? replaceExtensionWithWebp(baseFilename)
     : baseFilename;
 
-  const { error } = await client.storage
-    .from(BUCKET_NAME)
-    .upload(filename, uploadBody, {
-      cacheControl: "604800", // 1 week cache for product images
-      upsert: false,
-      contentType: uploadContentType,
-    });
+  const blobForUpload =
+    uploadBody.type === uploadContentType
+      ? uploadBody
+      : new Blob([uploadBody], { type: uploadContentType });
 
-  if (error) {
+  const formData = new FormData();
+  formData.append("file", blobForUpload, filename);
+  formData.append("filename", filename);
+
+  const response = await fetch("/api/images/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
     return {
-      message: error.message || "Failed to upload image",
+      message: message || `Upload failed (${response.status})`,
       code: "UPLOAD_FAILED",
     };
   }
 
-  const {
-    data: { publicUrl },
-  } = client.storage.from(BUCKET_NAME).getPublicUrl(filename);
-
-  return {
-    url: publicUrl,
-    path: filename,
-  };
+  const { url, key } = (await response.json()) as { url: string; key: string };
+  return { url, path: key };
 }
 
 export async function deleteProductImage(
   url: string
 ): Promise<{ success: true } | UploadError> {
-  const client = getSupabaseClient();
-  if (!client) {
+  const response = await fetch("/api/images/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
     return {
-      message: "Supabase client not available",
-      code: "NO_CLIENT",
-    };
-  }
-
-  // Extract path from URL
-  const urlPattern = /\/product-images\/(.+)$/;
-  const match = url.match(urlPattern);
-  if (!match) {
-    return {
-      message: "Invalid image URL",
-      code: "UPLOAD_FAILED",
-    };
-  }
-
-  const path = match[1];
-
-  const { error } = await client.storage.from(BUCKET_NAME).remove([path]);
-
-  if (error) {
-    return {
-      message: error.message || "Failed to delete image",
+      message: message || `Delete failed (${response.status})`,
       code: "UPLOAD_FAILED",
     };
   }

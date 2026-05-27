@@ -15,17 +15,10 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
-    formats: ["image/webp"],
-    minimumCacheTTL: 60 * 60 * 24 * 7,
+    loader: "custom",
+    loaderFile: "./src/lib/image-loader.ts",
     deviceSizes: [640, 1080],
-    imageSizes: [48, 96],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-    ],
+    imageSizes: [48, 96, 192],
   },
   async headers() {
     // Detect local development by checking if backend URL contains localhost

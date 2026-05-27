@@ -10,7 +10,7 @@ import {
 import { ArrowLeft, Copy, Layers, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { isUploadError, uploadProductImage } from "@/lib/supabase/storage";
+import { isUploadError, uploadProductImage } from "@/lib/storage/images";
 import { useToast } from "@/hooks/use-toast";
 import { useLastClosedKujiTiers } from "@/hooks/queries/use-kuji-box";
 import type { ProductListItem } from "@/types/api";

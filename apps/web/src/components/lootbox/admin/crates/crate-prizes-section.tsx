@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { deleteProductImage } from "@/lib/storage/images";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -214,8 +215,12 @@ function PrizeCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleDelete = async () => {
+    const oldImageUrl = prize.imageUrl ?? "";
     try {
       await deletePrize.mutateAsync({ id: prize.id });
+      if (oldImageUrl) {
+        deleteProductImage(oldImageUrl).catch(() => null);
+      }
       toast({ title: `Deleted ${prize.name}.`, variant: "success" });
       setConfirmDelete(false);
     } catch (err) {
@@ -396,19 +401,29 @@ function PrizeEditForm({
       toast({ title: "Quantity must be a non-negative whole number." });
       return;
     }
+    const oldImageUrl = prize.imageUrl ?? "";
+    const hadNewFile = imageUpload.hasNewFile;
+    const wasCleared =
+      !imageUpload.hasNewFile && !imageUpload.hasImage && Boolean(oldImageUrl);
     try {
-      const imageUrl = await imageUpload.upload();
+      const uploadedUrl = await imageUpload.upload();
+      // Backend patch path is `if (imageUrl != null) prize.setImageUrl(imageUrl)`,
+      // so send "" to clear (null is treated as "no change").
+      const imageUrl = wasCleared ? "" : uploadedUrl ?? null;
       await updatePrize.mutateAsync({
         id: prize.id,
         body: {
           tierId,
           name: trimmed,
           description: description.trim() ? description.trim() : null,
-          imageUrl: imageUrl ?? null,
+          imageUrl,
           active: prize.active,
           quantity,
         },
       });
+      if (oldImageUrl && (hadNewFile || wasCleared)) {
+        deleteProductImage(oldImageUrl).catch(() => null);
+      }
       toast({ title: `Updated ${trimmed}.`, variant: "success" });
       onClose();
     } catch (err) {

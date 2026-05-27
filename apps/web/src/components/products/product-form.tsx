@@ -30,7 +30,7 @@ import { useImageUpload } from "@/hooks/use-image-upload";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Permission } from "@/lib/rbac/permissions";
-import { deleteProductImage, isUploadError } from "@/lib/supabase/storage";
+import { deleteProductImage, isUploadError } from "@/lib/storage/images";
 import {
   useCategories,
   useChildCategories,
@@ -323,6 +323,8 @@ export function ProductForm({
     let imageUrl: string | undefined = values.imageUrl || undefined;
     const oldImageUrl = initialProduct?.imageUrl;
     const isReplacingImage = imageUpload.hasNewFile && oldImageUrl;
+    const isClearingImage =
+      !!oldImageUrl && !imageUpload.hasImage && !imageUpload.hasNewFile;
 
     if (imageUpload.hasNewFile) {
       const uploadedUrl = await imageUpload.upload();
@@ -331,6 +333,10 @@ export function ProductForm({
         return;
       }
       imageUrl = uploadedUrl ?? undefined;
+    } else if (isClearingImage) {
+      // Send empty string so the backend's `if (imageUrl != null)` patch path
+      // actually overwrites the existing value.
+      imageUrl = "";
     }
 
     const payload: ProductRequest = {
@@ -373,8 +379,8 @@ export function ProductForm({
         toast({ title: "Product updated", variant: "success" });
 
         // Delete old image from storage after successful update (non-blocking)
-        if (isReplacingImage) {
-          deleteProductImage(oldImageUrl).then((deleteResult) => {
+        if (isReplacingImage || isClearingImage) {
+          deleteProductImage(oldImageUrl as string).then((deleteResult) => {
             if (isUploadError(deleteResult)) {
               toast({
                 title: "Note",

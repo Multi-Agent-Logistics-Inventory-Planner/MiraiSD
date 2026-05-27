@@ -5,7 +5,7 @@ import {
   uploadProductImage,
   validateFile,
   isUploadError,
-} from "@/lib/supabase/storage";
+} from "@/lib/storage/images";
 
 interface ImageUploadState {
   file: File | null;
