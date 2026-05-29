@@ -14,6 +14,76 @@ REGIME_STEADY = "steady"
 REGIME_BURSTY = "bursty"
 
 
+def _dow_multiplier(dow_dict: object, dow: int) -> float:
+    """Read a dow multiplier from a {0..6 -> float} dict tolerating str/int keys.
+
+    Returns 1.0 when dow_dict is missing, malformed, or has no entry for ``dow``.
+    """
+    if not isinstance(dow_dict, dict) or not dow_dict:
+        return 1.0
+    val = dow_dict.get(dow)
+    if val is None:
+        val = dow_dict.get(str(dow))
+    try:
+        return float(val) if val is not None else 1.0
+    except (TypeError, ValueError):
+        return 1.0
+
+
+def effective_lead_demand_vectorized(
+    mu_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
+) -> pd.Series:
+    """Expected demand over the lead-time window, DOW-adjusted when possible.
+
+    For each row this returns ``sum_{k=0..L-1} mu_hat * dow_mult[dow(start+k)]``.
+    Falls back to ``mu_hat * L`` when ``dow_multipliers`` is not provided, the
+    row's multiplier dict is missing/empty, or ``start_date`` is None.
+
+    Args:
+        mu_hat: per-SKU mean daily demand (constant, the window average).
+        L: lead time (scalar or Series).
+        dow_multipliers: optional Series of dicts ``{0..6 -> float}``; one entry
+            per row, aligned to ``mu_hat.index``. Keys may be int or str.
+        start_date: calendar date the lead-time window begins. The day at index 0
+            is ``start_date`` itself. When None, the function degrades to the
+            constant-rate sum ``mu_hat * L``.
+
+    Returns:
+        Series of expected lead-time demand, same index as ``mu_hat``.
+    """
+    if isinstance(L, pd.Series):
+        L_arr = L.clip(lower=0.0).astype(float)
+    else:
+        L_arr = pd.Series([max(float(L), 0.0)] * len(mu_hat), index=mu_hat.index)
+
+    if dow_multipliers is None or start_date is None:
+        return mu_hat.astype(float) * L_arr
+
+    out = np.zeros(len(mu_hat), dtype=float)
+    mu_arr = mu_hat.astype(float).to_numpy()
+    L_int = np.round(L_arr.to_numpy()).astype(int)
+    dm_arr = dow_multipliers.reindex(mu_hat.index).to_numpy()
+
+    for i in range(len(mu_hat)):
+        dm = dm_arr[i]
+        L_i = int(L_int[i])
+        if L_i <= 0:
+            continue
+        if not isinstance(dm, dict) or not dm:
+            out[i] = mu_arr[i] * L_i
+            continue
+        total = 0.0
+        for k in range(L_i):
+            dow = (start_date + timedelta(days=k)).weekday()
+            total += mu_arr[i] * _dow_multiplier(dm, dow)
+        out[i] = total
+
+    return pd.Series(out, index=mu_hat.index)
+
+
 def z_for_service_level(alpha: float) -> float:
     """Return z-score for a given service level alpha (0<alpha<1).
 
@@ -115,6 +185,8 @@ def compute_safety_stock_vectorized(
     alpha: float,
     sigma_L: Optional[Union[pd.Series, float]] = None,
     regime: Optional[pd.Series] = None,
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
 ) -> pd.Series:
     """Vectorized safety stock computation.
 
@@ -151,7 +223,10 @@ def compute_safety_stock_vectorized(
         Series of safety stock values (floored at 0).
     """
     if regime is not None:
-        return _distribution_safety_stock(mu_hat, sigma_d_hat, L, alpha, regime)
+        return _distribution_safety_stock(
+            mu_hat, sigma_d_hat, L, alpha, regime,
+            dow_multipliers=dow_multipliers, start_date=start_date,
+        )
 
     z = z_for_service_level(alpha)
     sigma_d_safe = sigma_d_hat.clip(lower=0.0)
@@ -171,14 +246,18 @@ def _distribution_safety_stock(
     L: Union[pd.Series, int, float],
     alpha: float,
     regime: pd.Series,
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
 ) -> pd.Series:
     """Poisson (steady) / NegBin (bursty) safety stock, vectorized.
 
-    Lead-time demand mean = mu * L, variance approximation = sigma_d^2 * L
-    (treating L days as iid). NegBin parameters are derived from those moments
-    (mean=mu_L, var=var_L) via the standard scipy parameterization:
-    ``p = mu_L / var_L`` and ``n = mu_L * p / (1 - p)``. Per-row fallback to
-    Poisson when ``var_L <= mu_L`` (no overdispersion to model).
+    Lead-time demand mean uses the DOW-adjusted sum when ``dow_multipliers`` +
+    ``start_date`` are provided; otherwise it degrades to the flat ``mu * L``.
+    Variance approximation stays ``sigma_d^2 * L`` (sigma_d already excludes
+    DOW effect when produced by ``_dow_weighted_estimate``). NegBin parameters
+    follow the scipy parameterization: ``p = mu_L / var_L``,
+    ``n = mu_L * p / (1 - p)``. Per-row fallback to Poisson when
+    ``var_L <= mu_L`` (no overdispersion to model).
     """
     idx = mu_hat.index
     mu = mu_hat.clip(lower=0.0).astype(float).to_numpy()
@@ -188,7 +267,9 @@ def _distribution_safety_stock(
     else:
         L_arr = np.full_like(mu, max(float(L), 0.0))
 
-    mu_L = mu * L_arr
+    mu_L = effective_lead_demand_vectorized(
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date
+    ).astype(float).to_numpy()
     var_L = (sigma**2) * L_arr
 
     # Poisson baseline (works for every SKU as a safe fallback).
@@ -220,23 +301,32 @@ def reorder_point_vectorized(
     mu_hat: pd.Series,
     safety_stock: pd.Series,
     L: Union[pd.Series, int, float],
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
 ) -> pd.Series:
     """Vectorized reorder point computation.
 
-    ROP = mu * L + safety_stock
+    ROP = expected_lead_demand + safety_stock
+
+    Expected lead demand is the DOW-adjusted sum over the lead-time window
+    when ``dow_multipliers`` + ``start_date`` are provided; otherwise it
+    degrades to ``mu * L``.
 
     Args:
         mu_hat: Series of mean daily demand estimates.
         safety_stock: Series of safety stock values.
         L: Lead time (scalar or Series).
+        dow_multipliers: Optional Series of per-SKU dicts {0..6 -> float}.
+        start_date: Calendar date the lead-time window starts on.
 
     Returns:
         Series of reorder point values.
     """
-    L_arr = L if isinstance(L, pd.Series) else L
-    L_safe = np.maximum(L_arr, 0.0) if isinstance(L_arr, pd.Series) else max(L_arr, 0.0)
+    expected_lead = effective_lead_demand_vectorized(
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date
+    )
     ss_safe = safety_stock.clip(lower=0.0)
-    return mu_hat * L_safe + ss_safe
+    return expected_lead + ss_safe
 
 
 def days_to_stockout_vectorized(

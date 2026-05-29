@@ -134,6 +134,10 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             a.rollup_date,
             a.units_sold,
             (SELECT (fp.features->>'mu_hat')::numeric
+                  * COALESCE(
+                      (fp.features->'dow_multipliers'->>((EXTRACT(isodow FROM a.rollup_date)::int - 1)::text))::numeric,
+                      1.0
+                    )
              FROM forecast_predictions fp
              WHERE fp.item_id = a.item_id
                AND fp.computed_at < (a.rollup_date::timestamptz)

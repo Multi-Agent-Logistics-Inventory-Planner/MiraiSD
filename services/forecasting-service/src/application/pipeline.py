@@ -428,6 +428,15 @@ class ForecastingPipeline:
                 config.CV_DEFAULT_REGIME
             )
 
+        # DOW multipliers from the estimator land in merged as a column of dicts
+        # when method is dow_weighted or tsb. We feed them into the policy layer
+        # so the lead-time demand sum tracks weekday/weekend cadence instead of
+        # using a flat mu * L. Today is the start of the lead-time window.
+        dow_mult_series: pd.Series | None = None
+        if "dow_multipliers" in merged.columns:
+            dow_mult_series = merged["dow_multipliers"]
+        start_date = now.date()
+
         # Vectorized policy computations. When the new regime mapping is
         # present, the safety stock switches from the legacy Normal-quantile
         # formula to Poisson (steady) / NegBin (bursty).
@@ -438,6 +447,8 @@ class ForecastingPipeline:
                 L=lead_time,
                 alpha=service_level,
                 regime=regime_series,
+                dow_multipliers=dow_mult_series,
+                start_date=start_date,
             )
         else:
             ss = policy.compute_safety_stock_vectorized(
@@ -452,6 +463,8 @@ class ForecastingPipeline:
             mu_hat=mu_hat,
             safety_stock=ss,
             L=lead_time,
+            dow_multipliers=dow_mult_series,
+            start_date=start_date,
         )
 
         days_out = policy.days_to_stockout_vectorized(

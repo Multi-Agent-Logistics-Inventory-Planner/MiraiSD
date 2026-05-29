@@ -153,8 +153,11 @@ def run_method_comparison(
             for _, est_row in estimates.iterrows():
                 item_id = str(est_row["item_id"])
                 mu_hat = float(est_row["mu_hat"])
+                # DOW-adjust per-day predictions when the estimator produced
+                # multipliers. Without this the daily/LT WAPE scores compare a
+                # flat mu against a varying actual, hiding any DOW signal.
+                dow_mult = est_row.get("dow_multipliers") if "dow_multipliers" in est_row else None
                 category = category_by_item.get(item_id, "(uncategorized)")
-                # Score every day in the actual window for this item.
                 try:
                     item_actuals = actual_daily.loc[item_id]
                 except KeyError:
@@ -162,13 +165,19 @@ def run_method_comparison(
                 if isinstance(item_actuals, pd.Series):
                     item_actuals = item_actuals.to_frame().T
                 for date, actual in zip(item_actuals.index, item_actuals["consumption"]):
+                    if isinstance(dow_mult, dict) and dow_mult:
+                        dow = pd.Timestamp(date).dayofweek
+                        mult = dow_mult.get(dow, dow_mult.get(str(dow), 1.0))
+                        predicted = mu_hat * float(mult)
+                    else:
+                        predicted = mu_hat
                     rows.append({
                         "method": method,
                         "origin_days_ago": origin_days_ago,
                         "item_id": item_id,
                         "category": category,
                         "date": date,
-                        "predicted": mu_hat,
+                        "predicted": predicted,
                         "actual": float(actual),
                     })
 
@@ -222,9 +231,11 @@ def _aggregate_lead_time(df: pd.DataFrame) -> pd.DataFrame:
     ).agg(
         actual_sum=("actual", "sum"),
         days_count=("actual", "count"),
-        mu_hat=("predicted", "first"),
+        # Sum per-day predictions; for the flat-mu methods every row carries
+        # the same value, while DOW-adjusted methods now contribute the
+        # right per-day amount.
+        predicted_sum=("predicted", "sum"),
     )
-    per_item["predicted_sum"] = per_item["mu_hat"] * per_item["days_count"]
     per_item["abs_err"] = (per_item["predicted_sum"] - per_item["actual_sum"]).abs()
     per_item["signed_err"] = per_item["predicted_sum"] - per_item["actual_sum"]
 
