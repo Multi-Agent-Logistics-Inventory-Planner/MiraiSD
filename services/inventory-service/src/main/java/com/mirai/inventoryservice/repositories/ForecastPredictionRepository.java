@@ -128,19 +128,32 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
     Optional<ForecastPrediction> findHighestDemandForecast();
 
     /**
-     * Accuracy aggregates by category over a rolling window. For each (item, actual_day) in
-     * the window, takes the latest forecast_predictions row strictly before that day, joins
-     * mu_hat against analytics_daily_rollup.units_sold, then groups by category.
+     * Lead-time WAPE aggregates by category over a rolling window. For each
+     * (item, day) in the lookback we compute a forward 14-day sum of predicted
+     * vs actual units, then aggregate ``Σ|window_pred − window_actual| /
+     * Σ window_actual`` per category. Daily WAPE is misleading on intermittent
+     * demand because per-day actuals are spiky; the lead-time sum is what
+     * actually drives the reorder decision and is the metric the operator
+     * cares about.
+     *
+     * Per-day predicted is mu_hat × DOW multiplier × event multipliers
+     * (matching the production pipeline path). Windows extending beyond the
+     * lookback's end date are dropped so trailing rows don't bias the metric.
+     *
+     * Note: ``analytics_daily_rollup`` is sparse (only sale-days produce rows
+     * for an item), so window sums are over the SALE-DAYS in the 14-day
+     * calendar span, not 14 dense rows. Bias is divided by the actual count
+     * of observation-days to keep "units/day" honest.
      *
      * Returns rows of:
-     *   [0] category          (String, "(uncategorized)" when null)
-     *   [1] scored_item_days  (Long)
-     *   [2] sum_abs_error     (BigDecimal)   numerator of WAPE
-     *   [3] sum_actual        (Long)         denominator of WAPE
-     *   [4] sum_signed_error  (BigDecimal)   for bias
-     *   [5] mape_sale_days    (BigDecimal)   AVG over actual > 0 only (nullable)
-     *   [6] under_count       (Long)         predicted < actual
-     *   [7] over_count        (Long)         predicted > actual
+     *   [0] category            (String, "(uncategorized)" when null)
+     *   [1] scored_windows      (Long)         number of 14-day windows aggregated
+     *   [2] sum_abs_error       (BigDecimal)   Σ |window_pred - window_actual|
+     *   [3] sum_actual          (BigDecimal)   Σ window_actual  (denominator of WAPE)
+     *   [4] sum_signed_error    (BigDecimal)   Σ (window_pred - window_actual) for bias
+     *   [5] sum_days_observed   (Long)         Σ days_in_window (denominator of bias)
+     *   [6] under_count         (Long)         windows where pred_sum  < actual_sum
+     *   [7] over_count          (Long)         windows where pred_sum  > actual_sum
      */
     @Query(value = """
         WITH actuals AS (
@@ -160,10 +173,6 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
                       (fp.features->'dow_multipliers'->>((EXTRACT(isodow FROM a.rollup_date)::int - 1)::text))::numeric,
                       1.0
                     )
-                  -- Phase 4: apply event multipliers when the rollup_date sits
-                  -- within event_window_days of a SHIPMENT_RECEIPT / DISPLAY_SET
-                  -- for the item. Falls through to 1.0 when no multiplier is
-                  -- stored (e.g. legacy rows / non-events methods).
                   * CASE WHEN EXISTS (
                       SELECT 1 FROM stock_movements sm
                       WHERE sm.item_id = a.item_id
@@ -201,19 +210,38 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
           JOIN products pr ON pr.id = p.item_id
           LEFT JOIN categories c ON c.id = pr.category_id
           WHERE p.predicted_mu IS NOT NULL
+        ),
+        windowed AS (
+          -- Forward 14-day window sums per item. RANGE frame keyed on the
+          -- date column so a gap in predictions doesn't shift later windows.
+          -- We require both (a) the window end fits in the lookback and (b)
+          -- the window contains 14 distinct days so partial windows don't
+          -- skew the metric.
+          SELECT
+            category,
+            item_id,
+            rollup_date,
+            SUM(units_sold) OVER w  AS actual_window,
+            SUM(predicted_mu) OVER w AS predicted_window,
+            COUNT(*) OVER w          AS days_in_window
+          FROM joined
+          WHERE rollup_date <= CAST(:endDate AS DATE) - INTERVAL '13 days'
+          WINDOW w AS (
+            PARTITION BY item_id
+            ORDER BY rollup_date
+            RANGE BETWEEN CURRENT ROW AND INTERVAL '13 days' FOLLOWING
+          )
         )
         SELECT
           category,
-          COUNT(*)::bigint                                                   AS scored_item_days,
-          COALESCE(SUM(ABS(predicted_mu - units_sold)), 0)                   AS sum_abs_error,
-          COALESCE(SUM(units_sold), 0)::bigint                               AS sum_actual,
-          COALESCE(SUM(predicted_mu - units_sold), 0)                        AS sum_signed_error,
-          AVG(CASE WHEN units_sold > 0
-                   THEN ABS(predicted_mu - units_sold) / units_sold
-                   ELSE NULL END)                                            AS mape_sale_days,
-          COUNT(*) FILTER (WHERE predicted_mu < units_sold)::bigint          AS under_count,
-          COUNT(*) FILTER (WHERE predicted_mu > units_sold)::bigint          AS over_count
-        FROM joined
+          COUNT(*)::bigint                                                       AS scored_windows,
+          COALESCE(SUM(ABS(predicted_window - actual_window)), 0)                AS sum_abs_error,
+          COALESCE(SUM(actual_window), 0)                                        AS sum_actual,
+          COALESCE(SUM(predicted_window - actual_window), 0)                     AS sum_signed_error,
+          COALESCE(SUM(days_in_window), 0)::bigint                               AS sum_days_observed,
+          COUNT(*) FILTER (WHERE predicted_window < actual_window)::bigint       AS under_count,
+          COUNT(*) FILTER (WHERE predicted_window > actual_window)::bigint       AS over_count
+        FROM windowed
         GROUP BY category
         ORDER BY sum_actual DESC
         """, nativeQuery = true)

@@ -35,10 +35,9 @@ export async function getHighestDemandForecast(): Promise<ForecastPrediction | n
 
 export interface ForecastAccuracyWindow {
   days: number
-  scoredItemDays: number
-  wape: number | null
-  mape: number | null
-  bias: number | null
+  scoredWindows: number
+  ltWape: number | null
+  biasUnitsPerDay: number | null
   totalActualUnits: number
   underPredictions: number
   overPredictions: number
@@ -46,10 +45,9 @@ export interface ForecastAccuracyWindow {
 
 export interface ForecastAccuracyCategoryRow {
   category: string
-  scoredItemDays: number
-  wape: number | null
-  mape: number | null
-  bias: number | null
+  scoredWindows: number
+  ltWape: number | null
+  biasUnitsPerDay: number | null
   totalActualUnits: number
 }
 

@@ -4,11 +4,11 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Rolling accuracy of the demand-forecasting pipeline.
- *
- * WAPE is the headline (Sum |predicted - actual| / Sum actual). MAPE is kept for continuity
- * with the existing features.mape value but is computed only over days with actual sales > 0
- * because |error|/0 is undefined.
+ * Rolling accuracy of the demand-forecasting pipeline. Headline is lead-time
+ * WAPE (14-day forward window): {@code Σ |window_pred - window_actual| /
+ * Σ window_actual}. This matches the metric that actually drives the reorder
+ * decision; daily WAPE is structurally bad on intermittent demand and is no
+ * longer surfaced. MAPE is gone for the same reason.
  */
 public record ForecastAccuracyDTO(
     Window headline,
@@ -17,21 +17,19 @@ public record ForecastAccuracyDTO(
 ) {
     public record Window(
         int days,
-        long scoredItemDays,
-        BigDecimal wape,
-        BigDecimal mape,
-        BigDecimal bias,
-        long totalActualUnits,
+        long scoredWindows,
+        BigDecimal ltWape,
+        BigDecimal biasUnitsPerDay,
+        BigDecimal totalActualUnits,
         long underPredictions,
         long overPredictions
     ) {}
 
     public record CategoryAccuracy(
         String category,
-        long scoredItemDays,
-        BigDecimal wape,
-        BigDecimal mape,
-        BigDecimal bias,
-        long totalActualUnits
+        long scoredWindows,
+        BigDecimal ltWape,
+        BigDecimal biasUnitsPerDay,
+        BigDecimal totalActualUnits
     ) {}
 }

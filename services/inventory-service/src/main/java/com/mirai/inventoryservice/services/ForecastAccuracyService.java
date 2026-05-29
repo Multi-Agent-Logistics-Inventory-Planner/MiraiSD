@@ -44,47 +44,33 @@ public class ForecastAccuracyService {
     }
 
     private ForecastAccuracyDTO.Window aggregateWindow(List<Object[]> rows, int days) {
-        long scored = 0;
+        long scoredWindows = 0;
         BigDecimal sumAbsError = BigDecimal.ZERO;
-        long sumActual = 0;
+        BigDecimal sumActual = BigDecimal.ZERO;
         BigDecimal sumSignedError = BigDecimal.ZERO;
-        BigDecimal mapeWeightedNumerator = BigDecimal.ZERO;
-        long mapeWeightedDenominator = 0;
+        long sumDaysObserved = 0;
         long under = 0;
         long over = 0;
 
         for (Object[] row : rows) {
-            long rowScored = ((Number) row[1]).longValue();
-            BigDecimal rowSumAbs = toBigDecimal(row[2]);
-            long rowSumActual = ((Number) row[3]).longValue();
-            BigDecimal rowSumSigned = toBigDecimal(row[4]);
-            BigDecimal rowMape = toBigDecimal(row[5]);
-            long rowUnder = ((Number) row[6]).longValue();
-            long rowOver = ((Number) row[7]).longValue();
-
-            scored += rowScored;
-            sumAbsError = sumAbsError.add(rowSumAbs);
-            sumActual += rowSumActual;
-            sumSignedError = sumSignedError.add(rowSumSigned);
-            under += rowUnder;
-            over += rowOver;
-            if (rowMape != null) {
-                mapeWeightedNumerator = mapeWeightedNumerator.add(rowMape.multiply(BigDecimal.valueOf(rowScored)));
-                mapeWeightedDenominator += rowScored;
-            }
+            scoredWindows    += ((Number) row[1]).longValue();
+            sumAbsError       = sumAbsError.add(toBigDecimal(row[2]));
+            sumActual         = sumActual.add(toBigDecimal(row[3]));
+            sumSignedError    = sumSignedError.add(toBigDecimal(row[4]));
+            sumDaysObserved  += ((Number) row[5]).longValue();
+            under            += ((Number) row[6]).longValue();
+            over             += ((Number) row[7]).longValue();
         }
 
-        BigDecimal wape = sumActual > 0
-            ? sumAbsError.divide(BigDecimal.valueOf(sumActual), SCALE, RoundingMode.HALF_UP)
+        BigDecimal ltWape = sumActual.signum() > 0
+            ? sumAbsError.divide(sumActual, SCALE, RoundingMode.HALF_UP)
             : null;
-        BigDecimal mape = mapeWeightedDenominator > 0
-            ? mapeWeightedNumerator.divide(BigDecimal.valueOf(mapeWeightedDenominator), SCALE, RoundingMode.HALF_UP)
-            : null;
-        BigDecimal bias = scored > 0
-            ? sumSignedError.divide(BigDecimal.valueOf(scored), SCALE, RoundingMode.HALF_UP)
+        BigDecimal biasUnitsPerDay = sumDaysObserved > 0
+            ? sumSignedError.divide(BigDecimal.valueOf(sumDaysObserved), SCALE, RoundingMode.HALF_UP)
             : null;
 
-        return new ForecastAccuracyDTO.Window(days, scored, wape, mape, bias, sumActual, under, over);
+        return new ForecastAccuracyDTO.Window(
+            days, scoredWindows, ltWape, biasUnitsPerDay, sumActual, under, over);
     }
 
     private List<ForecastAccuracyDTO.CategoryAccuracy> perCategory(List<Object[]> rows) {
@@ -92,22 +78,21 @@ public class ForecastAccuracyService {
 
         for (Object[] row : rows) {
             String category = (String) row[0];
-            long scored = ((Number) row[1]).longValue();
+            long scoredWindows = ((Number) row[1]).longValue();
             BigDecimal sumAbs = toBigDecimal(row[2]);
-            long sumActual = ((Number) row[3]).longValue();
+            BigDecimal sumActual = toBigDecimal(row[3]);
             BigDecimal sumSigned = toBigDecimal(row[4]);
-            BigDecimal mape = toBigDecimal(row[5]);
+            long sumDaysObserved = ((Number) row[5]).longValue();
 
-            BigDecimal wape = sumActual > 0
-                ? sumAbs.divide(BigDecimal.valueOf(sumActual), SCALE, RoundingMode.HALF_UP)
+            BigDecimal ltWape = sumActual.signum() > 0
+                ? sumAbs.divide(sumActual, SCALE, RoundingMode.HALF_UP)
                 : null;
-            BigDecimal bias = scored > 0
-                ? sumSigned.divide(BigDecimal.valueOf(scored), SCALE, RoundingMode.HALF_UP)
+            BigDecimal biasUnitsPerDay = sumDaysObserved > 0
+                ? sumSigned.divide(BigDecimal.valueOf(sumDaysObserved), SCALE, RoundingMode.HALF_UP)
                 : null;
-            BigDecimal mapeScaled = mape != null ? mape.setScale(SCALE, RoundingMode.HALF_UP) : null;
 
             result.add(new ForecastAccuracyDTO.CategoryAccuracy(
-                category, scored, wape, mapeScaled, bias, sumActual));
+                category, scoredWindows, ltWape, biasUnitsPerDay, sumActual));
         }
 
         return result;
