@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { AlertCircle, Package, TrendingUp } from "lucide-react";
+import { AlertCircle, Clock, Package, TrendingUp } from "lucide-react";
 import { computePriorityScore } from "@/lib/utils/format-forecast";
 import { Card } from "@/components/ui/card";
 import { usePredictions } from "@/hooks/queries/use-predictions";
@@ -12,7 +12,9 @@ import { STOCKOUT_THRESHOLDS } from "@/components/analytics/predictions";
 import {
   PAGE_SIZE,
   WELL_STOCKED_THRESHOLD,
-  isForecastStale,
+  STALENESS_BANNER_THRESHOLD_MS,
+  forecastAgeMs,
+  formatRelativeAge,
   ForecastAccuracyCard,
   PredictionItemCard,
   UrgencyTabs,
@@ -71,15 +73,33 @@ export function TabPredictions() {
     [dismissedIds, dismissedMap],
   );
 
-  // Items that pass stale + stockout filters (before dismiss filter)
+  // Items that pass the stockout cutoff (before dismiss filter). The legacy
+  // 30-day isForecastStale silent filter was removed in favor of the per-row
+  // age badge + top-of-tab freshness banner -- hiding rows because a forecast
+  // is old was masking real "the worker stopped" incidents.
   const nonStaleItems = useMemo(() => {
     if (!data?.items) return [];
     return data.items.filter((item) => {
-      if (isForecastStale(item.computedAt)) return false;
       if (item.daysToStockout != null && item.daysToStockout >= WELL_STOCKED_THRESHOLD) return false;
       return true;
     });
   }, [data?.items]);
+
+  // Pipeline freshness: max(computed_at) across all visible items. Used to
+  // decide whether the top-of-tab freshness banner appears.
+  const newestForecastAgeMs = useMemo(() => {
+    if (!data?.items?.length) return null;
+    let youngest: number | null = null;
+    for (const item of data.items) {
+      const age = forecastAgeMs(item.computedAt);
+      if (age === null) continue;
+      if (youngest === null || age < youngest) youngest = age;
+    }
+    return youngest;
+  }, [data?.items]);
+
+  const showStalenessBanner =
+    newestForecastAgeMs !== null && newestForecastAgeMs > STALENESS_BANNER_THRESHOLD_MS;
 
   // Active items (not dismissed)
   const baseFilteredItems = useMemo(
@@ -253,6 +273,20 @@ export function TabPredictions() {
       <ForecastAccuracyCard />
       {!isLoading && data && (
         <>
+          {showStalenessBanner && (
+            <Card className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 p-3">
+              <div className="flex items-center gap-2 text-sm text-amber-900 dark:text-amber-100">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span className="font-semibold">Forecasts may be stale.</span>
+                <span className="text-amber-800 dark:text-amber-200">
+                  Newest forecast is{" "}
+                  <span className="font-mono">{formatRelativeAge(newestForecastAgeMs)}</span>.
+                  The forecasting worker may be lagging or down.
+                </span>
+              </div>
+            </Card>
+          )}
+
           {/* Summary Header */}
           {tabCounts.actionNeeded > 0 && topPriorityItem && (
             <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 p-4">

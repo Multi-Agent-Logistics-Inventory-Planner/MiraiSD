@@ -2,7 +2,17 @@
 export type { UrgencyFilter, SortField, SortDirection, SortOption } from "./types";
 
 // Constants
-export { SORT_OPTIONS, PAGE_SIZE, STOCKOUT_THRESHOLDS, STALE_THRESHOLD_MS, WELL_STOCKED_THRESHOLD, isForecastStale } from "./constants";
+export {
+  SORT_OPTIONS,
+  PAGE_SIZE,
+  STOCKOUT_THRESHOLDS,
+  STALE_THRESHOLD_MS,
+  STALENESS_BANNER_THRESHOLD_MS,
+  WELL_STOCKED_THRESHOLD,
+  isForecastStale,
+  forecastAgeMs,
+  formatRelativeAge,
+} from "./constants";
 
 // Help Content
 export { METRIC_TOOLTIPS, BADGE_TOOLTIPS, TAB_TOOLTIPS } from "./help-content";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Warehouse, Activity, Timer, X, Undo2 } from "lucide-react";
+import { Package, Warehouse, Activity, Timer, X, Undo2, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
@@ -18,6 +18,7 @@ import {
   formatCoverageContext,
 } from "@/lib/utils/format-forecast";
 import { METRIC_TOOLTIPS, BADGE_TOOLTIPS } from "./help-content";
+import { forecastAgeMs, formatRelativeAge, STALENESS_BANNER_THRESHOLD_MS } from "./constants";
 
 interface PredictionItemCardProps {
   item: ActionItem;
@@ -34,6 +35,29 @@ function formatDate(dateStr: string | null): string {
 }
 
 export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestore }: PredictionItemCardProps) {
+  const ageMs = forecastAgeMs(item.computedAt);
+  const ageLabel = formatRelativeAge(ageMs);
+  const ageStale = ageMs !== null && ageMs > STALENESS_BANNER_THRESHOLD_MS;
+  const ageBadge = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "flex items-center gap-1 font-light cursor-help text-[11px] sm:text-xs",
+            ageStale ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/70",
+          )}
+        >
+          <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          <span className="font-mono">{ageLabel}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        Forecast last computed{" "}
+        {item.computedAt ? new Date(item.computedAt).toLocaleString() : "—"}.
+        {ageStale && " The worker may be lagging."}
+      </TooltipContent>
+    </Tooltip>
+  );
   return (
     <Card className={cn(
       "bg-card hover:bg-card/50 transition-colors border border-border dark:border-none shadow-none p-2 pr-3 relative group",
@@ -158,6 +182,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                   {METRIC_TOOLTIPS.daysToStockout}
                 </TooltipContent>
               </Tooltip>
+              {ageBadge}
             </div>
           </div>
 
@@ -282,6 +307,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
                 {METRIC_TOOLTIPS.daysToStockout}
               </TooltipContent>
             </Tooltip>
+            {ageBadge}
           </div>
 
           {/* Row 3: Action Info */}
