@@ -35,12 +35,22 @@ def effective_lead_demand_vectorized(
     L: Union[pd.Series, int, float],
     dow_multipliers: Optional[pd.Series] = None,
     start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
-    """Expected demand over the lead-time window, DOW-adjusted when possible.
+    """Expected demand over the lead-time window, DOW + event-adjusted.
 
-    For each row this returns ``sum_{k=0..L-1} mu_hat * dow_mult[dow(start+k)]``.
-    Falls back to ``mu_hat * L`` when ``dow_multipliers`` is not provided, the
-    row's multiplier dict is missing/empty, or ``start_date`` is None.
+    For each row this returns
+    ``sum_{k=0..L-1} mu_hat * dow_mult[dow(start+k)] * Π event_mult_if_active``.
+    Falls back to ``mu_hat * L`` when DOW info is missing and to the DOW-only
+    sum when event info is missing.
+
+    Event activation: an event with global multiplier ``m`` is "active" on
+    lead-time day ``k`` (where ``k=0`` is ``start_date``) for SKUs whose last
+    occurrence is ``X`` days before ``start_date`` and ``1 - k <= X <=
+    event_window_days - k``. This matches the "recent in prior N days,
+    excluding the event day itself" semantic used at training time.
 
     Args:
         mu_hat: per-SKU mean daily demand (constant, the window average).
@@ -50,6 +60,13 @@ def effective_lead_demand_vectorized(
         start_date: calendar date the lead-time window begins. The day at index 0
             is ``start_date`` itself. When None, the function degrades to the
             constant-rate sum ``mu_hat * L``.
+        event_multipliers: global ``{event_col -> multiplier}`` learned from
+            training. When None or empty, events are skipped.
+        event_days_since: ``{event_col -> Series of days-since-last-event}``,
+            aligned to ``mu_hat.index``. NaN means "no prior event observed";
+            those SKUs do not get the multiplier.
+        event_window_days: lookback length used to define "recent" (default 7,
+            matching ``recent_*_7d`` flags).
 
     Returns:
         Series of expected lead-time demand, same index as ``mu_hat``.
@@ -67,6 +84,21 @@ def effective_lead_demand_vectorized(
     L_int = np.round(L_arr.to_numpy()).astype(int)
     dm_arr = dow_multipliers.reindex(mu_hat.index).to_numpy()
 
+    # Pre-extract event arrays once per call. Each entry is (multiplier,
+    # days_since_array). Multipliers within (1 - epsilon, 1 + epsilon) are
+    # filtered out as no-ops to keep the inner loop fast.
+    active_events: list[tuple[float, np.ndarray]] = []
+    if event_multipliers and event_days_since:
+        for col, mult in event_multipliers.items():
+            if abs(float(mult) - 1.0) < 1e-9:
+                continue
+            recency = event_days_since.get(col)
+            if recency is None:
+                continue
+            active_events.append(
+                (float(mult), recency.reindex(mu_hat.index).to_numpy())
+            )
+
     for i in range(len(mu_hat)):
         dm = dm_arr[i]
         L_i = int(L_int[i])
@@ -78,7 +110,17 @@ def effective_lead_demand_vectorized(
         total = 0.0
         for k in range(L_i):
             dow = (start_date + timedelta(days=k)).weekday()
-            total += mu_arr[i] * _dow_multiplier(dm, dow)
+            day_demand = mu_arr[i] * _dow_multiplier(dm, dow)
+            for mult, recency_arr in active_events:
+                X = recency_arr[i]
+                # NaN means "never observed" -> flag inactive.
+                if X != X:  # NaN check without numpy import in hot loop
+                    continue
+                # Active iff most recent event is within (k - event_window_days, k - 1]
+                # relative to start_date. Equivalent: 1 - k <= X <= window - k.
+                if (1 - k) <= X <= (event_window_days - k):
+                    day_demand *= mult
+            total += day_demand
         out[i] = total
 
     return pd.Series(out, index=mu_hat.index)
@@ -187,6 +229,9 @@ def compute_safety_stock_vectorized(
     regime: Optional[pd.Series] = None,
     dow_multipliers: Optional[pd.Series] = None,
     start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized safety stock computation.
 
@@ -226,6 +271,9 @@ def compute_safety_stock_vectorized(
         return _distribution_safety_stock(
             mu_hat, sigma_d_hat, L, alpha, regime,
             dow_multipliers=dow_multipliers, start_date=start_date,
+            event_multipliers=event_multipliers,
+            event_days_since=event_days_since,
+            event_window_days=event_window_days,
         )
 
     z = z_for_service_level(alpha)
@@ -248,6 +296,9 @@ def _distribution_safety_stock(
     regime: pd.Series,
     dow_multipliers: Optional[pd.Series] = None,
     start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
     """Poisson (steady) / NegBin (bursty) safety stock, vectorized.
 
@@ -268,7 +319,10 @@ def _distribution_safety_stock(
         L_arr = np.full_like(mu, max(float(L), 0.0))
 
     mu_L = effective_lead_demand_vectorized(
-        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date,
+        event_multipliers=event_multipliers,
+        event_days_since=event_days_since,
+        event_window_days=event_window_days,
     ).astype(float).to_numpy()
     var_L = (sigma**2) * L_arr
 
@@ -303,6 +357,9 @@ def reorder_point_vectorized(
     L: Union[pd.Series, int, float],
     dow_multipliers: Optional[pd.Series] = None,
     start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized reorder point computation.
 
@@ -323,7 +380,10 @@ def reorder_point_vectorized(
         Series of reorder point values.
     """
     expected_lead = effective_lead_demand_vectorized(
-        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date,
+        event_multipliers=event_multipliers,
+        event_days_since=event_days_since,
+        event_window_days=event_window_days,
     )
     ss_safe = safety_stock.clip(lower=0.0)
     return expected_lead + ss_safe

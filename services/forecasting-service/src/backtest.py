@@ -123,6 +123,17 @@ def run_method_comparison(
         raise RuntimeError("No active items found in database")
     category_by_item = dict(zip(items_df["item_id"].astype(str), items_df["category_name"]))
 
+    # Phase 4: methods ending in "_events" learn global event multipliers
+    # (recent SHIPMENT_RECEIPT / DISPLAY_SET in the prior 7 days) from the
+    # history window and apply them at scoring time. The underlying estimator
+    # is the prefix ("dow_weighted" for "dow_weighted_events").
+    event_window_days = 7
+    ship_col = f"recent_shipment_{event_window_days}d"
+    disp_col = f"recent_display_{event_window_days}d"
+
+    def base_method(m: str) -> str:
+        return m[:-len("_events")] if m.endswith("_events") else m
+
     rows: list[dict] = []
     for origin_days_ago in origin_days_ago_list:
         origin = datetime.now(timezone.utc) - timedelta(days=origin_days_ago)
@@ -148,14 +159,47 @@ def run_method_comparison(
         actual_daily["item_id"] = actual_daily["item_id"].astype(str)
         actual_daily = actual_daily.set_index(["item_id", "date"])
 
+        # Combined movements for event-feature lookup at scoring time.
+        # Multipliers are learned from history only; the at-scoring feature
+        # state uses any event up to (scored_day - 1), which can span both
+        # windows -- that mirrors how the deployed pipeline would see events
+        # arriving by the time it predicts each day.
+        combined_mv = pd.concat([history_mv, actual_mv], ignore_index=True) \
+            if not actual_mv.empty else history_mv
+
+        # Learn global event multipliers from history training window.
+        history_events = feat.build_event_features(history_mv, window_days=event_window_days)
+        if not history_events.empty and not history_daily.empty:
+            history_daily_keyed = history_daily.copy()
+            history_daily_keyed["item_id"] = history_daily_keyed["item_id"].astype(str)
+            history_daily_keyed["date"] = pd.to_datetime(history_daily_keyed["date"]).dt.floor("D")
+            history_events["date"] = pd.to_datetime(history_events["date"]).dt.floor("D")
+            train = history_daily_keyed.merge(
+                history_events, on=["item_id", "date"], how="left",
+            )
+            train[ship_col] = train[ship_col].fillna(0).astype(int)
+            train[disp_col] = train[disp_col].fillna(0).astype(int)
+            global_event_mults = feat.compute_global_event_multipliers(
+                train, event_cols=[ship_col, disp_col],
+            )
+        else:
+            global_event_mults = {ship_col: 1.0, disp_col: 1.0}
+
+        # Per (item, day) event-state lookup across the full window.
+        all_events = feat.build_event_features(combined_mv, window_days=event_window_days)
+        if not all_events.empty:
+            all_events["date"] = pd.to_datetime(all_events["date"]).dt.floor("D")
+            all_events["item_id"] = all_events["item_id"].astype(str)
+            events_index = all_events.set_index(["item_id", "date"])
+        else:
+            events_index = None
+
         for method in methods:
-            estimates = fc.estimate_mu_sigma(history_daily, method=method)
+            estimates = fc.estimate_mu_sigma(history_daily, method=base_method(method))
+            apply_events = method.endswith("_events")
             for _, est_row in estimates.iterrows():
                 item_id = str(est_row["item_id"])
                 mu_hat = float(est_row["mu_hat"])
-                # DOW-adjust per-day predictions when the estimator produced
-                # multipliers. Without this the daily/LT WAPE scores compare a
-                # flat mu against a varying actual, hiding any DOW signal.
                 dow_mult = est_row.get("dow_multipliers") if "dow_multipliers" in est_row else None
                 category = category_by_item.get(item_id, "(uncategorized)")
                 try:
@@ -171,6 +215,14 @@ def run_method_comparison(
                         predicted = mu_hat * float(mult)
                     else:
                         predicted = mu_hat
+                    if apply_events and events_index is not None:
+                        key = (item_id, pd.Timestamp(date).floor("D"))
+                        if key in events_index.index:
+                            row_ev = events_index.loc[key]
+                            if int(row_ev[ship_col]) == 1:
+                                predicted *= global_event_mults.get(ship_col, 1.0)
+                            if int(row_ev[disp_col]) == 1:
+                                predicted *= global_event_mults.get(disp_col, 1.0)
                     rows.append({
                         "method": method,
                         "origin_days_ago": origin_days_ago,

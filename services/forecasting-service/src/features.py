@@ -119,6 +119,130 @@ def detect_stockout_days(movements_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+SHIPMENT_REASONS = {"SHIPMENT_RECEIPT", "SHIPMENT_PARTIAL_RECEIPT", "shipment_receipt", "shipment_partial_receipt"}
+DISPLAY_REASONS = {"DISPLAY_SET", "display_set"}
+
+
+def build_event_features(
+    movements_df: pd.DataFrame,
+    window_days: int = 7,
+) -> pd.DataFrame:
+    """Per (item, day) binary flags for non-sale events in a prior lookback window.
+
+    Reads ``stock_movements`` and emits, for each (item_id, date) in the
+    observed window, whether a SHIPMENT_RECEIPT or DISPLAY_SET occurred in
+    the prior ``window_days`` calendar days (exclusive of today).
+
+    Args:
+        movements_df: DataFrame with columns ``item_id``, ``reason``, ``at``.
+            Reason values may be upper- or lower-case (DB stores uppercase,
+            tests sometimes use lowercase).
+        window_days: lookback window size in days. Defaults to 7.
+
+    Returns:
+        DataFrame with columns ``[item_id, date, recent_shipment_Nd,
+        recent_display_Nd]`` where N is ``window_days``. Empty DataFrame if
+        the input is empty or missing required columns.
+    """
+    required = {"item_id", "reason", "at"}
+    if movements_df.empty or not required.issubset(movements_df.columns):
+        return pd.DataFrame(
+            columns=["item_id", "date", f"recent_shipment_{window_days}d", f"recent_display_{window_days}d"]
+        )
+
+    df = movements_df[["item_id", "reason", "at"]].copy()
+    df["at"] = pd.to_datetime(df["at"], utc=True)
+    df["date"] = df["at"].dt.floor("D").dt.tz_localize(None)
+    df["item_id"] = df["item_id"].astype(str)
+
+    # Per (item, day): did each event type happen today?
+    df["is_shipment"] = df["reason"].isin(SHIPMENT_REASONS).astype(int)
+    df["is_display"] = df["reason"].isin(DISPLAY_REASONS).astype(int)
+
+    per_day = (
+        df.groupby(["item_id", "date"], as_index=False)[["is_shipment", "is_display"]]
+        .max()
+    )
+
+    # Build a full grid over the observed window per item so the lookback
+    # rolling-max sees zeros on non-event days.
+    if per_day.empty:
+        return pd.DataFrame(
+            columns=["item_id", "date", f"recent_shipment_{window_days}d", f"recent_display_{window_days}d"]
+        )
+
+    all_items = per_day["item_id"].unique()
+    date_min = per_day["date"].min()
+    date_max = per_day["date"].max()
+    all_dates = pd.date_range(date_min, date_max, freq="D")
+    full_idx = pd.MultiIndex.from_product([all_items, all_dates], names=["item_id", "date"])
+    grid = per_day.set_index(["item_id", "date"]).reindex(full_idx).fillna(0).reset_index()
+
+    # Rolling max over the prior window_days (excluding today). Shift by 1
+    # so today's own event does not count toward "recent".
+    grid = grid.sort_values(["item_id", "date"]).reset_index(drop=True)
+    grouped = grid.groupby("item_id", sort=False)
+    ship_col = f"recent_shipment_{window_days}d"
+    disp_col = f"recent_display_{window_days}d"
+    grid[ship_col] = grouped["is_shipment"].transform(
+        lambda s: s.shift(1).fillna(0).rolling(window_days, min_periods=1).max()
+    ).astype(int)
+    grid[disp_col] = grouped["is_display"].transform(
+        lambda s: s.shift(1).fillna(0).rolling(window_days, min_periods=1).max()
+    ).astype(int)
+
+    return grid[["item_id", "date", ship_col, disp_col]]
+
+
+def compute_global_event_multipliers(
+    daily_with_events: pd.DataFrame,
+    event_cols: list[str],
+    min_n: int = 30,
+    cap: float = 3.0,
+) -> dict[str, float]:
+    """Learn global demand multipliers per event flag.
+
+    For each flag in ``event_cols``, computes
+    ``mean(consumption | flag=1) / mean(consumption | flag=0)`` pooled across
+    all items. Falls back to ``1.0`` when either group has fewer than
+    ``min_n`` rows or the baseline mean is zero. Clips to ``[1/cap, cap]`` so
+    a noisy estimate cannot blow up predictions.
+
+    Args:
+        daily_with_events: long-form DataFrame with at least ``consumption``
+            and each column in ``event_cols`` (0/1).
+        event_cols: flag columns to learn multipliers for.
+        min_n: minimum row count in either group required to trust the
+            estimate.
+        cap: clip multipliers to ``[1/cap, cap]``.
+
+    Returns:
+        Dict mapping ``event_col -> multiplier``. Always contains an entry
+        per requested column (defaulting to 1.0 on insufficient data).
+    """
+    out: dict[str, float] = {}
+    if daily_with_events.empty or "consumption" not in daily_with_events.columns:
+        return {col: 1.0 for col in event_cols}
+
+    for col in event_cols:
+        if col not in daily_with_events.columns:
+            out[col] = 1.0
+            continue
+        on = daily_with_events.loc[daily_with_events[col] == 1, "consumption"]
+        off = daily_with_events.loc[daily_with_events[col] == 0, "consumption"]
+        if len(on) < min_n or len(off) < min_n:
+            out[col] = 1.0
+            continue
+        off_mean = float(off.mean())
+        on_mean = float(on.mean())
+        if off_mean <= 0:
+            out[col] = 1.0
+            continue
+        mult = on_mean / off_mean
+        out[col] = float(np.clip(mult, 1.0 / cap, cap))
+    return out
+
+
 def build_daily_usage(events_df: pd.DataFrame) -> pd.DataFrame:
     """Build per-SKU daily consumption from inventory change events.
 

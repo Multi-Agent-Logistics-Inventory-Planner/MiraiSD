@@ -138,6 +138,28 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
                       (fp.features->'dow_multipliers'->>((EXTRACT(isodow FROM a.rollup_date)::int - 1)::text))::numeric,
                       1.0
                     )
+                  -- Phase 4: apply event multipliers when the rollup_date sits
+                  -- within event_window_days of a SHIPMENT_RECEIPT / DISPLAY_SET
+                  -- for the item. Falls through to 1.0 when no multiplier is
+                  -- stored (e.g. legacy rows / non-events methods).
+                  * CASE WHEN EXISTS (
+                      SELECT 1 FROM stock_movements sm
+                      WHERE sm.item_id = a.item_id
+                        AND sm.reason IN ('SHIPMENT_RECEIPT','SHIPMENT_PARTIAL_RECEIPT')
+                        AND sm.at >= a.rollup_date - INTERVAL '7 days'
+                        AND sm.at < a.rollup_date
+                    ) THEN COALESCE(
+                      (fp.features->'event_multipliers'->>'recent_shipment_7d')::numeric, 1.0
+                    ) ELSE 1.0 END
+                  * CASE WHEN EXISTS (
+                      SELECT 1 FROM stock_movements sm
+                      WHERE sm.item_id = a.item_id
+                        AND sm.reason = 'DISPLAY_SET'
+                        AND sm.at >= a.rollup_date - INTERVAL '7 days'
+                        AND sm.at < a.rollup_date
+                    ) THEN COALESCE(
+                      (fp.features->'event_multipliers'->>'recent_display_7d')::numeric, 1.0
+                    ) ELSE 1.0 END
              FROM forecast_predictions fp
              WHERE fp.item_id = a.item_id
                AND fp.computed_at < (a.rollup_date::timestamptz)

@@ -124,9 +124,15 @@ def estimate_mu_sigma(
         raise ValueError(f"features_df missing required columns: {sorted(missing)}")
 
     method = method.lower()
-    valid_methods = {"ma7", "ma14", "exp_smooth", "dow_weighted", "tsb"}
+    valid_methods = {"ma7", "ma14", "exp_smooth", "dow_weighted", "tsb", "dow_weighted_events"}
     if method not in valid_methods:
         raise ValueError(f"method must be one of {valid_methods}")
+    # The "events" suffix routes the per-SKU estimate through dow_weighted -- the
+    # event-multiplier learning + application happens in the pipeline layer where
+    # we have access to the full event stream. Method label is preserved on the
+    # output row so downstream code knows the events path is active.
+    base_method = "dow_weighted" if method == "dow_weighted_events" else method
+    label_method = method
 
     if min_in_stock_days is None:
         min_in_stock_days = config.MIN_IN_STOCK_DAYS
@@ -140,20 +146,20 @@ def estimate_mu_sigma(
         p_value = None
         z_value = None
 
-        if method == "tsb":
+        if base_method == "tsb":
             # TSB consumes the zero-filled daily series directly and does not
             # need stockout-day filtering: zero-sale days are the signal it
             # decays the sale probability against.
             mu_hat, sigma_d_hat, p_value, z_value, dow_multipliers = tsb_estimate(group)
-        elif method == "dow_weighted":
+        elif base_method == "dow_weighted":
             mu_hat, sigma_d_hat, dow_multipliers = _dow_weighted_estimate(
                 group, min_in_stock_days
             )
-        elif method == "exp_smooth":
+        elif base_method == "exp_smooth":
             in_stock = _filter_in_stock(group, min_in_stock_days)
             level = _exp_smooth_last(in_stock, alpha=config.ES_ALPHA) if not in_stock.empty else 0.0
             mu_hat = max(level, config.MU_FLOOR)
-        elif method == "ma7":
+        elif base_method == "ma7":
             in_stock = _filter_in_stock(group, min_in_stock_days)
             ma = float(in_stock["ma7"].iloc[-1]) if not in_stock.empty else 0.0
             mu_hat = max(ma, config.MU_FLOOR)
@@ -162,7 +168,7 @@ def estimate_mu_sigma(
             ma = float(in_stock["ma14"].iloc[-1]) if not in_stock.empty else 0.0
             mu_hat = max(ma, config.MU_FLOOR)
 
-        if method not in ("dow_weighted", "tsb"):
+        if base_method not in ("dow_weighted", "tsb"):
             in_stock_for_sigma = _filter_in_stock(group, min_in_stock_days)
             sigma = float(in_stock_for_sigma["std14"].iloc[-1]) if not in_stock_for_sigma.empty else 0.0
             sigma_d_hat = max(sigma, config.SIGMA_FLOOR)
@@ -171,7 +177,7 @@ def estimate_mu_sigma(
             "item_id": str(item_id),
             "mu_hat": float(mu_hat),
             "sigma_d_hat": float(sigma_d_hat),
-            "method": method,
+            "method": label_method,
         }
         if dow_multipliers is not None:
             row["dow_multipliers"] = dow_multipliers
@@ -183,9 +189,9 @@ def estimate_mu_sigma(
         results.append(row)
 
     cols = ["item_id", "mu_hat", "sigma_d_hat", "method"]
-    if method in ("dow_weighted", "tsb"):
+    if base_method in ("dow_weighted", "tsb"):
         cols.append("dow_multipliers")
-    if method == "tsb":
+    if base_method == "tsb":
         cols.extend(["p", "z"])
     return pd.DataFrame(results, columns=cols).reset_index(drop=True)
 

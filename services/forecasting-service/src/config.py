@@ -16,13 +16,15 @@ ES_ALPHA = float(os.getenv("ES_ALPHA", "0.3"))
 MU_FLOOR = float(os.getenv("MU_FLOOR", "0.1"))
 SIGMA_FLOOR = float(os.getenv("SIGMA_FLOOR", "0.01"))
 
-# Estimator selection. Default is "dow_weighted" -- the Phase 1 backtest
-# (run 2026-05-29) showed TSB underperforms it on lead-time WAPE across
-# alpha in {0.02, 0.05, 0.1, 0.3} for the current Mirai dataset (~85 days,
-# single store, kuji-heavy bursty mix). TSB stays selectable via env var
-# so the implementation can be re-evaluated when more history accumulates
-# or when exogenous features (kuji calendar, holidays, price) land.
-FORECAST_METHOD = os.getenv("FORECAST_METHOD", "dow_weighted")
+# Estimator selection. Default is "dow_weighted_events" -- the Phase 4 backtest
+# (run 2026-05-29) showed it beats plain dow_weighted on lead-time WAPE
+# (84.18% -> 81.77%, -2.4pp) by learning a global demand uplift multiplier
+# for SHIPMENT_RECEIPT and DISPLAY_SET events in the prior 7 days and
+# applying it to lead-time demand. Plain dow_weighted and tsb stay selectable
+# via env var: dow_weighted as the rollback ("turn events off") and tsb for
+# re-evaluation when more history or exogenous features land. The Phase 1
+# decision to hold tsb on this data substrate still applies.
+FORECAST_METHOD = os.getenv("FORECAST_METHOD", "dow_weighted_events")
 
 # TSB smoothing constants. 0.1 is the textbook default. Higher alpha makes
 # the sale probability decay faster when a series goes cold; higher beta
