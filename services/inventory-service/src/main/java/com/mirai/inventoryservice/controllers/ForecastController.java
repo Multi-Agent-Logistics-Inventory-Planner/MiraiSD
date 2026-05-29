@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.requests.PredictionDismissalRequest;
 import com.mirai.inventoryservice.dtos.responses.ForecastAccuracyDTO;
+import com.mirai.inventoryservice.dtos.responses.ForecastExplanationDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.PredictionDismissalDTO;
 import com.mirai.inventoryservice.services.ForecastAccuracyService;
@@ -72,6 +73,15 @@ public class ForecastController {
     @GetMapping("/accuracy")
     public ResponseEntity<ForecastAccuracyDTO> getRollingAccuracy() {
         return ResponseEntity.ok(forecastAccuracyService.getRollingAccuracy());
+    }
+
+    @GetMapping("/{itemId}/explain")
+    public ResponseEntity<ForecastExplanationDTO> explainForecast(@PathVariable UUID itemId) {
+        ForecastExplanationDTO explanation = forecastService.getForecastExplanation(itemId);
+        if (explanation == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(explanation);
     }
 
     // ---------- prediction dismissals (org-wide) ----------

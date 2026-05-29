@@ -96,3 +96,16 @@ export async function dismissForecast(
 export async function restoreForecastDismissal(itemId: string): Promise<void> {
   await apiDelete<void>(`${BASE_PATH}/dismissals/${itemId}`)
 }
+
+// ---- "Why this number" explanation ----
+
+export interface ForecastExplanation {
+  itemId: string
+  computedAt: string
+  features: Record<string, unknown>
+  lastRestockAt: string | null
+}
+
+export async function getForecastExplanation(itemId: string): Promise<ForecastExplanation> {
+  return apiGet<ForecastExplanation>(`${BASE_PATH}/${itemId}/explain`)
+}

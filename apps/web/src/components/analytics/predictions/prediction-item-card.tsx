@@ -1,7 +1,9 @@
 "use client";
 
-import { Package, Warehouse, Activity, Timer, X, Undo2, Clock } from "lucide-react";
+import { useState } from "react";
+import { Package, Warehouse, Activity, Timer, X, Undo2, Clock, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { WhyThisNumberDrawer } from "./why-this-number-drawer";
 import {
   Tooltip,
   TooltipContent,
@@ -35,6 +37,7 @@ function formatDate(dateStr: string | null): string {
 }
 
 export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestore }: PredictionItemCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const ageMs = forecastAgeMs(item.computedAt);
   const ageLabel = formatRelativeAge(ageMs);
   const ageStale = ageMs !== null && ageMs > STALENESS_BANNER_THRESHOLD_MS;
@@ -64,6 +67,22 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
       onRestore && "opacity-60",
     )}>
       <CardContent className="p-0">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={cn(
+            "absolute z-10 rounded-md p-0.5 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-muted hover:text-foreground transition-all",
+            (onDismiss || onRestore)
+              ? "top-1.5 right-7 sm:top-2 sm:right-8"
+              : "top-1.5 right-1.5 sm:top-2 sm:right-2",
+          )}
+          aria-label={expanded ? "Hide explanation" : "Show explanation"}
+          aria-expanded={expanded}
+        >
+          <ChevronDown
+            className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
+          />
+        </button>
         {onDismiss && (
           <button
             type="button"
@@ -330,6 +349,7 @@ export function PredictionItemCard({ item, showUrgencyColor, onDismiss, onRestor
             </TooltipContent>
           </Tooltip>
         </div>
+        <WhyThisNumberDrawer itemId={item.itemId} open={expanded} />
       </CardContent>
     </Card>
   );
