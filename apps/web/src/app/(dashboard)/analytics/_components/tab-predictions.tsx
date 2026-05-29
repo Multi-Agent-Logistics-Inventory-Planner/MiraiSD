@@ -13,6 +13,7 @@ import {
   PAGE_SIZE,
   WELL_STOCKED_THRESHOLD,
   isForecastStale,
+  ForecastAccuracyCard,
   PredictionItemCard,
   UrgencyTabs,
   MobileFilterControls,
@@ -249,6 +250,7 @@ export function TabPredictions() {
 
   return (
     <div className="space-y-6">
+      <ForecastAccuracyCard />
       {!isLoading && data && (
         <>
           {/* Summary Header */}

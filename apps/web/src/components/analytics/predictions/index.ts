@@ -16,3 +16,4 @@ export { UrgencyTabs } from "./urgency-tabs";
 export { MobileFilterControls, DesktopFilterControls } from "./filter-controls";
 export { PredictionsPagination } from "./predictions-pagination";
 export { PredictionsSkeleton } from "./predictions-skeleton";
+export { ForecastAccuracyCard } from "./forecast-accuracy-card";

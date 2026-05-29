@@ -16,6 +16,33 @@ ES_ALPHA = float(os.getenv("ES_ALPHA", "0.3"))
 MU_FLOOR = float(os.getenv("MU_FLOOR", "0.1"))
 SIGMA_FLOOR = float(os.getenv("SIGMA_FLOOR", "0.01"))
 
+# Estimator selection. Default is "dow_weighted" -- the Phase 1 backtest
+# (run 2026-05-29) showed TSB underperforms it on lead-time WAPE across
+# alpha in {0.02, 0.05, 0.1, 0.3} for the current Mirai dataset (~85 days,
+# single store, kuji-heavy bursty mix). TSB stays selectable via env var
+# so the implementation can be re-evaluated when more history accumulates
+# or when exogenous features (kuji calendar, holidays, price) land.
+FORECAST_METHOD = os.getenv("FORECAST_METHOD", "dow_weighted")
+
+# TSB smoothing constants. 0.1 is the textbook default. Higher alpha makes
+# the sale probability decay faster when a series goes cold; higher beta
+# makes the sale-day demand react faster to recent sale sizes.
+TSB_ALPHA = float(os.getenv("TSB_ALPHA", "0.1"))
+TSB_BETA = float(os.getenv("TSB_BETA", "0.1"))
+
+# Demand-regime routing for safety stock distribution.
+# CV computed from sale-day-only consumption over CV_WINDOW_DAYS. Hysteresis
+# avoids day-to-day regime flips around the boundary: only move to "bursty"
+# once CV exceeds CV_THRESHOLD_HIGH, only move to "steady" once it drops
+# below CV_THRESHOLD_LOW. SKUs in the band keep their prior regime.
+CV_WINDOW_DAYS = int(os.getenv("CV_WINDOW_DAYS", "60"))
+CV_THRESHOLD_LOW = float(os.getenv("CV_THRESHOLD_LOW", "0.9"))
+CV_THRESHOLD_HIGH = float(os.getenv("CV_THRESHOLD_HIGH", "1.1"))
+# Default regime for items with no prior state and CV inside the deadband.
+# "bursty" is the safer side -- NegBin gives a larger buffer than Poisson, so
+# the worst case from misclassification is over-buffering, not stockout.
+CV_DEFAULT_REGIME = os.getenv("CV_DEFAULT_REGIME", "bursty")
+
 # Policy defaults
 SERVICE_LEVEL_DEFAULT = float(os.getenv("SERVICE_LEVEL_DEFAULT", "0.95"))
 LEAD_TIME_STD_DEFAULT_DAYS = float(os.getenv("LEAD_TIME_STD_DEFAULT_DAYS", "2.0"))
@@ -44,8 +71,15 @@ MIN_IN_STOCK_DAYS = int(os.getenv("MIN_IN_STOCK_DAYS", "7"))
 # predictions against unobservable demand in stockout-heavy test windows.
 MIN_TEST_IN_STOCK_DAYS = int(os.getenv("MIN_TEST_IN_STOCK_DAYS", "3"))
 
-# Stockout filter: disabled by default. Enable once 60-90+ days of data
-# accumulate, at which point the bias correction outweighs the sample-size penalty.
+# Stockout filter: disabled by default. The detector in features.py was
+# rewritten 2026-05-29 to use start-of-day-plus-peak inventory (was end-of-day,
+# which mis-flagged sellout days as stockouts). Backtest with the fix enabled
+# showed the overall WAPE moves <0.1pp because most bias is on items with
+# stable inventory and intermittent demand -- not on items whose forward
+# demand the filter could meaningfully correct. Chronic-stockout SKUs also
+# over-correct under the filter (predicted demand inflates 3-4x vs realized).
+# Leave off unless you've added exogenous features that disentangle "no
+# demand" from "no inventory".
 STOCKOUT_FILTER_ENABLED = os.getenv("STOCKOUT_FILTER_ENABLED", "false").lower() == "true"
 
 # API settings

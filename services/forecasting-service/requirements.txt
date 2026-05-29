@@ -5,8 +5,7 @@ python-dateutil>=2.8.2
 pytz>=2024.1
 
 # --- Forecasting ---
-prophet==1.1.5
-cmdstanpy>=1.2.0
+scipy>=1.13.0
 
 # --- API / serving ---
 fastapi==0.115.0

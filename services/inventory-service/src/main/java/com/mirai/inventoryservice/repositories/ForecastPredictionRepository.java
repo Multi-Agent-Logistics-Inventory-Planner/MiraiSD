@@ -104,5 +104,73 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             + "LIMIT 1",
             nativeQuery = true)
     Optional<ForecastPrediction> findHighestDemandForecast();
+
+    /**
+     * Accuracy aggregates by category over a rolling window. For each (item, actual_day) in
+     * the window, takes the latest forecast_predictions row strictly before that day, joins
+     * mu_hat against analytics_daily_rollup.units_sold, then groups by category.
+     *
+     * Returns rows of:
+     *   [0] category          (String, "(uncategorized)" when null)
+     *   [1] scored_item_days  (Long)
+     *   [2] sum_abs_error     (BigDecimal)   numerator of WAPE
+     *   [3] sum_actual        (Long)         denominator of WAPE
+     *   [4] sum_signed_error  (BigDecimal)   for bias
+     *   [5] mape_sale_days    (BigDecimal)   AVG over actual > 0 only (nullable)
+     *   [6] under_count       (Long)         predicted < actual
+     *   [7] over_count        (Long)         predicted > actual
+     */
+    @Query(value = """
+        WITH actuals AS (
+          SELECT item_id, rollup_date, units_sold
+          FROM analytics_daily_rollup
+          WHERE rollup_date >= :startDate
+            AND rollup_date <= :endDate
+            AND units_sold IS NOT NULL
+        ),
+        preds AS (
+          SELECT
+            a.item_id,
+            a.rollup_date,
+            a.units_sold,
+            (SELECT (fp.features->>'mu_hat')::numeric
+             FROM forecast_predictions fp
+             WHERE fp.item_id = a.item_id
+               AND fp.computed_at < (a.rollup_date::timestamptz)
+               AND fp.features->>'mu_hat' IS NOT NULL
+             ORDER BY fp.computed_at DESC
+             LIMIT 1) AS predicted_mu
+          FROM actuals a
+        ),
+        joined AS (
+          SELECT
+            p.item_id,
+            p.rollup_date,
+            p.units_sold,
+            p.predicted_mu,
+            COALESCE(c.name, '(uncategorized)') AS category
+          FROM preds p
+          JOIN products pr ON pr.id = p.item_id
+          LEFT JOIN categories c ON c.id = pr.category_id
+          WHERE p.predicted_mu IS NOT NULL
+        )
+        SELECT
+          category,
+          COUNT(*)::bigint                                                   AS scored_item_days,
+          COALESCE(SUM(ABS(predicted_mu - units_sold)), 0)                   AS sum_abs_error,
+          COALESCE(SUM(units_sold), 0)::bigint                               AS sum_actual,
+          COALESCE(SUM(predicted_mu - units_sold), 0)                        AS sum_signed_error,
+          AVG(CASE WHEN units_sold > 0
+                   THEN ABS(predicted_mu - units_sold) / units_sold
+                   ELSE NULL END)                                            AS mape_sale_days,
+          COUNT(*) FILTER (WHERE predicted_mu < units_sold)::bigint          AS under_count,
+          COUNT(*) FILTER (WHERE predicted_mu > units_sold)::bigint          AS over_count
+        FROM joined
+        GROUP BY category
+        ORDER BY sum_actual DESC
+        """, nativeQuery = true)
+    List<Object[]> aggregateAccuracyByCategory(
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate);
 }
 

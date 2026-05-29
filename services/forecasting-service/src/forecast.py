@@ -1,6 +1,7 @@
 import pandas as pd
 
 from . import config
+from .estimators.tsb import tsb_estimate
 
 
 def _ensure_rollups(features_df: pd.DataFrame) -> pd.DataFrame:
@@ -123,7 +124,7 @@ def estimate_mu_sigma(
         raise ValueError(f"features_df missing required columns: {sorted(missing)}")
 
     method = method.lower()
-    valid_methods = {"ma7", "ma14", "exp_smooth", "dow_weighted"}
+    valid_methods = {"ma7", "ma14", "exp_smooth", "dow_weighted", "tsb"}
     if method not in valid_methods:
         raise ValueError(f"method must be one of {valid_methods}")
 
@@ -136,8 +137,15 @@ def estimate_mu_sigma(
     for item_id, group in df.groupby("item_id", sort=False):
         group = group.sort_values("date")
         dow_multipliers = None
+        p_value = None
+        z_value = None
 
-        if method == "dow_weighted":
+        if method == "tsb":
+            # TSB consumes the zero-filled daily series directly and does not
+            # need stockout-day filtering: zero-sale days are the signal it
+            # decays the sale probability against.
+            mu_hat, sigma_d_hat, p_value, z_value, dow_multipliers = tsb_estimate(group)
+        elif method == "dow_weighted":
             mu_hat, sigma_d_hat, dow_multipliers = _dow_weighted_estimate(
                 group, min_in_stock_days
             )
@@ -154,7 +162,7 @@ def estimate_mu_sigma(
             ma = float(in_stock["ma14"].iloc[-1]) if not in_stock.empty else 0.0
             mu_hat = max(ma, config.MU_FLOOR)
 
-        if method != "dow_weighted":
+        if method not in ("dow_weighted", "tsb"):
             in_stock_for_sigma = _filter_in_stock(group, min_in_stock_days)
             sigma = float(in_stock_for_sigma["std14"].iloc[-1]) if not in_stock_for_sigma.empty else 0.0
             sigma_d_hat = max(sigma, config.SIGMA_FLOOR)
@@ -167,12 +175,18 @@ def estimate_mu_sigma(
         }
         if dow_multipliers is not None:
             row["dow_multipliers"] = dow_multipliers
+        if p_value is not None:
+            row["p"] = float(p_value)
+        if z_value is not None:
+            row["z"] = float(z_value)
 
         results.append(row)
 
     cols = ["item_id", "mu_hat", "sigma_d_hat", "method"]
-    if method == "dow_weighted":
+    if method in ("dow_weighted", "tsb"):
         cols.append("dow_multipliers")
+    if method == "tsb":
+        cols.extend(["p", "z"])
     return pd.DataFrame(results, columns=cols).reset_index(drop=True)
 
 

@@ -354,6 +354,41 @@ class SupabaseRepo:
         df["mu_hat"] = df["mu_hat"].astype(float)
         return df
 
+    def get_latest_demand_regimes(self, item_ids: list[str]) -> dict[str, str]:
+        """Read the most recently persisted demand_regime per item.
+
+        Returns ``{item_id: "steady" | "bursty"}``. Items with no prior regime
+        (no previous forecast, or older forecasts that predate Phase 1B) are
+        absent; callers should apply a default.
+        """
+        if not item_ids:
+            return {}
+
+        query = """
+            SELECT DISTINCT ON (item_id)
+                item_id::text AS item_id,
+                features->>'demand_regime' AS regime
+            FROM forecast_predictions
+            WHERE item_id = ANY(:item_ids)
+              AND features->>'demand_regime' IS NOT NULL
+            ORDER BY item_id, computed_at DESC
+        """
+        params = {"item_ids": [uuid.UUID(iid) for iid in item_ids]}
+
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(text(query), params).fetchall()
+        except Exception:
+            logger.warning("Failed to load prior demand regimes")
+            return {}
+
+        result: dict[str, str] = {}
+        for row in rows:
+            regime = row[1]
+            if regime in ("steady", "bursty"):
+                result[str(row[0])] = regime
+        return result
+
     def _prepare_forecast_rows(self, forecasts_df: pd.DataFrame) -> list[dict]:
         """Prepare DataFrame rows for batch INSERT using vectorized operations.
 

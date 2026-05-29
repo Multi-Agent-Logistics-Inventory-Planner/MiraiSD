@@ -1,6 +1,8 @@
 package com.mirai.inventoryservice.controllers;
 
+import com.mirai.inventoryservice.dtos.responses.ForecastAccuracyDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
+import com.mirai.inventoryservice.services.ForecastAccuracyService;
 import com.mirai.inventoryservice.services.ForecastService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class ForecastController {
 
     private final ForecastService forecastService;
+    private final ForecastAccuracyService forecastAccuracyService;
 
     @GetMapping
     public ResponseEntity<Page<ForecastPredictionResponseDTO>> getAllForecasts(
@@ -58,5 +61,10 @@ public class ForecastController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(forecast);
+    }
+
+    @GetMapping("/accuracy")
+    public ResponseEntity<ForecastAccuracyDTO> getRollingAccuracy() {
+        return ResponseEntity.ok(forecastAccuracyService.getRollingAccuracy());
     }
 }

@@ -32,3 +32,37 @@ export async function getHighestDemandForecast(): Promise<ForecastPrediction | n
   const result = await apiGet<ForecastPrediction | undefined>(`${BASE_PATH}/highest-demand`)
   return result ?? null
 }
+
+export interface ForecastAccuracyWindow {
+  days: number
+  scoredItemDays: number
+  wape: number | null
+  mape: number | null
+  bias: number | null
+  totalActualUnits: number
+  underPredictions: number
+  overPredictions: number
+}
+
+export interface ForecastAccuracyCategoryRow {
+  category: string
+  scoredItemDays: number
+  wape: number | null
+  mape: number | null
+  bias: number | null
+  totalActualUnits: number
+}
+
+export interface ForecastAccuracy {
+  headline: ForecastAccuracyWindow
+  comparison: ForecastAccuracyWindow
+  byCategory: ForecastAccuracyCategoryRow[]
+}
+
+/**
+ * Rolling predicted-vs-actual accuracy of the forecast pipeline.
+ * Headline = last 30 days WAPE/MAPE/bias, comparison = last 7 days.
+ */
+export async function getForecastAccuracy(): Promise<ForecastAccuracy> {
+  return apiGet<ForecastAccuracy>(`${BASE_PATH}/accuracy`)
+}

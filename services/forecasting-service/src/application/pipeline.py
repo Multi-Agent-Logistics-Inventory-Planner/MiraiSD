@@ -23,6 +23,35 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _resolve_regimes(
+    item_ids: list[str],
+    cv_map: dict[str, float],
+    prior_regimes: dict[str, str],
+) -> dict[str, str]:
+    """Apply deadband regime routing per SKU.
+
+    Move to ``bursty`` only when CV crosses ``CV_THRESHOLD_HIGH``; move to
+    ``steady`` only when it drops below ``CV_THRESHOLD_LOW``. SKUs whose CV
+    sits inside the deadband keep their previous regime. New SKUs (no prior
+    state, no measurable CV) default to ``CV_DEFAULT_REGIME``.
+    """
+    resolved: dict[str, str] = {}
+    for item_id in item_ids:
+        prior = prior_regimes.get(item_id)
+        cv = cv_map.get(item_id)
+        if cv is None:
+            # No sale-day data this window -- preserve prior or default.
+            resolved[item_id] = prior or config.CV_DEFAULT_REGIME
+            continue
+        if cv > config.CV_THRESHOLD_HIGH:
+            resolved[item_id] = policy.REGIME_BURSTY
+        elif cv < config.CV_THRESHOLD_LOW:
+            resolved[item_id] = policy.REGIME_STEADY
+        else:
+            resolved[item_id] = prior or config.CV_DEFAULT_REGIME
+    return resolved
+
+
 class ForecastingPipeline:
     """Orchestrates the forecasting pipeline for affected items.
 
@@ -92,8 +121,10 @@ class ForecastingPipeline:
             inventory_df = self._repo.get_current_inventory(item_ids=item_list)
             logger.debug("Loaded inventory for %d items", len(inventory_df))
 
-        # Step 3: Load recent stock movements (lookback window for feature building)
-        lookback_days = config.ROLLING_WINDOW * 2  # 2x rolling window for stability
+        # Step 3: Load recent stock movements (lookback window for feature building).
+        # Use the larger of 2x rolling window or the CV window so the per-SKU
+        # CV used for safety-stock regime routing has enough history.
+        lookback_days = max(config.ROLLING_WINDOW * 2, config.CV_WINDOW_DAYS)
         end_ts = datetime.now(timezone.utc)
         start_ts = end_ts - timedelta(days=lookback_days)
 
@@ -133,10 +164,11 @@ class ForecastingPipeline:
 
         # Use stockout-aware min_in_stock_days only when filter is enabled
         min_stock_days = config.MIN_IN_STOCK_DAYS if config.STOCKOUT_FILTER_ENABLED else 0
+        forecast_method = config.FORECAST_METHOD
         estimates_df = fc.estimate_mu_sigma(
-            features_df, method="dow_weighted", min_in_stock_days=min_stock_days,
+            features_df, method=forecast_method, min_in_stock_days=min_stock_days,
         )
-        logger.debug("Estimated demand for %d items (DOW-weighted)", len(estimates_df))
+        logger.debug("Estimated demand for %d items (method=%s)", len(estimates_df), forecast_method)
 
         # Step 5a: Category-pooled fallback for cold-start items only
         cat_col = items_df["category_name"] if "category_name" in items_df.columns else pd.Series("Unknown", index=items_df.index)
@@ -168,6 +200,13 @@ class ForecastingPipeline:
                 )
                 logger.debug("Computed MAPE for %d items", len(mape_df))
 
+        # Step 5c: Compute per-SKU CV and apply demand-regime routing with
+        # hysteresis. The regime selects the safety-stock distribution
+        # (steady -> Poisson, bursty -> NegBin) in _compute_forecasts.
+        cv_map = feat.compute_per_sku_cv(daily_df) if not movements_df.empty else {}
+        prior_regimes = self._repo.get_latest_demand_regimes(item_list)
+        regime_map = _resolve_regimes(item_list, cv_map, prior_regimes)
+
         # Step 6: Merge all data and compute policy
         forecasts_df = self._compute_forecasts(
             items_df=items_df,
@@ -175,6 +214,8 @@ class ForecastingPipeline:
             estimates_df=estimates_df,
             lead_time_stats_df=lead_time_stats_df,
             mape_df=mape_df,
+            regime_map=regime_map,
+            cv_map=cv_map,
         )
 
         if forecasts_df.empty:
@@ -307,6 +348,8 @@ class ForecastingPipeline:
         estimates_df: pd.DataFrame,
         lead_time_stats_df: pd.DataFrame | None = None,
         mape_df: pd.DataFrame | None = None,
+        regime_map: dict[str, str] | None = None,
+        cv_map: dict[str, float] | None = None,
     ) -> pd.DataFrame:
         """Compute forecast predictions using vectorized operations.
 
@@ -377,14 +420,33 @@ class ForecastingPipeline:
 
         service_level = config.SERVICE_LEVEL_DEFAULT
 
-        # Vectorized policy computations (with sigma_L if available)
-        ss = policy.compute_safety_stock_vectorized(
-            mu_hat=mu_hat,
-            sigma_d_hat=sigma_d_hat,
-            L=lead_time,
-            alpha=service_level,
-            sigma_L=sigma_L_series,
-        )
+        # Build the regime series (steady -> Poisson buffer, bursty -> NegBin)
+        # in the same index order as the rest of the merged DataFrame.
+        regime_series: pd.Series | None = None
+        if regime_map:
+            regime_series = merged["item_id"].astype(str).map(regime_map).fillna(
+                config.CV_DEFAULT_REGIME
+            )
+
+        # Vectorized policy computations. When the new regime mapping is
+        # present, the safety stock switches from the legacy Normal-quantile
+        # formula to Poisson (steady) / NegBin (bursty).
+        if regime_series is not None:
+            ss = policy.compute_safety_stock_vectorized(
+                mu_hat=mu_hat,
+                sigma_d_hat=sigma_d_hat,
+                L=lead_time,
+                alpha=service_level,
+                regime=regime_series,
+            )
+        else:
+            ss = policy.compute_safety_stock_vectorized(
+                mu_hat=mu_hat,
+                sigma_d_hat=sigma_d_hat,
+                L=lead_time,
+                alpha=service_level,
+                sigma_L=sigma_L_series,
+            )
 
         rop = policy.reorder_point_vectorized(
             mu_hat=mu_hat,
@@ -463,6 +525,27 @@ class ForecastingPipeline:
                 if isinstance(dm, dict):
                     feat_dict["dow_multipliers"] = {str(k): v for k, v in dm.items()}
                     feat_dict["dow_adjusted"] = True
+
+            # Add TSB state (p = sale probability, z = sale-day demand).
+            # Persisted for the "why this number" drawer; the next pipeline run
+            # re-derives both from the 60-day window rather than reading them.
+            if "method" in merged.columns:
+                feat_dict["method"] = str(merged["method"].iloc[i])
+            if "p" in merged.columns and pd.notna(merged["p"].iloc[i]):
+                feat_dict["tsb_p"] = round(float(merged["p"].iloc[i]), 4)
+            if "z" in merged.columns and pd.notna(merged["z"].iloc[i]):
+                feat_dict["tsb_z"] = round(float(merged["z"].iloc[i]), 4)
+
+            # Add demand-regime tag and the CV that informed it. Used by the
+            # next pipeline run for hysteresis and by the UI drawer to
+            # explain "we're treating this SKU as bursty because its CV is X."
+            item_id_str = str(merged["item_id"].iloc[i])
+            if regime_map is not None:
+                feat_dict["demand_regime"] = regime_map.get(
+                    item_id_str, config.CV_DEFAULT_REGIME
+                )
+            if cv_map and item_id_str in cv_map:
+                feat_dict["cv"] = round(float(cv_map[item_id_str]), 4)
 
             features_list.append(feat_dict)
 
