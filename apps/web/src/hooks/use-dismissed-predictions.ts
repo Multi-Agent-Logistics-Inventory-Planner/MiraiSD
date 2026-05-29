@@ -1,16 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  dismissForecast,
-  listForecastDismissals,
-  restoreForecastDismissal,
-  type PredictionDismissalDTO,
-} from "@/lib/api/forecasts";
+import { useState, useCallback, useMemo } from "react";
 
-const DISMISSALS_QUERY_KEY = ["forecast-dismissals"] as const;
-const STALE_TIME_MS = 60_000;
+const STORAGE_KEY = "mirai-dismissed-predictions";
+const ARCHIVE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 interface DismissedEntry {
   dismissedAt: number;
@@ -19,94 +12,64 @@ interface DismissedEntry {
 
 type DismissedMap = Record<string, DismissedEntry>;
 
-function toMap(rows: PredictionDismissalDTO[]): DismissedMap {
-  const map: DismissedMap = {};
-  for (const row of rows) {
-    map[row.itemId] = {
-      dismissedAt: Date.parse(row.dismissedAt),
-      computedAt: row.computedAt,
-    };
+function readStorage(): DismissedMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+
+    // Purge entries older than 30 days
+    const now = Date.now();
+    const entries = Object.entries(parsed as DismissedMap);
+    const fresh = entries.filter(
+      ([, entry]) => typeof entry.dismissedAt === "number" && now - entry.dismissedAt < ARCHIVE_THRESHOLD_MS,
+    );
+
+    if (fresh.length !== entries.length) {
+      const cleaned = Object.fromEntries(fresh);
+      writeStorage(cleaned);
+      return cleaned;
+    }
+
+    return parsed as DismissedMap;
+  } catch {
+    return {};
   }
-  return map;
 }
 
-/**
- * Org-wide dismissed-predictions state. Persists across browsers/sessions via
- * the inventory-service /api/forecasts/dismissals endpoints. Dismissals
- * auto-expire on the server after 30 days; this hook only renders what the
- * server currently treats as active.
- *
- * Mutations are optimistic so the UI feels instant -- a failed POST/DELETE
- * rolls back to the previous server state on the next invalidation.
- */
+function writeStorage(map: DismissedMap): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // localStorage full or unavailable -- silently ignore
+  }
+}
+
 export function useDismissedPredictions() {
-  const queryClient = useQueryClient();
+  const [dismissedMap, setDismissedMap] = useState<DismissedMap>(readStorage);
 
-  const { data: rows = [] } = useQuery({
-    queryKey: DISMISSALS_QUERY_KEY,
-    queryFn: listForecastDismissals,
-    staleTime: STALE_TIME_MS,
-  });
-
-  const dismissedMap = useMemo(() => toMap(rows), [rows]);
   const dismissedIds = useMemo(
     () => new Set(Object.keys(dismissedMap)),
     [dismissedMap],
   );
 
-  const dismissMutation = useMutation({
-    mutationFn: ({ itemId, computedAt }: { itemId: string; computedAt: string | null }) =>
-      dismissForecast(itemId, computedAt),
-    onMutate: async ({ itemId, computedAt }) => {
-      await queryClient.cancelQueries({ queryKey: DISMISSALS_QUERY_KEY });
-      const previous = queryClient.getQueryData<PredictionDismissalDTO[]>(DISMISSALS_QUERY_KEY) ?? [];
-      const without = previous.filter((row) => row.itemId !== itemId);
-      const optimistic: PredictionDismissalDTO = {
-        itemId,
-        dismissedAt: new Date().toISOString(),
-        dismissedBy: "",
-        computedAt,
-        reason: null,
-      };
-      queryClient.setQueryData<PredictionDismissalDTO[]>(DISMISSALS_QUERY_KEY, [optimistic, ...without]);
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(DISMISSALS_QUERY_KEY, context.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: DISMISSALS_QUERY_KEY });
-    },
-  });
+  const dismiss = useCallback((itemId: string, computedAt: string | null) => {
+    setDismissedMap((prev) => {
+      const next = { ...prev, [itemId]: { dismissedAt: Date.now(), computedAt } };
+      writeStorage(next);
+      return next;
+    });
+  }, []);
 
-  const restoreMutation = useMutation({
-    mutationFn: (itemId: string) => restoreForecastDismissal(itemId),
-    onMutate: async (itemId) => {
-      await queryClient.cancelQueries({ queryKey: DISMISSALS_QUERY_KEY });
-      const previous = queryClient.getQueryData<PredictionDismissalDTO[]>(DISMISSALS_QUERY_KEY) ?? [];
-      queryClient.setQueryData<PredictionDismissalDTO[]>(
-        DISMISSALS_QUERY_KEY,
-        previous.filter((row) => row.itemId !== itemId),
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(DISMISSALS_QUERY_KEY, context.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: DISMISSALS_QUERY_KEY });
-    },
-  });
+  const restore = useCallback((itemId: string) => {
+    setDismissedMap((prev) => {
+      const { [itemId]: _, ...next } = prev;
+      writeStorage(next);
+      return next;
+    });
+  }, []);
 
-  return {
-    dismissedMap,
-    dismissedIds,
-    dismiss: (itemId: string, computedAt: string | null) =>
-      dismissMutation.mutate({ itemId, computedAt }),
-    restore: (itemId: string) => restoreMutation.mutate(itemId),
-  } as const;
+  return { dismissedMap, dismissedIds, dismiss, restore } as const;
 }

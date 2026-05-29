@@ -1,14 +1,10 @@
 package com.mirai.inventoryservice.controllers;
 
-import com.mirai.inventoryservice.dtos.requests.PredictionDismissalRequest;
 import com.mirai.inventoryservice.dtos.responses.ForecastAccuracyDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastExplanationDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
-import com.mirai.inventoryservice.dtos.responses.PredictionDismissalDTO;
 import com.mirai.inventoryservice.services.ForecastAccuracyService;
 import com.mirai.inventoryservice.services.ForecastService;
-import com.mirai.inventoryservice.services.PredictionDismissalService;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +13,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,7 +28,6 @@ public class ForecastController {
 
     private final ForecastService forecastService;
     private final ForecastAccuracyService forecastAccuracyService;
-    private final PredictionDismissalService dismissalService;
 
     @GetMapping
     public ResponseEntity<Page<ForecastPredictionResponseDTO>> getAllForecasts(
@@ -82,25 +76,5 @@ public class ForecastController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(explanation);
-    }
-
-    // ---------- prediction dismissals (org-wide) ----------
-
-    @GetMapping("/dismissals")
-    public ResponseEntity<List<PredictionDismissalDTO>> listDismissals() {
-        return ResponseEntity.ok(dismissalService.listActive());
-    }
-
-    @PostMapping("/dismissals")
-    public ResponseEntity<PredictionDismissalDTO> dismissForecast(
-            @Valid @RequestBody PredictionDismissalRequest request,
-            Authentication authentication) {
-        return ResponseEntity.ok(dismissalService.upsert(request, authentication));
-    }
-
-    @DeleteMapping("/dismissals/{itemId}")
-    public ResponseEntity<Void> restoreForecast(@PathVariable UUID itemId) {
-        dismissalService.delete(itemId);
-        return ResponseEntity.noContent().build();
     }
 }

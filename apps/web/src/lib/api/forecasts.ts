@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiDelete } from './client'
+import { apiGet } from './client'
 import type { ForecastPrediction, PaginatedResponse } from '@/types/api'
 
 const BASE_PATH = '/api/forecasts'
@@ -65,36 +65,6 @@ export interface ForecastAccuracy {
  */
 export async function getForecastAccuracy(): Promise<ForecastAccuracy> {
   return apiGet<ForecastAccuracy>(`${BASE_PATH}/accuracy`)
-}
-
-// ---- Org-wide prediction dismissals ----
-
-export interface PredictionDismissalDTO {
-  itemId: string
-  dismissedAt: string
-  dismissedBy: string
-  computedAt: string | null
-  reason: string | null
-}
-
-export async function listForecastDismissals(): Promise<PredictionDismissalDTO[]> {
-  return apiGet<PredictionDismissalDTO[]>(`${BASE_PATH}/dismissals`)
-}
-
-export async function dismissForecast(
-  itemId: string,
-  computedAt: string | null,
-  reason?: string,
-): Promise<PredictionDismissalDTO> {
-  return apiPost<PredictionDismissalDTO>(`${BASE_PATH}/dismissals`, {
-    itemId,
-    computedAt,
-    reason: reason ?? null,
-  })
-}
-
-export async function restoreForecastDismissal(itemId: string): Promise<void> {
-  await apiDelete<void>(`${BASE_PATH}/dismissals/${itemId}`)
 }
 
 // ---- "Why this number" explanation ----
