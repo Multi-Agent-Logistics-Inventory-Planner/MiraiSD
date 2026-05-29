@@ -8,14 +8,12 @@ import com.mirai.inventoryservice.dtos.assistant.MovementSummaryDTO;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
-import com.mirai.inventoryservice.models.analytics.ForecastDailySnapshot;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.ForecastSnapshotRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -62,7 +60,6 @@ public class ProductReportBundleService {
     private final ProductRepository productRepository;
     private final LocationInventoryRepository locationInventoryRepository;
     private final DailySalesRollupRepository dailySalesRollupRepository;
-    private final ForecastSnapshotRepository forecastSnapshotRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final ShipmentItemRepository shipmentItemRepository;
     private final MachineDisplayRepository machineDisplayRepository;
@@ -105,13 +102,13 @@ public class ProductReportBundleService {
         BigDecimal daysToStockout = latestPrediction.map(ForecastPrediction::getDaysToStockout).orElse(null);
         BigDecimal confidence = latestPrediction.map(ForecastPrediction::getConfidence).orElse(null);
 
-        // Latest forecast snapshot for MAPE
-        List<ForecastDailySnapshot> snapshots = forecastSnapshotRepository
-                .findByItemIdAndSnapshotDateBetweenOrderBySnapshotDateAsc(
-                        productId, today.minusDays(DETAIL_WINDOW_DAYS), today);
-        BigDecimal mape = snapshots.isEmpty()
-                ? null
-                : snapshots.get(snapshots.size() - 1).getMape();
+        // MAPE comes from the latest forecast_predictions row's features JSONB.
+        // The analytics_forecast_snapshot table was a dev-profile dupe; this
+        // path always has fresher data because it reads what the pipeline just
+        // wrote on its most recent Kafka tick.
+        BigDecimal mape = latestPrediction
+                .map(p -> extractBigDecimal(p.getFeatures(), "mape"))
+                .orElse(null);
 
         // Last restock timestamp via the (item_id, at DESC) index on a single row
         Pageable onePage = PageRequest.of(0, 1);
@@ -161,8 +158,8 @@ public class ProductReportBundleService {
         LocalDate windowStart = today.minusDays(clampedDays);
         List<DailySalesRollup> rollups = dailySalesRollupRepository
                 .findByItemIdAndRollupDateBetweenOrderByRollupDateAsc(productId, windowStart, today);
-        List<ForecastDailySnapshot> snapshots = forecastSnapshotRepository
-                .findByItemIdAndSnapshotDateBetweenOrderBySnapshotDateAsc(productId, windowStart, today);
+        List<ForecastPrediction> dailyForecasts = forecastPredictionRepository
+                .findLatestPerDayByItemBetween(productId, windowStart, today);
         Optional<ForecastPrediction> latestPrediction = forecastPredictionRepository
                 .findFirstByItemIdOrderByComputedAtDesc(productId);
         List<ShipmentItem> shipmentItems = shipmentItemRepository
@@ -201,14 +198,19 @@ public class ProductReportBundleService {
                         r.getDamageUnits()))
                 .toList();
 
-        List<DetailBundleDTO.ForecastSnapshotPoint> snapshotPoints = snapshots.stream()
-                .map(s -> new DetailBundleDTO.ForecastSnapshotPoint(
-                        s.getSnapshotDate(),
-                        s.getMuHat(),
-                        s.getConfidence(),
-                        s.getMape(),
-                        s.getDaysToStockout(),
-                        s.getCurrentStock()))
+        // Build the per-day series from forecast_predictions. Historical per-day
+        // currentStock is not captured on forecast rows, so we stamp the same
+        // current value for every point -- the UI uses this for the chart axis
+        // and "did stock track demand" visual, not for backfilled historical
+        // inventory levels.
+        List<DetailBundleDTO.ForecastSnapshotPoint> snapshotPoints = dailyForecasts.stream()
+                .map(fp -> new DetailBundleDTO.ForecastSnapshotPoint(
+                        fp.getComputedAt().atZoneSameInstant(ZoneOffset.UTC).toLocalDate(),
+                        extractBigDecimal(fp.getFeatures(), "mu_hat"),
+                        fp.getConfidence(),
+                        extractBigDecimal(fp.getFeatures(), "mape"),
+                        fp.getDaysToStockout(),
+                        currentStock))
                 .toList();
 
         DetailBundleDTO.LatestPrediction latest = latestPrediction
@@ -376,6 +378,32 @@ public class ProductReportBundleService {
             result.add(new ComparisonRowDTO(p.getId(), p.getName(), value, i + 1));
         }
         return result;
+    }
+
+    /**
+     * Pull a numeric value out of the forecast_predictions features JSONB.
+     * Tolerates the upstream pipeline storing values as Integer, Double, Long,
+     * BigDecimal, or numeric strings; returns null on anything it can't parse.
+     */
+    private static BigDecimal extractBigDecimal(Map<String, Object> features, String key) {
+        if (features == null) {
+            return null;
+        }
+        Object value = features.get(key);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal bd) {
+            return bd;
+        }
+        if (value instanceof Number n) {
+            return BigDecimal.valueOf(n.doubleValue());
+        }
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static void validateDateRange(OffsetDateTime from, OffsetDateTime to) {

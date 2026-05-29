@@ -63,6 +63,28 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
             nativeQuery = true)
     List<ForecastPrediction> findAllLatestLimited(@Param("limit") int limit);
 
+    /**
+     * For each calendar day in [startDate, endDate], returns the most recent
+     * forecast_predictions row for the given item (max computed_at within the day).
+     * Powers the per-day chart series on the Product Assistant detail bundle --
+     * replaces the deleted analytics_forecast_snapshot table.
+     */
+    @Query(value = "SELECT fp.* FROM forecast_predictions fp "
+            + "INNER JOIN (SELECT (computed_at AT TIME ZONE 'UTC')::date AS day, "
+            + "MAX(computed_at) AS max_at FROM forecast_predictions "
+            + "WHERE item_id = :itemId "
+            + "AND (computed_at AT TIME ZONE 'UTC')::date >= :startDate "
+            + "AND (computed_at AT TIME ZONE 'UTC')::date <= :endDate "
+            + "GROUP BY (computed_at AT TIME ZONE 'UTC')::date) latest "
+            + "ON fp.computed_at = latest.max_at "
+            + "WHERE fp.item_id = :itemId "
+            + "ORDER BY fp.computed_at ASC",
+            nativeQuery = true)
+    List<ForecastPrediction> findLatestPerDayByItemBetween(
+        @Param("itemId") UUID itemId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate);
+
     // Find latest prediction per item, filtered to a set of item IDs. `features` is null.
     @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
