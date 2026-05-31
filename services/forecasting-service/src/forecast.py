@@ -117,22 +117,23 @@ def _dow_weighted_estimate(
     g["dow"] = pd.to_datetime(g["date"]).dt.dayofweek
 
     # Overall mu: censored-Poisson MLE when censored observations are present
-    # and the SKU has enough stockout days to be worth the extra computation;
-    # otherwise a plain mean. The MLE accounts for "demand was at least X"
-    # observations that a plain mean understates.
+    # and not so dominant that the rate becomes unidentifiable; otherwise a
+    # plain mean. The MLE accounts for "demand was at least X" observations
+    # that a plain mean understates. Above ~50% stockout fraction the
+    # censored term dominates the likelihood and the MLE blows up
+    # (see 2026-05-31 ablation), so we gate by CENSORED_DEMAND_MAX_STOCKOUT_PCT.
     naive_mean = max(float(g["consumption"].mean()), config.MU_FLOOR)
-    if (
-        config.CENSORED_DEMAND_ENABLED
-        and "is_stockout" in g.columns
-        and int(g["is_stockout"].sum()) >= config.CENSORED_DEMAND_MIN_STOCKOUT_DAYS
-    ):
-        overall_mean = _censored_poisson_rate(
-            observed=g["consumption"].to_numpy(),
-            censored=g["is_stockout"].astype(bool).to_numpy(),
-            initial=naive_mean,
-        )
-    else:
-        overall_mean = naive_mean
+    overall_mean = naive_mean
+    if config.CENSORED_DEMAND_ENABLED and "is_stockout" in g.columns:
+        stockout_n = int(g["is_stockout"].sum())
+        if stockout_n >= config.CENSORED_DEMAND_MIN_STOCKOUT_DAYS:
+            stockout_frac = stockout_n / len(g)
+            if stockout_frac <= config.CENSORED_DEMAND_MAX_STOCKOUT_PCT:
+                overall_mean = _censored_poisson_rate(
+                    observed=g["consumption"].to_numpy(),
+                    censored=g["is_stockout"].astype(bool).to_numpy(),
+                    initial=naive_mean,
+                )
 
     # Per-DOW mean consumption
     dow_means = g.groupby("dow")["consumption"].mean()

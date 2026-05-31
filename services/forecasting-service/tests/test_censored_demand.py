@@ -94,6 +94,36 @@ def test_pipeline_integration_uses_censored_when_flag_on(monkeypatch):
     assert mu > naive, f"censored MLE ({mu}) should exceed naive mean ({naive})"
 
 
+def test_pipeline_skips_mle_when_stockout_fraction_too_high(monkeypatch):
+    """Above CENSORED_DEMAND_MAX_STOCKOUT_PCT, the MLE is unidentifiable
+    (it tries to estimate 'rate-if-we-had-inventory') and blows up to the
+    optimizer's upper bound. Live 2026-05-31 ablation: items at >50% stockout
+    showed median 10x bump in mu_hat. Above the threshold we fall back to
+    naive mean."""
+    monkeypatch.setattr(config, "CENSORED_DEMAND_ENABLED", True)
+    monkeypatch.setattr(config, "CENSORED_DEMAND_MIN_STOCKOUT_DAYS", 1)
+    monkeypatch.setattr(config, "CENSORED_DEMAND_MAX_STOCKOUT_PCT", 0.5)
+
+    # 70% stockout (above threshold) -> should fall back to naive.
+    dates = pd.date_range("2025-10-01", periods=20, freq="D")
+    consumption = [2.0] * 6 + [5.0] * 14  # 6 in-stock at 2/day, 14 stockout at 5/day
+    is_stockout = [False] * 6 + [True] * 14
+
+    feats = pd.DataFrame({
+        "date": dates,
+        "item_id": ["A"] * 20,
+        "consumption": consumption,
+        "is_stockout": is_stockout,
+    })
+
+    result = estimate_mu_sigma(feats, method="dow_weighted")
+    mu = result.iloc[0]["mu_hat"]
+    # Naive mean = (6*2 + 14*5)/20 = 4.1. Expect we got it (MLE skipped).
+    assert mu == pytest.approx(4.1, abs=0.01), (
+        f"expected naive 4.1 since stockout_pct=70% > threshold, got {mu}"
+    )
+
+
 def test_pipeline_skips_censored_when_flag_off(monkeypatch):
     """Same input as above but flag off -> back to naive mean."""
     monkeypatch.setattr(config, "CENSORED_DEMAND_ENABLED", False)

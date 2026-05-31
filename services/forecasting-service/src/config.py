@@ -112,6 +112,14 @@ MIN_TEST_IN_STOCK_DAYS = int(os.getenv("MIN_TEST_IN_STOCK_DAYS", "3"))
 # items with no stockouts skip the optimizer call (no-op).
 CENSORED_DEMAND_ENABLED = os.getenv("CENSORED_DEMAND_ENABLED", "false").lower() == "true"
 CENSORED_DEMAND_MIN_STOCKOUT_DAYS = int(os.getenv("CENSORED_DEMAND_MIN_STOCKOUT_DAYS", "1"))
+# Stockout-fraction gate. The MLE is well-behaved when censored observations
+# are a minority of the data (median bump ~1.1-1.7x in the 0-25% bucket on
+# live 2026-05-31 data). Above ~50% stockout fraction the censored term
+# dominates the likelihood and drags lambda to the optimizer's upper bound
+# -- statistically correct for "what demand would have been with inventory"
+# but useless for lt-WAPE since realized demand is bounded by inventory.
+# Items above this threshold fall through to the naive mean.
+CENSORED_DEMAND_MAX_STOCKOUT_PCT = float(os.getenv("CENSORED_DEMAND_MAX_STOCKOUT_PCT", "0.5"))
 
 # Residual bias correction: subtracts the recent per-item signed forecast
 # error (forecast_mu - actual_mu) from the next mu_hat before the policy layer.
