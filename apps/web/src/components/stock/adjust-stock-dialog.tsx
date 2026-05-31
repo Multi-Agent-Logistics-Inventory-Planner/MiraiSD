@@ -612,7 +612,7 @@ export function AdjustStockDialog({
     const enrichedPayload: InventoryRequest = {
       ...payload,
       actorId,
-      reason: StockMovementReason.RESTOCK,
+      reason: StockMovementReason.ADJUSTMENT,
     };
 
     try {
@@ -656,7 +656,7 @@ export function AdjustStockDialog({
       itemId: preselectedProduct.product.id,
       quantity,
       actorId,
-      reason: StockMovementReason.RESTOCK,
+      reason: StockMovementReason.ADJUSTMENT,
     };
 
     try {
