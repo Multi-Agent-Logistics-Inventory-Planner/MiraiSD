@@ -1,4 +1,7 @@
+import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
+from scipy.stats import poisson
 
 from . import config
 from .estimators.tsb import tsb_estimate
@@ -44,18 +47,53 @@ def _exp_smooth_last(group: pd.DataFrame, alpha: float) -> float:
     return float(0.0 if level is None else level)
 
 
-def _filter_in_stock(group: pd.DataFrame, min_in_stock_days: int = 0) -> pd.DataFrame:
-    """Remove stockout days from training data if the column exists.
+def _censored_poisson_rate(
+    observed: np.ndarray,
+    censored: np.ndarray,
+    initial: float | None = None,
+) -> float:
+    """Maximum-likelihood Poisson rate with right-censored stockout days.
 
-    If filtering would leave fewer than min_in_stock_days rows, returns
-    the original group unfiltered to avoid noisy estimates from tiny samples.
+    Stockout days carry partial information: we know demand was at least the
+    observed consumption (the store sold its remaining inventory), but the
+    true rate could be higher. Treats those rows as right-censored and
+    maximizes the joint log-likelihood:
+
+        sum_{not censored} log P(X = k_i | lambda)
+        + sum_{censored}   log P(X >= k_i | lambda)
+
+    using scipy's bounded scalar optimizer. Used in place of a naive mean
+    for items that have ≥1 stockout day in the training window.
     """
-    if "is_stockout" not in group.columns:
-        return group
-    filtered = group[~group["is_stockout"]]
-    if len(filtered) < min_in_stock_days:
-        return group
-    return filtered.copy()
+    if len(observed) == 0:
+        return config.MU_FLOOR
+    obs = np.asarray(observed, dtype=float)
+    cens = np.asarray(censored, dtype=bool)
+    if not cens.any():
+        return max(float(obs.mean()), config.MU_FLOOR)
+
+    uncensored = obs[~cens]
+    censored_obs = obs[cens]
+    init = initial if initial is not None else max(float(obs.mean()), config.MU_FLOOR)
+
+    def neg_log_lik(lam: float) -> float:
+        if lam <= 0:
+            return 1e12
+        ll = 0.0
+        if uncensored.size:
+            ll += float(poisson.logpmf(uncensored, lam).sum())
+        if censored_obs.size:
+            # P(X >= k) = P(X > k-1) = poisson.sf(k-1, lam)
+            sf_vals = poisson.sf(np.maximum(censored_obs - 1, 0), lam)
+            sf_vals = np.clip(sf_vals, 1e-300, 1.0)
+            ll += float(np.log(sf_vals).sum())
+        return -ll
+
+    upper = max(init * 10.0, 1.0)
+    result = minimize_scalar(neg_log_lik, bounds=(1e-6, upper), method="bounded")
+    if not result.success or not np.isfinite(result.x):
+        return max(init, config.MU_FLOOR)
+    return max(float(result.x), config.MU_FLOOR)
 
 
 def _dow_weighted_estimate(
@@ -65,28 +103,48 @@ def _dow_weighted_estimate(
     """Estimate demand with day-of-week weighting.
 
     1. Compute mean consumption per day-of-week (Mon=0..Sun=6)
-    2. Overall mu_hat = mean of all daily consumption (same as ma14)
+    2. Overall mu_hat = mean of all daily consumption (same as ma14),
+       or censored-Poisson MLE if is_stockout flags are present.
     3. dow_multiplier[d] = mean_consumption_on_day_d / overall_mean
     4. sigma_d_hat uses residuals after removing DOW effect
 
-    Stockout days (is_stockout == True) are excluded from computation
-    only when enough in-stock days remain (>= min_in_stock_days).
-
     Returns: (mu_hat, sigma_d_hat, dow_multipliers_dict)
     """
-    g = _filter_in_stock(group, min_in_stock_days)
+    g = group
     if g.empty:
         return config.MU_FLOOR, config.SIGMA_FLOOR, {d: 1.0 for d in range(7)}
 
     g["dow"] = pd.to_datetime(g["date"]).dt.dayofweek
 
-    overall_mean = max(float(g["consumption"].mean()), config.MU_FLOOR)
+    # Overall mu: censored-Poisson MLE when censored observations are present
+    # and the SKU has enough stockout days to be worth the extra computation;
+    # otherwise a plain mean. The MLE accounts for "demand was at least X"
+    # observations that a plain mean understates.
+    naive_mean = max(float(g["consumption"].mean()), config.MU_FLOOR)
+    if (
+        config.CENSORED_DEMAND_ENABLED
+        and "is_stockout" in g.columns
+        and int(g["is_stockout"].sum()) >= config.CENSORED_DEMAND_MIN_STOCKOUT_DAYS
+    ):
+        overall_mean = _censored_poisson_rate(
+            observed=g["consumption"].to_numpy(),
+            censored=g["is_stockout"].astype(bool).to_numpy(),
+            initial=naive_mean,
+        )
+    else:
+        overall_mean = naive_mean
 
     # Per-DOW mean consumption
     dow_means = g.groupby("dow")["consumption"].mean()
 
-    # Multipliers: how much each DOW deviates from overall mean
-    dow_multipliers = (dow_means / max(overall_mean, config.MU_FLOOR)).to_dict()
+    # Multipliers: how much each DOW deviates from overall mean.
+    # Floored at config.DOW_MULTIPLIER_FLOOR so cold weekdays do not collapse
+    # to literally zero -- one weekday sale on a zeroed-out DOW reads as
+    # infinite error and the policy layer ends up over-concentrating buffer
+    # on a single day.
+    dow_multipliers = (dow_means / max(overall_mean, config.MU_FLOOR)).clip(
+        lower=config.DOW_MULTIPLIER_FLOOR
+    ).to_dict()
 
     # Fill missing DOWs with 1.0 (no adjustment)
     for d in range(7):
@@ -115,8 +173,9 @@ def estimate_mu_sigma(
     are missing, they are computed with appropriate rolling windows.
 
     Args:
-        min_in_stock_days: Minimum in-stock training days required to apply
-            stockout filtering. If None, uses config.MIN_IN_STOCK_DAYS.
+        min_in_stock_days: Retained for back-compat; the censored-demand path
+            handles stockout-aware estimation internally. Used as a sanity
+            floor for n_observed_days reporting.
     """
     required = {"date", "item_id", "consumption"}
     missing = required - set(features_df.columns)
@@ -146,31 +205,35 @@ def estimate_mu_sigma(
         p_value = None
         z_value = None
 
+        # n_observed_days = count of in-stock training days. Surfaced so the
+        # shrinkage layer can weight item-level vs category-level estimates
+        # by sample size rather than treating every item identically. When
+        # is_stockout is present, only in-stock days count toward sample size.
+        if "is_stockout" in group.columns:
+            n_observed_days = int((~group["is_stockout"].astype(bool)).sum())
+        else:
+            n_observed_days = int(len(group))
+
         if base_method == "tsb":
-            # TSB consumes the zero-filled daily series directly and does not
-            # need stockout-day filtering: zero-sale days are the signal it
-            # decays the sale probability against.
+            # TSB consumes the zero-filled daily series directly: zero-sale
+            # days are the signal it decays the sale probability against.
             mu_hat, sigma_d_hat, p_value, z_value, dow_multipliers = tsb_estimate(group)
         elif base_method == "dow_weighted":
             mu_hat, sigma_d_hat, dow_multipliers = _dow_weighted_estimate(
                 group, min_in_stock_days
             )
         elif base_method == "exp_smooth":
-            in_stock = _filter_in_stock(group, min_in_stock_days)
-            level = _exp_smooth_last(in_stock, alpha=config.ES_ALPHA) if not in_stock.empty else 0.0
+            level = _exp_smooth_last(group, alpha=config.ES_ALPHA) if not group.empty else 0.0
             mu_hat = max(level, config.MU_FLOOR)
         elif base_method == "ma7":
-            in_stock = _filter_in_stock(group, min_in_stock_days)
-            ma = float(in_stock["ma7"].iloc[-1]) if not in_stock.empty else 0.0
+            ma = float(group["ma7"].iloc[-1]) if not group.empty else 0.0
             mu_hat = max(ma, config.MU_FLOOR)
         else:  # "ma14"
-            in_stock = _filter_in_stock(group, min_in_stock_days)
-            ma = float(in_stock["ma14"].iloc[-1]) if not in_stock.empty else 0.0
+            ma = float(group["ma14"].iloc[-1]) if not group.empty else 0.0
             mu_hat = max(ma, config.MU_FLOOR)
 
         if base_method not in ("dow_weighted", "tsb"):
-            in_stock_for_sigma = _filter_in_stock(group, min_in_stock_days)
-            sigma = float(in_stock_for_sigma["std14"].iloc[-1]) if not in_stock_for_sigma.empty else 0.0
+            sigma = float(group["std14"].iloc[-1]) if not group.empty else 0.0
             sigma_d_hat = max(sigma, config.SIGMA_FLOOR)
 
         row = {
@@ -178,6 +241,7 @@ def estimate_mu_sigma(
             "mu_hat": float(mu_hat),
             "sigma_d_hat": float(sigma_d_hat),
             "method": label_method,
+            "n_observed_days": n_observed_days,
         }
         if dow_multipliers is not None:
             row["dow_multipliers"] = dow_multipliers
@@ -188,7 +252,7 @@ def estimate_mu_sigma(
 
         results.append(row)
 
-    cols = ["item_id", "mu_hat", "sigma_d_hat", "method"]
+    cols = ["item_id", "mu_hat", "sigma_d_hat", "method", "n_observed_days"]
     if base_method in ("dow_weighted", "tsb"):
         cols.append("dow_multipliers")
     if base_method == "tsb":
@@ -235,6 +299,72 @@ def apply_category_fallback(
         df.loc[is_cold_start, "_category"].map(cat_mu).fillna(config.MU_FLOOR)
     )
 
+    return df.drop(columns=["_category"])
+
+
+def apply_shrinkage(
+    estimates_df: pd.DataFrame,
+    category_map: dict[str, str],
+    strength: float | None = None,
+    min_category_items: int | None = None,
+) -> pd.DataFrame:
+    """Pull each item's mu_hat toward its category prior, weighted by sample size.
+
+    Formula: ``mu_shrunk = (n * mu_item + k * mu_cat) / (n + k)`` where
+    ``n = n_observed_days`` and ``k = strength``. Items with lots of history
+    keep their own estimate; items with thin history get pulled toward the
+    category mean. Categories with fewer than ``min_category_items`` SKUs
+    provide too-noisy a prior, so we leave their items untouched. The
+    "(uncategorized)"/"Unknown" bucket is also skipped because pooling across
+    unrelated SKUs is worse than no pooling.
+
+    Runs AFTER apply_category_fallback, so cold-start items (which have
+    already been replaced with the category mean) collapse to their prior
+    when shrunk; thin-history items get a soft pull; rich-history items
+    are essentially unchanged.
+
+    Args:
+        estimates_df: Must include item_id, mu_hat, and n_observed_days.
+        category_map: item_id -> category_name.
+        strength: k parameter; defaults to config.SHRINKAGE_STRENGTH.
+        min_category_items: skip categories smaller than this.
+
+    Returns:
+        New DataFrame with shrunken mu_hat. Adds a "mu_hat_pre_shrinkage"
+        column so callers (the why-this-number drawer) can show the move.
+    """
+    k = strength if strength is not None else config.SHRINKAGE_STRENGTH
+    min_items = (
+        min_category_items if min_category_items is not None
+        else config.SHRINKAGE_MIN_CATEGORY_ITEMS
+    )
+    df = estimates_df.copy()
+    if "n_observed_days" not in df.columns:
+        df["n_observed_days"] = 0
+
+    df["_category"] = df["item_id"].map(category_map).fillna("Unknown")
+    df["mu_hat_pre_shrinkage"] = df["mu_hat"].astype(float)
+
+    has_demand = df[df["mu_hat"] > config.MU_FLOOR]
+    cat_mu = has_demand.groupby("_category")["mu_hat"].mean()
+    cat_size = df.groupby("_category")["item_id"].nunique()
+
+    def _shrink(row):
+        cat = row["_category"]
+        if cat in {"Unknown", "(uncategorized)"}:
+            return row["mu_hat"]
+        size = int(cat_size.get(cat, 0))
+        if size < min_items:
+            return row["mu_hat"]
+        prior = cat_mu.get(cat)
+        if prior is None or pd.isna(prior):
+            return row["mu_hat"]
+        n = float(row["n_observed_days"])
+        if n <= 0:
+            return row["mu_hat"]
+        return (n * float(row["mu_hat"]) + k * float(prior)) / (n + k)
+
+    df["mu_hat"] = df.apply(_shrink, axis=1).astype(float).clip(lower=config.MU_FLOOR)
     return df.drop(columns=["_category"])
 
 

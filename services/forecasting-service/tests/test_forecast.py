@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 
 from src.forecast import (
-    _filter_in_stock,
     _dow_weighted_estimate,
     apply_category_fallback,
     estimate_mu_sigma,
@@ -84,74 +83,22 @@ def test_multi_sku_with_prints():
 
 
 # ---------------------------------------------------------------------------
-# _filter_in_stock tests
-# ---------------------------------------------------------------------------
-
-class TestFilterInStock:
-    def _make_group(self, n_total: int, n_stockout: int) -> pd.DataFrame:
-        """Create a group with n_total rows, n_stockout of which are stockout."""
-        dates = pd.date_range("2025-01-01", periods=n_total, freq="D")
-        stockout_flags = [True] * n_stockout + [False] * (n_total - n_stockout)
-        consumption = [0.0 if s else 3.0 for s in stockout_flags]
-        return pd.DataFrame({
-            "date": dates,
-            "item_id": ["X"] * n_total,
-            "consumption": consumption,
-            "is_stockout": stockout_flags,
-        })
-
-    def test_no_stockout_column_returns_original(self):
-        """Without is_stockout column, returns group unchanged."""
-        group = pd.DataFrame({
-            "date": pd.date_range("2025-01-01", periods=5),
-            "item_id": ["A"] * 5,
-            "consumption": [1.0] * 5,
-        })
-        result = _filter_in_stock(group, min_in_stock_days=3)
-        assert len(result) == 5
-
-    def test_enough_in_stock_days_filters_stockouts(self):
-        """When enough in-stock days remain, stockout rows are removed."""
-        group = self._make_group(n_total=20, n_stockout=5)
-        result = _filter_in_stock(group, min_in_stock_days=7)
-        assert len(result) == 15
-        assert not result["is_stockout"].any()
-
-    def test_too_few_in_stock_days_returns_original(self):
-        """When filtering leaves fewer than min_in_stock_days, returns all."""
-        group = self._make_group(n_total=10, n_stockout=7)
-        # Only 3 in-stock days, threshold is 5
-        result = _filter_in_stock(group, min_in_stock_days=5)
-        assert len(result) == 10  # original returned
-
-    def test_threshold_zero_always_filters(self):
-        """With min_in_stock_days=0, always filters (even if 0 remain)."""
-        group = self._make_group(n_total=5, n_stockout=5)
-        result = _filter_in_stock(group, min_in_stock_days=0)
-        assert len(result) == 0
-
-    def test_exact_threshold_filters(self):
-        """When in-stock days == min_in_stock_days, filtering is applied."""
-        group = self._make_group(n_total=10, n_stockout=3)
-        # 7 in-stock days, threshold is 7
-        result = _filter_in_stock(group, min_in_stock_days=7)
-        assert len(result) == 7
-
-
-# ---------------------------------------------------------------------------
 # _dow_weighted_estimate with stockout data
 # ---------------------------------------------------------------------------
 
 class TestDowWeightedStockout:
-    def test_stockout_days_excluded_from_mean(self):
-        """Stockout days should not drag down the estimated mean."""
-        dates = pd.date_range("2025-11-03", periods=14, freq="D")  # Mon start
+    def test_stockout_days_pull_rate_upward_via_censored_mle(self, monkeypatch):
+        """With CENSORED_DEMAND_ENABLED, stockout days with above-mean
+        consumption are treated as right-censored: 'we sold X but demand
+        could have been higher'. The MLE rate should land above the naive mean."""
+        monkeypatch.setattr(config, "CENSORED_DEMAND_ENABLED", True)
+        monkeypatch.setattr(config, "CENSORED_DEMAND_MIN_STOCKOUT_DAYS", 1)
+
+        dates = pd.date_range("2025-11-03", periods=14, freq="D")
+        # 10 in-stock days at 5/day, 4 stockout days where we sold 5 before
+        # running out (could have been more)
         consumption = [5.0] * 14
-        is_stockout = [False] * 14
-        # Make last 4 days stockout with 0 consumption
-        for i in range(10, 14):
-            consumption[i] = 0.0
-            is_stockout[i] = True
+        is_stockout = [False] * 10 + [True] * 4
 
         group = pd.DataFrame({
             "date": dates,
@@ -160,54 +107,27 @@ class TestDowWeightedStockout:
             "is_stockout": is_stockout,
         })
 
-        mu, sigma, mults = _dow_weighted_estimate(group, min_in_stock_days=5)
-        # With filtering: mean of in-stock days = 5.0
-        # Without filtering: mean would be (5*10 + 0*4)/14 = 3.57
-        assert mu == pytest.approx(5.0, abs=0.01)
+        mu, sigma, mults = _dow_weighted_estimate(group)
+        # Censored days at observed=5 should push the MLE above 5.
+        assert mu >= 5.0
 
     def test_empty_group_returns_floors(self):
-        """All-stockout group with high guard should return MU_FLOOR."""
+        """Empty input -> mu_hat and sigma_d_hat at config floors."""
         group = pd.DataFrame({
-            "date": pd.date_range("2025-01-01", periods=5),
-            "item_id": ["A"] * 5,
-            "consumption": [0.0] * 5,
-            "is_stockout": [True] * 5,
+            "date": pd.Series([], dtype="datetime64[ns]"),
+            "item_id": pd.Series([], dtype=str),
+            "consumption": pd.Series([], dtype=float),
         })
-        # min_in_stock_days=0 means filter all -> empty
-        mu, sigma, mults = _dow_weighted_estimate(group, min_in_stock_days=0)
+        mu, sigma, mults = _dow_weighted_estimate(group)
         assert mu == config.MU_FLOOR
         assert sigma == config.SIGMA_FLOOR
 
 
 # ---------------------------------------------------------------------------
-# estimate_mu_sigma with min_in_stock_days parameter
+# estimate_mu_sigma input validation
 # ---------------------------------------------------------------------------
 
 class TestEstimateMuSigmaStockout:
-    def test_min_in_stock_days_param_threaded(self):
-        """min_in_stock_days should be passed through to filtering."""
-        dates = pd.date_range("2025-11-03", periods=14, freq="D")
-        consumption = [5.0] * 7 + [0.0] * 7
-        is_stockout = [False] * 7 + [True] * 7
-
-        feats = pd.DataFrame({
-            "date": dates,
-            "item_id": ["A"] * 14,
-            "consumption": consumption,
-            "is_stockout": is_stockout,
-        })
-
-        # With high guard (7), filtering should be applied (7 in-stock == 7 threshold)
-        result_filtered = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=7)
-        mu_filtered = result_filtered.iloc[0]["mu_hat"]
-
-        # With very high guard (20), falls back to all data
-        result_all = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=20)
-        mu_all = result_all.iloc[0]["mu_hat"]
-
-        # Filtered mean should be higher (excludes zeros)
-        assert mu_filtered > mu_all
-
     def test_invalid_method_raises(self):
         """Invalid method should raise ValueError."""
         feats = _make_constant_features("A", 5.0, days=10)
@@ -289,18 +209,14 @@ class TestApplyCategoryFallback:
 
 
 # ---------------------------------------------------------------------------
-# Stockout filter disabled: all data used (matching main's superior approach)
+# Stockout-aware estimation
 # ---------------------------------------------------------------------------
 
-class TestStockoutFilterDisabled:
+class TestStockoutAware:
     def test_no_stockout_column_uses_all_data(self):
-        """Without is_stockout column (STOCKOUT_FILTER_ENABLED=false path),
-        all data including zeros is used in the mean.
-
-        The pipeline gates stockout detection: when disabled, is_stockout
-        column is never added, so all rows (including zero-consumption days
-        from stockouts) contribute to the estimate.
-        """
+        """Without is_stockout column, all rows feed the mean (current default
+        behavior; censored MLE only kicks in when the column is present and
+        the censored-demand flag is on)."""
         dates = pd.date_range("2025-11-03", periods=14, freq="D")
         # 10 days at 5.0, 4 days at 0.0 (would be stockouts if detected)
         consumption = [5.0] * 10 + [0.0] * 4
@@ -311,28 +227,9 @@ class TestStockoutFilterDisabled:
             "consumption": consumption,
         })
 
-        result = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=0)
+        result = estimate_mu_sigma(feats, method="dow_weighted")
         mu = result.iloc[0]["mu_hat"]
 
         # Mean of all 14 days: (5*10 + 0*4) / 14 = 3.571
         assert mu == pytest.approx(50.0 / 14.0, abs=0.1)
-
-    def test_stockout_column_present_with_guard_still_filters(self):
-        """When is_stockout IS present (STOCKOUT_FILTER_ENABLED=true path),
-        stockout days are excluded and in-stock mean is used."""
-        dates = pd.date_range("2025-11-03", periods=14, freq="D")
-        consumption = [5.0] * 10 + [0.0] * 4
-
-        feats = pd.DataFrame({
-            "date": dates,
-            "item_id": ["A"] * 14,
-            "consumption": consumption,
-            "is_stockout": [False] * 10 + [True] * 4,
-        })
-
-        result = estimate_mu_sigma(feats, method="dow_weighted", min_in_stock_days=7)
-        mu = result.iloc[0]["mu_hat"]
-
-        # Mean of 10 in-stock days: 5.0
-        assert mu == pytest.approx(5.0, abs=0.01)
 

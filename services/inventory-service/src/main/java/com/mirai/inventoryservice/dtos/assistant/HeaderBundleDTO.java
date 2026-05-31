@@ -19,7 +19,6 @@ public record HeaderBundleDTO(
         BigDecimal velocity,
         BigDecimal daysToStockout,
         BigDecimal forecastConfidence,
-        BigDecimal mape,
         OffsetDateTime lastRestockAt,
         Integer damageCountLast30,
         boolean onDisplay

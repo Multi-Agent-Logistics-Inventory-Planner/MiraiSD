@@ -15,6 +15,34 @@ ROLLING_WINDOW = int(os.getenv("ROLLING_WINDOW", "14"))
 ES_ALPHA = float(os.getenv("ES_ALPHA", "0.3"))
 MU_FLOOR = float(os.getenv("MU_FLOOR", "0.1"))
 SIGMA_FLOOR = float(os.getenv("SIGMA_FLOOR", "0.01"))
+# Floor on per-DOW multipliers. A SKU like Penguin-with-backpack with
+# `[0,0,0,0,0.97,6.03,0]` predicts literal zero on weekdays. A nonzero
+# floor (e.g. 0.2) enforces a minimum weekday baseline -- conceptually
+# right but the 2026-05-31 ablation on live data showed it costs ~1.1pp
+# overall lt-WAPE because most legitimately-weekend-only SKUs get
+# inflated weekday predictions vs actual zero sales. Default 0.0
+# (disabled); flip via env var if Penguin-class items become a problem.
+DOW_MULTIPLIER_FLOOR = float(os.getenv("DOW_MULTIPLIER_FLOOR", "0.0"))
+# Cap on globally-learned event-flag multipliers (recent_shipment_7d /
+# recent_display_7d). Raw signal was ~5x for shipments, clipped at 3.0 in
+# the prior config; lowered to 2.0 after the 6.6pp WAPE spike in 7d windows
+# pointed at over-amplification of event days. Clipping is symmetric on the
+# log scale so the lower bound is 1/cap = 0.5.
+EVENT_MULTIPLIER_CAP = float(os.getenv("EVENT_MULTIPLIER_CAP", "2.0"))
+
+# Hierarchical shrinkage: blend an item's noisy mu_hat toward its category
+# prior with weight n / (n + k), where n is the item's observed sale-day
+# count and k is SHRINKAGE_STRENGTH. With k=10, an item with 10 sale-days
+# gets 50/50 blend with its category mean; an item with 80 sale-days keeps
+# ~89% of its own estimate. Replaces the binary cliff in apply_category_fallback
+# (which only kicks in for truly cold-start items) with a smooth curve that
+# pulls thin-history SKUs toward the more reliable category-level signal.
+SHRINKAGE_ENABLED = os.getenv("SHRINKAGE_ENABLED", "false").lower() == "true"
+SHRINKAGE_STRENGTH = float(os.getenv("SHRINKAGE_STRENGTH", "10.0"))
+# Categories with fewer items than this provide a noisy prior, so we skip
+# shrinkage for items in such categories rather than blending toward a
+# 1-or-2-SKU mean.
+SHRINKAGE_MIN_CATEGORY_ITEMS = int(os.getenv("SHRINKAGE_MIN_CATEGORY_ITEMS", "5"))
 
 # Estimator selection. Default is "dow_weighted_events" -- the Phase 4 backtest
 # (run 2026-05-29) showed it beats plain dow_weighted on lead-time WAPE
@@ -73,16 +101,29 @@ MIN_IN_STOCK_DAYS = int(os.getenv("MIN_IN_STOCK_DAYS", "7"))
 # predictions against unobservable demand in stockout-heavy test windows.
 MIN_TEST_IN_STOCK_DAYS = int(os.getenv("MIN_TEST_IN_STOCK_DAYS", "3"))
 
-# Stockout filter: disabled by default. The detector in features.py was
-# rewritten 2026-05-29 to use start-of-day-plus-peak inventory (was end-of-day,
-# which mis-flagged sellout days as stockouts). Backtest with the fix enabled
-# showed the overall WAPE moves <0.1pp because most bias is on items with
-# stable inventory and intermittent demand -- not on items whose forward
-# demand the filter could meaningfully correct. Chronic-stockout SKUs also
-# over-correct under the filter (predicted demand inflates 3-4x vs realized).
-# Leave off unless you've added exogenous features that disentangle "no
-# demand" from "no inventory".
-STOCKOUT_FILTER_ENABLED = os.getenv("STOCKOUT_FILTER_ENABLED", "false").lower() == "true"
+# Stockout treatment: replaced the prior "drop stockout days" filter with a
+# right-censored Poisson MLE. On stockout days we know demand was AT LEAST
+# the observed consumption (the store sold out); the MLE uses that partial
+# information instead of either dropping the row (under-counts demand on
+# stockout-prone SKUs) or taking it at face value (under-states peak demand).
+# Detector in features.py uses start-of-day-plus-peak inventory; rewrite
+# landed 2026-05-29. Default off until backtest validates; flip via env var
+# for ~60s rollback. The MIN_STOCKOUT_DAYS knob gates the censored path so
+# items with no stockouts skip the optimizer call (no-op).
+CENSORED_DEMAND_ENABLED = os.getenv("CENSORED_DEMAND_ENABLED", "false").lower() == "true"
+CENSORED_DEMAND_MIN_STOCKOUT_DAYS = int(os.getenv("CENSORED_DEMAND_MIN_STOCKOUT_DAYS", "1"))
+
+# Residual bias correction: subtracts the recent per-item signed forecast
+# error (forecast_mu - actual_mu) from the next mu_hat before the policy layer.
+# Textbook "bias-adjusted forecast" pattern for intermittent demand. Defaults
+# to off until the backtest confirms lt-WAPE drops and bias moves toward zero.
+# Rollback is a single env-var flip. The cap is the maximum correction as a
+# fraction of mu_hat (0.5 = +/-50%), so one outlier backtest window cannot
+# drag a SKU's level to zero or double it. Items with fewer than
+# MIN_BACKTEST_DAYS of measured history pass through uncorrected.
+RESIDUAL_BIAS_CORRECTION_ENABLED = os.getenv("RESIDUAL_BIAS_CORRECTION_ENABLED", "false").lower() == "true"
+RESIDUAL_BIAS_CORRECTION_CAP = float(os.getenv("RESIDUAL_BIAS_CORRECTION_CAP", "0.5"))
+RESIDUAL_BIAS_MIN_BACKTEST_DAYS = int(os.getenv("RESIDUAL_BIAS_MIN_BACKTEST_DAYS", "7"))
 
 # API settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")

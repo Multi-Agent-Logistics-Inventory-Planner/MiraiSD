@@ -102,14 +102,6 @@ public class ProductReportBundleService {
         BigDecimal daysToStockout = latestPrediction.map(ForecastPrediction::getDaysToStockout).orElse(null);
         BigDecimal confidence = latestPrediction.map(ForecastPrediction::getConfidence).orElse(null);
 
-        // MAPE comes from the latest forecast_predictions row's features JSONB.
-        // The analytics_forecast_snapshot table was a dev-profile dupe; this
-        // path always has fresher data because it reads what the pipeline just
-        // wrote on its most recent Kafka tick.
-        BigDecimal mape = latestPrediction
-                .map(p -> extractBigDecimal(p.getFeatures(), "mape"))
-                .orElse(null);
-
         // Last restock timestamp via the (item_id, at DESC) index on a single row
         Pageable onePage = PageRequest.of(0, 1);
         List<StockMovementHistoryView> lastRestockRows = stockMovementRepository.findHistoryByItemId(
@@ -134,7 +126,6 @@ public class ProductReportBundleService {
                 velocity,
                 daysToStockout,
                 confidence,
-                mape,
                 lastRestockAt,
                 damageLast30,
                 onDisplay);
@@ -208,7 +199,6 @@ public class ProductReportBundleService {
                         fp.getComputedAt().atZoneSameInstant(ZoneOffset.UTC).toLocalDate(),
                         extractBigDecimal(fp.getFeatures(), "mu_hat"),
                         fp.getConfidence(),
-                        extractBigDecimal(fp.getFeatures(), "mape"),
                         fp.getDaysToStockout(),
                         currentStock))
                 .toList();

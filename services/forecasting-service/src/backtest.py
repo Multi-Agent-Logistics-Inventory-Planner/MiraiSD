@@ -35,11 +35,14 @@ def compute_mape(
             Defaults to config.MAPE_EPSILON.
 
     Returns:
-        DataFrame[item_id, mape, forecast_mu, actual_mu, backtest_days]
+        DataFrame[item_id, mape, forecast_mu, actual_mu, residual_bias,
+        backtest_days]. residual_bias is the signed per-day error
+        (forecast_mu - actual_mu); positive = over-prediction, negative
+        = under-prediction. Used by the residual bias correction layer.
     """
     h = horizon_days if horizon_days is not None else config.BACKTEST_HORIZON_DAYS
     eps = epsilon if epsilon is not None else config.MAPE_EPSILON
-    result_cols = ["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"]
+    result_cols = ["item_id", "mape", "forecast_mu", "actual_mu", "residual_bias", "backtest_days"]
 
     if historical_forecasts_df.empty:
         return pd.DataFrame(columns=result_cols)
@@ -71,8 +74,70 @@ def compute_mape(
         np.abs(merged["actual_mu"] - merged["forecast_mu"])
         / np.maximum(merged["actual_mu"], eps)
     )
+    merged["residual_bias"] = merged["forecast_mu"] - merged["actual_mu"]
 
     return merged[result_cols].reset_index(drop=True)
+
+
+def apply_residual_bias_correction(
+    mu_hat: pd.Series,
+    residual_bias: pd.Series,
+    backtest_days: pd.Series,
+    cap_fraction: float | None = None,
+    min_backtest_days: int | None = None,
+    mu_floor: float | None = None,
+) -> pd.DataFrame:
+    """Subtract recent forecast bias from mu_hat, clipped and floored.
+
+    For each item: ``corrected = max(mu_hat - clip(bias, +/- cap*mu_hat), mu_floor)``
+    where ``bias = forecast_mu - actual_mu`` from a recent backtest window.
+    Items with NaN bias or ``backtest_days < min_backtest_days`` pass through
+    uncorrected (correction is 0).
+
+    Args:
+        mu_hat: Current period mu estimate per item.
+        residual_bias: Signed per-day bias from compute_mape.
+        backtest_days: Number of days the bias was measured over (per item).
+        cap_fraction: Max correction as fraction of mu_hat (default config).
+        min_backtest_days: Skip items with fewer than this many days (default config).
+        mu_floor: Lower bound for corrected mu_hat (default config).
+
+    Returns:
+        DataFrame with columns [mu_hat_corrected, correction_applied,
+        mu_hat_pre_correction], indexed like the inputs.
+    """
+    cap = cap_fraction if cap_fraction is not None else config.RESIDUAL_BIAS_CORRECTION_CAP
+    min_days = (
+        min_backtest_days if min_backtest_days is not None
+        else config.RESIDUAL_BIAS_MIN_BACKTEST_DAYS
+    )
+    floor = mu_floor if mu_floor is not None else config.MU_FLOOR
+
+    mu = mu_hat.astype(float)
+    if mu.empty:
+        return pd.DataFrame(
+            {"mu_hat_corrected": mu, "correction_applied": mu, "mu_hat_pre_correction": mu}
+        )
+
+    bias = residual_bias.astype(float) if residual_bias is not None else pd.Series(
+        np.nan, index=mu.index
+    )
+    days = backtest_days.astype(float) if backtest_days is not None else pd.Series(
+        0.0, index=mu.index
+    )
+
+    eligible = bias.notna() & (days >= min_days)
+    cap_per_item = cap * mu.abs()
+    correction = bias.where(eligible, 0.0).clip(lower=-cap_per_item, upper=cap_per_item)
+    corrected = (mu - correction).clip(lower=floor)
+
+    return pd.DataFrame(
+        {
+            "mu_hat_corrected": corrected,
+            "correction_applied": correction,
+            "mu_hat_pre_correction": mu,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,8 +199,19 @@ def run_method_comparison(
     def base_method(m: str) -> str:
         return m[:-len("_events")] if m.endswith("_events") else m
 
+    # Walk-forward bias correction: when enabled, for each (method, item) we
+    # carry forward the per-day signed error from the most-recently-scored
+    # origin and subtract it from mu_hat at the next (newer) origin -- the
+    # same mechanic the deployed pipeline applies via mape_df, just exercised
+    # one origin at a time. Origins are processed oldest-first so the bias
+    # signal flows forward in time. Items lacking prior data at a given
+    # origin pass through uncorrected (first origin always uncorrected).
+    apply_bias = config.RESIDUAL_BIAS_CORRECTION_ENABLED
+    prior_bias: dict[tuple[str, str], tuple[float, int]] = {}  # (method, item) -> (bias, days)
+
     rows: list[dict] = []
-    for origin_days_ago in origin_days_ago_list:
+    ordered_origins = sorted(origin_days_ago_list, reverse=True) if apply_bias else origin_days_ago_list
+    for origin_days_ago in ordered_origins:
         origin = datetime.now(timezone.utc) - timedelta(days=origin_days_ago)
         history_start = origin - timedelta(days=lookback)
         actual_end = origin + timedelta(days=horizon_days)
@@ -148,6 +224,16 @@ def run_method_comparison(
             continue
 
         history_daily = feat.build_daily_usage(history_mv)
+        # Censored-demand path: merge is_stockout into history so the MLE in
+        # _dow_weighted_estimate treats stockout days as right-censored
+        # observations. Mirrors what pipeline.py:Step 4 does.
+        if config.CENSORED_DEMAND_ENABLED:
+            stockout_df = feat.detect_stockout_days(history_mv)
+            if not stockout_df.empty:
+                history_daily = history_daily.merge(
+                    stockout_df, on=["item_id", "date"], how="left",
+                )
+                history_daily["is_stockout"] = history_daily["is_stockout"].fillna(False).astype(bool)
         actual_daily = (
             feat.build_daily_usage(actual_mv) if not actual_mv.empty
             else pd.DataFrame(columns=["item_id", "date", "consumption"])
@@ -181,6 +267,7 @@ def run_method_comparison(
             train[disp_col] = train[disp_col].fillna(0).astype(int)
             global_event_mults = feat.compute_global_event_multipliers(
                 train, event_cols=[ship_col, disp_col],
+                cap=config.EVENT_MULTIPLIER_CAP,
             )
         else:
             global_event_mults = {ship_col: 1.0, disp_col: 1.0}
@@ -194,14 +281,38 @@ def run_method_comparison(
         else:
             events_index = None
 
+        # Collect this origin's per-(method, item) prediction errors so the
+        # next (newer) origin can use them as the bias signal. Only populated
+        # when apply_bias is on.
+        per_origin_diffs: dict[tuple[str, str], list[float]] = {}
+
         for method in methods:
             estimates = fc.estimate_mu_sigma(history_daily, method=base_method(method))
+            # Shrinkage: pull thin-history items toward category prior.
+            # Mirrors pipeline.py:Step 5a.1.
+            if config.SHRINKAGE_ENABLED and "n_observed_days" in estimates.columns:
+                estimates = fc.apply_shrinkage(estimates, category_by_item)
             apply_events = method.endswith("_events")
             for _, est_row in estimates.iterrows():
                 item_id = str(est_row["item_id"])
                 mu_hat = float(est_row["mu_hat"])
                 dow_mult = est_row.get("dow_multipliers") if "dow_multipliers" in est_row else None
                 category = category_by_item.get(item_id, "(uncategorized)")
+
+                # Apply walk-forward residual bias correction to mu_hat using
+                # the prior-origin signal for this (method, item). Mirrors the
+                # production helper exactly.
+                if apply_bias:
+                    prior = prior_bias.get((method, item_id))
+                    if prior is not None:
+                        bias_val, days_val = prior
+                        corr_df = apply_residual_bias_correction(
+                            mu_hat=pd.Series([mu_hat]),
+                            residual_bias=pd.Series([bias_val]),
+                            backtest_days=pd.Series([float(days_val)]),
+                        )
+                        mu_hat = float(corr_df["mu_hat_corrected"].iloc[0])
+
                 try:
                     item_actuals = actual_daily.loc[item_id]
                 except KeyError:
@@ -232,6 +343,16 @@ def run_method_comparison(
                         "predicted": predicted,
                         "actual": float(actual),
                     })
+                    if apply_bias:
+                        per_origin_diffs.setdefault((method, item_id), []).append(
+                            predicted - float(actual)
+                        )
+
+        # After scoring this origin, freeze its signal for the next origin.
+        if apply_bias:
+            for key, diffs in per_origin_diffs.items():
+                if diffs:
+                    prior_bias[key] = (float(np.mean(diffs)), len(diffs))
 
     if not rows:
         return pd.DataFrame(columns=[

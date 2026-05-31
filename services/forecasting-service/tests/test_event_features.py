@@ -113,6 +113,15 @@ class TestComputeGlobalEventMultipliers:
         )
         assert out["recent_shipment_7d"] == 3.0
 
+    def test_clips_at_lower_cap(self):
+        # Production default is now cap=2.0 after the 6.6pp WAPE spike pointed
+        # at over-amplification. Same upward signal should clip at 2.0.
+        train = self._train(on_consumption=[100.0] * 40, off_consumption=[1.0] * 40)
+        out = compute_global_event_multipliers(
+            train, event_cols=["recent_shipment_7d"], min_n=10, cap=2.0,
+        )
+        assert out["recent_shipment_7d"] == 2.0
+
     def test_empty_input_returns_neutral(self):
         out = compute_global_event_multipliers(
             pd.DataFrame(), event_cols=["recent_shipment_7d"], min_n=10,

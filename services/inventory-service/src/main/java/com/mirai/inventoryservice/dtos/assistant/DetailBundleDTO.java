@@ -51,7 +51,6 @@ public record DetailBundleDTO(
             LocalDate date,
             BigDecimal muHat,
             BigDecimal confidence,
-            BigDecimal mape,
             BigDecimal daysToStockout,
             Integer currentStock
     ) {}

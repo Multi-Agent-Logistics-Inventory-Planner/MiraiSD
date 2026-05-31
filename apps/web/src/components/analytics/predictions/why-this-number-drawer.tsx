@@ -95,7 +95,6 @@ function ExplanationBody({ data }: { data: ForecastExplanation }) {
   const cv = asNumber(f.cv);
   const leadTimeDays = asNumber(f.lead_time_days);
   const leadTimeSource = typeof f.lead_time_source === "string" ? f.lead_time_source : null;
-  const mape = asNumber(f.mape);
   const safetyStock = asNumber(f.safety_stock);
   const reorderPoint = asNumber(f.reorder_point);
   const dowMultipliers = asRecord(f.dow_multipliers);
@@ -198,7 +197,6 @@ function ExplanationBody({ data }: { data: ForecastExplanation }) {
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Accuracy
         </h4>
-        <Row label="Backtest MAPE" value={mape !== null ? formatPct(mape) : "—"} />
         <Row
           label="Last restock"
           value={data.lastRestockAt ? formatDate(data.lastRestockAt) : "—"}

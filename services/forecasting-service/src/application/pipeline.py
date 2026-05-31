@@ -145,15 +145,17 @@ class ForecastingPipeline:
             features_df = self._create_zero_demand_features(items_df)
         else:
             daily_df = feat.build_daily_usage(movements_df)
-            # Stockout awareness: opt-in via config. With <60 days of data,
-            # excluding stockout days hurts accuracy (sample-size penalty > bias correction).
-            if config.STOCKOUT_FILTER_ENABLED:
+            # Censored-demand path: merge is_stockout so the MLE in
+            # _dow_weighted_estimate can treat stockout rows as right-censored
+            # observations ("demand was at least X") instead of either dropping
+            # them or taking them at face value. Gated for safe rollback.
+            if config.CENSORED_DEMAND_ENABLED:
                 stockout_df = feat.detect_stockout_days(movements_df)
                 if not stockout_df.empty:
                     daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
                     daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
                     stockout_pct = daily_df["is_stockout"].mean() * 100
-                    logger.debug("Stockout filter ON: %.1f%% of item-days are stockout", stockout_pct)
+                    logger.debug("Censored demand ON: %.1f%% of item-days are stockout", stockout_pct)
             features_df = feat.build_stats(daily_df)
             logger.debug("Built features: %d rows", len(features_df))
 
@@ -162,11 +164,9 @@ class ForecastingPipeline:
             logger.warning("No features built, skipping forecast")
             return 0
 
-        # Use stockout-aware min_in_stock_days only when filter is enabled
-        min_stock_days = config.MIN_IN_STOCK_DAYS if config.STOCKOUT_FILTER_ENABLED else 0
         forecast_method = config.FORECAST_METHOD
         estimates_df = fc.estimate_mu_sigma(
-            features_df, method=forecast_method, min_in_stock_days=min_stock_days,
+            features_df, method=forecast_method, min_in_stock_days=config.MIN_IN_STOCK_DAYS,
         )
         logger.debug("Estimated demand for %d items (method=%s)", len(estimates_df), forecast_method)
 
@@ -176,6 +176,13 @@ class ForecastingPipeline:
         items_with_history = set(features_df["item_id"].unique()) if not features_df.empty else set()
         estimates_df = fc.apply_category_fallback(estimates_df, category_map, items_with_history)
         logger.debug("Applied category fallback for cold-start items")
+
+        # Step 5a.1: Hierarchical shrinkage. Thin-history SKUs get pulled
+        # toward their category mean (sample-size-weighted), preserving the
+        # estimate for items with rich history. Gated for safe rollback.
+        if config.SHRINKAGE_ENABLED:
+            estimates_df = fc.apply_shrinkage(estimates_df, category_map)
+            logger.debug("Applied hierarchical shrinkage (k=%.1f)", config.SHRINKAGE_STRENGTH)
 
         # Step 5b: Compute backtest MAPE
         mape_df = pd.DataFrame(columns=["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"])
@@ -245,6 +252,7 @@ class ForecastingPipeline:
                     train[disp_col] = train[disp_col].fillna(0).astype(int)
                     event_multipliers = feat.compute_global_event_multipliers(
                         train, event_cols=[ship_col, disp_col],
+                        cap=config.EVENT_MULTIPLIER_CAP,
                     )
                 # Recency for the batched items uses the full movement window
                 # so we don't miss a shipment that arrived for the SKU before
@@ -491,9 +499,16 @@ class ForecastingPipeline:
 
         # Merge MAPE if available
         if mape_df is not None and not mape_df.empty:
+            mape_cols = ["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"]
+            if "residual_bias" in mape_df.columns:
+                mape_cols.append("residual_bias")
             merged = merged.merge(
-                mape_df[["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"]].rename(
-                    columns={"forecast_mu": "backtest_forecast_mu", "actual_mu": "backtest_actual_mu"}
+                mape_df[mape_cols].rename(
+                    columns={
+                        "forecast_mu": "backtest_forecast_mu",
+                        "actual_mu": "backtest_actual_mu",
+                        "residual_bias": "backtest_residual_bias",
+                    }
                 ),
                 on="item_id",
                 how="left",
@@ -503,6 +518,29 @@ class ForecastingPipeline:
         mu_hat = merged["mu_hat"].astype(float)
         sigma_d_hat = merged["sigma_d_hat"].astype(float)
         current_qty = merged["current_qty"].astype(int)
+
+        # Residual bias correction: subtract recent per-item signed forecast
+        # error from mu_hat before the policy layer sees it. Gated on
+        # RESIDUAL_BIAS_CORRECTION_ENABLED so rollback is a single env flip.
+        # sigma_d_hat is intentionally NOT corrected -- bias correction shifts
+        # the level only, dispersion is handled separately by the estimator.
+        if (
+            config.RESIDUAL_BIAS_CORRECTION_ENABLED
+            and "backtest_residual_bias" in merged.columns
+        ):
+            from .. import backtest as bt
+            bt_days = merged["backtest_days"] if "backtest_days" in merged.columns else pd.Series(
+                0.0, index=merged.index
+            )
+            correction_df = bt.apply_residual_bias_correction(
+                mu_hat=mu_hat,
+                residual_bias=merged["backtest_residual_bias"],
+                backtest_days=bt_days,
+            )
+            merged["mu_hat_pre_correction"] = correction_df["mu_hat_pre_correction"]
+            merged["bias_correction_applied"] = correction_df["correction_applied"]
+            mu_hat = correction_df["mu_hat_corrected"]
+            merged["mu_hat"] = mu_hat
 
         # Handle lead_time_days column (may not exist)
         if "lead_time_days" in merged.columns:
@@ -609,6 +647,15 @@ class ForecastingPipeline:
 
         # Build the features dict for each row (must use iteration for dict creation)
         features_list = []
+        # Hoist column-existence checks out of the per-row loop. Adding new
+        # optional trace fields (residual_bias, shrinkage, n_observed_days)
+        # was tipping the vectorized-vs-legacy perf test because each "X in
+        # merged.columns" runs N times. Compute once here, use in the loop.
+        has_bias_applied = "bias_correction_applied" in merged.columns
+        has_mu_pre_corr = "mu_hat_pre_correction" in merged.columns
+        has_mu_pre_shrink = "mu_hat_pre_shrinkage" in merged.columns
+        has_n_observed = "n_observed_days" in merged.columns
+
         for i in range(len(merged)):
             lt = float(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else float(lead_time)
             feat_dict = {
@@ -638,6 +685,31 @@ class ForecastingPipeline:
                 feat_dict["backtest_forecast_mu"] = round(float(merged["backtest_forecast_mu"].iloc[i]), 4)
             if "backtest_actual_mu" in merged.columns and pd.notna(merged["backtest_actual_mu"].iloc[i]):
                 feat_dict["backtest_actual_mu"] = round(float(merged["backtest_actual_mu"].iloc[i]), 4)
+
+            # Residual bias correction trace: persist the signed correction
+            # that was actually applied and the pre-correction mu so the
+            # "why this number" drawer can explain "we shaved 0.4 units off
+            # because last 14d backtest over-predicted by 0.4/day".
+            if has_bias_applied:
+                v = merged["bias_correction_applied"].iloc[i]
+                if pd.notna(v):
+                    feat_dict["residual_bias"] = round(float(v), 4)
+            if has_mu_pre_corr:
+                v = merged["mu_hat_pre_correction"].iloc[i]
+                if pd.notna(v):
+                    feat_dict["bias_corrected_from"] = round(float(v), 4)
+
+            # Shrinkage trace: the pre-shrinkage mu and the sample size used.
+            # Lets the drawer explain "we pulled this estimate from 2.1 to 1.5
+            # because the SKU only has 3 sale-days vs the category mean of 1.2".
+            if has_mu_pre_shrink:
+                v = merged["mu_hat_pre_shrinkage"].iloc[i]
+                if pd.notna(v):
+                    feat_dict["shrunk_from"] = round(float(v), 4)
+            if has_n_observed:
+                v = merged["n_observed_days"].iloc[i]
+                if pd.notna(v):
+                    feat_dict["n_observed_days"] = int(v)
 
             # Add DOW multipliers
             if "dow_multipliers" in merged.columns:
