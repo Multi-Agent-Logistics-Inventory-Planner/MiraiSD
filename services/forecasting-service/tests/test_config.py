@@ -32,7 +32,15 @@ class TestConfigDefaults:
         assert hasattr(config, "EVENT_MULTIPLIER_CAP")
         assert config.EVENT_MULTIPLIER_CAP == 2.0
 
-    def test_shrinkage_disabled_by_default(self):
+    def test_shrinkage_enabled_by_default(self):
+        # Flipped on 2026-05-31 after live ablation validated -0.9pp lt-WAPE.
+        # Rollback: env SHRINKAGE_ENABLED=false.
         assert hasattr(config, "SHRINKAGE_ENABLED")
-        assert config.SHRINKAGE_ENABLED is False
+        assert config.SHRINKAGE_ENABLED is True
         assert config.SHRINKAGE_STRENGTH == 10.0
+
+    def test_residual_bias_correction_enabled_by_default(self):
+        # Flipped on 2026-05-31 after live ablation validated -9.8pp lt-WAPE.
+        # Rollback: env RESIDUAL_BIAS_CORRECTION_ENABLED=false.
+        assert hasattr(config, "RESIDUAL_BIAS_CORRECTION_ENABLED")
+        assert config.RESIDUAL_BIAS_CORRECTION_ENABLED is True

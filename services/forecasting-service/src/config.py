@@ -37,7 +37,9 @@ EVENT_MULTIPLIER_CAP = float(os.getenv("EVENT_MULTIPLIER_CAP", "2.0"))
 # ~89% of its own estimate. Replaces the binary cliff in apply_category_fallback
 # (which only kicks in for truly cold-start items) with a smooth curve that
 # pulls thin-history SKUs toward the more reliable category-level signal.
-SHRINKAGE_ENABLED = os.getenv("SHRINKAGE_ENABLED", "false").lower() == "true"
+# Default ON after 2026-05-31 backtest showed -0.9pp lt-WAPE on top of bias
+# correction. Rollback: SHRINKAGE_ENABLED=false.
+SHRINKAGE_ENABLED = os.getenv("SHRINKAGE_ENABLED", "true").lower() == "true"
 SHRINKAGE_STRENGTH = float(os.getenv("SHRINKAGE_STRENGTH", "10.0"))
 # Categories with fewer items than this provide a noisy prior, so we skip
 # shrinkage for items in such categories rather than blending toward a
@@ -123,13 +125,14 @@ CENSORED_DEMAND_MAX_STOCKOUT_PCT = float(os.getenv("CENSORED_DEMAND_MAX_STOCKOUT
 
 # Residual bias correction: subtracts the recent per-item signed forecast
 # error (forecast_mu - actual_mu) from the next mu_hat before the policy layer.
-# Textbook "bias-adjusted forecast" pattern for intermittent demand. Defaults
-# to off until the backtest confirms lt-WAPE drops and bias moves toward zero.
-# Rollback is a single env-var flip. The cap is the maximum correction as a
-# fraction of mu_hat (0.5 = +/-50%), so one outlier backtest window cannot
+# Textbook "bias-adjusted forecast" pattern for intermittent demand. Default
+# ON after the 2026-05-31 live backtest showed -9.8pp lt-WAPE (87.96% ->
+# 78.20%) on this substrate. Rollback is a single env-var flip
+# (RESIDUAL_BIAS_CORRECTION_ENABLED=false). The cap is the maximum correction
+# as a fraction of mu_hat (0.5 = +/-50%) so one outlier backtest window cannot
 # drag a SKU's level to zero or double it. Items with fewer than
 # MIN_BACKTEST_DAYS of measured history pass through uncorrected.
-RESIDUAL_BIAS_CORRECTION_ENABLED = os.getenv("RESIDUAL_BIAS_CORRECTION_ENABLED", "false").lower() == "true"
+RESIDUAL_BIAS_CORRECTION_ENABLED = os.getenv("RESIDUAL_BIAS_CORRECTION_ENABLED", "true").lower() == "true"
 RESIDUAL_BIAS_CORRECTION_CAP = float(os.getenv("RESIDUAL_BIAS_CORRECTION_CAP", "0.5"))
 RESIDUAL_BIAS_MIN_BACKTEST_DAYS = int(os.getenv("RESIDUAL_BIAS_MIN_BACKTEST_DAYS", "7"))
 
