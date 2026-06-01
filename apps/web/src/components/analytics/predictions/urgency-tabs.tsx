@@ -26,29 +26,42 @@ export function UrgencyTabs({ tabs, activeTab, onTabChange }: UrgencyTabsProps) 
     <div className="relative">
       <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10" />
       <div className="flex gap-6 overflow-x-auto scrollbar-none border-b dark:border-b-[0.5px] pr-6">
-        {tabs.map((tab) => (
-          <Tooltip key={tab.value}>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => onTabChange(tab.value)}
-                className={cn(
-                  "shrink-0 whitespace-nowrap pb-2 text-xs sm:text-sm font-medium transition-colors relative cursor-pointer",
-                  activeTab === tab.value
-                    ? "text-[#0b66c2] dark:text-[#7c3aed]"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tab.label} ({tab.count})
-                {activeTab === tab.value && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0b66c2] dark:bg-[#7c3aed]" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {TAB_TOOLTIPS[tab.value]}
-            </TooltipContent>
-          </Tooltip>
-        ))}
+        {tabs.map((tab) => {
+          const active = activeTab === tab.value;
+          return (
+            <Tooltip key={tab.value}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onTabChange(tab.value)}
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-2 whitespace-nowrap pb-2 text-xs sm:text-sm transition-colors relative cursor-pointer",
+                    active
+                      ? "font-semibold text-foreground"
+                      : "font-medium text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded font-mono text-[11px] px-1.5 py-[1px] tabular-nums",
+                      active
+                        ? "bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                  {active && (
+                    <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-[#0b66c2] dark:bg-[#a78bfa]" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {TAB_TOOLTIPS[tab.value]}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </div>
     </div>
   );

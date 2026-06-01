@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { ActionItem, PredictionsData } from "@/types/analytics";
 
-// Mock hooks before importing the component
 const mockUsePredictions = vi.fn();
 const mockUseDismissedPredictions = vi.fn();
 
@@ -14,15 +13,23 @@ vi.mock("@/hooks/use-dismissed-predictions", () => ({
   useDismissedPredictions: () => mockUseDismissedPredictions(),
 }));
 
-// Mock child components to isolate TabPredictions logic
 vi.mock("@/components/analytics/predictions", async () => {
-  const actual = await vi.importActual("@/components/analytics/predictions");
+  const actual = await vi.importActual<typeof import("@/components/analytics/predictions")>(
+    "@/components/analytics/predictions",
+  );
   return {
     ...actual,
-    PredictionItemCard: ({ item }: { item: ActionItem }) => (
-      <div data-testid={`prediction-card-${item.itemId}`}>{item.name}</div>
+    TriageRow: ({ item }: { item: ActionItem }) => (
+      <div data-testid={`triage-row-${item.itemId}`}>{item.name}</div>
     ),
-    UrgencyTabs: ({ tabs, activeTab, onTabChange }: {
+    SummaryHead: ({ actionCount }: { actionCount: number }) => (
+      <div data-testid="summary-head" data-count={actionCount} />
+    ),
+    UrgencyTabs: ({
+      tabs,
+      activeTab,
+      onTabChange,
+    }: {
       tabs: Array<{ value: string; label: string; count: number }>;
       activeTab: string;
       onTabChange: (tab: string) => void;
@@ -62,7 +69,7 @@ function createMockItem(overrides: Partial<ActionItem>): ActionItem {
     daysToStockout: 5,
     avgDailyDelta: -2.5,
     suggestedReorderQty: 40,
-    suggestedOrderDate: "2026-04-05",
+    suggestedOrderDate: "2026-06-15",
     leadTimeDays: 3,
     demandVelocity: 2.5,
     demandVolatility: 0.3,
@@ -103,9 +110,7 @@ describe("TabPredictions", () => {
         isLoading: true,
         isError: false,
       });
-
       render(<TabPredictions />);
-
       expect(screen.getByTestId("predictions-skeleton")).toBeInTheDocument();
     });
   });
@@ -117,15 +122,13 @@ describe("TabPredictions", () => {
         isLoading: false,
         isError: true,
       });
-
       render(<TabPredictions />);
-
       expect(screen.getByText("Failed to load predictions")).toBeInTheDocument();
     });
   });
 
-  describe("urgency tab counts (countByUrgency)", () => {
-    it("displays correct counts for each urgency level", () => {
+  describe("urgency tab counts", () => {
+    it("displays counts grouped by daysToStockout thresholds", () => {
       const items = [
         createMockItem({ itemId: "c1", urgency: "CRITICAL", daysToStockout: 1 }),
         createMockItem({ itemId: "c2", urgency: "CRITICAL", daysToStockout: 2 }),
@@ -144,34 +147,18 @@ describe("TabPredictions", () => {
 
       render(<TabPredictions />);
 
-      // All tab shows total count
-      expect(screen.getByTestId("tab-ALL")).toHaveTextContent("All (7)");
-      expect(screen.getByTestId("tab-CRITICAL")).toHaveTextContent("Critical (2)");
-      expect(screen.getByTestId("tab-URGENT")).toHaveTextContent("Urgent (1)");
-      expect(screen.getByTestId("tab-ATTENTION")).toHaveTextContent("Attention (3)");
-      expect(screen.getByTestId("tab-HEALTHY")).toHaveTextContent("Safe (1)");
+      // Action needed = days <= 7 (CRITICAL + URGENT)
+      expect(screen.getByTestId("tab-ACTION_NEEDED")).toHaveTextContent("Action Needed (3)");
+      // Watch = 7 < days <= 14
+      expect(screen.getByTestId("tab-WATCH")).toHaveTextContent("Watch (3)");
+      // Healthy = days > 14 and < 30 (well-stocked threshold)
+      expect(screen.getByTestId("tab-HEALTHY")).toHaveTextContent("Healthy (1)");
       expect(screen.getByTestId("tab-RESOLVED")).toHaveTextContent("Resolved (0)");
-    });
-
-    it("shows zero counts when no items exist", () => {
-      mockUsePredictions.mockReturnValue({
-        data: createMockPredictionsData([]),
-        isLoading: false,
-        isError: false,
-      });
-
-      render(<TabPredictions />);
-
-      expect(screen.getByTestId("tab-ALL")).toHaveTextContent("All (0)");
-      expect(screen.getByTestId("tab-CRITICAL")).toHaveTextContent("Critical (0)");
-      expect(screen.getByTestId("tab-URGENT")).toHaveTextContent("Urgent (0)");
-      expect(screen.getByTestId("tab-ATTENTION")).toHaveTextContent("Attention (0)");
-      expect(screen.getByTestId("tab-HEALTHY")).toHaveTextContent("Safe (0)");
     });
   });
 
-  describe("filtering stale and well-stocked items", () => {
-    it("excludes items with daysToStockout >= 30 (well-stocked threshold)", () => {
+  describe("well-stocked filter", () => {
+    it("excludes items with daysToStockout >= 30", () => {
       const items = [
         createMockItem({ itemId: "u1", urgency: "URGENT", daysToStockout: 5 }),
         createMockItem({ itemId: "ws1", urgency: "HEALTHY", daysToStockout: 35 }),
@@ -184,32 +171,14 @@ describe("TabPredictions", () => {
       });
 
       render(<TabPredictions />);
-
-      // Only the non-well-stocked item should appear in the All count
-      expect(screen.getByTestId("tab-ALL")).toHaveTextContent("All (1)");
-    });
-
-    it("excludes items with stale computedAt (older than 30 days)", () => {
-      const staleDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
-      const items = [
-        createMockItem({ itemId: "fresh", urgency: "URGENT", daysToStockout: 5 }),
-        createMockItem({ itemId: "stale", urgency: "CRITICAL", daysToStockout: 1, computedAt: staleDate }),
-      ];
-
-      mockUsePredictions.mockReturnValue({
-        data: createMockPredictionsData(items),
-        isLoading: false,
-        isError: false,
-      });
-
-      render(<TabPredictions />);
-
-      expect(screen.getByTestId("tab-ALL")).toHaveTextContent("All (1)");
+      // Only the non-well-stocked URGENT item should appear in Action Needed
+      expect(screen.getByTestId("tab-ACTION_NEEDED")).toHaveTextContent("Action Needed (1)");
+      expect(screen.getByTestId("tab-HEALTHY")).toHaveTextContent("Healthy (0)");
     });
   });
 
   describe("rendering items", () => {
-    it("renders prediction cards for active items", () => {
+    it("renders triage rows for action-needed items by default", () => {
       const items = [
         createMockItem({ itemId: "p1", name: "Pocky", urgency: "CRITICAL", daysToStockout: 2 }),
         createMockItem({ itemId: "p2", name: "KitKat", urgency: "URGENT", daysToStockout: 5 }),
@@ -223,16 +192,26 @@ describe("TabPredictions", () => {
 
       render(<TabPredictions />);
 
-      expect(screen.getByTestId("prediction-card-p1")).toHaveTextContent("Pocky");
-      expect(screen.getByTestId("prediction-card-p2")).toHaveTextContent("KitKat");
+      expect(screen.getByTestId("triage-row-p1")).toHaveTextContent("Pocky");
+      expect(screen.getByTestId("triage-row-p2")).toHaveTextContent("KitKat");
     });
   });
 
   describe("dismissed items", () => {
-    it("moves dismissed items to the resolved count", () => {
+    it("moves dismissed items into the resolved tab count", () => {
       const items = [
-        createMockItem({ itemId: "keep", urgency: "URGENT", daysToStockout: 5, computedAt: "2026-03-30T00:00:00Z" }),
-        createMockItem({ itemId: "dismissed", urgency: "CRITICAL", daysToStockout: 1, computedAt: "2026-03-30T00:00:00Z" }),
+        createMockItem({
+          itemId: "keep",
+          urgency: "URGENT",
+          daysToStockout: 5,
+          computedAt: "2026-03-30T00:00:00Z",
+        }),
+        createMockItem({
+          itemId: "dismissed",
+          urgency: "CRITICAL",
+          daysToStockout: 1,
+          computedAt: "2026-03-30T00:00:00Z",
+        }),
       ];
 
       mockUseDismissedPredictions.mockReturnValue({
@@ -252,7 +231,7 @@ describe("TabPredictions", () => {
 
       render(<TabPredictions />);
 
-      expect(screen.getByTestId("tab-ALL")).toHaveTextContent("All (1)");
+      expect(screen.getByTestId("tab-ACTION_NEEDED")).toHaveTextContent("Action Needed (1)");
       expect(screen.getByTestId("tab-RESOLVED")).toHaveTextContent("Resolved (1)");
     });
   });

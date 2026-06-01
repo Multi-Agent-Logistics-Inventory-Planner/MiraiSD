@@ -11,13 +11,14 @@ import {
   AnalyticsTabs,
   TabPredictions,
   TabOverview,
-  TabAssistant,
+  TabAccuracy,
+  // TabAssistant, // Pito hidden pending redesign — restore by uncommenting.
 } from "./_components"
 
 const ANALYTICS_TAB_VALUES = [
   AnalyticsTab.OVERVIEW,
   AnalyticsTab.PREDICTIONS,
-  AnalyticsTab.ASSISTANT,
+  AnalyticsTab.ACCURACY,
 ] as const
 
 // Old tab values that should redirect to overview
@@ -57,11 +58,16 @@ function AnalyticsContent() {
       <div className={currentTab !== AnalyticsTab.PREDICTIONS ? "hidden" : undefined}>
         {mountedValues.has(AnalyticsTab.PREDICTIONS) && <TabPredictions />}
       </div>
+      <div className={currentTab !== AnalyticsTab.ACCURACY ? "hidden" : undefined}>
+        {mountedValues.has(AnalyticsTab.ACCURACY) && <TabAccuracy />}
+      </div>
+      {/* Pito hidden pending redesign — restore by uncommenting.
       {isAdmin && (
         <div className={currentTab !== AnalyticsTab.ASSISTANT ? "hidden" : undefined}>
           {mountedValues.has(AnalyticsTab.ASSISTANT) && <TabAssistant />}
         </div>
       )}
+      */}
     </div>
   )
 }
