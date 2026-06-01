@@ -50,22 +50,6 @@ public class AnalyticsRollupScheduler {
     }
 
     /**
-     * Snapshot forecast data for demand-based metrics.
-     * Runs at 2:00 AM every day.
-     * Captures mu_hat, sigma_d_hat, confidence, mape from forecast features.
-     */
-    @Scheduled(cron = "0 0 2 * * *")
-    public void snapshotForecastData() {
-        log.info("Starting nightly forecast snapshot");
-        try {
-            int count = analyticsSeedService.snapshotForecastData();
-            log.info("Completed nightly forecast snapshot: {} snapshots created", count);
-        } catch (Exception e) {
-            log.error("Error during nightly forecast snapshot", e);
-        }
-    }
-
-    /**
      * Cleanup overdue forecast predictions.
      * Runs at 2:30 AM every day.
      * Deletes forecasts where suggested_order_date has passed.

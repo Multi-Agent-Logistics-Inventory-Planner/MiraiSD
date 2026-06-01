@@ -47,6 +47,7 @@ public class ProductResponseDTO {
     private BigDecimal unitCost;
     private BigDecimal msrp;
     private Boolean isActive;
+    private Boolean forecastingEnabled;
     private Integer quantity;
     private String imageUrl;
     private String notes;

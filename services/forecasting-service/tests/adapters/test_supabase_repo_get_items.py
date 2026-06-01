@@ -67,6 +67,28 @@ class TestGetItems:
         assert "left join" in sql
         assert "preferred_supplier_id" in sql
 
+    def test_get_items_filters_forecasting_disabled(self):
+        """Per-item forecasting opt-out: SKUs with forecasting_enabled = false are excluded."""
+        mock_engine = MagicMock()
+        mock_conn = MagicMock()
+        mock_engine.connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = MagicMock(return_value=False)
+
+        from src.adapters.supabase_repo import SupabaseRepo
+        repo = SupabaseRepo(engine=mock_engine)
+
+        captured_sql = []
+        def capture_sql(sql, conn, params=None):
+            captured_sql.append(str(sql))
+            return pd.DataFrame(columns=EXPECTED_COLUMNS)
+
+        with patch("pandas.read_sql", side_effect=capture_sql):
+            repo.get_items()
+
+        sql = captured_sql[0].lower()
+        assert "forecasting_enabled" in sql
+        assert "p.forecasting_enabled = true" in sql
+
     def test_get_items_empty_returns_correct_schema(self):
         """Verify empty result has correct column schema."""
         mock_engine = MagicMock()

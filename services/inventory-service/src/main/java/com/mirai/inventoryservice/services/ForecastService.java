@@ -1,18 +1,24 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.dtos.responses.ForecastExplanationDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +34,7 @@ public class ForecastService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final ProductRepository productRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
+    private final StockMovementRepository stockMovementRepository;
 
     @Transactional(readOnly = true)
     public Page<ForecastPredictionResponseDTO> getAllForecasts(Pageable pageable) {
@@ -73,6 +80,36 @@ public class ForecastService {
                     return convertToDTO(p, product, stockMap);
                 })
                 .orElse(null);
+    }
+
+    /**
+     * Bundle of forecast features + most-recent restock for the
+     * "Why this number" drawer on the predictions tab. Reads the full
+     * features JSONB (mu_hat, dow_multipliers, event_multipliers,
+     * event_days_since, demand_regime, lead_time_source, tsb_p/z, mape,
+     * etc.) plus the latest RESTOCK or SHIPMENT_RECEIPT timestamp.
+     */
+    @Transactional(readOnly = true)
+    public ForecastExplanationDTO getForecastExplanation(UUID itemId) {
+        ForecastPrediction prediction = forecastPredictionRepository
+                .findFirstByItemIdOrderByComputedAtDesc(itemId)
+                .orElse(null);
+        if (prediction == null) {
+            return null;
+        }
+        List<StockMovementHistoryView> recent = stockMovementRepository.findHistoryByItemId(
+                itemId,
+                OffsetDateTime.now().minusYears(10),
+                OffsetDateTime.now(),
+                List.of(StockMovementReason.RESTOCK, StockMovementReason.SHIPMENT_RECEIPT),
+                PageRequest.of(0, 1));
+        OffsetDateTime lastRestockAt = recent.isEmpty() ? null : recent.get(0).getAt();
+        return new ForecastExplanationDTO(
+                prediction.getItemId(),
+                prediction.getComputedAt(),
+                prediction.getFeatures(),
+                lastRestockAt
+        );
     }
 
     private Page<ForecastPredictionResponseDTO> mapToDTOs(Page<ForecastPrediction> predictions) {

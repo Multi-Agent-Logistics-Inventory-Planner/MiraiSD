@@ -258,6 +258,8 @@ export interface Product {
   unitCost?: number;
   msrp?: number;
   isActive: boolean;
+  /** When false, the forecasting pipeline skips this product and prediction surfaces hide it. */
+  forecastingEnabled?: boolean;
   quantity: number;
   imageUrl?: string;
   notes?: string;
@@ -284,6 +286,8 @@ export interface ProductRequest {
   unitCost?: number;
   msrp?: number;
   isActive?: boolean;
+  /** When false, this product is skipped by the forecasting pipeline. */
+  forecastingEnabled?: boolean;
   imageUrl?: string;
   notes?: string;
   /** Direct quantity update for prize products (products with a parent) */

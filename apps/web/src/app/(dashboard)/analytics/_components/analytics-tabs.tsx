@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, TrendingDown } from "lucide-react";
+import { Gauge, LayoutDashboard, TrendingDown } from "lucide-react";
 import {
   ScrollableTabs,
   type TabConfig,
@@ -15,15 +15,21 @@ const ANALYTICS_TABS: TabConfig<AnalyticsTab>[] = [
   },
   {
     value: AnalyticsTab.PREDICTIONS,
-    label: "Stockout Predictions",
+    label: "Forecast",
     icon: TrendingDown,
   },
   {
-    value: AnalyticsTab.ASSISTANT,
-    label: "Pito",
-    icon: "/pito.svg",
-    adminOnly: true,
+    value: AnalyticsTab.ACCURACY,
+    label: "Accuracy",
+    icon: Gauge,
   },
+  // Pito (AI assistant) hidden pending redesign — restore by uncommenting.
+  // {
+  //   value: AnalyticsTab.ASSISTANT,
+  //   label: "Pito",
+  //   icon: "/pito.svg",
+  //   adminOnly: true,
+  // },
 ];
 
 interface AnalyticsTabsProps {

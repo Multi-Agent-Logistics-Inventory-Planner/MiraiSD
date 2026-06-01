@@ -4,19 +4,29 @@ import numpy as np
 
 
 def detect_stockout_days(movements_df: pd.DataFrame) -> pd.DataFrame:
-    """Detect days where inventory was zero (stockout) from movement history.
+    """Detect days the SKU had no inventory available to sell at any point.
 
-    Uses previous_quantity and current_quantity from stock_movements to
-    determine end-of-day inventory level per item. Forward-fills across
-    the full date range so days with no movements inherit prior inventory.
+    A day is a stockout when the maximum inventory observed during the day
+    is zero -- i.e., the SKU started empty AND no restock arrived. End-of-day
+    sellouts (started with stock, sold it all by close) are NOT stockouts:
+    they had real demand and must remain in the training set.
+
+    Uses two signals from ``stock_movements``:
+
+    * Start-of-day inventory, computed as the previous day's end-of-day
+      forward-filled across no-movement days, with the recorded
+      ``previous_quantity`` from the first movement of the day overriding it
+      when present.
+    * Per-day max ``current_quantity`` across any movement during the day,
+      to catch mid-day restocks that brought the SKU out of stockout.
 
     Args:
-        movements_df: DataFrame with columns including item_id, at,
-            previous_quantity, current_quantity.
+        movements_df: DataFrame with columns ``item_id``, ``at``,
+            ``previous_quantity``, ``current_quantity``.
 
     Returns:
-        DataFrame with columns [item_id, date, is_stockout] where
-        is_stockout is True when the item had zero inventory that day.
+        DataFrame with columns ``[item_id, date, is_stockout]`` where
+        ``is_stockout`` is True only on days the SKU was empty the entire day.
     """
     if movements_df.empty:
         return pd.DataFrame(columns=["item_id", "date", "is_stockout"])
@@ -32,40 +42,205 @@ def detect_stockout_days(movements_df: pd.DataFrame) -> pd.DataFrame:
     df["at"] = pd.to_datetime(df["at"], utc=True)
     df["date"] = df["at"].dt.floor("D").dt.tz_localize(None)
 
-    # Take the last movement per (item_id, date) to get end-of-day inventory
+    # End-of-day inventory: last movement per (item, date). Used to derive the
+    # following day's start-of-day on no-movement days.
     eod = (
         df.dropna(subset=["current_quantity"])
         .sort_values("at")
         .groupby(["item_id", "date"], as_index=False)
         .last()[["item_id", "date", "current_quantity"]]
+        .rename(columns={"current_quantity": "eod_qty"})
     )
 
-    if eod.empty:
+    # First-movement previous_quantity per (item, date): the SKU's actual
+    # start-of-day inventory when at least one movement occurred that day.
+    first_prev = (
+        df.dropna(subset=["previous_quantity"])
+        .sort_values("at")
+        .groupby(["item_id", "date"], as_index=False)
+        .first()[["item_id", "date", "previous_quantity"]]
+        .rename(columns={"previous_quantity": "first_prev_qty"})
+    )
+
+    # Per-day peak inventory observed across any movement that day. A mid-day
+    # restock that brings inventory above zero rules out a stockout for that day.
+    peak = (
+        df.dropna(subset=["current_quantity"])
+        .groupby(["item_id", "date"], as_index=False)["current_quantity"]
+        .max()
+        .rename(columns={"current_quantity": "peak_qty"})
+    )
+
+    if eod.empty and first_prev.empty:
         return pd.DataFrame(columns=["item_id", "date", "is_stockout"])
 
-    # Build full date grid per item and forward-fill inventory
-    all_items = eod["item_id"].unique()
-    all_dates = pd.date_range(eod["date"].min(), eod["date"].max(), freq="D")
+    # Full (item, date) grid across the observed window.
+    all_items = pd.concat([eod["item_id"], first_prev["item_id"]]).unique()
+    date_min = min(
+        d for d in [eod["date"].min(), first_prev["date"].min()] if pd.notna(d)
+    )
+    date_max = max(
+        d for d in [eod["date"].max(), first_prev["date"].max()] if pd.notna(d)
+    )
+    all_dates = pd.date_range(date_min, date_max, freq="D")
     full_idx = pd.MultiIndex.from_product(
         [all_items, all_dates], names=["item_id", "date"]
     )
-    eod_full = eod.set_index(["item_id", "date"]).reindex(full_idx)
 
-    # Forward-fill within each item, then back-fill the very first days
-    eod_full["current_quantity"] = (
-        eod_full.groupby(level="item_id")["current_quantity"]
-        .ffill()
-        .groupby(level="item_id")
-        .bfill()
+    grid = (
+        eod.set_index(["item_id", "date"]).reindex(full_idx)
+        .join(first_prev.set_index(["item_id", "date"]), how="left")
+        .join(peak.set_index(["item_id", "date"]), how="left")
     )
 
-    eod_full["is_stockout"] = eod_full["current_quantity"] == 0
+    # Forward-fill end-of-day across no-movement days (inventory carries over).
+    grid["eod_qty"] = grid.groupby(level="item_id")["eod_qty"].ffill()
+
+    # Start-of-day: prefer the recorded start (first movement's previous_quantity);
+    # fall back to the previous day's end-of-day for no-movement days.
+    prev_eod = grid.groupby(level="item_id")["eod_qty"].shift(1)
+    grid["start_qty"] = grid["first_prev_qty"].fillna(prev_eod)
+    # Back-fill the very first days of the window when no prior inventory
+    # exists, using the next observed start_qty as a best-effort baseline.
+    grid["start_qty"] = grid.groupby(level="item_id")["start_qty"].bfill()
+
+    # Max inventory observed during the day. Days with no movements have NaN
+    # peak; those inherit start_qty (nothing changed all day).
+    grid["max_during_day"] = grid["peak_qty"].fillna(grid["start_qty"])
+    grid["max_inventory"] = grid[["start_qty", "max_during_day"]].max(axis=1)
+
+    grid["is_stockout"] = (grid["max_inventory"].fillna(0) == 0)
+
     return (
-        eod_full[["is_stockout"]]
+        grid[["is_stockout"]]
         .reset_index()
         .sort_values(["item_id", "date"])
         .reset_index(drop=True)
     )
+
+
+SHIPMENT_REASONS = {"SHIPMENT_RECEIPT", "SHIPMENT_PARTIAL_RECEIPT", "shipment_receipt", "shipment_partial_receipt"}
+DISPLAY_REASONS = {"DISPLAY_SET", "display_set"}
+
+
+def build_event_features(
+    movements_df: pd.DataFrame,
+    window_days: int = 7,
+) -> pd.DataFrame:
+    """Per (item, day) binary flags for non-sale events in a prior lookback window.
+
+    Reads ``stock_movements`` and emits, for each (item_id, date) in the
+    observed window, whether a SHIPMENT_RECEIPT or DISPLAY_SET occurred in
+    the prior ``window_days`` calendar days (exclusive of today).
+
+    Args:
+        movements_df: DataFrame with columns ``item_id``, ``reason``, ``at``.
+            Reason values may be upper- or lower-case (DB stores uppercase,
+            tests sometimes use lowercase).
+        window_days: lookback window size in days. Defaults to 7.
+
+    Returns:
+        DataFrame with columns ``[item_id, date, recent_shipment_Nd,
+        recent_display_Nd]`` where N is ``window_days``. Empty DataFrame if
+        the input is empty or missing required columns.
+    """
+    required = {"item_id", "reason", "at"}
+    if movements_df.empty or not required.issubset(movements_df.columns):
+        return pd.DataFrame(
+            columns=["item_id", "date", f"recent_shipment_{window_days}d", f"recent_display_{window_days}d"]
+        )
+
+    df = movements_df[["item_id", "reason", "at"]].copy()
+    df["at"] = pd.to_datetime(df["at"], utc=True)
+    df["date"] = df["at"].dt.floor("D").dt.tz_localize(None)
+    df["item_id"] = df["item_id"].astype(str)
+
+    # Per (item, day): did each event type happen today?
+    df["is_shipment"] = df["reason"].isin(SHIPMENT_REASONS).astype(int)
+    df["is_display"] = df["reason"].isin(DISPLAY_REASONS).astype(int)
+
+    per_day = (
+        df.groupby(["item_id", "date"], as_index=False)[["is_shipment", "is_display"]]
+        .max()
+    )
+
+    # Build a full grid over the observed window per item so the lookback
+    # rolling-max sees zeros on non-event days.
+    if per_day.empty:
+        return pd.DataFrame(
+            columns=["item_id", "date", f"recent_shipment_{window_days}d", f"recent_display_{window_days}d"]
+        )
+
+    all_items = per_day["item_id"].unique()
+    date_min = per_day["date"].min()
+    date_max = per_day["date"].max()
+    all_dates = pd.date_range(date_min, date_max, freq="D")
+    full_idx = pd.MultiIndex.from_product([all_items, all_dates], names=["item_id", "date"])
+    grid = per_day.set_index(["item_id", "date"]).reindex(full_idx).fillna(0).reset_index()
+
+    # Rolling max over the prior window_days (excluding today). Shift by 1
+    # so today's own event does not count toward "recent".
+    grid = grid.sort_values(["item_id", "date"]).reset_index(drop=True)
+    grouped = grid.groupby("item_id", sort=False)
+    ship_col = f"recent_shipment_{window_days}d"
+    disp_col = f"recent_display_{window_days}d"
+    grid[ship_col] = grouped["is_shipment"].transform(
+        lambda s: s.shift(1).fillna(0).rolling(window_days, min_periods=1).max()
+    ).astype(int)
+    grid[disp_col] = grouped["is_display"].transform(
+        lambda s: s.shift(1).fillna(0).rolling(window_days, min_periods=1).max()
+    ).astype(int)
+
+    return grid[["item_id", "date", ship_col, disp_col]]
+
+
+def compute_global_event_multipliers(
+    daily_with_events: pd.DataFrame,
+    event_cols: list[str],
+    min_n: int = 30,
+    cap: float = 3.0,
+) -> dict[str, float]:
+    """Learn global demand multipliers per event flag.
+
+    For each flag in ``event_cols``, computes
+    ``mean(consumption | flag=1) / mean(consumption | flag=0)`` pooled across
+    all items. Falls back to ``1.0`` when either group has fewer than
+    ``min_n`` rows or the baseline mean is zero. Clips to ``[1/cap, cap]`` so
+    a noisy estimate cannot blow up predictions.
+
+    Args:
+        daily_with_events: long-form DataFrame with at least ``consumption``
+            and each column in ``event_cols`` (0/1).
+        event_cols: flag columns to learn multipliers for.
+        min_n: minimum row count in either group required to trust the
+            estimate.
+        cap: clip multipliers to ``[1/cap, cap]``.
+
+    Returns:
+        Dict mapping ``event_col -> multiplier``. Always contains an entry
+        per requested column (defaulting to 1.0 on insufficient data).
+    """
+    out: dict[str, float] = {}
+    if daily_with_events.empty or "consumption" not in daily_with_events.columns:
+        return {col: 1.0 for col in event_cols}
+
+    for col in event_cols:
+        if col not in daily_with_events.columns:
+            out[col] = 1.0
+            continue
+        on = daily_with_events.loc[daily_with_events[col] == 1, "consumption"]
+        off = daily_with_events.loc[daily_with_events[col] == 0, "consumption"]
+        if len(on) < min_n or len(off) < min_n:
+            out[col] = 1.0
+            continue
+        off_mean = float(off.mean())
+        on_mean = float(on.mean())
+        if off_mean <= 0:
+            out[col] = 1.0
+            continue
+        mult = on_mean / off_mean
+        out[col] = float(np.clip(mult, 1.0 / cap, cap))
+    return out
 
 
 def build_daily_usage(events_df: pd.DataFrame) -> pd.DataFrame:
@@ -149,6 +324,43 @@ def build_stats(daily_df: pd.DataFrame) -> pd.DataFrame:
     if "is_stockout" in df.columns:
         cols.append("is_stockout")
     return df[cols]
+
+
+def compute_per_sku_cv(daily_df: pd.DataFrame) -> dict[str, float]:
+    """Per-SKU coefficient of variation, computed on sale-days only.
+
+    Used to route safety stock between Poisson (CV <= threshold) and Negative
+    Binomial (CV > threshold). The zero-filled grid would understate the
+    burstiness of intermittent demand because it deflates both the mean and
+    the std with zeros -- the metric we care about is "how variable are the
+    days something actually sold."
+
+    Args:
+        daily_df: Output of ``build_daily_usage``: long-form DataFrame with
+            columns ``item_id`` and ``consumption``, one row per (item, day).
+
+    Returns:
+        Dict ``{item_id: cv}``. Items with no sale-days are absent (caller
+        should default to a regime).
+    """
+    if daily_df.empty:
+        return {}
+
+    sale_days = daily_df[daily_df["consumption"] > 0]
+    if sale_days.empty:
+        return {}
+
+    grouped = sale_days.groupby("item_id")["consumption"]
+    means = grouped.mean()
+    stds = grouped.std(ddof=0)
+
+    result: dict[str, float] = {}
+    for item_id, mean_v in means.items():
+        if mean_v <= 0:
+            continue
+        std_v = stds.get(item_id, 0.0)
+        result[str(item_id)] = float(std_v / mean_v)
+    return result
 
 
 def build_daily_consumption(events_df: pd.DataFrame) -> pd.DataFrame:

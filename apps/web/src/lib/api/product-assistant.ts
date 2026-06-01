@@ -12,10 +12,10 @@ export interface HeaderBundle {
   velocity: number | null;
   daysToStockout: number | null;
   forecastConfidence: number | null;
-  mape: number | null;
   lastRestockAt: string | null;
   damageCountLast30: number;
   onDisplay: boolean;
+  forecastingEnabled: boolean;
 }
 
 export interface DetailBundle {
@@ -30,6 +30,7 @@ export interface DetailBundle {
     leadTimeDays: number | null;
     unitCost: number | null;
     currentStock: number;
+    forecastingEnabled: boolean;
   };
   inventoryByLocation: Array<{
     locationId: string | null;
@@ -48,7 +49,6 @@ export interface DetailBundle {
     date: string;
     muHat: number | null;
     confidence: number | null;
-    mape: number | null;
     daysToStockout: number | null;
     currentStock: number | null;
   }>;

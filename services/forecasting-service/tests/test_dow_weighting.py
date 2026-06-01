@@ -128,3 +128,37 @@ def test_multi_sku_dow_weighted():
 
     # B should have uniform multipliers
     assert abs(b_row["dow_multipliers"][5] - 1.0) < 0.01
+
+
+def test_zero_weekday_multipliers_floored_when_enabled(monkeypatch):
+    """With DOW_MULTIPLIER_FLOOR > 0, weekday multipliers that would compute
+    to 0 are floored. Default 0.0 disables this; tested via override.
+    The live-data 2026-05-31 ablation showed the floor costs WAPE on this
+    substrate, but the mechanism still works when opted in."""
+    monkeypatch.setattr(config, "DOW_MULTIPLIER_FLOOR", 0.2)
+    dates = pd.date_range("2025-11-03", periods=28, freq="D")  # 4 weeks Mon-start
+    consumption = [0.0 if d.dayofweek < 5 else 7.0 for d in dates]
+    feats = pd.DataFrame({
+        "date": dates,
+        "item_id": ["P"] * 28,
+        "consumption": consumption,
+    })
+    result = estimate_mu_sigma(feats, method="dow_weighted")
+    dm = result.iloc[0]["dow_multipliers"]
+    for d in range(5):
+        assert dm[d] == 0.2, f"weekday {d} should be floored at 0.2, got {dm[d]}"
+
+
+def test_default_floor_zero_lets_zeros_through():
+    """Default DOW_MULTIPLIER_FLOOR=0.0 -> no flooring; raw zeros pass through."""
+    dates = pd.date_range("2025-11-03", periods=28, freq="D")
+    consumption = [0.0 if d.dayofweek < 5 else 7.0 for d in dates]
+    feats = pd.DataFrame({
+        "date": dates,
+        "item_id": ["P"] * 28,
+        "consumption": consumption,
+    })
+    result = estimate_mu_sigma(feats, method="dow_weighted")
+    dm = result.iloc[0]["dow_multipliers"]
+    for d in range(5):
+        assert dm[d] == 0.0, f"weekday {d} should be unfloored 0.0, got {dm[d]}"

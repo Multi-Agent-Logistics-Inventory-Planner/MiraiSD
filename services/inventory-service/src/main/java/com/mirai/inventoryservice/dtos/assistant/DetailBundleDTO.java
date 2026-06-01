@@ -29,7 +29,8 @@ public record DetailBundleDTO(
             Integer targetStockLevel,
             Integer leadTimeDays,
             BigDecimal unitCost,
-            Integer currentStock
+            Integer currentStock,
+            boolean forecastingEnabled
     ) {}
 
     public record InventoryByLocation(
@@ -51,7 +52,6 @@ public record DetailBundleDTO(
             LocalDate date,
             BigDecimal muHat,
             BigDecimal confidence,
-            BigDecimal mape,
             BigDecimal daysToStockout,
             Integer currentStock
     ) {}

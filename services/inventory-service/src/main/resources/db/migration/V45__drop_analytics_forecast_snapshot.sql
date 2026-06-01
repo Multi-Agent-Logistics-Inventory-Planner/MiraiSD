@@ -1,0 +1,11 @@
+-- Drop the analytics_forecast_snapshot table.
+-- Created in V14 as a daily snapshot of forecast metrics, but the only
+-- writer was AnalyticsRollupScheduler.snapshotForecastData() which was
+-- @Profile("dev"), so production never received fresh rows. All readers
+-- (ProductReportBundleService.getHeader / getDetail) have been switched to
+-- read directly from forecast_predictions, which is always up to date
+-- because the Kafka-driven pipeline rewrites it on every inventory change.
+--
+-- Deploy ordering: this migration runs after the code-side switch ships, so
+-- there is no window where readers point at a freshly-empty table.
+DROP TABLE IF EXISTS analytics_forecast_snapshot;

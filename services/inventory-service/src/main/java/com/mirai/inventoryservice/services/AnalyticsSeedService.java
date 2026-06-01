@@ -1,11 +1,9 @@
 package com.mirai.inventoryservice.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.models.Category;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.analytics.CategoryDemandRollup;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
-import com.mirai.inventoryservice.models.analytics.ForecastDailySnapshot;
 import com.mirai.inventoryservice.models.analytics.MonthlyPerformanceRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -14,7 +12,6 @@ import com.mirai.inventoryservice.repositories.CategoryDemandRollupRepository;
 import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.ForecastSnapshotRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MonthlyPerformanceRollupRepository;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -53,12 +50,10 @@ public class AnalyticsSeedService {
     private final DailySalesRollupRepository dailySalesRollupRepository;
     private final MonthlyPerformanceRollupRepository monthlyPerformanceRollupRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
-    private final ForecastSnapshotRepository forecastSnapshotRepository;
     private final CategoryDemandRollupRepository categoryDemandRollupRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
     private final CacheManager cacheManager;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final Random random = new Random();
 
     // Day-of-week multipliers: Sunday=0, Monday=1, ..., Saturday=6
@@ -693,65 +688,6 @@ public class AnalyticsSeedService {
     }
 
     /**
-     * Snapshot forecast data for all items.
-     * Captures mu_hat, sigma_d_hat, confidence, mape from forecast_predictions features.
-     * Called by scheduled job at 2:00 AM daily.
-     */
-    @Transactional
-    public int snapshotForecastData() {
-        LocalDate today = LocalDate.now();
-        List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
-
-        if (latestPredictions.isEmpty()) {
-            log.warn("No forecast predictions found for snapshot");
-            return 0;
-        }
-
-        // Batch fetch existing snapshots for today to avoid N+1 EXISTS queries
-        java.util.Set<UUID> existingItemIds = new java.util.HashSet<>(
-            forecastSnapshotRepository.findItemIdsBySnapshotDate(today));
-
-        List<ForecastDailySnapshot> snapshots = new ArrayList<>();
-
-        for (ForecastPrediction prediction : latestPredictions) {
-            // Skip if already snapshotted today
-            if (existingItemIds.contains(prediction.getItemId())) {
-                continue;
-            }
-
-            Map<String, Object> features = prediction.getFeatures();
-            if (features == null) {
-                features = new HashMap<>();
-            }
-
-            BigDecimal muHat = extractBigDecimal(features.get("mu_hat"));
-            BigDecimal sigmaDHat = extractBigDecimal(features.get("sigma_d_hat"));
-            BigDecimal mape = extractBigDecimal(features.get("mape"));
-            String dowMultipliers = extractDowMultipliers(features.get("dow_multipliers"));
-
-            snapshots.add(ForecastDailySnapshot.builder()
-                .itemId(prediction.getItemId())
-                .snapshotDate(today)
-                .muHat(muHat)
-                .sigmaDHat(sigmaDHat)
-                .confidence(prediction.getConfidence())
-                .mape(mape)
-                .daysToStockout(prediction.getDaysToStockout())
-                .currentStock(stockMap.getOrDefault(prediction.getItemId(), 0))
-                .dowMultipliers(dowMultipliers)
-                .build());
-        }
-
-        if (!snapshots.isEmpty()) {
-            forecastSnapshotRepository.saveAll(snapshots);
-            log.info("Created {} forecast snapshots for {}", snapshots.size(), today);
-        }
-
-        return snapshots.size();
-    }
-
-    /**
      * Rollup category demand metrics.
      * Aggregates demand velocity, stock velocity, and risk counts by category.
      * Called by scheduled job at 2:15 AM daily.
@@ -917,17 +853,4 @@ public class AnalyticsSeedService {
         return null;
     }
 
-    /**
-     * Extract dow_multipliers as JSON string from features map.
-     */
-    private String extractDowMultipliers(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }

@@ -74,19 +74,32 @@ export function ProductReportPanel({ productId }: ProductReportPanelProps) {
   const totalStock = data.product.currentStock;
   const latest = data.latestPrediction;
   const reorderPoint = data.product.reorderPoint;
+  const forecastingDisabled = data.product.forecastingEnabled === false;
 
   return (
     <div className="flex flex-col gap-4">
+      {forecastingDisabled && (
+        <div className="inline-flex items-center self-start gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Forecasting disabled for this item
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Total Stock" value={totalStock} />
         <Kpi label="Reorder pt" value={reorderPoint ?? "—"} />
         <Kpi
           label="Days to stockout"
-          value={formatNumber(latest?.daysToStockout)}
+          value={forecastingDisabled ? "—" : formatNumber(latest?.daysToStockout)}
         />
         <Kpi
           label="Confidence"
-          value={latest?.confidence != null ? `${Math.round(latest.confidence * 100)}%` : "—"}
+          value={
+            forecastingDisabled
+              ? "—"
+              : latest?.confidence != null
+                ? `${Math.round(latest.confidence * 100)}%`
+                : "—"
+          }
         />
       </div>
 

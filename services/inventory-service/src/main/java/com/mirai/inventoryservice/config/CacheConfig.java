@@ -20,6 +20,7 @@ public class CacheConfig {
     public static final String DEMAND_LEADERS_CACHE = "analytics-demand-leaders";
     public static final String SALES_SUMMARY_CACHE = "analytics-sales-summary";
     public static final String PERFORMANCE_METRICS_CACHE = "analytics-performance-metrics";
+    public static final String FORECAST_ACCURACY_CACHE = "analytics-forecast-accuracy";
 
     @Bean
     public CacheManager cacheManager() {
@@ -29,7 +30,8 @@ public class CacheConfig {
             buildCache(INSIGHTS_CACHE, 60, TimeUnit.MINUTES, 10),
             buildCache(DEMAND_LEADERS_CACHE, 60, TimeUnit.MINUTES, 20),
             buildCache(SALES_SUMMARY_CACHE, 60, TimeUnit.MINUTES, 10),
-            buildCache(PERFORMANCE_METRICS_CACHE, 5, TimeUnit.MINUTES, 5)
+            buildCache(PERFORMANCE_METRICS_CACHE, 5, TimeUnit.MINUTES, 5),
+            buildCache(FORECAST_ACCURACY_CACHE, 10, TimeUnit.MINUTES, 4)
         ));
         return manager;
     }

@@ -123,8 +123,13 @@ def test_build_stats_preserves_is_stockout():
 # ---------------------------------------------------------------------------
 
 class TestDetectStockoutDays:
+    """A day is stockout only if the SKU had zero inventory the entire day.
+
+    Sellout days (started with stock, sold to zero) are NOT stockouts -- they
+    had real demand and must remain in the training set.
+    """
+
     def _make_movements(self, records: list[dict]) -> pd.DataFrame:
-        """Create a movements DataFrame from simple records."""
         return pd.DataFrame(records)
 
     def test_empty_input_returns_empty(self):
@@ -134,7 +139,6 @@ class TestDetectStockoutDays:
         assert list(result.columns) == ["item_id", "date", "is_stockout"]
 
     def test_missing_inventory_columns_returns_empty(self):
-        """Without current_quantity/previous_quantity, returns empty."""
         movements = pd.DataFrame({
             "item_id": ["A"],
             "at": ["2025-01-01T12:00:00Z"],
@@ -144,66 +148,87 @@ class TestDetectStockoutDays:
         result = detect_stockout_days(movements)
         assert result.empty
 
-    def test_detects_zero_inventory_as_stockout(self):
-        """Days where current_quantity=0 should be marked as stockout."""
+    def test_sellout_day_is_not_stockout(self):
+        """The bug fix: a day that started with stock and sold to zero
+        had real demand and must NOT be flagged stockout."""
         movements = self._make_movements([
-            {"item_id": "A", "at": "2025-01-01T10:00:00Z",
-             "current_quantity": 5, "previous_quantity": 8},
+            # Day 2: started with 2 units, sold both, ended at 0.
             {"item_id": "A", "at": "2025-01-02T10:00:00Z",
              "current_quantity": 0, "previous_quantity": 2},
+        ])
+        result = detect_stockout_days(movements)
+        assert bool(result["is_stockout"].iloc[0]) is False
+
+    def test_true_stockout_day_is_flagged(self):
+        """Day starts at zero (carried over from prior day) and gets no restock."""
+        movements = self._make_movements([
+            # Jan 1: ended at 0.
+            {"item_id": "A", "at": "2025-01-01T10:00:00Z",
+             "current_quantity": 0, "previous_quantity": 2},
+            # Jan 2: no movements (handled by forward-fill).
+            # Jan 3: a restock day; should not be stockout.
             {"item_id": "A", "at": "2025-01-03T10:00:00Z",
              "current_quantity": 10, "previous_quantity": 0},
         ])
         result = detect_stockout_days(movements)
         result["date"] = pd.to_datetime(result["date"])
-
-        day1 = result[(result["item_id"] == "A") & (result["date"] == "2025-01-01")]
+        # Jan 2 had no inventory all day -> stockout.
         day2 = result[(result["item_id"] == "A") & (result["date"] == "2025-01-02")]
-        day3 = result[(result["item_id"] == "A") & (result["date"] == "2025-01-03")]
+        assert bool(day2["is_stockout"].iloc[0]) is True
 
-        assert day1["is_stockout"].iloc[0] is np.bool_(False)
-        assert day2["is_stockout"].iloc[0] is np.bool_(True)
-        assert day3["is_stockout"].iloc[0] is np.bool_(False)
+    def test_restock_day_is_not_stockout(self):
+        """Started empty, restock arrived mid-day. The SKU could and did sell."""
+        movements = self._make_movements([
+            # First movement of the day is a restock from 0 -> 100.
+            {"item_id": "A", "at": "2025-01-01T10:00:00Z",
+             "current_quantity": 100, "previous_quantity": 0},
+        ])
+        result = detect_stockout_days(movements)
+        assert bool(result["is_stockout"].iloc[0]) is False
 
-    def test_forward_fills_inventory_on_missing_days(self):
-        """Days with no movements should inherit prior day's inventory."""
+    def test_no_movement_day_inherits_prior_eod(self):
+        """No-movement day at the START of the window inherits prior state."""
         movements = self._make_movements([
             {"item_id": "A", "at": "2025-01-01T10:00:00Z",
-             "current_quantity": 0, "previous_quantity": 3},
-            # No movement on Jan 2
-            {"item_id": "A", "at": "2025-01-03T10:00:00Z",
-             "current_quantity": 5, "previous_quantity": 0},
+             "current_quantity": 50, "previous_quantity": 55},
+            # No movements Jan 2, Jan 3
+            {"item_id": "A", "at": "2025-01-04T10:00:00Z",
+             "current_quantity": 48, "previous_quantity": 50},
         ])
         result = detect_stockout_days(movements)
         result["date"] = pd.to_datetime(result["date"])
-
-        # Jan 2 should be forward-filled from Jan 1 (qty=0 -> stockout)
-        day2 = result[(result["item_id"] == "A") & (result["date"] == "2025-01-02")]
-        assert day2["is_stockout"].iloc[0] is np.bool_(True)
+        # Jan 2 and Jan 3 had qty=50 at start, no movements -> not stockout.
+        for d in ("2025-01-02", "2025-01-03"):
+            row = result[(result["item_id"] == "A") & (result["date"] == d)]
+            assert bool(row["is_stockout"].iloc[0]) is False
 
     def test_multiple_items_independent(self):
-        """Stockout detection should be independent per item."""
         movements = self._make_movements([
+            # Item A: out of stock all day (start = 0 from prev, no movement = no restock).
+            # Use a no-movement day flanked by stockout endpoints to make A's day
+            # unambiguously empty.
             {"item_id": "A", "at": "2025-01-01T10:00:00Z",
-             "current_quantity": 0, "previous_quantity": 1},
+             "current_quantity": 0, "previous_quantity": 0},
+            # Item B: full stock on the same day.
             {"item_id": "B", "at": "2025-01-01T10:00:00Z",
              "current_quantity": 5, "previous_quantity": 8},
         ])
         result = detect_stockout_days(movements)
-
         a_row = result[result["item_id"] == "A"].iloc[0]
         b_row = result[result["item_id"] == "B"].iloc[0]
-        assert a_row["is_stockout"] is np.bool_(True)
-        assert b_row["is_stockout"] is np.bool_(False)
+        assert bool(a_row["is_stockout"]) is True
+        assert bool(b_row["is_stockout"]) is False
 
-    def test_last_movement_of_day_wins(self):
-        """When multiple movements on same day, last one determines EOD inventory."""
+    def test_partial_day_stockout_then_restock_is_not_stockout(self):
+        """Started empty, restocked mid-day after a brief stockout window."""
         movements = self._make_movements([
-            {"item_id": "A", "at": "2025-01-01T08:00:00Z",
-             "current_quantity": 0, "previous_quantity": 2},
-            {"item_id": "A", "at": "2025-01-01T18:00:00Z",
+            # First movement: restock from 0 to 10 at 2pm.
+            {"item_id": "A", "at": "2025-01-01T14:00:00Z",
              "current_quantity": 10, "previous_quantity": 0},
+            # Second: a sale later that day.
+            {"item_id": "A", "at": "2025-01-01T18:00:00Z",
+             "current_quantity": 8, "previous_quantity": 10},
         ])
         result = detect_stockout_days(movements)
-        # Last movement has qty=10, so NOT stockout
-        assert result["is_stockout"].iloc[0] is np.bool_(False)
+        # Peak inventory during the day was 10, so SKU could sell -> NOT stockout.
+        assert bool(result["is_stockout"].iloc[0]) is False

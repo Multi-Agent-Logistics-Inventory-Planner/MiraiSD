@@ -7,6 +7,123 @@ from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
+from scipy.stats import nbinom, poisson
+
+
+REGIME_STEADY = "steady"
+REGIME_BURSTY = "bursty"
+
+
+def _dow_multiplier(dow_dict: object, dow: int) -> float:
+    """Read a dow multiplier from a {0..6 -> float} dict tolerating str/int keys.
+
+    Returns 1.0 when dow_dict is missing, malformed, or has no entry for ``dow``.
+    """
+    if not isinstance(dow_dict, dict) or not dow_dict:
+        return 1.0
+    val = dow_dict.get(dow)
+    if val is None:
+        val = dow_dict.get(str(dow))
+    try:
+        return float(val) if val is not None else 1.0
+    except (TypeError, ValueError):
+        return 1.0
+
+
+def effective_lead_demand_vectorized(
+    mu_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
+) -> pd.Series:
+    """Expected demand over the lead-time window, DOW + event-adjusted.
+
+    For each row this returns
+    ``sum_{k=0..L-1} mu_hat * dow_mult[dow(start+k)] * Π event_mult_if_active``.
+    Falls back to ``mu_hat * L`` when DOW info is missing and to the DOW-only
+    sum when event info is missing.
+
+    Event activation: an event with global multiplier ``m`` is "active" on
+    lead-time day ``k`` (where ``k=0`` is ``start_date``) for SKUs whose last
+    occurrence is ``X`` days before ``start_date`` and ``1 - k <= X <=
+    event_window_days - k``. This matches the "recent in prior N days,
+    excluding the event day itself" semantic used at training time.
+
+    Args:
+        mu_hat: per-SKU mean daily demand (constant, the window average).
+        L: lead time (scalar or Series).
+        dow_multipliers: optional Series of dicts ``{0..6 -> float}``; one entry
+            per row, aligned to ``mu_hat.index``. Keys may be int or str.
+        start_date: calendar date the lead-time window begins. The day at index 0
+            is ``start_date`` itself. When None, the function degrades to the
+            constant-rate sum ``mu_hat * L``.
+        event_multipliers: global ``{event_col -> multiplier}`` learned from
+            training. When None or empty, events are skipped.
+        event_days_since: ``{event_col -> Series of days-since-last-event}``,
+            aligned to ``mu_hat.index``. NaN means "no prior event observed";
+            those SKUs do not get the multiplier.
+        event_window_days: lookback length used to define "recent" (default 7,
+            matching ``recent_*_7d`` flags).
+
+    Returns:
+        Series of expected lead-time demand, same index as ``mu_hat``.
+    """
+    if isinstance(L, pd.Series):
+        L_arr = L.clip(lower=0.0).astype(float)
+    else:
+        L_arr = pd.Series([max(float(L), 0.0)] * len(mu_hat), index=mu_hat.index)
+
+    if dow_multipliers is None or start_date is None:
+        return mu_hat.astype(float) * L_arr
+
+    out = np.zeros(len(mu_hat), dtype=float)
+    mu_arr = mu_hat.astype(float).to_numpy()
+    L_int = np.round(L_arr.to_numpy()).astype(int)
+    dm_arr = dow_multipliers.reindex(mu_hat.index).to_numpy()
+
+    # Pre-extract event arrays once per call. Each entry is (multiplier,
+    # days_since_array). Multipliers within (1 - epsilon, 1 + epsilon) are
+    # filtered out as no-ops to keep the inner loop fast.
+    active_events: list[tuple[float, np.ndarray]] = []
+    if event_multipliers and event_days_since:
+        for col, mult in event_multipliers.items():
+            if abs(float(mult) - 1.0) < 1e-9:
+                continue
+            recency = event_days_since.get(col)
+            if recency is None:
+                continue
+            active_events.append(
+                (float(mult), recency.reindex(mu_hat.index).to_numpy())
+            )
+
+    for i in range(len(mu_hat)):
+        dm = dm_arr[i]
+        L_i = int(L_int[i])
+        if L_i <= 0:
+            continue
+        if not isinstance(dm, dict) or not dm:
+            out[i] = mu_arr[i] * L_i
+            continue
+        total = 0.0
+        for k in range(L_i):
+            dow = (start_date + timedelta(days=k)).weekday()
+            day_demand = mu_arr[i] * _dow_multiplier(dm, dow)
+            for mult, recency_arr in active_events:
+                X = recency_arr[i]
+                # NaN means "never observed" -> flag inactive.
+                if X != X:  # NaN check without numpy import in hot loop
+                    continue
+                # Active iff most recent event is within (k - event_window_days, k - 1]
+                # relative to start_date. Equivalent: 1 - k <= X <= window - k.
+                if (1 - k) <= X <= (event_window_days - k):
+                    day_demand *= mult
+            total += day_demand
+        out[i] = total
+
+    return pd.Series(out, index=mu_hat.index)
 
 
 def z_for_service_level(alpha: float) -> float:
@@ -109,22 +226,56 @@ def compute_safety_stock_vectorized(
     L: Union[pd.Series, int, float],
     alpha: float,
     sigma_L: Optional[Union[pd.Series, float]] = None,
+    regime: Optional[pd.Series] = None,
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized safety stock computation.
 
-    Without sigma_L: SS = z(alpha) * sigma_d * sqrt(L)
-    With sigma_L:    SS = z(alpha) * sqrt(L * sigma_d^2 + mu^2 * sigma_L^2)
+    Three modes:
+
+    * ``regime is None`` (legacy) and ``sigma_L is None`` -- Normal-quantile
+      buffer: ``SS = z(alpha) * sigma_d * sqrt(L)``. Used by the dow_weighted
+      estimator's existing call sites.
+    * ``regime is None`` and ``sigma_L`` is provided -- Normal-quantile buffer
+      with lead-time variance term:
+      ``SS = z(alpha) * sqrt(L * sigma_d^2 + mu^2 * sigma_L^2)``.
+    * ``regime`` is provided -- distribution-routed buffer. Each SKU's buffer
+      is sized against the lead-time demand distribution that matches its
+      demand shape:
+
+      - ``steady`` (CV <= threshold): ``SS = poisson.ppf(alpha, mu*L) - mu*L``
+      - ``bursty`` (CV > threshold):  Negative Binomial fit to (mean=mu*L,
+        var=sigma^2*L), then ``SS = nbinom.ppf(alpha, n, p) - mu*L``
+
+      Falls back to Poisson per-row when overdispersion does not hold
+      (variance <= mean), keeping behavior conservative.
 
     Args:
         mu_hat: Series of mean daily demand estimates.
         sigma_d_hat: Series of demand standard deviations.
         L: Lead time (scalar or Series).
         alpha: Service level (e.g., 0.95).
-        sigma_L: Lead time standard deviation (scalar or Series). None = demand-only.
+        sigma_L: Lead time standard deviation (scalar or Series). None =
+            demand-only. Ignored when ``regime`` is provided.
+        regime: Per-SKU demand regime label ("steady" or "bursty"). When
+            provided, switches the buffer from Normal to Poisson / NegBin.
 
     Returns:
-        Series of safety stock values.
+        Series of safety stock values (floored at 0).
     """
+    if regime is not None:
+        return _distribution_safety_stock(
+            mu_hat, sigma_d_hat, L, alpha, regime,
+            dow_multipliers=dow_multipliers, start_date=start_date,
+            event_multipliers=event_multipliers,
+            event_days_since=event_days_since,
+            event_window_days=event_window_days,
+        )
+
     z = z_for_service_level(alpha)
     sigma_d_safe = sigma_d_hat.clip(lower=0.0)
     L_safe = np.maximum(L, 0.0) if isinstance(L, pd.Series) else max(L, 0.0)
@@ -137,27 +288,105 @@ def compute_safety_stock_vectorized(
     return z * np.sqrt(L_safe * sigma_d_safe**2 + mu_hat**2 * sigma_L_safe**2)
 
 
+def _distribution_safety_stock(
+    mu_hat: pd.Series,
+    sigma_d_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    alpha: float,
+    regime: pd.Series,
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
+) -> pd.Series:
+    """Poisson (steady) / NegBin (bursty) safety stock, vectorized.
+
+    Lead-time demand mean uses the DOW-adjusted sum when ``dow_multipliers`` +
+    ``start_date`` are provided; otherwise it degrades to the flat ``mu * L``.
+    Variance approximation stays ``sigma_d^2 * L`` (sigma_d already excludes
+    DOW effect when produced by ``_dow_weighted_estimate``). NegBin parameters
+    follow the scipy parameterization: ``p = mu_L / var_L``,
+    ``n = mu_L * p / (1 - p)``. Per-row fallback to Poisson when
+    ``var_L <= mu_L`` (no overdispersion to model).
+    """
+    idx = mu_hat.index
+    mu = mu_hat.clip(lower=0.0).astype(float).to_numpy()
+    sigma = sigma_d_hat.clip(lower=0.0).astype(float).to_numpy()
+    if isinstance(L, pd.Series):
+        L_arr = L.clip(lower=0.0).astype(float).to_numpy()
+    else:
+        L_arr = np.full_like(mu, max(float(L), 0.0))
+
+    mu_L = effective_lead_demand_vectorized(
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date,
+        event_multipliers=event_multipliers,
+        event_days_since=event_days_since,
+        event_window_days=event_window_days,
+    ).astype(float).to_numpy()
+    var_L = (sigma**2) * L_arr
+
+    # Poisson baseline (works for every SKU as a safe fallback).
+    safe_mu_L = np.maximum(mu_L, 1e-9)
+    poisson_ss = poisson.ppf(alpha, safe_mu_L) - mu_L
+
+    # NegBin where overdispersion holds. Where it doesn't (var_L <= mu_L)
+    # NegBin reduces to Poisson, so we mask those rows out.
+    overdispersed = var_L > mu_L + 1e-9
+    nbinom_ss = np.zeros_like(mu_L)
+    if overdispersed.any():
+        mu_L_od = mu_L[overdispersed]
+        var_L_od = var_L[overdispersed]
+        p_param = np.clip(mu_L_od / np.maximum(var_L_od, 1e-9), 1e-9, 1.0 - 1e-9)
+        n_param = mu_L_od * p_param / (1.0 - p_param)
+        nbinom_ss[overdispersed] = nbinom.ppf(alpha, n_param, p_param) - mu_L_od
+
+    regime_arr = regime.reindex(idx).fillna(REGIME_BURSTY).astype(str).to_numpy()
+    use_nbinom = (regime_arr == REGIME_BURSTY) & overdispersed
+    ss = np.where(use_nbinom, nbinom_ss, poisson_ss)
+
+    # ppf returns NaN for degenerate inputs (e.g., mu_L = 0). Treat as 0.
+    ss = np.where(np.isnan(ss), 0.0, ss)
+    ss = np.maximum(ss, 0.0)
+    return pd.Series(ss, index=idx)
+
+
 def reorder_point_vectorized(
     mu_hat: pd.Series,
     safety_stock: pd.Series,
     L: Union[pd.Series, int, float],
+    dow_multipliers: Optional[pd.Series] = None,
+    start_date: Optional[date] = None,
+    event_multipliers: Optional[dict[str, float]] = None,
+    event_days_since: Optional[dict[str, pd.Series]] = None,
+    event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized reorder point computation.
 
-    ROP = mu * L + safety_stock
+    ROP = expected_lead_demand + safety_stock
+
+    Expected lead demand is the DOW-adjusted sum over the lead-time window
+    when ``dow_multipliers`` + ``start_date`` are provided; otherwise it
+    degrades to ``mu * L``.
 
     Args:
         mu_hat: Series of mean daily demand estimates.
         safety_stock: Series of safety stock values.
         L: Lead time (scalar or Series).
+        dow_multipliers: Optional Series of per-SKU dicts {0..6 -> float}.
+        start_date: Calendar date the lead-time window starts on.
 
     Returns:
         Series of reorder point values.
     """
-    L_arr = L if isinstance(L, pd.Series) else L
-    L_safe = np.maximum(L_arr, 0.0) if isinstance(L_arr, pd.Series) else max(L_arr, 0.0)
+    expected_lead = effective_lead_demand_vectorized(
+        mu_hat.clip(lower=0.0), L, dow_multipliers, start_date,
+        event_multipliers=event_multipliers,
+        event_days_since=event_days_since,
+        event_window_days=event_window_days,
+    )
     ss_safe = safety_stock.clip(lower=0.0)
-    return mu_hat * L_safe + ss_safe
+    return expected_lead + ss_safe
 
 
 def days_to_stockout_vectorized(

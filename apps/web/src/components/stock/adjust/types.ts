@@ -14,15 +14,19 @@ export const REASON_OPTIONS_BY_ACTION: Record<AdjustAction, readonly ReasonOptio
     { value: StockMovementReason.SALE, label: "Sale" },
     { value: StockMovementReason.ADJUSTMENT, label: "Adjustment" },
   ],
+  // RESTOCK is reserved for the formal shipment-receiving flow; the manual
+  // adjust dialog emits ADJUSTMENT so users have a single mental model for
+  // ad-hoc stock additions. Historical RESTOCK rows still render in the
+  // audit log, and the forecasting "last restock" signal still picks up
+  // SHIPMENT_RECEIPT (plus any legacy RESTOCK) events.
   add: [
-    { value: StockMovementReason.RESTOCK, label: "Restock" },
     { value: StockMovementReason.ADJUSTMENT, label: "Adjustment" },
   ],
 } as const;
 
 export const DEFAULT_REASON_BY_ACTION: Record<AdjustAction, StockMovementReason> = {
   subtract: StockMovementReason.SALE,
-  add: StockMovementReason.RESTOCK,
+  add: StockMovementReason.ADJUSTMENT,
 } as const;
 
 /**

@@ -1,6 +1,7 @@
 export enum AnalyticsTab {
   OVERVIEW = "overview",
   PREDICTIONS = "predictions",
+  ACCURACY = "accuracy",
   // Archived tabs (moved to _archive folder)
   // DEMAND_LEADERS = "demand-leaders",
   ASSISTANT = "assistant",

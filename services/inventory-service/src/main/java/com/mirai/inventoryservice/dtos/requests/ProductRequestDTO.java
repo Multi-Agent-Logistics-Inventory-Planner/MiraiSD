@@ -84,4 +84,7 @@ public class ProductRequestDTO {
 
     /** True if auto-assigned from delivery, false if manually set. */
     private Boolean preferredSupplierAuto;
+
+    /** When false, this product is skipped by the forecasting pipeline and hidden from prediction surfaces. */
+    private Boolean forecastingEnabled;
 }
