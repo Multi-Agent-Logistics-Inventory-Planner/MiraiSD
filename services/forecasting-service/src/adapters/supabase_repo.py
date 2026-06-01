@@ -512,19 +512,25 @@ class SupabaseRepo:
         Returns DataFrame with columns: item_id, supplier_id, n, avg_lt, sigma_L
         Returns empty DataFrame if the MV does not exist yet.
         """
+        # Postgres folds unquoted identifiers to lowercase, so the MV column is
+        # actually `sigma_l`; alias it back to `sigma_L` so the downstream
+        # hierarchy code (which expects the camel-cased name) keeps working.
         query = """
             SELECT
                 item_id::text AS item_id,
                 supplier_id::text AS supplier_id,
                 n,
                 avg_lt,
-                sigma_L
+                sigma_l AS "sigma_L"
             FROM mv_lead_time_stats
         """
         params: dict = {}
 
         if item_ids:
-            query += " WHERE item_id = ANY(:item_ids)"
+            # Keep Level 2 (per-supplier) rows, which have item_id IS NULL --
+            # those are how SKUs without their own Level 1/Level 3 history get
+            # promoted out of the global_fallback bucket.
+            query += " WHERE item_id = ANY(:item_ids) OR item_id IS NULL"
             params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
 
         try:
