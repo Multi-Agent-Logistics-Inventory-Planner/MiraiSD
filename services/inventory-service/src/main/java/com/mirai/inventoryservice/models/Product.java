@@ -105,6 +105,10 @@ public class Product {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "forecasting_enabled")
+    @Builder.Default
+    private Boolean forecastingEnabled = true;
+
     @Column(name = "quantity")
     @Builder.Default
     private Integer quantity = 0;

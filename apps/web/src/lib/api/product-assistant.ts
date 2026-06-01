@@ -15,6 +15,7 @@ export interface HeaderBundle {
   lastRestockAt: string | null;
   damageCountLast30: number;
   onDisplay: boolean;
+  forecastingEnabled: boolean;
 }
 
 export interface DetailBundle {
@@ -29,6 +30,7 @@ export interface DetailBundle {
     leadTimeDays: number | null;
     unitCost: number | null;
     currentStock: number;
+    forecastingEnabled: boolean;
   };
   inventoryByLocation: Array<{
     locationId: string | null;

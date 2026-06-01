@@ -146,6 +146,7 @@ class SupabaseRepo:
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.is_active = true
               AND p.parent_id IS NULL
+              AND p.forecasting_enabled = true
         """
         params: dict = {}
 

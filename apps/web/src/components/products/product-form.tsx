@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,6 +84,7 @@ const schema = z.object({
   imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   notes: z.string().optional(),
   isActive: z.boolean().default(true),
+  forecastingEnabled: z.boolean().default(true),
   preferredSupplierId: z.string().optional(),
   preferredSupplierName: z.string().optional(),
   preferredSupplierAuto: z.boolean().optional(),
@@ -125,6 +136,15 @@ export function ProductForm({
   const imageUpload = useImageUpload(initialProduct?.imageUrl);
   const { reset: resetImage } = imageUpload;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  // Holds an update payload while we wait for the user to confirm a
+  // forecasting-disable transition (true -> false). Null when no confirm
+  // is pending.
+  const [pendingDisablePayload, setPendingDisablePayload] = useState<{
+    payload: ProductRequest;
+    oldImageUrl: string | undefined;
+    isReplacingImage: boolean;
+    isClearingImage: boolean;
+  } | null>(null);
 
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
@@ -164,6 +184,7 @@ export function ProductForm({
       imageUrl: "",
       notes: "",
       isActive: true,
+      forecastingEnabled: true,
       kujiType: "",
       kujiSlackWebhookUrl: "",
     },
@@ -193,6 +214,7 @@ export function ProductForm({
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
+          forecastingEnabled: initialProduct.forecastingEnabled ?? true,
           preferredSupplierId: initialProduct.preferredSupplierId ?? "",
           preferredSupplierName: initialProduct.preferredSupplierName ?? "",
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
@@ -217,6 +239,7 @@ export function ProductForm({
           imageUrl: initialProduct.imageUrl ?? "",
           notes: initialProduct.notes ?? "",
           isActive: initialProduct.isActive ?? true,
+          forecastingEnabled: initialProduct.forecastingEnabled ?? true,
           preferredSupplierId: initialProduct.preferredSupplierId ?? "",
           preferredSupplierName: initialProduct.preferredSupplierName ?? "",
           preferredSupplierAuto: initialProduct.preferredSupplierAuto ?? undefined,
@@ -354,6 +377,7 @@ export function ProductForm({
       imageUrl,
       notes: values.notes || undefined,
       isActive: values.isActive,
+      forecastingEnabled: values.forecastingEnabled,
       preferredSupplierId: values.preferredSupplierId || undefined,
       preferredSupplierAuto: values.preferredSupplierAuto,
     };
@@ -375,6 +399,21 @@ export function ProductForm({
 
     try {
       if (initialProduct) {
+        // If the user just toggled forecasting from on -> off, stop here and
+        // surface a confirmation. The actual update fires from confirmAndDisableForecasting.
+        const wasForecastingOn = initialProduct.forecastingEnabled !== false;
+        const turningForecastingOff =
+          wasForecastingOn && values.forecastingEnabled === false;
+        if (turningForecastingOff) {
+          setPendingDisablePayload({
+            payload,
+            oldImageUrl,
+            isReplacingImage: Boolean(isReplacingImage),
+            isClearingImage: Boolean(isClearingImage),
+          });
+          return;
+        }
+
         await updateMutation.mutateAsync({ id: initialProduct.id, payload });
         toast({ title: "Product updated", variant: "success" });
 
@@ -486,6 +525,34 @@ export function ProductForm({
       toast({ title: "Save failed", description: message });
     }
   }
+
+  const confirmAndDisableForecasting = async () => {
+    if (!initialProduct || !pendingDisablePayload) return;
+    const { payload, oldImageUrl, isReplacingImage, isClearingImage } =
+      pendingDisablePayload;
+    try {
+      await updateMutation.mutateAsync({ id: initialProduct.id, payload });
+      toast({ title: "Product updated", variant: "success" });
+      if (isReplacingImage || isClearingImage) {
+        deleteProductImage(oldImageUrl as string).then((deleteResult) => {
+          if (isUploadError(deleteResult)) {
+            toast({
+              title: "Note",
+              description:
+                "Old image cleanup failed. Storage may need manual cleanup.",
+              variant: "default",
+            });
+          }
+        });
+      }
+      setPendingDisablePayload(null);
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong";
+      toast({ title: "Save failed", description: message });
+    }
+  };
 
   const handleDeleteCustomKuji = () => {
     if (!initialProduct) return;
@@ -990,6 +1057,29 @@ export function ProductForm({
                 </div>
               )}
 
+              {/* Forecasting toggle - root products only, hidden for CUSTOM kuji
+                  parents (their lifecycle is per-box, not per-SKU forecast). */}
+              {!parentId && !initialProduct?.parentId && !isEditingCustomKuji && (
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={form.watch("forecastingEnabled") !== false}
+                    onCheckedChange={(checked) =>
+                      form.setValue("forecastingEnabled", checked === true, {
+                        shouldDirty: true,
+                      })
+                    }
+                    disabled={isSaving}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Enable demand forecasting</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Off skips this item in predictions, reorder suggestions, and accuracy.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               {/* Inline prizes section for Kuji - create mode only.
                   Hidden for CUSTOM kuji: tiers are defined per-box, no prize children. */}
               {!initialProduct && isKujiCategory && watchedKujiType !== KujiType.CUSTOM && (
@@ -1072,6 +1162,38 @@ export function ProductForm({
           renderTrigger={false}
         />
       )}
+
+      <AlertDialog
+        open={pendingDisablePayload !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDisablePayload(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable forecasting</AlertDialogTitle>
+            <AlertDialogDescription>
+              Disable forecasting for{" "}
+              <span className="font-semibold">{initialProduct?.name}</span>?
+              This will delete its existing forecast predictions. You can
+              re-enable any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmAndDisableForecasting();
+              }}
+              disabled={updateMutation.isPending}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {updateMutation.isPending ? "Disabling..." : "Disable"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

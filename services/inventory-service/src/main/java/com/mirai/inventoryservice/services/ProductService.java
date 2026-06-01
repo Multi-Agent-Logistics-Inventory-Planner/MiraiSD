@@ -89,7 +89,8 @@ public class ProductService {
                                  Integer initialStock,
                                  com.mirai.inventoryservice.models.enums.KujiType kujiType,
                                  String kujiSlackWebhookUrl,
-                                 Integer packsPerBox) {
+                                 Integer packsPerBox,
+                                 Boolean forecastingEnabled) {
         // Validate parent if provided
         Product parent = null;
         Category category;
@@ -141,6 +142,7 @@ public class ProductService {
                 .imageUrl(imageUrl)
                 .notes(notes)
                 .isActive(startsActive)
+                .forecastingEnabled(forecastingEnabled == null ? Boolean.TRUE : forecastingEnabled)
                 .build();
 
         Product savedProduct = productRepository.save(product);
@@ -221,7 +223,8 @@ public class ProductService {
                                  com.mirai.inventoryservice.models.enums.KujiType kujiType,
                                  String kujiSlackWebhookUrl,
                                  Integer packsPerBox,
-                                 Boolean clearPacksPerBox) {
+                                 Boolean clearPacksPerBox,
+                                 Boolean forecastingEnabled) {
         Product product = getProductById(id);
 
         if (sku != null && !sku.equals(product.getSku()) && productRepository.existsBySku(sku)) {
@@ -302,7 +305,19 @@ public class ProductService {
             product.setPreferredSupplierAuto(true);
         }
 
+        // Capture the pre-update value so we can detect a true -> false transition
+        // and purge existing forecast_predictions rows in the same transaction.
+        boolean wasForecastingEnabled = !Boolean.FALSE.equals(product.getForecastingEnabled());
+        boolean turningForecastingOff = false;
+        if (forecastingEnabled != null) {
+            product.setForecastingEnabled(forecastingEnabled);
+            turningForecastingOff = wasForecastingEnabled && Boolean.FALSE.equals(forecastingEnabled);
+        }
+
         productRepository.save(product);
+        if (turningForecastingOff) {
+            forecastPredictionRepository.deleteByItemId(product.getId());
+        }
         broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
         // Re-fetch to ensure preferredSupplier is eagerly loaded via JOIN FETCH
         return productRepository.findByIdWithCategories(product.getId())

@@ -111,7 +111,8 @@ public class ProductController {
                 requestDTO.getInitialStock(),
                 requestDTO.getKujiType(),
                 requestDTO.getKujiSlackWebhookUrl(),
-                requestDTO.getPacksPerBox()
+                requestDTO.getPacksPerBox(),
+                requestDTO.getForecastingEnabled()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(productMapper.toResponseDTO(product));
     }
@@ -148,7 +149,8 @@ public class ProductController {
                 requestDTO.getKujiType(),
                 requestDTO.getKujiSlackWebhookUrl(),
                 requestDTO.getPacksPerBox(),
-                clearPacksPerBox
+                clearPacksPerBox,
+                requestDTO.getForecastingEnabled()
         );
         return ResponseEntity.ok(productMapper.toResponseDTO(product));
     }

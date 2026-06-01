@@ -128,7 +128,8 @@ public class ProductReportBundleService {
                 confidence,
                 lastRestockAt,
                 damageLast30,
-                onDisplay);
+                onDisplay,
+                !Boolean.FALSE.equals(product.getForecastingEnabled()));
     }
 
     // ---------- detail ----------
@@ -169,7 +170,8 @@ public class ProductReportBundleService {
                 product.getTargetStockLevel(),
                 product.getLeadTimeDays(),
                 product.getUnitCost(),
-                currentStock);
+                currentStock,
+                !Boolean.FALSE.equals(product.getForecastingEnabled()));
 
         List<DetailBundleDTO.InventoryByLocation> inventoryByLocation = inventoryRows.stream()
                 .map(li -> new DetailBundleDTO.InventoryByLocation(

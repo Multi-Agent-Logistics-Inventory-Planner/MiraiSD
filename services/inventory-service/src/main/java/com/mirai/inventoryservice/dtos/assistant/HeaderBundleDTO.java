@@ -21,5 +21,6 @@ public record HeaderBundleDTO(
         BigDecimal forecastConfidence,
         OffsetDateTime lastRestockAt,
         Integer damageCountLast30,
-        boolean onDisplay
+        boolean onDisplay,
+        boolean forecastingEnabled
 ) {}

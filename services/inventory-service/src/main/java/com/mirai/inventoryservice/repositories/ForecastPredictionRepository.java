@@ -210,6 +210,7 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
           JOIN products pr ON pr.id = p.item_id
           LEFT JOIN categories c ON c.id = pr.category_id
           WHERE p.predicted_mu IS NOT NULL
+            AND pr.forecasting_enabled = true
         ),
         windowed AS (
           -- Forward 14-day window sums per item. RANGE frame keyed on the

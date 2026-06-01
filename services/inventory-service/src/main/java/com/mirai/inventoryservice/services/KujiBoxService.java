@@ -255,7 +255,8 @@ public class KujiBoxService {
                         null,                                       // initialStock — kuji counters own this
                         null,                                       // kujiType
                         null,                                       // kujiSlackWebhookUrl
-                        null                                        // packsPerBox
+                        null,                                       // packsPerBox
+                        null                                        // forecastingEnabled — defaults to true
                 );
                 linkedProduct.setIsActive(true);
                 linkedProduct = productRepository.save(linkedProduct);
@@ -1372,7 +1373,8 @@ public class KujiBoxService {
                     null,                                       // initialStock — kuji counters own this
                     null,                                       // kujiType
                     null,                                       // kujiSlackWebhookUrl
-                    null                                        // packsPerBox
+                    null,                                       // packsPerBox
+                    null                                        // forecastingEnabled — defaults to true
             );
             linkedProduct.setIsActive(true);
             linkedProduct = productRepository.save(linkedProduct);
