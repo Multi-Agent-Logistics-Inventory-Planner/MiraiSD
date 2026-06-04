@@ -44,6 +44,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { useProducts } from "@/hooks/queries/use-products";
 import { getProductChildren } from "@/lib/api/products";
 import { ProductForm } from "@/components/products/product-form";
+import { ProductThumbnail } from "@/components/products/product-thumbnail";
+import { DialogCloseButton } from "@/components/kuji/dialog-chrome";
 import { SelectShipmentProductDialog } from "@/components/shipments/select-shipment-product-dialog";
 import { SupplierAutocomplete } from "@/components/suppliers";
 import {
@@ -158,6 +160,7 @@ export function ShipmentCreateDialog({
   });
 
   const items = form.watch("items");
+  const hasSelectedProducts = (items ?? []).some((item) => !!item?.productId);
 
   const rowHasReceipts: Record<number, boolean> = (() => {
     if (!initialShipment) return {};
@@ -493,16 +496,30 @@ export function ShipmentCreateDialog({
         }}
       />
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle>
-              {isEditMode ? "Edit Shipment" : "Create New Shipment"}
-            </DialogTitle>
-            <DialogDescription>
-              {isEditMode
-                ? "Update the shipment details below."
-                : "Add a new inbound shipment to track incoming inventory."}
-            </DialogDescription>
+        <DialogContent
+          showCloseButton={!hasSelectedProducts}
+          onInteractOutside={(e) => {
+            if (hasSelectedProducts) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (hasSelectedProducts) e.preventDefault();
+          }}
+          className="w-[calc(100%-2rem)] sm:max-w-3xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden"
+        >
+          <DialogHeader className="px-6 py-4 border-b flex flex-row items-start gap-3 space-y-0">
+            <div className="flex-1 min-w-0">
+              <DialogTitle>
+                {isEditMode ? "Edit Shipment" : "Create New Shipment"}
+              </DialogTitle>
+              <DialogDescription>
+                {isEditMode
+                  ? "Update the shipment details below."
+                  : "Add a new inbound shipment to track incoming inventory."}
+              </DialogDescription>
+            </div>
+            {hasSelectedProducts && (
+              <DialogCloseButton onClose={() => onOpenChange(false)} />
+            )}
           </DialogHeader>
 
           <form
@@ -1003,6 +1020,16 @@ function ShipmentItemPanel({
 
       <div className="grid gap-1.5">
         <Label className="text-xs">Product</Label>
+        {selectedProduct && (
+          <div className="flex justify-center pb-1">
+            <ProductThumbnail
+              imageUrl={selectedProduct.imageUrl}
+              alt={selectedProduct.name}
+              size="xl"
+              fallbackVariant="package"
+            />
+          </div>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -1010,12 +1037,14 @@ function ShipmentItemPanel({
           disabled={productsLoading}
           onClick={onOpenProductPicker}
         >
-          {selectedProduct
-            ? selectedProduct.sku
-              ? `${selectedProduct.name} (${selectedProduct.sku})`
-              : selectedProduct.name
-            : "Select product..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+          <span className="truncate">
+            {selectedProduct
+              ? selectedProduct.sku
+                ? `${selectedProduct.name} (${selectedProduct.sku})`
+                : selectedProduct.name
+              : "Select product..."}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
         </Button>
         {form.formState.errors.items?.[index]?.productId?.message && (
           <p className="text-xs text-destructive">

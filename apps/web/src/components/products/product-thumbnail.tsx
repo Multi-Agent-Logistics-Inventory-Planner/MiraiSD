@@ -7,12 +7,17 @@ import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 import { Badge } from "@/components/ui/badge";
 
-type ThumbnailSize = "sm" | "md" | "lg";
+type ThumbnailSize = "sm" | "md" | "lg" | "xl";
 
 const SIZE_CONFIG: Record<ThumbnailSize, { container: string; icon: string; sizes: string }> = {
   sm: { container: "h-8 w-8", icon: "h-4 w-4", sizes: "48px" },
   md: { container: "h-10 w-10", icon: "h-5 w-5", sizes: "48px" },
   lg: { container: "h-12 w-12", icon: "h-6 w-6", sizes: "48px" },
+  xl: {
+    container: "h-24 w-24 sm:h-32 sm:w-32",
+    icon: "h-8 w-8 sm:h-10 sm:w-10",
+    sizes: "(max-width: 640px) 96px, 128px",
+  },
 };
 
 type FallbackVariant = "text" | "icon" | "package";
