@@ -12,8 +12,8 @@ import type {
 import type { AdjustAction } from "./types";
 
 interface QuantityControlsProps {
-  /** Always in packs. */
-  quantity: number;
+  /** Always in packs. "" represents a staged-but-empty input (no quantity entered yet). */
+  quantity: number | "";
   /** Current stock at location (in packs). */
   currentStock: number;
   action: AdjustAction;
@@ -46,10 +46,11 @@ export function QuantityControls({
   }, [hasBoxToggle, unit]);
 
   const multiplier = unit === "box" && hasBoxToggle ? (packsPerBox as number) : 1;
-  const displayedRaw = Math.floor(quantity / multiplier);
+  const quantityNum = quantity === "" ? 0 : quantity;
+  const displayedRaw = quantity === "" ? "" : Math.floor(quantityNum / multiplier);
 
-  const canDecrement = displayedRaw > 1;
-  const canIncrement = action === "add" || quantity < currentStock;
+  const canDecrement = typeof displayedRaw === "number" && displayedRaw > 1;
+  const canIncrement = action === "add" || quantityNum < currentStock;
 
   const emitRaw = (rawStr: string) => {
     if (rawStr === "") {
@@ -64,11 +65,13 @@ export function QuantityControls({
   };
 
   const emitDecrement = () => {
+    if (quantity === "") return;
     if (multiplier === 1) {
       onDecrement();
-      onIntakeMetaChange?.({ unit: "pack", rawQty: Math.max(1, quantity - 1) });
+      onIntakeMetaChange?.({ unit: "pack", rawQty: Math.max(1, quantityNum - 1) });
       return;
     }
+    if (typeof displayedRaw !== "number") return;
     const nextRaw = Math.max(1, displayedRaw - 1);
     onQuantityChange(String(nextRaw * multiplier));
     onIntakeMetaChange?.({ unit, rawQty: nextRaw });
@@ -77,10 +80,11 @@ export function QuantityControls({
   const emitIncrement = () => {
     if (multiplier === 1) {
       onIncrement();
-      onIntakeMetaChange?.({ unit: "pack", rawQty: quantity + 1 });
+      onIntakeMetaChange?.({ unit: "pack", rawQty: quantityNum + 1 });
       return;
     }
-    const nextRaw = displayedRaw + 1;
+    const curRaw = typeof displayedRaw === "number" ? displayedRaw : 0;
+    const nextRaw = curRaw + 1;
     onQuantityChange(String(nextRaw * multiplier));
     onIntakeMetaChange?.({ unit, rawQty: nextRaw });
   };
@@ -90,7 +94,7 @@ export function QuantityControls({
     setUnit(next);
     // Pure display flip — canonical packs preserved; the render recomputes displayedRaw.
     const newMultiplier = next === "box" && hasBoxToggle ? (packsPerBox as number) : 1;
-    const newRaw = Math.max(1, Math.floor(quantity / newMultiplier));
+    const newRaw = Math.max(1, Math.floor(quantityNum / newMultiplier));
     onIntakeMetaChange?.({ unit: next, rawQty: newRaw });
   };
 
@@ -114,6 +118,7 @@ export function QuantityControls({
             inputMode="numeric"
             pattern="[0-9]*"
             value={displayedRaw}
+            placeholder="0"
             onChange={(e) => emitRaw(e.target.value)}
             disabled={disabled}
             className="h-9 w-14 text-center rounded-none border-x-0"
@@ -164,8 +169,8 @@ export function QuantityControls({
           </div>
         )}
       </div>
-      {hasBoxToggle && unit === "box" && quantity > 0 && (
-        <span className="text-xs text-muted-foreground">= {quantity} packs</span>
+      {hasBoxToggle && unit === "box" && quantityNum > 0 && (
+        <span className="text-xs text-muted-foreground">= {quantityNum} packs</span>
       )}
       {action === "subtract" && (
         <span className="text-xs text-muted-foreground">

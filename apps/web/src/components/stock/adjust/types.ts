@@ -100,14 +100,18 @@ export interface ProductListProps {
  */
 export interface CartLine {
   inventoryId: string;
-  /** Always stored as a positive integer; the dialog applies the action sign at submit. */
-  quantity: number;
+  /**
+   * Stored as a positive integer once the user enters one; "" represents a staged
+   * row whose quantity hasn't been entered yet. The dialog applies the action sign
+   * at submit and filters out empty lines.
+   */
+  quantity: number | "";
   intakeUnit: "pack" | "box";
   intakeQty: number;
 }
 
 export interface QuantityControlsProps {
-  quantity: number;
+  quantity: number | "";
   maxQuantity: number;
   action: AdjustAction;
   disabled: boolean;

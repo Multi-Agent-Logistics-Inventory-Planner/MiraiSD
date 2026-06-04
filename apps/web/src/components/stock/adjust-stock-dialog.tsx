@@ -114,10 +114,11 @@ export function AdjustStockDialog({
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(
     null
   );
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number | "">("");
   const [quantityWarning, setQuantityWarning] = useState<string | null>(null);
   const [intakeUnit, setIntakeUnit] = useState<"pack" | "box">("pack");
   const [intakeQty, setIntakeQty] = useState<number>(1);
+  const quantityNum = quantity === "" ? 0 : quantity;
 
   const batchAdjustMutation = useBatchAdjustStockMutation();
 
@@ -148,7 +149,7 @@ export function AdjustStockDialog({
       setFailedInventoryId(null);
       setCart(new Map());
       setSelectedInventoryId(null);
-      setQuantity(1);
+      setQuantity("");
       setQuantityWarning(null);
       setIntakeUnit("pack");
       setIntakeQty(1);
@@ -167,7 +168,7 @@ export function AdjustStockDialog({
       setCart(new Map());
       setSelectedInventoryId(null);
       setAddInventoryDialogOpen(false);
-      setQuantity(1);
+      setQuantity("");
       setQuantityWarning(null);
       setFailedInventoryId(null);
     }
@@ -178,7 +179,7 @@ export function AdjustStockDialog({
     setCart(new Map());
     setSelectedInventoryId(null);
     setAddInventoryDialogOpen(false);
-    setQuantity(1);
+    setQuantity("");
     setQuantityWarning(null);
     setSearchQuery("");
     setCategoryFilters([]);
@@ -285,10 +286,11 @@ export function AdjustStockDialog({
     ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
     : "";
 
-  /** Build batch payload from cart entries (cart mode). */
+  /** Build batch payload from cart entries (cart mode). Skips lines whose quantity hasn't been entered yet. */
   const cartLines = useMemo<BatchAdjustLine[]>(() => {
     const out: BatchAdjustLine[] = [];
     for (const line of cart.values()) {
+      if (typeof line.quantity !== "number" || line.quantity <= 0) continue;
       const signed = action === "subtract" ? -line.quantity : line.quantity;
       out.push({
         inventoryId: line.inventoryId,
@@ -301,7 +303,11 @@ export function AdjustStockDialog({
   }, [cart, action]);
 
   const cartTotalQuantity = useMemo(
-    () => [...cart.values()].reduce((sum, l) => sum + l.quantity, 0),
+    () =>
+      [...cart.values()].reduce(
+        (sum, l) => sum + (typeof l.quantity === "number" ? l.quantity : 0),
+        0
+      ),
     [cart]
   );
 
@@ -415,14 +421,14 @@ export function AdjustStockDialog({
     return Math.max(1, value);
   }
 
-  function handleStage(id: string, currentStock: number) {
+  function handleStage(id: string) {
     setFailedInventoryId(null);
     setCart((prev) => {
       const next = new Map(prev);
       if (!next.has(id)) {
         next.set(id, {
           inventoryId: id,
-          quantity: clampLineQuantity(1, currentStock),
+          quantity: "",
           intakeUnit: "pack",
           intakeQty: 1,
         });
@@ -447,8 +453,8 @@ export function AdjustStockDialog({
     setCart((prev) => {
       const line = prev.get(id);
       if (!line) return prev;
-      const newQty =
-        parsed === null ? 1 : clampLineQuantity(parsed, stock);
+      const newQty: number | "" =
+        parsed === null ? "" : clampLineQuantity(parsed, stock);
       const next = new Map(prev);
       next.set(id, { ...line, quantity: newQty });
       return next;
@@ -461,7 +467,8 @@ export function AdjustStockDialog({
     setCart((prev) => {
       const line = prev.get(id);
       if (!line) return prev;
-      const newQty = clampLineQuantity(line.quantity + 1, stock);
+      const curQty = typeof line.quantity === "number" ? line.quantity : 0;
+      const newQty = clampLineQuantity(curQty + 1, stock);
       const next = new Map(prev);
       next.set(id, { ...line, quantity: newQty });
       return next;
@@ -471,7 +478,8 @@ export function AdjustStockDialog({
   function handleLineDecrement(id: string) {
     setCart((prev) => {
       const line = prev.get(id);
-      if (!line || line.quantity <= 1) return prev;
+      if (!line) return prev;
+      if (typeof line.quantity !== "number" || line.quantity <= 1) return prev;
       const next = new Map(prev);
       next.set(id, { ...line, quantity: line.quantity - 1 });
       return next;
@@ -516,7 +524,7 @@ export function AdjustStockDialog({
   function handleSingleQuantityChange(value: string) {
     const parsed = parseQuantityInput(value);
     if (parsed === null) {
-      setQuantity(0);
+      setQuantity("");
       setQuantityWarning(null);
       return;
     }
@@ -530,27 +538,28 @@ export function AdjustStockDialog({
   }
 
   function handleSingleIncrement() {
+    const cur = quantityNum;
     if (action === "subtract") {
-      if (quantity < availableForSubtract) {
-        setQuantity(quantity + 1);
+      if (cur < availableForSubtract) {
+        setQuantity(cur + 1);
         setQuantityWarning(null);
       }
     } else {
-      setQuantity(quantity + 1);
+      setQuantity(cur + 1);
       setQuantityWarning(null);
     }
   }
 
   function handleSingleDecrement() {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
+    if (quantityNum > 1) {
+      setQuantity(quantityNum - 1);
       setQuantityWarning(null);
     }
   }
 
   function handleClearSingleSelection() {
     setSelectedInventoryId(null);
-    setQuantity(1);
+    setQuantity("");
     setQuantityWarning(null);
     setIntakeUnit("pack");
     setIntakeQty(1);
@@ -558,7 +567,7 @@ export function AdjustStockDialog({
 
   function handleSingleProductSelect(id: string, itemQuantity: number) {
     setSelectedInventoryId(id);
-    if (action === "subtract" && quantity > itemQuantity) {
+    if (action === "subtract" && quantityNum > itemQuantity) {
       setQuantity(Math.max(1, itemQuantity));
     }
     setQuantityWarning(null);
@@ -570,7 +579,15 @@ export function AdjustStockDialog({
 
   async function handleSingleSubmit() {
     if (!selectedInventory) return;
-    if (action === "subtract" && quantity > availableForSubtract) {
+    if (quantityNum < 1) {
+      toast({
+        title: "Invalid quantity",
+        description: "Enter a quantity of at least 1.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (action === "subtract" && quantityNum > availableForSubtract) {
       toast({
         title: "Invalid quantity",
         description: "Cannot subtract more than available stock.",
@@ -581,7 +598,7 @@ export function AdjustStockDialog({
     const adjustments: BatchAdjustLine[] = [
       {
         inventoryId: selectedInventory.id,
-        quantityChange: action === "subtract" ? -quantity : quantity,
+        quantityChange: action === "subtract" ? -quantityNum : quantityNum,
         intakeUnit: intakeUnit === "box" ? "box" : undefined,
         intakeQty: intakeUnit === "box" ? intakeQty : undefined,
       },
@@ -593,7 +610,7 @@ export function AdjustStockDialog({
       if (ok) {
         // Match prior UX: stay on dialog, reset selection so user can adjust another product.
         setSelectedInventoryId(null);
-        setQuantity(1);
+        setQuantity("");
         setQuantityWarning(null);
       }
     };
@@ -645,7 +662,7 @@ export function AdjustStockDialog({
       toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
-    if (quantity < 1) {
+    if (quantityNum < 1) {
       toast({
         title: "Invalid quantity",
         description: "Quantity must be at least 1.",
@@ -654,7 +671,7 @@ export function AdjustStockDialog({
     }
     const payload: InventoryRequest = {
       itemId: preselectedProduct.product.id,
-      quantity,
+      quantity: quantityNum,
       actorId,
       reason: StockMovementReason.ADJUSTMENT,
     };
@@ -672,7 +689,7 @@ export function AdjustStockDialog({
         queryKey: ["productInventoryEntries", preselectedProduct.product.id],
       });
       toast({ title: "Product added to location", variant: "success" });
-      setQuantity(1);
+      setQuantity("");
       onOpenChange(false);
     } catch (err) {
       const message =
@@ -689,12 +706,12 @@ export function AdjustStockDialog({
 
   const cartItemCount = cart.size;
   const cartCanSubmit =
-    hasValidLocation && cartItemCount > 0 && !isAdjusting;
+    hasValidLocation && cartLines.length > 0 && !isAdjusting;
   const singleCanSubmit =
     hasValidLocation &&
     Boolean(selectedInventory) &&
-    quantity >= 1 &&
-    (action === "add" || quantity <= availableForSubtract) &&
+    quantityNum >= 1 &&
+    (action === "add" || quantityNum <= availableForSubtract) &&
     !isAdjusting;
 
   const listTitle =
@@ -806,7 +823,7 @@ export function AdjustStockDialog({
                         size="icon"
                         className="h-8 w-8"
                         onClick={handleSingleDecrement}
-                        disabled={quantity <= 1 || isSavingInventory}
+                        disabled={quantityNum <= 1 || isSavingInventory}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
@@ -814,6 +831,7 @@ export function AdjustStockDialog({
                         type="text"
                         inputMode="numeric"
                         value={quantity}
+                        placeholder="0"
                         onChange={(e) => handleSingleQuantityChange(e.target.value)}
                         className="h-8 w-16 text-center border rounded-md text-sm"
                         disabled={isSavingInventory}
@@ -832,7 +850,7 @@ export function AdjustStockDialog({
                   </div>
                   <Button
                     onClick={handleAddPreselectedProduct}
-                    disabled={isSavingInventory || quantity < 1}
+                    disabled={isSavingInventory || quantityNum < 1}
                     className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
                   >
                     {isSavingInventory ? (

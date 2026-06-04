@@ -17,7 +17,7 @@ interface SelectedProductCardProps {
   inventory: NormalizedInventory;
   existingQuantityAtLocation: number;
   action: AdjustAction;
-  quantity: number;
+  quantity: number | "";
   reason: StockMovementReason;
   quantityWarning: string | null;
   locationLabel: string;
@@ -55,7 +55,8 @@ export function SelectedProductCard({
   // For subtract: current is the existing quantity at location
   // For add: current is the existing quantity at location (may be 0 if new)
   const currentQty = existingQuantityAtLocation;
-  const newQty = action === "subtract" ? currentQty - quantity : currentQty + quantity;
+  const quantityNum = quantity === "" ? 0 : quantity;
+  const newQty = action === "subtract" ? currentQty - quantityNum : currentQty + quantityNum;
 
   // For subtract, max is the current stock at location
   // For add, there's no upper limit
@@ -140,7 +141,7 @@ export function SelectedProductCard({
       <AdjustSummary
         action={action}
         currentQty={currentQty}
-        quantity={quantity}
+        quantity={quantityNum}
         newQty={newQty}
         locationLabel={locationLabel}
       />
