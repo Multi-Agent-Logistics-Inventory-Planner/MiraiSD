@@ -12,8 +12,15 @@ import { getSafeImageUrl } from "@/lib/utils/validation";
 
 interface ProductTransferCardProps {
   inventory: LocationInventory;
-  transferQuantity: number;
-  onQuantityChange: (qty: number) => void;
+  /** "" means staged but no quantity entered yet. */
+  transferQuantity: number | "";
+  /**
+   * Whether the row is staged. Parent owns this since `transferQuantity` of `""`
+   * is also a staged state — relying on `transferQuantity > 0` would hide the
+   * controls before the user has typed a number.
+   */
+  isStaged: boolean;
+  onQuantityChange: (qty: number | "") => void;
   maxQuantity: number;
   disabled?: boolean;
 }
@@ -21,6 +28,7 @@ interface ProductTransferCardProps {
 export function ProductTransferCard({
   inventory,
   transferQuantity,
+  isStaged,
   onQuantityChange,
   maxQuantity,
   disabled = false,
@@ -29,40 +37,43 @@ export function ProductTransferCard({
   const item = inventory.item;
   const safeImageUrl = getSafeImageUrl(item.imageUrl);
   const hasImage = safeImageUrl && !imageError;
-  const isStaged = transferQuantity > 0;
+  const quantityNum = transferQuantity === "" ? 0 : transferQuantity;
 
   function handleStageToggle() {
     if (disabled) return;
     if (isStaged) {
       onQuantityChange(0);
     } else {
-      onQuantityChange(Math.min(1, maxQuantity));
+      // Stage with an empty input so the user enters a quantity (mirrors product creator).
+      onQuantityChange("");
     }
   }
 
   function handleDecrement() {
-    if (transferQuantity > 1) {
-      onQuantityChange(transferQuantity - 1);
+    if (quantityNum > 1) {
+      onQuantityChange(quantityNum - 1);
     } else {
+      // Going below 1 unstages the row entirely.
       onQuantityChange(0);
     }
   }
 
   function handleIncrement() {
-    if (transferQuantity < maxQuantity) {
-      onQuantityChange(transferQuantity + 1);
+    if (quantityNum < maxQuantity) {
+      onQuantityChange(quantityNum + 1);
     }
   }
 
   function handleInputChange(value: string) {
     const trimmed = value.trim();
-    if (trimmed === "" || !/^\d+$/.test(trimmed)) {
-      onQuantityChange(0);
+    if (trimmed === "") {
+      onQuantityChange("");
       return;
     }
+    if (!/^\d+$/.test(trimmed)) return;
     const parsed = parseInt(trimmed, 10);
     const clamped = Math.max(0, Math.min(parsed, maxQuantity));
-    onQuantityChange(clamped);
+    onQuantityChange(clamped === 0 ? "" : clamped);
   }
 
   function handleRemove(e: React.MouseEvent) {
@@ -151,7 +162,7 @@ export function ProductTransferCard({
                 size="icon"
                 className="h-9 w-9 rounded-r-none border-r-0 border-input touch-manipulation"
                 onClick={handleDecrement}
-                disabled={disabled || transferQuantity <= 0}
+                disabled={disabled || quantityNum <= 0}
                 aria-label={`Decrease quantity for ${item.name}`}
               >
                 <Minus className="h-4 w-4" />
@@ -161,6 +172,7 @@ export function ProductTransferCard({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={transferQuantity}
+                placeholder="0"
                 onChange={(e) => handleInputChange(e.target.value)}
                 disabled={disabled}
                 className="h-9 w-14 text-center rounded-none border-x-0 touch-manipulation"
@@ -172,7 +184,7 @@ export function ProductTransferCard({
                 size="icon"
                 className="h-9 w-9 rounded-l-none border-l-0 border-input touch-manipulation"
                 onClick={handleIncrement}
-                disabled={disabled || transferQuantity >= maxQuantity}
+                disabled={disabled || quantityNum >= maxQuantity}
                 aria-label={`Increase quantity for ${item.name}`}
               >
                 <Plus className="h-4 w-4" />

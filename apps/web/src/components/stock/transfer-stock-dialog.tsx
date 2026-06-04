@@ -61,7 +61,7 @@ export function TransferStockDialog({
   const [destinationLocation, setDestinationLocation] =
     useState<LocationSelection>(EMPTY_LOCATION);
   const [transferQuantities, setTransferQuantities] = useState<
-    Record<string, number>
+    Record<string, number | "">
   >({});
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
@@ -115,9 +115,12 @@ export function TransferStockDialog({
       const matchingInventory = sourceInventoryQuery.data.find(
         (inv) => inv.item.id === preselectedProduct.product.id
       );
-      if (matchingInventory && !transferQuantities[matchingInventory.id]) {
-        // Pre-set quantity to 1 for the preselected product
-        setTransferQuantities({ [matchingInventory.id]: 1 });
+      if (
+        matchingInventory &&
+        transferQuantities[matchingInventory.id] === undefined
+      ) {
+        // Stage the preselected product with an empty input so the user enters a quantity.
+        setTransferQuantities({ [matchingInventory.id]: "" });
       }
     }
   }, [isProductFilteredMode, preselectedProduct, sourceLocation.locationId, sourceInventoryQuery.data, transferQuantities]);
@@ -191,15 +194,16 @@ export function TransferStockDialog({
 
   const transferItems = useMemo(() => {
     return sourceInventory.filter((inv) => {
-      const qty = transferQuantities[inv.id] ?? 0;
-      return qty > 0;
+      const qty = transferQuantities[inv.id];
+      return typeof qty === "number" && qty > 0;
     });
   }, [sourceInventory, transferQuantities]);
 
   const totalItemsToTransfer = transferItems.length;
   const totalQuantityToTransfer = useMemo(() => {
     return transferItems.reduce((sum, inv) => {
-      return sum + (transferQuantities[inv.id] ?? 0);
+      const qty = transferQuantities[inv.id];
+      return sum + (typeof qty === "number" ? qty : 0);
     }, 0);
   }, [transferItems, transferQuantities]);
 
@@ -219,11 +223,17 @@ export function TransferStockDialog({
     hasItemsToTransfer &&
     !batchTransferMutation.isPending;
 
-  function handleQuantityChange(inventoryId: string, quantity: number) {
-    setTransferQuantities((prev) => ({
-      ...prev,
-      [inventoryId]: quantity,
-    }));
+  function handleQuantityChange(inventoryId: string, quantity: number | "") {
+    setTransferQuantities((prev) => {
+      // A literal 0 (passed by the card on unstage / remove) clears the row entirely
+      // so it falls out of staged state. "" keeps it staged but empty.
+      if (quantity === 0) {
+        const next = { ...prev };
+        delete next[inventoryId];
+        return next;
+      }
+      return { ...prev, [inventoryId]: quantity };
+    });
   }
 
   function handleCategoryChange(categories: string[]) {
@@ -281,7 +291,10 @@ export function TransferStockDialog({
             : destLocationType !== LocationType.NOT_ASSIGNED
               ? { destinationLocationId: destLocationId }
               : {}),
-          quantity: transferQuantities[inv.id] ?? 0,
+          quantity:
+            typeof transferQuantities[inv.id] === "number"
+              ? (transferQuantities[inv.id] as number)
+              : 0,
           actorId,
         },
         productId: inv.item.id,
@@ -422,6 +435,7 @@ export function TransferStockDialog({
                           key={inv.id}
                           inventory={inv}
                           transferQuantity={transferQuantities[inv.id] ?? 0}
+                          isStaged={transferQuantities[inv.id] !== undefined}
                           onQuantityChange={(qty) =>
                             handleQuantityChange(inv.id, qty)
                           }

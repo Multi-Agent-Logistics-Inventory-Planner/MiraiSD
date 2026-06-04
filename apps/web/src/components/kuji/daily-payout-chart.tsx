@@ -17,6 +17,13 @@ interface DailyPayoutChartProps {
   readonly range?: DailyPayoutRange;
   readonly onRangeChange?: (range: DailyPayoutRange) => void;
   readonly canExpandRange?: boolean;
+  /**
+   * Strips per-bar dollar/draw labels for dense series. The dollar amount is
+   * only revealed for the currently-selected bar, and a single total-draws
+   * figure is shown in the subtitle. Use for long windows (>~10 days) where
+   * the full labels collide with their neighbors.
+   */
+  readonly compact?: boolean;
 }
 
 interface ChartRow {
@@ -28,9 +35,10 @@ interface ChartRow {
   isYesterday: boolean;
 }
 
-function dayLabel(date: string): string {
+function dayLabel(date: string, compact: boolean): string {
   const d = new Date(`${date}T00:00:00`);
   if (Number.isNaN(d.getTime())) return date;
+  if (compact) return `${d.getMonth() + 1}/${d.getDate()}`;
   return d.toLocaleDateString("en-US", { weekday: "short" });
 }
 
@@ -44,6 +52,7 @@ export function DailyPayoutChart({
   range = "week",
   onRangeChange,
   canExpandRange = false,
+  compact = false,
 }: DailyPayoutChartProps) {
   const [todayIso] = useState(() => new Date().toISOString().slice(0, 10));
   const [yesterdayIso] = useState(
@@ -54,13 +63,13 @@ export function DailyPayoutChart({
     () =>
       data.map((d) => ({
         date: d.date,
-        label: dayLabel(d.date),
+        label: dayLabel(d.date, compact),
         valueWon: d.valueWon,
         slipCount: d.slipCount,
         isToday: d.date === todayIso,
         isYesterday: d.date === yesterdayIso,
       })),
-    [data, todayIso, yesterdayIso],
+    [data, todayIso, yesterdayIso, compact],
   );
 
   const total = totals?.valueWon ?? rows.reduce((s, r) => s + r.valueWon, 0);
@@ -71,7 +80,13 @@ export function DailyPayoutChart({
   );
 
   const isClickable = typeof onSelectDate === "function";
-  const subtitle = range === "all" ? "All time" : `Last ${rows.length || 7} days`;
+  const totalSlips =
+    totals?.slipCount ?? rows.reduce((s, r) => s + r.slipCount, 0);
+  const baseSubtitle =
+    range === "all" ? "All time" : `Last ${rows.length || 7} days`;
+  const subtitle = compact
+    ? `${baseSubtitle} · ${formatMoney(total)} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
+    : `${baseSubtitle} · ${formatMoney(total)} total`;
 
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
@@ -79,7 +94,7 @@ export function DailyPayoutChart({
         <div>
           <div className="text-sm font-medium">Value paid out per day</div>
           <div className="text-[11px] text-muted-foreground tabular-nums">
-            {subtitle} · {formatMoney(total)} total
+            {subtitle}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -143,7 +158,12 @@ export function DailyPayoutChart({
             No payouts yet.
           </div>
         ) : (
-          <div className="relative flex h-full items-stretch gap-3">
+          <div
+            className={cn(
+              "relative flex h-full items-stretch",
+              compact ? "gap-1 sm:gap-1.5" : "gap-3",
+            )}
+          >
             <div className="pointer-events-none absolute inset-x-0 inset-y-6">
               {[0.25, 0.5, 0.75, 1.0].map((p) => (
                 <div
@@ -153,13 +173,20 @@ export function DailyPayoutChart({
                 />
               ))}
             </div>
-            {rows.map((r) => {
+            {rows.map((r, idx) => {
               const denom = max > 0 ? max : 1;
               const heightPct = (r.valueWon / denom) * 100;
               const minHeight = r.valueWon > 0 ? 2 : 0;
               const isSelected = selectedDate === r.date;
               const hasSelection = selectedDate !== null && selectedDate !== undefined;
               const dimmed = hasSelection && !isSelected;
+              const isFirst = idx === 0;
+              const isLast = idx === rows.length - 1;
+              // In compact mode, dense series would collide; keep only the
+              // endpoints + the currently-selected bar's label visible. The
+              // selection acts as a movable cursor revealing date + value.
+              const showLabel =
+                !compact || isFirst || isLast || isSelected;
               const barBg = isSelected
                 ? "var(--brand-primary)"
                 : r.isToday
@@ -182,7 +209,7 @@ export function DailyPayoutChart({
                   aria-pressed={isClickable ? isSelected : undefined}
                   aria-label={`${r.label} — ${formatMoney(r.valueWon)} paid out, ${r.slipCount} ${r.slipCount === 1 ? "draw" : "draws"}`}
                   className={cn(
-                    "relative z-10 flex flex-1 flex-col items-center justify-end gap-1.5",
+                    "relative z-10 flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5",
                     isClickable && "cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40",
                     !isClickable && "cursor-default",
                     dimmed && "opacity-40 hover:opacity-70",
@@ -193,7 +220,7 @@ export function DailyPayoutChart({
                     className="text-[11px] tabular-nums"
                     style={{ height: 14 }}
                   >
-                    {r.valueWon > 0 ? (
+                    {r.valueWon > 0 && (!compact || isSelected) ? (
                       <span
                         className={
                           isSelected || r.isToday
@@ -203,9 +230,9 @@ export function DailyPayoutChart({
                       >
                         {formatMoney(r.valueWon)}
                       </span>
-                    ) : (
+                    ) : !compact && r.valueWon === 0 ? (
                       <span className="text-muted-foreground/40">—</span>
-                    )}
+                    ) : null}
                   </div>
                   <div
                     className="flex w-full flex-1 items-end"
@@ -225,17 +252,21 @@ export function DailyPayoutChart({
                   </div>
                   <div
                     className={cn(
-                      "text-[10.5px]",
+                      "text-[10.5px] tabular-nums",
                       isSelected
                         ? "font-medium text-foreground"
                         : "text-muted-foreground",
+                      !showLabel && "opacity-0",
                     )}
+                    aria-hidden={!showLabel}
                   >
                     {r.label}
                   </div>
-                  <div className="text-[10px] tabular-nums text-muted-foreground/60">
-                    {r.slipCount} {r.slipCount === 1 ? "draw" : "draws"}
-                  </div>
+                  {compact ? null : (
+                    <div className="text-[10px] tabular-nums text-muted-foreground/60">
+                      {r.slipCount} {r.slipCount === 1 ? "draw" : "draws"}
+                    </div>
+                  )}
                 </button>
               );
             })}
