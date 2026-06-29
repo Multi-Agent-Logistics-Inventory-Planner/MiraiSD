@@ -42,9 +42,8 @@ public class CoinAdjustment {
     @Column(nullable = false)
     private String reason;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "granted_by_user_id", nullable = false)
+    @JoinColumn(name = "granted_by_user_id", nullable = true)
     @ToString.Exclude
     private User grantedBy;
 
