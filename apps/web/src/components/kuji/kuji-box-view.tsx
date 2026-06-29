@@ -211,7 +211,7 @@ export function KujiBoxView({
               value="history"
               className="flex-1 overflow-y-auto px-6 pb-4 mt-3"
             >
-              <KujiHistoryView productId={productId} />
+              <KujiHistoryView productId={productId} productName={productName} />
             </TabsContent>
           </Tabs>
         </DialogContent>
