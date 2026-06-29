@@ -226,6 +226,7 @@ export interface ProductListItem {
   preferredSupplierAuto?: boolean;
   category: Category;
   hasChildren?: boolean;
+  hasActiveBox?: boolean;
   updatedAt: string;
 }
 

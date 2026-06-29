@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { History, Package, Settings } from "lucide-react";
+import { Package, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ScrollableTabs,
@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/scrollable-tabs";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import { KujiBoxPanel } from "./kuji-box-panel";
-import { KujiHistoryDialog } from "./kuji-history-dialog";
+import { KujiHistoryView } from "./kuji-history-view";
+import { OpenBoxDialog } from "./open-box-dialog";
 
 const ProductForm = dynamic(
   () =>
@@ -26,18 +27,35 @@ interface CustomKujiTabsProps {
 
 export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [statusTab, setStatusTab] = useState<"active" | "closed">("active");
   const [editOpen, setEditOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [openBoxOpen, setOpenBoxOpen] = useState(false);
+
+  const activeItems = useMemo(
+    () => items.filter((row) => row.product.hasActiveBox),
+    [items],
+  );
+  const closedItems = useMemo(
+    () => items.filter((row) => !row.product.hasActiveBox),
+    [items],
+  );
+
+  const visibleItems = statusTab === "active" ? activeItems : closedItems;
 
   const tabs = useMemo<TabConfig<string>[]>(
     () =>
-      items.map((row) => ({
+      visibleItems.map((row) => ({
         value: row.product.id,
         label: row.product.name,
         icon: Package,
       })),
-    [items],
+    [visibleItems],
   );
+
+  const current =
+    visibleItems.find((row) => row.product.id === selected) ??
+    visibleItems[0] ??
+    null;
 
   if (items.length === 0) {
     return (
@@ -50,61 +68,131 @@ export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
     );
   }
 
-  // Resolve current tab during render: honor the user's selection when it still
-  // points at a valid item, otherwise fall back to the first item. Avoids an
-  // effect-driven sync that would set state during render.
-  const current =
-    items.find((row) => row.product.id === selected) ?? items[0]!;
-
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <ScrollableTabs
-            tabs={tabs}
-            value={current.product.id}
-            onValueChange={setSelected}
-          />
-        </div>
-        <Button
+      {/* Status tab strip */}
+      <div className="flex items-center gap-1 border-b">
+        <button
           type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 h-9"
-          onClick={() => setHistoryOpen(true)}
-          aria-label={`History for ${current.product.name}`}
+          onClick={() => {
+            setStatusTab("active");
+            setSelected(null);
+          }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            statusTab === "active"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <History className="h-4 w-4 sm:mr-1.5" />
-          <span className="hidden sm:inline">History</span>
-        </Button>
-        <Button
+          Active
+          {activeItems.length > 0 ? (
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              ({activeItems.length})
+            </span>
+          ) : null}
+        </button>
+        <button
           type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 h-9"
-          onClick={() => setEditOpen(true)}
-          aria-label={`Edit ${current.product.name}`}
+          onClick={() => {
+            setStatusTab("closed");
+            setSelected(null);
+          }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            statusTab === "closed"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <Settings className="h-4 w-4 sm:mr-1.5" />
-          <span className="hidden sm:inline">Edit Kuji</span>
-        </Button>
+          Closed
+          {closedItems.length > 0 ? (
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              ({closedItems.length})
+            </span>
+          ) : null}
+        </button>
       </div>
-      <KujiBoxPanel
-        key={current.product.id}
-        productId={current.product.id}
-        productName={current.product.name}
-      />
-      <ProductForm
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        initialProductId={current.product.id}
-      />
-      <KujiHistoryDialog
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        productId={current.product.id}
-        productName={current.product.name}
-      />
+
+      {visibleItems.length === 0 ? (
+        <div className="rounded-xl border bg-card p-8 text-center dark:border-none">
+          <Package className="mx-auto h-8 w-8 text-muted-foreground/40" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {statusTab === "active"
+              ? "No active kuji boxes right now."
+              : "No closed kuji products."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 min-w-0">
+            <ScrollableTabs
+              tabs={tabs}
+              value={current?.product.id ?? ""}
+              onValueChange={setSelected}
+            />
+          </div>
+
+          {/* Closed tab: action buttons on their own row for clarity */}
+          {current && statusTab === "closed" ? (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => setOpenBoxOpen(true)}
+                aria-label={`Open new box for ${current.product.name}`}
+              >
+                Open Box
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => setEditOpen(true)}
+                aria-label={`Edit ${current.product.name}`}
+              >
+                <Settings className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Edit Kuji</span>
+              </Button>
+            </div>
+          ) : null}
+
+          {current ? (
+            statusTab === "active" ? (
+              <KujiBoxPanel
+                key={current.product.id}
+                productId={current.product.id}
+                productName={current.product.name}
+                onEdit={() => setEditOpen(true)}
+              />
+            ) : (
+              <KujiHistoryView
+                key={current.product.id}
+                productId={current.product.id}
+                productName={current.product.name}
+              />
+            )
+          ) : null}
+
+          {current ? (
+            <ProductForm
+              open={editOpen}
+              onOpenChange={setEditOpen}
+              initialProductId={current.product.id}
+            />
+          ) : null}
+
+          {current && statusTab === "closed" ? (
+            <OpenBoxDialog
+              open={openBoxOpen}
+              onOpenChange={setOpenBoxOpen}
+              productId={current.product.id}
+              productName={current.product.name}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

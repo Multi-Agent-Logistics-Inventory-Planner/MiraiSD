@@ -17,6 +17,7 @@ import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.SupplierRepository;
 import com.mirai.inventoryservice.services.InventoryAggregateService;
+import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ProductRepository;
@@ -523,6 +524,15 @@ public class ProductService {
         return items;
     }
 
+    private List<ProductListItemDTO> withHasActiveBox(List<ProductListItemDTO> items) {
+        Set<UUID> activeBoxProductIds = new HashSet<>(
+                kujiBoxRepository.findProductIdsWithStatus(KujiBoxStatus.OPEN));
+        for (ProductListItemDTO item : items) {
+            item.setHasActiveBox(activeBoxProductIds.contains(item.getId()));
+        }
+        return items;
+    }
+
     public List<ProductListItemDTO> getAllProductsAsListItems() {
         return withHasChildren(productRepository.findAllAsListItems());
     }
@@ -544,15 +554,15 @@ public class ProductService {
     }
 
     public List<ProductListItemDTO> getRootProductsAsListItems() {
-        return withHasChildren(productRepository.findRootAsListItems());
+        return withHasActiveBox(withHasChildren(productRepository.findRootAsListItems()));
     }
 
     public List<ProductListItemDTO> getActiveRootProductsAsListItems() {
-        return withHasChildren(productRepository.findRootActiveAsListItems());
+        return withHasActiveBox(withHasChildren(productRepository.findRootActiveAsListItems()));
     }
 
     public List<ProductListItemDTO> getRootKujiProductsAsListItems() {
-        return withHasChildren(productRepository.findRootKujiAsListItems());
+        return withHasActiveBox(withHasChildren(productRepository.findRootKujiAsListItems()));
     }
 
     public List<ProductListItemDTO> getChildProductsAsListItems(UUID parentId) {
