@@ -39,6 +39,7 @@ public class ProductListItemDTO {
     private Boolean preferredSupplierAuto;
     private CategoryResponseDTO category;
     private Boolean hasChildren;
+    private Boolean hasActiveBox;
     private OffsetDateTime updatedAt;
 
     /**

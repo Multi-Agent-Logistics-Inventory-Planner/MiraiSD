@@ -32,6 +32,9 @@ public interface KujiBoxRepository extends JpaRepository<KujiBox, UUID> {
     Optional<KujiBox> findByMachineDisplayIdAndStatus(@Param("machineDisplayId") UUID machineDisplayId,
                                                      @Param("status") KujiBoxStatus status);
 
+    @Query("SELECT b.product.id FROM KujiBox b WHERE b.status = :status")
+    List<UUID> findProductIdsWithStatus(@Param("status") KujiBoxStatus status);
+
     @org.springframework.data.jpa.repository.Modifying
     @Query("DELETE FROM KujiBox b WHERE b.product.id = :productId")
     int deleteByProductId(@Param("productId") UUID productId);

@@ -8,6 +8,7 @@ import {
   MinusCircle,
   PackageOpen,
   Plus,
+  Settings,
   Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { computeBoxValues } from "./kuji-value-rollups";
 interface KujiBoxPanelProps {
   readonly productId: string;
   readonly productName: string;
+  readonly onEdit?: () => void;
 }
 
 function todayLocalDateString(): string {
@@ -45,7 +47,7 @@ function todayLocalDateString(): string {
   return `${y}-${m}-${d}`;
 }
 
-export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
+export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelProps) {
   const activeQuery = useActiveKujiBox(productId);
   const { role } = usePermissions();
 
@@ -192,6 +194,18 @@ export function KujiBoxPanel({ productId, productName }: KujiBoxPanelProps) {
             >
               <Plus className="mr-1 h-4 w-4" />
               Open Box
+            </Button>
+          ) : null}
+          {onEdit ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onEdit}
+              aria-label="Edit Kuji"
+            >
+              <Settings className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Edit Kuji</span>
             </Button>
           ) : null}
           {boxIsOpen && canDraw ? (
