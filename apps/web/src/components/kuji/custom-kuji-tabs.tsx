@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Package, Settings } from "lucide-react";
+import { UserRole } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import {
   ScrollableTabs,
   type TabConfig,
 } from "@/components/ui/scrollable-tabs";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { ProductWithInventory } from "@/hooks/queries/use-product-inventory";
 import { KujiBoxPanel } from "./kuji-box-panel";
 import { KujiHistoryView } from "./kuji-history-view";
@@ -28,6 +30,8 @@ interface CustomKujiTabsProps {
 export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "closed">("active");
+  const { role } = usePermissions();
+  const canStructural = role === UserRole.ADMIN || role === UserRole.ASSISTANT_MANAGER;
   const [editOpen, setEditOpen] = useState(false);
   const [openBoxOpen, setOpenBoxOpen] = useState(false);
 
@@ -132,7 +136,7 @@ export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
           </div>
 
           {/* Closed tab: action buttons on their own row for clarity */}
-          {current && statusTab === "closed" ? (
+          {current && statusTab === "closed" && canStructural ? (
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -164,7 +168,7 @@ export function CustomKujiTabs({ items }: CustomKujiTabsProps) {
                 key={current.product.id}
                 productId={current.product.id}
                 productName={current.product.name}
-                onEdit={() => setEditOpen(true)}
+                onEdit={canStructural ? () => setEditOpen(true) : undefined}
               />
             ) : (
               <KujiHistoryView
