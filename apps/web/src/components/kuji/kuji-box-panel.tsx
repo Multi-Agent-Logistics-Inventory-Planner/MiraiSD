@@ -49,7 +49,7 @@ function todayLocalDateString(): string {
 
 export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelProps) {
   const activeQuery = useActiveKujiBox(productId);
-  const { role } = usePermissions();
+  const { role, canViewKujiPrices } = usePermissions();
 
   const canStructural =
     role === UserRole.ADMIN || role === UserRole.ASSISTANT_MANAGER;
@@ -196,7 +196,7 @@ export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelPro
               Open Box
             </Button>
           ) : null}
-          {onEdit ? (
+          {onEdit && canStructural ? (
             <Button
               type="button"
               size="sm"
@@ -208,7 +208,7 @@ export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelPro
               <span className="hidden sm:inline">Edit Kuji</span>
             </Button>
           ) : null}
-          {boxIsOpen && canDraw ? (
+          {boxIsOpen && canStructural ? (
             <Button
               type="button"
               size="sm"
@@ -277,7 +277,7 @@ export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelPro
         </div>
       ) : (
         <>
-          <UniformBar valueRollups={valueRollups} />
+          <UniformBar valueRollups={valueRollups} showPrices={canViewKujiPrices} />
 
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1.5fr_1fr]">
             <DailyPayoutChart
@@ -293,6 +293,7 @@ export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelPro
                 setSelectedDate(null);
               }}
               canExpandRange={canExpandRange}
+              showPrices={canViewKujiPrices}
             />
             <div className="relative min-h-0">
               <div className="lg:absolute lg:inset-0">
@@ -306,7 +307,7 @@ export function KujiBoxPanel({ productId, productName, onEdit }: KujiBoxPanelPro
             </div>
           </div>
 
-          <PrizePoolTable tiers={box.tiers} />
+          <PrizePoolTable tiers={box.tiers} showPrices={canViewKujiPrices} />
 
           {boxIsOpen && canDraw ? (
             <>

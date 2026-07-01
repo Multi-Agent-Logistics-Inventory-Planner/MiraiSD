@@ -24,6 +24,7 @@ interface DailyPayoutChartProps {
    * the full labels collide with their neighbors.
    */
   readonly compact?: boolean;
+  readonly showPrices?: boolean;
 }
 
 interface ChartRow {
@@ -53,6 +54,7 @@ export function DailyPayoutChart({
   onRangeChange,
   canExpandRange = false,
   compact = false,
+  showPrices = true,
 }: DailyPayoutChartProps) {
   const [todayIso] = useState(() => new Date().toISOString().slice(0, 10));
   const [yesterdayIso] = useState(
@@ -85,8 +87,12 @@ export function DailyPayoutChart({
   const baseSubtitle =
     range === "all" ? "All time" : `Last ${rows.length || 7} days`;
   const subtitle = compact
-    ? `${baseSubtitle} · ${formatMoney(total)} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
-    : `${baseSubtitle} · ${formatMoney(total)} total`;
+    ? showPrices
+      ? `${baseSubtitle} · ${formatMoney(total)} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
+      : `${baseSubtitle} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
+    : showPrices
+      ? `${baseSubtitle} · ${formatMoney(total)} total`
+      : baseSubtitle;
 
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
@@ -134,14 +140,16 @@ export function DailyPayoutChart({
               </button>
             </div>
           ) : null}
-          <div className="text-right">
-            <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
-              Avg / day
+          {showPrices ? (
+            <div className="text-right">
+              <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                Avg / day
+              </div>
+              <div className="text-sm font-medium tabular-nums">
+                {formatMoney(avg)}
+              </div>
             </div>
-            <div className="text-sm font-medium tabular-nums">
-              {formatMoney(avg)}
-            </div>
-          </div>
+          ) : null}
         </div>
       </div>
       <div className="h-44">
@@ -220,7 +228,7 @@ export function DailyPayoutChart({
                     className="text-[11px] tabular-nums"
                     style={{ height: 14 }}
                   >
-                    {r.valueWon > 0 && (!compact || isSelected) ? (
+                    {showPrices && r.valueWon > 0 && (!compact || isSelected) ? (
                       <span
                         className={
                           isSelected || r.isToday
@@ -230,7 +238,7 @@ export function DailyPayoutChart({
                       >
                         {formatMoney(r.valueWon)}
                       </span>
-                    ) : !compact && r.valueWon === 0 ? (
+                    ) : showPrices && !compact && r.valueWon === 0 ? (
                       <span className="text-muted-foreground/40">—</span>
                     ) : null}
                   </div>

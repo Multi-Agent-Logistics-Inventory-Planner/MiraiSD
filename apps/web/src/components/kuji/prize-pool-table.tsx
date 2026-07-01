@@ -17,6 +17,7 @@ import { effectivePrice } from "./kuji-value-rollups";
 
 interface PrizePoolTableProps {
   readonly tiers: readonly KujiBoxTier[];
+  readonly showPrices: boolean;
 }
 
 interface Row {
@@ -35,7 +36,7 @@ interface Row {
   heldOnly: boolean;
 }
 
-export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
+export function PrizePoolTable({ tiers, showPrices }: PrizePoolTableProps) {
   const [lightbox, setLightbox] = useState<TierThumbExpand | null>(null);
 
   const rows: Row[] = useMemo(() => {
@@ -78,8 +79,8 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
       <div className="mb-3 flex items-center justify-between border-b pb-2.5">
         <span className="text-sm font-medium">Prize pool</span>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {prizesRemaining} prize{prizesRemaining === 1 ? "" : "s"} ·{" "}
-          {formatMoney(totalRemaining)} remaining
+          {prizesRemaining} prize{prizesRemaining === 1 ? "" : "s"}
+          {showPrices ? <> · {formatMoney(totalRemaining)} remaining</> : null}
         </span>
       </div>
       {rows.length === 0 ? (
@@ -95,6 +96,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
                 <PrizeRowMobile
                   key={r.tier.id}
                   row={r}
+                  showPrices={showPrices}
                   onExpand={setLightbox}
                 />
               ))}
@@ -103,13 +105,13 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
 
           {/* Desktop: full columned table */}
           <div className="hidden md:block">
-            <div className="grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 border-b pb-2 text-[10.5px] uppercase tracking-wider text-muted-foreground">
+            <div className={showPrices ? "grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 border-b pb-2 text-[10.5px] uppercase tracking-wider text-muted-foreground" : "grid grid-cols-[32px_minmax(0,1fr)_84px] items-center gap-3 border-b pb-2 text-[10.5px] uppercase tracking-wider text-muted-foreground"}>
               <span aria-hidden />
               <span>Prize</span>
-              <span className="text-right">Unit</span>
+              {showPrices ? <span className="text-right">Unit</span> : null}
               <span className="text-right">In box</span>
-              <span className="text-right">Value remaining</span>
-              <span className="text-right">Value paid out</span>
+              {showPrices ? <span className="text-right">Value remaining</span> : null}
+              {showPrices ? <span className="text-right">Value paid out</span> : null}
             </div>
             <div className="max-h-[28rem] overflow-y-auto scrollbar-none">
               <ul className="divide-y">
@@ -118,6 +120,7 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
                     key={r.tier.id}
                     row={r}
                     maxRemaining={maxRemaining}
+                    showPrices={showPrices}
                     onExpand={setLightbox}
                   />
                 ))}
@@ -142,10 +145,11 @@ export function PrizePoolTable({ tiers }: PrizePoolTableProps) {
 interface PrizeRowProps {
   readonly row: Row;
   readonly maxRemaining: number;
+  readonly showPrices: boolean;
   readonly onExpand: (state: TierThumbExpand) => void;
 }
 
-function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
+function PrizeRow({ row, maxRemaining, showPrices, onExpand }: PrizeRowProps) {
   const { tier, rank, price, active, held, drawn, remaining, valueDrawn } = row;
   const color = tierColor(rank);
   const classColor = useTierClassColor(tier.label);
@@ -159,7 +163,9 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
   return (
     <li
       className={cn(
-        "grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 min-h-[44px] py-2 text-xs",
+        showPrices
+          ? "grid grid-cols-[32px_minmax(0,1fr)_80px_84px_140px_110px] items-center gap-3 min-h-[44px] py-2 text-xs"
+          : "grid grid-cols-[32px_minmax(0,1fr)_84px] items-center gap-3 min-h-[44px] py-2 text-xs",
         dim
       )}
     >
@@ -186,9 +192,11 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
           </span>
         )}
       </div>
-      <span className="text-right tabular-nums text-muted-foreground">
-        {price == null ? "—" : formatMoneyDecimals(price)}
-      </span>
+      {showPrices ? (
+        <span className="text-right tabular-nums text-muted-foreground">
+          {price == null ? "—" : formatMoneyDecimals(price)}
+        </span>
+      ) : null}
       <span className="text-right tabular-nums">
         {row.empty ? (
           "—"
@@ -201,42 +209,47 @@ function PrizeRow({ row, maxRemaining, onExpand }: PrizeRowProps) {
           </>
         )}
       </span>
-      <div className="flex items-center justify-end gap-2">
-        {!row.empty && remaining > 0 && (
-          <div
-            className="h-1.5 rounded-full"
-            style={{
-              width: barWidth,
-              maxWidth: 100,
-              background: hexWithAlpha(color, 0.85),
-            }}
-            aria-hidden
-          />
-        )}
-        <span className="tabular-nums">
-          {row.empty || remaining === 0 ? "—" : formatMoney(remaining)}
-        </span>
-      </div>
-      <div className="flex flex-col items-end leading-tight tabular-nums text-muted-foreground">
-        {drawn === 0 ? (
-          <span>—</span>
-        ) : (
-          <>
-            <span>{price == null ? "—" : formatMoney(valueDrawn)}</span>
-            <span className="text-[10px] opacity-70">×{drawn}</span>
-          </>
-        )}
-      </div>
+      {showPrices ? (
+        <div className="flex items-center justify-end gap-2">
+          {!row.empty && remaining > 0 && (
+            <div
+              className="h-1.5 rounded-full"
+              style={{
+                width: barWidth,
+                maxWidth: 100,
+                background: hexWithAlpha(color, 0.85),
+              }}
+              aria-hidden
+            />
+          )}
+          <span className="tabular-nums">
+            {row.empty || remaining === 0 ? "—" : formatMoney(remaining)}
+          </span>
+        </div>
+      ) : null}
+      {showPrices ? (
+        <div className="flex flex-col items-end leading-tight tabular-nums text-muted-foreground">
+          {drawn === 0 ? (
+            <span>—</span>
+          ) : (
+            <>
+              <span>{price == null ? "—" : formatMoney(valueDrawn)}</span>
+              <span className="text-[10px] opacity-70">×{drawn}</span>
+            </>
+          )}
+        </div>
+      ) : null}
     </li>
   );
 }
 
 interface PrizeRowMobileProps {
   readonly row: Row;
+  readonly showPrices: boolean;
   readonly onExpand: (state: TierThumbExpand) => void;
 }
 
-function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
+function PrizeRowMobile({ row, showPrices, onExpand }: PrizeRowMobileProps) {
   const { tier, rank, price, active, held, drawn, remaining, valueDrawn } = row;
   const color = useTierClassColor(tier.label);
   const hasImage = !!getSafeImageUrl(tier.linkedProductImageUrl);
@@ -274,18 +287,24 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
               className="block truncate text-sm"
               colorSecondary
             />
-            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
-              {tier.letter ? <span>{tier.letter}</span> : null}
-              <span>·</span>
-              <span>
-                {price == null ? "no price" : formatMoneyDecimals(price)}
-              </span>
-              {price == null && (
-                <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500">
-                  set price
+            {showPrices ? (
+              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
+                {tier.letter ? <span>{tier.letter}</span> : null}
+                {tier.letter ? <span>·</span> : null}
+                <span>
+                  {price == null ? "no price" : formatMoneyDecimals(price)}
                 </span>
-              )}
-            </div>
+                {price == null && (
+                  <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500">
+                    set price
+                  </span>
+                )}
+              </div>
+            ) : tier.letter ? (
+              <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                {tier.letter}
+              </div>
+            ) : null}
           </div>
           <div className="text-right tabular-nums">
             <div className="text-base font-medium leading-none">
@@ -303,13 +322,15 @@ function PrizeRowMobile({ row, onExpand }: PrizeRowMobileProps) {
               )}
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              {price == null
-                ? `— · ${wonPct}% won`
-                : row.empty
-                  ? valueDrawn > 0
-                    ? `${formatMoney(valueDrawn)} paid out`
-                    : "—"
-                  : `${formatMoney(remaining)} · ${wonPct}% won`}
+              {showPrices
+                ? price == null
+                  ? `— · ${wonPct}% won`
+                  : row.empty
+                    ? valueDrawn > 0
+                      ? `${formatMoney(valueDrawn)} paid out`
+                      : "—"
+                    : `${formatMoney(remaining)} · ${wonPct}% won`
+                : `${wonPct}% won`}
             </div>
           </div>
         </div>

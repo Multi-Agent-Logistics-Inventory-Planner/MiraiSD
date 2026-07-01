@@ -156,7 +156,7 @@ export function KujiBoxView({
                           Record Draw
                         </Button>
                       ) : null}
-                      {boxIsOpen && canDraw ? (
+                      {boxIsOpen && canStructural ? (
                         <Button
                           type="button"
                           size="sm"

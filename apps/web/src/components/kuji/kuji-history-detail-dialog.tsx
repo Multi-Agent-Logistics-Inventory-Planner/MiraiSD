@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuditLogs } from "@/hooks/queries/use-audit-log";
 import { useKujiDailyPayouts } from "@/hooks/queries/use-kuji-daily-payouts";
+import { usePermissions } from "@/hooks/use-permissions";
 import {
   StockMovementReason,
   type AuditLog,
@@ -90,6 +91,7 @@ interface DetailBodyProps {
 }
 
 function DetailBody({ box, productId }: DetailBodyProps) {
+  const { canViewKujiPrices } = usePermissions();
   const fromDate = box.openedAt.slice(0, 10);
   const toDate = (box.closedAt ?? box.openedAt).slice(0, 10);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -146,7 +148,7 @@ function DetailBody({ box, productId }: DetailBodyProps) {
 
   return (
     <div className="min-w-0 space-y-3">
-      <UniformBar valueRollups={valueRollups} />
+      <UniformBar valueRollups={valueRollups} showPrices={canViewKujiPrices} />
 
       <div className="grid min-w-0 grid-cols-1 gap-2 lg:grid-cols-[1.5fr_1fr]">
         <div className="min-w-0">
@@ -160,6 +162,7 @@ function DetailBody({ box, productId }: DetailBodyProps) {
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             compact
+            showPrices={canViewKujiPrices}
           />
         </div>
         <div className="relative min-w-0 min-h-0">

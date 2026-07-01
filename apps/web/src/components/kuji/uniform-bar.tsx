@@ -5,9 +5,10 @@ import type { KujiValueRollups } from "./kuji-value-rollups";
 
 interface UniformBarProps {
   readonly valueRollups: KujiValueRollups;
+  readonly showPrices: boolean;
 }
 
-export function UniformBar({ valueRollups }: UniformBarProps) {
+export function UniformBar({ valueRollups, showPrices }: UniformBarProps) {
   const {
     valueInBox,
     valueHeld,
@@ -40,7 +41,7 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-[28px] font-medium leading-none tabular-nums">
-                  {formatMoney(valueOriginal)}
+                  {showPrices ? formatMoney(valueOriginal) : "—"}
                 </span>
                 <span className="text-[11px] text-muted-foreground tabular-nums">
                   {prizesOriginal} prizes
@@ -62,7 +63,7 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
             <span>{drawnPct}% drawn</span>
-            <span>{formatMoney(valueDrawn)} paid out</span>
+            {showPrices ? <span>{formatMoney(valueDrawn)} paid out</span> : null}
           </div>
         </div>
 
@@ -77,10 +78,12 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
               </span>
               <span className="text-[11px] text-muted-foreground">slips</span>
             </div>
-            <div className="mt-1 text-[13px] tabular-nums">
-              {formatMoney(valueInBox)}
-            </div>
-            {totalHeld > 0 && (
+            {showPrices && (
+              <div className="mt-1 text-[13px] tabular-nums">
+                {formatMoney(valueInBox)}
+              </div>
+            )}
+            {showPrices && totalHeld > 0 && (
               <div className="mt-0.5 text-[10.5px] text-muted-foreground tabular-nums">
                 +{formatMoney(valueHeld)} held
               </div>
@@ -96,12 +99,11 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
               </span>
               <span className="text-[11px] text-muted-foreground">slips</span>
             </div>
-            <div className="mt-1 text-[13px] tabular-nums">
-              {formatMoney(valueDrawn)}
-            </div>
-            <div className="mt-0.5 text-[10.5px] text-muted-foreground">
-              paid out
-            </div>
+            {showPrices && (
+              <div className="mt-1 text-[13px] tabular-nums">
+                {formatMoney(valueDrawn)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -118,7 +120,7 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
               </span>
             </div>
             <span className="text-[26px] font-medium leading-none tabular-nums text-brand-primary">
-              {evDisplay}
+              {showPrices ? evDisplay : "—"}
             </span>
           </div>
         </div>
@@ -137,17 +139,17 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
           <div className="grid flex-1 grid-cols-1 gap-6 sm:grid-cols-3">
             <BarStat
               label="Box value"
-              value={formatMoney(valueOriginal)}
+              value={showPrices ? formatMoney(valueOriginal) : "—"}
               sub={`${prizesOriginal} prize${prizesOriginal === 1 ? "" : "s"} total`}
             />
             <BarStat
               label="In box"
-              value={`${totalActive} slip${totalActive === 1 ? "" : "s"} · ${formatMoney(valueInBox)}`}
-              sub={inBoxSub}
+              value={showPrices ? `${totalActive} slip${totalActive === 1 ? "" : "s"} · ${formatMoney(valueInBox)}` : `${totalActive} slip${totalActive === 1 ? "" : "s"}`}
+              sub={showPrices ? inBoxSub : "drawable now"}
             />
             <BarStat
               label="Drawn"
-              value={`${totalDrawn} slip${totalDrawn === 1 ? "" : "s"} · ${formatMoney(valueDrawn)}`}
+              value={showPrices ? `${totalDrawn} slip${totalDrawn === 1 ? "" : "s"} · ${formatMoney(valueDrawn)}` : `${totalDrawn} slip${totalDrawn === 1 ? "" : "s"}`}
               sub="paid out this box"
             />
           </div>
@@ -156,12 +158,14 @@ export function UniformBar({ valueRollups }: UniformBarProps) {
               EV / draw
             </span>
             <span className="text-[26px] font-medium leading-none tabular-nums text-brand-primary">
-              {evDisplay}
+              {showPrices ? evDisplay : "—"}
             </span>
             <span className="text-[11px] text-muted-foreground">
-              {evPerDraw == null
-                ? "no draws available"
-                : "expected payout · 1 slip"}
+              {showPrices
+                ? evPerDraw == null
+                  ? "no draws available"
+                  : "expected payout · 1 slip"
+                : null}
             </span>
           </div>
         </div>
