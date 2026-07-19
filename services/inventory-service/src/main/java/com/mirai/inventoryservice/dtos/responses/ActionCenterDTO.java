@@ -42,7 +42,12 @@ public record ActionCenterDTO(
         BigDecimal confidence,
         ActionUrgency urgency,
         boolean overdue,
-        String computedAt
+        String computedAt,
+        String demandSegment,
+        BigDecimal revenueAtRisk,
+        BigDecimal lastDropSize,
+        Integer lastDropDays,
+        BigDecimal onOrderQty
     ) {}
 
     /**
