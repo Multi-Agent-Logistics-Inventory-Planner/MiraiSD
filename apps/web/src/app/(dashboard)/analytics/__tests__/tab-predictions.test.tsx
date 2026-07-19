@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import type { ActionItem, PredictionsData } from "@/types/analytics";
 
 const mockUsePredictions = vi.fn();
@@ -48,7 +48,34 @@ vi.mock("@/components/analytics/predictions", async () => {
       </div>
     ),
     MobileFilterControls: () => <div data-testid="mobile-filters" />,
-    DesktopFilterControls: () => <div data-testid="desktop-filters" />,
+    DesktopFilterControls: ({
+      searchQuery,
+      onSearchChange,
+      categories,
+      onCategoryChange,
+    }: {
+      searchQuery: string;
+      onSearchChange: (query: string) => void;
+      categories: Array<{ value: string; label: string }>;
+      onCategoryChange: (categories: string[]) => void;
+    }) => (
+      <div data-testid="desktop-filters">
+        <input
+          data-testid="search-input"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        {categories.map((cat) => (
+          <button
+            key={cat.value}
+            data-testid={`category-${cat.value}`}
+            onClick={() => onCategoryChange([cat.value])}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+    ),
     PredictionsPagination: () => <div data-testid="pagination" />,
     PredictionsSkeleton: () => <div data-testid="predictions-skeleton" />,
   };
@@ -78,6 +105,11 @@ function createMockItem(overrides: Partial<ActionItem>): ActionItem {
     urgency: "URGENT",
     overdue: false,
     computedAt: new Date().toISOString(),
+    demandSegment: null,
+    revenueAtRisk: null,
+    lastDropSize: null,
+    lastDropDays: null,
+    onOrderQty: null,
     ...overrides,
   };
 }
@@ -194,6 +226,153 @@ describe("TabPredictions", () => {
 
       expect(screen.getByTestId("triage-row-p1")).toHaveTextContent("Pocky");
       expect(screen.getByTestId("triage-row-p2")).toHaveTextContent("KitKat");
+    });
+  });
+
+  describe("restock candidates section", () => {
+    it("pins out-of-stock drop items in a dedicated section", () => {
+      const items = [
+        createMockItem({
+          itemId: "drop1",
+          name: "Booster Box",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+          revenueAtRisk: 840,
+        }),
+        createMockItem({ itemId: "cont1", name: "Plush", daysToStockout: 5 }),
+      ];
+
+      mockUsePredictions.mockReturnValue({
+        data: createMockPredictionsData(items),
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<TabPredictions />);
+
+      expect(screen.getByText("Restock candidates")).toBeInTheDocument();
+      // Drop item renders in the pinned section alongside the regular list
+      expect(screen.getByTestId("triage-row-drop1")).toHaveTextContent("Booster Box");
+      expect(screen.getByTestId("triage-row-cont1")).toHaveTextContent("Plush");
+    });
+
+    it("applies the search query to the pinned section", () => {
+      const items = [
+        createMockItem({
+          itemId: "drop-tcg",
+          name: "Booster Box",
+          categoryName: "TCG",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+        }),
+        createMockItem({
+          itemId: "drop-plush",
+          name: "Plush Crate",
+          categoryName: "Plush",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+        }),
+      ];
+      mockUsePredictions.mockReturnValue({
+        data: createMockPredictionsData(items),
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<TabPredictions />);
+      fireEvent.change(screen.getByTestId("search-input"), {
+        target: { value: "plush" },
+      });
+
+      expect(screen.getByText("Restock candidates")).toBeInTheDocument();
+      expect(screen.getByTestId("triage-row-drop-plush")).toBeInTheDocument();
+      expect(screen.queryByTestId("triage-row-drop-tcg")).not.toBeInTheDocument();
+    });
+
+    it("hides the section when the search matches no candidates", () => {
+      const items = [
+        createMockItem({
+          itemId: "drop-tcg",
+          name: "Booster Box",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+        }),
+      ];
+      mockUsePredictions.mockReturnValue({
+        data: createMockPredictionsData(items),
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<TabPredictions />);
+      fireEvent.change(screen.getByTestId("search-input"), {
+        target: { value: "zzz-no-match" },
+      });
+
+      expect(screen.queryByText("Restock candidates")).not.toBeInTheDocument();
+    });
+
+    it("applies the category filter to the pinned section", () => {
+      const items = [
+        createMockItem({
+          itemId: "drop-tcg",
+          name: "Booster Box",
+          categoryName: "TCG",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+        }),
+        createMockItem({
+          itemId: "drop-plush",
+          name: "Plush Crate",
+          categoryName: "Plush",
+          demandSegment: "drop",
+          currentStock: 0,
+          daysToStockout: 0,
+          urgency: "CRITICAL",
+        }),
+      ];
+      mockUsePredictions.mockReturnValue({
+        data: createMockPredictionsData(items),
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<TabPredictions />);
+      fireEvent.click(screen.getByTestId("category-Plush"));
+
+      expect(screen.getByTestId("triage-row-drop-plush")).toBeInTheDocument();
+      expect(screen.queryByTestId("triage-row-drop-tcg")).not.toBeInTheDocument();
+    });
+
+    it("does not render the section when no drop items need restocking", () => {
+      const items = [
+        createMockItem({
+          itemId: "drop-stocked",
+          demandSegment: "drop",
+          currentStock: 100,
+          daysToStockout: 5,
+        }),
+      ];
+
+      mockUsePredictions.mockReturnValue({
+        data: createMockPredictionsData(items),
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<TabPredictions />);
+
+      expect(screen.queryByText("Restock candidates")).not.toBeInTheDocument();
     });
   });
 

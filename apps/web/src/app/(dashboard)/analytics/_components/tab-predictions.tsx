@@ -124,6 +124,39 @@ export function TabPredictions() {
     return uniqueCategories.map((cat) => ({ value: cat, label: cat }));
   }, [sourceItems]);
 
+  // Single predicate for the user's search + category filters, shared by the
+  // main list and the pinned restock section so they can never disagree.
+  const matchesSearchAndCategory = useCallback(
+    (item: ActionItem) => {
+      const query = searchQuery.toLowerCase().trim();
+      if (query && !item.name.toLowerCase().includes(query)) return false;
+      if (categoryFilter.length > 0 && !categoryFilter.includes(item.categoryName)) return false;
+      return true;
+    },
+    [searchQuery, categoryFilter],
+  );
+
+  // Drop-segment items at or past their reorder trigger. Pinned as a
+  // "Restock candidates" section at the top of ACTION_NEEDED: their
+  // days-to-stockout math is drop-shaped (sell out in days when stocked),
+  // so they get order-per-drop framing instead of runway framing.
+  const restockCandidates = useMemo(
+    () =>
+      baseFilteredItems
+        .filter(
+          (item) =>
+            item.demandSegment === "drop" &&
+            (item.currentStock <= 0 || item.currentStock < item.reorderPoint) &&
+            matchesSearchAndCategory(item),
+        )
+        .sort((a, b) => (b.revenueAtRisk ?? 0) - (a.revenueAtRisk ?? 0)),
+    [baseFilteredItems, matchesSearchAndCategory],
+  );
+  const restockCandidateIds = useMemo(
+    () => new Set(restockCandidates.map((item) => item.itemId)),
+    [restockCandidates],
+  );
+
   const processedItems = useMemo(() => {
     if (sourceItems.length === 0) return { items: [], totalCount: 0 };
 
@@ -148,14 +181,12 @@ export function TabPredictions() {
       );
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((item) => item.name.toLowerCase().includes(query));
+    // Restock candidates render in their own pinned section on ACTION_NEEDED
+    if (urgencyFilter === "ACTION_NEEDED") {
+      filtered = filtered.filter((item) => !restockCandidateIds.has(item.itemId));
     }
 
-    if (categoryFilter.length > 0) {
-      filtered = filtered.filter((item) => categoryFilter.includes(item.categoryName));
-    }
+    filtered = filtered.filter(matchesSearchAndCategory);
 
     const sortedItems = [...filtered].sort((a, b) => {
       const multiplier = sortDirection === "asc" ? 1 : -1;
@@ -178,7 +209,7 @@ export function TabPredictions() {
       items: sortedItems.slice(start, start + PAGE_SIZE),
       totalCount: filtered.length,
     };
-  }, [sourceItems, urgencyFilter, categoryFilter, searchQuery, sortField, sortDirection, page]);
+  }, [sourceItems, urgencyFilter, restockCandidateIds, matchesSearchAndCategory, sortField, sortDirection, page]);
 
   const handleUrgencyChange = (newUrgency: UrgencyFilter) => {
     setUrgencyFilter(newUrgency);
@@ -286,6 +317,28 @@ export function TabPredictions() {
               sortOption={sortOption}
               onSortChange={handleSortChange}
             />
+
+            {urgencyFilter === "ACTION_NEEDED" && restockCandidates.length > 0 && (
+              <Card className="overflow-hidden rounded-xl border border-purple-300 dark:border-purple-700/60 p-0">
+                <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-950/30 border-b border-purple-200 dark:border-purple-800/60">
+                  <Package className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                  <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Restock candidates
+                  </span>
+                  <span className="text-xs text-purple-800 dark:text-purple-300">
+                    Drop products at or below their reorder trigger — order per
+                    drop, not by daily runway.
+                  </span>
+                </div>
+                {restockCandidates.map((item) => (
+                  <TriageRow
+                    key={item.itemId}
+                    item={item}
+                    onDismiss={() => handleDismiss(item)}
+                  />
+                ))}
+              </Card>
+            )}
 
             {processedItems.items.length === 0 ? (
               <Card className="bg-card border p-6 text-center rounded-xl">

@@ -27,6 +27,21 @@ export function buildWhyCopy(item: ActionItem): string {
   const lead = item.leadTimeDays;
   const reorder = item.reorderPoint;
 
+  // Drop items sell in bursts, not daily trickles — the honest explanation
+  // is the last drop's sell-through, not a per-day runway.
+  if (item.demandSegment === "drop") {
+    const dropSize = item.lastDropSize ? Math.round(item.lastDropSize) : null;
+    const dropDays = item.lastDropDays;
+    const sellThrough =
+      dropSize && dropDays
+        ? `last drop of ${dropSize} units sold out in ${dropDays} day${dropDays === 1 ? "" : "s"}`
+        : "sells out quickly when stocked";
+    if (stock <= 0) {
+      return `Sells in drops — ${sellThrough}. Currently out of stock; every day without a reorder is lost sales.`;
+    }
+    return `Sells in drops — ${sellThrough}. ${stock} left is unlikely to survive the next rush.`;
+  }
+
   switch (item.urgency) {
     case "CRITICAL":
       return `${stock} left, selling ${velocity} — already inside the ${lead}-day reorder window, so it runs out before new stock can arrive.`;
