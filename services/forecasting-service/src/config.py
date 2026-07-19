@@ -151,6 +151,45 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "inventory-changes")
 KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", "forecasting-service")
 KAFKA_DLQ_TOPIC = os.getenv("KAFKA_DLQ_TOPIC", "inventory-changes.DLQ")
 
+# Demand-shape segmentation. Classifies each SKU as continuous / drop / dead /
+# new from its 60d sales shape so the policy layer can stop applying the
+# daily-mu math to products it is categorically wrong for (booster-box style
+# "drops" that sell out in days, and dead tail items that pollute the at-risk
+# list). Two flags: SEGMENTATION_ENABLED computes + persists labels
+# (observe-only), SEGMENT_POLICY_ENABLED lets the labels change policy
+# outputs. Roll out one at a time; each rollback is a single env flip.
+SEGMENTATION_ENABLED = os.getenv("SEGMENTATION_ENABLED", "false").lower() == "true"
+SEGMENT_POLICY_ENABLED = os.getenv("SEGMENT_POLICY_ENABLED", "false").lower() == "true"
+# Drop entry/exit thresholds on top3_share (share of window units sold on the
+# 3 biggest days). Hysteresis mirrors the CV regime deadband: enter drop at
+# 0.80, stay until it falls below 0.60.
+SEGMENT_TOP3_SHARE_ENTER = float(os.getenv("SEGMENT_TOP3_SHARE_ENTER", "0.80"))
+SEGMENT_TOP3_SHARE_EXIT = float(os.getenv("SEGMENT_TOP3_SHARE_EXIT", "0.60"))
+SEGMENT_DROP_MIN_UNITS = float(os.getenv("SEGMENT_DROP_MIN_UNITS", "10"))
+SEGMENT_DROP_MAX_SALE_DAYS = int(os.getenv("SEGMENT_DROP_MAX_SALE_DAYS", "6"))
+SEGMENT_DROP_MIN_STOCKOUT_FRAC = float(os.getenv("SEGMENT_DROP_MIN_STOCKOUT_FRAC", "0.3"))
+# Dead: nothing sold in the window, or a 1-2 sale trickle that has been quiet
+# for over four weeks.
+SEGMENT_DEAD_DAYS_SINCE_SALE = float(os.getenv("SEGMENT_DEAD_DAYS_SINCE_SALE", "28"))
+SEGMENT_DEAD_MAX_SALE_DAYS = int(os.getenv("SEGMENT_DEAD_MAX_SALE_DAYS", "2"))
+SEGMENT_NEW_MAX_HISTORY_DAYS = int(os.getenv("SEGMENT_NEW_MAX_HISTORY_DAYS", "14"))
+# Suggested reorder for drop items = mean of the last N drop sizes.
+SEGMENT_DROP_AVG_LAST_N = int(os.getenv("SEGMENT_DROP_AVG_LAST_N", "2"))
+# Max gap (consecutive zero-sale days) tolerated inside one drop cluster.
+SEGMENT_DROP_CLUSTER_GAP_DAYS = int(os.getenv("SEGMENT_DROP_CLUSTER_GAP_DAYS", "2"))
+
+# suggest_order v2: Q = ceil(mu*(L + target_days) + safety_stock - on_hand
+# - on_order). The v1 formula ignores lead time and safety stock (it targets
+# cycle stock only) and double-orders anything already inbound on a PENDING
+# shipment. Default off until the backtest gate passes; single env-var
+# rollback.
+SUGGEST_ORDER_V2_ENABLED = os.getenv("SUGGEST_ORDER_V2_ENABLED", "false").lower() == "true"
+
+# run_all chunking: the nightly full recompute processes items in chunks so
+# one bad chunk (DB timeout, malformed rows) cannot abort the entire run and
+# leave the remaining items stale.
+RUN_ALL_CHUNK_SIZE = int(os.getenv("RUN_ALL_CHUNK_SIZE", "100"))
+
 # Real-time batching
 BATCH_WINDOW_SECONDS = int(os.getenv("BATCH_WINDOW_SECONDS", "30"))
 BATCH_SIZE_TRIGGER = int(os.getenv("BATCH_SIZE_TRIGGER", "50"))
