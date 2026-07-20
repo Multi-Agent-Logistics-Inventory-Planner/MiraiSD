@@ -102,6 +102,10 @@ function ExplanationBody({ data }: { data: ForecastExplanation }) {
   const eventDaysSince = asRecord(f.event_days_since);
   const tsbP = asNumber(f.tsb_p);
   const tsbZ = asNumber(f.tsb_z);
+  const demandSegment = typeof f.demand_segment === "string" ? f.demand_segment : null;
+  const rateWhileAvailable = asNumber(f.rate_while_available);
+  const muPreSegment = asNumber(f.mu_pre_segment);
+  const onOrderQty = asNumber(f.on_order_qty);
 
   return (
     <div className="space-y-4 text-sm">
@@ -124,6 +128,24 @@ function ExplanationBody({ data }: { data: ForecastExplanation }) {
             <Row label="Sale probability (p)" value={formatPct(tsbP)} />
             <Row label="Sale-day demand (z)" value={formatNum(tsbZ)} />
           </>
+        )}
+        {demandSegment && (
+          <Row label="Demand shape" value={demandSegment} mono={false} />
+        )}
+        {rateWhileAvailable !== null && (
+          <Row
+            label="Rate while in stock"
+            value={`${formatNum(rateWhileAvailable)} units/day`}
+          />
+        )}
+        {muPreSegment !== null && (
+          <Row
+            label="μ̂ before drop override"
+            value={`${formatNum(muPreSegment)} units/day`}
+          />
+        )}
+        {onOrderQty !== null && (
+          <Row label="On order (pending shipments)" value={formatNum(onOrderQty, 0)} />
         )}
       </section>
 

@@ -284,4 +284,180 @@ class AnalyticsServiceTest {
             assertEquals(100, result.totalUnits());
         }
     }
+
+    @Nested
+    @DisplayName("getActionCenter demand-shape segments")
+    class GetActionCenterSegments {
+
+        private ForecastPrediction buildSegmentPrediction(UUID itemId, Map<String, Object> extraFeatures) {
+            Map<String, Object> features = new HashMap<>();
+            features.put("mu_hat", 0.3);
+            features.put("sigma_d_hat", 0.8);
+            features.putAll(extraFeatures);
+            return ForecastPrediction.builder()
+                    .id(UUID.randomUUID())
+                    .itemId(itemId)
+                    .horizonDays(21)
+                    .avgDailyDelta(BigDecimal.valueOf(-0.3))
+                    .daysToStockout(BigDecimal.valueOf(590))
+                    .suggestedReorderQty(0)
+                    .confidence(BigDecimal.valueOf(0.5))
+                    .computedAt(java.time.OffsetDateTime.now())
+                    .features(features)
+                    .build();
+        }
+
+        private void stubCommon(Product product, ForecastPrediction prediction, int stock) {
+            when(forecastPredictionRepository.findAllLatest()).thenReturn(List.of(prediction));
+            Map<UUID, Integer> stockMap = new HashMap<>();
+            stockMap.put(product.getId(), stock);
+            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(stockMap);
+            when(productRepository.findByIdInWithCategories(any())).thenReturn(List.of(product));
+        }
+
+        @Test
+        @DisplayName("dead-segment items are excluded once segment policy is applied")
+        void deadSegmentExcluded() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Dead Item", "DEAD-001", null);
+            ForecastPrediction prediction = buildSegmentPrediction(
+                    itemId, Map.of("demand_segment", "dead", "segment_policy_applied", true));
+            stubCommon(product, prediction, 3);
+
+            var result = analyticsService.getActionCenter();
+
+            assertTrue(result.items().isEmpty());
+        }
+
+        @Test
+        @DisplayName("observe-only labels (no policy marker) do not exclude dead items")
+        void deadSegmentWithoutMarkerStillAppears() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Dead Item", "DEAD-002", null);
+            ForecastPrediction prediction = buildSegmentPrediction(
+                    itemId, Map.of("demand_segment", "dead"));
+            stubCommon(product, prediction, 3);
+
+            var result = analyticsService.getActionCenter();
+
+            assertEquals(1, result.items().size());
+        }
+
+        @Test
+        @DisplayName("observe-only drop labels keep mu_hat velocity and null segment fields")
+        void dropSegmentWithoutMarkerKeepsMuHat() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Booster Box", "DROP-003", null);
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, Map.of(
+                    "demand_segment", "drop",
+                    "rate_while_available", 6.0,
+                    "segment_signals", Map.of("last_drop_size", 180.0, "last_drop_days", 1)));
+            stubCommon(product, prediction, 0);
+
+            var result = analyticsService.getActionCenter();
+
+            assertEquals(1, result.items().size());
+            var item = result.items().get(0);
+            // Policy not applied: the stored mu drives velocity and the UI
+            // must not see segment framing yet.
+            assertEquals(0, item.demandVelocity().compareTo(BigDecimal.valueOf(0.3)));
+            assertNull(item.demandSegment());
+            assertNull(item.lastDropSize());
+            assertNull(item.lastDropDays());
+        }
+
+        @Test
+        @DisplayName("drop-segment items use rate_while_available as demand velocity")
+        void dropSegmentUsesRate() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Booster Box", "DROP-001", null);
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, Map.of(
+                    "demand_segment", "drop",
+                    "rate_while_available", 6.0,
+                    "segment_policy_applied", true,
+                    "segment_signals", Map.of("last_drop_size", 180.0, "last_drop_days", 1)));
+            stubCommon(product, prediction, 0);
+
+            var result = analyticsService.getActionCenter();
+
+            assertEquals(1, result.items().size());
+            var item = result.items().get(0);
+            assertEquals("drop", item.demandSegment());
+            assertEquals(0, item.demandVelocity().compareTo(BigDecimal.valueOf(6.0)));
+            assertEquals(0, item.daysToStockout().compareTo(BigDecimal.ZERO));
+            assertEquals(0, item.lastDropSize().compareTo(BigDecimal.valueOf(180.0)));
+            assertEquals(1, item.lastDropDays());
+        }
+
+        @Test
+        @DisplayName("revenue at risk = msrp x rate x min(leadTime, 14) when stockout precedes replenishment")
+        void revenueAtRiskComputed() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Booster Box", "DROP-002", null);
+            product.setMsrp(BigDecimal.valueOf(10.00));
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, Map.of(
+                    "demand_segment", "drop",
+                    "rate_while_available", 6.0,
+                    "segment_policy_applied", true));
+            stubCommon(product, prediction, 0);
+
+            var item = analyticsService.getActionCenter().items().get(0);
+
+            // leadTimeDays=14 -> window=14; 10 * 6 * 14 = 840
+            assertEquals(0, item.revenueAtRisk().compareTo(BigDecimal.valueOf(840.00)));
+        }
+
+        @Test
+        @DisplayName("suggested reorder qty nets out units already on order")
+        void suggestedQtyNetsOnOrder() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Plush", "NET-001", null);
+            Map<String, Object> extra = new HashMap<>();
+            extra.put("mu_hat", 2.0);
+            extra.put("on_order_qty", 30.0);
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, extra);
+            stubCommon(product, prediction, 0);
+
+            var item = analyticsService.getActionCenter().items().get(0);
+
+            // target 50 - stock 0 + leadTimeDemand ceil(2*14)=28 - onOrder 30 = 48
+            assertEquals(48, item.suggestedReorderQty());
+            assertEquals(0, item.onOrderQty().compareTo(BigDecimal.valueOf(30.0)));
+        }
+
+        @Test
+        @DisplayName("on-order netting floors the suggested qty at zero")
+        void suggestedQtyNettingFloorsAtZero() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Plush", "NET-002", null);
+            Map<String, Object> extra = new HashMap<>();
+            extra.put("mu_hat", 2.0);
+            extra.put("on_order_qty", 500.0);
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, extra);
+            stubCommon(product, prediction, 0);
+
+            var item = analyticsService.getActionCenter().items().get(0);
+
+            assertEquals(0, item.suggestedReorderQty());
+        }
+
+        @Test
+        @DisplayName("healthy continuous items carry zero revenue at risk and null segment fields")
+        void continuousHealthyItemHasZeroRevenueAtRisk() {
+            UUID itemId = UUID.randomUUID();
+            Product product = buildProduct(itemId, "Plush", "CONT-001", null);
+            product.setMsrp(BigDecimal.valueOf(20.00));
+            Map<String, Object> extra = new HashMap<>();
+            extra.put("mu_hat", 2.0);
+            ForecastPrediction prediction = buildSegmentPrediction(itemId, extra);
+            stubCommon(product, prediction, 100);
+
+            var item = analyticsService.getActionCenter().items().get(0);
+
+            // 100 units / 2 per day = 50 days > 14-day lead time -> no revenue at risk
+            assertEquals(0, item.revenueAtRisk().compareTo(BigDecimal.ZERO));
+            assertNull(item.demandSegment());
+            assertNull(item.lastDropSize());
+        }
+    }
 }

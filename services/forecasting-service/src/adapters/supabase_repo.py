@@ -141,7 +141,8 @@ class SupabaseRepo:
                 p.lead_time_days,
                 p.preferred_supplier_id::text AS preferred_supplier_id,
                 COALESCE(p.reorder_point / NULLIF(p.target_stock_level / NULLIF(p.lead_time_days, 0), 0), 7)::int AS safety_stock_days,
-                c.name AS category_name
+                c.name AS category_name,
+                p.created_at
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.is_active = true
@@ -159,7 +160,7 @@ class SupabaseRepo:
 
         if df.empty:
             return pd.DataFrame(
-                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "preferred_supplier_id", "category_name"]
+                columns=["item_id", "name", "lead_time_days", "safety_stock_days", "preferred_supplier_id", "category_name", "created_at"]
             )
 
         df["item_id"] = df["item_id"].astype(str)
@@ -279,7 +280,7 @@ class SupabaseRepo:
                     ) AS rn
                 FROM shipments s
                 JOIN shipment_items si ON si.shipment_id = s.id
-                WHERE s.status = 'DELIVERED'
+                WHERE s.status = 'RECEIVED'
                   AND s.actual_delivery_date IS NOT NULL
                   AND s.order_date IS NOT NULL
                   AND s.actual_delivery_date >= :cutoff_date
@@ -388,6 +389,70 @@ class SupabaseRepo:
             regime = row[1]
             if regime in ("steady", "bursty"):
                 result[str(row[0])] = regime
+        return result
+
+    def get_on_order_quantities(self, item_ids: list[str] | None = None) -> dict[str, float]:
+        """Units already inbound per item on PENDING shipments.
+
+        Returns ``{item_id: on_order_qty}`` where on_order is the un-received
+        remainder of each PENDING shipment line. Items with nothing inbound
+        are absent.
+        """
+        query = """
+            SELECT
+                si.item_id::text AS item_id,
+                SUM(GREATEST(si.ordered_quantity - COALESCE(si.received_quantity, 0), 0)) AS on_order_qty
+            FROM shipment_items si
+            JOIN shipments s ON s.id = si.shipment_id
+            WHERE s.status = 'PENDING'
+        """
+        params: dict = {}
+        if item_ids:
+            query += " AND si.item_id = ANY(:item_ids)"
+            params["item_ids"] = [uuid.UUID(iid) for iid in item_ids]
+        query += " GROUP BY si.item_id"
+
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(text(query), params).fetchall()
+        except Exception:
+            logger.warning("Failed to load on-order quantities")
+            return {}
+
+        return {str(row[0]): float(row[1] or 0) for row in rows}
+
+    def get_latest_demand_segments(self, item_ids: list[str]) -> dict[str, str]:
+        """Read the most recently persisted demand_segment per item.
+
+        Returns ``{item_id: "continuous" | "drop" | "dead" | "new"}``. Items
+        with no prior segment are absent; used for drop-entry/exit hysteresis.
+        """
+        if not item_ids:
+            return {}
+
+        query = """
+            SELECT DISTINCT ON (item_id)
+                item_id::text AS item_id,
+                features->>'demand_segment' AS segment
+            FROM forecast_predictions
+            WHERE item_id = ANY(:item_ids)
+              AND features->>'demand_segment' IS NOT NULL
+            ORDER BY item_id, computed_at DESC
+        """
+        params = {"item_ids": [uuid.UUID(iid) for iid in item_ids]}
+
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(text(query), params).fetchall()
+        except Exception:
+            logger.warning("Failed to load prior demand segments")
+            return {}
+
+        result: dict[str, str] = {}
+        for row in rows:
+            segment = row[1]
+            if segment in ("continuous", "drop", "dead", "new"):
+                result[str(row[0])] = segment
         return result
 
     def _prepare_forecast_rows(self, forecasts_df: pd.DataFrame) -> list[dict]:

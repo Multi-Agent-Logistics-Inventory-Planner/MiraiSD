@@ -12,6 +12,11 @@ export enum AnalyticsTab {
 // Predictions Types - Demand-based metrics for reorder decisions
 export type ActionUrgency = 'CRITICAL' | 'URGENT' | 'ATTENTION' | 'HEALTHY'
 
+// Demand-shape segment assigned by the forecasting service.
+// 'drop' = burst sellers (booster boxes) that sell out in days;
+// 'dead' items are filtered out server-side and never reach the UI.
+export type DemandSegment = 'continuous' | 'drop' | 'dead' | 'new'
+
 export interface ActionItem {
   itemId: string
   name: string
@@ -33,6 +38,11 @@ export interface ActionItem {
   urgency: ActionUrgency
   overdue: boolean
   computedAt: string | null
+  demandSegment: DemandSegment | null
+  revenueAtRisk: number | null
+  lastDropSize: number | null
+  lastDropDays: number | null
+  onOrderQty: number | null
 }
 
 export interface RiskSummary {

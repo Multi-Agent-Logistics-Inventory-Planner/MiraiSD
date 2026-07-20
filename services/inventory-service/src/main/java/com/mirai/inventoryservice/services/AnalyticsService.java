@@ -83,7 +83,13 @@ public class AnalyticsService {
         BigDecimal sigmaDHat,
         BigDecimal mape,
         List<Double> dowMultipliers,
-        Integer safetyStock
+        Integer safetyStock,
+        String demandSegment,
+        BigDecimal rateWhileAvailable,
+        BigDecimal lastDropSize,
+        Integer lastDropDays,
+        BigDecimal onOrderQty,
+        boolean segmentPolicyApplied
     ) {}
 
     /**
@@ -92,7 +98,7 @@ public class AnalyticsService {
     private ForecastFeatures extractFeatures(ForecastPrediction fp) {
         Map<String, Object> features = fp.getFeatures();
         if (features == null) {
-            return new ForecastFeatures(null, null, null, null, null);
+            return new ForecastFeatures(null, null, null, null, null, null, null, null, null, null, false);
         }
 
         BigDecimal muHat = extractBigDecimal(features.get("mu_hat"));
@@ -114,7 +120,29 @@ public class AnalyticsService {
             safetyStock = num.intValue();
         }
 
-        return new ForecastFeatures(muHat, sigmaDHat, mape, dowMultipliers, safetyStock);
+        String demandSegment = features.get("demand_segment") instanceof String s ? s : null;
+        BigDecimal rateWhileAvailable = extractBigDecimal(features.get("rate_while_available"));
+        BigDecimal onOrderQty = extractBigDecimal(features.get("on_order_qty"));
+
+        BigDecimal lastDropSize = null;
+        Integer lastDropDays = null;
+        Object sigObj = features.get("segment_signals");
+        if (sigObj instanceof Map<?, ?> sig) {
+            lastDropSize = extractBigDecimal(sig.get("last_drop_size"));
+            Object dropDays = sig.get("last_drop_days");
+            if (dropDays instanceof Number n) {
+                lastDropDays = n.intValue();
+            }
+        }
+
+        // Set by the forecasting service only when SEGMENT_POLICY_ENABLED --
+        // observe-only label runs must not change read-path behavior.
+        boolean segmentPolicyApplied = Boolean.TRUE.equals(features.get("segment_policy_applied"));
+
+        return new ForecastFeatures(
+            muHat, sigmaDHat, mape, dowMultipliers, safetyStock,
+            demandSegment, rateWhileAvailable, lastDropSize, lastDropDays, onOrderQty,
+            segmentPolicyApplied);
     }
 
     private BigDecimal extractBigDecimal(Object value) {
@@ -216,7 +244,8 @@ public class AnalyticsService {
             int targetStockLevel,
             BigDecimal muHat,
             int leadTimeDays,
-            Integer safetyStock) {
+            Integer safetyStock,
+            BigDecimal onOrderQty) {
         int baseQty = targetStockLevel - currentStock;
 
         // Add lead time demand (units sold while waiting for delivery)
@@ -228,7 +257,11 @@ public class AnalyticsService {
         // Add safety buffer from forecast (or default to 0)
         int buffer = safetyStock != null ? safetyStock : 0;
 
-        return Math.max(0, baseQty + leadTimeDemand + buffer);
+        // Net out units already inbound on PENDING shipments so the same
+        // stock is not ordered twice (the row's tooltip promises this).
+        int inbound = onOrderQty != null ? (int) Math.floor(onOrderQty.doubleValue()) : 0;
+
+        return Math.max(0, baseQty + leadTimeDemand + buffer - inbound);
     }
 
     /**
@@ -446,22 +479,44 @@ public class AnalyticsService {
             if (product == null || !product.getIsActive() || product.getParentId() != null) {
                 continue;
             }
+            if (Boolean.FALSE.equals(product.getForecastingEnabled())) {
+                continue;
+            }
+
+            ForecastFeatures features = extractFeatures(prediction);
+            // Segment labels only change behavior once the forecasting
+            // service has applied segment policy (SEGMENT_POLICY_ENABLED);
+            // observe-only label runs must leave this output untouched.
+            boolean policyApplied = features.segmentPolicyApplied();
+            // Dead-segment items (no meaningful sales in the training window)
+            // are excluded entirely -- they were ~2/3 of the at-risk noise.
+            if (policyApplied && "dead".equals(features.demandSegment())) {
+                continue;
+            }
 
             int currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
             int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 14;
             int rp = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
             int targetStock = product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50;
 
-            ForecastFeatures features = extractFeatures(prediction);
-            BigDecimal demandVelocity = features.muHat();
+            boolean isDrop = policyApplied && "drop".equals(features.demandSegment());
+            // Drop items: the honest demand rate is units/day while in stock,
+            // not the zero-fill-crushed mu_hat.
+            BigDecimal effectiveMu = isDrop && features.rateWhileAvailable() != null
+                ? features.rateWhileAvailable()
+                : features.muHat();
+            BigDecimal demandVelocity = effectiveMu;
             BigDecimal demandVolatility = calculateDemandVolatility(features.muHat(), features.sigmaDHat());
             BigDecimal forecastAccuracy = calculateForecastAccuracy(features.mape());
 
-            // Recalculate dynamic fields from live stock + stored mu_hat
-            BigDecimal daysToStockout = recalculateDaysToStockout(currentStock, features.muHat());
+            // Recalculate dynamic fields from live stock + stored demand rate
+            BigDecimal daysToStockout = recalculateDaysToStockout(currentStock, effectiveMu);
             LocalDate suggestedOrderDate = recalculateSuggestedOrderDate(daysToStockout, leadTimeDays, today);
             int suggestedReorderQty = recalculateSuggestedReorderQty(
-                currentStock, targetStock, features.muHat(), leadTimeDays, features.safetyStock());
+                currentStock, targetStock, effectiveMu, leadTimeDays, features.safetyStock(),
+                features.onOrderQty());
+            BigDecimal revenueAtRisk = calculateRevenueAtRisk(
+                product.getMsrp(), effectiveMu, daysToStockout, leadTimeDays);
             // Use recalculated date so overdue badge is consistent with displayed order date
             boolean overdue = isOverdue(suggestedOrderDate, currentStock, rp, today);
 
@@ -511,7 +566,12 @@ public class AnalyticsService {
                 prediction.getConfidence(),
                 urgency,
                 overdue,
-                computedAt
+                computedAt,
+                policyApplied ? features.demandSegment() : null,
+                revenueAtRisk,
+                policyApplied ? features.lastDropSize() : null,
+                policyApplied ? features.lastDropDays() : null,
+                features.onOrderQty()
             ));
         }
 
@@ -530,6 +590,29 @@ public class AnalyticsService {
             totalDemandVelocity.setScale(2, RoundingMode.HALF_UP),
             new RiskSummary(critical, urgent, attention, healthy)
         );
+    }
+
+    /**
+     * Revenue at risk over the replenishment window: msrp x daily demand x
+     * min(leadTimeDays, 14), charged only when the item is projected to run
+     * out before a reorder placed today could arrive. This is the number
+     * that lets owners sort the action list by money instead of days.
+     */
+    private BigDecimal calculateRevenueAtRisk(
+            BigDecimal msrp,
+            BigDecimal effectiveMu,
+            BigDecimal daysToStockout,
+            int leadTimeDays) {
+        if (msrp == null || effectiveMu == null || daysToStockout == null) {
+            return null;
+        }
+        if (daysToStockout.doubleValue() >= leadTimeDays) {
+            return BigDecimal.ZERO;
+        }
+        int windowDays = Math.min(leadTimeDays, 14);
+        return msrp.multiply(effectiveMu)
+            .multiply(BigDecimal.valueOf(windowDays))
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private ActionUrgency calculateUrgency(BigDecimal daysToStockout, int leadTimeDays, int currentStock, Integer reorderPoint) {

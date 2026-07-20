@@ -12,7 +12,7 @@ import pytest
 
 EXPECTED_COLUMNS = [
     "item_id", "name", "lead_time_days", "safety_stock_days",
-    "preferred_supplier_id", "category_name",
+    "preferred_supplier_id", "category_name", "created_at",
 ]
 
 
@@ -36,6 +36,7 @@ class TestGetItems:
             "safety_stock_days": [3, 5],
             "preferred_supplier_id": ["sup-1", None],
             "category_name": ["Toys", "Food"],
+            "created_at": pd.to_datetime(["2026-01-01", "2026-02-01"], utc=True),
         })
 
         with patch("pandas.read_sql", return_value=test_df):

@@ -95,11 +95,21 @@ public interface ForecastPredictionRepository extends JpaRepository<ForecastPred
     List<ForecastPrediction> findLatestByItemIds(@Param("itemIds") List<UUID> itemIds);
 
     // Find at-risk items using only the latest prediction per item. `features` is null.
+    // Joins products so disabled/child/non-forecast items cannot surface as at-risk.
+    // Dead-segment items (no meaningful sales in the training window) are excluded
+    // only once the forecasting service has applied segment policy -- observe-only
+    // label runs (SEGMENTATION_ENABLED without SEGMENT_POLICY_ENABLED) stay inert.
     @Query(value = "SELECT " + FORECAST_COLS_NO_FEATURES + " FROM forecast_predictions fp "
             + "INNER JOIN (SELECT item_id, MAX(computed_at) AS max_computed_at "
             + "FROM forecast_predictions GROUP BY item_id) latest "
             + "ON fp.item_id = latest.item_id AND fp.computed_at = latest.max_computed_at "
+            + "INNER JOIN products p ON p.id = fp.item_id "
             + "WHERE fp.days_to_stockout < :threshold "
+            + "AND p.is_active = true "
+            + "AND p.forecasting_enabled = true "
+            + "AND p.parent_id IS NULL "
+            + "AND NOT (COALESCE(fp.features->>'demand_segment', '') = 'dead' "
+            + "AND COALESCE(fp.features->>'segment_policy_applied', '') = 'true') "
             + "ORDER BY fp.days_to_stockout ASC",
             nativeQuery = true)
     List<ForecastPrediction> findLatestAtRisk(@Param("threshold") double threshold);

@@ -451,6 +451,51 @@ def suggest_order_vectorized(
     return np.ceil(needed).clip(lower=0).astype(int)
 
 
+def suggest_order_v2_vectorized(
+    current_qty: pd.Series,
+    mu_hat: pd.Series,
+    L: Union[pd.Series, int, float],
+    safety_stock: pd.Series,
+    target_days: int,
+    on_order: Optional[pd.Series] = None,
+) -> pd.Series:
+    """Lead-time-aware order suggestion with on-order netting.
+
+    Q = max(0, ceil(mu * (L + target_days) + safety_stock - on_hand - on_order))
+
+    Unlike ``suggest_order_vectorized`` (v1), this covers the demand that
+    arrives DURING the replenishment lead time plus the target cover window,
+    keeps the safety buffer intact, and nets out units already inbound on
+    PENDING shipments so the same stock is not ordered twice.
+
+    Args:
+        current_qty: Series of on-hand quantities.
+        mu_hat: Series of mean daily demand estimates.
+        L: Lead time in days (scalar or Series).
+        safety_stock: Series of safety stock values.
+        target_days: Target days of cover beyond the lead time.
+        on_order: Optional Series of inbound units on PENDING shipments.
+
+    Returns:
+        Series of suggested order quantities (integers, floored at 0).
+    """
+    mu_safe = mu_hat.clip(lower=0.0).astype(float)
+    qty_safe = current_qty.clip(lower=0.0).astype(float)
+    ss_safe = safety_stock.clip(lower=0.0).astype(float)
+    if isinstance(L, pd.Series):
+        L_safe = L.clip(lower=0.0).astype(float)
+    else:
+        L_safe = max(float(L), 0.0)
+    inbound = (
+        on_order.fillna(0.0).clip(lower=0.0).astype(float)
+        if on_order is not None
+        else 0.0
+    )
+
+    needed = mu_safe * (L_safe + max(target_days, 0)) + ss_safe - qty_safe - inbound
+    return np.ceil(needed).clip(lower=0).astype(int)
+
+
 def compute_order_date(
     days_to_stockout: float,
     lead_time: float,

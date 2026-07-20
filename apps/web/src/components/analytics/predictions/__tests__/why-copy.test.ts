@@ -24,6 +24,11 @@ function makeItem(overrides: Partial<ActionItem>): ActionItem {
     urgency: "HEALTHY",
     overdue: false,
     computedAt: null,
+    demandSegment: null,
+    revenueAtRisk: null,
+    lastDropSize: null,
+    lastDropDays: null,
+    onOrderQty: null,
     ...overrides,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { Activity, Clock, Package, Timer, Undo2, Warehouse, X } from "lucide-react";
+import { Activity, Clock, DollarSign, Package, Timer, Truck, Undo2, Warehouse, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils/format-money";
 import {
   Tooltip,
   TooltipContent,
@@ -42,6 +43,9 @@ export function TriageRow({ item, onDismiss, onRestore }: TriageRowProps) {
   const ageStale = ageMs !== null && ageMs > STALENESS_BANNER_THRESHOLD_MS;
   const isFastSeller = getDemandCategory(item.demandVelocity) === "Fast seller";
   const stockoutColor = severity.text;
+  const isDrop = item.demandSegment === "drop";
+  const hasRevenueAtRisk = item.revenueAtRisk != null && item.revenueAtRisk > 0;
+  const hasOnOrder = item.onOrderQty != null && item.onOrderQty > 0;
 
   return (
     <div
@@ -88,6 +92,19 @@ export function TriageRow({ item, onDismiss, onRestore }: TriageRowProps) {
           >
             {severity.label}
           </span>
+          {isDrop && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium cursor-help bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                  Drop
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Sells in bursts and sells out fast. Order per drop rather than
+                by daily runway.
+              </TooltipContent>
+            </Tooltip>
+          )}
           {isFastSeller && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -150,6 +167,38 @@ export function TriageRow({ item, onDismiss, onRestore }: TriageRowProps) {
             </TooltipTrigger>
             <TooltipContent side="top">{METRIC_TOOLTIPS.daysToStockout}</TooltipContent>
           </Tooltip>
+          {hasRevenueAtRisk && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help text-red-700 dark:text-red-400">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  <span className="tabular-nums font-semibold">
+                    {formatMoney(item.revenueAtRisk)}
+                  </span>
+                  <span>at risk</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Estimated sales lost over the restock window if no order is
+                placed today (price × daily demand × lead time).
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {hasOnOrder && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help text-sky-700 dark:text-sky-400">
+                  <Truck className="h-3.5 w-3.5" />
+                  <span className="tabular-nums">{Math.round(item.onOrderQty!)}</span>
+                  <span>inbound</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Units already on a pending shipment — the suggested order
+                quantity nets these out.
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <span

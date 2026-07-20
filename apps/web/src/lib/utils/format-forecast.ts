@@ -130,11 +130,19 @@ export function getAccuracyColor(accuracy: number | null): string {
  * Computes a priority score for an item based on multiple factors.
  * Higher score = higher priority (needs attention sooner).
  *
- * Factors:
- * - Days to stockout (40%): Lower days = higher priority
- * - Demand velocity (30%): Higher velocity = higher priority
- * - Confidence (20%): Higher confidence = more reliable prediction
- * - Volatility penalty (10%): Higher volatility = less reliable
+ * Factors (when revenue at risk is known):
+ * - Revenue at risk (40%): dollars lost over the replenishment window if not
+ *   reordered — the dominant term, so the list is money-ordered
+ * - Days to stockout (25%): Lower days = higher priority
+ * - Demand velocity (15%): Higher velocity = higher priority
+ * - Confidence (15%): Higher confidence = more reliable prediction
+ * - Volatility penalty (5%): Higher volatility = less reliable
+ *
+ * Items without a money signal (no MSRP on the product, or a caller that
+ * predates the field) must not be structurally demoted by a zeroed 40%
+ * term — they keep the urgency-driven weighting (days 40%, velocity 30%,
+ * confidence 20%, volatility penalty 10%) so an out-of-stock item still
+ * ranks high.
  *
  * @returns Priority score from 0 to 1
  */
@@ -143,7 +151,10 @@ export function computePriorityScore(item: {
   demandVelocity: number | null;
   confidence: number;
   demandVolatility: number | null;
+  revenueAtRisk?: number | null;
 }): number {
+  const hasRevenueSignal = item.revenueAtRisk != null;
+
   // Days score: 0 days = 1.0, 30+ days = 0.0
   const daysScore =
     item.daysToStockout !== null
@@ -159,16 +170,33 @@ export function computePriorityScore(item: {
   // Confidence score: direct 0-1 value
   const confidenceScore = item.confidence ?? 0.5;
 
+  if (!hasRevenueSignal) {
+    const volatilityPenalty =
+      item.demandVolatility !== null
+        ? Math.min(0.1, item.demandVolatility * 0.1)
+        : 0;
+    return (
+      daysScore * 0.4 +
+      velocityScore * 0.3 +
+      confidenceScore * 0.2 -
+      volatilityPenalty
+    );
+  }
+
+  // Revenue score: normalized to $1000 max over the replenishment window
+  const revenueScore = Math.min(1, Math.max(0, item.revenueAtRisk!) / 1000);
+
   // Volatility penalty: higher volatility = lower score
   const volatilityPenalty =
     item.demandVolatility !== null
-      ? Math.min(0.1, item.demandVolatility * 0.1)
+      ? Math.min(0.05, item.demandVolatility * 0.05)
       : 0;
 
   return (
-    daysScore * 0.4 +
-    velocityScore * 0.3 +
-    confidenceScore * 0.2 -
+    revenueScore * 0.4 +
+    daysScore * 0.25 +
+    velocityScore * 0.15 +
+    confidenceScore * 0.15 -
     volatilityPenalty
   );
 }

@@ -26,6 +26,11 @@ function makeItem(overrides?: Partial<ActionItem>): ActionItem {
     urgency: "URGENT",
     overdue: false,
     computedAt: new Date().toISOString(),
+    demandSegment: null,
+    revenueAtRisk: null,
+    lastDropSize: null,
+    lastDropDays: null,
+    onOrderQty: null,
     ...overrides,
   };
 }
@@ -85,5 +90,46 @@ describe("TriageRow", () => {
   it("includes plain-language 'Why' copy", () => {
     renderRow({ item: makeItem({ urgency: "URGENT" }) });
     expect(screen.getByText(/order this week/i)).toBeInTheDocument();
+  });
+
+  it("shows Drop badge for drop-segment items", () => {
+    renderRow({ item: makeItem({ demandSegment: "drop" }) });
+    expect(screen.getByText("Drop")).toBeInTheDocument();
+  });
+
+  it("does not show Drop badge for continuous items", () => {
+    renderRow({ item: makeItem({ demandSegment: "continuous" }) });
+    expect(screen.queryByText("Drop")).not.toBeInTheDocument();
+  });
+
+  it("shows revenue at risk when positive", () => {
+    renderRow({ item: makeItem({ revenueAtRisk: 840 }) });
+    expect(screen.getByText("$840")).toBeInTheDocument();
+    expect(screen.getByText("at risk")).toBeInTheDocument();
+  });
+
+  it("hides revenue at risk when zero or null", () => {
+    renderRow({ item: makeItem({ revenueAtRisk: 0 }) });
+    expect(screen.queryByText("at risk")).not.toBeInTheDocument();
+  });
+
+  it("shows inbound units when on order", () => {
+    renderRow({ item: makeItem({ onOrderQty: 30 }) });
+    expect(screen.getByText("30")).toBeInTheDocument();
+    expect(screen.getByText("inbound")).toBeInTheDocument();
+  });
+
+  it("uses drop sell-through copy in Why line for drop items", () => {
+    renderRow({
+      item: makeItem({
+        demandSegment: "drop",
+        lastDropSize: 180,
+        lastDropDays: 1,
+        currentStock: 0,
+      }),
+    });
+    expect(
+      screen.getByText(/last drop of 180 units sold out in 1 day/i),
+    ).toBeInTheDocument();
   });
 });

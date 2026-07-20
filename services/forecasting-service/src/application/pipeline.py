@@ -13,6 +13,7 @@ from .. import config
 from .. import features as feat
 from .. import forecast as fc
 from .. import policy
+from .. import segmentation as seg
 from ..backtest import compute_mape
 from ..lead_time import compute_hierarchical_lead_time, compute_lead_time_stats
 from ..adapters.supabase_repo import SupabaseRepo
@@ -140,24 +141,49 @@ class ForecastingPipeline:
         )
 
         # Step 4: Build features
+        stockout_df = pd.DataFrame(columns=["item_id", "date", "is_stockout"])
+        # Items with actual movement history in the window. Zero-movement
+        # items unioned in below are cold-start for the category fallback.
+        covered_ids: set[str] = set()
         if movements_df.empty:
             logger.info("No movements found, using zero-demand baseline")
             features_df = self._create_zero_demand_features(items_df)
         else:
             daily_df = feat.build_daily_usage(movements_df)
+            # Stockout detection feeds both the censored-demand estimator and
+            # the demand-shape segmentation; compute it once and share.
+            if config.CENSORED_DEMAND_ENABLED or config.SEGMENTATION_ENABLED:
+                stockout_df = feat.detect_stockout_days(movements_df)
             # Censored-demand path: merge is_stockout so the MLE in
             # _dow_weighted_estimate can treat stockout rows as right-censored
             # observations ("demand was at least X") instead of either dropping
             # them or taking them at face value. Gated for safe rollback.
-            if config.CENSORED_DEMAND_ENABLED:
-                stockout_df = feat.detect_stockout_days(movements_df)
-                if not stockout_df.empty:
-                    daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
-                    daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
-                    stockout_pct = daily_df["is_stockout"].mean() * 100
-                    logger.debug("Censored demand ON: %.1f%% of item-days are stockout", stockout_pct)
+            if config.CENSORED_DEMAND_ENABLED and not stockout_df.empty:
+                daily_df = daily_df.merge(stockout_df, on=["item_id", "date"], how="left")
+                daily_df["is_stockout"] = daily_df["is_stockout"].fillna(False).astype(bool)
+                stockout_pct = daily_df["is_stockout"].mean() * 100
+                logger.debug("Censored demand ON: %.1f%% of item-days are stockout", stockout_pct)
             features_df = feat.build_stats(daily_df)
             logger.debug("Built features: %d rows", len(features_df))
+
+            # Coverage guarantee: build_daily_usage only emits rows for items
+            # present in movements_df, and _compute_forecasts inner-merges the
+            # estimates -- so an eligible item with zero movements in the
+            # lookback window would silently get no forecast row and stay
+            # stale forever. Union in a zero-demand baseline for those items.
+            covered_ids = set(features_df["item_id"].astype(str))
+            quiet_items = items_df[~items_df["item_id"].astype(str).isin(covered_ids)]
+            if not quiet_items.empty:
+                zero_df = self._create_zero_demand_features(quiet_items)
+                features_df = pd.concat([features_df, zero_df], ignore_index=True)
+                if "is_stockout" in features_df.columns:
+                    features_df["is_stockout"] = (
+                        features_df["is_stockout"].fillna(False).astype(bool)
+                    )
+                logger.info(
+                    "Added zero-demand baseline for %d items with no movements",
+                    len(quiet_items),
+                )
 
         # Step 5: Estimate demand parameters
         if features_df.empty:
@@ -173,7 +199,10 @@ class ForecastingPipeline:
         # Step 5a: Category-pooled fallback for cold-start items only
         cat_col = items_df["category_name"] if "category_name" in items_df.columns else pd.Series("Unknown", index=items_df.index)
         category_map = dict(zip(items_df["item_id"], cat_col))
-        items_with_history = set(features_df["item_id"].unique()) if not features_df.empty else set()
+        # Cold-start = no movements in the window. Must be the pre-union
+        # coverage set: the zero-demand baseline rows added above would
+        # otherwise count as "history" and keep the fallback from ever firing.
+        items_with_history = covered_ids
         estimates_df = fc.apply_category_fallback(estimates_df, category_map, items_with_history)
         logger.debug("Applied category fallback for cold-start items")
 
@@ -213,6 +242,54 @@ class ForecastingPipeline:
         cv_map = feat.compute_per_sku_cv(daily_df) if not movements_df.empty else {}
         prior_regimes = self._repo.get_latest_demand_regimes(item_list)
         regime_map = _resolve_regimes(item_list, cv_map, prior_regimes)
+
+        # Step 5c.2: demand-shape segmentation. Labels each SKU continuous /
+        # drop / dead / new from its sales shape so the policy layer can stop
+        # applying daily-mu math to drop products (whose zero-filled OOS days
+        # crush mu) and dead tail items (which pollute the at-risk list).
+        # SEGMENTATION_ENABLED persists labels observe-only; policy changes
+        # are separately gated by SEGMENT_POLICY_ENABLED in _compute_forecasts.
+        segment_map: dict[str, str] = {}
+        segment_signals_map: dict[str, dict] = {}
+        rate_map: dict[str, float] = {}
+        drop_qty_map: dict[str, float] = {}
+        if config.SEGMENTATION_ENABLED:
+            today = datetime.now(timezone.utc).date()
+            if not movements_df.empty:
+                first_activity = {
+                    str(iid): ts.date()
+                    for iid, ts in movements_df.groupby("item_id")["at"].min().items()
+                }
+                signals_df = seg.compute_segment_signals(
+                    daily_df,
+                    stockout_df=stockout_df,
+                    today=today,
+                    first_activity=first_activity,
+                )
+                prior_segments = self._repo.get_latest_demand_segments(item_list)
+                segment_map = seg.classify_segments(signals_df, prior_segments)
+                rate_map = {
+                    str(r.item_id): float(r.rate_while_available)
+                    for r in signals_df.itertuples(index=False)
+                }
+                drop_qty_map = seg.build_drop_order_qty(signals_df)
+                segment_signals_map = self._build_segment_signals_map(signals_df)
+            # Items with no movements at all in the lookback window never
+            # reach the classifier; split them new/dead by creation date so a
+            # product created days ago is not hidden as dead tail.
+            created_map: dict[str, object] = {}
+            if "created_at" in items_df.columns:
+                created_map = dict(
+                    zip(items_df["item_id"].astype(str), items_df["created_at"])
+                )
+            for iid in items_df["item_id"].astype(str):
+                segment_map.setdefault(
+                    iid, seg.classify_quiet_item(created_map.get(iid), today)
+                )
+            counts: dict[str, int] = {}
+            for label in segment_map.values():
+                counts[label] = counts.get(label, 0) + 1
+            logger.info("Segment distribution: %s", counts)
 
         # Step 5d: Phase 4 event multipliers. When the active method is the
         # events-aware variant, learn global SHIPMENT_RECEIPT / DISPLAY_SET
@@ -261,6 +338,13 @@ class ForecastingPipeline:
                     global_movements, item_list,
                 )
 
+        # Step 5e: units already inbound on PENDING shipments. Used by
+        # suggest_order v2 and the drop-segment order override so the same
+        # stock is not ordered twice. Failure degrades to "nothing inbound".
+        on_order_map: dict[str, float] = {}
+        if config.SUGGEST_ORDER_V2_ENABLED or config.SEGMENT_POLICY_ENABLED:
+            on_order_map = self._repo.get_on_order_quantities(item_list)
+
         # Step 6: Merge all data and compute policy
         forecasts_df = self._compute_forecasts(
             items_df=items_df,
@@ -273,6 +357,11 @@ class ForecastingPipeline:
             event_multipliers=event_multipliers,
             event_days_since=event_days_since,
             event_window_days=event_window_days,
+            segment_map=segment_map,
+            segment_signals_map=segment_signals_map,
+            rate_map=rate_map,
+            drop_qty_map=drop_qty_map,
+            on_order_map=on_order_map,
         )
 
         if forecasts_df.empty:
@@ -299,6 +388,14 @@ class ForecastingPipeline:
     def run_all(self) -> int:
         """Run the forecasting pipeline for all active items.
 
+        Happy path is a single full pass: cross-item pooled estimates
+        (shrinkage category means, supplier lead-time stats) must see the
+        whole catalog, not a chunk of it. Only when the full pass fails do we
+        retry in ``RUN_ALL_CHUNK_SIZE`` chunks with per-chunk error isolation
+        (degraded chunk-local pooling, but not stale). If every chunk fails
+        too, the error is raised so the caller sees the failure instead of a
+        successful-looking ``saved=0``.
+
         Returns:
             Number of forecast predictions saved.
         """
@@ -310,8 +407,43 @@ class ForecastingPipeline:
             logger.warning("No active items found")
             return 0
 
-        item_ids = set(items_df["item_id"].tolist())
-        return self.run_for_items(item_ids)
+        item_ids = items_df["item_id"].tolist()
+        try:
+            total_saved = self.run_for_items(set(item_ids))
+            logger.info(
+                "run_all complete: eligible=%d saved=%d failed_chunks=0",
+                len(item_ids),
+                total_saved,
+            )
+            return total_saved
+        except Exception:
+            logger.exception(
+                "run_all full pass failed; retrying in %d-item chunks",
+                config.RUN_ALL_CHUNK_SIZE,
+            )
+
+        chunk_size = max(config.RUN_ALL_CHUNK_SIZE, 1)
+        chunk_starts = range(0, len(item_ids), chunk_size)
+        total_saved = 0
+        failed_chunks = 0
+        for start in chunk_starts:
+            batch = set(item_ids[start : start + chunk_size])
+            try:
+                total_saved += self.run_for_items(batch)
+            except Exception:
+                failed_chunks += 1
+                logger.exception(
+                    "run_all chunk failed (%d items); continuing", len(batch)
+                )
+        logger.info(
+            "run_all complete: eligible=%d saved=%d failed_chunks=%d",
+            len(item_ids),
+            total_saved,
+            failed_chunks,
+        )
+        if failed_chunks == len(chunk_starts):
+            raise RuntimeError(f"run_all: all {failed_chunks} chunks failed")
+        return total_saved
 
     def _build_inventory_from_events(
         self,
@@ -342,6 +474,28 @@ class ForecastingPipeline:
         df["as_of_ts"] = pd.to_datetime(df["as_of_ts"], utc=True)
         df["current_qty"] = df["current_qty"].astype(int)
         return df
+
+    @staticmethod
+    def _build_segment_signals_map(signals_df: pd.DataFrame) -> dict[str, dict]:
+        """Project segment signals to JSON-safe per-item dicts for features JSONB."""
+        out: dict[str, dict] = {}
+        for row in signals_df.itertuples(index=False):
+            sig: dict = {
+                "window_days": int(row.window_days),
+                "sale_days": int(row.sale_days),
+                "total_units": round(float(row.total_units), 1),
+                "top3_share": round(float(row.top3_share), 4),
+                "stockout_frac": round(float(row.stockout_frac), 4),
+                "in_stock_days": int(row.in_stock_days),
+            }
+            dsls = float(row.days_since_last_sale)
+            sig["days_since_last_sale"] = None if dsls != dsls else dsls
+            lds = float(row.last_drop_size)
+            if lds == lds:  # not NaN
+                sig["last_drop_size"] = lds
+                sig["last_drop_days"] = int(row.last_drop_days)
+            out[str(row.item_id)] = sig
+        return out
 
     @staticmethod
     def _compute_event_days_since(
@@ -450,6 +604,11 @@ class ForecastingPipeline:
         event_multipliers: dict[str, float] | None = None,
         event_days_since: dict[str, dict[str, float]] | None = None,
         event_window_days: int = 7,
+        segment_map: dict[str, str] | None = None,
+        segment_signals_map: dict[str, dict] | None = None,
+        rate_map: dict[str, float] | None = None,
+        drop_qty_map: dict[str, float] | None = None,
+        on_order_map: dict[str, float] | None = None,
     ) -> pd.DataFrame:
         """Compute forecast predictions using vectorized operations.
 
@@ -542,6 +701,19 @@ class ForecastingPipeline:
             mu_hat = correction_df["mu_hat_corrected"]
             merged["mu_hat"] = mu_hat
 
+        # Segment policy routing (drop items): replace mu with the item's
+        # in-stock demand rate BEFORE the policy layer so safety stock, ROP,
+        # and days-to-stockout all follow. The zero-filled mu for a booster
+        # box that sells 6/day when stocked reads ~0.3/day; the rate override
+        # is what stops "stockout in 590 days" outputs on sold-out items.
+        if config.SEGMENT_POLICY_ENABLED and segment_map:
+            mu_before_segment = mu_hat.copy()
+            mu_hat, segment_applied = seg.apply_drop_mu_override(
+                mu_hat, merged["item_id"], segment_map, rate_map or {}
+            )
+            merged["mu_pre_segment"] = mu_before_segment.where(segment_applied)
+            merged["mu_hat"] = mu_hat
+
         # Handle lead_time_days column (may not exist)
         if "lead_time_days" in merged.columns:
             lead_time = merged["lead_time_days"].fillna(14).astype(float)
@@ -618,13 +790,45 @@ class ForecastingPipeline:
             epsilon=config.EPSILON_MU,
         )
 
-        suggested_qty = policy.suggest_order_vectorized(
-            current_qty=current_qty,
-            mu_hat=mu_hat,
-            L=lead_time,
-            safety_stock=ss,
-            target_days=config.TARGET_DAYS,
+        on_order_series = (
+            merged["item_id"].astype(str).map(on_order_map).fillna(0.0).astype(float)
+            if on_order_map
+            else pd.Series(0.0, index=merged.index)
         )
+
+        if config.SUGGEST_ORDER_V2_ENABLED:
+            suggested_qty = policy.suggest_order_v2_vectorized(
+                current_qty=current_qty,
+                mu_hat=mu_hat,
+                L=lead_time,
+                safety_stock=ss,
+                target_days=config.TARGET_DAYS,
+                on_order=on_order_series,
+            )
+        else:
+            suggested_qty = policy.suggest_order_vectorized(
+                current_qty=current_qty,
+                mu_hat=mu_hat,
+                L=lead_time,
+                safety_stock=ss,
+                target_days=config.TARGET_DAYS,
+            )
+
+        # Segment policy routing (post-policy): dead items get their urgency
+        # outputs suppressed (they are 2/3 of the at-risk noise), and drop
+        # items get an order-per-drop quantity instead of target-days cover.
+        if config.SEGMENT_POLICY_ENABLED and segment_map:
+            days_out, suggested_qty = seg.apply_dead_policy_mask(
+                days_out, suggested_qty, merged["item_id"], segment_map
+            )
+            suggested_qty = seg.apply_drop_qty_override(
+                suggested_qty,
+                current_qty,
+                merged["item_id"],
+                segment_map,
+                drop_qty_map or {},
+                on_order=on_order_series,
+            )
 
         # Confidence: 1/(1+CV) -- eliminates zero-confidence scores and
         # correlates well with actual prediction accuracy per backtest results.
@@ -655,6 +859,7 @@ class ForecastingPipeline:
         has_mu_pre_corr = "mu_hat_pre_correction" in merged.columns
         has_mu_pre_shrink = "mu_hat_pre_shrinkage" in merged.columns
         has_n_observed = "n_observed_days" in merged.columns
+        has_mu_pre_segment = "mu_pre_segment" in merged.columns
 
         for i in range(len(merged)):
             lt = float(lead_time_arr.iloc[i]) if isinstance(lead_time, pd.Series) else float(lead_time)
@@ -738,6 +943,41 @@ class ForecastingPipeline:
                 )
             if cv_map and item_id_str in cv_map:
                 feat_dict["cv"] = round(float(cv_map[item_id_str]), 4)
+
+            # Demand-shape segment + the signals that produced it. Persisted
+            # even in observe-only mode so label distributions can be tuned
+            # from live data before SEGMENT_POLICY_ENABLED flips, and so the
+            # Java layer / "why this number" drawer can read the segment.
+            if segment_map and item_id_str in segment_map:
+                seg_label = segment_map[item_id_str]
+                feat_dict["demand_segment"] = seg_label
+                # Marker the Java read path keys policy behavior off (dead
+                # exclusion, drop velocity swap). Observe-only runs persist
+                # labels WITHOUT it, so downstream consumers stay inert until
+                # SEGMENT_POLICY_ENABLED actually changes outputs.
+                if config.SEGMENT_POLICY_ENABLED:
+                    feat_dict["segment_policy_applied"] = True
+                sig = (segment_signals_map or {}).get(item_id_str)
+                if sig:
+                    feat_dict["segment_signals"] = sig
+                if seg_label == seg.SEGMENT_DROP:
+                    if rate_map and item_id_str in rate_map:
+                        feat_dict["rate_while_available"] = round(
+                            float(rate_map[item_id_str]), 4
+                        )
+                    if drop_qty_map and item_id_str in drop_qty_map:
+                        feat_dict["drop_order_qty"] = round(
+                            float(drop_qty_map[item_id_str]), 1
+                        )
+            if has_mu_pre_segment:
+                v = merged["mu_pre_segment"].iloc[i]
+                if pd.notna(v):
+                    feat_dict["mu_pre_segment"] = round(float(v), 4)
+
+            # Inbound units on PENDING shipments, netted out of suggested
+            # order quantities and shown in the "why this number" drawer.
+            if on_order_map and item_id_str in on_order_map:
+                feat_dict["on_order_qty"] = round(float(on_order_map[item_id_str]), 1)
 
             # Phase 4 event-feature state: persist the learned global multipliers
             # plus per-SKU days-since-event so the accuracy SQL can replay the

@@ -151,6 +151,7 @@ def run_method_comparison(
     horizon_days: int = 14,
     lookback_days: int | None = None,
     metric: str = "lt_wape",
+    group_by: str = "category",
 ) -> pd.DataFrame:
     """Run a walk-forward backtest comparing forecast methods on live data.
 
@@ -170,13 +171,21 @@ def run_method_comparison(
       actual. Brutal on point estimates of bursty demand (most days are 0 or a
       burst) but useful as a diagnostic. The "scored" column is item-days.
 
-    Returns a per-(method, category) DataFrame with WAPE, bias, scored count,
-    and total units sold. Use these numbers as the Phase 1 ship gate.
+    Returns a per-(method, group) DataFrame with WAPE, bias, scored count,
+    and total units sold, where the group dimension is ``group_by``:
+    ``"category"`` (default) or ``"segment"`` (demand-shape segments,
+    classified per origin from the history window with empty priors). The
+    segment view is the ship gate for segment policy routing: drop-segment
+    WAPE must improve without a continuous-segment regression.
     """
     # Imported lazily so unit tests that hit compute_mape do not require DB.
     from . import features as feat
     from . import forecast as fc
+    from . import segmentation
     from .adapters.supabase_repo import SupabaseRepo
+
+    if group_by not in ("category", "segment"):
+        raise ValueError(f"group_by must be 'category' or 'segment', got {group_by!r}")
 
     lookback = lookback_days if lookback_days is not None else max(
         config.ROLLING_WINDOW * 2, config.CV_WINDOW_DAYS
@@ -238,6 +247,17 @@ def run_method_comparison(
             feat.build_daily_usage(actual_mv) if not actual_mv.empty
             else pd.DataFrame(columns=["item_id", "date", "consumption"])
         )
+
+        # Segment dimension: classify each item's demand shape from the same
+        # history window the estimators see (empty priors -- each origin is
+        # scored on what would have been known at that time).
+        segment_by_item: dict[str, str] = {}
+        if group_by == "segment":
+            seg_stockout = feat.detect_stockout_days(history_mv)
+            seg_signals = segmentation.compute_segment_signals(
+                history_daily, stockout_df=seg_stockout, today=origin.date(),
+            )
+            segment_by_item = segmentation.classify_segments(seg_signals)
 
         # Index actual consumption by (item_id, date) for fast lookup.
         if actual_daily.empty:
@@ -339,6 +359,7 @@ def run_method_comparison(
                         "origin_days_ago": origin_days_ago,
                         "item_id": item_id,
                         "category": category,
+                        "segment": segment_by_item.get(item_id, "continuous"),
                         "date": date,
                         "predicted": predicted,
                         "actual": float(actual),
@@ -356,25 +377,25 @@ def run_method_comparison(
 
     if not rows:
         return pd.DataFrame(columns=[
-            "method", "category", "scored", "wape", "bias", "units_sold"
+            "method", group_by, "scored", "wape", "bias", "units_sold"
         ])
 
     df = pd.DataFrame(rows)
     if metric == "daily_wape":
-        return _aggregate_daily(df)
+        return _aggregate_daily(df, dimension=group_by)
     if metric == "lt_wape":
-        return _aggregate_lead_time(df)
+        return _aggregate_lead_time(df, dimension=group_by)
     raise ValueError(f"Unknown metric: {metric!r}. Use 'lt_wape' or 'daily_wape'.")
 
 
-def _aggregate_daily(df: pd.DataFrame) -> pd.DataFrame:
+def _aggregate_daily(df: pd.DataFrame, dimension: str = "category") -> pd.DataFrame:
     """Daily WAPE: every (item, day, origin) row contributes one |error|.
 
     Useful diagnostic but unfair to point estimates of intermittent demand --
     most days are zero or a burst, so a constant rate forecast always looks
     wrong on individual days even when the rate is correct.
     """
-    grouped = df.groupby(["method", "category"], as_index=False)
+    grouped = df.groupby(["method", dimension], as_index=False)
     return grouped.apply(_daily_category_metrics, include_groups=False).reset_index(drop=True)
 
 
@@ -391,7 +412,7 @@ def _daily_category_metrics(g: pd.DataFrame) -> pd.Series:
     })
 
 
-def _aggregate_lead_time(df: pd.DataFrame) -> pd.DataFrame:
+def _aggregate_lead_time(df: pd.DataFrame, dimension: str = "category") -> pd.DataFrame:
     """Lead-time WAPE: each (item, origin) gets summed predicted vs summed actual.
 
     For a forecast that estimates a daily rate, the right test is whether
@@ -400,7 +421,7 @@ def _aggregate_lead_time(df: pd.DataFrame) -> pd.DataFrame:
     correct-on-average rate forecast pass even when daily actuals are lumpy.
     """
     per_item = df.groupby(
-        ["method", "origin_days_ago", "item_id", "category"], as_index=False,
+        ["method", "origin_days_ago", "item_id", dimension], as_index=False,
     ).agg(
         actual_sum=("actual", "sum"),
         days_count=("actual", "count"),
@@ -412,7 +433,7 @@ def _aggregate_lead_time(df: pd.DataFrame) -> pd.DataFrame:
     per_item["abs_err"] = (per_item["predicted_sum"] - per_item["actual_sum"]).abs()
     per_item["signed_err"] = per_item["predicted_sum"] - per_item["actual_sum"]
 
-    agg = per_item.groupby(["method", "category"], as_index=False).agg(
+    agg = per_item.groupby(["method", dimension], as_index=False).agg(
         scored=("actual_sum", "count"),
         units_sold=("actual_sum", "sum"),
         abs_err_total=("abs_err", "sum"),
@@ -428,7 +449,7 @@ def _aggregate_lead_time(df: pd.DataFrame) -> pd.DataFrame:
         agg["signed_err_total"] / agg["scored"].clip(lower=1),
         np.nan,
     )
-    return agg[["method", "category", "scored", "units_sold", "wape", "bias"]]
+    return agg[["method", dimension, "scored", "units_sold", "wape", "bias"]]
 
 
 def evaluate_ship_gate(
@@ -436,6 +457,7 @@ def evaluate_ship_gate(
     new_method: str,
     baseline_method: str,
     category_regression_limit: float = 0.25,
+    dimension: str = "category",
 ) -> dict:
     """Apply the Phase 1 ship gate to a method-comparison DataFrame.
 
@@ -463,11 +485,11 @@ def evaluate_ship_gate(
 
     regressed = []
     new_by_cat = dict(
-        zip(comparison_df[comparison_df["method"] == new_method]["category"],
+        zip(comparison_df[comparison_df["method"] == new_method][dimension],
             comparison_df[comparison_df["method"] == new_method]["wape"])
     )
     base_by_cat = dict(
-        zip(comparison_df[comparison_df["method"] == baseline_method]["category"],
+        zip(comparison_df[comparison_df["method"] == baseline_method][dimension],
             comparison_df[comparison_df["method"] == baseline_method]["wape"])
     )
     for cat, new_wape in new_by_cat.items():
@@ -535,6 +557,16 @@ def main() -> None:
         "--baseline", default="dow_weighted", help="Baseline method for the ship gate."
     )
     parser.add_argument(
+        "--by",
+        default="category",
+        choices=["category", "segment"],
+        help=(
+            "Grouping dimension for the report. 'segment' classifies items by "
+            "demand shape (continuous/drop/dead/new) per origin -- use it to "
+            "gate segment policy routing changes."
+        ),
+    )
+    parser.add_argument(
         "--metric",
         default="lt_wape",
         choices=["lt_wape", "daily_wape"],
@@ -556,11 +588,13 @@ def main() -> None:
         horizon_days=args.horizon,
         lookback_days=args.lookback,
         metric=args.metric,
+        group_by=args.by,
     )
     gate = evaluate_ship_gate(
         comparison_df=comparison_df,
         new_method=args.new_method,
         baseline_method=args.baseline,
+        dimension=args.by,
     )
     print(f"Metric: {args.metric}\n")
     print(_format_report(comparison_df, gate))
