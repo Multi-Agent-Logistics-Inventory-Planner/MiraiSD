@@ -38,7 +38,7 @@ public class ReviewController {
     }
 
     @GetMapping("/users/all")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<List<UserResponseDTO>> getAllUsersForReviewManagement() {
         return ResponseEntity.ok(reviewService.getAllUsersForReviewManagement());
     }
@@ -49,7 +49,7 @@ public class ReviewController {
     }
 
     @PutMapping("/users/{id}/tracking")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<UserResponseDTO> updateUserReviewTracking(
             @PathVariable UUID id,
             @RequestBody UserReviewTrackingRequestDTO request) {

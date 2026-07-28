@@ -21,6 +21,7 @@ import {
 import { getReviewSummaries } from "@/lib/api/reviews";
 import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
+import { Permission } from "@/lib/rbac";
 import { ManageEmployeesDialog, UserStatsDialog } from "@/components/reviews";
 import { Settings, Star, ChevronLeft, ChevronRight, CalendarIcon, Trophy, Medal } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -162,7 +163,8 @@ function LeaderboardTable({
 }
 
 export function TabReviews() {
-  const { isAdmin } = usePermissions();
+  const { can } = usePermissions();
+  const canManageReviews = can(Permission.REVIEWS_MANAGE);
   const currentDateRef = useRef(new Date());
   const currentDate = currentDateRef.current;
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
@@ -280,7 +282,7 @@ export function TabReviews() {
           </PopoverContent>
         </Popover>
 
-        {isAdmin && (
+        {canManageReviews && (
           <Button
             variant="outline"
             onClick={() => setIsManageDialogOpen(true)}
