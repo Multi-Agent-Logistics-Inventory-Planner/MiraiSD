@@ -101,12 +101,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (s.carrierStatus IS NULL " +
             "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (s.carrierStatus IS NULL " +
             "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))")
     Page<Shipment> findActiveShipments(Pageable pageable);
@@ -115,13 +115,13 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (s.carrierStatus IS NULL " +
             "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED)) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (s.carrierStatus IS NULL " +
             "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED)) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
@@ -133,11 +133,11 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)")
     Page<Shipment> findAwaitingReceiptShipments(Pageable pageable);
 
     @Query(value = "SELECT s FROM Shipment s " +
@@ -145,12 +145,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findAwaitingReceiptShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
 
@@ -159,21 +159,21 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)",
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)")
     Page<Shipment> findPartialShipments(Pageable pageable);
 
     @Query(value = "SELECT s FROM Shipment s " +
             "LEFT JOIN FETCH s.createdBy " +
             "LEFT JOIN FETCH s.receivedBy " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)",
             countQuery = "SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (LOWER(s.shipmentNumber) LIKE :searchPattern OR LOWER(s.supplierName) LIKE :searchPattern)")
     Page<Shipment> findPartialShipmentsWithSearch(@Param("searchPattern") String searchPattern, Pageable pageable);
 
@@ -217,7 +217,7 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     // Counts (mirror the page queries above)
     @Query("SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0) " +
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0) " +
             "AND (s.carrierStatus IS NULL " +
             "     OR s.carrierStatus NOT IN (com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED, com.mirai.inventoryservice.models.enums.CarrierStatus.FAILED))")
     long countActiveShipments();
@@ -225,12 +225,12 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
     @Query("SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
             "AND s.carrierStatus = com.mirai.inventoryservice.models.enums.CarrierStatus.DELIVERED " +
-            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+            "AND NOT EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)")
     long countAwaitingReceiptShipments();
 
     @Query("SELECT COUNT(s) FROM Shipment s " +
             "WHERE s.status = com.mirai.inventoryservice.models.enums.ShipmentStatus.PENDING " +
-            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND si.receivedQuantity > 0)")
+            "AND EXISTS (SELECT 1 FROM ShipmentItem si WHERE si.shipment = s AND (si.receivedQuantity + si.damagedQuantity + si.displayQuantity + si.shopQuantity) > 0)")
     long countPartialShipments();
 
     @Query("SELECT COUNT(s) FROM Shipment s WHERE s.status = :status")
