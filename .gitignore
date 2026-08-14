@@ -190,6 +190,41 @@ docs/
 .env*.local
 
 # ============================================
+# REVIEWED ARCHITECTURE DOCUMENTATION
+# Keep personal/working Markdown ignored while allowing the maintained docs below.
+# ============================================
+!docs/
+docs/*
+!docs/README.md
+!docs/adr/
+docs/adr/*
+!docs/adr/0001-spring-domain-modular-monolith.md
+!docs/roadmap/
+docs/roadmap/*
+!docs/roadmap/enterprise-modernization.md
+!docs/specs/
+docs/specs/*
+!docs/specs/spring-domain-modular-monolith.md
+!docs/specs/authentication-and-authorization.md
+!docs/specs/multi-site-data-and-api.md
+!docs/specs/client-applications.md
+!docs/specs/events-and-replica-readiness.md
+!docs/specs/production-platform.md
+!docs/plans/
+docs/plans/*
+!docs/plans/spring-domain-modular-monolith-migration.md
+!docs/plans/enterprise-modernization.md
+!docs/baseline/
+docs/baseline/*
+!docs/baseline/phase-0-baseline.md
+!docs/baseline/system-inventory.md
+!docs/baseline/tenant-migration-worksheet.md
+!docs/baseline/api-v1-map.md
+!docs/templates/
+docs/templates/*
+!docs/templates/phase-cost-impact.md
+
+# ============================================
 # Experiment data & results
 # ============================================
 services/forecasting-service/experiments/data/
