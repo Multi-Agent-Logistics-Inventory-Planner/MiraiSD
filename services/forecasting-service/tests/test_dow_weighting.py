@@ -1,8 +1,7 @@
 import pandas as pd
-import numpy as np
 
-from src.forecast import estimate_mu_sigma, _dow_weighted_estimate
 from src import config
+from src.forecast import _dow_weighted_estimate, estimate_mu_sigma
 
 
 def _make_features_with_dow(days: int = 28, base_consumption: float = 5.0,

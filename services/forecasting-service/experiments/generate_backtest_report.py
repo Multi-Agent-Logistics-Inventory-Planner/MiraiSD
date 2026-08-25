@@ -20,6 +20,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
@@ -61,8 +62,8 @@ def prepare_data(movements, products):
     daily_all["date"] = pd.to_datetime(daily_all["date"])
     daily_with_stockout["date"] = pd.to_datetime(daily_with_stockout["date"])
 
-    category_map = dict(zip(products["item_id"], products["category_name"]))
-    name_map = dict(zip(products["item_id"], products["name"]))
+    category_map = dict(zip(products["item_id"], products["category_name"], strict=False))
+    name_map = dict(zip(products["item_id"], products["name"], strict=False))
 
     return daily_all, daily_with_stockout, category_map, name_map
 
@@ -171,13 +172,13 @@ def fig_summary_comparison(old_m, new_m):
     colors_old = "#4A90D9"
     colors_new = "#E8833A"
 
-    for ax, (label, key, note) in zip(axes, metrics):
+    for ax, (label, key, note) in zip(axes, metrics, strict=False):
         vals = [old_m[key], new_m[key]]
         bars = ax.bar(["Old", "New"], vals, color=[colors_old, colors_new], width=0.5)
         ax.set_title(f"{label}\n({note})", fontsize=10)
         ax.set_ylabel(label)
 
-        for bar, val in zip(bars, vals):
+        for bar, val in zip(bars, vals, strict=False):
             fmt = f"{val:+.4f}" if key == "bias" else f"{val:.4f}" if "mae" in key or "rmse" in key else f"{val:.1f}%"
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                     fmt, ha="center", va="bottom", fontsize=9, fontweight="bold")
@@ -333,13 +334,13 @@ def fig_category_breakdown(old_preds, new_preds, category_map):
     y = np.arange(len(cat_compare))
     height = 0.35
 
-    bars_old = ax.barh(y - height / 2, cat_compare["mae_old"], height,
+    ax.barh(y - height / 2, cat_compare["mae_old"], height,
                        color="#4A90D9", alpha=0.8, label="Old Pipeline")
-    bars_new = ax.barh(y + height / 2, cat_compare["mae_new"], height,
+    ax.barh(y + height / 2, cat_compare["mae_new"], height,
                        color="#E8833A", alpha=0.8, label="New Pipeline")
 
     labels = [f"{cat} (n={int(n)})" for cat, n in
-              zip(cat_compare.index, cat_compare["n_predictions"])]
+              zip(cat_compare.index, cat_compare["n_predictions"], strict=False)]
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=9)
     ax.set_xlabel("MAE")

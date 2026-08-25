@@ -2,7 +2,6 @@
 import pandas as pd
 import pytest
 
-from src import config
 from src.forecast import apply_shrinkage
 
 
@@ -19,7 +18,7 @@ def test_high_n_item_essentially_unchanged():
         _est_row("D", mu=2.0, n=80),
         _est_row("E", mu=4.0, n=80),
     ])
-    category_map = {iid: "toys" for iid in ["A", "B", "C", "D", "E"]}
+    category_map = dict.fromkeys(["A", "B", "C", "D", "E"], "toys")
 
     result = apply_shrinkage(estimates, category_map, strength=10.0, min_category_items=5)
 
@@ -38,7 +37,7 @@ def test_low_n_item_pulled_hard_toward_category():
         _est_row("D", mu=0.9, n=80),
         _est_row("E", mu=1.1, n=80),
     ])
-    category_map = {iid: "toys" for iid in ["A", "B", "C", "D", "E"]}
+    category_map = dict.fromkeys(["A", "B", "C", "D", "E"], "toys")
 
     result = apply_shrinkage(estimates, category_map, strength=10.0, min_category_items=5)
 
@@ -87,7 +86,7 @@ def test_n_zero_item_not_shrunk():
         _est_row("D", mu=3.0, n=50),
         _est_row("E", mu=3.5, n=50),
     ])
-    category_map = {iid: "toys" for iid in ["A", "B", "C", "D", "E"]}
+    category_map = dict.fromkeys(["A", "B", "C", "D", "E"], "toys")
 
     result = apply_shrinkage(estimates, category_map, strength=10.0, min_category_items=5)
     a = result.loc[result["item_id"] == "A", "mu_hat"].iloc[0]
@@ -103,7 +102,7 @@ def test_pre_shrinkage_column_preserved():
         _est_row("D", mu=1.0, n=80),
         _est_row("E", mu=1.0, n=80),
     ])
-    category_map = {iid: "toys" for iid in ["A", "B", "C", "D", "E"]}
+    category_map = dict.fromkeys(["A", "B", "C", "D", "E"], "toys")
 
     result = apply_shrinkage(estimates, category_map, strength=10.0, min_category_items=5)
     a_pre = result.loc[result["item_id"] == "A", "mu_hat_pre_shrinkage"].iloc[0]

@@ -4,18 +4,15 @@ TDD Step 1: RED - These tests should FAIL initially because
 vectorized functions do not exist yet.
 """
 
-import math
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.policy import (
     compute_safety_stock,
     days_to_stockout,
     reorder_point,
     suggest_order,
-    z_for_service_level,
 )
 
 
@@ -295,13 +292,14 @@ class TestVectorizedPolicyEdgeCases:
 
     def test_large_dataset_performance(self):
         """Vectorized functions should handle large datasets efficiently."""
+        import time
+
         from src.policy import (
             compute_safety_stock_vectorized,
             days_to_stockout_vectorized,
             reorder_point_vectorized,
             suggest_order_vectorized,
         )
-        import time
 
         n = 10000
         np.random.seed(42)

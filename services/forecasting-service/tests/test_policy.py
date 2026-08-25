@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 
 from src.policy import (
-    z_for_service_level,
-    sigma_lead_time,
     compute_safety_stock,
     compute_safety_stock_vectorized,
-    reorder_point,
     days_to_stockout,
+    reorder_point,
+    sigma_lead_time,
     suggest_order,
+    z_for_service_level,
 )
 
 
@@ -65,7 +65,7 @@ def test_policy_edge_cases_with_prints():
     # Invalid alpha should raise
     try:
         _ = z_for_service_level(1.5)
-        assert False, "Expected ValueError for invalid alpha"
+        raise AssertionError("Expected ValueError for invalid alpha")
     except ValueError:
         pass
 

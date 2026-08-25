@@ -30,9 +30,9 @@ if _service_root not in sys.path:
 import numpy as np
 import pandas as pd
 
+from src.config import MU_FLOOR, SIGMA_FLOOR
 from src.features import build_daily_usage, build_stats
 from src.forecast import estimate_mu_sigma
-from src.config import MU_FLOOR, SIGMA_FLOOR
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -141,7 +141,7 @@ def print_stockout_summary(stockout_days: pd.DataFrame, daily_usage: pd.DataFram
     total_seller_days = len(seller_stockouts)
     stockout_count = seller_stockouts["is_stockout"].sum()
 
-    print(f"\n  === STOCKOUT ANALYSIS ===")
+    print("\n  === STOCKOUT ANALYSIS ===")
     print(f"  Total item-days for selling items: {total_seller_days}")
     print(f"  Days with stockout (inventory = 0): {stockout_count} ({stockout_count/max(total_seller_days,1)*100:.1f}%)")
     print(f"  Days in stock: {total_seller_days - stockout_count}")
@@ -612,7 +612,7 @@ def main():
     products, movements, inventory = load_snapshot(data_dir)
     print(f"  Products: {len(products)}, Movements: {len(movements)}")
 
-    category_map = dict(zip(products["item_id"], products["category_name"]))
+    category_map = dict(zip(products["item_id"], products["category_name"], strict=False))
     print(f"  Categories: {products['category_name'].nunique()} unique")
 
     print("\nDetecting stockouts from inventory levels...")

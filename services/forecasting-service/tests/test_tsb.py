@@ -1,8 +1,8 @@
 import pandas as pd
 
+from src import config
 from src.estimators.tsb import tsb_estimate
 from src.forecast import estimate_mu_sigma
-from src import config
 
 
 def _daily_series(consumption: list[float], item_id: str = "A", start: str = "2026-03-01") -> pd.DataFrame:

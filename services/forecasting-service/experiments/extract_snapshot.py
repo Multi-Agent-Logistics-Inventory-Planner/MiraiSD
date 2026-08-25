@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote, urlparse, urlunparse
 
 import pandas as pd
 from sqlalchemy import create_engine, text
-
 
 LOOKBACK_DAYS = 45  # 14d warm-up for rolling stats + ~30d actual data
 
@@ -77,7 +76,7 @@ def extract_products(engine) -> pd.DataFrame:
 
 
 def extract_stock_movements(engine, lookback_days: int) -> pd.DataFrame:
-    end_ts = datetime.now(timezone.utc)
+    end_ts = datetime.now(UTC)
     start_ts = end_ts - timedelta(days=lookback_days)
     query = """
         SELECT

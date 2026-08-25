@@ -16,9 +16,10 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -60,8 +61,8 @@ def load_and_run():
         daily["is_stockout"] = daily["is_stockout"].fillna(False).astype(bool)
     daily["date"] = pd.to_datetime(daily["date"])
 
-    category_map = dict(zip(products["item_id"], products["category_name"]))
-    name_map = dict(zip(products["item_id"], products["name"]))
+    category_map = dict(zip(products["item_id"], products["category_name"], strict=False))
+    name_map = dict(zip(products["item_id"], products["name"], strict=False))
 
     # Walk-forward backtest
     date_min = daily["date"].min()
@@ -171,7 +172,7 @@ def fig_predicted_vs_actual(df):
     ax.text(0.98, 0.05,
             f"MAE: {mae:.2f} units/day\n{within_1:.0f}% within 1 unit",
             transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=10, bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.8))
+            fontsize=10, bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.8})
 
     plt.tight_layout()
     fig.savefig(OUT_DIR / "1_predicted_vs_actual.png", dpi=150, bbox_inches="tight")
@@ -193,7 +194,7 @@ def fig_error_distribution(df):
     n, bin_edges, patches = ax.hist(errors, bins=bins, color=BLUE, alpha=0.8, edgecolor="white")
 
     # Color bars: green if within 1 unit of zero
-    for patch, left, right in zip(patches, bin_edges[:-1], bin_edges[1:]):
+    for patch, left, right in zip(patches, bin_edges[:-1], bin_edges[1:], strict=False):
         if abs((left + right) / 2) <= 1.0:
             patch.set_facecolor(GREEN)
             patch.set_alpha(0.85)
@@ -218,7 +219,7 @@ def fig_error_distribution(df):
             f"Within ±1 unit: {within_1:.1f}%\n"
             f"Within ±2 units: {within_2:.1f}%",
             transform=ax.transAxes, va="top", fontsize=10,
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.85))
+            bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.85})
 
     plt.tight_layout()
     fig.savefig(OUT_DIR / "2_error_distribution.png", dpi=150, bbox_inches="tight")
@@ -260,7 +261,7 @@ def fig_per_item_accuracy(df):
     ax1.set_xlabel("Average Error (units/day)", fontsize=11)
     ax1.set_title("5 Most Accurately Predicted Items", fontsize=11, fontweight="bold")
     ax1.set_xlim(0, 1.8)
-    for bar, val in zip(bars1, top_5["mae"]):
+    for bar, val in zip(bars1, top_5["mae"], strict=False):
         ax1.text(val + 0.02, bar.get_y() + bar.get_height() / 2,
                  f"{val:.2f}", va="center", fontsize=10, fontweight="bold", color=DARK)
     ax1.text(1.02, -0.5, "1 unit", fontsize=8, color=GRAY,
@@ -275,7 +276,7 @@ def fig_per_item_accuracy(df):
     ax2.set_xlabel("Average Error (units/day)", fontsize=11)
     ax2.set_title("5 Hardest-to-Predict Items", fontsize=11, fontweight="bold")
     ax2.set_xlim(0, worst_5["mae"].max() * 1.3)
-    for bar, val in zip(bars2, worst_5["mae"]):
+    for bar, val in zip(bars2, worst_5["mae"], strict=False):
         ax2.text(val + 0.1, bar.get_y() + bar.get_height() / 2,
                  f"{val:.2f}", va="center", fontsize=10, fontweight="bold", color=DARK)
     ax2.grid(True, axis="x", alpha=0.15)
@@ -295,8 +296,8 @@ def fig_per_item_accuracy(df):
         1.08, 0.5, explanation,
         transform=ax2.transAxes,
         fontsize=9, va="center", ha="left",
-        bbox=dict(boxstyle="round,pad=0.6", facecolor="#FFF8F0",
-                  edgecolor=ORANGE, linewidth=1.2),
+        bbox={"boxstyle": "round,pad=0.6", "facecolor": "#FFF8F0",
+                  "edgecolor": ORANGE, "linewidth": 1.2},
         multialignment="left",
     )
 
@@ -324,14 +325,14 @@ def fig_category_accuracy(df):
 
     colors = [GREEN if m <= 1.0 else ORANGE if m <= 2.5 else RED for m in cat_stats["mae"]]
     bars = ax.barh(
-        [f"{c} ({n} items)" for c, n in zip(cat_stats["category"], cat_stats["n_items"])],
+        [f"{c} ({n} items)" for c, n in zip(cat_stats["category"], cat_stats["n_items"], strict=False)],
         cat_stats["mae"],
         color=colors, alpha=0.85
     )
     ax.axvline(1.0, color=GRAY, linestyle="--", alpha=0.6, linewidth=1.5, label="1 unit/day")
     ax.axvline(2.0, color=GRAY, linestyle=":", alpha=0.4, linewidth=1.5, label="2 units/day")
 
-    for bar, val, w1 in zip(bars, cat_stats["mae"], cat_stats["within_1"]):
+    for bar, val, w1 in zip(bars, cat_stats["mae"], cat_stats["within_1"], strict=False):
         ax.text(val + 0.02, bar.get_y() + bar.get_height() / 2,
                 f"{val:.2f}  ({w1:.0f}% within 1)",
                 va="center", fontsize=8.5)
@@ -370,7 +371,7 @@ def fig_cumulative_accuracy(df):
         (2.0, "2 units/day\n(order 2 items off)", ORANGE),
         (5.0, "5 units/day", RED),
     ]
-    for threshold, label, color in milestones:
+    for threshold, _label, color in milestones:
         pct_at = float((abs_errors <= threshold).mean()) * 100
         ax.axvline(threshold, color=color, linestyle="--", alpha=0.5, linewidth=1.5)
         ax.annotate(
@@ -378,8 +379,8 @@ def fig_cumulative_accuracy(df):
             xy=(threshold, pct_at),
             xytext=(threshold + 0.3, pct_at - 10),
             fontsize=9.5,
-            arrowprops=dict(arrowstyle="->", color=DARK, lw=1.2),
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.85),
+            arrowprops={"arrowstyle": "->", "color": DARK, "lw": 1.2},
+            bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.85},
         )
 
     ax.axhline(50, color=GRAY, linestyle=":", alpha=0.3)
@@ -417,9 +418,9 @@ def fig_scorecard(df, meta):
 
     # Grade each metric
     def grade(value, thresholds, labels):
-        for t, l in zip(thresholds, labels):
+        for t, label in zip(thresholds, labels, strict=False):
             if value <= t:
-                return l
+                return label
         return labels[-1]
 
     mae_grade = grade(mae, [1.0, 2.0, 3.5], ["Excellent", "Good", "Fair", "Poor"])
@@ -476,8 +477,8 @@ def fig_scorecard(df, meta):
                 fontsize=8.5, color="#666666", multialignment="center")
         ax.text(x, 4.0, g, ha="center", va="center",
                 fontsize=11, fontweight="bold", color=color,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor=color + "22",
-                          edgecolor=color, linewidth=1.2))
+                bbox={"boxstyle": "round,pad=0.3", "facecolor": color + "22",
+                          "edgecolor": color, "linewidth": 1.2})
 
     # Also show within 1 unit
     ax.text(6, 3.1,

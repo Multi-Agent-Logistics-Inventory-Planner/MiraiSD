@@ -91,7 +91,7 @@ def write_forecasts(forecasts_df: pd.DataFrame) -> Path:
     df = forecasts_df.copy()
     if "id" not in df.columns:
         df.insert(0, "id", [str(uuid.uuid4()) for _ in range(len(df))])
-    df = df[[c for c in FORECAST_OUTPUT_COLUMNS]]
+    df = df[list(FORECAST_OUTPUT_COLUMNS)]
     df.to_csv(out_path, index=False)
     return out_path
 

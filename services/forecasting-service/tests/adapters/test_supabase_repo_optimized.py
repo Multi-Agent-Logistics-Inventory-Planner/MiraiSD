@@ -5,16 +5,14 @@ This module contains tests for:
 2. upsert_forecasts() - Batch INSERT using single execute() call instead of N+1 pattern
 """
 
-from unittest.mock import MagicMock, patch, call
 import json
-import re
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # Mock kafka module and submodules before any src imports
 mock_kafka = MagicMock()
@@ -113,7 +111,7 @@ class TestUpsertForecastsBatch:
         # Create test DataFrame with 5 forecast rows
         test_df = pd.DataFrame({
             "item_id": [str(uuid.uuid4()) for _ in range(5)],
-            "computed_at": [datetime.now(timezone.utc)] * 5,
+            "computed_at": [datetime.now(UTC)] * 5,
             "horizon_days": [14] * 5,
             "avg_daily_delta": np.random.uniform(-5, 0, 5),
             "days_to_stockout": np.random.uniform(1, 30, 5),

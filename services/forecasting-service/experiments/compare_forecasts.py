@@ -13,27 +13,28 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVICE_ROOT))
 
 from unittest.mock import MagicMock
+
 sys.modules["kafka"] = MagicMock()
 sys.modules["kafka.errors"] = MagicMock()
 
 import pydantic
+
 if not hasattr(pydantic, "field_validator"):
     pydantic.field_validator = lambda *a, **kw: lambda f: f
 
 import numpy as np
 import pandas as pd
 
-from src import config
+from src import config, policy
 from src import features as feat
 from src import forecast as fc
-from src import policy
 from src.adapters.supabase_repo import SupabaseRepo
 
 
@@ -96,7 +97,7 @@ def run_new_forecasts(repo: SupabaseRepo) -> pd.DataFrame:
 
     # Load movements
     lookback_days = config.ROLLING_WINDOW * 2
-    end_ts = datetime.now(timezone.utc)
+    end_ts = datetime.now(UTC)
     start_ts = end_ts - timedelta(days=lookback_days)
     movements_df = repo.get_stock_movements(start=start_ts, end=end_ts, item_ids=item_list)
 
@@ -115,7 +116,7 @@ def run_new_forecasts(repo: SupabaseRepo) -> pd.DataFrame:
 
     # Category fallback
     cat_col = items_df["category_name"] if "category_name" in items_df.columns else pd.Series("Unknown", index=items_df.index)
-    category_map = dict(zip(items_df["item_id"], cat_col))
+    category_map = dict(zip(items_df["item_id"], cat_col, strict=False))
     items_with_history = set(features_df["item_id"].unique())
     estimates_df = fc.apply_category_fallback(estimates_df, category_map, items_with_history)
 
@@ -227,7 +228,7 @@ def main():
     print(f"  Items without sales (at MU_FLOOR): {len(no_sales)}")
 
     if not has_sales.empty:
-        print(f"\n  --- Items WITH sales ---")
+        print("\n  --- Items WITH sales ---")
         print(f"  Avg mu_hat current: {has_sales['mu_hat_current'].mean():.4f}")
         print(f"  Avg mu_hat new:     {has_sales['mu_hat_new'].mean():.4f}")
         print(f"  Avg mu delta:       {has_sales['mu_delta'].mean():+.4f}")
@@ -244,14 +245,14 @@ def main():
 
     if not has_sales.empty:
         mu_change = has_sales["mu_delta"].abs()
-        print(f"\n  mu_hat change magnitude:")
+        print("\n  mu_hat change magnitude:")
         print(f"    No change (<0.01):  {(mu_change < 0.01).sum()} items")
         print(f"    Small (0.01-0.5):   {((mu_change >= 0.01) & (mu_change < 0.5)).sum()} items")
         print(f"    Medium (0.5-2.0):   {((mu_change >= 0.5) & (mu_change < 2.0)).sum()} items")
         print(f"    Large (>2.0):       {(mu_change >= 2.0).sum()} items")
 
         conf_change = has_sales["confidence_delta"]
-        print(f"\n  Confidence change:")
+        print("\n  Confidence change:")
         print(f"    Increased:  {(conf_change > 0.01).sum()} items")
         print(f"    Decreased:  {(conf_change < -0.01).sum()} items")
         print(f"    Unchanged:  {(conf_change.abs() <= 0.01).sum()} items")

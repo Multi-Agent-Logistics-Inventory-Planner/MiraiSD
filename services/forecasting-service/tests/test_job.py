@@ -1,12 +1,11 @@
-from pathlib import Path
 import json
-import logging
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
 from src import config
-from src.forecast_job import run_batch, main
+from src.forecast_job import main, run_batch
 
 
 def _write_csv(p: Path, rows: list[dict]) -> None:
@@ -199,9 +198,9 @@ def test_workflow_event_to_prediction(tmp_path: Path, monkeypatch):
     df = pd.read_csv(out_path)
 
     print("\nINPUTS:")
-    print(f"  Item: TEST-001, Lead time: 7 days, Service level: 95%")
-    print(f"  Current inventory: 50 units")
-    print(f"  Events: 3 sales (day 1: 5 units, day 2: 4 units), 1 shipment (ignored)")
+    print("  Item: TEST-001, Lead time: 7 days, Service level: 95%")
+    print("  Current inventory: 50 units")
+    print("  Events: 3 sales (day 1: 5 units, day 2: 4 units), 1 shipment (ignored)")
 
     print("\nOUTPUT (forecast_predictions.csv):")
     print(df.to_string(index=False))
@@ -217,7 +216,7 @@ def test_workflow_event_to_prediction(tmp_path: Path, monkeypatch):
 
     # Features JSON should contain policy details
     features = json.loads(row["features"])
-    print(f"\nFEATURES (from JSON):")
+    print("\nFEATURES (from JSON):")
     print(f"  safety_stock: {features.get('safety_stock', 0):.2f}")
     print(f"  rop: {features.get('rop', 0):.2f}")
     print(f"  current_qty: {features.get('current_qty', 0)}")
@@ -301,12 +300,12 @@ def test_stock_below_rop_triggers_order_date(tmp_path: Path, monkeypatch):
     df = pd.read_csv(out_path)
     row = df[df["item_id"] == "LOW-STOCK"].iloc[0]
 
-    print(f"\nCurrent stock: 15 units")
+    print("\nCurrent stock: 15 units")
     features = json.loads(row["features"])
     rop = features.get("rop", 0)
     print(f"ROP: {rop:.2f} units")
 
-    print(f"\nOUTPUT:")
+    print("\nOUTPUT:")
     print(f"  suggested_order_date: '{row['suggested_order_date']}'")
     print(f"  suggested_reorder_qty: {row['suggested_reorder_qty']}")
 
@@ -393,10 +392,10 @@ def test_forecast_changes_with_different_date_ranges(tmp_path: Path, monkeypatch
     df_long = pd.read_csv(out_path_long)
     mu_long = float(df_long[df_long["item_id"] == "VOLATILE"].iloc[0]["avg_daily_delta"])
 
-    print(f"\nSales pattern: Days 1-7: 3 units/day, Days 8-14: 7 units/day")
-    print(f"\nShort window (last 3 days):")
+    print("\nSales pattern: Days 1-7: 3 units/day, Days 8-14: 7 units/day")
+    print("\nShort window (last 3 days):")
     print(f"  avg_daily_delta: {mu_short:.2f} units/day")
-    print(f"\nLong window (all 14 days):")
+    print("\nLong window (all 14 days):")
     print(f"  avg_daily_delta: {mu_long:.2f} units/day")
 
     # Short window should reflect recent higher demand better
@@ -548,12 +547,12 @@ def test_high_demand_scenario(tmp_path: Path, monkeypatch):
     row = df[df["item_id"] == "HIGH-DEMAND"].iloc[0]
     features = json.loads(row["features"])
 
-    print(f"\nINPUTS:")
-    print(f"  Current stock: 10 units")
-    print(f"  Demand: 8 units/day (consistent)")
-    print(f"  Lead time: 7 days")
+    print("\nINPUTS:")
+    print("  Current stock: 10 units")
+    print("  Demand: 8 units/day (consistent)")
+    print("  Lead time: 7 days")
 
-    print(f"\nOUTPUT:")
+    print("\nOUTPUT:")
     print(f"  avg_daily_delta: {row['avg_daily_delta']:.2f} units/day")
     print(f"  days_to_stockout: {row['days_to_stockout']:.1f} days")
     print(f"  suggested_reorder_qty: {row['suggested_reorder_qty']} units")

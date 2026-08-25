@@ -19,7 +19,6 @@ import pandas as pd
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVICE_ROOT))
 
-from src import config
 from src import features as feat
 from src import forecast as fc
 
@@ -47,8 +46,8 @@ def prepare_data(movements, products):
     daily_all["date"] = pd.to_datetime(daily_all["date"])
     daily_with_stockout["date"] = pd.to_datetime(daily_with_stockout["date"])
 
-    category_map = dict(zip(products["item_id"], products["category_name"]))
-    name_map = dict(zip(products["item_id"], products["name"]))
+    category_map = dict(zip(products["item_id"], products["category_name"], strict=False))
+    name_map = dict(zip(products["item_id"], products["name"], strict=False))
 
     return daily_all, daily_with_stockout, category_map, name_map
 
@@ -250,7 +249,7 @@ def main():
 
     # Show per-item detail for the best config
     if best:
-        print(f"\n--- Running detailed comparison for best config ---")
+        print("\n--- Running detailed comparison for best config ---")
         old_preds, new_preds = walk_forward(
             daily_all, daily_with_stockout, category_map,
             min_in_stock_days=best["min_train"],
@@ -285,7 +284,7 @@ def main():
             if not worsened.empty:
                 print(worsened[["name", "mae_old", "mae_new", "mae_delta"]].head(10).to_string())
 
-    print(f"\nRecommended config.py settings:")
+    print("\nRecommended config.py settings:")
     if best:
         print(f"  MIN_IN_STOCK_DAYS = {best['min_train']}")
         print(f"  MIN_TEST_IN_STOCK_DAYS = {best['min_test']}")

@@ -1,8 +1,7 @@
 import pandas as pd
-import numpy as np
 
-from src.lead_time import compute_lead_time_stats, compute_hierarchical_lead_time, LeadTimeSource
 from src import config
+from src.lead_time import LeadTimeSource, compute_hierarchical_lead_time, compute_lead_time_stats
 
 
 def _make_shipment_df(data: list[dict]) -> pd.DataFrame:

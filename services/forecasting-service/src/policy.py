@@ -3,12 +3,10 @@ from __future__ import annotations
 import math
 from datetime import date, datetime, timedelta
 from statistics import NormalDist
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
 from scipy.stats import nbinom, poisson
-
 
 REGIME_STEADY = "steady"
 REGIME_BURSTY = "bursty"
@@ -32,11 +30,11 @@ def _dow_multiplier(dow_dict: object, dow: int) -> float:
 
 def effective_lead_demand_vectorized(
     mu_hat: pd.Series,
-    L: Union[pd.Series, int, float],
-    dow_multipliers: Optional[pd.Series] = None,
-    start_date: Optional[date] = None,
-    event_multipliers: Optional[dict[str, float]] = None,
-    event_days_since: Optional[dict[str, pd.Series]] = None,
+    L: pd.Series | int | float,
+    dow_multipliers: pd.Series | None = None,
+    start_date: date | None = None,
+    event_multipliers: dict[str, float] | None = None,
+    event_days_since: dict[str, pd.Series] | None = None,
     event_window_days: int = 7,
 ) -> pd.Series:
     """Expected demand over the lead-time window, DOW + event-adjusted.
@@ -140,7 +138,7 @@ def sigma_lead_time(
     mu_hat: float,
     sigma_d_hat: float,
     L: float,
-    sigma_L: Optional[float] = None,
+    sigma_L: float | None = None,
 ) -> float:
     """Estimate lead-time demand std-dev.
 
@@ -163,7 +161,7 @@ def compute_safety_stock(
     sigma_d_hat: float,
     L: float,
     alpha: float,
-    sigma_L: Optional[float] = None,
+    sigma_L: float | None = None,
 ) -> float:
     """Compute safety stock for service level alpha.
 
@@ -223,14 +221,14 @@ def suggest_order(
 def compute_safety_stock_vectorized(
     mu_hat: pd.Series,
     sigma_d_hat: pd.Series,
-    L: Union[pd.Series, int, float],
+    L: pd.Series | int | float,
     alpha: float,
-    sigma_L: Optional[Union[pd.Series, float]] = None,
-    regime: Optional[pd.Series] = None,
-    dow_multipliers: Optional[pd.Series] = None,
-    start_date: Optional[date] = None,
-    event_multipliers: Optional[dict[str, float]] = None,
-    event_days_since: Optional[dict[str, pd.Series]] = None,
+    sigma_L: pd.Series | float | None = None,
+    regime: pd.Series | None = None,
+    dow_multipliers: pd.Series | None = None,
+    start_date: date | None = None,
+    event_multipliers: dict[str, float] | None = None,
+    event_days_since: dict[str, pd.Series] | None = None,
     event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized safety stock computation.
@@ -291,13 +289,13 @@ def compute_safety_stock_vectorized(
 def _distribution_safety_stock(
     mu_hat: pd.Series,
     sigma_d_hat: pd.Series,
-    L: Union[pd.Series, int, float],
+    L: pd.Series | int | float,
     alpha: float,
     regime: pd.Series,
-    dow_multipliers: Optional[pd.Series] = None,
-    start_date: Optional[date] = None,
-    event_multipliers: Optional[dict[str, float]] = None,
-    event_days_since: Optional[dict[str, pd.Series]] = None,
+    dow_multipliers: pd.Series | None = None,
+    start_date: date | None = None,
+    event_multipliers: dict[str, float] | None = None,
+    event_days_since: dict[str, pd.Series] | None = None,
     event_window_days: int = 7,
 ) -> pd.Series:
     """Poisson (steady) / NegBin (bursty) safety stock, vectorized.
@@ -354,11 +352,11 @@ def _distribution_safety_stock(
 def reorder_point_vectorized(
     mu_hat: pd.Series,
     safety_stock: pd.Series,
-    L: Union[pd.Series, int, float],
-    dow_multipliers: Optional[pd.Series] = None,
-    start_date: Optional[date] = None,
-    event_multipliers: Optional[dict[str, float]] = None,
-    event_days_since: Optional[dict[str, pd.Series]] = None,
+    L: pd.Series | int | float,
+    dow_multipliers: pd.Series | None = None,
+    start_date: date | None = None,
+    event_multipliers: dict[str, float] | None = None,
+    event_days_since: dict[str, pd.Series] | None = None,
     event_window_days: int = 7,
 ) -> pd.Series:
     """Vectorized reorder point computation.
@@ -422,7 +420,7 @@ def days_to_stockout_vectorized(
 def suggest_order_vectorized(
     current_qty: pd.Series,
     mu_hat: pd.Series,
-    L: Union[pd.Series, int, float],
+    L: pd.Series | int | float,
     safety_stock: pd.Series,
     target_days: int,
 ) -> pd.Series:
@@ -454,10 +452,10 @@ def suggest_order_vectorized(
 def suggest_order_v2_vectorized(
     current_qty: pd.Series,
     mu_hat: pd.Series,
-    L: Union[pd.Series, int, float],
+    L: pd.Series | int | float,
     safety_stock: pd.Series,
     target_days: int,
-    on_order: Optional[pd.Series] = None,
+    on_order: pd.Series | None = None,
 ) -> pd.Series:
     """Lead-time-aware order suggestion with on-order netting.
 

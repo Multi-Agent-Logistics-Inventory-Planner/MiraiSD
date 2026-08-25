@@ -12,11 +12,9 @@ is tested at the E2E layer (tests/e2e/).
 """
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import uuid4
-
-import pytest
 
 # Mock kafka before any src imports
 sys.modules.setdefault("kafka", MagicMock())
@@ -24,7 +22,7 @@ sys.modules.setdefault("kafka.errors", MagicMock())
 
 from src.application.event_aggregator import EventAggregator
 from src.application.pipeline import ForecastingPipeline
-from src.events import EventEnvelope, NormalizedEvent
+from src.events import NormalizedEvent
 
 
 class TestEventToAggregatorFlow:
@@ -43,7 +41,7 @@ class TestEventToAggregatorFlow:
             item_id=item_id,
             quantity_change=-3,
             reason="sale",
-            at=datetime.now(timezone.utc),
+            at=datetime.now(UTC),
             current_total_qty=47,
             previous_total_qty=50,
         )
@@ -66,7 +64,7 @@ class TestEventToAggregatorFlow:
             item_id=item_id,
             quantity_change=-3,
             reason="sale",
-            at=datetime.now(timezone.utc),
+            at=datetime.now(UTC),
             current_total_qty=50,
         )
         aggregator.add_event(event1)
@@ -76,7 +74,7 @@ class TestEventToAggregatorFlow:
             item_id=item_id,
             quantity_change=-3,
             reason="sale",
-            at=datetime.now(timezone.utc),
+            at=datetime.now(UTC),
             current_total_qty=47,
         )
         aggregator.add_event(event2)
@@ -98,7 +96,7 @@ class TestEventToAggregatorFlow:
                 item_id=str(uuid4()),
                 quantity_change=-1,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
             )
             aggregator.add_event(event)
 
@@ -122,7 +120,7 @@ class TestEventToAggregatorFlow:
                 item_id=iid,
                 quantity_change=-2,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
                 current_total_qty=40,
             )
             aggregator.add_event(event)
@@ -148,7 +146,7 @@ class TestAggregatorToPipelineFlow:
             item_id=item_id,
             quantity_change=-3,
             reason="sale",
-            at=datetime.now(timezone.utc),
+            at=datetime.now(UTC),
             current_total_qty=45,
         )
         aggregator.add_event(event)
@@ -250,7 +248,7 @@ class TestEndToEndEventFlow:
                 item_id=item_id,
                 quantity_change=-3,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
                 current_total_qty=47,
                 previous_total_qty=50,
             ),
@@ -259,7 +257,7 @@ class TestEndToEndEventFlow:
                 item_id=item_id,
                 quantity_change=-2,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
                 current_total_qty=45,
                 previous_total_qty=47,
             ),
