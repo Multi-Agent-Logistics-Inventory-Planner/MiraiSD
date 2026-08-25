@@ -1,4 +1,4 @@
-name: Deploy Backend to DigitalOcean
+name: Deploy Backend to Hetzner
 
 on:
   push:
@@ -77,7 +77,7 @@ jobs:
           echo "services_to_rebuild=$SERVICES_TO_REBUILD" >> $GITHUB_OUTPUT
           echo "Services to rebuild: $SERVICES_TO_REBUILD"
 
-      - name: Deploy to DigitalOcean
+      - name: Deploy to Hetzner
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -135,7 +135,8 @@ jobs:
             docker image prune -f
 
             # Wait for services to be healthy
-            # Spring Boot on 2GB droplet takes 2-3 minutes to initialize
+            # Spring Boot on the CPX21 takes 2-3 minutes to initialize
+            # (revisit after the heap was raised from 192m to 512m)
             echo "Waiting for services to become healthy..."
             sleep 180
 
