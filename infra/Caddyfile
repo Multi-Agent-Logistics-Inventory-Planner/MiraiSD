@@ -3,6 +3,13 @@
 }
 
 mirai-inventory.com {
+    # Explicit Cloudflare Origin CA cert, not Caddy's automatic ACME HTTP-01.
+    # Once Cloudflare proxies this hostname (orange-cloud), it intercepts
+    # port 80 before Let's Encrypt's validation request can reliably reach
+    # this container, so automatic HTTPS cannot be trusted here. Cloudflare's
+    # SSL/TLS mode must be "Full (strict)" for this pairing to work.
+    tls /certs/mirai-origin.pem /certs/mirai-origin-key.pem
+
     reverse_proxy web:3000
 
     header X-Content-Type-Options "nosniff"
