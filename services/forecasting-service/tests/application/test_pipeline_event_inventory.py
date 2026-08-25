@@ -209,7 +209,7 @@ class TestBuildInventoryFromEvents:
 
         result = pipeline._build_inventory_from_events(item_ids, event_inventory)
 
-        assert result["item_id"].dtype == object  # String
+        assert pd.api.types.is_string_dtype(result["item_id"])
         assert pd.api.types.is_datetime64_any_dtype(result["as_of_ts"])
         assert result["current_qty"].dtype == int
 
