@@ -10,9 +10,11 @@
 # Network isolation is enforced by the 'mirai' bridge network - only containers
 # attached to this network can communicate with Kafka.
 #
-# RESOURCE LIMITS: Configured for DigitalOcean Basic 2GB Droplet
-# Total container memory: ~1.4GB (leaving ~600MB for system overhead)
-# - kafka: 512M, inventory-service: 512M, forecasting: 192M, messaging: 128M, caddy: 64M, forecast-cron: 16M
+# RESOURCE LIMITS: Configured for Hetzner CPX21 (3 vCPU / 4GB / 80GB)
+# Total container memory: ~2.7GB (leaving ~1.3GB for OS, Docker and page cache)
+# - kafka: 640M, inventory-service: 896M, forecasting: 448M, messaging: 128M,
+#   web: 512M, caddy: 64M, forecast-cron: 16M
+# Declared CPU limits total ~2.9 of 3 vCPU. These are limits, not reservations.
 
 services:
   kafka:
@@ -39,14 +41,17 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       # JVM memory limits for 2GB droplet
-      - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m
+      - KAFKA_HEAP_OPTS=-Xmx320m -Xms320m
+      # Explicit retention so kafka-data cannot grow unbounded on the 80GB disk
+      - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_RETENTION_BYTES=2147483648
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 640M
           cpus: '0.5'
         reservations:
-          memory: 256M
+          memory: 320M
     volumes:
       - kafka-data:/var/lib/kafka/data
     dns:
@@ -82,19 +87,19 @@ services:
     env_file:
       - ../.env
     environment:
-      # JVM memory limits optimized for 512M container on 2GB droplet
-      # - Heap: 192m max (reduced to leave room for metaspace)
+      # JVM memory limits optimized for 896M container on the CPX21
+      # - Heap: 512m max (raised from 192m; the old cap was sized for a 2GB droplet)
       # - MaxMetaspaceSize: 256m (increased to avoid OkHttp / Resend metaspace OOM)
       # - ReservedCodeCacheSize: 32m (caps JIT compiler memory)
       # - UseContainerSupport: respect container memory limits
-      - JAVA_OPTS=-Xmx192m -Xms128m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=32m
+      - JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseContainerSupport -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=32m
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 896M
           cpus: '0.75'
         reservations:
-          memory: 384M
+          memory: 512M
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -126,8 +131,15 @@ services:
       context: ../services/forecasting-service
       dockerfile: Dockerfile
     image: forecasting-service:latest
+    # Opt-in profile: a plain `docker compose up -d` skips this service, including
+    # the one run by .github/workflows/deploy-backend.yml. Start it deliberately
+    # with `docker compose --profile forecasting up -d`.
+    # See refs/egress-investigation-forecasting.md (Phase 0, Option B).
+    profiles: ["forecasting"]
     ports:
-      - "5010:5000"
+      # Localhost-bound like kafka and inventory-service; forecast-cron reaches
+      # this over the mirai bridge as forecasting-service:5000.
+      - "127.0.0.1:5010:5000"
     env_file:
       - ../.env
     environment:
@@ -144,10 +156,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192M
+          memory: 448M
           cpus: '0.75'
         reservations:
-          memory: 128M
+          memory: 256M
     depends_on:
       kafka:
         condition: service_healthy
@@ -224,6 +236,8 @@ services:
   forecast-cron:
     image: alpine:3.21
     container_name: forecast-cron
+    # Paired with forecasting-service; see the profile note above.
+    profiles: ["forecasting"]
     entrypoint: /bin/sh
     command:
       - -c
@@ -250,6 +264,51 @@ services:
         max-size: "5m"
         max-file: "2"
 
+  web:
+    container_name: web
+    # INTERIM: a locally built tag, not a GHCR digest. production-platform.md §4
+    # requires digest-pinned images and prohibits building on the host, so this is
+    # a knowingly temporary state until the web image is published to GHCR.
+    # There is deliberately no `build:` key here so that the deploy workflow's
+    # `docker compose build --no-cache` does NOT try to build Next.js on the host
+    # (npm ci + next build needs 2-4GB and would contend with the JVM and Kafka).
+    # Build it explicitly on the host with the NEXT_PUBLIC_* args, see
+    # docs/runbooks/frontend-consolidation.md §4a.
+    image: web:latest
+    pull_policy: never
+    ports:
+      - "127.0.0.1:3000:3000"  # Localhost only - Caddy handles external access
+    env_file:
+      - ../.env
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.75'
+        reservations:
+          memory: 256M
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+    networks:
+      - mirai
+    depends_on:
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     image: caddy:2.8-alpine
     container_name: caddy
@@ -264,6 +323,8 @@ services:
       - mirai
     depends_on:
       inventory-service:
+        condition: service_healthy
+      web:
         condition: service_healthy
     restart: unless-stopped
     deploy:

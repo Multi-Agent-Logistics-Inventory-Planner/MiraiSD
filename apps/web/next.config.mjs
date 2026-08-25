@@ -29,14 +29,14 @@ const nextConfig = {
     // Production CSP includes actual backend domain and WebSocket connections
     const connectSrc = isLocalDevelopment
       ? "'self' http://localhost:3000 http://localhost:4000 https://*.supabase.co wss://*.supabase.co"
-      : `'self' https://*.supabase.co wss://*.supabase.co http://*.mirai-inventory.com https://*.mirai-inventory.com`;
+      : `'self' https://*.supabase.co wss://*.supabase.co https://*.mirai-inventory.com`;
 
     // React 19 dev mode uses eval() for source-map reconstruction and Fast
     // Refresh; allow it only in development. Production never ships eval().
     const isDev = process.env.NODE_ENV !== 'production';
     const scriptSrc = isDev
-      ? "'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live"
-      : "'self' 'unsafe-inline' https://vercel.live";
+      ? "'self' 'unsafe-inline' 'unsafe-eval'"
+      : "'self' 'unsafe-inline'";
 
     return [
       {
