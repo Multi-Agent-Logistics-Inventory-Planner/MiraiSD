@@ -47,11 +47,12 @@ class UserControllerSecurityIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return 403 when EMPLOYEE role attempts to list users")
-        void getAllUsers_employeeRole_returns403() throws Exception {
+        @DisplayName("Should allow EMPLOYEE role to list users (read-only, see 62a52df)")
+        void getAllUsers_employeeRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL)
                             .header("Authorization", "Bearer " + employeeToken()))
-                    .andExpect(status().isForbidden());
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }
 
         @Test
@@ -69,11 +70,15 @@ class UserControllerSecurityIT extends BaseIntegrationTest {
     class GetUserByIdTests {
 
         @Test
-        @DisplayName("Should return 403 when EMPLOYEE role attempts to get user by ID")
-        void getUserById_employeeRole_returns403() throws Exception {
+        @DisplayName("Should allow EMPLOYEE role to get user by ID (read-only, see 62a52df)")
+        void getUserById_employeeRole_notForbidden() throws Exception {
+            // ID doesn't exist, so this 404s rather than 200 - the point of this
+            // test is that authorization doesn't block it (no 403/401), not that
+            // the lookup itself succeeds.
             mockMvc.perform(get(BASE_URL + "/550e8400-e29b-41d4-a716-446655440000")
                             .header("Authorization", "Bearer " + employeeToken()))
-                    .andExpect(status().isForbidden());
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }
 
         @Test
