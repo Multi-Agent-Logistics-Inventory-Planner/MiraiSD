@@ -119,7 +119,6 @@ export function useSupabaseRealtime<T>({
           if (status === "SUBSCRIBED") {
             // Keep this as debug-ish signal; it's extremely helpful when users report “no realtime”
             // and we need to know if the WS connected.
-            // eslint-disable-next-line no-console
             console.log(`[Realtime] Subscribed to ${channelName}`);
           } else if (status === "CHANNEL_ERROR") {
             console.warn(`[Realtime] Channel error for ${channelName}`);
@@ -147,5 +146,10 @@ export function useSupabaseRealtime<T>({
     };
   }, [table, schema, event, filter, queryKeys, queryClient, stableOnReceive, enabled]);
 
-  return channelRef.current;
+  // Expose the channel via a stable accessor instead of reading channelRef.current
+  // during render: a ref's live value can change without triggering a re-render, so
+  // returning it directly could hand callers a stale (or since-torn-down) channel.
+  // A getter callback is safe to call from event handlers/effects, where refs are
+  // meant to be read.
+  return useCallback(() => channelRef.current, []);
 }

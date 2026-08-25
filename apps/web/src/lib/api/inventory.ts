@@ -6,7 +6,6 @@ import {
   ProductInventoryResponse,
   InventoryTotal,
   DISPLAY_ONLY_LOCATION_TYPES,
-  type Location,
 } from "@/types/api";
 import { getLocations } from "./locations";
 

@@ -194,7 +194,7 @@ function ExpandedDetail({ auditLogId }: { auditLogId: string }) {
     <div className="px-4 md:px-12 pb-4 pt-1">
       {/* Show notes if present */}
       {detail.notes && (
-        <p className="text-sm text-muted-foreground mb-3 italic">"{detail.notes}"</p>
+        <p className="text-sm text-muted-foreground mb-3 italic">&quot;{detail.notes}&quot;</p>
       )}
 
       {/* Display operations - show movements with from/to and action indicators */}

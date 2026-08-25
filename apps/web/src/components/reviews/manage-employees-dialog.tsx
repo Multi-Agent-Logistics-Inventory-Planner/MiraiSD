@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from "react";
-import { Loader2, Pencil, X, ChevronLeft, ChevronRight, Check, UserCheck, UserX } from "lucide-react";
+import { Loader2, Pencil, X, ChevronLeft, ChevronRight, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,7 +136,7 @@ function EditUserModal({
       });
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setIsSaving(false);
@@ -231,7 +231,7 @@ export function ManageEmployeesDialog({
         return a.isReviewTracked ? -1 : 1;
       });
       setUsers(sorted);
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setIsLoading(false);
@@ -253,7 +253,7 @@ export function ManageEmployeesDialog({
       });
       fetchUsers();
       onSuccess();
-    } catch (error) {
+    } catch {
       // Error handled silently
     } finally {
       setTogglingUserId(null);

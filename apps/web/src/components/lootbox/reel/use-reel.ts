@@ -69,7 +69,16 @@ export function useReel({
 
   const prizeIds = useMemo(() => prizes.map((p) => p.id), [prizes]);
   const prizeIdsRef = useRef(prizeIds);
-  prizeIdsRef.current = prizeIds;
+  // Keep the ref in sync with the latest prizeIds after each commit, rather than
+  // writing to it during render: refs are mutable values React doesn't track for
+  // rendering, and writing one mid-render is unsafe under concurrent rendering
+  // (a render can be discarded or run twice). buildAndStartSpin/openOptimistic
+  // only read this ref from event handlers, so updating it in an effect (which
+  // always runs before the next handler can fire) preserves the "always see the
+  // latest prizeIds" behavior this ref exists for.
+  useEffect(() => {
+    prizeIdsRef.current = prizeIds;
+  }, [prizeIds]);
 
   const targetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

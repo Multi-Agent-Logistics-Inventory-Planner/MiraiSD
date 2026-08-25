@@ -6,8 +6,12 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+// These calls self-host the Geist fonts and inject their @font-face rules
+// (via the next/font compiler plugin) even though the result isn't assigned;
+// globals.css references the font by name ("Geist" / "Geist Mono") through
+// the Tailwind --font-sans / --font-mono variables instead of a className.
+Geist({ subsets: ["latin"] });
+Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Mirai Inventory',

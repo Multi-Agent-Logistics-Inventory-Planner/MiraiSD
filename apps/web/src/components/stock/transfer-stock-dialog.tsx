@@ -189,9 +189,6 @@ export function TransferStockDialog({
     );
   }, [sourceInventory]);
 
-  const hasActiveFilters =
-    categoryFilters.length > 0 || childCategoryFilters.length > 0;
-
   const transferItems = useMemo(() => {
     return sourceInventory.filter((inv) => {
       const qty = transferQuantities[inv.id];

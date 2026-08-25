@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getProductById, type GetProductsOptions } from "@/lib/api/products";
@@ -233,5 +233,10 @@ export function useRealtimeBroadcast(enabled = true) {
     };
   }, [queryClient, enabled]);
 
-  return channelRef.current;
+  // Expose the channel via a stable accessor instead of reading channelRef.current
+  // during render: a ref's live value can change without triggering a re-render, so
+  // returning it directly could hand callers a stale (or since-torn-down) channel.
+  // A getter callback is safe to call from event handlers/effects, where refs are
+  // meant to be read.
+  return useCallback(() => channelRef.current, []);
 }

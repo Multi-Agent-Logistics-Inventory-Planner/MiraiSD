@@ -77,7 +77,11 @@ export function TabPredictions() {
       if (item.daysToStockout != null && item.daysToStockout >= WELL_STOCKED_THRESHOLD) return false;
       return true;
     });
-  }, [data?.items]);
+    // Depend on `data` itself (not `data?.items`): the body reads `data.items`
+    // unconditionally after the guard, and React Compiler infers the real
+    // dependency as the `data` object, not the optional-chained expression -
+    // matching that keeps manual memoization compiler-verifiable.
+  }, [data]);
 
   const newestForecastAgeMs = useMemo(() => {
     if (!data?.items?.length) return null;
@@ -88,7 +92,7 @@ export function TabPredictions() {
       if (youngest === null || age < youngest) youngest = age;
     }
     return youngest;
-  }, [data?.items]);
+  }, [data]);
 
   const showStalenessBanner =
     newestForecastAgeMs !== null && newestForecastAgeMs > STALENESS_BANNER_THRESHOLD_MS;

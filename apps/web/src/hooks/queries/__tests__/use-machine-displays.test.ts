@@ -16,9 +16,6 @@ vi.mock("@/lib/api/machine-displays", () => ({
 import {
   useActiveDisplays,
   useActiveDisplaysByType,
-  useMachineDisplayHistoryPaged,
-  useProductDisplayHistory,
-  useActiveDisplaysForMachine,
   STALE_DISPLAY_THRESHOLD_DAYS,
 } from "../use-machine-displays";
 
