@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date
 
+from .. import config
 from ..adapters.apify_client import ApifyClient, ApifyClientError
 from ..adapters.kafka_producer import ReviewKafkaProducer
 from ..adapters.slack_notifier import SlackNotifier
 from ..adapters.supabase_repo import SupabaseRepo
-from .. import config
 
 logger = logging.getLogger(__name__)
 

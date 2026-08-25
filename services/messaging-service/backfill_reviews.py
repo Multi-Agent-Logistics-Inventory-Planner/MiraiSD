@@ -34,11 +34,10 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.application.review_fetcher import ReviewFetcher
-from src.application.review_processor import ReviewProcessor
 from src.adapters.apify_client import ApifyClient
 from src.adapters.supabase_repo import SupabaseRepo
-from src import config
+from src.application.review_fetcher import ReviewFetcher
+from src.application.review_processor import ReviewProcessor
 
 
 def save_reviews_to_file(
@@ -469,7 +468,7 @@ Examples:
         parser.error("--rate must be >= 0")
 
     # Run backfill
-    results = backfill_date_range(
+    backfill_date_range(
         start_date=start_date,
         end_date=end_date,
         max_reviews=args.max_reviews,

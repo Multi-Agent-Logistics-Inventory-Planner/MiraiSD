@@ -5,6 +5,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env file from the project root (MiraiSD/)
@@ -15,8 +16,8 @@ env_path_str = str(env_path.resolve())
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.adapters.supabase_repo import SupabaseRepo
-from src import config
+from src import config  # noqa: E402 - must follow sys.path.insert above
+from src.adapters.supabase_repo import SupabaseRepo  # noqa: E402
 
 
 def main():
@@ -211,7 +212,7 @@ def main():
 
         if notification_id:
             print(f"✓ Success! Created notification with ID: {notification_id}")
-            print(f"\nYou can verify this in your database:")
+            print("\nYou can verify this in your database:")
             print(f"  SELECT * FROM notifications WHERE id = '{notification_id}';")
             sys.exit(0)
         else:

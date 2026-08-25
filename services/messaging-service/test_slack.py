@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -12,8 +13,8 @@ env_path_str = str(env_path.resolve())
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.adapters.slack_notifier import AlertMessage, SlackNotifier
-from src import config
+from src import config  # noqa: E402 - must follow sys.path.insert above
+from src.adapters.slack_notifier import AlertMessage, SlackNotifier  # noqa: E402
 
 
 def main():
@@ -21,7 +22,7 @@ def main():
     env_webhook = os.getenv("SLACK_WEBHOOK_URL", "")
     config_webhook = getattr(config, "SLACK_WEBHOOK_URL", "")
     default_webhook = env_webhook or config_webhook
-    
+
     parser = argparse.ArgumentParser(description="Test Slack notifications")
     parser.add_argument(
         "--webhook-url",

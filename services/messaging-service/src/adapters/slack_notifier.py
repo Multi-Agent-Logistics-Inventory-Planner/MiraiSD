@@ -6,7 +6,6 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 import requests
@@ -213,7 +212,6 @@ class SlackNotifier:
         notif_type = notification.get("type", "ALERT")
         severity = notification.get("severity", "INFO")
         message = notification.get("message", "")
-        item_id = notification.get("item_id")
         metadata = notification.get("metadata") or {}
         dest_channel = channel or self._channel
 

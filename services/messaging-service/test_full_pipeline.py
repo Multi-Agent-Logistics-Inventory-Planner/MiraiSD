@@ -28,12 +28,12 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from src import config
+from src.adapters.apify_client import ApifyClient
+from src.adapters.slack_notifier import SlackNotifier
+from src.adapters.supabase_repo import SupabaseRepo
 from src.application.review_fetcher import ReviewFetcher
 from src.application.review_processor import ReviewProcessor
-from src.adapters.apify_client import ApifyClient
-from src.adapters.supabase_repo import SupabaseRepo
-from src.adapters.slack_notifier import SlackNotifier
-from src import config
 
 
 def parse_date(date_str: str) -> date:

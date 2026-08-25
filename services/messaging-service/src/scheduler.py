@@ -10,8 +10,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from . import config
-from .adapters.apify_client import ApifyClient
-from .adapters.kafka_producer import ReviewKafkaProducer
 from .adapters.slack_notifier import SlackNotifier
 from .adapters.supabase_repo import SupabaseRepo
 from .application.review_fetcher import ReviewFetcher
@@ -52,7 +50,6 @@ def daily_review_fetch_job() -> None:
 
     try:
         # Get yesterday's date in the configured timezone
-        tz = ZoneInfo(config.APP_TIMEZONE)
         yesterday = date.today() - timedelta(days=1)
 
         fetcher = ReviewFetcher()

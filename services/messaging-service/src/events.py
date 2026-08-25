@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -20,7 +20,7 @@ def _parse_datetime(value: str | datetime) -> datetime:
     """
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
 
     if not isinstance(value, str):
@@ -45,7 +45,7 @@ def _parse_datetime(value: str | datetime) -> datetime:
     try:
         dt = datetime.fromisoformat(normalized)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt
     except ValueError as e:
         raise ValueError(f"Cannot parse datetime '{value}': {e}") from e

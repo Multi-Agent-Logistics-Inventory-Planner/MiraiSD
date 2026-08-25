@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+
 from src.adapters.slack_notifier import SlackNotifier
 
 # Valid token must be 24+ alphanumeric chars to match the regex in _validate_webhook_url
