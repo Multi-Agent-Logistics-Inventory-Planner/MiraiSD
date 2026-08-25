@@ -29,7 +29,13 @@ export function useProductInventory(rootOnly = false) {
   const totalsQuery = useQuery({
     queryKey: ["inventoryTotals"],
     queryFn: getInventoryTotals,
-    staleTime: 30_000,
+    // No staleTime override: this fetches an unpaginated, whole-catalog
+    // aggregate (InventoryTotalsRepository.findAllInventoryTotals). At the old
+    // 30s staleTime, every remount of a component that calls this hook
+    // (products page, location-detail-sheet) past 30s re-ran the full-table
+    // query — the dominant contributor to Supabase pooler egress. Falls back
+    // to the app-wide 5-minute default in lib/query-client.ts.
+    // See refs/product-inventory-query-egress.md.
   });
 
   const data: ProductWithInventory[] | null = useMemo(() => {
