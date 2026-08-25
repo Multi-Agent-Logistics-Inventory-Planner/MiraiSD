@@ -297,13 +297,16 @@ services:
       inventory-service:
         condition: service_healthy
     healthcheck:
-      # node's built-in fetch (Node 18+) rather than wget/curl — the
-      # node:22-alpine runtime image doesn't reliably ship either.
+      # node's built-in fetch (Node 18+), against 127.0.0.1 explicitly.
+      # `localhost` can resolve to ::1 first inside the container; the app
+      # binds 0.0.0.0 (IPv4 only), so an IPv6-first resolution makes every
+      # request to "localhost" fail with connection refused even though the
+      # server is up and serving fine over IPv4.
       test:
         - "CMD"
         - "node"
         - "-e"
-        - "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 30s
       timeout: 10s
       retries: 3
