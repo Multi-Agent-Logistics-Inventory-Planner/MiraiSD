@@ -22,8 +22,13 @@ function AcceptInviteContent() {
   const supabase = getSupabaseClient();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Lazy initializers so the "client not configured" case is reflected in the
+  // very first render instead of being set from inside the effect below (whose
+  // job is just the async session check).
+  const [isVerifying, setIsVerifying] = useState(() => !!supabase);
+  const [error, setError] = useState<string | null>(() =>
+    supabase ? null : "Supabase client not configured"
+  );
   const [email, setEmail] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
@@ -32,8 +37,6 @@ function AcceptInviteContent() {
 
   useEffect(() => {
     if (!supabase) {
-      setError("Supabase client not configured");
-      setIsVerifying(false);
       return;
     }
 
@@ -103,7 +106,7 @@ function AcceptInviteContent() {
           }
           setIsVerifying(false);
           return;
-        } catch (err) {
+        } catch {
           setError("Failed to verify invitation");
           setIsVerifying(false);
           return;
@@ -182,7 +185,7 @@ function AcceptInviteContent() {
       } else {
         router.push("/");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to complete profile setup");
       setIsLoading(false);
     }
@@ -229,7 +232,7 @@ function AcceptInviteContent() {
         <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
-            You've been invited to join. Please complete your profile to
+            You&apos;ve been invited to join. Please complete your profile to
             continue.
           </CardDescription>
         </CardHeader>

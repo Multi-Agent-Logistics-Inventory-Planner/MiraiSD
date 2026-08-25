@@ -20,7 +20,7 @@ async function backendGet<T>(path: string, jwt: string): Promise<T> {
     headers: { Authorization: `Bearer ${jwt}` },
   });
   if (!res.ok) {
-    const body = await res.text();
+    await res.text();
     throw new Error(`Data fetch failed (${res.status}). Please try again.`);
   }
   return (await res.json()) as T;
