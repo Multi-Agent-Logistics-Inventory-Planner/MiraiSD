@@ -12,9 +12,7 @@ from its sales shape so the pipeline can route policy per segment.
 
 from __future__ import annotations
 
-import math
 from datetime import date
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -56,7 +54,7 @@ def _drop_clusters(sale_rows: pd.DataFrame, gap_days: int) -> list[tuple[float, 
     clusters: list[tuple[float, int]] = []
     start = prev = dates[0]
     total = units[0]
-    for d, u in zip(dates[1:], units[1:]):
+    for d, u in zip(dates[1:], units[1:], strict=False):
         if (d - prev).days > gap_days + 1:
             clusters.append((float(total), (prev - start).days + 1))
             start = d
@@ -71,7 +69,7 @@ def _item_signals(
     group: pd.DataFrame,
     stockout_map: dict,
     today: date,
-    first_activity: Optional[dict[str, date]],
+    first_activity: dict[str, date] | None,
     item_id: str,
 ) -> dict:
     """Compute the signal row for one item's zero-filled daily grid."""
@@ -120,9 +118,9 @@ def _item_signals(
 
 def compute_segment_signals(
     daily_df: pd.DataFrame,
-    stockout_df: Optional[pd.DataFrame] = None,
-    today: Optional[date] = None,
-    first_activity: Optional[dict[str, date]] = None,
+    stockout_df: pd.DataFrame | None = None,
+    today: date | None = None,
+    first_activity: dict[str, date] | None = None,
 ) -> pd.DataFrame:
     """Per-item demand-shape signals from the zero-filled daily usage grid.
 
@@ -164,7 +162,7 @@ def compute_segment_signals(
 
 def classify_segments(
     signals_df: pd.DataFrame,
-    prior_segments: Optional[dict[str, str]] = None,
+    prior_segments: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """First-match segment rules with drop-entry/exit hysteresis.
 
@@ -235,7 +233,7 @@ def classify_quiet_item(created_at, today: date) -> str:
 
 def build_drop_order_qty(
     signals_df: pd.DataFrame,
-    avg_last_n: Optional[int] = None,
+    avg_last_n: int | None = None,
 ) -> dict[str, float]:
     """Suggested order size per drop item: mean of the last N drop sizes.
 
@@ -295,7 +293,7 @@ def apply_drop_qty_override(
     item_ids: pd.Series,
     segment_map: dict[str, str],
     drop_qty_map: dict[str, float],
-    on_order: Optional[pd.Series] = None,
+    on_order: pd.Series | None = None,
 ) -> pd.Series:
     """Order-per-drop quantity for drop items, netting stock and inbound units."""
     ids = item_ids.astype(str)

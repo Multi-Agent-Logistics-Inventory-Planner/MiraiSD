@@ -7,8 +7,6 @@ sys.modules["kafka"] = MagicMock()
 sys.modules["kafka.errors"] = MagicMock()
 
 import pandas as pd
-import pytest
-
 
 EXPECTED_COLUMNS = [
     "item_id", "name", "lead_time_days", "safety_stock_days",

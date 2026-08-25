@@ -8,7 +8,6 @@ and stayed stale forever. These tests pin the fix.
 """
 
 import sys
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 

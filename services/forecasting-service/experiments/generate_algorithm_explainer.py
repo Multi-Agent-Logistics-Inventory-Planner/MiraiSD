@@ -13,11 +13,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch
-import numpy as np
+import matplotlib.pyplot as plt
 
 OUT_DIR = Path(__file__).parent / "system_report"
 OUT_DIR.mkdir(exist_ok=True)
@@ -66,7 +65,7 @@ def fig_maturity_timeline():
          GREEN),
     ]
 
-    for label, x, accuracy, description, color in stages:
+    for label, x, accuracy, _description, color in stages:
         # Circle on timeline
         ax.add_patch(plt.Circle((x, 4.2), 0.38, color=color, zorder=4))
 
@@ -77,14 +76,14 @@ def fig_maturity_timeline():
         # Accuracy badge above label
         ax.text(x, 6.05, accuracy, ha="center", va="center",
                 fontsize=12, fontweight="bold", color=color,
-                bbox=dict(boxstyle="round,pad=0.45", facecolor=color + "20",
-                          edgecolor=color, linewidth=1.8))
+                bbox={"boxstyle": "round,pad=0.45", "facecolor": color + "20",
+                          "edgecolor": color, "linewidth": 1.8})
 
     # Arrows between circles on the timeline
     for x_start, x_end in [(2.4, 5.1), (5.9, 8.6), (9.4, 12.1)]:
         ax.annotate("", xy=(x_end, 4.2), xytext=(x_start, 4.2),
-                    arrowprops=dict(arrowstyle="-|>", color=GRAY,
-                                   lw=1.8, mutation_scale=16))
+                    arrowprops={"arrowstyle": "-|>", "color": GRAY,
+                                   "lw": 1.8, "mutation_scale": 16})
 
     plt.tight_layout()
     fig.savefig(OUT_DIR / "8_maturity_timeline.png", dpi=150, bbox_inches="tight",
@@ -152,8 +151,8 @@ def fig_algorithm_explainer():
             mid_y = y_top - box_h / 2
             ax.annotate("", xy=(ax_next - 0.04, mid_y),
                         xytext=(ax_end + 0.04, mid_y),
-                        arrowprops=dict(arrowstyle="-|>", color=GRAY,
-                                       lw=2.5, mutation_scale=22),
+                        arrowprops={"arrowstyle": "-|>", "color": GRAY,
+                                       "lw": 2.5, "mutation_scale": 22},
                         zorder=4)
 
     plt.savefig(OUT_DIR / "7_algorithm_explainer.png", dpi=150,

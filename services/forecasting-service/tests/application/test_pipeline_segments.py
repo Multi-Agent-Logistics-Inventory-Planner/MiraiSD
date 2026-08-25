@@ -18,7 +18,6 @@ sys.modules.setdefault("kafka.errors", MagicMock())
 
 from src.application.pipeline import ForecastingPipeline
 
-
 DROP_ID = str(uuid4())
 CONT_ID = str(uuid4())
 DEAD_ID = str(uuid4())

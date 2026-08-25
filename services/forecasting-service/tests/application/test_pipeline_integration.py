@@ -6,11 +6,8 @@ filtering affects mu_hat, category fallback applies, and confidence uses 1/(1+CV
 """
 
 import sys
-import math
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -20,11 +17,12 @@ sys.modules["kafka.errors"] = MagicMock()
 
 # Patch pydantic v1 -> v2 compatibility
 import pydantic
+
 if not hasattr(pydantic, "field_validator"):
     pydantic.field_validator = lambda *a, **kw: lambda f: f
 
-from src.application.pipeline import ForecastingPipeline
 from src import config
+from src.application.pipeline import ForecastingPipeline
 
 
 @pytest.fixture

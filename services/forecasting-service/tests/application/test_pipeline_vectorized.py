@@ -5,12 +5,10 @@ vectorized implementations do not exist yet.
 """
 
 import sys
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # Mock kafka module before importing pipeline
 sys.modules["kafka"] = MagicMock()
@@ -342,7 +340,7 @@ class TestComputeForecastsVectorized:
         )
 
         result = pipeline._compute_forecasts(items_df, inventory_df, estimates_df)
-        legacy_result = pipeline._compute_forecasts_legacy(
+        pipeline._compute_forecasts_legacy(
             items_df, inventory_df, estimates_df
         )
 
@@ -422,7 +420,7 @@ class TestComputeForecastsVectorized:
         vectorized_time = time.time() - start
 
         start = time.time()
-        legacy_result = pipeline._compute_forecasts_legacy(
+        pipeline._compute_forecasts_legacy(
             items_df, inventory_df, estimates_df
         )
         legacy_time = time.time() - start

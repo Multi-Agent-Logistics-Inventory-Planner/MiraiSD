@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ import pandas as pd
 from . import config
 
 
-class LeadTimeSource(str, Enum):
+class LeadTimeSource(StrEnum):
     """Source of lead time calculation in the 4-level hierarchy."""
     PREFERRED_SUPPLIER_ITEM = "preferred_supplier_item"  # Level 1
     PREFERRED_SUPPLIER_AVG = "preferred_supplier_avg"    # Level 2

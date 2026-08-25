@@ -58,6 +58,21 @@ ignore = [
     "E501",  # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Scripts and tests intentionally run sys.path.insert(...) / mock out the
+# `kafka` module (not installed in the dev/test env) or patch pydantic
+# compat shims before importing project modules that transitively depend
+# on them. Reordering these imports to satisfy E402 would break the
+# scripts/tests at runtime, so the ordering is intentional here.
+"experiments/*.py" = ["E402"]
+"tests/**/*.py" = ["E402"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Query()/Depends() are designed to be used as argument defaults;
+# that's the documented dependency-injection pattern, not a mutable-default
+# bug. Treat them as immutable so B008 doesn't flag idiomatic FastAPI code.
+extend-immutable-calls = ["fastapi.Query", "fastapi.Depends"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 

@@ -14,18 +14,18 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
+from urllib.parse import ParseResult, parse_qsl, quote, urlencode, urlparse, urlunparse
 
 import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from urllib.parse import ParseResult, parse_qsl, quote, urlencode, urlparse, urlunparse
 
 from .. import config
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,7 @@ class SupabaseRepo:
         """
         lb = lookback_months if lookback_months is not None else config.LEAD_TIME_LOOKBACK_MONTHS
         ms = max_shipments if max_shipments is not None else config.LEAD_TIME_MAX_SHIPMENTS
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=lb * 30)
+        cutoff_date = datetime.now(UTC) - timedelta(days=lb * 30)
 
         query = """
             WITH ranked AS (

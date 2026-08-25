@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 from src.features import build_daily_usage, build_stats, detect_stockout_days
 

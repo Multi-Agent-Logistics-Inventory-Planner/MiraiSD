@@ -2,11 +2,10 @@
 
 import sys
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, call
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 import pandas as pd
-import pytest
 
 mock_kafka = MagicMock()
 mock_kafka.errors = MagicMock()
@@ -20,7 +19,7 @@ def _make_forecasts_df(rows):
     """Build a forecasts DataFrame from a list of (item_id, features) tuples."""
     return pd.DataFrame({
         "item_id": [r[0] for r in rows],
-        "computed_at": [datetime.now(timezone.utc)] * len(rows),
+        "computed_at": [datetime.now(UTC)] * len(rows),
         "features": [r[1] for r in rows],
     })
 

@@ -5,11 +5,9 @@ and falls back to database queries when not.
 """
 
 import sys
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 import pandas as pd
-import pytest
 
 # Mock kafka module before importing
 sys.modules["kafka"] = MagicMock()
@@ -105,7 +103,7 @@ class TestPipelineEventInventory:
         pipeline = ForecastingPipeline(repo=mock_repo)
 
         # Call with empty event_inventory
-        result = pipeline.run_for_items({"item-1"}, event_inventory={})
+        pipeline.run_for_items({"item-1"}, event_inventory={})
 
         # Should fall back to database
         mock_repo.get_current_inventory.assert_called_once()

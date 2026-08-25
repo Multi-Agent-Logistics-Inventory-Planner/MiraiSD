@@ -7,9 +7,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
-from src.events import EventEnvelope, EventPayload, NormalizedEvent
+from src.events import EventPayload, NormalizedEvent
 
 
 class TestEventPayloadInventoryFields:

@@ -14,12 +14,12 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 
 RESULTS_DIR = Path(__file__).parent / "results"
 COLORS = {
@@ -61,7 +61,7 @@ def plot_method_comparison(method_summary: pd.DataFrame):
     metrics = ["mae", "rmse", "mape", "bias"]
     labels = ["MAE (units/day)", "RMSE (units/day)", "MAPE", "Bias (units/day)"]
 
-    for ax, metric, label in zip(axes, metrics, labels):
+    for ax, metric, label in zip(axes, metrics, labels, strict=False):
         values = summary[metric].values
         bars = ax.bar(range(len(methods)), values, color=bar_colors, edgecolor="white", linewidth=0.5)
         ax.set_ylabel(label)
@@ -69,7 +69,7 @@ def plot_method_comparison(method_summary: pd.DataFrame):
         ax.set_xticks(range(len(methods)))
         ax.set_xticklabels(methods, rotation=45, ha="right", fontsize=8)
 
-        for bar, val in zip(bars, values):
+        for bar, val in zip(bars, values, strict=False):
             y = bar.get_height()
             offset = 0.01 if y >= 0 else -0.05
             ax.text(
@@ -313,7 +313,7 @@ def plot_confidence_vs_accuracy(predictions: pd.DataFrame):
             count=(col, "count"),
         ).dropna()
 
-        scatter = ax.scatter(binned["avg_conf"], binned["avg_error"],
+        ax.scatter(binned["avg_conf"], binned["avg_error"],
                              s=binned["count"] * 2, alpha=0.7, c="steelblue")
         ax.set_xlabel("Confidence")
         ax.set_ylabel("Average MAPE")
