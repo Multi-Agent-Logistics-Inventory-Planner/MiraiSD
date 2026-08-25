@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from ..adapters.supabase_repo import SupabaseRepo
 from ..events import NormalizedEvent
@@ -12,7 +12,7 @@ from ..events import NormalizedEvent
 logger = logging.getLogger(__name__)
 
 
-class AlertType(str, Enum):
+class AlertType(StrEnum):
     """Types of stock alerts."""
 
     TOTAL_LOW_STOCK = "total_low_stock"
@@ -109,7 +109,7 @@ class AlertChecker:
             return AlertResult(
                 should_alert=True,
                 alert_type=AlertType.TOTAL_OUT_OF_STOCK,
-                reason=f"Total inventory crossed to 0",
+                reason="Total inventory crossed to 0",
                 item_id=event.item_id,
                 location_code=None,
                 previous_qty=prev_total,

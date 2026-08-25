@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from kafka import KafkaProducer
@@ -105,7 +105,7 @@ class ReviewKafkaProducer:
                 "published_at": published_at,
                 "coin_rate": int(coin_rate),
             },
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         try:

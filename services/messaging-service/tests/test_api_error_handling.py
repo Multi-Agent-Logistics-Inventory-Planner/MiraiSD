@@ -6,8 +6,8 @@ in error responses. All exceptions should return generic error messages
 to the client while logging detailed errors server-side.
 """
 
-import pytest
 from fastapi.testclient import TestClient
+
 from src.api.main import app
 
 client = TestClient(app)
