@@ -29,7 +29,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ENV_FILE="apps/web/.env.production.local"
+ENV_FILE="apps/web/.env.prod.local"
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "error: $ENV_FILE not found. Copy it from your local machine first:" >&2
   echo "  scp apps/web/.env.prod.local <user>@<host>:$(pwd)/$ENV_FILE" >&2
