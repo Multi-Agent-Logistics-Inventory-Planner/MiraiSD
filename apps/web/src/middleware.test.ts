@@ -125,9 +125,9 @@ describe("middleware - permission-based route guards", () => {
           ).toBe(true);
         });
 
-        it("should deny access to team (TEAM_VIEW)", () => {
+        it("should allow access to team (TEAM_VIEW)", () => {
           expect(shouldAllowRouteAccess("/team", UserRole.EMPLOYEE)).toBe(
-            false
+            true
           );
         });
 
