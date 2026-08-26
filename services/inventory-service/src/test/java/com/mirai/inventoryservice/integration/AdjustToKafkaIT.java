@@ -411,6 +411,10 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         // Test-only: trust all packages. Never use "*" in production code.
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        // The producer intentionally omits Spring type headers so messages remain
+        // language-agnostic for downstream consumers. Supply the expected JSON type
+        // explicitly for this Java test consumer.
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, java.util.HashMap.class.getName());
 
         return new KafkaConsumer<>(props);
     }
