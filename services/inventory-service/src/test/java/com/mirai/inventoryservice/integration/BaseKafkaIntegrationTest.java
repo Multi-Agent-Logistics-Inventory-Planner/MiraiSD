@@ -15,8 +15,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import javax.crypto.SecretKey;
@@ -35,19 +33,25 @@ import java.util.Map;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("integration")
-@Testcontainers
 public abstract class BaseKafkaIntegrationTest {
 
-    @Container
     static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"))
                     .withDatabaseName("mirai_test")
                     .withUsername("test")
                     .withPassword("test");
 
-    @Container
     static final KafkaContainer kafka =
             new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
+
+    static {
+        // Spring caches the application context across concrete subclasses of this
+        // base class. JUnit's @Container lifecycle stops inherited containers after
+        // the first subclass, leaving that cached context pointing at a dead
+        // PostgreSQL/Kafka pair. Start them once for the test JVM instead.
+        postgres.start();
+        kafka.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {

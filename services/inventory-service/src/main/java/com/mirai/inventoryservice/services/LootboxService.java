@@ -22,7 +22,6 @@ import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -58,9 +57,7 @@ public class LootboxService {
     private final LootboxPrizeRepository lootboxPrizeRepository;
     private final LootboxTierLifecycle tierLifecycle;
     private final Random lootboxRandom;
-
-    @PersistenceContext
-    private EntityManager em;
+    private final EntityManager em;
 
     public record BalanceBreakdown(
             long balance,
