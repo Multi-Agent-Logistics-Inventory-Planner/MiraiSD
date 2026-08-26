@@ -92,6 +92,7 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
 
         Category category = new Category();
         category.setName("Test Category " + suffix);
+        category.setSlug("test-category-" + suffix);
         category = categoryRepository.save(category);
 
         testProduct = new Product();
@@ -278,7 +279,10 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @DisplayName("Multi-line batch creates one outbox event per line sharing one audit_log_id")
     void multiLineBatchSharesAuditLog() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 6);
-        Category category = categoryRepository.save(Category.builder().name("Cat2 " + suffix).build());
+        Category category = categoryRepository.save(Category.builder()
+                .name("Cat2 " + suffix)
+                .slug("cat2-" + suffix)
+                .build());
         Product secondProduct = productRepository.save(Product.builder()
                 .name("Second Product")
                 .sku("TST-MULTI-" + suffix)
