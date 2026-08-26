@@ -8,7 +8,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,11 +20,14 @@ Integration test for JWT authentication with real Supabase tokens.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration",
-    "spring.jpa.hibernate.ddl-auto=none"
-})
 class AuthIntegrationTest {
+    // Previously excluded DataSourceAutoConfiguration/HibernateJpaAutoConfiguration here
+    // as a test-speed shortcut. That broke once JwtAuthenticationFilter started
+    // requiring UserService -> UserRepository for every request (DB-role lookup,
+    // see JwtAuthenticationFilter): AuthController's context failed to load with
+    // no UserRepository bean available. The "test" profile already points at a
+    // fast in-memory H2 (application-test.properties), so there's no real cost to
+    // just letting the datasource autoconfigure normally.
 
     @Autowired
     private MockMvc mockMvc;

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(

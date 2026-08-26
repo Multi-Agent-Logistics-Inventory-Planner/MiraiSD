@@ -54,7 +54,7 @@ def prepare_data(movements, items):
 
     category_map = {}
     if "category_name" in items.columns:
-        category_map = dict(zip(items["item_id"], items["category_name"]))
+        category_map = dict(zip(items["item_id"], items["category_name"], strict=False))
 
     return daily_all, daily_with_stockout, category_map
 
@@ -102,7 +102,7 @@ def estimate_all_approaches(train_all, train_stockout, category_map):
     train_clean = train_all.drop(columns=["is_stockout"], errors="ignore")
     features_a = feat.build_stats(train_clean)
     est_a = fc.estimate_mu_sigma(features_a, method="dow_weighted", min_in_stock_days=0)
-    results["main"] = dict(zip(est_a["item_id"], est_a["mu_hat"]))
+    results["main"] = dict(zip(est_a["item_id"], est_a["mu_hat"], strict=False))
 
     # B: Branch (stockout exclusion)
     features_b = feat.build_stats(train_stockout)
@@ -112,7 +112,7 @@ def estimate_all_approaches(train_all, train_stockout, category_map):
     )
     items_hist = set(features_b["item_id"].unique())
     est_b = fc.apply_category_fallback(est_b, category_map, items_hist)
-    results["branch"] = dict(zip(est_b["item_id"], est_b["mu_hat"]))
+    results["branch"] = dict(zip(est_b["item_id"], est_b["mu_hat"], strict=False))
 
     # C: Imputation
     imputed_rows = []
@@ -124,12 +124,12 @@ def estimate_all_approaches(train_all, train_stockout, category_map):
         imputed_rows.append({"item_id": str(item_id), "mu_hat": mu, "sigma_d_hat": sigma, "method": "imputed"})
     est_c = pd.DataFrame(imputed_rows)
     est_c = fc.apply_category_fallback(est_c, category_map, items_hist)
-    results["imputed"] = dict(zip(est_c["item_id"], est_c["mu_hat"]))
+    results["imputed"] = dict(zip(est_c["item_id"], est_c["mu_hat"], strict=False))
 
     # D: Main + category fallback (best of main + cold-start handling)
     est_d = fc.estimate_mu_sigma(features_a, method="dow_weighted", min_in_stock_days=0)
     est_d = fc.apply_category_fallback(est_d, category_map, items_hist)
-    results["main_plus_fallback"] = dict(zip(est_d["item_id"], est_d["mu_hat"]))
+    results["main_plus_fallback"] = dict(zip(est_d["item_id"], est_d["mu_hat"], strict=False))
 
     # E: Imputation with lower guard (min_in_stock=3 instead of 7)
     imputed_low = []
@@ -139,7 +139,7 @@ def estimate_all_approaches(train_all, train_stockout, category_map):
         imputed_low.append({"item_id": str(item_id), "mu_hat": mu, "sigma_d_hat": sigma, "method": "imputed_low"})
     est_e = pd.DataFrame(imputed_low)
     est_e = fc.apply_category_fallback(est_e, category_map, items_hist)
-    results["imputed_low_guard"] = dict(zip(est_e["item_id"], est_e["mu_hat"]))
+    results["imputed_low_guard"] = dict(zip(est_e["item_id"], est_e["mu_hat"], strict=False))
 
     return results
 

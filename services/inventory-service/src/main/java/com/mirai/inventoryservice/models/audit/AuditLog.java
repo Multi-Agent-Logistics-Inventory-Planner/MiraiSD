@@ -79,7 +79,10 @@ public class AuditLog {
     private String shipmentNumber;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "field_changes", columnDefinition = "jsonb")
+    // Let Hibernate select the JSON type for the active dialect.  Hard-coding
+    // PostgreSQL's `jsonb` prevents the H2-backed test profile from creating
+    // the schema, while PostgreSQL still maps SqlTypes.JSON to jsonb.
+    @Column(name = "field_changes")
     private List<Map<String, Object>> fieldChanges;
 
     @Column(name = "previous_status", length = 50)

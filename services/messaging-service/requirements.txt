@@ -27,4 +27,7 @@ pytest-mock>=3.12.0
 ruff>=0.1.0
 black>=24.0.0
 mypy>=1.5.0
+# Required by starlette.testclient (used in tests/test_api_error_handling.py)
+# but not pulled in transitively by fastapi/starlette themselves.
+httpx>=0.27.0
 

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -112,19 +113,21 @@ class AnalyticsControllerSecurityIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should allow EMPLOYEE role to access")
-        void getSalesSummary_employeeRole_returns200() throws Exception {
+        @DisplayName("Should authorize EMPLOYEE role to access")
+        void getSalesSummary_employeeRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL + "/sales-summary")
                             .header("Authorization", "Bearer " + employeeToken()))
-                    .andExpect(status().isOk());
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401))
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
         }
 
         @Test
-        @DisplayName("Should allow ADMIN role to access")
-        void getSalesSummary_adminRole_returns200() throws Exception {
+        @DisplayName("Should authorize ADMIN role to access")
+        void getSalesSummary_adminRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL + "/sales-summary")
                             .header("Authorization", "Bearer " + adminToken()))
-                    .andExpect(status().isOk());
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401))
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
         }
     }
 

@@ -92,6 +92,7 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
 
         Category category = new Category();
         category.setName("Test Category " + suffix);
+        category.setSlug("test-category-" + suffix);
         category = categoryRepository.save(category);
 
         testProduct = new Product();
@@ -278,7 +279,10 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
     @DisplayName("Multi-line batch creates one outbox event per line sharing one audit_log_id")
     void multiLineBatchSharesAuditLog() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 6);
-        Category category = categoryRepository.save(Category.builder().name("Cat2 " + suffix).build());
+        Category category = categoryRepository.save(Category.builder()
+                .name("Cat2 " + suffix)
+                .slug("cat2-" + suffix)
+                .build());
         Product secondProduct = productRepository.save(Product.builder()
                 .name("Second Product")
                 .sku("TST-MULTI-" + suffix)
@@ -407,6 +411,10 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         // Test-only: trust all packages. Never use "*" in production code.
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        // The producer intentionally omits Spring type headers so messages remain
+        // language-agnostic for downstream consumers. Supply the expected JSON type
+        // explicitly for this Java test consumer.
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, java.util.HashMap.class.getName());
 
         return new KafkaConsumer<>(props);
     }

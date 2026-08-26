@@ -43,7 +43,7 @@ export function Can({
   children,
   fallback = null,
 }: CanProps) {
-  const { can, canAll, canAny } = usePermissions();
+  const { canAll, canAny } = usePermissions();
 
   const permissions = Array.isArray(permission) ? permission : [permission];
   const hasAccess = all ? canAll(permissions) : canAny(permissions);

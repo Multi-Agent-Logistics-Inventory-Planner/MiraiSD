@@ -3,14 +3,9 @@
 import {
   Bell,
   AlertTriangle,
-  Info,
   Archive,
   CheckCircle,
   RotateCcw,
-  Package,
-  Truck,
-  Monitor,
-  Settings,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -165,7 +160,6 @@ export function NotificationsTable({
   onRowClick,
   onResolve,
   onUnresolve,
-  onDelete,
   onMarkAsRead,
 }: NotificationsTableProps) {
   if (isLoading) {

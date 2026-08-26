@@ -12,8 +12,6 @@ so error/code fields are accessed via response.json()["detail"]["error"].
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # Mock kafka before importing the app
 sys.modules.setdefault("kafka", MagicMock())
 sys.modules.setdefault("kafka.errors", MagicMock())

@@ -49,7 +49,10 @@ class AuditLogSpecificationsIT extends BaseKafkaIntegrationTest {
     @BeforeEach
     void seedAuditLogs() {
         Category category = categoryRepository.save(
-                Category.builder().name("test-cat-" + UUID.randomUUID()).build());
+                Category.builder()
+                        .name("test-cat-" + UUID.randomUUID())
+                        .slug("test-cat-" + UUID.randomUUID())
+                        .build());
 
         product = productRepository.save(Product.builder()
                 .name("Test Product")

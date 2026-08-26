@@ -1,6 +1,9 @@
 package com.mirai.inventoryservice.auth;
 
 import com.mirai.inventoryservice.auth.JwtService;
+import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.services.UserService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +43,12 @@ class SecurityConfigTest {
 
     @MockBean
     private JwtService jwtService;
+
+    // The enforced role now comes from a DB lookup by email (see JwtAuthenticationFilter),
+    // not from the JWT's user_metadata.role claim. JwtService itself is mocked here, so
+    // this must be mocked too whenever a test needs a specific enforced role.
+    @MockBean
+    private UserService userService;
 
     private String testSecret = "test-secret-key-for-jwt-validation-that-is-long-enough-for-hmac-sha";
     private SecretKey signingKey;
@@ -125,7 +134,9 @@ class SecurityConfigTest {
         when(jwtService.extractPersonId(token)).thenReturn("admin-123");
         when(jwtService.extractName(token)).thenReturn("Admin User");
         when(jwtService.extractRole(token)).thenReturn("admin");
+        when(jwtService.extractEmail(token)).thenReturn("admin-123@test.local");
         when(jwtService.validateToken(token)).thenReturn(true);
+        mockAdminDbUser("admin-123@test.local", "Admin User");
 
         // When & Then
         mockMvc.perform(get("/api/admin/test")
@@ -286,7 +297,9 @@ class SecurityConfigTest {
         when(jwtService.extractPersonId(token)).thenReturn("admin-123");
         when(jwtService.extractName(token)).thenReturn("Admin User");
         when(jwtService.extractRole(token)).thenReturn("admin");
+        when(jwtService.extractEmail(token)).thenReturn("admin-123@test.local");
         when(jwtService.validateToken(token)).thenReturn(true);
+        mockAdminDbUser("admin-123@test.local", "Admin User");
 
         // When & Then - actuator endpoints should be accessible for admin (not 401/403)
         mockMvc.perform(get("/actuator/info")
@@ -298,6 +311,17 @@ class SecurityConfigTest {
     }
 
     // Helper methods
+
+    /**
+     * Stubs the backend-controlled User lookup (see JwtAuthenticationFilter) so a request
+     * carrying the given email resolves to an ADMIN role.
+     */
+    private void mockAdminDbUser(String email, String name) {
+        when(userService.existsByEmail(email)).thenReturn(true);
+        when(userService.getUserByEmail(email)).thenReturn(
+                User.builder().email(email).fullName(name).role(UserRole.ADMIN).build());
+    }
+
     private String createValidToken(String personId, String name, String role) {
         Map<String, Object> userMetadata = new HashMap<>();
         userMetadata.put("name", name);

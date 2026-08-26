@@ -4,11 +4,8 @@ TDD Step 1: RED - These tests verify event-carried state tracking.
 """
 
 import sys
-import time
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
-
-import pytest
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 # Mock kafka module before importing
 sys.modules["kafka"] = MagicMock()
@@ -31,7 +28,7 @@ def create_event(
         item_id=item_id,
         quantity_change=quantity_change,
         reason="sale",
-        at=datetime.now(timezone.utc),
+        at=datetime.now(UTC),
         current_total_qty=current_total_qty,
         previous_total_qty=previous_total_qty,
     )
@@ -213,7 +210,7 @@ class TestEventAggregatorBackwardCompatibility:
                 item_id=f"item-{i}",
                 quantity_change=-1,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
             )
             aggregator.add_event(event)
 

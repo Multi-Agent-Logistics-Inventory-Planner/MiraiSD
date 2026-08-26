@@ -6,7 +6,6 @@ demand and double-orders anything already inbound on a PENDING shipment.
 """
 
 import pandas as pd
-import pytest
 
 from src import policy
 

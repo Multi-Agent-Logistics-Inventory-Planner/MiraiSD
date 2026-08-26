@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import UTC
 from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, parse_qsl, quote, urlencode, urlparse, urlunparse
 
@@ -14,7 +15,7 @@ from sqlalchemy.engine import Engine
 from .. import config
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ class SupabaseRepo:
             Created notification ID, or None if creation failed or duplicate
         """
         import json
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Generate UUID client-side (matching Hibernate's GenerationType.UUID behavior)
         notification_id = uuid.uuid4()
@@ -291,7 +292,7 @@ class SupabaseRepo:
                     "inventory_id": uuid.UUID(inventory_id) if inventory_id else None,
                     "via": via_array_str,
                     "metadata": metadata_json_str,
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                     "source_event_id": uuid.UUID(source_event_id) if source_event_id else None,
                     "dedupe_key": dedupe_key,
                 }
@@ -720,8 +721,8 @@ class SupabaseRepo:
         Returns:
             List of (user_name, total_count) tuples, ordered by count descending.
         """
-        from datetime import date as date_type
         import calendar
+        from datetime import date as date_type
 
         first_day = date_type(year, month, 1)
         last_day = date_type(year, month, calendar.monthrange(year, month)[1])

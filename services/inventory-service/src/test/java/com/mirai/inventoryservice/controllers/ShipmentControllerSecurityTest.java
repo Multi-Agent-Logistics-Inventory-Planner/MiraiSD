@@ -5,7 +5,10 @@ import com.mirai.inventoryservice.auth.JwtService;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
 import com.mirai.inventoryservice.dtos.requests.ShipmentItemRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
+import com.mirai.inventoryservice.models.audit.User;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
+import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.services.UserService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +56,12 @@ class ShipmentControllerSecurityTest {
 
     @MockBean
     private JwtService jwtService;
+
+    // The enforced role now comes from a DB lookup by email (see JwtAuthenticationFilter),
+    // not from the JWT's user_metadata.role claim. JwtService itself is mocked here, so
+    // this must be mocked too whenever a test needs a specific enforced role.
+    @MockBean
+    private UserService userService;
 
     @Autowired
     private RateLimitingFilter rateLimitingFilter;
@@ -350,6 +359,23 @@ class ShipmentControllerSecurityTest {
         when(jwtService.extractName(token)).thenReturn(name);
         when(jwtService.extractRole(token)).thenReturn(role);
         when(jwtService.validateToken(token)).thenReturn(true);
+
+        // The enforced role comes from a DB lookup by email (see JwtAuthenticationFilter),
+        // not from the role claim stubbed above. Stub the email claim and, for roles that
+        // correspond to a real UserRole, the backend User lookup so the enforced role
+        // matches what the test intends.
+        String email = personId + "@test.local";
+        when(jwtService.extractEmail(token)).thenReturn(email);
+        try {
+            UserRole userRole = UserRole.valueOf(role.toUpperCase());
+            when(userService.existsByEmail(email)).thenReturn(true);
+            when(userService.getUserByEmail(email)).thenReturn(
+                    User.builder().email(email).fullName(name).role(userRole).build());
+        } catch (IllegalArgumentException e) {
+            // Role has no backend UserRole equivalent (e.g. plain "user"); leave the
+            // lookup unstubbed so it falls back to no matching record, matching how
+            // JwtAuthenticationFilter treats an unregistered authenticated user.
+        }
     }
 
     private String createValidToken(String personId, String name, String role) {

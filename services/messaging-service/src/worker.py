@@ -200,8 +200,9 @@ class MessagingWorker:
 
         Runs a separate consumer for the employee-reviews topic.
         """
-        from kafka import KafkaConsumer
         import json
+
+        from kafka import KafkaConsumer
 
         logger.info("Starting review consumer thread for topic: %s", config.KAFKA_REVIEWS_TOPIC)
 
@@ -253,7 +254,6 @@ class MessagingWorker:
         Args:
             value: Deserialized Kafka message value.
         """
-        from .application.review_processor import ReviewEvent
 
         event = self._review_processor.parse_kafka_message(value)
         if event is None:

@@ -5,6 +5,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env file from the project root (MiraiSD/)
@@ -14,9 +15,8 @@ env_loaded = load_dotenv(env_path)
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.adapters.supabase_repo import SupabaseRepo
-from src.adapters.slack_notifier import AlertMessage, SlackNotifier
-from src import config
+from src import config  # noqa: E402 - must follow sys.path.insert above
+from src.adapters.slack_notifier import AlertMessage, SlackNotifier  # noqa: E402
 
 
 def main():

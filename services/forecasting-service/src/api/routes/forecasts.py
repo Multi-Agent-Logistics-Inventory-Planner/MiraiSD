@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 from ...adapters.supabase_repo import SupabaseRepo
@@ -40,7 +41,7 @@ def trigger_forecast(
         raise HTTPException(
             status_code=500,
             detail={"error": "Forecast trigger failed", "code": "INTERNAL_ERROR"},
-        )
+        ) from e
 
 
 @router.get("/backtest")
@@ -75,7 +76,7 @@ def backtest_endpoint(
         raise HTTPException(
             status_code=500,
             detail={"error": "Backtest failed", "code": "INTERNAL_ERROR"},
-        )
+        ) from e
 
 
 @router.post("/run")
@@ -125,7 +126,7 @@ def run_forecast_job(
                 "error": "Invalid input parameters",
                 "code": "VALIDATION_ERROR"
             }
-        )
+        ) from e
 
     except FileNotFoundError as e:
         # File system errors - log details, return generic message
@@ -137,7 +138,7 @@ def run_forecast_job(
                 "error": "Forecast calculation failed",
                 "code": "FILE_ERROR"
             }
-        )
+        ) from e
 
     except (ConnectionError, OSError) as e:
         # Database/network connection errors - log details, return generic message
@@ -148,7 +149,7 @@ def run_forecast_job(
                 "error": "Forecast calculation failed",
                 "code": "DATABASE_ERROR"
             }
-        )
+        ) from e
 
     except (ImportError, ModuleNotFoundError) as e:
         # Import errors - log details, return generic message
@@ -159,7 +160,7 @@ def run_forecast_job(
                 "error": "An unexpected error occurred",
                 "code": "INTERNAL_ERROR"
             }
-        )
+        ) from e
 
     except Exception as e:
         # Catch-all for unexpected errors - log details, return generic message
@@ -170,5 +171,5 @@ def run_forecast_job(
                 "error": "An unexpected error occurred",
                 "code": "INTERNAL_ERROR"
             }
-        )
+        ) from e
 

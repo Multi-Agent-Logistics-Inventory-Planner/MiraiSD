@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src import config, segmentation as seg
-
+from src import config
+from src import segmentation as seg
 
 TODAY = date(2026, 7, 1)
 
@@ -40,7 +40,7 @@ class TestComputeSegmentSignals:
 
     def test_top3_share_partial(self):
         # 10 sale days of 1 unit + one day of 90: top3 = 92/100
-        spec = {i: 1.0 for i in range(10)}
+        spec = dict.fromkeys(range(10), 1.0)
         spec[20] = 90.0
         df = _daily("a", spec)
         signals = seg.compute_segment_signals(df, today=TODAY)

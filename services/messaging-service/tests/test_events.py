@@ -1,6 +1,6 @@
 """Tests for event models and datetime parsing."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -47,7 +47,7 @@ class TestParseDatetime:
 
     def test_parse_datetime_object(self):
         """Should pass through datetime objects."""
-        dt = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 3, 2, 12, 0, 0, tzinfo=UTC)
         result = _parse_datetime(dt)
         assert result == dt
 
@@ -55,7 +55,7 @@ class TestParseDatetime:
         """Should add UTC timezone to naive datetime."""
         dt = datetime(2026, 3, 2, 12, 0, 0)
         result = _parse_datetime(dt)
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
 
     def test_parse_without_microseconds(self):
         """Should parse datetime without microseconds."""

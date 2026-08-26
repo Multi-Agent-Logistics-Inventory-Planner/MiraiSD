@@ -1,12 +1,10 @@
 """Tests for ROP propagation error handling in the pipeline."""
 
 import sys
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
-import numpy as np
 import pandas as pd
-import pytest
 
 sys.modules["kafka"] = MagicMock()
 sys.modules["kafka.errors"] = MagicMock()
@@ -32,7 +30,7 @@ def _build_mock_repo():
 
     inventory_df = pd.DataFrame({
         "item_id": ["item-1"],
-        "as_of_ts": [datetime.now(timezone.utc)],
+        "as_of_ts": [datetime.now(UTC)],
         "current_qty": [50],
     })
     repo.get_current_inventory.return_value = inventory_df
@@ -42,7 +40,7 @@ def _build_mock_repo():
         "item_id": ["item-1"],
         "quantity_change": [-3],
         "reason": ["sale"],
-        "at": [datetime.now(timezone.utc)],
+        "at": [datetime.now(UTC)],
     })
     repo.get_stock_movements.return_value = movements_df
 
