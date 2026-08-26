@@ -24,14 +24,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Full history: a push can bundle multiple commits, and the "Detect
+          # changed services" step below needs to diff against the commit that
+          # was HEAD before this push (github.event.before), which a shallow
+          # fetch-depth: 2 checkout may not contain.
+          fetch-depth: 0
 
       - name: Detect changed services
         id: changes
         run: |
-          # Get list of changed files
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          # Diff against the commit that was HEAD before this push, not just
+          # HEAD~1 - a push can bundle multiple commits, and HEAD~1 only ever
+          # looks at the last one, silently missing changes from earlier
+          # commits in the same push. github.event.before is empty/all-zero
+          # for workflow_dispatch and for a brand-new branch's first push;
+          # fall back to HEAD~1 in that case.
+          BASE_SHA="${{ github.event.before }}"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          fi
 
+          if [ -n "$BASE_SHA" ]; then
+            CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+          else
+            CHANGED_FILES=""
+          fi
+
+          echo "Base SHA: $BASE_SHA"
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
@@ -39,7 +58,14 @@ jobs:
           INVENTORY_CHANGED=false
           FORECASTING_CHANGED=false
           MESSAGING_CHANGED=false
-          INFRA_CHANGED=false
+          # docker-compose.yml defines every container's resolved config (env,
+          # memory limits, etc), so a change there can affect any service - but
+          # `docker compose up -d` already diffs each container's config against
+          # what's running and only recreates ones that actually changed, so we
+          # don't need to (and shouldn't) rebuild/restart everything for this.
+          COMPOSE_CHANGED=false
+          # Caddyfile only affects the caddy container - no image to rebuild.
+          CADDY_CHANGED=false
 
           if echo "$CHANGED_FILES" | grep -q "^services/inventory-service/"; then
             INVENTORY_CHANGED=true
@@ -53,14 +79,19 @@ jobs:
             MESSAGING_CHANGED=true
           fi
 
-          if echo "$CHANGED_FILES" | grep -q "^infra/"; then
-            INFRA_CHANGED=true
+          if echo "$CHANGED_FILES" | grep -q "^infra/docker-compose\.yml$"; then
+            COMPOSE_CHANGED=true
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^infra/Caddyfile$"; then
+            CADDY_CHANGED=true
           fi
 
           echo "inventory_changed=$INVENTORY_CHANGED" >> $GITHUB_OUTPUT
           echo "forecasting_changed=$FORECASTING_CHANGED" >> $GITHUB_OUTPUT
           echo "messaging_changed=$MESSAGING_CHANGED" >> $GITHUB_OUTPUT
-          echo "infra_changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
+          echo "compose_changed=$COMPOSE_CHANGED" >> $GITHUB_OUTPUT
+          echo "caddy_changed=$CADDY_CHANGED" >> $GITHUB_OUTPUT
 
           # Build list of services to rebuild (space-separated, no leading space)
           SERVICES_TO_REBUILD=""
@@ -104,30 +135,59 @@ jobs:
             cd infra
 
             # Determine what to rebuild
-            INFRA_CHANGED="${{ steps.changes.outputs.infra_changed }}"
+            COMPOSE_CHANGED="${{ steps.changes.outputs.compose_changed }}"
+            CADDY_CHANGED="${{ steps.changes.outputs.caddy_changed }}"
             SERVICES="${{ steps.changes.outputs.services_to_rebuild }}"
+            IS_MANUAL="${{ github.event_name == 'workflow_dispatch' }}"
 
-            echo "INFRA_CHANGED=$INFRA_CHANGED"
+            echo "COMPOSE_CHANGED=$COMPOSE_CHANGED"
+            echo "CADDY_CHANGED=$CADDY_CHANGED"
             echo "SERVICES=$SERVICES"
+            echo "IS_MANUAL=$IS_MANUAL"
 
-            if [ "$INFRA_CHANGED" = "true" ] || [ -z "$SERVICES" ]; then
-              echo "Infrastructure changed or full rebuild needed. Rebuilding all services..."
-              docker compose build --no-cache
-              # Stop and remove any conflicting containers before recreating
-              docker compose down --remove-orphans || true
-              docker compose up -d
+            if [ "$IS_MANUAL" = "true" ]; then
+              # Manual trigger has no path diff to key off - do a full,
+              # deliberate redeploy of every buildable service (never `web`,
+              # which has no build: key by design - see docker-compose.yml).
+              echo "Manual trigger. Rebuilding all backend services..."
+              docker compose build --no-cache kafka inventory-service forecasting-service messaging-service
+              docker compose up -d --remove-orphans
             else
-              echo "Rebuilding specific services: $SERVICES"
-              for SERVICE in $SERVICES; do
-                echo "Building $SERVICE..."
-                docker compose build --no-cache $SERVICE
-              done
+              if [ -n "$SERVICES" ]; then
+                echo "Building changed services: $SERVICES"
+                for SERVICE in $SERVICES; do
+                  docker compose build --no-cache $SERVICE
+                done
+              fi
 
-              echo "Restarting services with zero-downtime..."
-              for SERVICE in $SERVICES; do
-                echo "Restarting $SERVICE..."
-                docker compose up -d --no-deps --force-recreate $SERVICE
-              done
+              if [ "$COMPOSE_CHANGED" = "true" ]; then
+                # docker-compose.yml can affect any service's resolved config.
+                # `up -d` (no --force-recreate) diffs each container's config
+                # (and, for rebuilt services, image ID) against what's running
+                # and only recreates ones that actually differ, so this is safe
+                # to run broadly - it will NOT touch `web` or any other service
+                # whose config didn't change.
+                echo "docker-compose.yml changed. Applying config (only changed services will restart)..."
+                docker compose up -d --remove-orphans
+              elif [ -n "$SERVICES" ]; then
+                echo "Restarting changed services with zero-downtime..."
+                for SERVICE in $SERVICES; do
+                  docker compose up -d --no-deps --force-recreate $SERVICE
+                done
+              fi
+
+              if [ "$CADDY_CHANGED" = "true" ]; then
+                # Caddyfile is bind-mounted, not baked into an image, so a
+                # content-only edit doesn't change caddy's resolved compose
+                # config or image ID - `up -d` above won't detect it. Force a
+                # restart so Caddy actually picks up the new file.
+                echo "Caddyfile changed. Restarting caddy to pick up the new config..."
+                docker compose up -d --no-deps --force-recreate caddy
+              fi
+
+              if [ -z "$SERVICES" ] && [ "$COMPOSE_CHANGED" != "true" ] && [ "$CADDY_CHANGED" != "true" ]; then
+                echo "No service, compose, or Caddyfile changes detected (e.g. workflow file only). Nothing to redeploy."
+              fi
             fi
 
             # Clean up old images
