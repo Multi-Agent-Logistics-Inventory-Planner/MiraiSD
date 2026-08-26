@@ -2,6 +2,9 @@ package com.mirai.inventoryservice.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
+import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,8 +73,17 @@ public abstract class BaseKafkaIntegrationTest {
     @Autowired
     private RateLimitingFilter rateLimitingFilter;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Value("${supabase.jwt.secret}")
     private String jwtSecret;
+
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.jwt.audience:authenticated}")
+    private String jwtAudience;
 
     @BeforeEach
     void clearRateLimits() {
@@ -84,11 +96,15 @@ public abstract class BaseKafkaIntegrationTest {
         userMetadata.put("role", role);
 
         SecretKey signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        String email = personId + "@test.internal";
+        String issuer = supabaseUrl.replaceAll("/+$", "") + "/auth/v1";
 
         return Jwts.builder()
                 .subject(personId)
+                .issuer(issuer)
+                .audience().add(jwtAudience).and()
                 .claim("user_metadata", userMetadata)
-                .claim("email", "test@test.com")
+                .claim("email", email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
                 .signWith(signingKey)
@@ -96,10 +112,21 @@ public abstract class BaseKafkaIntegrationTest {
     }
 
     protected String adminToken() {
+        seedUser("admin-id@test.internal", UserRole.ADMIN);
         return generateTestToken("admin-id", "ADMIN");
     }
 
     protected String employeeToken() {
+        seedUser("employee-id@test.internal", UserRole.EMPLOYEE);
         return generateTestToken("employee-id", "EMPLOYEE");
+    }
+
+    private void seedUser(String email, UserRole role) {
+        User user = userRepository.findByEmail(email).orElseGet(() -> User.builder()
+                .email(email)
+                .fullName("Integration Test User")
+                .build());
+        user.setRole(role);
+        userRepository.save(user);
     }
 }
