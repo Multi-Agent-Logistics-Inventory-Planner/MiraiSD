@@ -20,7 +20,6 @@ export function ImageUpload({
   displayUrl,
   isUploading,
   error,
-  hasNewFile,
   onFileSelect,
   onClear,
   disabled = false,

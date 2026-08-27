@@ -1,10 +1,6 @@
 "use client"
 
-import { Bell, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Badge } from "@/components/ui/badge"
 
 interface DashboardHeaderProps {
   title: string

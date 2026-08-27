@@ -1,8 +1,7 @@
 """Tests for DLQ producer."""
 
 import base64
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -47,7 +46,7 @@ class TestDLQMessage:
             original_partition=0,
             error_message="Parse error: missing item_id",
             raw_value=b'{"invalid": "json"}',
-            failed_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+            failed_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
         )
 
         assert msg.original_topic == "inventory-changes"
@@ -65,7 +64,7 @@ class TestDLQMessage:
             original_partition=1,
             error_message="Validation failed",
             raw_value=b'{"bad": "data"}',
-            failed_at=datetime(2024, 2, 15, 10, 30, 0, tzinfo=timezone.utc),
+            failed_at=datetime(2024, 2, 15, 10, 30, 0, tzinfo=UTC),
         )
 
         result = msg.to_dict()
@@ -86,7 +85,7 @@ class TestDLQMessage:
             original_partition=0,
             error_message="Test error",
             raw_value=raw_bytes,
-            failed_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+            failed_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
 
         result = msg.to_dict()
@@ -97,7 +96,7 @@ class TestDLQMessage:
 
     def test_to_dict_datetime_isoformat(self):
         """Should format datetime as ISO format string."""
-        test_datetime = datetime(2024, 6, 15, 14, 30, 45, tzinfo=timezone.utc)
+        test_datetime = datetime(2024, 6, 15, 14, 30, 45, tzinfo=UTC)
         msg = DLQMessage(
             original_topic="test-topic",
             original_offset=200,
@@ -157,7 +156,7 @@ class TestDLQProducer:
             original_partition=2,
             error_message="Test error",
             raw_value=b"test data",
-            failed_at=datetime.now(timezone.utc),
+            failed_at=datetime.now(UTC),
         )
 
         dlq.send(msg)
@@ -177,7 +176,7 @@ class TestDLQProducer:
             original_partition=0,
             error_message="error",
             raw_value=b"data",
-            failed_at=datetime.now(timezone.utc),
+            failed_at=datetime.now(UTC),
         )
 
         with pytest.raises(RuntimeError):

@@ -7,6 +7,8 @@ import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,8 @@ class LootboxBalanceFormulaTest {
     @Mock private LootboxTierRepository lootboxTierRepository;
     @Mock private LootboxPrizeRepository lootboxPrizeRepository;
     @Mock private UserRepository userRepository;
+    @Mock private EntityManager entityManager;
+    @Mock private Query nativeBalanceQuery;
 
     @InjectMocks private LootboxService service;
 
@@ -73,6 +77,22 @@ class LootboxBalanceFormulaTest {
         lenient().when(coinAdjustmentRepository.sumAdjustmentTotalsByUserId(eq(userId), any(OffsetDateTime.class)))
                 .thenReturn(totals(0L, 0L));
         lenient().when(lootboxPlayRepository.sumCostByUserId(userId)).thenReturn(0L);
+
+        // computeBalance now deliberately performs one native aggregate query instead
+        // of three repository round trips. Keep these formula tests mock-backed by
+        // adapting their existing repository-sum fixtures to that query result.
+        lenient().when(entityManager.createNativeQuery(any(String.class))).thenReturn(nativeBalanceQuery);
+        lenient().when(nativeBalanceQuery.setParameter(any(String.class), any())).thenReturn(nativeBalanceQuery);
+        lenient().when(nativeBalanceQuery.getSingleResult()).thenAnswer(ignored -> {
+            Object[] reviewTotals = reviewDailyCountRepository
+                    .sumCoinTotalsByUserId(userId, LocalDate.now()).get(0);
+            Object[] adjustmentTotals = coinAdjustmentRepository
+                    .sumAdjustmentTotalsByUserId(userId, OffsetDateTime.now()).get(0);
+            return new Object[]{
+                    reviewTotals[0], reviewTotals[1], adjustmentTotals[0], adjustmentTotals[1],
+                    lootboxPlayRepository.sumCostByUserId(userId)
+            };
+        });
     }
 
     @Test

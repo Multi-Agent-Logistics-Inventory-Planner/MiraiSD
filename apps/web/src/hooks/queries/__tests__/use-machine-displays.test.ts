@@ -16,9 +16,6 @@ vi.mock("@/lib/api/machine-displays", () => ({
 import {
   useActiveDisplays,
   useActiveDisplaysByType,
-  useMachineDisplayHistoryPaged,
-  useProductDisplayHistory,
-  useActiveDisplaysForMachine,
   STALE_DISPLAY_THRESHOLD_DAYS,
 } from "../use-machine-displays";
 
@@ -109,8 +106,11 @@ describe("use-machine-displays", () => {
   });
 
   describe("STALE_DISPLAY_THRESHOLD_DAYS", () => {
-    it("is set to 14 days", () => {
-      expect(STALE_DISPLAY_THRESHOLD_DAYS).toBe(14);
+    it("is set to 45 days", () => {
+      // Raised from 14 to 45 days; 14 was flagging active displays as
+      // stale given the lower display refresh cadence. See the commit
+      // that changed the source constant for context.
+      expect(STALE_DISPLAY_THRESHOLD_DAYS).toBe(45);
     });
   });
 

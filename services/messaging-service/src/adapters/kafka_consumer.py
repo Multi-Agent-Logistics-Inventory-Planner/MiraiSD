@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from kafka import KafkaConsumer
@@ -135,8 +135,7 @@ class KafkaEventConsumer:
         logger.info("Starting event stream")
         while self._running:
             events = self.poll(timeout_ms=poll_timeout_ms)
-            for event in events:
-                yield event
+            yield from events
 
     def _send_to_dlq(self, record: ConsumerRecord, error_message: str) -> None:
         """Send a failed record to the Dead Letter Queue.
@@ -164,7 +163,7 @@ class KafkaEventConsumer:
                 original_partition=record.partition,
                 error_message=error_message,
                 raw_value=raw_value,
-                failed_at=datetime.now(timezone.utc),
+                failed_at=datetime.now(UTC),
             )
             self._dlq_producer.send(dlq_message)
         except Exception as e:

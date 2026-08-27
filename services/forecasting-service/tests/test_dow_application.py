@@ -13,14 +13,12 @@ were stored but never applied. These tests pin the new behavior:
 """
 from datetime import date
 
-import numpy as np
 import pandas as pd
 
 from src import policy
 
-
 # 1.0 multiplier every day -> sum reduces to mu*L
-FLAT = {d: 1.0 for d in range(7)}
+FLAT = dict.fromkeys(range(7), 1.0)
 
 # Weekend-heavy: Sat (5) and Sun (6) sell 3x, weekdays sell ~0.6x.
 # Average over 7 days: (5*0.6 + 2*3.0)/7 = 1.286 -> close to 1.0 over a full week.

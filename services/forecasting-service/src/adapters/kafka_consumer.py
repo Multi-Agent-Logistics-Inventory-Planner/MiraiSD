@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from kafka import KafkaConsumer
@@ -106,16 +106,16 @@ class KafkaEventConsumer:
 
         events: list[NormalizedEvent] = []
         records = self._consumer.poll(timeout_ms=timeout_ms)
-        
+
         # Log assignment and poll results for debugging
         assignment = self._consumer.assignment()
         if not assignment:
             logger.warning("Consumer has no partition assignment yet")
-        
+
         if records:
             logger.info("Poll returned %d partitions with messages", len(records))
 
-        for topic_partition, messages in records.items():
+        for _topic_partition, messages in records.items():
             for record in messages:
                 try:
                     event = self._parse_record(record)
@@ -143,8 +143,7 @@ class KafkaEventConsumer:
         logger.info("Starting event stream")
         while self._running:
             events = self.poll(timeout_ms=poll_timeout_ms)
-            for event in events:
-                yield event
+            yield from events
 
     def _send_to_dlq(self, record: ConsumerRecord, error_message: str) -> None:
         """Send a failed record to the Dead Letter Queue.
@@ -172,7 +171,7 @@ class KafkaEventConsumer:
                 original_partition=record.partition,
                 error_message=error_message,
                 raw_value=raw_value,
-                failed_at=datetime.now(timezone.utc),
+                failed_at=datetime.now(UTC),
             )
             self._dlq_producer.send(dlq_message)
         except Exception as e:

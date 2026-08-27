@@ -3,20 +3,19 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
-from .. import config
+from .. import config, policy
 from .. import features as feat
 from .. import forecast as fc
-from .. import policy
 from .. import segmentation as seg
-from ..backtest import compute_mape
-from ..lead_time import compute_hierarchical_lead_time, compute_lead_time_stats
 from ..adapters.supabase_repo import SupabaseRepo
+from ..backtest import compute_mape
+from ..lead_time import compute_hierarchical_lead_time
 
 if TYPE_CHECKING:
     pass
@@ -126,7 +125,7 @@ class ForecastingPipeline:
         # Use the larger of 2x rolling window or the CV window so the per-SKU
         # CV used for safety-stock regime routing has enough history.
         lookback_days = max(config.ROLLING_WINDOW * 2, config.CV_WINDOW_DAYS)
-        end_ts = datetime.now(timezone.utc)
+        end_ts = datetime.now(UTC)
         start_ts = end_ts - timedelta(days=lookback_days)
 
         movements_df = self._repo.get_stock_movements(
@@ -198,7 +197,7 @@ class ForecastingPipeline:
 
         # Step 5a: Category-pooled fallback for cold-start items only
         cat_col = items_df["category_name"] if "category_name" in items_df.columns else pd.Series("Unknown", index=items_df.index)
-        category_map = dict(zip(items_df["item_id"], cat_col))
+        category_map = dict(zip(items_df["item_id"], cat_col, strict=False))
         # Cold-start = no movements in the window. Must be the pre-union
         # coverage set: the zero-demand baseline rows added above would
         # otherwise count as "history" and keep the fallback from ever firing.
@@ -215,14 +214,14 @@ class ForecastingPipeline:
 
         # Step 5b: Compute backtest MAPE
         mape_df = pd.DataFrame(columns=["item_id", "mape", "forecast_mu", "actual_mu", "backtest_days"])
-        backtest_target = datetime.now(timezone.utc) - timedelta(days=config.BACKTEST_HORIZON_DAYS)
+        backtest_target = datetime.now(UTC) - timedelta(days=config.BACKTEST_HORIZON_DAYS)
         historical_fc_df = self._repo.get_historical_forecasts(
             item_ids=item_list, target_date=backtest_target,
         )
         if not historical_fc_df.empty and not movements_df.empty:
             # Build actual daily usage for the backtest window
             backtest_start = backtest_target
-            backtest_end = datetime.now(timezone.utc)
+            backtest_end = datetime.now(UTC)
             backtest_movements = movements_df[
                 (movements_df["at"] >= backtest_start) & (movements_df["at"] <= backtest_end)
             ]
@@ -254,7 +253,7 @@ class ForecastingPipeline:
         rate_map: dict[str, float] = {}
         drop_qty_map: dict[str, float] = {}
         if config.SEGMENTATION_ENABLED:
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
             if not movements_df.empty:
                 first_activity = {
                     str(iid): ts.date()
@@ -280,7 +279,7 @@ class ForecastingPipeline:
             created_map: dict[str, object] = {}
             if "created_at" in items_df.columns:
                 created_map = dict(
-                    zip(items_df["item_id"].astype(str), items_df["created_at"])
+                    zip(items_df["item_id"].astype(str), items_df["created_at"], strict=False)
                 )
             for iid in items_df["item_id"].astype(str):
                 segment_map.setdefault(
@@ -459,7 +458,7 @@ class ForecastingPipeline:
         Returns:
             DataFrame with columns: item_id, as_of_ts, current_qty
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         rows = [
             {"item_id": item_id, "as_of_ts": now, "current_qty": event_inventory[item_id]}
             for item_id in item_ids
@@ -513,7 +512,7 @@ class ForecastingPipeline:
         df = movements_df[["item_id", "reason", "at"]].copy()
         df["at"] = pd.to_datetime(df["at"], utc=True)
         df["item_id"] = df["item_id"].astype(str)
-        today = pd.Timestamp(datetime.now(timezone.utc)).floor("D")
+        today = pd.Timestamp(datetime.now(UTC)).floor("D")
 
         groups = {
             "recent_shipment_7d": feat.SHIPMENT_REASONS,
@@ -556,7 +555,7 @@ class ForecastingPipeline:
                 ]
             )
 
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
 
         return pd.DataFrame(
             {
@@ -575,7 +574,7 @@ class ForecastingPipeline:
         self, items_df: pd.DataFrame
     ) -> pd.DataFrame:
         """Legacy iterrows version for comparison testing."""
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         rows = []
         for _, item in items_df.iterrows():
             rows.append(
@@ -614,7 +613,7 @@ class ForecastingPipeline:
 
         Uses vectorized policy functions for better performance on large datasets.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Merge items with estimates
         merged = items_df.merge(estimates_df, on="item_id", how="inner")
@@ -1031,7 +1030,7 @@ class ForecastingPipeline:
         estimates_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """Legacy iterrows version for comparison testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Merge items with estimates
         merged = items_df.merge(estimates_df, on="item_id", how="inner")

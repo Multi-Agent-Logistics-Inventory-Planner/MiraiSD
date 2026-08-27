@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Minus, Plus } from "lucide-react";
 import {
   Dialog,
@@ -378,10 +378,11 @@ export function AdjustStockDialog({
     void submit();
   }
 
-  const pendingSubmitRef = useMemo(
-    () => ({ current: null as null | (() => Promise<void>) }),
-    []
-  );
+  // A real ref (not a useMemo-cached plain object): this needs to be mutated
+  // from event handlers below (handleConfirmAdjustment/handleCancelAdjustment)
+  // and read back later, and only useRef guarantees the identity is stable and
+  // safe to mutate outside of render.
+  const pendingSubmitRef = useRef<null | (() => Promise<void>)>(null);
 
   function handleConfirmAdjustment() {
     setConfirmDialogOpen(false);

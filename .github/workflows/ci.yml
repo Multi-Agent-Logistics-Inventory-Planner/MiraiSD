@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    name: Web (lint, typecheck, unit tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # No "typecheck" npm script exists; run tsc directly against the project config.
+      - run: npx tsc --noEmit
+      - run: npm run test:run
+
+  inventory-service:
+    name: Inventory Service (build, unit + Testcontainers tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/inventory-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      # No maven-failsafe-plugin is configured, so plain `mvn test` (Surefire's default
+      # include pattern) does not pick up *IT.java classes at all. The two existing
+      # Testcontainers-backed integration tests (BaseKafkaIntegrationTest,
+      # CoinAdminDashboardServiceIT) are real Postgres/Kafka tests, not H2, and are exactly
+      # what this job should exercise per the "PostgreSQL Testcontainers coverage where H2
+      # is not faithful" requirement — so the test pattern is widened explicitly rather than
+      # relying on the default. GitHub-hosted ubuntu-latest runners have Docker available out
+      # of the box, which Testcontainers needs; no extra setup required for that.
+      - run: mvn -B test -Dtest='*Test,*Tests,*IT'
+
+  forecasting-service:
+    name: Forecasting Service (lint, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/forecasting-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/forecasting-service/pyproject.toml
+      # Installs prophet/cmdstanpy (compiled Stan models) — this step is the slow part of
+      # this job; expect it to dominate the run time.
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest tests/
+
+  messaging-service:
+    name: Messaging Service (lint, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/messaging-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/messaging-service/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: ruff check .
+      # Deliberately scoped to tests/ only, NOT the whole service directory: several
+      # root-level test_*.py files here (test_slack.py, test_full_pipeline.py,
+      # test_full_flow.py, test_notifications.py) are manual CLI scripts with a `main()`
+      # entrypoint that send real Slack messages / hit real external services when
+      # executed — they are not pytest suites despite the test_ prefix, and must never run
+      # unattended in CI. pyproject.toml already scopes `testpaths = ["tests"]`, so
+      # `pytest` alone would already respect this; the explicit tests/ argument here is
+      # belt-and-suspenders so this stays correct even if that config ever changes.
+      - run: pytest tests/

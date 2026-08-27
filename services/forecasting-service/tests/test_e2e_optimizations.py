@@ -7,11 +7,10 @@ verifying all optimizations work together correctly.
 import json
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 # Mock kafka module hierarchy to avoid import error in test environment
 kafka_mock = MagicMock()
@@ -20,10 +19,9 @@ kafka_mock.errors.KafkaError = Exception
 sys.modules["kafka"] = kafka_mock
 sys.modules["kafka.errors"] = kafka_mock.errors
 
-from src.events import EventEnvelope, EventPayload, NormalizedEvent, _parse_line
 from src.application.event_aggregator import EventAggregator
 from src.application.pipeline import ForecastingPipeline
-from src import config
+from src.events import NormalizedEvent, _parse_line
 
 
 class TestE2EEventCarriedState:
@@ -35,12 +33,12 @@ class TestE2EEventCarriedState:
         event_json = json.dumps({
             "event_id": str(uuid.uuid4()),
             "event_type": "INVENTORY_CHANGE",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "payload": {
                 "item_id": "item-abc-123",
                 "quantity_change": -5,
                 "reason": "sale",
-                "at": datetime.now(timezone.utc).isoformat(),
+                "at": datetime.now(UTC).isoformat(),
                 "current_total_qty": 95,  # Event carries current inventory
                 "previous_total_qty": 100,
             }
@@ -80,7 +78,7 @@ class TestE2EEventCarriedState:
             "item_id": ["item-abc-123"] * 14,
             "quantity_change": [-5] * 14,
             "reason": ["sale"] * 14,
-            "at": pd.date_range(end=datetime.now(timezone.utc), periods=14, freq="D"),
+            "at": pd.date_range(end=datetime.now(UTC), periods=14, freq="D"),
         })
         mock_repo.upsert_forecasts.return_value = 1
 
@@ -112,12 +110,12 @@ class TestE2EBackwardCompatibility:
         event_json = json.dumps({
             "event_id": str(uuid.uuid4()),
             "event_type": "INVENTORY_CHANGE",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "payload": {
                 "item_id": "item-xyz-789",
                 "quantity_change": -3,
                 "reason": "sale",
-                "at": datetime.now(timezone.utc).isoformat(),
+                "at": datetime.now(UTC).isoformat(),
                 # No current_total_qty or previous_total_qty
             }
         })
@@ -153,7 +151,7 @@ class TestE2EBackwardCompatibility:
         })
         mock_repo.get_current_inventory.return_value = pd.DataFrame({
             "item_id": ["item-xyz-789"],
-            "as_of_ts": [datetime.now(timezone.utc)],
+            "as_of_ts": [datetime.now(UTC)],
             "current_qty": [50],  # DB returns inventory
         })
         mock_repo.get_stock_movements.return_value = pd.DataFrame({
@@ -161,7 +159,7 @@ class TestE2EBackwardCompatibility:
             "item_id": ["item-xyz-789"] * 14,
             "quantity_change": [-3] * 14,
             "reason": ["sale"] * 14,
-            "at": pd.date_range(end=datetime.now(timezone.utc), periods=14, freq="D"),
+            "at": pd.date_range(end=datetime.now(UTC), periods=14, freq="D"),
         })
         mock_repo.upsert_forecasts.return_value = 1
 
@@ -235,7 +233,7 @@ class TestE2EBatchUpsert:
         # Create test data with 10 rows
         df = pd.DataFrame({
             "item_id": [f"item-{i}" for i in range(10)],
-            "computed_at": [datetime.now(timezone.utc)] * 10,
+            "computed_at": [datetime.now(UTC)] * 10,
             "horizon_days": [21] * 10,
             "avg_daily_delta": [-5.0] * 10,
             "days_to_stockout": [20.0] * 10,
@@ -315,7 +313,7 @@ class TestE2EFullPipelineIntegration:
                 item_id=f"item-{i}",
                 quantity_change=-3,
                 reason="sale",
-                at=datetime.now(timezone.utc),
+                at=datetime.now(UTC),
                 current_total_qty=100 - (i * 10),  # 100, 90, 80, 70, 60
                 previous_total_qty=103 - (i * 10),
             )
@@ -357,7 +355,7 @@ class TestE2EFullPipelineIntegration:
                     "item_id": f"item-{i}",
                     "quantity_change": -3,
                     "reason": "sale",
-                    "at": datetime.now(timezone.utc) - timedelta(days=day),
+                    "at": datetime.now(UTC) - timedelta(days=day),
                 })
         mock_repo.get_stock_movements.return_value = pd.DataFrame(movements)
         mock_repo.upsert_forecasts.return_value = 5
@@ -402,7 +400,7 @@ class TestE2EEdgeCases:
         })
         mock_repo.get_current_inventory.return_value = pd.DataFrame({
             "item_id": ["item-1"],
-            "as_of_ts": [datetime.now(timezone.utc)],
+            "as_of_ts": [datetime.now(UTC)],
             "current_qty": [50],
         })
         mock_repo.get_stock_movements.return_value = pd.DataFrame({
@@ -410,7 +408,7 @@ class TestE2EEdgeCases:
             "item_id": ["item-1"] * 14,
             "quantity_change": [-3] * 14,
             "reason": ["sale"] * 14,
-            "at": pd.date_range(end=datetime.now(timezone.utc), periods=14, freq="D"),
+            "at": pd.date_range(end=datetime.now(UTC), periods=14, freq="D"),
         })
         mock_repo.upsert_forecasts.return_value = 1
 
@@ -435,7 +433,7 @@ class TestE2EEdgeCases:
         # DB returns inventory for item-2 (not in event inventory)
         mock_repo.get_current_inventory.return_value = pd.DataFrame({
             "item_id": ["item-1", "item-2"],
-            "as_of_ts": [datetime.now(timezone.utc)] * 2,
+            "as_of_ts": [datetime.now(UTC)] * 2,
             "current_qty": [50, 75],
         })
         mock_repo.get_stock_movements.return_value = pd.DataFrame({
@@ -443,7 +441,7 @@ class TestE2EEdgeCases:
             "item_id": ["item-1"] * 14 + ["item-2"] * 14,
             "quantity_change": [-3] * 28,
             "reason": ["sale"] * 28,
-            "at": list(pd.date_range(end=datetime.now(timezone.utc), periods=14, freq="D")) * 2,
+            "at": list(pd.date_range(end=datetime.now(UTC), periods=14, freq="D")) * 2,
         })
         mock_repo.upsert_forecasts.return_value = 2
 

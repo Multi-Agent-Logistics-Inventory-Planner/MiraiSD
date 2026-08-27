@@ -3,9 +3,7 @@
 import sys
 from unittest.mock import MagicMock
 
-import numpy as np
 import pandas as pd
-import pytest
 
 # Mock kafka (not installed in test env)
 sys.modules["kafka"] = MagicMock()
@@ -13,6 +11,7 @@ sys.modules["kafka.errors"] = MagicMock()
 
 # Patch pydantic v1 -> v2 compatibility (field_validator not in pydantic v1)
 import pydantic
+
 if not hasattr(pydantic, "field_validator"):
     pydantic.field_validator = lambda *a, **kw: lambda f: f
 

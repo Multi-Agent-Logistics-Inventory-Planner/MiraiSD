@@ -1,9 +1,6 @@
 """Tests for Kafka consumer DLQ integration."""
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from src.adapters.dlq_producer import DLQMessage, DLQProducer
 from src.adapters.kafka_consumer import KafkaEventConsumer
@@ -38,7 +35,7 @@ class TestKafkaConsumerDLQ:
         }
 
         # Poll should not raise
-        events = consumer.poll()
+        consumer.poll()
 
         # Should have sent to DLQ
         mock_dlq.send.assert_called_once()
@@ -72,7 +69,7 @@ class TestKafkaConsumerDLQ:
             ("inventory-changes", 1): [mock_record]
         }
 
-        events = consumer.poll()
+        consumer.poll()
 
         # Should have sent to DLQ
         mock_dlq.send.assert_called_once()

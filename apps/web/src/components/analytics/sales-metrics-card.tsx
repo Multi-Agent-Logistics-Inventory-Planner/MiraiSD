@@ -420,7 +420,6 @@ export function SalesMetricsCard({
 
   const {
     chartData,
-    lineChartData,
     filteredRevenue,
     yearOverYearChange,
     periodLabel,

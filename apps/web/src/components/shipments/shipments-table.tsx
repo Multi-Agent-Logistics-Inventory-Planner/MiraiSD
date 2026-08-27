@@ -18,7 +18,6 @@ import {
   SHIPMENT_DISPLAY_STATUS_LABELS,
   SHIPMENT_DISPLAY_STATUS_COLORS,
   calculateTotalReceived,
-  type ShipmentDisplayStatus,
 } from "@/lib/shipment-utils";
 
 interface ShipmentsTableProps {

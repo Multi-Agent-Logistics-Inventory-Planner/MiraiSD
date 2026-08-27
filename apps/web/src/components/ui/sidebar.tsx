@@ -606,10 +606,12 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<'div'> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Random width between 50 to 90%. useMemo is a cache, not a guarantee the
+  // initializer runs exactly once (React may re-run or discard it), so calling
+  // an impure function like Math.random() there can produce an unstable result.
+  // useState's initializer is guaranteed to run only once per mount, which is
+  // the correct place for one-time non-deterministic initialization.
+  const [width] = React.useState(() => `${Math.floor(Math.random() * 40) + 50}%`)
 
   return (
     <div

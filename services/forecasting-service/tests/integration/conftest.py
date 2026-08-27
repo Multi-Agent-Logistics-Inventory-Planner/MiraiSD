@@ -6,7 +6,6 @@ used for real Kafka and PostgreSQL.
 """
 
 import sys
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 

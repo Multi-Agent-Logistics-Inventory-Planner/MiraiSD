@@ -21,9 +21,14 @@ function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const supabase = getSupabaseClient();
 
-  const [isVerifying, setIsVerifying] = useState(true);
+  // Lazy initializers so the "client not configured" case is reflected in the
+  // very first render instead of being set from inside the effect below (whose
+  // job is just the async session check).
+  const [isVerifying, setIsVerifying] = useState(() => !!supabase);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    supabase ? null : "Supabase client not configured"
+  );
   const [success, setSuccess] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -34,8 +39,6 @@ function ResetPasswordContent() {
 
   useEffect(() => {
     if (!supabase) {
-      setError("Supabase client not configured");
-      setIsVerifying(false);
       return;
     }
 
@@ -102,7 +105,7 @@ function ResetPasswordContent() {
           }
           setIsVerifying(false);
           return;
-        } catch (err) {
+        } catch {
           setError("Failed to verify reset link");
           setIsVerifying(false);
           return;
@@ -155,7 +158,7 @@ function ResetPasswordContent() {
       setTimeout(() => {
         router.push("/login");
       }, 2000);
-    } catch (err) {
+    } catch {
       setError("Failed to update password");
       setIsSubmitting(false);
     }

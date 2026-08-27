@@ -1,12 +1,12 @@
 import pandas as pd
 import pytest
 
+from src import config
 from src.forecast import (
     _dow_weighted_estimate,
     apply_category_fallback,
     estimate_mu_sigma,
 )
-from src import config
 
 
 def _make_constant_features(item: str, value: float, days: int = 20) -> pd.DataFrame:

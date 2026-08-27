@@ -48,7 +48,7 @@ def tsb_estimate(
     b = config.TSB_BETA if beta is None else beta
 
     if group.empty:
-        floor_dow = {d: 1.0 for d in range(7)}
+        floor_dow = dict.fromkeys(range(7), 1.0)
         return config.MU_FLOOR, config.SIGMA_FLOOR, 0.0, config.MU_FLOOR, floor_dow
 
     g = group.sort_values("date").reset_index(drop=True)
@@ -79,7 +79,7 @@ def tsb_estimate(
     # DOW multipliers: per-day-of-week sale-day consumption relative to the
     # overall sale-day mean. Stored as metadata for the "why this number"
     # drawer; the prediction itself is p * z, not DOW-adjusted.
-    dow_multipliers: dict[int, float] = {d: 1.0 for d in range(7)}
+    dow_multipliers: dict[int, float] = dict.fromkeys(range(7), 1.0)
     if sale_idx.size > 0:
         g["dow"] = pd.to_datetime(g["date"]).dt.dayofweek
         sale_g = g.loc[s_arr == 1.0]

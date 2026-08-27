@@ -3,9 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _now_utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def snapshot_onhand(inv_df: pd.DataFrame) -> pd.DataFrame:
@@ -38,10 +37,10 @@ def _build_features(events_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_batch(
-    from_ts: Optional[str] = None,
-    to_ts: Optional[str] = None,
+    from_ts: str | None = None,
+    to_ts: str | None = None,
     method: str = "ma14",
-    target_days: Optional[int] = None,
+    target_days: int | None = None,
 ) -> Path:
     """Run the forecasting pipeline and write database-aligned forecasts CSV.
 

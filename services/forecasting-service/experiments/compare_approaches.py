@@ -25,6 +25,8 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from datetime import UTC
+
 import numpy as np
 import pandas as pd
 
@@ -38,11 +40,12 @@ from src import forecast as fc
 
 def load_from_db():
     """Load data from Supabase."""
+    from datetime import datetime, timedelta
+
     from src.adapters.supabase_repo import SupabaseRepo
-    from datetime import datetime, timedelta, timezone
 
     repo = SupabaseRepo()
-    end_ts = datetime.now(timezone.utc)
+    end_ts = datetime.now(UTC)
     start_ts = end_ts - timedelta(days=45)
 
     movements = repo.get_stock_movements(start=start_ts, end=end_ts)
@@ -77,9 +80,9 @@ def prepare_data(movements, items):
 
     category_map = {}
     if "category_name" in items.columns:
-        category_map = dict(zip(items["item_id"], items["category_name"]))
+        category_map = dict(zip(items["item_id"], items["category_name"], strict=False))
     elif "category" in items.columns:
-        category_map = dict(zip(items["item_id"], items["category"]))
+        category_map = dict(zip(items["item_id"], items["category"], strict=False))
 
     return daily_all, daily_with_stockout, category_map
 
@@ -105,7 +108,7 @@ def _dow_weighted_with_imputation(group, min_in_stock_days=7):
         in_stock = group.copy()
 
     if in_stock.empty:
-        return config.MU_FLOOR, config.SIGMA_FLOOR, {d: 1.0 for d in range(7)}
+        return config.MU_FLOOR, config.SIGMA_FLOOR, dict.fromkeys(range(7), 1.0)
 
     in_stock["dow"] = pd.to_datetime(in_stock["date"]).dt.dayofweek
     dow_means_in_stock = in_stock.groupby("dow")["consumption"].mean()

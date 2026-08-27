@@ -1,6 +1,6 @@
 # features.py
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def detect_stockout_days(movements_df: pd.DataFrame) -> pd.DataFrame:
@@ -222,7 +222,7 @@ def compute_global_event_multipliers(
     """
     out: dict[str, float] = {}
     if daily_with_events.empty or "consumption" not in daily_with_events.columns:
-        return {col: 1.0 for col in event_cols}
+        return dict.fromkeys(event_cols, 1.0)
 
     for col in event_cols:
         if col not in daily_with_events.columns:
@@ -306,7 +306,7 @@ def build_stats(daily_df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values(["item_id", "date"]).reset_index(drop=True)
 
     grouped = df.groupby("item_id", sort=False)["consumption"]
-    values = grouped.transform(lambda x: x.astype(float))
+    grouped.transform(lambda x: x.astype(float))
     df["ma7"] = grouped.transform(
         lambda x: x.astype(float).rolling(window=7, min_periods=1).mean()
     )

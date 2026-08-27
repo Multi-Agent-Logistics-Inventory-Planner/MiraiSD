@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,6 @@ def compute_mape(
         (forecast_mu - actual_mu); positive = over-prediction, negative
         = under-prediction. Used by the residual bias correction layer.
     """
-    h = horizon_days if horizon_days is not None else config.BACKTEST_HORIZON_DAYS
     eps = epsilon if epsilon is not None else config.MAPE_EPSILON
     result_cols = ["item_id", "mape", "forecast_mu", "actual_mu", "residual_bias", "backtest_days"]
 
@@ -195,7 +194,7 @@ def run_method_comparison(
     items_df = repo.get_items()
     if items_df.empty:
         raise RuntimeError("No active items found in database")
-    category_by_item = dict(zip(items_df["item_id"].astype(str), items_df["category_name"]))
+    category_by_item = dict(zip(items_df["item_id"].astype(str), items_df["category_name"], strict=False))
 
     # Phase 4: methods ending in "_events" learn global event multipliers
     # (recent SHIPMENT_RECEIPT / DISPLAY_SET in the prior 7 days) from the
@@ -221,7 +220,7 @@ def run_method_comparison(
     rows: list[dict] = []
     ordered_origins = sorted(origin_days_ago_list, reverse=True) if apply_bias else origin_days_ago_list
     for origin_days_ago in ordered_origins:
-        origin = datetime.now(timezone.utc) - timedelta(days=origin_days_ago)
+        origin = datetime.now(UTC) - timedelta(days=origin_days_ago)
         history_start = origin - timedelta(days=lookback)
         actual_end = origin + timedelta(days=horizon_days)
 
@@ -339,7 +338,7 @@ def run_method_comparison(
                     continue
                 if isinstance(item_actuals, pd.Series):
                     item_actuals = item_actuals.to_frame().T
-                for date, actual in zip(item_actuals.index, item_actuals["consumption"]):
+                for date, actual in zip(item_actuals.index, item_actuals["consumption"], strict=False):
                     if isinstance(dow_mult, dict) and dow_mult:
                         dow = pd.Timestamp(date).dayofweek
                         mult = dow_mult.get(dow, dow_mult.get(str(dow), 1.0))
@@ -486,11 +485,11 @@ def evaluate_ship_gate(
     regressed = []
     new_by_cat = dict(
         zip(comparison_df[comparison_df["method"] == new_method][dimension],
-            comparison_df[comparison_df["method"] == new_method]["wape"])
+            comparison_df[comparison_df["method"] == new_method]["wape"], strict=False)
     )
     base_by_cat = dict(
         zip(comparison_df[comparison_df["method"] == baseline_method][dimension],
-            comparison_df[comparison_df["method"] == baseline_method]["wape"])
+            comparison_df[comparison_df["method"] == baseline_method]["wape"], strict=False)
     )
     for cat, new_wape in new_by_cat.items():
         base_wape = base_by_cat.get(cat)

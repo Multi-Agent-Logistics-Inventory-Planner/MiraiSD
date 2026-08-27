@@ -16,7 +16,7 @@ Usage programmatically:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -57,7 +57,7 @@ def run_backtest(
     if methods is None:
         methods = ["dow_weighted"]
 
-    end_ts = datetime.now(timezone.utc)
+    end_ts = datetime.now(UTC)
     start_ts = end_ts - timedelta(days=lookback_days)
 
     # Load data
@@ -66,7 +66,7 @@ def run_backtest(
         return {"method_summary": [], "predictions_count": 0, "stockout_stats": {}}
 
     items_df = repo.get_items()
-    category_map = dict(zip(items_df["item_id"], items_df.get("category_name", "Unknown")))
+    category_map = dict(zip(items_df["item_id"], items_df.get("category_name", "Unknown"), strict=False))
 
     # Build daily usage + stockout flags
     daily_df = feat.build_daily_usage(movements_df)

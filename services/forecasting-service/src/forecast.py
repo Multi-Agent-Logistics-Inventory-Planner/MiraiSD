@@ -112,7 +112,7 @@ def _dow_weighted_estimate(
     """
     g = group
     if g.empty:
-        return config.MU_FLOOR, config.SIGMA_FLOOR, {d: 1.0 for d in range(7)}
+        return config.MU_FLOOR, config.SIGMA_FLOOR, dict.fromkeys(range(7), 1.0)
 
     g["dow"] = pd.to_datetime(g["date"]).dt.dayofweek
 

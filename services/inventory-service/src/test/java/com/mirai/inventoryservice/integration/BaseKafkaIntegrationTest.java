@@ -2,6 +2,9 @@ package com.mirai.inventoryservice.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
+import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.repositories.UserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,8 +18,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import javax.crypto.SecretKey;
@@ -35,19 +36,25 @@ import java.util.Map;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("integration")
-@Testcontainers
 public abstract class BaseKafkaIntegrationTest {
 
-    @Container
     static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"))
                     .withDatabaseName("mirai_test")
                     .withUsername("test")
                     .withPassword("test");
 
-    @Container
     static final KafkaContainer kafka =
             new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
+
+    static {
+        // Spring caches the application context across concrete subclasses of this
+        // base class. JUnit's @Container lifecycle stops inherited containers after
+        // the first subclass, leaving that cached context pointing at a dead
+        // PostgreSQL/Kafka pair. Start them once for the test JVM instead.
+        postgres.start();
+        kafka.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -66,8 +73,17 @@ public abstract class BaseKafkaIntegrationTest {
     @Autowired
     private RateLimitingFilter rateLimitingFilter;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Value("${supabase.jwt.secret}")
     private String jwtSecret;
+
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.jwt.audience:authenticated}")
+    private String jwtAudience;
 
     @BeforeEach
     void clearRateLimits() {
@@ -80,11 +96,15 @@ public abstract class BaseKafkaIntegrationTest {
         userMetadata.put("role", role);
 
         SecretKey signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        String email = personId + "@test.internal";
+        String issuer = supabaseUrl.replaceAll("/+$", "") + "/auth/v1";
 
         return Jwts.builder()
                 .subject(personId)
+                .issuer(issuer)
+                .audience().add(jwtAudience).and()
                 .claim("user_metadata", userMetadata)
-                .claim("email", "test@test.com")
+                .claim("email", email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
                 .signWith(signingKey)
@@ -92,10 +112,21 @@ public abstract class BaseKafkaIntegrationTest {
     }
 
     protected String adminToken() {
+        seedUser("admin-id@test.internal", UserRole.ADMIN);
         return generateTestToken("admin-id", "ADMIN");
     }
 
     protected String employeeToken() {
+        seedUser("employee-id@test.internal", UserRole.EMPLOYEE);
         return generateTestToken("employee-id", "EMPLOYEE");
+    }
+
+    private void seedUser(String email, UserRole role) {
+        User user = userRepository.findByEmail(email).orElseGet(() -> User.builder()
+                .email(email)
+                .fullName("Integration Test User")
+                .build());
+        user.setRole(role);
+        userRepository.save(user);
     }
 }

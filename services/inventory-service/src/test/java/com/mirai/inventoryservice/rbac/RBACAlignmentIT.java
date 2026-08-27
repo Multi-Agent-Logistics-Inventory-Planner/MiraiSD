@@ -386,11 +386,11 @@ class RBACAlignmentIT extends BaseIntegrationTest {
     class TeamPermissions {
 
         @Test
-        @DisplayName("Employee denied user list access")
-        void employee_cannotViewUsers() throws Exception {
+        @DisplayName("Employee can view user list (read-only, see 62a52df)")
+        void employee_canViewUsers() throws Exception {
             mockMvc.perform(get("/api/users")
                             .header("Authorization", "Bearer " + employeeToken()))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isOk());
         }
 
         @Test
