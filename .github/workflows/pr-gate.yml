@@ -1,0 +1,169 @@
+name: PR Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      inventory_changed: ${{ steps.detect.outputs.inventory_changed }}
+      forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
+      messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
+      web_changed: ${{ steps.detect.outputs.web_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: detect
+        uses: ./.github/actions/detect-changes
+
+  integration-test:
+    name: "integration-test / inventory-service"
+    needs: changes
+    if: needs.changes.outputs.inventory_changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/inventory-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      # No maven-failsafe-plugin is configured, so the *IT pattern must be
+      # named explicitly — plain `mvn test` (Surefire's default include
+      # pattern) does not pick up *IT.java classes at all. GitHub-hosted
+      # ubuntu-latest runners have Docker available out of the box, which
+      # Testcontainers needs; no extra setup required for that.
+      - run: mvn -B test -Dtest='*IT'
+
+  docker-build-check:
+    name: "docker-build-check / ${{ matrix.service }}"
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: inventory-service
+            context: services/inventory-service
+            changed: ${{ needs.changes.outputs.inventory_changed }}
+          - service: forecasting-service
+            context: services/forecasting-service
+            changed: ${{ needs.changes.outputs.forecasting_changed }}
+          - service: messaging-service
+            context: services/messaging-service
+            changed: ${{ needs.changes.outputs.messaging_changed }}
+          - service: web
+            context: apps/web
+            changed: ${{ needs.changes.outputs.web_changed }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: matrix.changed == 'true'
+      - name: Build (no push)
+        if: matrix.changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          platforms: linux/amd64
+          # web needs real values here to get past `npm run build`, but this
+          # check only proves the Dockerfile/build-arg wiring is not broken —
+          # it never runs against real secrets and is never deployed, so
+          # placeholders are fine and deliberate.
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder
+            NEXT_PUBLIC_BACKEND_URL=http://placeholder
+            NEXT_PUBLIC_API_URL=http://placeholder
+            NEXT_PUBLIC_R2_PUBLIC_BASE_URL=http://placeholder
+
+  gate:
+    name: Gate
+    if: always()
+    needs: [ci, integration-test, docker-build-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all required results
+        run: |
+          # `ci` is a workflow_call job so its own internal job failures
+          # surface as a single ci.result. integration-test and
+          # docker-build-check are path-filtered and report `skipped` when
+          # their path didn't change — skipped is a pass, failure is not.
+          # This is the one job registered as a required status check in
+          # branch protection; see docs/runbooks/ci-cd-pipeline.md §2 for why
+          # a single aggregate job is used instead of registering every job
+          # name individually.
+          fail=0
+          for result in "${{ needs.ci.result }}" "${{ needs.integration-test.result }}" "${{ needs.docker-build-check.result }}"; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "Required job result was '$result'"
+              fail=1
+            fi
+          done
+          if [ "$fail" = "1" ]; then
+            echo "One or more required jobs did not succeed."
+            exit 1
+          fi
+          echo "All required jobs passed or were correctly skipped."
+
+  report:
+    name: Report
+    if: always()
+    needs: [ci, integration-test, docker-build-check]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post consolidated PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              ci: '${{ needs.ci.result }}',
+              'integration-test': '${{ needs.integration-test.result }}',
+              'docker-build-check': '${{ needs.docker-build-check.result }}',
+            };
+            const marker = '<!-- pr-gate-report -->';
+            const lines = Object.entries(results).map(([name, result]) => {
+              const icon = result === 'success' ? '✅' : result === 'skipped' ? '⏭️' : '❌';
+              return `- ${icon} \`${name}\`: ${result}`;
+            });
+            const body = `${marker}\n### PR Gate Report\n\n${lines.join('\n')}\n\n[Run details](${context.payload.pull_request.html_url}/checks)`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

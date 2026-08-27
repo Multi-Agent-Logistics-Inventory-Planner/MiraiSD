@@ -1,14 +1,45 @@
 name: CI
 
+# Triggered directly on pull_request/push, AND reused by pr-gate.yml via
+# workflow_call so the same jobs aren't billed twice for one push on an open
+# PR (push:main only fires after merge, when there's no open PR to double up
+# with). See docs/runbooks/ci-cd-pipeline.md §1.
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
-  web:
-    name: Web (lint, typecheck, unit tests)
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      inventory_changed: ${{ steps.detect.outputs.inventory_changed }}
+      forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
+      messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
+      web_changed: ${{ steps.detect.outputs.web_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: detect
+        uses: ./.github/actions/detect-changes
+
+  # ---------------------------------------------------------------------
+  # unit-test: per-deployable unit tests, no Docker, no Testcontainers.
+  # Testcontainers-backed integration tests live in pr-gate.yml's
+  # integration-test job instead, see docs/runbooks/ci-cd-pipeline.md §1/§2.
+  # ---------------------------------------------------------------------
+
+  unit-test-web:
+    name: "unit-test / web"
+    needs: changes
+    if: needs.changes.outputs.web_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,13 +52,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
-      - run: npm run lint
-      # No "typecheck" npm script exists; run tsc directly against the project config.
-      - run: npx tsc --noEmit
       - run: npm run test:run
 
-  inventory-service:
-    name: Inventory Service (build, unit + Testcontainers tests)
+  unit-test-inventory-service:
+    name: "unit-test / inventory-service"
+    needs: changes
+    if: needs.changes.outputs.inventory_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,18 +69,17 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'maven'
-      # No maven-failsafe-plugin is configured, so plain `mvn test` (Surefire's default
-      # include pattern) does not pick up *IT.java classes at all. The two existing
-      # Testcontainers-backed integration tests (BaseKafkaIntegrationTest,
-      # CoinAdminDashboardServiceIT) are real Postgres/Kafka tests, not H2, and are exactly
-      # what this job should exercise per the "PostgreSQL Testcontainers coverage where H2
-      # is not faithful" requirement — so the test pattern is widened explicitly rather than
-      # relying on the default. GitHub-hosted ubuntu-latest runners have Docker available out
-      # of the box, which Testcontainers needs; no extra setup required for that.
-      - run: mvn -B test -Dtest='*Test,*Tests,*IT'
+      # No maven-failsafe-plugin is configured, so plain `mvn test` (Surefire's
+      # default include pattern) already excludes *IT.java classes without any
+      # -Dtest override. The Testcontainers-backed integration tests
+      # (BaseKafkaIntegrationTest, CoinAdminDashboardServiceIT) run separately
+      # in pr-gate.yml's integration-test job with an explicit -Dtest='*IT'.
+      - run: mvn -B test
 
-  forecasting-service:
-    name: Forecasting Service (lint, tests)
+  unit-test-forecasting-service:
+    name: "unit-test / forecasting-service"
+    needs: changes
+    if: needs.changes.outputs.forecasting_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -62,14 +91,15 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: services/forecasting-service/pyproject.toml
-      # Installs prophet/cmdstanpy (compiled Stan models) — this step is the slow part of
-      # this job; expect it to dominate the run time.
+      # Installs prophet/cmdstanpy (compiled Stan models) — this step is the
+      # slow part of this job; expect it to dominate the run time.
       - run: pip install -e ".[dev]"
-      - run: ruff check .
       - run: pytest tests/
 
-  messaging-service:
-    name: Messaging Service (lint, tests)
+  unit-test-messaging-service:
+    name: "unit-test / messaging-service"
+    needs: changes
+    if: needs.changes.outputs.messaging_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -82,13 +112,90 @@ jobs:
           cache: 'pip'
           cache-dependency-path: services/messaging-service/requirements.txt
       - run: pip install -r requirements.txt
-      - run: ruff check .
-      # Deliberately scoped to tests/ only, NOT the whole service directory: several
-      # root-level test_*.py files here (test_slack.py, test_full_pipeline.py,
-      # test_full_flow.py, test_notifications.py) are manual CLI scripts with a `main()`
-      # entrypoint that send real Slack messages / hit real external services when
-      # executed — they are not pytest suites despite the test_ prefix, and must never run
-      # unattended in CI. pyproject.toml already scopes `testpaths = ["tests"]`, so
-      # `pytest` alone would already respect this; the explicit tests/ argument here is
-      # belt-and-suspenders so this stays correct even if that config ever changes.
+      # Deliberately scoped to tests/ only, NOT the whole service directory:
+      # several root-level test_*.py files here (test_slack.py,
+      # test_full_pipeline.py, test_full_flow.py, test_notifications.py) are
+      # manual CLI scripts with a `main()` entrypoint that send real Slack
+      # messages / hit real external services when executed — they are not
+      # pytest suites despite the test_ prefix, and must never run unattended
+      # in CI. pyproject.toml already scopes `testpaths = ["tests"]`, so
+      # `pytest` alone would already respect this; the explicit tests/
+      # argument here is belt-and-suspenders so this stays correct even if
+      # that config ever changes.
       - run: pytest tests/
+
+  # ---------------------------------------------------------------------
+  # build: typecheck only. No `mvn compile` job exists — mvn test in
+  # unit-test-inventory-service already compiles main and test sources, so a
+  # separate compile job would cost a runner and catch nothing extra.
+  # ---------------------------------------------------------------------
+
+  build-web:
+    name: "build / web (typecheck)"
+    needs: changes
+    if: needs.changes.outputs.web_changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      # No "typecheck" npm script exists; run tsc directly against the project config.
+      - run: npx tsc --noEmit
+
+  # ---------------------------------------------------------------------
+  # static-analysis: lint + free dependency scan. Container image scanning
+  # (trivy image) is a different check and lives in deploy.yml — see
+  # docs/runbooks/ci-cd-pipeline.md §3.
+  # ---------------------------------------------------------------------
+
+  static-analysis:
+    name: Static analysis
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ESLint (web)
+        if: needs.changes.outputs.web_changed == 'true'
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run lint
+
+      # No Checkstyle/Spotless plugin is currently bound in
+      # services/inventory-service/pom.xml, so there is no Java lint step
+      # here yet — adding one means picking and configuring a plugin first,
+      # which is separate work from this pipeline migration.
+
+      - name: ruff (forecasting-service)
+        if: needs.changes.outputs.forecasting_changed == 'true'
+        working-directory: services/forecasting-service
+        run: |
+          pip install ruff
+          ruff check .
+
+      - name: ruff (messaging-service)
+        if: needs.changes.outputs.messaging_changed == 'true'
+        working-directory: services/messaging-service
+        run: |
+          pip install ruff
+          ruff check .
+
+      - name: trivy fs (dependency CVEs)
+        # Pinned to the tag, not a SHA: aquasecurity/trivy-action had a supply
+        # chain incident in 2025 that motivated their move to signed "v"
+        # releases. SHA-pinning is worth revisiting once Actions minutes are
+        # being tracked seriously (see docs/runbooks/ci-cd-pipeline.md §0).
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '0' # report-only at this stage; deploy.yml's image scan is the gate

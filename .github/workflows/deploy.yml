@@ -1,0 +1,472 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'apps/web/**'
+      - 'infra/**'
+      - '.github/workflows/deploy.yml'
+      - '.github/actions/detect-changes/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ghcr.io/multi-agent-logistics-inventory-planner
+  DEPLOY_PATH: /opt/mirai
+
+# One deploy at a time against the single Hetzner host. Never
+# cancel-in-progress: cancelling mid-deploy would leave the host with a
+# partially-applied .env / partially-recreated container set.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  changes:
+    name: Detect changed deployables
+    runs-on: ubuntu-latest
+    outputs:
+      inventory_changed: ${{ steps.detect.outputs.inventory_changed }}
+      forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
+      messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
+      web_changed: ${{ steps.detect.outputs.web_changed }}
+      caddy_changed: ${{ steps.detect.outputs.caddy_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: detect
+        uses: ./.github/actions/detect-changes
+      - name: Force full rebuild on manual dispatch
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "Manual dispatch — every build-push-* job below force-runs regardless of the path diff above."
+
+  # -----------------------------------------------------------------------
+  # build-push-*: one job per deployable (not a matrix — matrix jobs cannot
+  # reliably surface per-combination outputs to a downstream job, and each
+  # service needs its own digest to reach the deploy job). Each builds
+  # single-platform linux/amd64 (Hetzner and the runners are both amd64; no
+  # multi-arch manifest is needed) and pushes to GHCR tagged with the git SHA
+  # and `latest`. Image path casing must stay lowercase — GHCR rejects
+  # uppercase in an image reference, and the org name
+  # (Multi-Agent-Logistics-Inventory-Planner) is not, which is why
+  # IMAGE_NAMESPACE above is hardcoded lowercase rather than interpolated
+  # from github.repository_owner.
+  # -----------------------------------------------------------------------
+
+  build-push-inventory-service:
+    name: "build-push / inventory-service"
+    needs: changes
+    if: needs.changes.outputs.inventory_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: services/inventory-service
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/mirai-inventory-service:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/mirai-inventory-service:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  build-push-forecasting-service:
+    name: "build-push / forecasting-service"
+    needs: changes
+    if: needs.changes.outputs.forecasting_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: services/forecasting-service
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/mirai-forecasting-service:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/mirai-forecasting-service:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  build-push-messaging-service:
+    name: "build-push / messaging-service"
+    needs: changes
+    if: needs.changes.outputs.messaging_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: services/messaging-service
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/mirai-messaging-service:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/mirai-messaging-service:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  build-push-web:
+    name: "build-push / web"
+    needs: changes
+    if: needs.changes.outputs.web_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: true
+          platforms: linux/amd64
+          # NEXT_PUBLIC_* values come from the protected `production`
+          # environment (secrets/variables), never hardcoded — see
+          # frontend-consolidation.md §4a. They must not be treated as
+          # secrets in the ARG sense (ARG values are recoverable from image
+          # layer metadata via `docker history`), but they still come from a
+          # protected source so a fork PR can't override them — this job
+          # only runs on push to main / workflow_dispatch, never on
+          # pull_request, so that boundary already holds.
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_R2_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_R2_PUBLIC_BASE_URL }}
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/mirai-web:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/mirai-web:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  # -----------------------------------------------------------------------
+  # scan-*: container vulnerability scanning per production-platform.md §4.
+  # This is distinct from ci.yml's static-analysis `trivy fs` job, which
+  # scans dependency manifests, not the built image (base OS packages,
+  # anything pulled in at image-build time). Fails the deploy on a CRITICAL
+  # finding with a known fix available; everything else is report-only for
+  # now — revisit the threshold once there is real signal on noise level.
+  # -----------------------------------------------------------------------
+
+  scan-inventory-service:
+    name: "scan / inventory-service"
+    needs: build-push-inventory-service
+    if: needs.build-push-inventory-service.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAMESPACE }}/mirai-inventory-service@${{ needs.build-push-inventory-service.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  scan-forecasting-service:
+    name: "scan / forecasting-service"
+    needs: build-push-forecasting-service
+    if: needs.build-push-forecasting-service.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAMESPACE }}/mirai-forecasting-service@${{ needs.build-push-forecasting-service.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  scan-messaging-service:
+    name: "scan / messaging-service"
+    needs: build-push-messaging-service
+    if: needs.build-push-messaging-service.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAMESPACE }}/mirai-messaging-service@${{ needs.build-push-messaging-service.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  scan-web:
+    name: "scan / web"
+    needs: build-push-web
+    if: needs.build-push-web.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAMESPACE }}/mirai-web@${{ needs.build-push-web.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  # -----------------------------------------------------------------------
+  # deploy: SSH to Hetzner. Only runs once every build-push-* / scan-* job
+  # that was supposed to run either succeeded or was correctly skipped
+  # (nothing changed for that deployable this run).
+  #
+  # KNOWN GAP — no Flyway/migration gating. production-platform.md §6 calls
+  # for migration gating as step 3 of this sequence; inventory-service has
+  # no Flyway dependency wired up yet (V1-V28 in
+  # services/inventory-service/src/main/resources/db/migration/ are not
+  # executed by anything today — schema changes are currently applied to
+  # Supabase by hand). Wiring Flyway up safely needs a one-time baseline
+  # against production's actual current schema state first; that is
+  # deliberately out of scope for this pipeline change and tracked
+  # separately. See docs/runbooks/ci-cd-pipeline.md §0/§3d.
+  # -----------------------------------------------------------------------
+
+  deploy:
+    name: Deploy to Hetzner
+    needs:
+      - changes
+      - build-push-inventory-service
+      - build-push-forecasting-service
+      - build-push-messaging-service
+      - build-push-web
+      - scan-inventory-service
+      - scan-forecasting-service
+      - scan-messaging-service
+      - scan-web
+    if: always()
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Verify required jobs succeeded or were skipped
+        run: |
+          fail=0
+          for result in \
+            "${{ needs.build-push-inventory-service.result }}" \
+            "${{ needs.build-push-forecasting-service.result }}" \
+            "${{ needs.build-push-messaging-service.result }}" \
+            "${{ needs.build-push-web.result }}" \
+            "${{ needs.scan-inventory-service.result }}" \
+            "${{ needs.scan-forecasting-service.result }}" \
+            "${{ needs.scan-messaging-service.result }}" \
+            "${{ needs.scan-web.result }}" \
+          ; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "Required job result was '$result'"
+              fail=1
+            fi
+          done
+          if [ "$fail" = "1" ]; then
+            echo "A build or scan job failed — aborting before touching the host."
+            exit 1
+          fi
+
+      - name: Record new digests and pull/deploy on Hetzner
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          command_timeout: 15m
+          envs: INVENTORY_DIGEST,FORECASTING_DIGEST,MESSAGING_DIGEST,WEB_DIGEST,CADDY_CHANGED
+          script: |
+            set -ex
+            cd ${{ env.DEPLOY_PATH }}
+
+            echo "=== Deploy started at $(date) ==="
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Preserve the currently-live digest set for rollback before
+            # touching anything. .env.prev is overwritten every deploy — it
+            # is a one-generation rollback point, not a history.
+            cp .env .env.prev
+
+            update_digest() {
+              key="$1"
+              value="$2"
+              if [ -z "$value" ]; then
+                return
+              fi
+              if grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+              else
+                echo "${key}=${value}" >> .env
+              fi
+            }
+
+            update_digest "INVENTORY_SERVICE_IMAGE_DIGEST" "$INVENTORY_DIGEST"
+            update_digest "FORECASTING_SERVICE_IMAGE_DIGEST" "$FORECASTING_DIGEST"
+            update_digest "MESSAGING_SERVICE_IMAGE_DIGEST" "$MESSAGING_DIGEST"
+            update_digest "WEB_IMAGE_DIGEST" "$WEB_DIGEST"
+
+            # Verify required configuration is present without printing values.
+            for key in SUPABASE_DB_URL SUPABASE_DB_USERNAME SUPABASE_DB_PASSWORD \
+                       INVENTORY_SERVICE_IMAGE_DIGEST WEB_IMAGE_DIGEST; do
+              if ! grep -q "^${key}=.\+" .env; then
+                echo "Missing required configuration: $key"
+                exit 1
+              fi
+            done
+
+            cd infra
+
+            # Pull is safe to run unconditionally: unchanged services'
+            # digests are unchanged, so this is a no-op for them.
+            docker compose pull
+
+            # `up -d` (no --force-recreate) diffs each container's resolved
+            # config, including the digest baked into `image:`, against what
+            # is running and only recreates containers that actually
+            # differ. This subsumes the old deploy-backend.yml's separate
+            # "did docker-compose.yml change" branch — that distinction
+            # mattered only when compose could also trigger a host-side
+            # rebuild, which it no longer does.
+            docker compose up -d --remove-orphans
+
+            if [ "$CADDY_CHANGED" = "true" ]; then
+              # Caddyfile is bind-mounted, not baked into an image — a
+              # content-only edit changes no resolved config or image ID, so
+              # `up -d` above will not notice it. Force a restart.
+              echo "Caddyfile changed. Restarting caddy to pick up the new config..."
+              docker compose up -d --no-deps --force-recreate caddy
+            fi
+
+            docker image prune -f
+
+            echo "Waiting for services to become healthy..."
+            sleep 180
+
+            docker compose ps
+        env:
+          INVENTORY_DIGEST: ${{ needs.build-push-inventory-service.outputs.digest }}
+          FORECASTING_DIGEST: ${{ needs.build-push-forecasting-service.outputs.digest }}
+          MESSAGING_DIGEST: ${{ needs.build-push-messaging-service.outputs.digest }}
+          WEB_DIGEST: ${{ needs.build-push-web.outputs.digest }}
+          CADDY_CHANGED: ${{ needs.changes.outputs.caddy_changed }}
+
+      - name: Smoke test — unauthenticated
+        id: smoke_unauth
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script: |
+            set -e
+            curl -sf http://localhost:4000/actuator/health > /dev/null
+            curl -sf http://localhost:3000/api/health > /dev/null
+            echo "Unauthenticated smoke checks passed"
+
+      - name: Smoke test — authenticated
+        id: smoke_auth
+        if: success()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          envs: SMOKE_TEST_JWT
+          script: |
+            set -e
+            # SMOKE_TEST_JWT is a long-lived token for a dedicated, otherwise
+            # unused EMPLOYEE-role test account, stored as a repo secret
+            # rotated alongside the Supabase JWT signing key. It exists
+            # solely so this check can hit an authenticated, read-only
+            # endpoint (GET /api/users, allowed to all three roles) without
+            # depending on a human's personal token.
+            curl -sf -H "Authorization: Bearer $SMOKE_TEST_JWT" \
+              http://localhost:4000/api/users > /dev/null
+            echo "Authenticated smoke check passed"
+        env:
+          SMOKE_TEST_JWT: ${{ secrets.SMOKE_TEST_JWT }}
+
+      - name: Roll back on smoke test failure
+        if: failure() && (steps.smoke_unauth.outcome == 'failure' || steps.smoke_auth.outcome == 'failure')
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          command_timeout: 15m
+          script: |
+            set -ex
+            cd ${{ env.DEPLOY_PATH }}
+
+            echo "=== Smoke tests failed. Restoring previous digest set at $(date) ==="
+            cp .env.prev .env
+
+            cd infra
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            echo "Waiting for rollback to stabilize..."
+            sleep 180
+            docker compose ps
+
+            echo "=== Rollback completed at $(date) ==="
+
+      - name: Notify on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT || 22 }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}/infra
+            echo "=== Deploy failed. Recent logs ==="
+            docker compose logs --tail=50
