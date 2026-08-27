@@ -1,0 +1,114 @@
+name: Detect changed deployables
+description: >
+  Diffs the current ref against a base commit and reports which of the four
+  deployables (inventory-service, forecasting-service, messaging-service,
+  apps/web) changed, plus infra/docker-compose.yml and infra/Caddyfile.
+  Shared by ci.yml, pr-gate.yml and deploy.yml so all three agree on what
+  "changed" means. See docs/runbooks/ci-cd-pipeline.md §1.
+
+outputs:
+  inventory_changed:
+    description: "true if services/inventory-service/** changed"
+    value: ${{ steps.diff.outputs.inventory_changed }}
+  forecasting_changed:
+    description: "true if services/forecasting-service/** changed"
+    value: ${{ steps.diff.outputs.forecasting_changed }}
+  messaging_changed:
+    description: "true if services/messaging-service/** changed"
+    value: ${{ steps.diff.outputs.messaging_changed }}
+  web_changed:
+    description: "true if apps/web/** changed"
+    value: ${{ steps.diff.outputs.web_changed }}
+  compose_changed:
+    description: "true if infra/docker-compose.yml changed"
+    value: ${{ steps.diff.outputs.compose_changed }}
+  caddy_changed:
+    description: "true if infra/Caddyfile changed"
+    value: ${{ steps.diff.outputs.caddy_changed }}
+  services_to_rebuild:
+    description: "space-separated list of changed backend service directory names"
+    value: ${{ steps.diff.outputs.services_to_rebuild }}
+
+runs:
+  using: composite
+  steps:
+    - id: diff
+      shell: bash
+      run: |
+        set -e
+
+        # Pull request: diff against the PR's base branch tip, which
+        # github.event.before does not carry on this event type.
+        # Push: diff against the pre-push HEAD, falling back to HEAD~1 for a
+        # brand-new branch's first push or a workflow_dispatch run, matching
+        # the logic this replaces in the old deploy-backend.yml.
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+        else
+          BASE_SHA="${{ github.event.before }}"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          fi
+        fi
+
+        if [ -n "$BASE_SHA" ]; then
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" HEAD 2>/dev/null || echo "")
+        else
+          CHANGED_FILES=""
+        fi
+
+        echo "Base SHA: $BASE_SHA"
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+
+        INVENTORY_CHANGED=false
+        FORECASTING_CHANGED=false
+        MESSAGING_CHANGED=false
+        WEB_CHANGED=false
+        # docker-compose.yml defines every container's resolved config, but
+        # `docker compose up -d` already diffs each container's config against
+        # what's running and only recreates ones that actually changed, so a
+        # compose-only change does not require rebuilding every image.
+        COMPOSE_CHANGED=false
+        # Caddyfile is bind-mounted, not baked into an image - no image to build.
+        CADDY_CHANGED=false
+
+        if echo "$CHANGED_FILES" | grep -q "^services/inventory-service/"; then
+          INVENTORY_CHANGED=true
+        fi
+        if echo "$CHANGED_FILES" | grep -q "^services/forecasting-service/"; then
+          FORECASTING_CHANGED=true
+        fi
+        if echo "$CHANGED_FILES" | grep -q "^services/messaging-service/"; then
+          MESSAGING_CHANGED=true
+        fi
+        if echo "$CHANGED_FILES" | grep -q "^apps/web/"; then
+          WEB_CHANGED=true
+        fi
+        if echo "$CHANGED_FILES" | grep -q "^infra/docker-compose\.yml$"; then
+          COMPOSE_CHANGED=true
+        fi
+        if echo "$CHANGED_FILES" | grep -q "^infra/Caddyfile$"; then
+          CADDY_CHANGED=true
+        fi
+
+        echo "inventory_changed=$INVENTORY_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "forecasting_changed=$FORECASTING_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "messaging_changed=$MESSAGING_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "web_changed=$WEB_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "compose_changed=$COMPOSE_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "caddy_changed=$CADDY_CHANGED" >> "$GITHUB_OUTPUT"
+
+        SERVICES_TO_REBUILD=""
+        if [ "$INVENTORY_CHANGED" = "true" ]; then
+          SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }inventory-service"
+        fi
+        if [ "$FORECASTING_CHANGED" = "true" ]; then
+          SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }forecasting-service"
+        fi
+        if [ "$MESSAGING_CHANGED" = "true" ]; then
+          SERVICES_TO_REBUILD="${SERVICES_TO_REBUILD:+$SERVICES_TO_REBUILD }messaging-service"
+        fi
+
+        echo "services_to_rebuild=$SERVICES_TO_REBUILD" >> "$GITHUB_OUTPUT"
+        echo "Services to rebuild: $SERVICES_TO_REBUILD"
