@@ -19,6 +19,11 @@ FROM python:3.11.11-slim AS runner
 
 WORKDIR /app
 
+# Patch OS packages for known CVEs (GnuTLS, OpenSSL) in the base image
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    libgnutls30 libssl3 openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user
 RUN groupadd --system --gid 1001 appgroup && \
     useradd --system --uid 1001 --gid appgroup appuser
