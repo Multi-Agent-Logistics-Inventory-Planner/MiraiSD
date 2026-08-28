@@ -127,6 +127,17 @@ jobs:
     needs: [ci, integration-test, docker-build-check]
     runs-on: ubuntu-latest
     continue-on-error: true
+    # The workflow-level `permissions: contents: read` above overrides every
+    # scope not explicitly listed, including issues/PRs - not just the one
+    # named. PR comments use the issues API (list/create on
+    # /issues/{number}/comments), so without this job-level override the
+    # token gets a 403 "Resource not accessible by integration" the moment it
+    # tries to list existing comments. Scoped to this job only, not the
+    # workflow, since nothing else here needs write access to anything.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - name: Post consolidated PR comment
