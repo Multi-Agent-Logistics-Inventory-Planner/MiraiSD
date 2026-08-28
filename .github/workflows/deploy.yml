@@ -392,9 +392,20 @@ jobs:
 
             cd infra
 
+            # --env-file ../.env is required on every invocation below, not
+            # optional: `env_file: - ../.env` on each service only loads vars
+            # INTO the container at runtime. Compose's own ${VAR}/@${VAR}
+            # substitution in the YAML (what resolves the image digests) is
+            # a separate mechanism that auto-loads .env from the CURRENT
+            # DIRECTORY (infra/.env) by default, not the root file — those
+            # are two different files in this repo. Without this flag every
+            # digest silently resolves to blank ("variable not set") even
+            # though the root .env has the correct values, which is exactly
+            # what happened on the first real run of this workflow.
+
             # Pull is safe to run unconditionally: unchanged services'
             # digests are unchanged, so this is a no-op for them.
-            docker compose pull
+            docker compose --env-file ../.env pull
 
             # `up -d` (no --force-recreate) diffs each container's resolved
             # config, including the digest baked into `image:`, against what
@@ -403,14 +414,14 @@ jobs:
             # "did docker-compose.yml change" branch — that distinction
             # mattered only when compose could also trigger a host-side
             # rebuild, which it no longer does.
-            docker compose up -d --remove-orphans
+            docker compose --env-file ../.env up -d --remove-orphans
 
             if [ "$CADDY_CHANGED" = "true" ]; then
               # Caddyfile is bind-mounted, not baked into an image — a
               # content-only edit changes no resolved config or image ID, so
               # `up -d` above will not notice it. Force a restart.
               echo "Caddyfile changed. Restarting caddy to pick up the new config..."
-              docker compose up -d --no-deps --force-recreate caddy
+              docker compose --env-file ../.env up -d --no-deps --force-recreate caddy
             fi
 
             docker image prune -f
@@ -418,7 +429,7 @@ jobs:
             echo "Waiting for services to become healthy..."
             sleep 180
 
-            docker compose ps
+            docker compose --env-file ../.env ps
         env:
           INVENTORY_DIGEST: ${{ needs.build-push-inventory-service.outputs.digest }}
           FORECASTING_DIGEST: ${{ needs.build-push-forecasting-service.outputs.digest }}
@@ -481,12 +492,12 @@ jobs:
             cp .env.prev .env
 
             cd infra
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose --env-file ../.env pull
+            docker compose --env-file ../.env up -d --remove-orphans
 
             echo "Waiting for rollback to stabilize..."
             sleep 180
-            docker compose ps
+            docker compose --env-file ../.env ps
 
             echo "=== Rollback completed at $(date) ==="
 
