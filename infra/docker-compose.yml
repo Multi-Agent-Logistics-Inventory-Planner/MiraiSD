@@ -78,10 +78,12 @@ services:
 
   inventory-service:
     container_name: inventory-service
-    build:
-      context: ../services/inventory-service
-      dockerfile: Dockerfile
-    image: inventory-service:latest
+    # Digest-pinned per production-platform.md §4: production never builds
+    # application source on the host. .github/workflows/deploy.yml resolves
+    # INVENTORY_SERVICE_IMAGE_DIGEST and writes it into the host env file
+    # before `docker compose pull` runs. See docs/runbooks/ci-cd-pipeline.md §3b/§3c.
+    image: ghcr.io/multi-agent-logistics-inventory-planner/mirai-inventory-service@${INVENTORY_SERVICE_IMAGE_DIGEST}
+    pull_policy: always
     ports:
       - "127.0.0.1:4000:4000"  # Localhost only - Caddy handles external access
     env_file:
@@ -127,10 +129,10 @@ services:
 
   forecasting-service:
     container_name: forecasting-service
-    build:
-      context: ../services/forecasting-service
-      dockerfile: Dockerfile
-    image: forecasting-service:latest
+    # Digest-pinned per production-platform.md §4 — see the inventory-service
+    # comment above for the mechanism.
+    image: ghcr.io/multi-agent-logistics-inventory-planner/mirai-forecasting-service@${FORECASTING_SERVICE_IMAGE_DIGEST}
+    pull_policy: always
     # Opt-in profile: a plain `docker compose up -d` skips this service, including
     # the one run by .github/workflows/deploy-backend.yml. Start it deliberately
     # with `docker compose --profile forecasting up -d`.
@@ -185,10 +187,10 @@ services:
 
   messaging-service:
     container_name: messaging-service
-    build:
-      context: ../services/messaging-service
-      dockerfile: Dockerfile
-    image: messaging-service:latest
+    # Digest-pinned per production-platform.md §4 — see the inventory-service
+    # comment above for the mechanism.
+    image: ghcr.io/multi-agent-logistics-inventory-planner/mirai-messaging-service@${MESSAGING_SERVICE_IMAGE_DIGEST}
+    pull_policy: always
     env_file:
       - ../.env
     environment:
@@ -266,16 +268,12 @@ services:
 
   web:
     container_name: web
-    # INTERIM: a locally built tag, not a GHCR digest. production-platform.md §4
-    # requires digest-pinned images and prohibits building on the host, so this is
-    # a knowingly temporary state until the web image is published to GHCR.
-    # There is deliberately no `build:` key here so that the deploy workflow's
-    # `docker compose build --no-cache` does NOT try to build Next.js on the host
-    # (npm ci + next build needs 2-4GB and would contend with the JVM and Kafka).
-    # Build it explicitly on the host with the NEXT_PUBLIC_* args, see
+    # Digest-pinned per production-platform.md §4 — see the inventory-service
+    # comment above for the mechanism. NEXT_PUBLIC_* values are baked in at
+    # build time by the CI build args, not read from env_file at runtime; see
     # docs/runbooks/frontend-consolidation.md §4a.
-    image: web:latest
-    pull_policy: never
+    image: ghcr.io/multi-agent-logistics-inventory-planner/mirai-web@${WEB_IMAGE_DIGEST}
+    pull_policy: always
     ports:
       - "127.0.0.1:3000:3000"  # Localhost only - Caddy handles external access
     env_file:
