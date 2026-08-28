@@ -7,11 +7,16 @@ import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 // These calls self-host the Geist fonts and inject their @font-face rules
-// (via the next/font compiler plugin) even though the result isn't assigned;
-// globals.css references the font by name ("Geist" / "Geist Mono") through
-// the Tailwind --font-sans / --font-mono variables instead of a className.
-Geist({ subsets: ["latin"] });
-Geist_Mono({ subsets: ["latin"] });
+// (via the next/font compiler plugin); globals.css references the font by
+// name ("Geist" / "Geist Mono") through the Tailwind --font-sans/--font-mono
+// variables instead of a className, so the results below are unused on
+// purpose. Turbopack (next build's default bundler since Next 15/16, per
+// next.config's `turbopack` block) requires the call be assigned to a
+// module-scope const even when discarded - a bare expression statement fails
+// the build with "Font loaders must be called and assigned to a const in the
+// module scope".
+const _geistSans = Geist({ subsets: ["latin"] });
+const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Mirai Inventory',
