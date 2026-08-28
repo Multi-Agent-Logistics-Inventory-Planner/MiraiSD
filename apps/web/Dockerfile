@@ -34,6 +34,13 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
+# npm ships in every official node:* image by default even though this
+# stage never invokes it (output: 'standalone' means CMD is just
+# `node server.js`) — strip it so a CVE in npm's bundled tooling (e.g.
+# CVE-2026-59873 in its vendored tar) can't fail the image scan for a
+# binary nothing here ever runs.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
