@@ -4,880 +4,16 @@
  */
 
 export interface paths {
-    "/api/users/{id}": {
+    "/api/activity-feed": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getUserById"];
-        put: operations["updateUser"];
+        get: operations["getActivityFeed"];
+        put?: never;
         post?: never;
-        delete: operations["deleteUser"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSupplierById"];
-        put: operations["updateSupplier"];
-        post?: never;
-        delete: operations["deleteSupplier"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getShipmentById"];
-        put: operations["updateShipment"];
-        post?: never;
-        delete: operations["deleteShipment"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/{id}/tracking": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["updateUserReviewTracking"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/products/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getProductById"];
-        put: operations["updateProduct"];
-        post?: never;
-        delete: operations["deleteProduct"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/unresolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["unresolveNotification"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["resolveNotification"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAsRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/mark-read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAsUserRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/read-all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAllAsRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/coin-config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCoinConfig"];
-        put: operations["updateCoinConfig"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{locationId}/inventory/{inventoryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getInventoryById"];
-        put: operations["updateInventory"];
-        post?: never;
-        delete: operations["deleteInventory"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLocationById"];
-        put: operations["updateLocation"];
-        post?: never;
-        delete: operations["deleteLocation"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/categories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCategoryById"];
-        put: operations["updateCategory"];
-        post?: never;
-        delete: operations["deleteCategory"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/webhooks/easypost": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["handleEasyPostWebhook"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllUsers"];
-        put?: never;
-        post: operations["createUser"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tracking/lookup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["lookupTracking"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSuppliers"];
-        put?: never;
-        post: operations["createSupplier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers/{id}/assign-products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["assignProducts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/transfer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["transferInventory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/batch-transfer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["batchTransferInventory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/batch-adjust": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["batchAdjustInventory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listShipments"];
-        put?: never;
-        post: operations["createShipment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/{shipmentId}/undo-receive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["undoReceiveShipmentItems"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/{shipmentId}/items/{itemId}/undo-receive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["undoReceiveShipmentItem"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/{id}/receive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["receiveShipment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllProducts"];
-        put?: never;
-        post: operations["createProduct"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllActiveDisplays"];
-        put?: never;
-        post: operations["setDisplay"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/swap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["swapDisplay"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/renew": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["renewDisplays"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["setDisplayBatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/batch-swap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["batchSwapDisplay"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/batch-clear": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["batchClearDisplays"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/play": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["play"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/tiers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createTier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/tiers/bulk-update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["bulkUpdateTierProbabilities"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/redeem/{playId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["markRedeemed"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/prizes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createPrize"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/crates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listCrates"];
-        put?: never;
-        post: operations["createCrate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/adjustments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createAdjustment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllLocations"];
-        put?: never;
-        post: operations["createLocation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{locationId}/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listInventoryAtLocation"];
-        put?: never;
-        post: operations["addInventory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["openBox"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["addTier"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}/transfer-in": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["transferInMore"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}/transfer-in-inventory-only": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["transferInInventoryOnly"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}/move-slips": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["moveSlips"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}/delete-prize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["deletePrize"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}/add-slip": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["addSlip"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/draws": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["recordDraw"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/draws/{auditLogId}/undo": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["undoDraw"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCategories"];
-        put?: never;
-        post: operations["createCategory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/validate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["validateToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/sync-user": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["syncUser"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/analytics/recompute-rollups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["recomputeRollups"];
         delete?: never;
         options?: never;
         head?: never;
@@ -900,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/invitations/{email}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["cancelInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/invitations/{email}/resend": {
         parameters: {
             query?: never;
@@ -916,1374 +68,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/suppliers/{id}/deactivate": {
+    "/api/analytics/action-center": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getActionCenter"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["deactivateSupplier"];
-        trace?: never;
-    };
-    "/api/suppliers/{id}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["activateSupplier"];
-        trace?: never;
-    };
-    "/api/shipments/{id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["overrideShipmentStatus"];
-        trace?: never;
-    };
-    "/api/products/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["deactivateProduct"];
-        trace?: never;
-    };
-    "/api/products/{id}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["activateProduct"];
-        trace?: never;
-    };
-    "/api/lootbox/admin/tiers/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["deleteTier"];
-        options?: never;
-        head?: never;
-        patch: operations["updateTier"];
-        trace?: never;
-    };
-    "/api/lootbox/admin/prizes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["deletePrize_1"];
-        options?: never;
-        head?: never;
-        patch: operations["updatePrize"];
-        trace?: never;
-    };
-    "/api/lootbox/admin/crates/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete: operations["deleteCrate"];
-        options?: never;
-        head?: never;
-        patch: operations["updateCrate"];
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/tiers/{tierId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["patchTier"];
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/reopen": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["reopenBox"];
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/close": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["closeBox"];
-        trace?: never;
-    };
-    "/api/categories/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["deactivateCategory"];
-        trace?: never;
-    };
-    "/api/categories/{id}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["activateCategory"];
-        trace?: never;
-    };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["health"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/users/{id}/last-audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLastAudit"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/users/name/{fullName}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserByFullName"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/users/last-audits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllLastAudits"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/users/email/{email}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserByEmail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tracking/{trackingNumber}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getTracking"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/suppliers/{id}/products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSupplierProducts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllStorageLocations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations/{storageLocationId}/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listInventoryByStorageLocation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations/inventory-locations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getInventoryStorageLocations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations/display-locations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getDisplayStorageLocations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations/by-code/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getStorageLocationByCode"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/history/{itemId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMovementHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/history/{itemId}/all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllMovementHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stock-movements/audit-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAuditLog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/display-status-counts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getDisplayStatusCounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shipments/by-product/{productId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getShipmentsByProduct"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/{userId}/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserReviewStats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/{userId}/reviews": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserReviews"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserForReviewTracking"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/tracked": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getReviewTrackedUsers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/users/all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllUsersForReviewManagement"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reviews/summaries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMonthlySummaries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/products/{id}/with-children": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getProductWithChildren"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/products/{id}/children": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getProductChildren"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/products/sku/{sku}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getProductBySku"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getNotificationById"];
-        put?: never;
-        post?: never;
-        delete: operations["deleteNotification"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/unread": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUnreadNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["searchNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/counts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getNotificationCounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/{locationType}/{machineId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCurrentDisplay"];
-        put?: never;
-        post?: never;
-        delete: operations["clearDisplay"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/{locationType}/{machineId}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMachineHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/{locationType}/{machineId}/history/paged": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMachineHistoryPaged"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/{locationType}/{machineId}/active": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getActiveDisplaysForMachine"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/stale": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getStaleDisplays"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/stale/{locationType}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getStaleDisplaysByType"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/product/{productId}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getProductHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/paged": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllActiveDisplaysPaged"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/machine-displays/by-type/{locationType}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getActiveDisplaysByType"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/wallet/breakdown": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getWalletBreakdown"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/recent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getRecentPlays"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/my-prizes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMyPrizes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/my-history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getMyHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCatalog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getBalance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/users/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUserProfile"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/players": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getPlayers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getPending"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/coin-stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCoinStats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getFullCatalog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lootbox/admin/activity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getActivity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/with-counts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLocationsWithCounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getBox"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/{boxId}/daily-payouts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getDailyPayouts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/by-product/{productId}/last-tiers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getLastClosedTiers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/by-product/{productId}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getBoxHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/by-product/{productId}/active": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getActiveBoxByProduct"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/allocations/by-product/{productId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllocationsByProduct"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/kuji-boxes/allocations/by-location/{locationId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllocationsByLocation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/inventory/totals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getInventoryTotals"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/inventory/by-product/{productId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getInventoryByProduct"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllForecasts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/{itemId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getForecastByItem"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/{itemId}/explain": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["explainForecast"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/highest-demand": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getHighestDemandForecast"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/at-risk": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAtRiskItems"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllForecastsUnpaginated"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/forecasts/accuracy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getRollingAccuracy"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/categories/{parentId}/children": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getChildCategories"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getSession"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getCurrentUser"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/audit-logs": {
+    "/api/analytics/demand-leaders": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getAuditLogs"];
+        get: operations["getDemandLeaders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2292,14 +100,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/audit-logs/{id}": {
+    "/api/analytics/insights": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getAuditLogDetail"];
+        get: operations["getInsights"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2308,14 +116,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/sales-summary": {
+    "/api/analytics/inventory-by-category": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getSalesSummary"];
+        get: operations["getInventoryByCategory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2324,14 +132,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/products/{id}/report-bundle/header": {
+    "/api/analytics/performance-metrics": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getReportBundleHeader"];
+        get: operations["getPerformanceMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2340,14 +148,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/products/{id}/report-bundle/detail": {
+    "/api/analytics/products/{id}/comparison": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getReportBundleDetail"];
+        get: operations["getProductComparison"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2388,14 +196,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/products/{id}/comparison": {
+    "/api/analytics/products/{id}/report-bundle/detail": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getProductComparison"];
+        get: operations["getReportBundleDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2404,14 +212,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/performance-metrics": {
+    "/api/analytics/products/{id}/report-bundle/header": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getPerformanceMetrics"];
+        get: operations["getReportBundleHeader"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2420,14 +228,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/inventory-by-category": {
+    "/api/analytics/recompute-rollups": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getInventoryByCategory"];
+        get?: never;
+        put?: never;
+        post: operations["recomputeRollups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/sales-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSalesSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2436,14 +260,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/insights": {
+    "/api/audit-logs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getInsights"];
+        get: operations["getAuditLogs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2452,14 +276,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/demand-leaders": {
+    "/api/audit-logs/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getDemandLeaders"];
+        get: operations["getAuditLogDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2468,14 +292,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/action-center": {
+    "/api/auth/me": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getActionCenter"];
+        get: operations["getCurrentUser"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2484,14 +308,1118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/activity-feed": {
+    "/api/auth/session": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getActivityFeed"];
+        get: operations["getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sync-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["syncUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validateToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCategories"];
+        put?: never;
+        post: operations["createCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCategoryById"];
+        put: operations["updateCategory"];
+        post?: never;
+        delete: operations["deleteCategory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["activateCategory"];
+        trace?: never;
+    };
+    "/api/categories/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["deactivateCategory"];
+        trace?: never;
+    };
+    "/api/categories/{parentId}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getChildCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllForecasts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRollingAccuracy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllForecastsUnpaginated"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/at-risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAtRiskItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/highest-demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHighestDemandForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getForecastByItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forecasts/{itemId}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["explainForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/by-product/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getInventoryByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getInventoryTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["openBox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/allocations/by-location/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllocationsByLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/allocations/by-product/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllocationsByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/by-product/{productId}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActiveBoxByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/by-product/{productId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBoxHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/by-product/{productId}/last-tiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLastClosedTiers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["closeBox"];
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/daily-payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDailyPayouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/draws": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordDraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/draws/{auditLogId}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["undoDraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["reopenBox"];
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["addTier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["patchTier"];
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}/add-slip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["addSlip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}/delete-prize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["deletePrize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}/move-slips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["moveSlips"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}/transfer-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferInMore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kuji-boxes/{boxId}/tiers/{tierId}/transfer-in-inventory-only": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferInInventoryOnly"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllLocations"];
+        put?: never;
+        post: operations["createLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/with-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLocationsWithCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLocationById"];
+        put: operations["updateLocation"];
+        post?: never;
+        delete: operations["deleteLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{locationId}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listInventoryAtLocation"];
+        put?: never;
+        post: operations["addInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{locationId}/inventory/{inventoryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getInventoryById"];
+        put: operations["updateInventory"];
+        post?: never;
+        delete: operations["deleteInventory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFullCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/coin-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCoinConfig"];
+        put: operations["updateCoinConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/coin-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCoinStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/crates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCrates"];
+        put?: never;
+        post: operations["createCrate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/crates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteCrate"];
+        options?: never;
+        head?: never;
+        patch: operations["updateCrate"];
+        trace?: never;
+    };
+    "/api/lootbox/admin/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPlayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/prizes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPrize"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/prizes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deletePrize_1"];
+        options?: never;
+        head?: never;
+        patch: operations["updatePrize"];
+        trace?: never;
+    };
+    "/api/lootbox/admin/redeem/{playId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markRedeemed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/tiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createTier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/tiers/bulk-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulkUpdateTierProbabilities"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/admin/tiers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteTier"];
+        options?: never;
+        head?: never;
+        patch: operations["updateTier"];
+        trace?: never;
+    };
+    "/api/lootbox/admin/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/my-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/my-prizes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMyPrizes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/play": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["play"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRecentPlays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lootbox/wallet/breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getWalletBreakdown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllActiveDisplays"];
+        put?: never;
+        post: operations["setDisplay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setDisplayBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/batch-clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batchClearDisplays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/batch-swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batchSwapDisplay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/by-id/{displayId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["clearDisplayById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/by-type/{locationType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActiveDisplaysByType"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2516,23 +1444,375 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/machine-displays/by-id/{displayId}": {
+    "/api/machine-displays/paged": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getAllActiveDisplaysPaged"];
         put?: never;
         post?: never;
-        delete: operations["clearDisplayById"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/invitations/{email}": {
+    "/api/machine-displays/product/{productId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["renewDisplays"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/stale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getStaleDisplays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/stale/{locationType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getStaleDisplaysByType"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["swapDisplay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/{locationType}/{machineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentDisplay"];
+        put?: never;
+        post?: never;
+        delete: operations["clearDisplay"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/{locationType}/{machineId}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getActiveDisplaysForMachine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/{locationType}/{machineId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMachineHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/machine-displays/{locationType}/{machineId}/history/paged": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMachineHistoryPaged"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNotificationCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["markAllAsRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUnreadNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNotificationById"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteNotification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/mark-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["markAsUserRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["markAsRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["resolveNotification"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/unresolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["unresolveNotification"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllProducts"];
+        put?: never;
+        post: operations["createProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/products/sku/{sku}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductBySku"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductById"];
+        put: operations["updateProduct"];
+        post?: never;
+        delete: operations["deleteProduct"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/products/{id}/activate": {
         parameters: {
             query?: never;
             header?: never;
@@ -2542,7 +1822,727 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["cancelInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["activateProduct"];
+        trace?: never;
+    };
+    "/api/products/{id}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductChildren"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/products/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["deactivateProduct"];
+        trace?: never;
+    };
+    "/api/products/{id}/with-children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductWithChildren"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMonthlySummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllUsersForReviewManagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/tracked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReviewTrackedUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserForReviewTracking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/{id}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateUserReviewTracking"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/{userId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reviews/users/{userId}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserReviewStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listShipments"];
+        put?: never;
+        post: operations["createShipment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/by-product/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getShipmentsByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/display-status-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDisplayStatusCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getShipmentById"];
+        put: operations["updateShipment"];
+        post?: never;
+        delete: operations["deleteShipment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receiveShipment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["overrideShipmentStatus"];
+        trace?: never;
+    };
+    "/api/shipments/{shipmentId}/items/{itemId}/undo-receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["undoReceiveShipmentItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shipments/{shipmentId}/undo-receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["undoReceiveShipmentItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/batch-adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batchAdjustInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/batch-transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["batchTransferInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/history/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMovementHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/history/{itemId}/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllMovementHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-movements/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllStorageLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage-locations/by-code/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getStorageLocationByCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage-locations/display-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDisplayStorageLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage-locations/inventory-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getInventoryStorageLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage-locations/{storageLocationId}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listInventoryByStorageLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSuppliers"];
+        put?: never;
+        post: operations["createSupplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSupplierById"];
+        put: operations["updateSupplier"];
+        post?: never;
+        delete: operations["deleteSupplier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["activateSupplier"];
+        trace?: never;
+    };
+    "/api/suppliers/{id}/assign-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["assignProducts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/suppliers/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["deactivateSupplier"];
+        trace?: never;
+    };
+    "/api/suppliers/{id}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSupplierProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tracking/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lookupTracking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tracking/{trackingNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTracking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllUsers"];
+        put?: never;
+        post: operations["createUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/email/{email}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserByEmail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/last-audits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllLastAudits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/name/{fullName}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserByFullName"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getUserById"];
+        put: operations["updateUser"];
+        post?: never;
+        delete: operations["deleteUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{id}/last-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLastAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/easypost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["handleEasyPostWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["health"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2552,1664 +2552,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        UserRequestDTO: {
-            fullName?: string;
-            email?: string;
-            /** @enum {string} */
-            role: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
-        };
-        UserResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            fullName?: string;
-            email?: string;
-            /** @enum {string} */
-            role?: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
-            canonicalName?: string;
-            nameVariants?: string[];
-            isReviewTracked?: boolean;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        SupplierRequestDTO: {
-            displayName?: string;
-            contactEmail?: string;
-            isActive?: boolean;
-        };
-        SupplierResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            displayName?: string;
-            contactEmail?: string;
-            isActive?: boolean;
-            /** Format: int64 */
-            shipmentCount?: number;
-            /** Format: int64 */
-            productCount?: number;
-            avgLeadTimeDays?: number;
-            sigmaL?: number;
-            /** Format: date-time */
-            createdAt?: string;
-        };
-        ShipmentItemRequestDTO: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: int32 */
-            orderedQuantity: number;
-            unitCost?: number;
-            /** @enum {string} */
-            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            destinationLocationId?: string;
-            notes?: string;
-        };
-        ShipmentRequestDTO: {
-            shipmentNumber?: string;
-            supplierName?: string;
-            /** @enum {string} */
-            status: "PENDING" | "RECEIVED" | "CANCELLED";
-            /** Format: date */
-            orderDate: string;
-            /** Format: date */
-            expectedDeliveryDate?: string;
-            /** Format: date */
-            actualDeliveryDate?: string;
-            totalCost?: number;
-            notes?: string;
-            trackingId?: string;
-            /** Format: uuid */
-            createdBy?: string;
-            items?: components["schemas"]["ShipmentItemRequestDTO"][];
-        };
-        CategoryResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            parentId?: string;
-            name?: string;
-            slug?: string;
-            /** Format: int32 */
-            displayOrder?: number;
-            isActive?: boolean;
-            usesPacks?: boolean;
-            children?: components["schemas"]["CategoryResponseDTO"][];
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        ProductSummaryDTO: {
-            /** Format: uuid */
-            id?: string;
-            sku?: string;
-            name?: string;
-            category?: components["schemas"]["CategoryResponseDTO"];
-            imageUrl?: string;
-            isActive?: boolean;
-            /** Format: int32 */
-            quantity?: number;
-            /** Format: uuid */
-            parentId?: string;
-            letter?: string;
-            /** Format: int32 */
-            templateQuantity?: number;
-            hasChildren?: boolean;
-            /** Format: int32 */
-            packsPerBox?: number;
-        };
-        ShipmentItemAllocationResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** @enum {string} */
-            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            /** Format: int32 */
-            quantity?: number;
-            /** Format: date-time */
-            receivedAt?: string;
-        };
-        ShipmentItemResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            item?: components["schemas"]["ProductSummaryDTO"];
-            /** Format: int32 */
-            orderedQuantity?: number;
-            /** Format: int32 */
-            receivedQuantity?: number;
-            /** Format: int32 */
-            damagedQuantity?: number;
-            /** Format: int32 */
-            displayQuantity?: number;
-            /** Format: int32 */
-            shopQuantity?: number;
-            unitCost?: number;
-            /** @enum {string} */
-            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            destinationLocationId?: string;
-            notes?: string;
-            allocations?: components["schemas"]["ShipmentItemAllocationResponseDTO"][];
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        ShipmentResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            shipmentNumber?: string;
-            supplierName?: string;
-            /** Format: uuid */
-            supplierId?: string;
-            /** @enum {string} */
-            status?: "PENDING" | "RECEIVED" | "CANCELLED";
-            /** @enum {string} */
-            carrierStatus?: "PRE_TRANSIT" | "IN_TRANSIT" | "DELIVERED" | "FAILED";
-            /** Format: date-time */
-            carrierDeliveredAt?: string;
-            /** Format: date */
-            orderDate?: string;
-            /** Format: date */
-            expectedDeliveryDate?: string;
-            /** Format: date */
-            actualDeliveryDate?: string;
-            totalCost?: number;
-            notes?: string;
-            trackingId?: string;
-            createdBy?: components["schemas"]["UserResponseDTO"];
-            receivedBy?: components["schemas"]["UserResponseDTO"];
-            items?: components["schemas"]["ShipmentItemResponseDTO"][];
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        UserReviewTrackingRequestDTO: {
-            canonicalName?: string;
-            nameVariants?: string[];
-            isReviewTracked?: boolean;
-        };
-        ProductRequestDTO: {
-            sku?: string;
-            /** Format: uuid */
-            categoryId?: string;
-            /** Format: uuid */
-            parentId?: string;
-            letter?: string;
-            /** Format: int32 */
-            templateQuantity?: number;
-            /** @enum {string} */
-            kujiType?: "PREMADE" | "CUSTOM";
-            kujiSlackWebhookUrl?: string;
-            /** Format: int32 */
-            packsPerBox?: number;
-            name?: string;
-            description?: string;
-            /** Format: int32 */
-            reorderPoint?: number;
-            /** Format: int32 */
-            targetStockLevel?: number;
-            /** Format: int32 */
-            leadTimeDays?: number;
-            unitCost?: number;
-            msrp?: number;
-            imageUrl?: string;
-            notes?: string;
-            /** Format: int32 */
-            initialStock?: number;
-            /** Format: int32 */
-            quantity?: number;
-            /** Format: uuid */
-            preferredSupplierId?: string;
-            preferredSupplierAuto?: boolean;
-            forecastingEnabled?: boolean;
-        };
-        ProductResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            sku?: string;
-            category?: components["schemas"]["CategoryResponseDTO"];
-            /** Format: uuid */
-            parentId?: string;
-            parentName?: string;
-            letter?: string;
-            /** Format: int32 */
-            templateQuantity?: number;
-            /** @enum {string} */
-            kujiType?: "PREMADE" | "CUSTOM";
-            kujiSlackWebhookUrl?: string;
-            /** Format: int32 */
-            packsPerBox?: number;
-            parentSku?: string;
-            children?: components["schemas"]["ProductSummaryDTO"][];
-            /** Format: int32 */
-            totalChildStock?: number;
-            hasChildren?: boolean;
-            name?: string;
-            description?: string;
-            /** Format: int32 */
-            reorderPoint?: number;
-            /** Format: int32 */
-            targetStockLevel?: number;
-            /** Format: int32 */
-            leadTimeDays?: number;
-            /** Format: uuid */
-            preferredSupplierId?: string;
-            preferredSupplierName?: string;
-            preferredSupplierAuto?: boolean;
-            /** Format: uuid */
-            lastDeliveredSupplierId?: string;
-            lastDeliveredSupplierName?: string;
-            unitCost?: number;
-            msrp?: number;
-            isActive?: boolean;
-            forecastingEnabled?: boolean;
-            /** Format: int32 */
-            quantity?: number;
-            imageUrl?: string;
-            notes?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        NotificationResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** @enum {string} */
-            type?: "LOW_STOCK" | "OUT_OF_STOCK" | "REORDER_SUGGESTION" | "EXPIRY_WARNING" | "SYSTEM_ALERT" | "SHIPMENT_COMPLETED" | "SHIPMENT_DAMAGED" | "SHIPMENT_DELIVERY_FAILED" | "PACKAGE_ARRIVED" | "DISPLAY_STALE" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "DISPLAY_RENEWED" | "KUJI_PRIZE_DRAWN" | "KUJI_PRIZE_DRAW_UNDONE";
-            /** @enum {string} */
-            severity?: "INFO" | "WARNING" | "CRITICAL";
-            message?: string;
-            /** Format: uuid */
-            recipientId?: string;
-            /** Format: uuid */
-            itemId?: string;
-            itemName?: string;
-            /** Format: uuid */
-            inventoryId?: string;
-            via?: string[];
-            metadata?: {
-                [key: string]: Record<string, never>;
-            };
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            deliveredAt?: string;
-            /** Format: date-time */
-            resolvedAt?: string;
-            /** Format: date-time */
-            readAt?: string;
-        };
-        UpdateCoinEconomyConfigRequestDTO: {
-            /** Format: int32 */
-            reviewCoinRate: number;
-        };
-        CoinEconomyConfigResponseDTO: {
-            /** Format: int32 */
-            reviewCoinRate?: number;
-            /** Format: date-time */
-            updatedAt?: string;
-            /** Format: uuid */
-            updatedByUserId?: string;
-            updatedByName?: string;
-            nextFetchHint?: string;
-        };
-        InventoryRequestDTO: {
-            /** Format: uuid */
-            itemId: string;
-            /** Format: int32 */
-            quantity: number;
-            /** Format: uuid */
-            actorId?: string;
-            /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            intakeUnit?: string;
-            /** Format: int32 */
-            intakeQty?: number;
-        };
-        LocationInventoryResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            storageLocationType?: string;
-            item?: components["schemas"]["ProductSummaryDTO"];
-            /** Format: int32 */
-            quantity?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        UpdateLocationRequest: {
-            locationCode?: string;
-        };
-        Location: {
-            /** Format: uuid */
-            id?: string;
-            storageLocation: components["schemas"]["StorageLocation"];
-            locationCode?: string;
-            metadata?: {
-                [key: string]: Record<string, never>;
-            };
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-            fullLocationCode?: string;
-        };
-        Site: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            code?: string;
-            addressLine1?: string;
-            addressLine2?: string;
-            city?: string;
-            state?: string;
-            postalCode?: string;
-            country?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        StorageLocation: {
-            /** Format: uuid */
-            id?: string;
-            site: components["schemas"]["Site"];
-            name?: string;
-            code?: string;
-            codePrefix?: string;
-            icon?: string;
-            hasDisplay?: boolean;
-            isDisplayOnly?: boolean;
-            /** Format: int32 */
-            displayOrder?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        CategoryRequestDTO: {
-            name?: string;
-            /** Format: uuid */
-            parentId?: string;
-            /** Format: int32 */
-            displayOrder?: number;
-            usesPacks?: boolean;
-        };
-        TrackingLookupRequestDTO: {
-            trackingNumber?: string;
-            carrier?: string;
-        };
-        TrackingEventDTO: {
-            status?: string;
-            message?: string;
-            location?: string;
-            /** Format: date-time */
-            occurredAt?: string;
-        };
-        TrackingLookupResponseDTO: {
-            trackingNumber?: string;
-            carrier?: string;
-            status?: string;
-            /** @enum {string} */
-            carrierStatus?: "PRE_TRANSIT" | "IN_TRANSIT" | "DELIVERED" | "FAILED";
-            /** Format: date */
-            dateOrdered?: string;
-            /** Format: date */
-            expectedDelivery?: string;
-            /** Format: date */
-            actualDelivery?: string;
-            statusDetail?: string;
-            events?: components["schemas"]["TrackingEventDTO"][];
-            /** Format: date-time */
-            lastUpdated?: string;
-        };
-        BulkAssignProductsRequestDTO: {
-            productIds?: string[];
-        };
-        TransferInventoryRequestDTO: {
-            /** @enum {string} */
-            sourceLocationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            sourceInventoryId: string;
-            /** @enum {string} */
-            destinationLocationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            destinationInventoryId?: string;
-            /** Format: uuid */
-            destinationLocationId?: string;
-            /** Format: int32 */
-            quantity: number;
-            /** Format: uuid */
-            actorId?: string;
-            notes?: string;
-        };
-        BatchTransferInventoryRequestDTO: {
-            transfers: components["schemas"]["TransferInventoryRequestDTO"][];
-        };
-        BatchAdjustLineDTO: {
-            /** Format: uuid */
-            inventoryId: string;
-            /** Format: int32 */
-            quantityChange: number;
-            intakeUnit?: string;
-            /** Format: int32 */
-            intakeQty?: number;
-        };
-        BatchAdjustStockRequestDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            locationId: string;
-            adjustments: components["schemas"]["BatchAdjustLineDTO"][];
-            /** @enum {string} */
-            reason: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            /** Format: uuid */
-            actorId?: string;
-            notes?: string;
-        };
-        UndoReceiveRequest: {
-            itemIds?: string[];
-        };
-        DestinationAllocationDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            locationId?: string;
-            /** Format: int32 */
-            quantity: number;
-            intakeUnit?: string;
-            /** Format: int32 */
-            intakeQty?: number;
-        };
-        ItemReceiptDTO: {
-            /** Format: uuid */
-            shipmentItemId: string;
-            allocations?: components["schemas"]["DestinationAllocationDTO"][];
-            /** Format: int32 */
-            damagedQuantity?: number;
-            /** Format: int32 */
-            displayQuantity?: number;
-            /** Format: int32 */
-            shopQuantity?: number;
-            /** Format: int32 */
-            receivedQuantity?: number;
-            /** @enum {string} */
-            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            destinationLocationId?: string;
-        };
-        ReceiveShipmentRequestDTO: {
-            /** Format: date */
-            actualDeliveryDate: string;
-            /** Format: uuid */
-            receivedBy?: string;
-            itemReceipts: components["schemas"]["ItemReceiptDTO"][];
-        };
-        SetMachineDisplayRequestDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId: string;
-            /** Format: uuid */
-            productId: string;
-            /** Format: uuid */
-            actorId?: string;
-        };
-        MachineDisplayDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** @enum {string} */
-            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId?: string;
-            machineCode?: string;
-            /** Format: uuid */
-            productId?: string;
-            productName?: string;
-            productSku?: string;
-            /** Format: date-time */
-            startedAt?: string;
-            /** Format: date-time */
-            endedAt?: string;
-            /** Format: uuid */
-            actorId?: string;
-            actorName?: string;
-            /** Format: int64 */
-            daysActive?: number;
-            stale?: boolean;
-        };
-        SwapMachineDisplayRequestDTO: {
-            /** Format: uuid */
-            outgoingDisplayId: string;
-            /** Format: uuid */
-            incomingProductId: string;
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId: string;
-            /** Format: uuid */
-            actorId?: string;
-        };
-        RenewDisplayRequestDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId: string;
-            displayIds?: string[];
-            /** Format: uuid */
-            actorId?: string;
-        };
-        SetMachineDisplayBatchRequestDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId: string;
-            productIds?: string[];
-            /** Format: uuid */
-            actorId?: string;
-        };
-        BatchDisplaySwapRequestDTO: {
-            /** @enum {string} */
-            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            machineId: string;
-            displayIdsToRemove?: string[];
-            productIdsToAdd?: string[];
-            /** @enum {string} */
-            targetLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            targetMachineId?: string;
-            displayIdsFromTarget?: string[];
-            displayIdsToTarget?: string[];
-            /** Format: uuid */
-            actorId?: string;
-        };
-        BatchClearDisplaysRequestDTO: {
-            displayIds?: string[];
-            /** Format: uuid */
-            actorId?: string;
-        };
-        PlayLootboxRequestDTO: {
-            /** Format: uuid */
-            crateId: string;
-        };
-        LootboxPlayResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: uuid */
-            prizeId?: string;
-            prizeName?: string;
-            prizeDescription?: string;
-            prizeImageUrl?: string;
-            prizeTierName?: string;
-            /** Format: int32 */
-            cost?: number;
-            status?: string;
-            /** Format: date-time */
-            playedAt?: string;
-            /** Format: date-time */
-            redeemedAt?: string;
-            /** Format: uuid */
-            redeemedByUserId?: string;
-            redeemedByName?: string;
-        };
-        PlayLootboxResponseDTO: {
-            play?: components["schemas"]["LootboxPlayResponseDTO"];
-            /** Format: int64 */
-            newBalance?: number;
-        };
-        UpsertTierRequestDTO: {
-            /** Format: uuid */
-            lootboxId?: string;
-            name?: string;
-            probabilityPct: number;
-            displayColor?: string;
-            /** Format: int32 */
-            sortOrder?: number;
-            active?: boolean;
-        };
-        LootboxPrizeResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            /** Format: uuid */
-            tierId?: string;
-            tierName?: string;
-            tierColor?: string;
-            active?: boolean;
-            /** Format: int32 */
-            quantity?: number;
-        };
-        LootboxTierResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            probabilityPct?: number;
-            displayColor?: string;
-            /** Format: int32 */
-            sortOrder?: number;
-            active?: boolean;
-            prizes?: components["schemas"]["LootboxPrizeResponseDTO"][];
-        };
-        BulkUpdateTierProbabilitiesRequestDTO: {
-            /** Format: uuid */
-            lootboxId: string;
-            tiers?: components["schemas"]["TierProbability"][];
-        };
-        TierProbability: {
-            /** Format: uuid */
-            id: string;
-            probabilityPct: number;
-        };
-        UpsertPrizeRequestDTO: {
-            /** Format: uuid */
-            tierId: string;
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            active?: boolean;
-            /** Format: int32 */
-            quantity?: number;
-        };
-        UpsertLootboxRequestDTO: {
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            /** Format: int32 */
-            cost?: number;
-            /** Format: date-time */
-            startsAt?: string;
-            /** Format: date-time */
-            endsAt?: string;
-            active?: boolean;
-            /** Format: uuid */
-            siteId?: string;
-            /** Format: int32 */
-            sortOrder?: number;
-        };
-        LootboxAdminResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            /** Format: int32 */
-            cost?: number;
-            /** Format: date-time */
-            startsAt?: string;
-            /** Format: date-time */
-            endsAt?: string;
-            active?: boolean;
-            /** Format: uuid */
-            siteId?: string;
-            /** Format: int32 */
-            sortOrder?: number;
-            /** Format: int32 */
-            tierCount?: number;
-            /** Format: int32 */
-            prizeCount?: number;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        CoinAdjustmentRequestDTO: {
-            /** Format: uuid */
-            userId: string;
-            /** Format: int32 */
-            delta: number;
-            reason?: string;
-        };
-        CoinAdjustmentResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: int32 */
-            delta?: number;
-            reason?: string;
-            /** Format: uuid */
-            grantedByUserId?: string;
-            grantedByName?: string;
-            /** Format: date-time */
-            createdAt?: string;
-        };
-        CreateLocationRequest: {
-            locationCode?: string;
-            /** Format: uuid */
-            storageLocationId: string;
-        };
-        NewKujiBoxTierDTO: {
-            label?: string;
-            letter?: string;
-            /** Format: uuid */
-            linkedProductId?: string;
-            /** Format: uuid */
-            sourceLocationId?: string;
-            /** Format: int32 */
-            activeCount: number;
-            /** Format: int32 */
-            inactiveCount?: number;
-            price?: number;
-            autoCreate?: boolean;
-            productName?: string;
-            productImageUrl?: string;
-            productMsrp?: number;
-        };
-        OpenKujiBoxRequestDTO: {
-            /** Format: uuid */
-            productId: string;
-            /** Format: uuid */
-            locationId: string;
-            /** Format: uuid */
-            machineDisplayId?: string;
-            label?: string;
-            notes?: string;
-            tiers?: components["schemas"]["NewKujiBoxTierDTO"][];
-            /** Format: uuid */
-            actorId: string;
-        };
-        KujiBoxResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            productId?: string;
-            productName?: string;
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            locationName?: string;
-            /** Format: uuid */
-            machineDisplayId?: string;
-            /** @enum {string} */
-            status?: "OPEN" | "CLOSED";
-            label?: string;
-            notes?: string;
-            /** Format: date-time */
-            openedAt?: string;
-            /** Format: uuid */
-            openedBy?: string;
-            openedByName?: string;
-            /** Format: date-time */
-            closedAt?: string;
-            /** Format: uuid */
-            closedBy?: string;
-            closedByName?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-            tiers?: components["schemas"]["KujiBoxTierResponseDTO"][];
-            /** Format: int32 */
-            totalCount?: number;
-        };
-        KujiBoxTierResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            label?: string;
-            letter?: string;
-            /** Format: uuid */
-            linkedProductId?: string;
-            linkedProductName?: string;
-            linkedProductImageUrl?: string;
-            /** Format: int32 */
-            linkedProductPacksPerBox?: number;
-            /** Format: int32 */
-            activeCount?: number;
-            /** Format: int32 */
-            inactiveCount?: number;
-            /** Format: int32 */
-            drawnCount?: number;
-            /** Format: int32 */
-            totalCount?: number;
-            price?: number;
-            linkedProductPrice?: number;
-            autoCreatedProduct?: boolean;
-        };
-        AddKujiTierRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            label?: string;
-            letter?: string;
-            /** Format: uuid */
-            linkedProductId?: string;
-            /** Format: uuid */
-            sourceLocationId?: string;
-            /** Format: int32 */
-            activeCount: number;
-            /** Format: int32 */
-            inactiveCount?: number;
-            price?: number;
-            autoCreate?: boolean;
-            productName?: string;
-            productImageUrl?: string;
-            productMsrp?: number;
-        };
-        TransferInMoreRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            sourceLocationId?: string;
-            /** Format: int32 */
-            quantity: number;
-            intakeUnit?: string;
-            /** Format: int32 */
-            intakeQty?: number;
-        };
-        MoveSlipsRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            /** Format: int32 */
-            quantity: number;
-            /** @enum {string} */
-            direction: "ACTIVATE" | "DEACTIVATE";
-        };
-        DeletePrizeRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            fromActive?: boolean;
-        };
-        AddSlipRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            /** Format: int32 */
-            quantity: number;
-            inactive?: boolean;
-        };
-        DrawLine: {
-            /** Format: uuid */
-            tierId: string;
-            /** Format: int32 */
-            quantity: number;
-        };
-        RecordDrawRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            notes?: string;
-            draws?: components["schemas"]["DrawLine"][];
-        };
-        InvitationRequestDTO: {
-            email?: string;
-            role?: string;
-        };
-        InvitationResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            email?: string;
-            role?: string;
-            invitedByEmail?: string;
-            /** Format: date-time */
-            invitedAt?: string;
-            /** Format: date-time */
-            acceptedAt?: string;
-            status?: string;
-        };
-        StatusOverrideRequest: {
-            /** @enum {string} */
-            status?: "PENDING" | "RECEIVED" | "CANCELLED";
-            reason?: string;
-        };
-        PatchKujiTierRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            label?: string;
-            letter?: string;
-            clearLetter?: boolean;
-            /** Format: uuid */
-            linkedProductId?: string;
-            clearLinkedProduct?: boolean;
-            /** Format: uuid */
-            linkedProductDestinationLocationId?: string;
-            /** Format: int32 */
-            activeCount?: number;
-            /** Format: int32 */
-            inactiveCount?: number;
-            /** Format: uuid */
-            newProductSourceLocationId?: string;
-            /** Format: int32 */
-            newProductActiveCount?: number;
-            /** Format: int32 */
-            newProductInactiveCount?: number;
-            price?: number;
-            clearPrice?: boolean;
-        };
-        CloseKujiBoxRequestDTO: {
-            /** Format: uuid */
-            actorId: string;
-            transferOutTargets?: components["schemas"]["TierTransferDestination"][];
-        };
-        TierTransferDestination: {
-            /** Format: uuid */
-            tierId: string;
-            /** Format: uuid */
-            destinationLocationId: string;
-        };
-        Pageable: {
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            size?: number;
-            sort?: string[];
-        };
-        PageStockMovementResponseDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["StockMovementResponseDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        PageableObject: {
-            paged?: boolean;
-            /** Format: int32 */
-            pageNumber?: number;
-            /** Format: int32 */
-            pageSize?: number;
-            unpaged?: boolean;
-            /** Format: int64 */
-            offset?: number;
-            sort?: components["schemas"]["SortObject"];
-        };
-        SortObject: {
-            sorted?: boolean;
-            unsorted?: boolean;
-            empty?: boolean;
-        };
-        StockMovementResponseDTO: {
-            /** Format: int64 */
-            id?: number;
-            /** @enum {string} */
-            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            itemId?: string;
-            /** Format: uuid */
-            fromLocationId?: string;
-            /** Format: uuid */
-            toLocationId?: string;
-            /** Format: int32 */
-            quantityChange?: number;
-            /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            /** Format: uuid */
-            actorId?: string;
-            /** Format: date-time */
-            at?: string;
-            metadata?: {
-                [key: string]: Record<string, never>;
-            };
-        };
-        AuditLogEntryDTO: {
-            /** Format: int64 */
-            id?: number;
-            /** @enum {string} */
-            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            /** Format: uuid */
-            itemId?: string;
-            itemSku?: string;
-            itemName?: string;
-            /** Format: uuid */
-            fromLocationId?: string;
-            fromLocationCode?: string;
-            /** Format: uuid */
-            toLocationId?: string;
-            toLocationCode?: string;
-            /** Format: int32 */
-            previousQuantity?: number;
-            /** Format: int32 */
-            currentQuantity?: number;
-            /** Format: int32 */
-            quantityChange?: number;
-            /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            /** Format: uuid */
-            actorId?: string;
-            actorName?: string;
-            /** Format: date-time */
-            at?: string;
-        };
-        PageAuditLogEntryDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["AuditLogEntryDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        UserReviewStatsResponseDTO: {
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: int32 */
-            allTimeReviewCount?: number;
-            /** Format: date */
-            firstReviewDate?: string;
-            /** Format: date */
-            lastReviewDate?: string;
-            /** Format: int32 */
-            selectedMonthReviewCount?: number;
-            /** Format: int32 */
-            selectedMonthTotalReviews?: number;
-            /** Format: double */
-            selectedMonthPercentage?: number;
-            /** Format: int32 */
-            allTimeRank?: number;
-        };
-        PageReviewResponseDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["ReviewResponseDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        ReviewResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            externalId?: string;
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: date */
-            reviewDate?: string;
-            reviewText?: string;
-            /** Format: int32 */
-            rating?: number;
-            reviewerName?: string;
-            /** Format: date-time */
-            createdAt?: string;
-        };
-        ReviewSummaryResponseDTO: {
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: int32 */
-            totalReviews?: number;
-            /** Format: double */
-            averageReviewsPerDay?: number;
-            /** Format: date */
-            lastReviewDate?: string;
-        };
-        ProductListItemDTO: {
-            /** Format: uuid */
-            id?: string;
-            sku?: string;
-            name?: string;
-            imageUrl?: string;
-            isActive?: boolean;
-            /** Format: int32 */
-            quantity?: number;
-            letter?: string;
-            /** Format: int32 */
-            templateQuantity?: number;
-            /** Format: int32 */
-            packsPerBox?: number;
-            /** Format: uuid */
-            parentId?: string;
-            /** @enum {string} */
-            kujiType?: "PREMADE" | "CUSTOM";
-            kujiSlackWebhookUrl?: string;
-            /** Format: int32 */
-            reorderPoint?: number;
-            /** Format: int32 */
-            targetStockLevel?: number;
-            /** Format: int32 */
-            leadTimeDays?: number;
-            unitCost?: number;
-            msrp?: number;
-            /** Format: uuid */
-            preferredSupplierId?: string;
-            preferredSupplierName?: string;
-            preferredSupplierAuto?: boolean;
-            category?: components["schemas"]["CategoryResponseDTO"];
-            hasChildren?: boolean;
-            hasActiveBox?: boolean;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        PageNotificationResponseDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["NotificationResponseDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        PageMachineDisplayDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["MachineDisplayDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        ExpirationBucket: {
-            /** Format: int32 */
-            amount?: number;
-            /** Format: date */
-            expiresOn?: string;
-        };
-        WalletBreakdownResponseDTO: {
-            /** Format: int64 */
-            total?: number;
-            expiringSoon?: components["schemas"]["ExpirationBucket"][];
-            /** Format: date */
-            nextExpiryDate?: string;
-        };
-        RecentLootboxPlayResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            prizeId?: string;
-            prizeName?: string;
-            prizeImageUrl?: string;
-            tierName?: string;
-            tierColor?: string;
-            userDisplay?: string;
-            /** Format: date-time */
-            playedAt?: string;
-        };
-        CoinHistoryEntryDTO: {
-            kind?: string;
-            /** Format: date-time */
-            at?: string;
-            /** Format: int32 */
-            delta?: number;
-            label?: string;
-            /** Format: uuid */
-            refId?: string;
-            expired?: boolean;
-            /** Format: date-time */
-            expiresAt?: string;
-        };
-        LootboxResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            description?: string;
-            imageUrl?: string;
-            /** Format: int32 */
-            cost?: number;
-            /** Format: date-time */
-            startsAt?: string;
-            /** Format: date-time */
-            endsAt?: string;
-            /** Format: int32 */
-            sortOrder?: number;
-            tiers?: components["schemas"]["LootboxTierResponseDTO"][];
-        };
-        LootboxBalanceResponseDTO: {
-            /** Format: int64 */
-            balance?: number;
-            /** Format: int64 */
-            reviewCredits?: number;
-            /** Format: int64 */
-            totalAdjustments?: number;
-            /** Format: int64 */
-            totalSpent?: number;
-            /** Format: int64 */
-            totalExpired?: number;
-        };
-        UserCoinProfileResponseDTO: {
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            userEmail?: string;
-            balance?: components["schemas"]["LootboxBalanceResponseDTO"];
-            plays?: components["schemas"]["LootboxPlayResponseDTO"][];
-            adjustments?: components["schemas"]["CoinAdjustmentResponseDTO"][];
-        };
-        PlayerCoinRowDTO: {
-            /** Format: uuid */
-            userId?: string;
-            fullName?: string;
-            email?: string;
-            /** Format: int64 */
-            balance?: number;
-            /** Format: int32 */
-            lastChangeDelta?: number;
-            /** Format: date-time */
-            lastChangeAt?: string;
-        };
-        PageLootboxPlayResponseDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["LootboxPlayResponseDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        CoinStatsResponseDTO: {
-            /** Format: int64 */
-            circulation?: number;
-            /** Format: int32 */
-            holders?: number;
-            /** Format: int64 */
-            granted7d?: number;
-        };
-        AdminCoinActivityDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            userId?: string;
-            userName?: string;
-            /** Format: int32 */
-            delta?: number;
-            reason?: string;
-            /** Format: date-time */
-            occurredAt?: string;
-            kind?: string;
-        };
-        LocationWithCountsDTO: {
-            /** Format: uuid */
-            id?: string;
-            locationType?: string;
-            locationCode?: string;
-            /** Format: int32 */
-            inventoryRecords?: number;
-            /** Format: int32 */
-            totalQuantity?: number;
-            /** Format: int32 */
-            activeDisplayCount?: number;
-            hasActiveDisplay?: boolean;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        DailyPoint: {
-            /** Format: date */
-            date?: string;
-            valueWon?: number;
-            /** Format: int32 */
-            slipCount?: number;
-        };
-        KujiDailyPayoutsResponseDTO: {
-            /** Format: uuid */
-            boxId?: string;
-            /** Format: date */
-            from?: string;
-            /** Format: date */
-            to?: string;
-            tz?: string;
-            series?: components["schemas"]["DailyPoint"][];
-            total?: components["schemas"]["Totals"];
-        };
-        Totals: {
-            valueWon?: number;
-            /** Format: int32 */
-            slipCount?: number;
-        };
-        KujiAllocationByProductDTO: {
-            /** Format: uuid */
-            boxId?: string;
-            boxLabel?: string;
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            /** Format: uuid */
-            machineDisplayId?: string;
-            machineCode?: string;
-            /** Format: uuid */
-            tierId?: string;
-            tierLabel?: string;
-            tierLetter?: string;
-            /** Format: int32 */
-            count?: number;
-        };
-        KujiAllocationByLocationDTO: {
-            /** Format: uuid */
-            boxId?: string;
-            boxLabel?: string;
-            /** Format: uuid */
-            tierId?: string;
-            tierLabel?: string;
-            tierLetter?: string;
-            /** Format: uuid */
-            linkedProductId?: string;
-            linkedProductName?: string;
-            /** Format: int32 */
-            count?: number;
-            /** Format: uuid */
-            machineDisplayId?: string;
-            machineCode?: string;
-        };
-        InventoryTotalDTO: {
-            /** Format: uuid */
-            itemId?: string;
-            sku?: string;
-            name?: string;
-            imageUrl?: string;
-            /** Format: uuid */
-            categoryId?: string;
+        ActionCenterDTO: {
+            avgForecastAccuracy?: number;
+            items?: components["schemas"]["ActionItem"][];
+            riskSummary?: components["schemas"]["RiskSummary"];
+            /** Format: int32 */
+            totalActionItems?: number;
+            totalDemandVelocity?: number;
+        };
+        ActionItem: {
+            avgDailyDelta?: number;
             categoryName?: string;
-            /** Format: uuid */
-            parentCategoryId?: string;
-            parentCategoryName?: string;
-            /** Format: double */
-            unitCost?: number;
-            isActive?: boolean;
-            /** Format: int32 */
-            totalQuantity?: number;
-            /** Format: date-time */
-            lastUpdatedAt?: string;
-        };
-        ProductInventoryEntryDTO: {
-            /** Format: uuid */
-            inventoryId?: string;
-            locationType?: string;
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            locationLabel?: string;
-            /** Format: int32 */
-            quantity?: number;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        ProductInventoryResponseDTO: {
-            /** Format: uuid */
-            productId?: string;
-            productSku?: string;
-            productName?: string;
-            /** Format: int32 */
-            totalQuantity?: number;
-            entries?: components["schemas"]["ProductInventoryEntryDTO"][];
-        };
-        ForecastPredictionResponseDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            itemId?: string;
-            itemName?: string;
-            itemSku?: string;
+            computedAt?: string;
+            confidence?: number;
             /** Format: int32 */
             currentStock?: number;
-            /** Format: int32 */
-            horizonDays?: number;
-            avgDailyDelta?: number;
             daysToStockout?: number;
+            demandSegment?: string;
+            demandVelocity?: number;
+            demandVolatility?: number;
+            forecastAccuracy?: number;
+            imageUrl?: string;
+            /** Format: uuid */
+            itemId?: string;
             /** Format: int32 */
-            suggestedReorderQty?: number;
+            lastDropDays?: number;
+            lastDropSize?: number;
+            /** Format: int32 */
+            leadTimeDays?: number;
+            name?: string;
+            onOrderQty?: number;
+            overdue?: boolean;
+            /** Format: int32 */
+            reorderPoint?: number;
+            revenueAtRisk?: number;
+            sku?: string;
             /** Format: date */
             suggestedOrderDate?: string;
-            unitCost?: number;
-            confidence?: number;
-            /** Format: date-time */
-            computedAt?: string;
-        };
-        PageForecastPredictionResponseDTO: {
-            /** Format: int64 */
-            totalElements?: number;
             /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
+            suggestedReorderQty?: number;
             /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["ForecastPredictionResponseDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        ForecastExplanationDTO: {
-            /** Format: uuid */
-            itemId?: string;
-            /** Format: date-time */
-            computedAt?: string;
-            features?: {
-                [key: string]: Record<string, never>;
-            };
-            /** Format: date-time */
-            lastRestockAt?: string;
-        };
-        CategoryAccuracy: {
-            category?: string;
-            /** Format: int64 */
-            scoredWindows?: number;
-            ltWape?: number;
-            biasUnitsPerDay?: number;
-            totalActualUnits?: number;
-        };
-        ForecastAccuracyDTO: {
-            headline?: components["schemas"]["Window"];
-            comparison?: components["schemas"]["Window"];
-            byCategory?: components["schemas"]["CategoryAccuracy"][];
-        };
-        Window: {
-            /** Format: int32 */
-            days?: number;
-            /** Format: int64 */
-            scoredWindows?: number;
-            ltWape?: number;
-            biasUnitsPerDay?: number;
-            totalActualUnits?: number;
-            /** Format: int64 */
-            underPredictions?: number;
-            /** Format: int64 */
-            overPredictions?: number;
-        };
-        AuditLogDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            actorId?: string;
-            actorName?: string;
+            targetStockLevel?: number;
             /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            primaryFromLocationCode?: string;
-            primaryToLocationCode?: string;
-            /** Format: int32 */
-            itemCount?: number;
-            /** Format: int32 */
-            totalQuantityMoved?: number;
-            notes?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            productSummary?: string;
-            /** Format: uuid */
-            shipmentId?: string;
-            shipmentNumber?: string;
-            fieldChanges?: {
-                [key: string]: Record<string, never>;
-            }[];
-            previousStatus?: string;
-            newStatus?: string;
-            overrideReason?: string;
-            reversed?: boolean;
-        };
-        PageAuditLogDTO: {
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            numberOfElements?: number;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            size?: number;
-            content?: components["schemas"]["AuditLogDTO"][];
-            /** Format: int32 */
-            number?: number;
-            sort?: components["schemas"]["SortObject"];
-            empty?: boolean;
-        };
-        AuditLogDetailDTO: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            actorId?: string;
-            actorName?: string;
-            /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-            primaryFromLocationCode?: string;
-            primaryToLocationCode?: string;
-            /** Format: int32 */
-            itemCount?: number;
-            /** Format: int32 */
-            totalQuantityMoved?: number;
-            notes?: string;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: uuid */
-            shipmentId?: string;
-            shipmentNumber?: string;
-            fieldChanges?: {
-                [key: string]: Record<string, never>;
-            }[];
-            previousStatus?: string;
-            newStatus?: string;
-            overrideReason?: string;
-            movements?: components["schemas"]["MovementDetailDTO"][];
-        };
-        MovementDetailDTO: {
-            /** Format: int64 */
-            id?: number;
-            /** Format: uuid */
-            itemId?: string;
-            itemSku?: string;
-            itemName?: string;
-            itemImageUrl?: string;
-            fromLocationCode?: string;
-            toLocationCode?: string;
-            /** Format: int32 */
-            previousQuantity?: number;
-            /** Format: int32 */
-            currentQuantity?: number;
-            /** Format: int32 */
-            quantityChange?: number;
-            metadata?: {
-                [key: string]: Record<string, never>;
-            };
-        };
-        DailySalesDTO: {
-            date?: string;
-            /** Format: int32 */
-            totalUnits?: number;
-            totalRevenue?: number;
-            totalCost?: number;
-            totalProfit?: number;
-        };
-        MonthlySalesDTO: {
-            month?: string;
-            totalRevenue?: number;
-            totalCost?: number;
-            totalProfit?: number;
-            /** Format: int32 */
-            totalUnits?: number;
-        };
-        SalesSummaryDTO: {
-            monthlySales?: components["schemas"]["MonthlySalesDTO"][];
-            dailySales?: components["schemas"]["DailySalesDTO"][];
-            totalRevenue?: number;
-            totalCost?: number;
-            totalProfit?: number;
-            /** Format: int32 */
-            totalUnits?: number;
-            periodStart?: string;
-            periodEnd?: string;
-        };
-        HeaderBundleDTO: {
-            /** Format: uuid */
-            productId?: string;
-            productName?: string;
-            categoryName?: string;
-            /** Format: int32 */
-            currentStock?: number;
-            /** Format: int32 */
-            unitsSoldLast30?: number;
-            /** Format: int32 */
-            unitsSoldPrior30?: number;
-            velocity?: number;
-            daysToStockout?: number;
-            forecastConfidence?: number;
-            /** Format: date-time */
-            lastRestockAt?: string;
-            /** Format: int32 */
-            damageCountLast30?: number;
-            onDisplay?: boolean;
-            forecastingEnabled?: boolean;
+            urgency?: "CRITICAL" | "URGENT" | "ATTENTION" | "HEALTHY";
         };
         ActiveDisplay: {
             /** Format: uuid */
@@ -4222,106 +2607,188 @@ export interface components {
             /** Format: date-time */
             startedAt?: string;
         };
-        DailyRollupPoint: {
-            /** Format: date */
-            date?: string;
-            /** Format: int32 */
-            unitsSold?: number;
-            revenue?: number;
-            /** Format: int32 */
-            restockUnits?: number;
-            /** Format: int32 */
-            damageUnits?: number;
-        };
-        DetailBundleDTO: {
-            product?: components["schemas"]["ProductSummary"];
-            inventoryByLocation?: components["schemas"]["InventoryByLocation"][];
-            dailyRollups90d?: components["schemas"]["DailyRollupPoint"][];
-            forecastSnapshots?: components["schemas"]["ForecastSnapshotPoint"][];
-            latestPrediction?: components["schemas"]["LatestPrediction"];
-            recentShipments?: components["schemas"]["RecentShipment"][];
-            activeDisplays?: components["schemas"]["ActiveDisplay"][];
-        };
-        ForecastSnapshotPoint: {
-            /** Format: date */
-            date?: string;
-            muHat?: number;
-            confidence?: number;
-            daysToStockout?: number;
-            /** Format: int32 */
-            currentStock?: number;
-        };
-        InventoryByLocation: {
-            /** Format: uuid */
-            locationId?: string;
-            locationCode?: string;
-            storageLocationCode?: string;
-            /** Format: int32 */
-            quantity?: number;
-        };
-        LatestPrediction: {
-            /** Format: int32 */
-            horizonDays?: number;
-            avgDailyDelta?: number;
-            daysToStockout?: number;
-            /** Format: int32 */
-            suggestedReorderQty?: number;
-            /** Format: date */
-            suggestedOrderDate?: string;
-            confidence?: number;
+        ActivityFeedEventDTO: {
+            description?: string;
+            id?: string;
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            /** @enum {string} */
+            severity?: "INFO" | "WARNING" | "CRITICAL";
             /** Format: date-time */
-            computedAt?: string;
+            timestamp?: string;
+            title?: string;
+            type?: string;
         };
-        ProductSummary: {
+        AddKujiTierRequestDTO: {
+            /** Format: int32 */
+            activeCount: number;
+            /** Format: uuid */
+            actorId: string;
+            autoCreate?: boolean;
+            /** Format: int32 */
+            inactiveCount?: number;
+            label?: string;
+            letter?: string;
+            /** Format: uuid */
+            linkedProductId?: string;
+            price?: number;
+            productImageUrl?: string;
+            productMsrp?: number;
+            productName?: string;
+            /** Format: uuid */
+            sourceLocationId?: string;
+        };
+        AddSlipRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            inactive?: boolean;
+            /** Format: int32 */
+            quantity: number;
+        };
+        AdminCoinActivityDTO: {
+            /** Format: int32 */
+            delta?: number;
             /** Format: uuid */
             id?: string;
-            sku?: string;
-            name?: string;
-            categoryName?: string;
-            imageUrl?: string;
-            /** Format: int32 */
-            reorderPoint?: number;
-            /** Format: int32 */
-            targetStockLevel?: number;
-            /** Format: int32 */
-            leadTimeDays?: number;
-            unitCost?: number;
-            /** Format: int32 */
-            currentStock?: number;
-            forecastingEnabled?: boolean;
-        };
-        RecentShipment: {
-            /** Format: uuid */
-            shipmentItemId?: string;
-            /** Format: uuid */
-            shipmentId?: string;
-            /** Format: date */
-            deliveredOn?: string;
-            /** Format: int32 */
-            orderedQuantity?: number;
-            /** Format: int32 */
-            receivedQuantity?: number;
-            /** Format: int32 */
-            damagedQuantity?: number;
-            unitCost?: number;
-        };
-        MovementRowDTO: {
-            /** Format: int64 */
-            id?: number;
+            kind?: string;
             /** Format: date-time */
-            at?: string;
+            occurredAt?: string;
+            reason?: string;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        AuditLogDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            actorName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            fieldChanges?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            itemCount?: number;
+            newStatus?: string;
+            notes?: string;
+            overrideReason?: string;
+            previousStatus?: string;
+            primaryFromLocationCode?: string;
+            primaryToLocationCode?: string;
+            productSummary?: string;
             /** @enum {string} */
             reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            reversed?: boolean;
+            /** Format: uuid */
+            shipmentId?: string;
+            shipmentNumber?: string;
             /** Format: int32 */
-            quantityChange?: number;
+            totalQuantityMoved?: number;
+        };
+        AuditLogDetailDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            actorName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            fieldChanges?: {
+                [key: string]: Record<string, never>;
+            }[];
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            itemCount?: number;
+            movements?: components["schemas"]["MovementDetailDTO"][];
+            newStatus?: string;
+            notes?: string;
+            overrideReason?: string;
+            previousStatus?: string;
+            primaryFromLocationCode?: string;
+            primaryToLocationCode?: string;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            /** Format: uuid */
+            shipmentId?: string;
+            shipmentNumber?: string;
+            /** Format: int32 */
+            totalQuantityMoved?: number;
+        };
+        AuditLogEntryDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            actorName?: string;
+            /** Format: date-time */
+            at?: string;
+            /** Format: int32 */
+            currentQuantity?: number;
+            fromLocationCode?: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: uuid */
+            itemId?: string;
+            itemName?: string;
+            itemSku?: string;
+            /** @enum {string} */
+            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
             /** Format: int32 */
             previousQuantity?: number;
             /** Format: int32 */
-            currentQuantity?: number;
-            /** Format: uuid */
-            fromLocationId?: string;
+            quantityChange?: number;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            toLocationCode?: string;
             /** Format: uuid */
             toLocationId?: string;
+        };
+        BatchAdjustLineDTO: {
+            /** Format: int32 */
+            intakeQty?: number;
+            intakeUnit?: string;
+            /** Format: uuid */
+            inventoryId: string;
+            /** Format: int32 */
+            quantityChange: number;
+        };
+        BatchAdjustStockRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            adjustments: components["schemas"]["BatchAdjustLineDTO"][];
+            /** Format: uuid */
+            locationId: string;
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            notes?: string;
+            /** @enum {string} */
+            reason: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+        };
+        BatchClearDisplaysRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            displayIds?: string[];
+        };
+        BatchDisplaySwapRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            displayIdsFromTarget?: string[];
+            displayIdsToRemove?: string[];
+            displayIdsToTarget?: string[];
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            machineId: string;
+            productIdsToAdd?: string[];
+            /** @enum {string} */
+            targetLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            targetMachineId?: string;
+        };
+        BatchTransferInventoryRequestDTO: {
+            transfers: components["schemas"]["TransferInventoryRequestDTO"][];
         };
         BiggestSingleDay: {
             /** Format: date */
@@ -4329,28 +2796,21 @@ export interface components {
             /** Format: int64 */
             units?: number;
         };
-        MovementSummaryDTO: {
-            byReason?: {
-                [key: string]: number;
-            };
-            lastByReason?: {
-                [key: string]: string;
-            };
-            biggestSingleDay?: components["schemas"]["BiggestSingleDay"];
+        BulkAssignProductsRequestDTO: {
+            productIds?: string[];
         };
-        ComparisonRowDTO: {
+        BulkUpdateTierProbabilitiesRequestDTO: {
             /** Format: uuid */
-            productId?: string;
-            productName?: string;
-            metricValue?: number;
-            /** Format: int32 */
-            rank?: number;
+            lootboxId: string;
+            tiers?: components["schemas"]["TierProbability"][];
         };
-        PerformanceMetricsDTO: {
-            turnoverRate?: number;
-            forecastAccuracy?: number;
-            stockoutRate?: number;
-            fillRate?: number;
+        CategoryAccuracy: {
+            biasUnitsPerDay?: number;
+            category?: string;
+            ltWape?: number;
+            /** Format: int64 */
+            scoredWindows?: number;
+            totalActualUnits?: number;
         };
         CategoryInventoryDTO: {
             category?: string;
@@ -4359,80 +2819,171 @@ export interface components {
             /** Format: int32 */
             totalStock?: number;
         };
-        DayOfWeekPattern: {
-            /** Format: int32 */
-            dayOfWeek?: number;
-            dayName?: string;
-            /** Format: int32 */
-            totalUnits?: number;
-            avgDemandMultiplier?: number;
-            percentOfWeeklyTotal?: number;
-        };
-        InsightsDTO: {
-            dayOfWeekPatterns?: components["schemas"]["DayOfWeekPattern"][];
-            topMovers?: components["schemas"]["Mover"][];
-            bottomMovers?: components["schemas"]["Mover"][];
-            currentPeriod?: components["schemas"]["PeriodSummary"];
-            previousPeriod?: components["schemas"]["PeriodSummary"];
-        };
-        Mover: {
-            /** Format: int32 */
-            rank?: number;
-            /** Format: uuid */
-            itemId?: string;
-            name?: string;
-            imageUrl?: string;
-            categoryName?: string;
-            /** Format: int32 */
-            currentPeriodUnits?: number;
-            /** Format: int32 */
-            previousPeriodUnits?: number;
-            percentChange?: number;
-            /** @enum {string} */
-            direction?: "UP" | "DOWN" | "STABLE";
-            demandVelocity?: number;
-            displayConfidence?: number;
-        };
-        PeriodSummary: {
-            periodLabel?: string;
-            /** Format: int32 */
-            totalUnits?: number;
-            avgDemandVelocity?: number;
-            avgForecastAccuracy?: number;
-            /** Format: int32 */
-            uniqueItemsSold?: number;
-            /** Format: int32 */
-            totalMovements?: number;
-        };
         CategoryRanking: {
-            /** Format: int32 */
-            rank?: number;
             /** Format: uuid */
             categoryId?: string;
             categoryName?: string;
-            /** Format: int32 */
-            totalItems?: number;
+            percentOfTotal?: number;
             /** Format: int32 */
             periodDemand?: number;
-            totalDemandVelocity?: number;
-            percentOfTotal?: number;
-        };
-        DemandLeader: {
             /** Format: int32 */
             rank?: number;
-            /** Format: uuid */
-            itemId?: string;
-            name?: string;
-            sku?: string;
-            imageUrl?: string;
-            categoryName?: string;
+            totalDemandVelocity?: number;
             /** Format: int32 */
-            periodDemand?: number;
+            totalItems?: number;
+        };
+        CategoryRequestDTO: {
+            /** Format: int32 */
+            displayOrder?: number;
+            name?: string;
+            /** Format: uuid */
+            parentId?: string;
+            usesPacks?: boolean;
+        };
+        CategoryResponseDTO: {
+            children?: components["schemas"]["CategoryResponseDTO"][];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            displayOrder?: number;
+            /** Format: uuid */
+            id?: string;
+            isActive?: boolean;
+            name?: string;
+            /** Format: uuid */
+            parentId?: string;
+            slug?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            usesPacks?: boolean;
+        };
+        CloseKujiBoxRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            transferOutTargets?: components["schemas"]["TierTransferDestination"][];
+        };
+        CoinAdjustmentRequestDTO: {
+            /** Format: int32 */
+            delta: number;
+            reason?: string;
+            /** Format: uuid */
+            userId: string;
+        };
+        CoinAdjustmentResponseDTO: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            delta?: number;
+            grantedByName?: string;
+            /** Format: uuid */
+            grantedByUserId?: string;
+            /** Format: uuid */
+            id?: string;
+            reason?: string;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        CoinEconomyConfigResponseDTO: {
+            nextFetchHint?: string;
+            /** Format: int32 */
+            reviewCoinRate?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedByName?: string;
+            /** Format: uuid */
+            updatedByUserId?: string;
+        };
+        CoinHistoryEntryDTO: {
+            /** Format: date-time */
+            at?: string;
+            /** Format: int32 */
+            delta?: number;
+            expired?: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
+            kind?: string;
+            label?: string;
+            /** Format: uuid */
+            refId?: string;
+        };
+        CoinStatsResponseDTO: {
+            /** Format: int64 */
+            circulation?: number;
+            /** Format: int64 */
+            granted7d?: number;
+            /** Format: int32 */
+            holders?: number;
+        };
+        ComparisonRowDTO: {
+            metricValue?: number;
+            /** Format: uuid */
+            productId?: string;
+            productName?: string;
+            /** Format: int32 */
+            rank?: number;
+        };
+        CreateLocationRequest: {
+            locationCode?: string;
+            /** Format: uuid */
+            storageLocationId: string;
+        };
+        DailyPoint: {
+            /** Format: date */
+            date?: string;
+            /** Format: int32 */
+            slipCount?: number;
+            valueWon?: number;
+        };
+        DailyRollupPoint: {
+            /** Format: int32 */
+            damageUnits?: number;
+            /** Format: date */
+            date?: string;
+            /** Format: int32 */
+            restockUnits?: number;
+            revenue?: number;
+            /** Format: int32 */
+            unitsSold?: number;
+        };
+        DailySalesDTO: {
+            date?: string;
+            totalCost?: number;
+            totalProfit?: number;
+            totalRevenue?: number;
+            /** Format: int32 */
+            totalUnits?: number;
+        };
+        DayOfWeekPattern: {
+            avgDemandMultiplier?: number;
+            dayName?: string;
+            /** Format: int32 */
+            dayOfWeek?: number;
+            percentOfWeeklyTotal?: number;
+            /** Format: int32 */
+            totalUnits?: number;
+        };
+        DeletePrizeRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            fromActive?: boolean;
+        };
+        DemandLeader: {
+            categoryName?: string;
             demandVelocity?: number;
             demandVolatility?: number;
             forecastAccuracy?: number;
-            stockVelocity?: number;
+            imageUrl?: string;
+            /** Format: uuid */
+            itemId?: string;
+            name?: string;
             percentOfTotal?: number;
+            /** Format: int32 */
+            periodDemand?: number;
+            /** Format: int32 */
+            rank?: number;
+            sku?: string;
+            stockVelocity?: number;
         };
         DemandLeadersDTO: {
             byDemandVelocity?: components["schemas"]["DemandLeader"][];
@@ -4441,81 +2992,1530 @@ export interface components {
             summary?: components["schemas"]["DemandSummary"];
         };
         DemandSummary: {
+            demandGrowthPercent?: number;
+            periodLabel?: string;
+            systemForecastAccuracy?: number;
             totalDemandVelocity?: number;
             /** Format: int32 */
             totalPeriodDemand?: number;
             /** Format: int32 */
             uniqueItemsWithDemand?: number;
-            demandGrowthPercent?: number;
-            systemForecastAccuracy?: number;
-            periodLabel?: string;
         };
-        ActionCenterDTO: {
-            items?: components["schemas"]["ActionItem"][];
+        DestinationAllocationDTO: {
             /** Format: int32 */
-            totalActionItems?: number;
-            avgForecastAccuracy?: number;
-            totalDemandVelocity?: number;
-            riskSummary?: components["schemas"]["RiskSummary"];
+            intakeQty?: number;
+            intakeUnit?: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: int32 */
+            quantity: number;
         };
-        ActionItem: {
+        DetailBundleDTO: {
+            activeDisplays?: components["schemas"]["ActiveDisplay"][];
+            dailyRollups90d?: components["schemas"]["DailyRollupPoint"][];
+            forecastSnapshots?: components["schemas"]["ForecastSnapshotPoint"][];
+            inventoryByLocation?: components["schemas"]["InventoryByLocation"][];
+            latestPrediction?: components["schemas"]["LatestPrediction"];
+            product?: components["schemas"]["ProductSummary"];
+            recentShipments?: components["schemas"]["RecentShipment"][];
+        };
+        DrawLine: {
+            /** Format: int32 */
+            quantity: number;
+            /** Format: uuid */
+            tierId: string;
+        };
+        ExpirationBucket: {
+            /** Format: int32 */
+            amount?: number;
+            /** Format: date */
+            expiresOn?: string;
+        };
+        ForecastAccuracyDTO: {
+            byCategory?: components["schemas"]["CategoryAccuracy"][];
+            comparison?: components["schemas"]["Window"];
+            headline?: components["schemas"]["Window"];
+        };
+        ForecastExplanationDTO: {
+            /** Format: date-time */
+            computedAt?: string;
+            features?: {
+                [key: string]: Record<string, never>;
+            };
             /** Format: uuid */
             itemId?: string;
-            name?: string;
-            sku?: string;
-            imageUrl?: string;
+            /** Format: date-time */
+            lastRestockAt?: string;
+        };
+        ForecastPredictionResponseDTO: {
+            avgDailyDelta?: number;
+            /** Format: date-time */
+            computedAt?: string;
+            confidence?: number;
+            /** Format: int32 */
+            currentStock?: number;
+            daysToStockout?: number;
+            /** Format: int32 */
+            horizonDays?: number;
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            itemId?: string;
+            itemName?: string;
+            itemSku?: string;
+            /** Format: date */
+            suggestedOrderDate?: string;
+            /** Format: int32 */
+            suggestedReorderQty?: number;
+            unitCost?: number;
+        };
+        ForecastSnapshotPoint: {
+            confidence?: number;
+            /** Format: int32 */
+            currentStock?: number;
+            /** Format: date */
+            date?: string;
+            daysToStockout?: number;
+            muHat?: number;
+        };
+        HeaderBundleDTO: {
             categoryName?: string;
             /** Format: int32 */
             currentStock?: number;
             /** Format: int32 */
-            reorderPoint?: number;
-            /** Format: int32 */
-            targetStockLevel?: number;
+            damageCountLast30?: number;
             daysToStockout?: number;
-            avgDailyDelta?: number;
+            forecastConfidence?: number;
+            forecastingEnabled?: boolean;
+            /** Format: date-time */
+            lastRestockAt?: string;
+            onDisplay?: boolean;
+            /** Format: uuid */
+            productId?: string;
+            productName?: string;
             /** Format: int32 */
-            suggestedReorderQty?: number;
+            unitsSoldLast30?: number;
+            /** Format: int32 */
+            unitsSoldPrior30?: number;
+            velocity?: number;
+        };
+        InsightsDTO: {
+            bottomMovers?: components["schemas"]["Mover"][];
+            currentPeriod?: components["schemas"]["PeriodSummary"];
+            dayOfWeekPatterns?: components["schemas"]["DayOfWeekPattern"][];
+            previousPeriod?: components["schemas"]["PeriodSummary"];
+            topMovers?: components["schemas"]["Mover"][];
+        };
+        InventoryByLocation: {
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: int32 */
+            quantity?: number;
+            storageLocationCode?: string;
+        };
+        InventoryRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** Format: int32 */
+            intakeQty?: number;
+            intakeUnit?: string;
+            /** Format: uuid */
+            itemId: string;
+            /** Format: int32 */
+            quantity: number;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+        };
+        InventoryTotalDTO: {
+            /** Format: uuid */
+            categoryId?: string;
+            categoryName?: string;
+            imageUrl?: string;
+            isActive?: boolean;
+            /** Format: uuid */
+            itemId?: string;
+            /** Format: date-time */
+            lastUpdatedAt?: string;
+            name?: string;
+            /** Format: uuid */
+            parentCategoryId?: string;
+            parentCategoryName?: string;
+            sku?: string;
+            /** Format: int32 */
+            totalQuantity?: number;
+            /** Format: double */
+            unitCost?: number;
+        };
+        InvitationRequestDTO: {
+            email?: string;
+            role?: string;
+        };
+        InvitationResponseDTO: {
+            /** Format: date-time */
+            acceptedAt?: string;
+            email?: string;
+            /** Format: uuid */
+            id?: string;
+            /** Format: date-time */
+            invitedAt?: string;
+            invitedByEmail?: string;
+            role?: string;
+            status?: string;
+        };
+        ItemReceiptDTO: {
+            allocations?: components["schemas"]["DestinationAllocationDTO"][];
+            /** Format: int32 */
+            damagedQuantity?: number;
+            /** Format: uuid */
+            destinationLocationId?: string;
+            /** @enum {string} */
+            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: int32 */
+            displayQuantity?: number;
+            /** Format: int32 */
+            receivedQuantity?: number;
+            /** Format: uuid */
+            shipmentItemId: string;
+            /** Format: int32 */
+            shopQuantity?: number;
+        };
+        KujiAllocationByLocationDTO: {
+            /** Format: uuid */
+            boxId?: string;
+            boxLabel?: string;
+            /** Format: int32 */
+            count?: number;
+            /** Format: uuid */
+            linkedProductId?: string;
+            linkedProductName?: string;
+            machineCode?: string;
+            /** Format: uuid */
+            machineDisplayId?: string;
+            /** Format: uuid */
+            tierId?: string;
+            tierLabel?: string;
+            tierLetter?: string;
+        };
+        KujiAllocationByProductDTO: {
+            /** Format: uuid */
+            boxId?: string;
+            boxLabel?: string;
+            /** Format: int32 */
+            count?: number;
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            machineCode?: string;
+            /** Format: uuid */
+            machineDisplayId?: string;
+            /** Format: uuid */
+            tierId?: string;
+            tierLabel?: string;
+            tierLetter?: string;
+        };
+        KujiBoxResponseDTO: {
+            /** Format: date-time */
+            closedAt?: string;
+            /** Format: uuid */
+            closedBy?: string;
+            closedByName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: uuid */
+            id?: string;
+            label?: string;
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            locationName?: string;
+            /** Format: uuid */
+            machineDisplayId?: string;
+            notes?: string;
+            /** Format: date-time */
+            openedAt?: string;
+            /** Format: uuid */
+            openedBy?: string;
+            openedByName?: string;
+            /** Format: uuid */
+            productId?: string;
+            productName?: string;
+            /** @enum {string} */
+            status?: "OPEN" | "CLOSED";
+            tiers?: components["schemas"]["KujiBoxTierResponseDTO"][];
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        KujiBoxTierResponseDTO: {
+            /** Format: int32 */
+            activeCount?: number;
+            autoCreatedProduct?: boolean;
+            /** Format: int32 */
+            drawnCount?: number;
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            inactiveCount?: number;
+            label?: string;
+            letter?: string;
+            /** Format: uuid */
+            linkedProductId?: string;
+            linkedProductImageUrl?: string;
+            linkedProductName?: string;
+            /** Format: int32 */
+            linkedProductPacksPerBox?: number;
+            linkedProductPrice?: number;
+            price?: number;
+            /** Format: int32 */
+            totalCount?: number;
+        };
+        KujiDailyPayoutsResponseDTO: {
+            /** Format: uuid */
+            boxId?: string;
+            /** Format: date */
+            from?: string;
+            series?: components["schemas"]["DailyPoint"][];
+            /** Format: date */
+            to?: string;
+            total?: components["schemas"]["Totals"];
+            tz?: string;
+        };
+        LatestPrediction: {
+            avgDailyDelta?: number;
+            /** Format: date-time */
+            computedAt?: string;
+            confidence?: number;
+            daysToStockout?: number;
+            /** Format: int32 */
+            horizonDays?: number;
             /** Format: date */
             suggestedOrderDate?: string;
             /** Format: int32 */
-            leadTimeDays?: number;
-            demandVelocity?: number;
-            demandVolatility?: number;
-            forecastAccuracy?: number;
-            confidence?: number;
-            /** @enum {string} */
-            urgency?: "CRITICAL" | "URGENT" | "ATTENTION" | "HEALTHY";
-            overdue?: boolean;
-            computedAt?: string;
-            demandSegment?: string;
-            revenueAtRisk?: number;
-            lastDropSize?: number;
-            /** Format: int32 */
-            lastDropDays?: number;
-            onOrderQty?: number;
+            suggestedReorderQty?: number;
         };
-        RiskSummary: {
-            /** Format: int32 */
-            critical?: number;
-            /** Format: int32 */
-            urgent?: number;
-            /** Format: int32 */
-            attention?: number;
-            /** Format: int32 */
-            healthy?: number;
-        };
-        ActivityFeedEventDTO: {
-            id?: string;
-            type?: string;
-            title?: string;
-            description?: string;
+        Location: {
             /** Format: date-time */
-            timestamp?: string;
-            /** @enum {string} */
-            severity?: "INFO" | "WARNING" | "CRITICAL";
+            createdAt?: string;
+            fullLocationCode?: string;
+            /** Format: uuid */
+            id?: string;
+            locationCode?: string;
             metadata?: {
                 [key: string]: Record<string, never>;
             };
+            storageLocation: components["schemas"]["StorageLocation"];
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        LocationInventoryResponseDTO: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: uuid */
+            id?: string;
+            item?: components["schemas"]["ProductSummaryDTO"];
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** Format: int32 */
+            quantity?: number;
+            storageLocationType?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        LocationWithCountsDTO: {
+            /** Format: int32 */
+            activeDisplayCount?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            hasActiveDisplay?: boolean;
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            inventoryRecords?: number;
+            locationCode?: string;
+            locationType?: string;
+            /** Format: int32 */
+            totalQuantity?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        LootboxAdminResponseDTO: {
+            active?: boolean;
+            /** Format: int32 */
+            cost?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            description?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            name?: string;
+            /** Format: int32 */
+            prizeCount?: number;
+            /** Format: uuid */
+            siteId?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: int32 */
+            tierCount?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        LootboxBalanceResponseDTO: {
+            /** Format: int64 */
+            balance?: number;
+            /** Format: int64 */
+            reviewCredits?: number;
+            /** Format: int64 */
+            totalAdjustments?: number;
+            /** Format: int64 */
+            totalExpired?: number;
+            /** Format: int64 */
+            totalSpent?: number;
+        };
+        LootboxPlayResponseDTO: {
+            /** Format: int32 */
+            cost?: number;
+            /** Format: uuid */
+            id?: string;
+            /** Format: date-time */
+            playedAt?: string;
+            prizeDescription?: string;
+            /** Format: uuid */
+            prizeId?: string;
+            prizeImageUrl?: string;
+            prizeName?: string;
+            prizeTierName?: string;
+            /** Format: date-time */
+            redeemedAt?: string;
+            redeemedByName?: string;
+            /** Format: uuid */
+            redeemedByUserId?: string;
+            status?: string;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        LootboxPrizeResponseDTO: {
+            active?: boolean;
+            description?: string;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            name?: string;
+            /** Format: int32 */
+            quantity?: number;
+            tierColor?: string;
+            /** Format: uuid */
+            tierId?: string;
+            tierName?: string;
+        };
+        LootboxResponseDTO: {
+            /** Format: int32 */
+            cost?: number;
+            description?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            name?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+            /** Format: date-time */
+            startsAt?: string;
+            tiers?: components["schemas"]["LootboxTierResponseDTO"][];
+        };
+        LootboxTierResponseDTO: {
+            active?: boolean;
+            displayColor?: string;
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            prizes?: components["schemas"]["LootboxPrizeResponseDTO"][];
+            probabilityPct?: number;
+            /** Format: int32 */
+            sortOrder?: number;
+        };
+        MachineDisplayDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            actorName?: string;
+            /** Format: int64 */
+            daysActive?: number;
+            /** Format: date-time */
+            endedAt?: string;
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            machineCode?: string;
+            /** Format: uuid */
+            machineId?: string;
+            /** Format: uuid */
+            productId?: string;
+            productName?: string;
+            productSku?: string;
+            stale?: boolean;
+            /** Format: date-time */
+            startedAt?: string;
+        };
+        MonthlySalesDTO: {
+            month?: string;
+            totalCost?: number;
+            totalProfit?: number;
+            totalRevenue?: number;
+            /** Format: int32 */
+            totalUnits?: number;
+        };
+        MoveSlipsRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            /** @enum {string} */
+            direction: "ACTIVATE" | "DEACTIVATE";
+            /** Format: int32 */
+            quantity: number;
+        };
+        MovementDetailDTO: {
+            /** Format: int32 */
+            currentQuantity?: number;
+            fromLocationCode?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: uuid */
+            itemId?: string;
+            itemImageUrl?: string;
+            itemName?: string;
+            itemSku?: string;
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            /** Format: int32 */
+            previousQuantity?: number;
+            /** Format: int32 */
+            quantityChange?: number;
+            toLocationCode?: string;
+        };
+        MovementRowDTO: {
+            /** Format: date-time */
+            at?: string;
+            /** Format: int32 */
+            currentQuantity?: number;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: int32 */
+            previousQuantity?: number;
+            /** Format: int32 */
+            quantityChange?: number;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            /** Format: uuid */
+            toLocationId?: string;
+        };
+        MovementSummaryDTO: {
+            biggestSingleDay?: components["schemas"]["BiggestSingleDay"];
+            byReason?: {
+                [key: string]: number;
+            };
+            lastByReason?: {
+                [key: string]: string;
+            };
+        };
+        Mover: {
+            categoryName?: string;
+            /** Format: int32 */
+            currentPeriodUnits?: number;
+            demandVelocity?: number;
+            /** @enum {string} */
+            direction?: "UP" | "DOWN" | "STABLE";
+            displayConfidence?: number;
+            imageUrl?: string;
+            /** Format: uuid */
+            itemId?: string;
+            name?: string;
+            percentChange?: number;
+            /** Format: int32 */
+            previousPeriodUnits?: number;
+            /** Format: int32 */
+            rank?: number;
+        };
+        NewKujiBoxTierDTO: {
+            /** Format: int32 */
+            activeCount: number;
+            autoCreate?: boolean;
+            /** Format: int32 */
+            inactiveCount?: number;
+            label?: string;
+            letter?: string;
+            /** Format: uuid */
+            linkedProductId?: string;
+            price?: number;
+            productImageUrl?: string;
+            productMsrp?: number;
+            productName?: string;
+            /** Format: uuid */
+            sourceLocationId?: string;
+        };
+        NotificationResponseDTO: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            inventoryId?: string;
+            /** Format: uuid */
+            itemId?: string;
+            itemName?: string;
+            message?: string;
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            /** Format: date-time */
+            readAt?: string;
+            /** Format: uuid */
+            recipientId?: string;
+            /** Format: date-time */
+            resolvedAt?: string;
+            /** @enum {string} */
+            severity?: "INFO" | "WARNING" | "CRITICAL";
+            /** @enum {string} */
+            type?: "LOW_STOCK" | "OUT_OF_STOCK" | "REORDER_SUGGESTION" | "EXPIRY_WARNING" | "SYSTEM_ALERT" | "SHIPMENT_COMPLETED" | "SHIPMENT_DAMAGED" | "SHIPMENT_DELIVERY_FAILED" | "PACKAGE_ARRIVED" | "DISPLAY_STALE" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "DISPLAY_RENEWED" | "KUJI_PRIZE_DRAWN" | "KUJI_PRIZE_DRAW_UNDONE";
+            via?: string[];
+        };
+        OpenKujiBoxRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            label?: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: uuid */
+            machineDisplayId?: string;
+            notes?: string;
+            /** Format: uuid */
+            productId: string;
+            tiers?: components["schemas"]["NewKujiBoxTierDTO"][];
+        };
+        PageAuditLogDTO: {
+            content?: components["schemas"]["AuditLogDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageAuditLogEntryDTO: {
+            content?: components["schemas"]["AuditLogEntryDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageForecastPredictionResponseDTO: {
+            content?: components["schemas"]["ForecastPredictionResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageLootboxPlayResponseDTO: {
+            content?: components["schemas"]["LootboxPlayResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageMachineDisplayDTO: {
+            content?: components["schemas"]["MachineDisplayDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageNotificationResponseDTO: {
+            content?: components["schemas"]["NotificationResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageReviewResponseDTO: {
+            content?: components["schemas"]["ReviewResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageStockMovementResponseDTO: {
+            content?: components["schemas"]["StockMovementResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        Pageable: {
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string[];
+        };
+        PageableObject: {
+            /** Format: int64 */
+            offset?: number;
+            /** Format: int32 */
+            pageNumber?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            paged?: boolean;
+            sort?: components["schemas"]["SortObject"];
+            unpaged?: boolean;
+        };
+        PatchKujiTierRequestDTO: {
+            /** Format: int32 */
+            activeCount?: number;
+            /** Format: uuid */
+            actorId: string;
+            clearLetter?: boolean;
+            clearLinkedProduct?: boolean;
+            clearPrice?: boolean;
+            /** Format: int32 */
+            inactiveCount?: number;
+            label?: string;
+            letter?: string;
+            /** Format: uuid */
+            linkedProductDestinationLocationId?: string;
+            /** Format: uuid */
+            linkedProductId?: string;
+            /** Format: int32 */
+            newProductActiveCount?: number;
+            /** Format: int32 */
+            newProductInactiveCount?: number;
+            /** Format: uuid */
+            newProductSourceLocationId?: string;
+            price?: number;
+        };
+        PerformanceMetricsDTO: {
+            fillRate?: number;
+            forecastAccuracy?: number;
+            stockoutRate?: number;
+            turnoverRate?: number;
+        };
+        PeriodSummary: {
+            avgDemandVelocity?: number;
+            avgForecastAccuracy?: number;
+            periodLabel?: string;
+            /** Format: int32 */
+            totalMovements?: number;
+            /** Format: int32 */
+            totalUnits?: number;
+            /** Format: int32 */
+            uniqueItemsSold?: number;
+        };
+        PlayLootboxRequestDTO: {
+            /** Format: uuid */
+            crateId: string;
+        };
+        PlayLootboxResponseDTO: {
+            /** Format: int64 */
+            newBalance?: number;
+            play?: components["schemas"]["LootboxPlayResponseDTO"];
+        };
+        PlayerCoinRowDTO: {
+            /** Format: int64 */
+            balance?: number;
+            email?: string;
+            fullName?: string;
+            /** Format: date-time */
+            lastChangeAt?: string;
+            /** Format: int32 */
+            lastChangeDelta?: number;
+            /** Format: uuid */
+            userId?: string;
+        };
+        ProductInventoryEntryDTO: {
+            /** Format: uuid */
+            inventoryId?: string;
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            locationLabel?: string;
+            locationType?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ProductInventoryResponseDTO: {
+            entries?: components["schemas"]["ProductInventoryEntryDTO"][];
+            /** Format: uuid */
+            productId?: string;
+            productName?: string;
+            productSku?: string;
+            /** Format: int32 */
+            totalQuantity?: number;
+        };
+        ProductListItemDTO: {
+            category?: components["schemas"]["CategoryResponseDTO"];
+            hasActiveBox?: boolean;
+            hasChildren?: boolean;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            isActive?: boolean;
+            kujiSlackWebhookUrl?: string;
+            /** @enum {string} */
+            kujiType?: "PREMADE" | "CUSTOM";
+            /** Format: int32 */
+            leadTimeDays?: number;
+            letter?: string;
+            msrp?: number;
+            name?: string;
+            /** Format: int32 */
+            packsPerBox?: number;
+            /** Format: uuid */
+            parentId?: string;
+            preferredSupplierAuto?: boolean;
+            /** Format: uuid */
+            preferredSupplierId?: string;
+            preferredSupplierName?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            reorderPoint?: number;
+            sku?: string;
+            /** Format: int32 */
+            targetStockLevel?: number;
+            /** Format: int32 */
+            templateQuantity?: number;
+            unitCost?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ProductRequestDTO: {
+            /** Format: uuid */
+            categoryId?: string;
+            description?: string;
+            forecastingEnabled?: boolean;
+            imageUrl?: string;
+            /** Format: int32 */
+            initialStock?: number;
+            kujiSlackWebhookUrl?: string;
+            /** @enum {string} */
+            kujiType?: "PREMADE" | "CUSTOM";
+            /** Format: int32 */
+            leadTimeDays?: number;
+            letter?: string;
+            msrp?: number;
+            name?: string;
+            notes?: string;
+            /** Format: int32 */
+            packsPerBox?: number;
+            /** Format: uuid */
+            parentId?: string;
+            preferredSupplierAuto?: boolean;
+            /** Format: uuid */
+            preferredSupplierId?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            reorderPoint?: number;
+            sku?: string;
+            /** Format: int32 */
+            targetStockLevel?: number;
+            /** Format: int32 */
+            templateQuantity?: number;
+            unitCost?: number;
+        };
+        ProductResponseDTO: {
+            category?: components["schemas"]["CategoryResponseDTO"];
+            children?: components["schemas"]["ProductSummaryDTO"][];
+            /** Format: date-time */
+            createdAt?: string;
+            description?: string;
+            forecastingEnabled?: boolean;
+            hasChildren?: boolean;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            isActive?: boolean;
+            kujiSlackWebhookUrl?: string;
+            /** @enum {string} */
+            kujiType?: "PREMADE" | "CUSTOM";
+            /** Format: uuid */
+            lastDeliveredSupplierId?: string;
+            lastDeliveredSupplierName?: string;
+            /** Format: int32 */
+            leadTimeDays?: number;
+            letter?: string;
+            msrp?: number;
+            name?: string;
+            notes?: string;
+            /** Format: int32 */
+            packsPerBox?: number;
+            /** Format: uuid */
+            parentId?: string;
+            parentName?: string;
+            parentSku?: string;
+            preferredSupplierAuto?: boolean;
+            /** Format: uuid */
+            preferredSupplierId?: string;
+            preferredSupplierName?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            reorderPoint?: number;
+            sku?: string;
+            /** Format: int32 */
+            targetStockLevel?: number;
+            /** Format: int32 */
+            templateQuantity?: number;
+            /** Format: int32 */
+            totalChildStock?: number;
+            unitCost?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ProductSummary: {
+            categoryName?: string;
+            /** Format: int32 */
+            currentStock?: number;
+            forecastingEnabled?: boolean;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            /** Format: int32 */
+            leadTimeDays?: number;
+            name?: string;
+            /** Format: int32 */
+            reorderPoint?: number;
+            sku?: string;
+            /** Format: int32 */
+            targetStockLevel?: number;
+            unitCost?: number;
+        };
+        ProductSummaryDTO: {
+            category?: components["schemas"]["CategoryResponseDTO"];
+            hasChildren?: boolean;
+            /** Format: uuid */
+            id?: string;
+            imageUrl?: string;
+            isActive?: boolean;
+            letter?: string;
+            name?: string;
+            /** Format: int32 */
+            packsPerBox?: number;
+            /** Format: uuid */
+            parentId?: string;
+            /** Format: int32 */
+            quantity?: number;
+            sku?: string;
+            /** Format: int32 */
+            templateQuantity?: number;
+        };
+        ReceiveShipmentRequestDTO: {
+            /** Format: date */
+            actualDeliveryDate: string;
+            itemReceipts: components["schemas"]["ItemReceiptDTO"][];
+            /** Format: uuid */
+            receivedBy?: string;
+        };
+        RecentLootboxPlayResponseDTO: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: date-time */
+            playedAt?: string;
+            /** Format: uuid */
+            prizeId?: string;
+            prizeImageUrl?: string;
+            prizeName?: string;
+            tierColor?: string;
+            tierName?: string;
+            userDisplay?: string;
+        };
+        RecentShipment: {
+            /** Format: int32 */
+            damagedQuantity?: number;
+            /** Format: date */
+            deliveredOn?: string;
+            /** Format: int32 */
+            orderedQuantity?: number;
+            /** Format: int32 */
+            receivedQuantity?: number;
+            /** Format: uuid */
+            shipmentId?: string;
+            /** Format: uuid */
+            shipmentItemId?: string;
+            unitCost?: number;
+        };
+        RecordDrawRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            draws?: components["schemas"]["DrawLine"][];
+            notes?: string;
+        };
+        RenewDisplayRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            displayIds?: string[];
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            machineId: string;
+        };
+        ReviewResponseDTO: {
+            /** Format: date-time */
+            createdAt?: string;
+            externalId?: string;
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            rating?: number;
+            /** Format: date */
+            reviewDate?: string;
+            reviewText?: string;
+            reviewerName?: string;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        ReviewSummaryResponseDTO: {
+            /** Format: double */
+            averageReviewsPerDay?: number;
+            /** Format: date */
+            lastReviewDate?: string;
+            /** Format: int32 */
+            totalReviews?: number;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        RiskSummary: {
+            /** Format: int32 */
+            attention?: number;
+            /** Format: int32 */
+            critical?: number;
+            /** Format: int32 */
+            healthy?: number;
+            /** Format: int32 */
+            urgent?: number;
+        };
+        SalesSummaryDTO: {
+            dailySales?: components["schemas"]["DailySalesDTO"][];
+            monthlySales?: components["schemas"]["MonthlySalesDTO"][];
+            periodEnd?: string;
+            periodStart?: string;
+            totalCost?: number;
+            totalProfit?: number;
+            totalRevenue?: number;
+            /** Format: int32 */
+            totalUnits?: number;
+        };
+        SetMachineDisplayBatchRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            machineId: string;
+            productIds?: string[];
+        };
+        SetMachineDisplayRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            machineId: string;
+            /** Format: uuid */
+            productId: string;
+        };
+        ShipmentItemAllocationResponseDTO: {
+            /** Format: uuid */
+            id?: string;
+            locationCode?: string;
+            /** Format: uuid */
+            locationId?: string;
+            /** @enum {string} */
+            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: date-time */
+            receivedAt?: string;
+        };
+        ShipmentItemRequestDTO: {
+            /** Format: uuid */
+            destinationLocationId?: string;
+            /** @enum {string} */
+            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            itemId: string;
+            notes?: string;
+            /** Format: int32 */
+            orderedQuantity: number;
+            unitCost?: number;
+        };
+        ShipmentItemResponseDTO: {
+            allocations?: components["schemas"]["ShipmentItemAllocationResponseDTO"][];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            damagedQuantity?: number;
+            /** Format: uuid */
+            destinationLocationId?: string;
+            /** @enum {string} */
+            destinationLocationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: int32 */
+            displayQuantity?: number;
+            /** Format: uuid */
+            id?: string;
+            item?: components["schemas"]["ProductSummaryDTO"];
+            notes?: string;
+            /** Format: int32 */
+            orderedQuantity?: number;
+            /** Format: int32 */
+            receivedQuantity?: number;
+            /** Format: int32 */
+            shopQuantity?: number;
+            unitCost?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ShipmentRequestDTO: {
+            /** Format: date */
+            actualDeliveryDate?: string;
+            /** Format: uuid */
+            createdBy?: string;
+            /** Format: date */
+            expectedDeliveryDate?: string;
+            items?: components["schemas"]["ShipmentItemRequestDTO"][];
+            notes?: string;
+            /** Format: date */
+            orderDate: string;
+            shipmentNumber?: string;
+            /** @enum {string} */
+            status: "PENDING" | "RECEIVED" | "CANCELLED";
+            supplierName?: string;
+            totalCost?: number;
+            trackingId?: string;
+        };
+        ShipmentResponseDTO: {
+            /** Format: date */
+            actualDeliveryDate?: string;
+            /** Format: date-time */
+            carrierDeliveredAt?: string;
+            /** @enum {string} */
+            carrierStatus?: "PRE_TRANSIT" | "IN_TRANSIT" | "DELIVERED" | "FAILED";
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: components["schemas"]["UserResponseDTO"];
+            /** Format: date */
+            expectedDeliveryDate?: string;
+            /** Format: uuid */
+            id?: string;
+            items?: components["schemas"]["ShipmentItemResponseDTO"][];
+            notes?: string;
+            /** Format: date */
+            orderDate?: string;
+            receivedBy?: components["schemas"]["UserResponseDTO"];
+            shipmentNumber?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "RECEIVED" | "CANCELLED";
+            /** Format: uuid */
+            supplierId?: string;
+            supplierName?: string;
+            totalCost?: number;
+            trackingId?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        Site: {
+            addressLine1?: string;
+            addressLine2?: string;
+            city?: string;
+            code?: string;
+            country?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            postalCode?: string;
+            state?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        SortObject: {
+            empty?: boolean;
+            sorted?: boolean;
+            unsorted?: boolean;
+        };
+        StatusOverrideRequest: {
+            reason?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "RECEIVED" | "CANCELLED";
+        };
+        StockMovementResponseDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** Format: date-time */
+            at?: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: uuid */
+            itemId?: string;
+            /** @enum {string} */
+            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            /** Format: int32 */
+            quantityChange?: number;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            /** Format: uuid */
+            toLocationId?: string;
+        };
+        StorageLocation: {
+            code?: string;
+            codePrefix?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            displayOrder?: number;
+            hasDisplay?: boolean;
+            icon?: string;
+            /** Format: uuid */
+            id?: string;
+            isDisplayOnly?: boolean;
+            name?: string;
+            site: components["schemas"]["Site"];
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        SupplierRequestDTO: {
+            contactEmail?: string;
+            displayName?: string;
+            isActive?: boolean;
+        };
+        SupplierResponseDTO: {
+            avgLeadTimeDays?: number;
+            contactEmail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            displayName?: string;
+            /** Format: uuid */
+            id?: string;
+            isActive?: boolean;
+            /** Format: int64 */
+            productCount?: number;
+            /** Format: int64 */
+            shipmentCount?: number;
+            sigmaL?: number;
+        };
+        SwapMachineDisplayRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** Format: uuid */
+            incomingProductId: string;
+            /** @enum {string} */
+            locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            /** Format: uuid */
+            machineId: string;
+            /** Format: uuid */
+            outgoingDisplayId: string;
+        };
+        TierProbability: {
+            /** Format: uuid */
+            id: string;
+            probabilityPct: number;
+        };
+        TierTransferDestination: {
+            /** Format: uuid */
+            destinationLocationId: string;
+            /** Format: uuid */
+            tierId: string;
+        };
+        Totals: {
+            /** Format: int32 */
+            slipCount?: number;
+            valueWon?: number;
+        };
+        TrackingEventDTO: {
+            location?: string;
+            message?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+            status?: string;
+        };
+        TrackingLookupRequestDTO: {
+            carrier?: string;
+            trackingNumber?: string;
+        };
+        TrackingLookupResponseDTO: {
+            /** Format: date */
+            actualDelivery?: string;
+            carrier?: string;
+            /** @enum {string} */
+            carrierStatus?: "PRE_TRANSIT" | "IN_TRANSIT" | "DELIVERED" | "FAILED";
+            /** Format: date */
+            dateOrdered?: string;
+            events?: components["schemas"]["TrackingEventDTO"][];
+            /** Format: date */
+            expectedDelivery?: string;
+            /** Format: date-time */
+            lastUpdated?: string;
+            status?: string;
+            statusDetail?: string;
+            trackingNumber?: string;
+        };
+        TransferInMoreRequestDTO: {
+            /** Format: uuid */
+            actorId: string;
+            /** Format: int32 */
+            intakeQty?: number;
+            intakeUnit?: string;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: uuid */
+            sourceLocationId?: string;
+        };
+        TransferInventoryRequestDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** Format: uuid */
+            destinationInventoryId?: string;
+            /** Format: uuid */
+            destinationLocationId?: string;
+            /** @enum {string} */
+            destinationLocationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            notes?: string;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: uuid */
+            sourceInventoryId: string;
+            /** @enum {string} */
+            sourceLocationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+        };
+        UndoReceiveRequest: {
+            itemIds?: string[];
+        };
+        UpdateCoinEconomyConfigRequestDTO: {
+            /** Format: int32 */
+            reviewCoinRate: number;
+        };
+        UpdateLocationRequest: {
+            locationCode?: string;
+        };
+        UpsertLootboxRequestDTO: {
+            active?: boolean;
+            /** Format: int32 */
+            cost?: number;
+            description?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            imageUrl?: string;
+            name?: string;
+            /** Format: uuid */
+            siteId?: string;
+            /** Format: int32 */
+            sortOrder?: number;
+            /** Format: date-time */
+            startsAt?: string;
+        };
+        UpsertPrizeRequestDTO: {
+            active?: boolean;
+            description?: string;
+            imageUrl?: string;
+            name?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: uuid */
+            tierId: string;
+        };
+        UpsertTierRequestDTO: {
+            active?: boolean;
+            displayColor?: string;
+            /** Format: uuid */
+            lootboxId?: string;
+            name?: string;
+            probabilityPct: number;
+            /** Format: int32 */
+            sortOrder?: number;
+        };
+        UserCoinProfileResponseDTO: {
+            adjustments?: components["schemas"]["CoinAdjustmentResponseDTO"][];
+            balance?: components["schemas"]["LootboxBalanceResponseDTO"];
+            plays?: components["schemas"]["LootboxPlayResponseDTO"][];
+            userEmail?: string;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        UserRequestDTO: {
+            email?: string;
+            fullName?: string;
+            /** @enum {string} */
+            role: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
+        };
+        UserResponseDTO: {
+            canonicalName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            email?: string;
+            fullName?: string;
+            /** Format: uuid */
+            id?: string;
+            isReviewTracked?: boolean;
+            nameVariants?: string[];
+            /** @enum {string} */
+            role?: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        UserReviewStatsResponseDTO: {
+            /** Format: int32 */
+            allTimeRank?: number;
+            /** Format: int32 */
+            allTimeReviewCount?: number;
+            /** Format: date */
+            firstReviewDate?: string;
+            /** Format: date */
+            lastReviewDate?: string;
+            /** Format: double */
+            selectedMonthPercentage?: number;
+            /** Format: int32 */
+            selectedMonthReviewCount?: number;
+            /** Format: int32 */
+            selectedMonthTotalReviews?: number;
+            /** Format: uuid */
+            userId?: string;
+            userName?: string;
+        };
+        UserReviewTrackingRequestDTO: {
+            canonicalName?: string;
+            isReviewTracked?: boolean;
+            nameVariants?: string[];
+        };
+        WalletBreakdownResponseDTO: {
+            expiringSoon?: components["schemas"]["ExpirationBucket"][];
+            /** Format: date */
+            nextExpiryDate?: string;
+            /** Format: int64 */
+            total?: number;
+        };
+        Window: {
+            biasUnitsPerDay?: number;
+            /** Format: int32 */
+            days?: number;
+            ltWape?: number;
+            /** Format: int64 */
+            overPredictions?: number;
+            /** Format: int64 */
+            scoredWindows?: number;
+            totalActualUnits?: number;
+            /** Format: int64 */
+            underPredictions?: number;
         };
     };
     responses: never;
@@ -4526,562 +4526,18 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getUserById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getSupplierById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SupplierResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SupplierResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getShipmentById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateShipment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ShipmentRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteShipment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateUserReviewTracking: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserReviewTrackingRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateProduct: {
+    getActivityFeed: {
         parameters: {
             query?: {
-                clearParent?: boolean;
-                clearPreferredSupplier?: boolean;
-                clearPacksPerBox?: boolean;
+                limit?: number;
+                types?: string[];
+                includeResolved?: boolean;
             };
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProductRequestDTO"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -5089,7 +4545,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"];
+                    "*/*": components["schemas"]["ActivityFeedEventDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -5099,9 +4555,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -5112,20 +4568,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deleteProduct: {
+    getPendingInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvitationResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    inviteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvitationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    cancelInvitation: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                email: string;
             };
             cookie?: never;
         };
@@ -5145,9 +4697,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -5158,20 +4710,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    unresolveNotification: {
+    resendInvitation: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                email: string;
             };
             cookie?: never;
         };
@@ -5183,7 +4735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                    "*/*": components["schemas"]["InvitationResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -5193,9 +4745,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -5206,203 +4758,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    resolveNotification: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAsRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAsUserRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAllAsRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getCoinConfig: {
+    getActionCenter: {
         parameters: {
             query?: never;
             header?: never;
@@ -5417,7 +4781,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CoinEconomyConfigResponseDTO"];
+                    "*/*": components["schemas"]["ActionCenterDTO"];
                 };
             };
             /** @description Authentication required */
@@ -5427,9 +4791,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -5440,532 +4804,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    updateCoinConfig: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateCoinEconomyConfigRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CoinEconomyConfigResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInventoryById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteInventory: {
+    getDemandLeaders: {
         parameters: {
             query?: {
-                actorId?: string;
+                period?: string;
             };
             header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getLocationById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["Location"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateLocationRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["Location"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getCategoryById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CategoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CategoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    handleEasyPostWebhook: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Hmac-Signature"?: string;
-            };
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": string;
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["DemandLeadersDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
             };
         };
     };
-    getAllUsers: {
+    getInsights: {
         parameters: {
             query?: never;
             header?: never;
@@ -5980,7 +4875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"][];
+                    "*/*": components["schemas"]["InsightsDTO"];
                 };
             };
             /** @description Authentication required */
@@ -5990,9 +4885,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -6003,770 +4898,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    createUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    lookupTracking: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TrackingLookupRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getSuppliers: {
-        parameters: {
-            query?: {
-                q?: string;
-                active?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SupplierResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createSupplier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SupplierRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SupplierResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    assignProducts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkAssignProductsRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": number;
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    transferInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransferInventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    batchTransferInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchTransferInventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    batchAdjustInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchAdjustStockRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listShipments: {
-        parameters: {
-            query?: {
-                status?: "PENDING" | "RECEIVED" | "CANCELLED";
-                displayStatus?: string;
-                search?: string;
-                page?: number;
-                size?: number;
-                sortBy?: string;
-                sortDir?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": Record<string, never>;
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createShipment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ShipmentRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    undoReceiveShipmentItems: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shipmentId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UndoReceiveRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    undoReceiveShipmentItem: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                shipmentId: string;
-                itemId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    receiveShipment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReceiveShipmentRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllProducts: {
-        parameters: {
-            query?: {
-                categoryId?: string;
-                search?: string;
-                activeOnly?: boolean;
-                rootOnly?: boolean;
-                kujiOnly?: boolean;
-                excludeCustomKuji?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductListItemDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createProduct: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProductRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllActiveDisplays: {
+    getInventoryByCategory: {
         parameters: {
             query?: never;
             header?: never;
@@ -6781,7 +4921,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                    "*/*": components["schemas"]["CategoryInventoryDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -6791,9 +4931,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -6804,565 +4944,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    setDisplay: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetMachineDisplayRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    swapDisplay: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SwapMachineDisplayRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    renewDisplays: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenewDisplayRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    setDisplayBatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetMachineDisplayBatchRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    batchSwapDisplay: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchDisplaySwapRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    batchClearDisplays: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchClearDisplaysRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    play: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlayLootboxRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PlayLootboxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createTier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertTierRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxTierResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    bulkUpdateTierProbabilities: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkUpdateTierProbabilitiesRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxTierResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markRedeemed: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                playId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxPlayResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createPrize: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertPrizeRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxPrizeResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listCrates: {
+    getPerformanceMetrics: {
         parameters: {
             query?: never;
             header?: never;
@@ -7377,7 +4967,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["LootboxAdminResponseDTO"][];
+                    "*/*": components["schemas"]["PerformanceMetricsDTO"];
                 };
             };
             /** @description Authentication required */
@@ -7387,9 +4977,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -7400,740 +4990,23 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    createCrate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertLootboxRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxAdminResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createAdjustment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CoinAdjustmentRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CoinAdjustmentResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllLocations: {
-        parameters: {
-            query?: {
-                storageLocation?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["Location"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    createLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateLocationRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["Location"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listInventoryAtLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    addInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    openBox: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OpenKujiBoxRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    addTier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddKujiTierRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    transferInMore: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-                tierId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransferInMoreRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    transferInInventoryOnly: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-                tierId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransferInMoreRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    moveSlips: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-                tierId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MoveSlipsRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deletePrize: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-                tierId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeletePrizeRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    addSlip: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-                tierId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddSlipRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    recordDraw: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RecordDrawRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    undoDraw: {
+    getProductComparison: {
         parameters: {
             query: {
-                actorId: string;
+                metric: string;
+                limit?: number;
             };
             header?: never;
             path: {
-                boxId: string;
-                auditLogId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -8145,7 +5018,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                    "*/*": components["schemas"]["ComparisonRowDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -8155,9 +5028,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8168,15 +5041,267 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getCategories: {
+    getProductMovements: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                reasons?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MovementRowDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductMovementSummary: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MovementSummaryDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getReportBundleDetail: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DetailBundleDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getReportBundleHeader: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HeaderBundleDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    recomputeRollups: {
+        parameters: {
+            query?: {
+                monthsBack?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSalesSummary: {
         parameters: {
             query?: never;
             header?: never;
@@ -8191,7 +5316,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CategoryResponseDTO"][];
+                    "*/*": components["schemas"]["SalesSummaryDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8201,9 +5326,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8214,26 +5339,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    createCategory: {
+    getAuditLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                size?: number;
+                search?: string;
+                actorId?: string;
+                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+                reasons?: ("INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED")[];
+                fromDate?: string;
+                toDate?: string;
+                productId?: string;
+                locationId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryRequestDTO"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -8241,7 +5373,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CategoryResponseDTO"];
+                    "*/*": components["schemas"]["PageAuditLogDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8251,9 +5383,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8264,15 +5396,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    validateToken: {
+    getAuditLogDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuditLogDetailDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSession: {
         parameters: {
             query?: never;
             header: {
@@ -8319,9 +5545,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8332,18 +5558,562 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    recomputeRollups: {
+    validateToken: {
+        parameters: {
+            query?: never;
+            header: {
+                Authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+        };
+    };
+    getCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CategoryResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CategoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCategoryById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CategoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CategoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    activateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deactivateCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getChildCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CategoryResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllForecasts: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageForecastPredictionResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getRollingAccuracy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ForecastAccuracyDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllForecastsUnpaginated: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAtRiskItems: {
         parameters: {
             query?: {
-                monthsBack?: number;
+                daysThreshold?: number;
             };
             header?: never;
             path?: never;
@@ -8357,9 +6127,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: Record<string, never>;
-                    };
+                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -8369,9 +6137,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8382,15 +6150,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getPendingInvitations: {
+    getHighestDemandForecast: {
         parameters: {
             query?: never;
             header?: never;
@@ -8405,7 +6173,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["InvitationResponseDTO"][];
+                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8415,9 +6183,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8428,15 +6196,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    inviteUser: {
+    getForecastByItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    explainForecast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ForecastExplanationDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getInventoryByProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductInventoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getInventoryTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InventoryTotalDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    openBox: {
         parameters: {
             query?: never;
             header?: never;
@@ -8445,7 +6403,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InvitationRequestDTO"];
+                "application/json": components["schemas"]["OpenKujiBoxRequestDTO"];
             };
         };
         responses: {
@@ -8455,7 +6413,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["InvitationResponseDTO"];
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8465,9 +6423,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8478,20 +6436,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    resendInvitation: {
+    getAllocationsByLocation: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                email: string;
+                locationId: string;
             };
             cookie?: never;
         };
@@ -8503,7 +6461,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["InvitationResponseDTO"];
+                    "*/*": components["schemas"]["KujiAllocationByLocationDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -8513,9 +6471,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8526,20 +6484,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deactivateSupplier: {
+    getAllocationsByProduct: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                productId: string;
             };
             cookie?: never;
         };
@@ -8550,7 +6508,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["KujiAllocationByProductDTO"][];
+                };
             };
             /** @description Authentication required */
             401: {
@@ -8559,9 +6519,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8572,20 +6532,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    activateSupplier: {
+    getActiveBoxByProduct: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                productId: string;
             };
             cookie?: never;
         };
@@ -8596,7 +6556,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
             };
             /** @description Authentication required */
             401: {
@@ -8605,9 +6567,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8618,26 +6580,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    overrideShipmentStatus: {
+    getBoxHistory: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getLastClosedTiers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxTierResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getBox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    closeBox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StatusOverrideRequest"];
+                "application/json": components["schemas"]["CloseKujiBoxRequestDTO"];
             };
         };
         responses: {
@@ -8647,7 +6753,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8657,9 +6763,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8670,20 +6776,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deactivateProduct: {
+    getDailyPayouts: {
         parameters: {
-            query?: never;
+            query?: {
+                from?: string;
+                to?: string;
+                tz?: string;
+            };
             header?: never;
             path: {
-                id: string;
+                boxId: string;
             };
             cookie?: never;
         };
@@ -8694,7 +6804,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["KujiDailyPayoutsResponseDTO"];
+                };
             };
             /** @description Authentication required */
             401: {
@@ -8703,9 +6815,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8716,118 +6828,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    activateProduct: {
+    recordDraw: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteTier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateTier: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
+                boxId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpsertTierRequestDTO"];
+                "application/json": components["schemas"]["RecordDrawRequestDTO"];
             };
         };
         responses: {
@@ -8837,7 +6857,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["LootboxTierResponseDTO"];
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -8847,9 +6867,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8860,20 +6880,23 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deletePrize_1: {
+    undoDraw: {
         parameters: {
-            query?: never;
+            query: {
+                actorId: string;
+            };
             header?: never;
             path: {
-                id: string;
+                boxId: string;
+                auditLogId: string;
             };
             cookie?: never;
         };
@@ -8884,7 +6907,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
             };
             /** @description Authentication required */
             401: {
@@ -8893,9 +6918,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -8906,72 +6931,22 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    updatePrize: {
+    reopenBox: {
         parameters: {
-            query?: never;
+            query: {
+                actorId: string;
+            };
             header?: never;
             path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertPrizeRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxPrizeResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteCrate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
+                boxId: string;
             };
             cookie?: never;
         };
@@ -8982,7 +6957,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
             };
             /** @description Authentication required */
             401: {
@@ -8991,9 +6968,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9004,26 +6981,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    updateCrate: {
+    addTier: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
+                boxId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpsertLootboxRequestDTO"];
+                "application/json": components["schemas"]["AddKujiTierRequestDTO"];
             };
         };
         responses: {
@@ -9033,7 +7010,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["LootboxAdminResponseDTO"];
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -9043,9 +7020,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9056,9 +7033,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9096,9 +7073,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9109,76 +7086,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    reopenBox: {
-        parameters: {
-            query: {
-                actorId: string;
-            };
-            header?: never;
-            path: {
-                boxId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    closeBox: {
+    addSlip: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 boxId: string;
+                tierId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CloseKujiBoxRequestDTO"];
+                "application/json": components["schemas"]["AddSlipRequestDTO"];
             };
         };
         responses: {
@@ -9198,9 +7126,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9211,15 +7139,473 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deactivateCategory: {
+    deletePrize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
+                tierId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeletePrizeRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    moveSlips: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
+                tierId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveSlipsRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    transferInMore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
+                tierId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferInMoreRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    transferInInventoryOnly: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boxId: string;
+                tierId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferInMoreRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllLocations: {
+        parameters: {
+            query?: {
+                storageLocation?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getLocationsWithCounts: {
+        parameters: {
+            query?: {
+                type?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LocationWithCountsDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getLocationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteLocation: {
         parameters: {
             query?: never;
             header?: never;
@@ -9244,9 +7630,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9257,422 +7643,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    activateCategory: {
+    listInventoryAtLocation: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    health: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    getLastAudit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": string;
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUserByFullName: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fullName: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllLastAudits: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: string;
-                    };
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUserByEmail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                email: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getTracking: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                trackingNumber: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getSupplierProducts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllStorageLocations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["StorageLocation"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listInventoryByStorageLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                storageLocationId: string;
+                locationId: string;
             };
             cookie?: never;
         };
@@ -9694,9 +7678,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9707,116 +7691,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getInventoryStorageLocations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["StorageLocation"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getDisplayStorageLocations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["StorageLocation"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getStorageLocationByCode: {
+    addInventory: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: string;
+                locationId: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryRequestDTO"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -9824,7 +7720,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["StorageLocation"];
+                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -9834,9 +7730,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9847,70 +7743,21 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getMovementHistory: {
-        parameters: {
-            query: {
-                pageable: components["schemas"]["Pageable"];
-            };
-            header?: never;
-            path: {
-                itemId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageStockMovementResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllMovementHistory: {
+    getInventoryById: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                itemId: string;
+                locationId: string;
+                inventoryId: string;
             };
             cookie?: never;
         };
@@ -9922,7 +7769,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["StockMovementResponseDTO"][];
+                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -9932,9 +7779,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9945,23 +7792,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAuditLog: {
+    updateInventory: {
         parameters: {
-            query: {
-                search?: string;
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+                inventoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteInventory: {
+        parameters: {
+            query?: {
                 actorId?: string;
-                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-                fromDate?: string;
-                toDate?: string;
-                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                locationId: string;
+                inventoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getActivity: {
+        parameters: {
+            query?: {
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -9975,7 +7919,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PageAuditLogEntryDTO"];
+                    "*/*": components["schemas"]["AdminCoinActivityDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -9985,9 +7929,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -9998,15 +7942,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getDisplayStatusCounts: {
+    createAdjustment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoinAdjustmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CoinAdjustmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getFullCatalog: {
         parameters: {
             query?: never;
             header?: never;
@@ -10021,9 +8015,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": {
-                        [key: string]: number;
-                    };
+                    "*/*": components["schemas"]["LootboxResponseDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -10033,9 +8025,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10046,15 +8038,1660 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getShipmentsByProduct: {
+    getCoinConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CoinEconomyConfigResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateCoinConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCoinEconomyConfigRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CoinEconomyConfigResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCoinStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CoinStatsResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listCrates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxAdminResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createCrate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertLootboxRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxAdminResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteCrate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateCrate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertLootboxRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxAdminResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getPending: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageLootboxPlayResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getPlayers: {
+        parameters: {
+            query?: {
+                search?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlayerCoinRowDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createPrize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPrizeRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxPrizeResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deletePrize_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updatePrize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPrizeRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxPrizeResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    markRedeemed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                playId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxPlayResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createTier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertTierRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxTierResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    bulkUpdateTierProbabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUpdateTierProbabilitiesRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxTierResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteTier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateTier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertTierRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxTierResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserCoinProfileResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxBalanceResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CoinHistoryEntryDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMyPrizes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LootboxPlayResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    play: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayLootboxRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlayLootboxResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getRecentPlays: {
+        parameters: {
+            query?: {
+                limit?: number;
+                crateId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RecentLootboxPlayResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getWalletBreakdown: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WalletBreakdownResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllActiveDisplays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setDisplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMachineDisplayRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    setDisplayBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMachineDisplayBatchRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    batchClearDisplays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchClearDisplaysRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    batchSwapDisplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchDisplaySwapRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    clearDisplayById: {
+        parameters: {
+            query?: {
+                actorId?: string;
+            };
+            header?: never;
+            path: {
+                displayId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getActiveDisplaysByType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteDisplayHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                displayId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllActiveDisplaysPaged: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageMachineDisplayDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductHistory: {
         parameters: {
             query?: never;
             header?: never;
@@ -10071,7 +9708,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ShipmentResponseDTO"][];
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -10081,9 +9718,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10094,128 +9731,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getUserReviewStats: {
-        parameters: {
-            query?: {
-                year?: number;
-                month?: number;
-            };
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserReviewStatsResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUserReviews: {
-        parameters: {
-            query?: {
-                fromDate?: string;
-                toDate?: string;
-                page?: number;
-                size?: number;
-            };
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageReviewResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUserForReviewTracking: {
+    renewDisplays: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenewDisplayRequestDTO"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -10223,7 +9758,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -10233,9 +9768,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10246,17 +9781,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getReviewTrackedUsers: {
+    getStaleDisplays: {
         parameters: {
-            query?: never;
+            query?: {
+                thresholdDays?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10269,7 +9806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"][];
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -10279,9 +9816,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10292,19 +9829,21 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAllUsersForReviewManagement: {
+    getStaleDisplaysByType: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -10315,7 +9854,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"][];
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -10325,9 +9864,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10338,119 +9877,269 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getMonthlySummaries: {
+    swapDisplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwapMachineDisplayRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getCurrentDisplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+                machineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    clearDisplay: {
+        parameters: {
+            query?: {
+                actorId?: string;
+            };
+            header?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+                machineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getActiveDisplaysForMachine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+                machineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMachineHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+                machineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMachineHistoryPaged: {
         parameters: {
             query: {
-                year: number;
-                month: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ReviewSummaryResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductWithChildren: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductChildren: {
-        parameters: {
-            query?: {
-                activeOnly?: boolean;
+                pageable: components["schemas"]["Pageable"];
             };
             header?: never;
             path: {
-                id: string;
+                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+                machineId: string;
             };
             cookie?: never;
         };
@@ -10462,7 +10151,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ProductListItemDTO"][];
+                    "*/*": components["schemas"]["PageMachineDisplayDTO"];
                 };
             };
             /** @description Authentication required */
@@ -10472,9 +10161,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10485,57 +10174,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductBySku: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                sku: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
                         status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
                     };
                 };
             };
@@ -10569,9 +10210,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10582,21 +10223,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getNotificationById: {
+    getNotificationCounts: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -10607,7 +10246,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                    "*/*": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Authentication required */
@@ -10617,9 +10258,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10630,21 +10271,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    deleteNotification: {
+    markAllAsRead: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -10663,9 +10302,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10676,57 +10315,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUnreadNotifications: {
-        parameters: {
-            query: {
-                recipientId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
                         status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
                     };
                 };
             };
@@ -10764,9 +10355,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10777,15 +10368,1337 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getNotificationCounts: {
+    getUnreadNotifications: {
+        parameters: {
+            query: {
+                recipientId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getNotificationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    markAsUserRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    markAsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    resolveNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    unresolveNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NotificationResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllProducts: {
+        parameters: {
+            query?: {
+                categoryId?: string;
+                search?: string;
+                activeOnly?: boolean;
+                rootOnly?: boolean;
+                kujiOnly?: boolean;
+                excludeCustomKuji?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductListItemDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductBySku: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateProduct: {
+        parameters: {
+            query?: {
+                clearParent?: boolean;
+                clearPreferredSupplier?: boolean;
+                clearPacksPerBox?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    activateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductChildren: {
+        parameters: {
+            query?: {
+                activeOnly?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductListItemDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deactivateProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getProductWithChildren: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMonthlySummaries: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewSummaryResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllUsersForReviewManagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getReviewTrackedUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserForReviewTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateUserReviewTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserReviewTrackingRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserReviews: {
+        parameters: {
+            query?: {
+                fromDate?: string;
+                toDate?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageReviewResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserReviewStats: {
+        parameters: {
+            query?: {
+                year?: number;
+                month?: number;
+            };
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserReviewStatsResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listShipments: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "RECEIVED" | "CANCELLED";
+                displayStatus?: string;
+                search?: string;
+                page?: number;
+                size?: number;
+                sortBy?: string;
+                sortDir?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getShipmentsByProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getDisplayStatusCounts: {
         parameters: {
             query?: never;
             header?: never;
@@ -10812,9 +11725,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10825,21 +11738,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getCurrentDisplay: {
+    getShipmentById: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-                machineId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -10851,7 +11763,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"];
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -10861,9 +11773,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10874,23 +11786,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    clearDisplay: {
+    updateShipment: {
         parameters: {
-            query?: {
-                actorId?: string;
-            };
+            query?: never;
             header?: never;
             path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-                machineId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
             };
             cookie?: never;
         };
@@ -10910,9 +11871,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10923,21 +11884,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getMachineHistory: {
+    receiveShipment: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-                machineId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    overrideShipmentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    undoReceiveShipmentItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipmentId: string;
+                itemId: string;
             };
             cookie?: never;
         };
@@ -10949,7 +12014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -10959,9 +12024,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -10972,1406 +12037,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getMachineHistoryPaged: {
+    undoReceiveShipmentItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UndoReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAuditLog: {
         parameters: {
             query: {
-                pageable: components["schemas"]["Pageable"];
-            };
-            header?: never;
-            path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-                machineId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageMachineDisplayDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActiveDisplaysForMachine: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-                machineId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getStaleDisplays: {
-        parameters: {
-            query?: {
-                thresholdDays?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getStaleDisplaysByType: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductHistory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllActiveDisplaysPaged: {
-        parameters: {
-            query: {
-                pageable: components["schemas"]["Pageable"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageMachineDisplayDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActiveDisplaysByType: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationType: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MachineDisplayDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getWalletBreakdown: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["WalletBreakdownResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getRecentPlays: {
-        parameters: {
-            query?: {
-                limit?: number;
-                crateId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["RecentLootboxPlayResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getMyPrizes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxPlayResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getMyHistory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CoinHistoryEntryDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getCatalog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getBalance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxBalanceResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUserProfile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["UserCoinProfileResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getPlayers: {
-        parameters: {
-            query?: {
                 search?: string;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PlayerCoinRowDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getPending: {
-        parameters: {
-            query?: {
-                page?: number;
-                size?: number;
-                status?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageLootboxPlayResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getCoinStats: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CoinStatsResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getFullCatalog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LootboxResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActivity: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["AdminCoinActivityDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getLocationsWithCounts: {
-        parameters: {
-            query?: {
-                type?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationWithCountsDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getBox: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                boxId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getDailyPayouts: {
-        parameters: {
-            query?: {
-                from?: string;
-                to?: string;
-                tz?: string;
-            };
-            header?: never;
-            path: {
-                boxId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiDailyPayoutsResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getLastClosedTiers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxTierResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getBoxHistory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActiveBoxByProduct: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiBoxResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllocationsByProduct: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiAllocationByProductDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllocationsByLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["KujiAllocationByLocationDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInventoryTotals: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["InventoryTotalDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInventoryByProduct: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                productId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getAllForecasts: {
-        parameters: {
-            query: {
+                actorId?: string;
+                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+                fromDate?: string;
+                toDate?: string;
                 pageable: components["schemas"]["Pageable"];
             };
             header?: never;
@@ -12386,7 +12119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PageForecastPredictionResponseDTO"];
+                    "*/*": components["schemas"]["PageAuditLogEntryDTO"];
                 };
             };
             /** @description Authentication required */
@@ -12396,9 +12129,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12409,15 +12142,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getForecastByItem: {
+    batchAdjustInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAdjustStockRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    batchTransferInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTransferInventoryRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMovementHistory: {
+        parameters: {
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageStockMovementResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllMovementHistory: {
         parameters: {
             query?: never;
             header?: never;
@@ -12434,7 +12313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"];
+                    "*/*": components["schemas"]["StockMovementResponseDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -12444,9 +12323,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12457,33 +12336,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    explainForecast: {
+    transferInventory: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                itemId: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferInventoryRequestDTO"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ForecastExplanationDTO"];
-                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {
@@ -12492,9 +12371,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12505,15 +12384,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getHighestDemandForecast: {
+    getAllStorageLocations: {
         parameters: {
             query?: never;
             header?: never;
@@ -12528,7 +12407,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"];
+                    "*/*": components["schemas"]["StorageLocation"][];
                 };
             };
             /** @description Authentication required */
@@ -12538,9 +12417,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12551,18 +12430,207 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAtRiskItems: {
+    getStorageLocationByCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getDisplayStorageLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getInventoryStorageLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listInventoryByStorageLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storageLocationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LocationInventoryResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSuppliers: {
         parameters: {
             query?: {
-                daysThreshold?: number;
+                q?: string;
+                active?: boolean;
             };
             header?: never;
             path?: never;
@@ -12576,7 +12644,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"][];
+                    "*/*": components["schemas"]["SupplierResponseDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -12586,9 +12654,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12599,22 +12667,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAllForecastsUnpaginated: {
+    createSupplier: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRequestDTO"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -12622,7 +12694,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ForecastPredictionResponseDTO"][];
+                    "*/*": components["schemas"]["SupplierResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -12632,9 +12704,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12645,66 +12717,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getRollingAccuracy: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ForecastAccuracyDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getChildCategories: {
+    getSupplierById: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                parentId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -12716,7 +12742,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["CategoryResponseDTO"][];
+                    "*/*": components["schemas"]["SupplierResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -12726,9 +12752,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12739,20 +12765,406 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getSession: {
+    updateSupplier: {
         parameters: {
             query?: never;
-            header: {
-                Authorization: string;
+            header?: never;
+            path: {
+                id: string;
             };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    activateSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    assignProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAssignProductsRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": number;
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deactivateSupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSupplierProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    lookupTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackingLookupRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trackingNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getAllUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -12764,16 +13176,94 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["UserResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
                 };
             };
         };
     };
-    getCurrentUser: {
+    createUser: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserByEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -12794,9 +13284,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12807,28 +13297,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAuditLogs: {
+    getAllLastAudits: {
         parameters: {
-            query?: {
-                page?: number;
-                size?: number;
-                search?: string;
-                actorId?: string;
-                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-                reasons?: ("INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED")[];
-                fromDate?: string;
-                toDate?: string;
-                productId?: string;
-                locationId?: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -12841,7 +13320,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PageAuditLogDTO"];
+                    "*/*": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Authentication required */
@@ -12851,9 +13332,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12864,15 +13345,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getAuditLogDetail: {
+    getUserByFullName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fullName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getUserById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12889,7 +13418,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["AuditLogDetailDTO"];
+                    "*/*": components["schemas"]["UserResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -12899,9 +13428,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -12912,61 +13441,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getSalesSummary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["SalesSummaryDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getReportBundleHeader: {
+    updateUser: {
         parameters: {
             query?: never;
             header?: never;
@@ -12975,7 +13458,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRequestDTO"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -12983,7 +13470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["HeaderBundleDTO"];
+                    "*/*": components["schemas"]["UserResponseDTO"];
                 };
             };
             /** @description Authentication required */
@@ -12993,9 +13480,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -13006,507 +13493,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    getReportBundleDetail: {
+    deleteUser: {
         parameters: {
-            query?: {
-                days?: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["DetailBundleDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductMovements: {
-        parameters: {
-            query: {
-                from: string;
-                to: string;
-                reasons?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MovementRowDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductMovementSummary: {
-        parameters: {
-            query: {
-                from: string;
-                to: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["MovementSummaryDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getProductComparison: {
-        parameters: {
-            query: {
-                metric: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ComparisonRowDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getPerformanceMetrics: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PerformanceMetricsDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInventoryByCategory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["CategoryInventoryDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInsights: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["InsightsDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getDemandLeaders: {
-        parameters: {
-            query?: {
-                period?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["DemandLeadersDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActionCenter: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ActionCenterDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getActivityFeed: {
-        parameters: {
-            query?: {
-                limit?: number;
-                types?: string[];
-                includeResolved?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ActivityFeedEventDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteDisplayHistory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                displayId: string;
             };
             cookie?: never;
         };
@@ -13526,9 +13526,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -13539,68 +13539,20 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
         };
     };
-    clearDisplayById: {
-        parameters: {
-            query?: {
-                actorId?: string;
-            };
-            header?: never;
-            path: {
-                displayId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        status?: unknown;
-                        error?: unknown;
-                        message?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    cancelInvitation: {
+    getLastAudit: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                email: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -13611,7 +13563,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": string;
+                };
             };
             /** @description Authentication required */
             401: {
@@ -13620,9 +13574,9 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
                     };
                 };
             };
@@ -13633,9 +13587,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        status?: unknown;
                         error?: unknown;
                         message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    handleEasyPostWebhook: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Hmac-Signature"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string;
                     };
                 };
             };
