@@ -20,7 +20,7 @@ package move.
 | 0 | Approve scope and record baseline | Complete |
 | 1 | Security, CI and database safety | Substantially complete (Flyway not yet canonical) |
 | 2 | Reliable events and GHCR artifacts | Substantially complete (4 gaps reviewed and deferred, §5) |
-| 3 | Architecture and contract foundation | Not started |
+| 3 | Architecture and contract foundation | In progress (ArchUnit + package skeleton done, §6) |
 | 4 | Identity and sites | Not started |
 | 5 | Catalog and site assortment | Not started |
 | 6 | Inventory and stock movements | Not started |
@@ -231,6 +231,31 @@ vertical slice. Existing business domains stay in place until their phase.
 - Architecture violations cannot increase.
 - One endpoint works through the generated client.
 - Builds remain deployable with no behavioral rewrite.
+
+### Phase 3 status (2026-08-30)
+
+- [x] ArchUnit added (`archunit-junit5` 1.5.0) under `ArchitectureTest.java` with six rules:
+      three frozen against the legacy codebase (legacy technical-layer packages — `controllers`,
+      `services`, `repositories`, `models`, `dtos`, `converters` — cannot gain new classes;
+      repositories may only be accessed from `services`/`repositories`; top-level packages must
+      stay free of cycles), and three enforced in full from day one against the new domain-module
+      skeleton (`domain` must not depend on any module's `api` or another module's
+      `infrastructure`; a module must not depend on another module's `api`; `shared` must not
+      depend on a business module) — these have no baseline to freeze since no code has moved
+      into the skeleton yet. The three frozen rules' current violations (465, 147 and 156
+      respectively) live in `archunit_store/`; `allowStoreUpdate`/`allowStoreCreation` are both
+      `false` so the store can only change via a deliberate, reviewed regeneration, never as a
+      side effect of a CI run. Every rule was verified against injected probe violations (added,
+      confirmed the failure, removed) before being accepted.
+- [x] Target Spring domain package skeleton created: `catalog`, `sites`, `identity`, `inventory`,
+      `transfers`, `shipments`, `displays`, `kuji`, `lootbox`, `analytics`, `notifications`,
+      `reviews`, `audit`, `shared` — each an empty package with a `package-info.java` recording
+      its ownership per the module-ownership table. No business classes moved yet; that happens
+      per-module in Phases 4-8.
+- [ ] OpenAPI in `packages/contracts` — not started.
+- [ ] Generated TypeScript client in `packages/api-client` — not started.
+- [ ] Adopt the client in one read-only web workflow — not started (depends on the item above).
+- [ ] Correlation ID propagation through HTTP and events — not started.
 
 ## 7. Phase 4 — Identity and sites
 
