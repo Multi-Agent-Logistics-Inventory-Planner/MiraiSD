@@ -7,6 +7,7 @@ import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
+import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -132,6 +133,10 @@ public class EventOutboxService {
         // Add stock movement ID to payload for reference
         payload.put("stock_movement_id", movement.getId().toString());
 
+        // Carries the triggering request's correlation ID (null if none, e.g. a scheduled job)
+        // so it survives until publishPendingEvents runs, possibly long after the request ends.
+        payload.put("correlation_id", CorrelationIdContext.current());
+
         EventOutbox event = EventOutbox.builder()
                 .topic(inventoryChangesTopic)
                 .eventType("CREATED") // Expects "CREATED" or "UPDATED"
@@ -190,6 +195,7 @@ public class EventOutboxService {
                 message.put("entity_id", event.getEntityId().toString());
                 message.put("payload", event.getPayload());
                 message.put("created_at", event.getCreatedAt().toString());
+                message.put("correlation_id", event.getPayload().get("correlation_id"));
 
                 // Key for Kafka partitioning: item_id
                 String key = event.getPayload().get("item_id").toString();

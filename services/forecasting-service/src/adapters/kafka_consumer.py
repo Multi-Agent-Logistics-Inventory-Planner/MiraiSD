@@ -221,8 +221,9 @@ class KafkaEventConsumer:
             )
 
             logger.info(
-                "Parsed event: id=%s, item=%s, qty=%d, reason=%s",
+                "Parsed event: id=%s, correlation_id=%s, item=%s, qty=%d, reason=%s",
                 normalized.event_id,
+                envelope.correlation_id,
                 normalized.item_id,
                 normalized.quantity_change,
                 normalized.reason,

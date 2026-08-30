@@ -255,7 +255,20 @@ vertical slice. Existing business domains stay in place until their phase.
 - [ ] OpenAPI in `packages/contracts` — not started.
 - [ ] Generated TypeScript client in `packages/api-client` — not started.
 - [ ] Adopt the client in one read-only web workflow — not started (depends on the item above).
-- [ ] Correlation ID propagation through HTTP and events — not started.
+- [x] Correlation ID propagation through HTTP and events: a new `shared/correlation` package
+      generates or reuses an `X-Correlation-Id` header per request, stores it in MDC for the
+      request's lifetime, and echoes it back on the response. `application.properties` sets
+      `logging.pattern.level` so every log line actually renders `correlationId=...` from MDC
+      (verified with a `@SpringBootTest` + `OutputCaptureExtension` test asserting on real log
+      output, not just that the filter sets MDC — the first version of this shipped without the
+      pattern change and silently didn't appear in logs). `EventOutboxService` captures it from
+      MDC into the outbox payload at creation time (since the ID is otherwise gone by the time
+      the scheduled publisher runs later) and promotes it to a top-level `correlation_id` field
+      on the Kafka envelope. Forecasting-service and messaging-service's `EventEnvelope` models
+      and consumer logs were updated to read and log it. Not yet done: no correlation ID for
+      work started by a scheduler rather than an HTTP request, and no `packages/contracts`
+      schema documenting the envelope shape (that's part of the still-open OpenAPI/contracts
+      item above).
 
 ## 7. Phase 4 — Identity and sites
 
