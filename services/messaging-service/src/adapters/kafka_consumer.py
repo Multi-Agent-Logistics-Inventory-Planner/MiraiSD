@@ -228,8 +228,10 @@ class KafkaEventConsumer:
             )
 
             logger.debug(
-                "Parsed event: id=%s, item=%s, qty=%d, reason=%s, to_loc=%s, prev_loc_qty=%s, curr_loc_qty=%s",
+                "Parsed event: id=%s, correlation_id=%s, item=%s, qty=%d, reason=%s, to_loc=%s, "
+                "prev_loc_qty=%s, curr_loc_qty=%s",
                 normalized.event_id,
+                envelope.correlation_id,
                 normalized.item_id,
                 normalized.quantity_change,
                 normalized.reason,

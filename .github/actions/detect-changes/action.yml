@@ -19,6 +19,9 @@ outputs:
   web_changed:
     description: "true if apps/web/** changed"
     value: ${{ steps.diff.outputs.web_changed }}
+  packages_changed:
+    description: "true if packages/** changed"
+    value: ${{ steps.diff.outputs.packages_changed }}
   compose_changed:
     description: "true if infra/docker-compose.yml changed"
     value: ${{ steps.diff.outputs.compose_changed }}
@@ -65,6 +68,7 @@ runs:
         FORECASTING_CHANGED=false
         MESSAGING_CHANGED=false
         WEB_CHANGED=false
+        PACKAGES_CHANGED=false
         # docker-compose.yml defines every container's resolved config, but
         # `docker compose up -d` already diffs each container's config against
         # what's running and only recreates ones that actually changed, so a
@@ -85,6 +89,9 @@ runs:
         if echo "$CHANGED_FILES" | grep -q "^apps/web/"; then
           WEB_CHANGED=true
         fi
+        if echo "$CHANGED_FILES" | grep -q "^packages/"; then
+          PACKAGES_CHANGED=true
+        fi
         if echo "$CHANGED_FILES" | grep -q "^infra/docker-compose\.yml$"; then
           COMPOSE_CHANGED=true
         fi
@@ -96,6 +103,7 @@ runs:
         echo "forecasting_changed=$FORECASTING_CHANGED" >> "$GITHUB_OUTPUT"
         echo "messaging_changed=$MESSAGING_CHANGED" >> "$GITHUB_OUTPUT"
         echo "web_changed=$WEB_CHANGED" >> "$GITHUB_OUTPUT"
+        echo "packages_changed=$PACKAGES_CHANGED" >> "$GITHUB_OUTPUT"
         echo "compose_changed=$COMPOSE_CHANGED" >> "$GITHUB_OUTPUT"
         echo "caddy_changed=$CADDY_CHANGED" >> "$GITHUB_OUTPUT"
 

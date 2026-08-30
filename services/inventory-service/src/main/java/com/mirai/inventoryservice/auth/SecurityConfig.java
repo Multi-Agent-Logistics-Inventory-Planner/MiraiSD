@@ -13,6 +13,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import lombok.AllArgsConstructor;
+import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
+import com.mirai.inventoryservice.shared.correlation.CorrelationIdFilter;
 
 import java.util.Arrays;
 
@@ -23,6 +25,7 @@ import java.util.Arrays;
 public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final CorrelationIdFilter correlationIdFilter;
     private final Environment environment;
 
     @Bean
@@ -47,6 +50,10 @@ public class SecurityConfig {
 
                 // Webhook endpoints (validated by signature, not JWT)
                 .requestMatchers("/api/webhooks/**").permitAll()
+
+                // OpenAPI docs (only actually registered when springdoc.api-docs.enabled=true,
+                // i.e. the test profile - see application.properties)
+                .requestMatchers("/v3/api-docs/**").permitAll()
 
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -73,6 +80,9 @@ public class SecurityConfig {
         // Add rate limiting filter BEFORE JWT authentication
         // This ensures rate limiting happens first, protecting against DoS attacks
         http.addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class);
+        // Correlation ID runs before rate limiting so every subsequent filter's logs (and any
+        // outbox events created during this request) can be tied back to the request.
+        http.addFilterBefore(correlationIdFilter, RateLimitingFilter.class);
         http.addFilterAfter(jwtAuthenticationFilter, RateLimitingFilter.class);
 
         return http.build();
@@ -105,7 +115,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(allowedOrigins);
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Idempotency-Key"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Idempotency-Key", CorrelationIdContext.HEADER_NAME));
+        configuration.setExposedHeaders(Arrays.asList(CorrelationIdContext.HEADER_NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

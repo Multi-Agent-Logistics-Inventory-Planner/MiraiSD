@@ -18,17 +18,22 @@ package move.
 | Order | Phase | Status |
 | --- | --- | --- |
 | 0 | Approve scope and record baseline | Complete |
-| 1 | Security, CI and database safety | Not started |
-| 2 | Reliable events and GHCR artifacts | Not started |
-| 3 | Architecture and contract foundation | Not started |
+| 1 | Security, CI and database safety | Substantially complete (Flyway not yet canonical) |
+| 2 | Reliable events and GHCR artifacts | Substantially complete (4 gaps reviewed and deferred, §5) |
+| 3 | Architecture and contract foundation | In progress (ArchUnit + package skeleton done, §6) |
 | 4 | Identity and sites | Not started |
 | 5 | Catalog and site assortment | Not started |
 | 6 | Inventory and stock movements | Not started |
 | 7 | Shipments and remaining site operations | Not started |
 | 8 | Audited inter-site transfers | Not started |
 | 9 | Focused Expo mobile client | Not started |
-| 10 | Lean Hetzner cutover | Not started |
+| 10 | Lean Hetzner cutover | Complete |
 | 11 | Close the migration | Not started |
+
+Phases 1, 2 and 10 were substantially delivered together as one CI/CD and hosting migration effort
+(PRs #299, #300, #303-#310) rather than strictly in the order this plan lists, since the security,
+event-reliability and hosting-cutover deliverables shared the same underlying pipeline work. Phase 3
+onward has not started and still follows this plan's stated execution order.
 
 ## 3. Phase 0 — Approve scope and record the baseline
 
@@ -83,6 +88,25 @@ This phase addresses present-day risks before structural or tenant changes.
 - Required CI checks are green and branch-protected.
 - No new paid recurring service has been introduced.
 
+### Phase 1 status (verified 2026-08-28)
+
+- [x] JWT issuer/audience/signature validation (`JwtService.java`); role authority derived from a
+      backend `User` record looked up by email, not `user_metadata.role`.
+- [x] `ddl-auto=update` removed; both `application.properties` and `application-dev.properties` are
+      `ddl-auto=none`.
+- [x] Actuator exposure restricted to `health,info,metrics`.
+- [x] Testcontainers coverage added (PostgreSQL-faithful tests exist, not full parity).
+- [x] Required CI (`ci.yml`) wired into `pr-gate.yml`'s `gate` job, which is the sole required check.
+      Branch protection/rulesets themselves cannot be enforced without upgrading to GitHub Team on the
+      current free private-repo plan; checks still run on every PR via `on: pull_request` regardless.
+- [x] Dependency and secret scanning via Trivy (`fs` scan in `ci.yml`, image scan in `deploy.yml`;
+      Trivy `fs` mode scans for both vulnerabilities and secrets by default).
+- [ ] **Flyway is not canonical.** `pom.xml` has no Flyway dependency despite `V1`-`V49` migration
+      files existing under `db/migration`. Deliberately deferred: production schema was confirmed at
+      parity through V28 via direct query, but with no `flyway_schema_history` tracking, so wiring
+      Flyway in now would need a one-time baseline reconciliation first. This is the one open item
+      blocking a full Phase 1 close.
+
 ## 5. Phase 2 — Reliable events and immutable build artifacts
 
 These are single-store reliability improvements and should land before multi-site event volume grows.
@@ -106,6 +130,85 @@ These are single-store reliability improvements and should land before multi-sit
 - The exact tested image can be deployed and rolled back without building on the server.
 - GHCR/Actions usage remains within the approved budget.
 
+### Phase 2 status (verified 2026-08-28)
+
+- [x] Business mutation and outbox creation share one transaction: every
+      `eventOutboxService.createStockMovementEvent(...)` call site sits inside a `StockMovementService`
+      method already annotated `@Transactional`, so it joins that transaction rather than opening its
+      own (`StockMovementService.java`, `EventOutboxService.java`).
+- [x] Duplicate outbox rows are prevented at the database level: `V16__fix_duplicate_notifications.sql`
+      adds a unique index on `event_outbox` keyed by `payload->>'stock_movement_id'`, and
+      `EventOutboxService.createStockMovementEvent` catches `DataIntegrityViolationException` and
+      logs-and-continues on a race.
+- [x] Consumer-side idempotency is real, not just logged: messaging-service writes notifications via a
+      `dedupe_key` unique index with `ON CONFLICT DO NOTHING`, and forecasting-service upserts
+      predictions via `ON CONFLICT (item_id, computed_at) DO UPDATE` (`worker.py`, `supabase_repo.py`).
+- [x] Dead-letter handling exists on both ends: failed inventory-side outbox events move to
+      `event_dead_letter` after 3 attempts instead of being dropped; forecasting/messaging consumers
+      route malformed or failing records to a Kafka DLQ via `DLQProducer` (`kafka_consumer.py`).
+- [x] Versioned, immutable build artifacts: images are commit-SHA and digest tagged, pushed to GHCR,
+      and `deploy.yml` deploys/rolls back by digest, not by building on the host (proven in production).
+- [x] GHCR retention/pruning: `prune-ghcr.yml` added, weekly, keeps last 10 versions per package.
+### Phase 2 open gaps — all deliberately deferred (decided 2026-08-28)
+
+Four deliverables are not implemented. All four were reviewed and consciously deferred rather than
+skipped: each is latent rather than active, each has a trigger that would make it real, and the
+mitigation for the meantime is recorded below. Triggers are duplicated in §15.
+
+**1. No atomic row-claiming with a recoverable lease.**
+`EventOutboxService.publishPendingEvents` polls with a plain
+`findByPublishedAtIsNullAndPublishAttemptsLessThan...` query — no `SELECT ... FOR UPDATE SKIP LOCKED`
+and no lock/lease columns. Two instances would both fetch the same unpublished row and double-publish.
+
+- *Why deferred:* exactly one `inventory-service` container runs, and `docker compose up -d` recreates
+  rather than running two side by side, so there is no transient overlap either. The failure mode does
+  not currently exist. Consumer-side idempotency (dedupe_key / `ON CONFLICT`) would also absorb a
+  duplicate today, though relying on that is not the intended guarantee.
+- *Trigger:* adding a second `inventory-service` replica, or any rolling-deploy strategy.
+- *Preferred fix when triggered:* ShedLock (`shedlock-spring` + `shedlock-provider-jdbc-template`) with
+  `@SchedulerLock(name="publishPendingEvents", lockAtMostFor="5m")`. Needs one new `shedlock` table.
+  `lockAtMostFor` supplies the "recoverable" half of the lease. Preferred over `SKIP LOCKED` because it
+  is less code and protects every `@Scheduled` job, and the parallel-throughput advantage of
+  `SKIP LOCKED` is not needed at this volume.
+
+**2. No event schema versioning.**
+Neither the `EventOutbox` payload nor the Python `EventEnvelope` carries a `version`/`schema_version`
+field, so producer/consumer payload drift has no explicit contract.
+
+- *Why deferred:* the exposure is only events **in flight** at the moment of a deploy — unpublished
+  outbox rows plus unconsumed Kafka messages. With consumers keeping up, that window is seconds and
+  quite possibly zero events. (Kafka's 7-day retention governs how long messages persist, not how long
+  they stay unconsumed, so it does not widen this window while consumers are healthy.) Additive payload
+  changes are already tolerated by the Pydantic models' defaults; only renames, retypes and removals
+  break. There is currently one event type and one payload shape.
+- *What actually happens without it:* a mismatched event fails `EventEnvelope.model_validate`, goes to
+  the DLQ, and the consumer moves on. There is no retry — and retrying would not help, since a schema
+  mismatch is a deterministic failure, not a transient one. Nothing is lost: `DLQMessage` preserves
+  `raw_value` base64-encoded plus original topic/partition/offset, so manual replay is possible.
+- *Mitigation in the meantime — operational rule:* before deploying a breaking change to the event
+  payload shape, confirm `event_outbox` has no unpublished rows and consumer lag is zero, then deploy
+  inventory, forecasting and messaging together. Draining takes seconds given the 10-second poll.
+- *Trigger:* Phase 7 (multiple event types sharing one topic), or any additional consumer.
+
+**3. No lag/outbox-age health signal.**
+Per-event logging exists, but nothing surfaces "oldest pending event age" or consumer lag, so a stalled
+poller would be silent until someone queried the table.
+
+- *Why deferred:* this is one metric, and building a bespoke channel for it creates a snowflake. Doing
+  it properly means a metrics stack, and Phases 3-8 restructure the backend enough that dashboards and
+  alert rules built now would describe a system about to change underneath them.
+- *Trigger:* after Phase 8, when the system stops moving.
+- *Note:* `spring-boot-starter-actuator` is present but there is **no Micrometer registry** and
+  `/actuator/prometheus` is not exposed, so metrics are on-demand JSON that nothing collects.
+
+**4. No CI/GHCR budget check.**
+`prune-ghcr.yml` caps storage growth, but no automated Actions-minutes or GHCR-usage budget alert exists.
+
+- *Why deferred:* Actions minutes are free to a generous quota and GHCR storage is cheap at this volume.
+  Manual review of GitHub's billing page is sufficient; automating it now would be monitoring a number
+  that is not moving.
+- *Trigger:* usage trending toward a real line item.
+
 ## 6. Phase 3 — Architecture and contract foundation
 
 ### Deliverables
@@ -128,6 +231,85 @@ vertical slice. Existing business domains stay in place until their phase.
 - Architecture violations cannot increase.
 - One endpoint works through the generated client.
 - Builds remain deployable with no behavioral rewrite.
+
+### Phase 3 status (2026-08-30)
+
+- [x] ArchUnit added (`archunit-junit5` 1.5.0) under `ArchitectureTest.java` with six rules:
+      three frozen against the legacy codebase (legacy technical-layer packages — `controllers`,
+      `services`, `repositories`, `models`, `dtos`, `converters` — cannot gain new classes;
+      repositories may only be accessed from `services`/`repositories`; top-level packages must
+      stay free of cycles), and three enforced in full from day one against the new domain-module
+      skeleton (`domain` must not depend on any module's `api` or another module's
+      `infrastructure`; a module must not depend on another module's `api`; `shared` must not
+      depend on a business module) — these have no baseline to freeze since no code has moved
+      into the skeleton yet. The three frozen rules' current violations (465, 147 and 156
+      respectively) live in `archunit_store/`; `allowStoreUpdate`/`allowStoreCreation` are both
+      `false` so the store can only change via a deliberate, reviewed regeneration, never as a
+      side effect of a CI run. Every rule was verified against injected probe violations (added,
+      confirmed the failure, removed) before being accepted.
+- [x] Target Spring domain package skeleton created: `catalog`, `sites`, `identity`, `inventory`,
+      `transfers`, `shipments`, `displays`, `kuji`, `lootbox`, `analytics`, `notifications`,
+      `reviews`, `audit`, `shared` — each an empty package with a `package-info.java` recording
+      its ownership per the module-ownership table. No business classes moved yet; that happens
+      per-module in Phases 4-8.
+- [x] OpenAPI in `packages/contracts`: added `springdoc-openapi-starter-webmvc-api` (docs
+      endpoint only, no bundled UI). The endpoint is disabled by default
+      (`springdoc.api-docs.enabled=false`) and enabled only in the `test` profile, where a new
+      `OpenApiContractExportTest` (`@SpringBootTest`, random port) fetches `/v3/api-docs` and
+      writes it to `packages/contracts/openapi.json`, checked into the repo rather than generated
+      only at build time. `SecurityConfig` permits `/v3/api-docs/**` — harmless in production
+      since springdoc never registers the endpoint there. Currently 159 endpoints. Regenerate via
+      the command in `packages/contracts/README.md` after any endpoint shape change.
+      A new `OpenApiConfig` fixes `servers[0].url` to `/` instead of springdoc's default
+      request-derived host:port (random per test run, which made every regeneration dirty the
+      committed file for no reason), and adds a `bearerAuth` security requirement plus `401`/
+      `403` responses to every operation whose path isn't in `SecurityConfig`'s permitAll list —
+      the generated contract previously only documented the `200` shape and said nothing about
+      auth. Verified deterministic by regenerating twice in a row and diffing byte-for-byte.
+      `.github/workflows/ci.yml`'s new `contracts-check` job regenerates both this file and
+      `packages/api-client/src/schema.d.ts` on every relevant PR and fails the build if either
+      drifts from what's checked in, so an endpoint change without a regeneration step is caught
+      instead of shipping a stale contract. The same job resolves the pre-change contract via
+      `git show <base>:packages/contracts/openapi.json` and runs `oasdiff breaking --fail-on ERR`
+      against it, failing the build on removed/renamed routes, tightened requirements or other
+      breaking changes — the compatibility check required by `multi-site-data-and-api.md` §7 and
+      `client-applications.md` §4. Verified locally (via Homebrew's `oasdiff`) both that the
+      current contract reports no breaking changes and that deliberately deleting an operation is
+      correctly caught and fails. Skips gracefully when there's no base contract to compare
+      against (e.g. the PR that first introduces the contract). Upload-for-review is disabled
+      (`review: false`) so the contract never leaves CI.
+- [x] Generated TypeScript client in `packages/api-client`: types generated by
+      `openapi-typescript` from the contract above (`npm run generate`, checked-in
+      `src/schema.d.ts`), wrapped by a hand-written `createApiClient({ baseUrl, fetch,
+      getAccessToken, onUnauthorized, correlationId })` built on `openapi-fetch`, matching the
+      signature required by `docs/specs/client-applications.md` §4. The package imports no
+      browser/Node/React Native globals — callers inject `fetch` and token/redirect behavior — and
+      injects `Authorization` and `X-Correlation-Id` headers via an `openapi-fetch` middleware.
+      Typechecks clean (`npm run typecheck`).
+- [ ] Adopt the client in one read-only web workflow — **blocked, not merely unstarted.**
+      `multi-site-data-and-api.md` §7 requires site-owned operations to live under
+      `/api/v1/sites/{siteId}/...` and says "new clients must not use legacy endpoints." The
+      contract generated above has zero `/api/v1/...` paths — only the 159 existing legacy
+      `/api/...` routes, none of which carry a site ID because the `sites`/`user_site_memberships`
+      model doesn't exist yet (that's Phase 4). Adopting the generated client into a real web
+      workflow today would mean either violating that "no legacy endpoints for new clients" rule,
+      or building throwaway `/api/v1` routes ahead of the site model they're meant to scope by.
+      Track D is deferred until Phase 4 lands enough of the site model for genuine `/api/v1`
+      routes to exist; doing it earlier would need redoing once site scoping lands.
+- [x] Correlation ID propagation through HTTP and events: a new `shared/correlation` package
+      generates or reuses an `X-Correlation-Id` header per request, stores it in MDC for the
+      request's lifetime, and echoes it back on the response. `application.properties` sets
+      `logging.pattern.level` so every log line actually renders `correlationId=...` from MDC
+      (verified with a `@SpringBootTest` + `OutputCaptureExtension` test asserting on real log
+      output, not just that the filter sets MDC — the first version of this shipped without the
+      pattern change and silently didn't appear in logs). `EventOutboxService` captures it from
+      MDC into the outbox payload at creation time (since the ID is otherwise gone by the time
+      the scheduled publisher runs later) and promotes it to a top-level `correlation_id` field
+      on the Kafka envelope. Forecasting-service and messaging-service's `EventEnvelope` models
+      and consumer logs were updated to read and log it. Not yet done: no correlation ID for
+      work started by a scheduler rather than an HTTP request, and the Kafka envelope shape
+      itself is still undocumented as a schema (the OpenAPI contract above covers the HTTP API,
+      not the event envelope).
 
 ## 7. Phase 4 — Identity and sites
 
@@ -264,6 +446,49 @@ cutover. They may be added later through separate costed decisions.
 - DigitalOcean shutdown criteria and date are recorded.
 - Projected recurring stack cost remains below the approved ceiling.
 
+### Phase 10 status (verified 2026-08-28)
+
+Production is on Hetzner now: `infra/docker-compose.yml` resource limits are tuned for a Hetzner
+CPX21, `deploy.yml` deploys to the Hetzner host by SSH, and the DigitalOcean-specific
+`deploy-backend.yml` workflow was deleted (PR #309) after `deploy.yml` proved a successful real
+deploy. Digest-pinned deploy/rollback and GHCR retention are both in place. `docs/runbooks/hetzner-cutover.md`
+itself is still marked `Status: Draft` with its checklist unchecked — worth updating separately, but
+the cutover it describes has already happened in practice.
+
+Two exit-gate items remain open and are tracked here rather than silently closed:
+
+- [ ] **Basic external uptime monitoring.** Nothing currently watches the host from outside it. This is
+      the one failure mode internal monitoring structurally cannot catch: if the box is gone, nothing is
+      left to report it, and silence looks identical to health. Any free-tier checker (UptimeRobot,
+      Healthchecks.io, Better Stack, Grafana Cloud synthetics) pinging the public URL closes this. No
+      code and no container — roughly five minutes of setup, deferred only because it was bundled into
+      the wider observability decision below.
+- [ ] **Restoration rehearsal.** Supabase's included backups are in use, but a restore has not been
+      exercised. Untested backups are an assumption, not a recovery plan.
+
+### Observability decision (2026-08-28)
+
+A metrics stack (Micrometer registry, Prometheus, Grafana, alerting) was scoped and **deferred until
+after Phase 8**. Reasoning:
+
+- Phases 3-8 restructure packages, add site ownership to every table, and change event payloads.
+  Dashboards and alert rules built now would target a system about to change underneath them.
+- Self-hosting Prometheus + Grafana on the CPX21 is the option to avoid regardless: container limits
+  already total ~2.7GB of 4GB, and a TSDB plus Grafana would consume 400-750MB of the remaining
+  headroom. When this is revisited, Grafana Cloud's free tier (a ~100MB local agent remote-writing to
+  managed storage, with alerting included) is the better fit and keeps the $300 ceiling untouched.
+- Alerting only ever reports conditions someone wrote a rule for. The work is choosing a small set of
+  rules — outbox age, no-data/target-down, JVM heap headroom, restart loops, 5xx rate — not the install.
+
+Note the distinction this rests on: infrastructure monitoring answers "is the system running," while
+"is the system *correct*" is domain logic that already lives in the app. Forecast accuracy is tracked
+via `ForecastController` `GET /accuracy` and the analytics Accuracy tab (`tab-accuracy.tsx`,
+`components/analytics/accuracy/`), with `buildHealthBanner` already producing a good/warn/bad verdict
+from WAPE, bias, under-prediction rate and week-over-week delta. That evaluation logic exists; it is
+**pull-only**, rendering a banner when someone opens the page. A scheduled job in messaging-service
+reusing the existing Slack webhook and APScheduler would make it push-based with no new
+infrastructure — tracked as follow-up work, not part of the metrics stack.
+
 ## 14. Phase 11 — Close the migration
 
 - Remove MAIN compatibility routes after both clients have migrated.
@@ -284,6 +509,10 @@ These are not phases required for initial completion:
 | --- | --- |
 | Redis/shared rate limiting | More than one API process or demonstrated need for global limits |
 | Worker/API process separation and distributed locks | More than one relevant process or observed duplicate scheduling risk |
+| Outbox lease/atomic claiming (ShedLock) | A second `inventory-service` replica, or a rolling-deploy strategy |
+| Event schema versioning | Phase 7 (multiple event types on one topic), or any additional consumer |
+| Metrics stack and lag/outbox-age signal | After Phase 8, once the backend has stopped moving |
+| CI/GHCR usage budget alerting | Actions minutes or GHCR storage trending toward a real line item |
 | Second host and load balancer | Approved availability objective or measured capacity need |
 | Terraform/Ansible/SOPS | Manual host management becomes risky or repetitive enough to justify tooling |
 | OpenTelemetry/Grafana/Sentry paid tiers | Current logs/monitoring cannot meet incident needs within free/basic limits |

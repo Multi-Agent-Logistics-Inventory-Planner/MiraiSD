@@ -45,6 +45,7 @@ class EventEnvelope(BaseModel):
     entity_type: str | None = None
     entity_id: str | None = None
     created_at: datetime | None = None
+    correlation_id: str | None = None
 
     @field_validator("created_at", mode="before")
     @classmethod

@@ -17,7 +17,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -201,6 +203,45 @@ class EventOutboxServiceCreateEventTest {
 
         // Then — outbox was written exactly once
         verify(eventOutboxRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("carries the request's correlation ID into the payload when present")
+    void createStockMovementEvent_carriesCorrelationId_whenPresentInMdc() {
+        // Given
+        MDC.put(CorrelationIdContext.MDC_KEY, "req-123");
+        try {
+            StockMovement movement = buildMovement(11L);
+            when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+            when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+            when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // When
+            eventOutboxService.createStockMovementEvent(movement);
+
+            // Then
+            verify(eventOutboxRepository).save(outboxCaptor.capture());
+            assertThat(outboxCaptor.getValue().getPayload()).containsEntry("correlation_id", "req-123");
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
+    }
+
+    @Test
+    @DisplayName("stores a null correlation ID when created outside a request (e.g. a scheduled job)")
+    void createStockMovementEvent_storesNullCorrelationId_outsideARequest() {
+        // Given
+        StockMovement movement = buildMovement(12L);
+        when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+        when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        eventOutboxService.createStockMovementEvent(movement);
+
+        // Then
+        verify(eventOutboxRepository).save(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getPayload()).containsEntry("correlation_id", null);
     }
 
     private StockMovement buildMovement(Long id) {

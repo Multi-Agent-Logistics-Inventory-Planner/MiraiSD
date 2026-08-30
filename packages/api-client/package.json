@@ -1,0 +1,20 @@
+{
+  "name": "@mirai/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Platform-neutral generated TypeScript client for inventory-service, built on the OpenAPI contract in packages/contracts.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "generate": "openapi-typescript ../contracts/openapi.json -o src/schema.d.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.4"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.4",
+    "typescript": "^5.9.2"
+  }
+}
