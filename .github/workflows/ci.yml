@@ -23,6 +23,7 @@ jobs:
       forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
       messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
       web_changed: ${{ steps.detect.outputs.web_changed }}
+      packages_changed: ${{ steps.detect.outputs.packages_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,6 +76,88 @@ jobs:
       # (BaseKafkaIntegrationTest, CoinAdminDashboardServiceIT) run separately
       # in pr-gate.yml's integration-test job with an explicit -Dtest='*IT'.
       - run: mvn -B test
+
+  # ---------------------------------------------------------------------
+  # contracts-check: regenerates packages/contracts/openapi.json and
+  # packages/api-client/src/schema.d.ts and fails if either drifts from
+  # what's checked in, so an endpoint change without a regeneration step is
+  # caught here instead of silently shipping a stale generated client. Also
+  # runs oasdiff against the pre-change contract and fails on breaking
+  # changes (removed/renamed routes or fields, widened requirements, etc.) -
+  # the compatibility check required by multi-site-data-and-api.md §7 and
+  # client-applications.md §4.
+  # ---------------------------------------------------------------------
+
+  contracts-check:
+    name: OpenAPI contract and client freshness
+    needs: changes
+    if: needs.changes.outputs.inventory_changed == 'true' || needs.changes.outputs.packages_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so `git show <base>:packages/contracts/openapi.json` below can reach
+          # the pre-change contract for the oasdiff breaking-change comparison.
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - name: Regenerate packages/contracts/openapi.json
+        working-directory: services/inventory-service
+        run: mvn -B -Dtest=OpenApiContractExportTest test
+      - name: Fail if the checked-in contract is stale
+        run: git diff --exit-code packages/contracts/openapi.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/api-client/package-lock.json
+      - name: Regenerate packages/api-client/src/schema.d.ts
+        working-directory: packages/api-client
+        run: |
+          npm ci
+          npm run generate
+      - name: Fail if the checked-in generated client is stale
+        run: git diff --exit-code packages/api-client/src/schema.d.ts
+      - name: Typecheck the generated client
+        working-directory: packages/api-client
+        run: npm run typecheck
+      - name: Resolve base contract for compatibility check
+        id: base-contract
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+            fi
+          fi
+
+          # No base commit (repo's first commit) or the contract didn't exist yet at that
+          # commit (e.g. this PR is the one introducing it) - nothing to compare against.
+          # Written under the workspace, not host /tmp: oasdiff-action below runs as a Docker
+          # action, which only ever sees the repo checkout mounted at /github/workspace - a host
+          # /tmp path would be invisible to it.
+          mkdir -p .tmp
+          if [ -n "$BASE_SHA" ] && git show "$BASE_SHA:packages/contracts/openapi.json" > .tmp/base-openapi.json 2>/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fail on breaking API changes
+        if: steps.base-contract.outputs.found == 'true'
+        uses: oasdiff/oasdiff-action/breaking@v0.1.13
+        with:
+          base: .tmp/base-openapi.json
+          revision: packages/contracts/openapi.json
+          fail-on: ERR
+          # Uploading the spec to oasdiff.com for a shareable review link is opt-in
+          # elsewhere; disabled here so the contract never leaves CI.
+          review: false
+          github-token: ''
 
   unit-test-forecasting-service:
     name: "unit-test / forecasting-service"

@@ -51,6 +51,10 @@ public class SecurityConfig {
                 // Webhook endpoints (validated by signature, not JWT)
                 .requestMatchers("/api/webhooks/**").permitAll()
 
+                // OpenAPI docs (only actually registered when springdoc.api-docs.enabled=true,
+                // i.e. the test profile - see application.properties)
+                .requestMatchers("/v3/api-docs/**").permitAll()
+
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 

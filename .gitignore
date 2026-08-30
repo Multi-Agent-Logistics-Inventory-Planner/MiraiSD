@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 
+# Scratch dir used by CI (e.g. ci.yml's contracts-check job) for files that
+# must live under the workspace rather than host /tmp
+.tmp/
+
 # ============================================
 # NODE / NEXT.JS
 # ============================================
