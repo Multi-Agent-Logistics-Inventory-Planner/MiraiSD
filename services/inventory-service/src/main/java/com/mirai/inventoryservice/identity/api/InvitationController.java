@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.identity.api;
 import com.mirai.inventoryservice.identity.api.InvitationMapper;
 import com.mirai.inventoryservice.identity.api.InvitationRequestDTO;
 import com.mirai.inventoryservice.identity.api.InvitationResponseDTO;
+import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
 import com.mirai.inventoryservice.identity.domain.Invitation;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.identity.application.InvitationService;
@@ -14,7 +15,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/invitations")
@@ -39,10 +39,9 @@ public class InvitationController {
     public ResponseEntity<InvitationResponseDTO> inviteUser(
             @Valid @RequestBody InvitationRequestDTO requestDTO,
             Authentication authentication) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
-        String inviterEmail = principal.get("email");
-        String inviterName = principal.get("personName");
+        AuthenticatedPrincipal principal = (AuthenticatedPrincipal) authentication.getPrincipal();
+        String inviterEmail = principal.email();
+        String inviterName = principal.personName();
 
         UserRole role = UserRole.valueOf(requestDTO.getRole().toUpperCase());
 

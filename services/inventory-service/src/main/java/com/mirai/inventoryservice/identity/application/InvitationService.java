@@ -45,7 +45,7 @@ public class InvitationService {
             invitedBy = userService.getUserByEmail(inviterEmail);
         } else {
             // Auto-create admin user record if not exists
-            invitedBy = userService.createFromJwt(inviterEmail, inviterName, "ADMIN");
+            invitedBy = userService.createFromJwt(inviterEmail, inviterName, "ADMIN", null);
         }
 
         // Check if user already exists in Supabase (from a previous incomplete invite)

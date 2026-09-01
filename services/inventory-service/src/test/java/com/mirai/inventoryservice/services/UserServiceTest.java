@@ -1,0 +1,159 @@
+package com.mirai.inventoryservice.services;
+
+import com.mirai.inventoryservice.identity.application.UserService;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.infrastructure.InvitationRepository;
+import com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Covers resolveBySupabaseIdOrEmail's three branches per
+ * docs/specs/authentication-and-authorization.md section 2: prefer the JWT sub, fall back to
+ * email for rows not yet backfilled, and lazily persist the sub onto that row when found that
+ * way.
+ */
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private StockMovementRepository stockMovementRepository;
+
+    @Mock
+    private InvitationRepository invitationRepository;
+
+    @Mock
+    private SupabaseAdminService supabaseAdminService;
+
+    @InjectMocks
+    private UserService userService;
+
+    private static User userWithId(UUID id) {
+        return User.builder()
+                .id(id)
+                .fullName("Test User")
+                .email("user@example.com")
+                .role(UserRole.EMPLOYEE)
+                .build();
+    }
+
+    private static User userWithId(UUID id, UUID supabaseUserId) {
+        return User.builder()
+                .id(id)
+                .fullName("Test User")
+                .email("user@example.com")
+                .role(UserRole.EMPLOYEE)
+                .supabaseUserId(supabaseUserId)
+                .build();
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_SubMatch_ReturnsUserWithoutTouchingEmail() {
+        UUID sub = UUID.randomUUID();
+        User user = userWithId(UUID.randomUUID());
+        when(userRepository.findBySupabaseUserId(sub)).thenReturn(Optional.of(user));
+
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(sub, "user@example.com");
+
+        assertTrue(result.isPresent());
+        assertEquals(user, result.get());
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_EmailFallback_BackfillsSupabaseUserId() {
+        UUID sub = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User existing = userWithId(userId);
+        User backfilled = userWithId(userId, sub);
+        when(userRepository.findBySupabaseUserId(sub)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(existing));
+        when(userRepository.backfillSupabaseUserId(userId, sub)).thenReturn(1);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(backfilled));
+
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(sub, "user@example.com");
+
+        assertTrue(result.isPresent());
+        assertEquals(sub, result.get().getSupabaseUserId());
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_LosesBackfillRace_ReResolvesBySub() {
+        // Simulates two concurrent requests both reading the same row with
+        // supabase_user_id = NULL: this request's conditional update affects zero rows because
+        // another request already won and bound the row first.
+        UUID sub = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User existing = userWithId(userId);
+        User winnerBoundRow = userWithId(userId, sub);
+        when(userRepository.findBySupabaseUserId(sub))
+                .thenReturn(Optional.empty(), Optional.of(winnerBoundRow));
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(existing));
+        when(userRepository.backfillSupabaseUserId(userId, sub)).thenReturn(0);
+
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(sub, "user@example.com");
+
+        assertTrue(result.isPresent());
+        assertEquals(sub, result.get().getSupabaseUserId());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_EmailMatchesUserBoundToDifferentSub_RejectsAndDoesNotRebind() {
+        // A different Supabase account (a reused/shared email, or a deleted-and-recreated
+        // account) must NEVER take over an already-bound backend user just by sharing its
+        // email - that would let a signed token for the wrong account inherit this user's role.
+        UUID incomingSub = UUID.randomUUID();
+        UUID boundSub = UUID.randomUUID();
+        User boundUser = userWithId(UUID.randomUUID(), boundSub);
+        when(userRepository.findBySupabaseUserId(incomingSub)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(boundUser));
+
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(incomingSub, "user@example.com");
+
+        assertFalse(result.isPresent());
+        verify(userRepository, never()).save(any());
+        assertEquals(boundSub, boundUser.getSupabaseUserId(), "existing binding must be untouched");
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_NoMatch_ReturnsEmptyWithoutSaving() {
+        UUID sub = UUID.randomUUID();
+        when(userRepository.findBySupabaseUserId(sub)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(sub, "nobody@example.com");
+
+        assertFalse(result.isPresent());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resolveBySupabaseIdOrEmail_NullSubAndEmail_ReturnsEmpty() {
+        Optional<User> result = userService.resolveBySupabaseIdOrEmail(null, null);
+
+        assertFalse(result.isPresent());
+    }
+}

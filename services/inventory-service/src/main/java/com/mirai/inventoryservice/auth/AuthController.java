@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.auth;
 
 import com.mirai.inventoryservice.identity.api.UserMapper;
 import com.mirai.inventoryservice.identity.api.UserResponseDTO;
+import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.InvitationService;
 import com.mirai.inventoryservice.identity.application.UserService;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -42,11 +45,14 @@ public class AuthController {
                 String role = jwtService.extractRole(token);
                 String personName = jwtService.extractName(token);
                 String email = jwtService.extractEmail(token);
+                UUID supabaseUserId = parseUuid(jwtService.extractPersonId(token));
 
-                // Look up the application user by email - use database role for validation
+                // Resolve the application user by sub (falling back to email for rows not yet
+                // backfilled) - use database role for validation.
                 String personId = null;
-                if (email != null && userService.existsByEmail(email)) {
-                    User user = userService.getUserByEmail(email);
+                Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(supabaseUserId, email);
+                if (resolved.isPresent()) {
+                    User user = resolved.get();
                     personId = user.getId().toString();
                     // Use database role to ensure validation succeeds
                     role = user.getRole().name();
@@ -86,6 +92,7 @@ public class AuthController {
             String role = jwtService.extractRole(token);
             String personName = jwtService.extractName(token);
             String email = jwtService.extractEmail(token);
+            UUID supabaseUserId = parseUuid(jwtService.extractPersonId(token));
 
             Map<String, Object> response = new HashMap<>();
             response.put("valid", true);
@@ -94,9 +101,10 @@ public class AuthController {
             response.put("personId", null);
             response.put("user", null);
 
-            // Look up user and include full user data in response
-            if (email != null && userService.existsByEmail(email)) {
-                User user = userService.getUserByEmail(email);
+            // Resolve user and include full user data in response
+            Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(supabaseUserId, email);
+            if (resolved.isPresent()) {
+                User user = resolved.get();
                 response.put("personId", user.getId().toString());
                 response.put("role", user.getRole().name()); // Override with DB role
                 response.put("user", userMapper.toResponseDTO(user));
@@ -116,16 +124,15 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
-        String email = principal.get("email");
+        AuthenticatedPrincipal principal = (AuthenticatedPrincipal) authentication.getPrincipal();
 
-        if (email == null || !userService.existsByEmail(email)) {
+        Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(
+                principal.supabaseUserId(), principal.email());
+        if (resolved.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        User user = userService.getUserByEmail(email);
-        return ResponseEntity.ok(userMapper.toResponseDTO(user));
+        return ResponseEntity.ok(userMapper.toResponseDTO(resolved.get()));
     }
 
     /**
@@ -134,27 +141,37 @@ public class AuthController {
      */
     @PostMapping("/sync-user")
     public ResponseEntity<UserResponseDTO> syncUser(Authentication authentication) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
+        AuthenticatedPrincipal principal = (AuthenticatedPrincipal) authentication.getPrincipal();
 
-        String email = principal.get("email");
-        String name = principal.get("personName");
-        String role = principal.get("role");
+        String email = principal.email();
+        String name = principal.personName();
+        String role = principal.role();
 
         if (email == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        if (userService.existsByEmail(email)) {
-            User existingUser = userService.getUserByEmail(email);
-            return ResponseEntity.ok(userMapper.toResponseDTO(existingUser));
+        Optional<User> existing = userService.resolveBySupabaseIdOrEmail(principal.supabaseUserId(), email);
+        if (existing.isPresent()) {
+            return ResponseEntity.ok(userMapper.toResponseDTO(existing.get()));
         }
 
-        User user = userService.createFromJwt(email, name, role);
+        User user = userService.createFromJwt(email, name, role, principal.supabaseUserId());
 
         invitationService.markInvitationAccepted(email);
 
         return ResponseEntity.ok(userMapper.toResponseDTO(user));
+    }
+
+    private static UUID parseUuid(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
 }

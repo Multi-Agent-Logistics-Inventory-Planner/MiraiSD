@@ -9,6 +9,7 @@ import com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -20,6 +21,7 @@ import java.util.UUID;
 
 @Service
 @Transactional
+@Slf4j
 public class UserService {
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
@@ -114,7 +116,76 @@ public class UserService {
         return userRepository.existsByFullName(fullName);
     }
 
-    public User createFromJwt(String email, String name, String role) {
+    /**
+     * Resolves a backend user for an authenticated request, per
+     * docs/specs/authentication-and-authorization.md section 2: the JWT {@code sub} claim
+     * (supabaseUserId) is the stable identifier and must be preferred over email.
+     * <p>
+     * Existing rows created before supabase_user_id existed have no value there yet, so this
+     * falls back to an email match and lazily backfills the column on that row when found -
+     * every existing user is backfilled automatically on their first request after this change
+     * ships, with no separate migration script.
+     * <p>
+     * The email fallback only ever backfills a row whose supabaseUserId is still null. A row
+     * already bound to a different, non-null supabaseUserId is NEVER rebound by an email match:
+     * email is not a stable identifier (a Supabase account can be deleted and its email reused
+     * by a different account), so treating "same email" as authorization to take over an
+     * already-bound identity would let a signed token for one Supabase account impersonate a
+     * different backend account - and inherit its role - purely by sharing an email address.
+     * That case returns no match and is logged for audit visibility.
+     * <p>
+     * The backfill write itself is an atomic conditional update (see
+     * {@link UserRepository#backfillSupabaseUserId}), not a plain save: two concurrent requests
+     * can both read the same row with supabase_user_id still null before either writes, and a
+     * plain save would let the second writer silently overwrite the first with no version
+     * column or row lock to catch it. If this request loses that race, it re-resolves by sub -
+     * honoring the row if the winner bound it to the same sub this request presented, otherwise
+     * rejecting rather than trusting its now-stale read.
+     */
+    public Optional<User> resolveBySupabaseIdOrEmail(UUID supabaseUserId, String email) {
+        if (supabaseUserId != null) {
+            Optional<User> bySub = userRepository.findBySupabaseUserId(supabaseUserId);
+            if (bySub.isPresent()) {
+                return bySub;
+            }
+        }
+
+        if (email == null) {
+            return Optional.empty();
+        }
+
+        Optional<User> byEmail = userRepository.findByEmail(email);
+        if (byEmail.isEmpty()) {
+            return Optional.empty();
+        }
+
+        User user = byEmail.get();
+        UUID existingSupabaseUserId = user.getSupabaseUserId();
+
+        if (existingSupabaseUserId != null) {
+            if (!existingSupabaseUserId.equals(supabaseUserId)) {
+                log.warn("Rejected identity rebind attempt: email {} is already bound to "
+                                + "supabaseUserId {}, but the request presented sub {}",
+                        email, existingSupabaseUserId, supabaseUserId);
+                return Optional.empty();
+            }
+            return byEmail;
+        }
+
+        if (supabaseUserId == null) {
+            return byEmail;
+        }
+
+        int updated = userRepository.backfillSupabaseUserId(user.getId(), supabaseUserId);
+        if (updated == 0) {
+            // Lost the race to another concurrent request. Re-resolve by sub rather than trust
+            // this request's stale in-memory read of the row.
+            return userRepository.findBySupabaseUserId(supabaseUserId);
+        }
+        return userRepository.findById(user.getId());
+    }
+
+    public User createFromJwt(String email, String name, String role, UUID supabaseUserId) {
         UserRole userRole = UserRole.EMPLOYEE;
         if (role != null) {
             try {
@@ -133,6 +204,7 @@ public class UserService {
                 .role(userRole)
                 .canonicalName(firstName)
                 .isReviewTracked(true)
+                .supabaseUserId(supabaseUserId)
                 .build();
         return userRepository.save(user);
     }

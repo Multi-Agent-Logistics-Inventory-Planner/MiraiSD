@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.auth;
 
+import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.UserService;
 import jakarta.servlet.FilterChain;
@@ -16,7 +17,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @AllArgsConstructor
@@ -64,17 +66,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // ("security correctness must not depend on a client refreshing its token").
                 // If this lookup becomes a measured hot path, any cache added here MUST use a
                 // bounded TTL with explicit invalidation on role change, per the same section.
-                String dbRole = null;
-                if (personEmail != null && userService.existsByEmail(personEmail)) {
-                    User user = userService.getUserByEmail(personEmail);
-                    dbRole = user.getRole().name();
-                }
+                //
+                // Resolution prefers the JWT sub (supabaseUserId) over email, per section 2 -
+                // email is a profile attribute, not a stable authorization identifier. Existing
+                // rows without a captured sub yet are matched by email and lazily backfilled by
+                // resolveBySupabaseIdOrEmail, so every user is migrated onto sub-based lookup on
+                // their first request after this ships.
+                UUID supabaseUserId = parseUuid(personId);
+                Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(supabaseUserId, personEmail);
+                String dbRole = resolved.map(u -> u.getRole().name()).orElse(null);
+                UUID backendUserId = resolved.map(User::getId).orElse(null);
 
-                Map<String, String> principal = new java.util.HashMap<>();
-                principal.put("personId", personId);
-                principal.put("personName", personName != null ? personName : "Unknown");
-                principal.put("email", personEmail);
-                principal.put("role", dbRole);
+                AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                        supabaseUserId,
+                        backendUserId,
+                        personEmail,
+                        personName != null ? personName : "Unknown",
+                        dbRole);
 
                 // No matching backend user record grants no elevated role, never a
                 // JWT-claimed one.
@@ -91,5 +99,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private static UUID parseUuid(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

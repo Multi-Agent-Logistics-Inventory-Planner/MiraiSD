@@ -5,6 +5,7 @@ import com.mirai.inventoryservice.dtos.mappers.ShipmentMapperDecorator;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
+import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
@@ -23,7 +24,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -46,17 +46,16 @@ public class ShipmentController {
     /**
      * Extract actor info from authentication for audit logging
      */
-    @SuppressWarnings("unchecked")
     private ActorInfo getActorInfo(Authentication authentication) {
         if (authentication == null) {
             return new ActorInfo(null, null);
         }
-        Map<String, String> principal = (Map<String, String>) authentication.getPrincipal();
-        String email = principal.get("email");
-        if (email == null) {
+        AuthenticatedPrincipal principal = (AuthenticatedPrincipal) authentication.getPrincipal();
+        UUID backendUserId = principal.backendUserId();
+        if (backendUserId == null) {
             return new ActorInfo(null, null);
         }
-        return userRepository.findByEmail(email)
+        return userRepository.findById(backendUserId)
                 .map(user -> new ActorInfo(user.getId(), user.getFullName()))
                 .orElse(new ActorInfo(null, null));
     }

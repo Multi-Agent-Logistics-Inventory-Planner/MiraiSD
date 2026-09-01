@@ -31,10 +31,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -368,9 +371,10 @@ class ShipmentControllerSecurityTest {
         when(jwtService.extractEmail(token)).thenReturn(email);
         try {
             UserRole userRole = UserRole.valueOf(role.toUpperCase());
-            when(userService.existsByEmail(email)).thenReturn(true);
-            when(userService.getUserByEmail(email)).thenReturn(
-                    User.builder().email(email).fullName(name).role(userRole).build());
+            // personId here (e.g. "employee-123") is not a valid UUID, so the filter resolves
+            // with a null supabaseUserId and falls back to the email match.
+            when(userService.resolveBySupabaseIdOrEmail(isNull(), eq(email))).thenReturn(
+                    Optional.of(User.builder().email(email).fullName(name).role(userRole).build()));
         } catch (IllegalArgumentException e) {
             // Role has no backend UserRole equivalent (e.g. plain "user"); leave the
             // lookup unstubbed so it falls back to no matching record, matching how

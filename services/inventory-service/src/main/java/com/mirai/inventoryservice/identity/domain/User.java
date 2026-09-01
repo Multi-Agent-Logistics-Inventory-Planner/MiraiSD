@@ -48,6 +48,9 @@ public class User {
     @Column(name = "canonical_name")
     private String canonicalName;
 
+    @Column(name = "supabase_user_id")
+    private UUID supabaseUserId;
+
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "name_variants")
     @Builder.Default

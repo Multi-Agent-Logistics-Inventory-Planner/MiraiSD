@@ -20,9 +20,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.crypto.SecretKey;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -314,12 +317,13 @@ class SecurityConfigTest {
 
     /**
      * Stubs the backend-controlled User lookup (see JwtAuthenticationFilter) so a request
-     * carrying the given email resolves to an ADMIN role.
+     * carrying the given email resolves to an ADMIN role. The token's sub in these tests
+     * ("admin-123" etc.) is not a valid UUID, so the filter resolves with a null
+     * supabaseUserId and falls back to the email match.
      */
     private void mockAdminDbUser(String email, String name) {
-        when(userService.existsByEmail(email)).thenReturn(true);
-        when(userService.getUserByEmail(email)).thenReturn(
-                User.builder().email(email).fullName(name).role(UserRole.ADMIN).build());
+        when(userService.resolveBySupabaseIdOrEmail(isNull(), eq(email))).thenReturn(
+                Optional.of(User.builder().email(email).fullName(name).role(UserRole.ADMIN).build()));
     }
 
     private String createValidToken(String personId, String name, String role) {
