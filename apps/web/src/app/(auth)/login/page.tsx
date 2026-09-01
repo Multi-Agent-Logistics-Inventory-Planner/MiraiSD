@@ -2,11 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { LoginForm } from "@/components/auth/login-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Moon } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { Logo } from "@/components/logo";
+import { PitoAsciiArt } from "@/components/auth/pito-ascii-art";
+import { Button } from "@/components/ui/button";
+
+function BrandPanel() {
+  return (
+    <aside className="relative hidden overflow-hidden bg-brand-primary p-8 lg:block">
+      <PitoAsciiArt />
+      <div className="relative z-10">
+        <Logo width={64} height={64} />
+      </div>
+    </aside>
+  );
+}
+
+function TemporaryThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon-sm"
+      className="absolute right-4 top-4 z-20 bg-background/80 backdrop-blur-sm"
+      aria-label="Toggle light and dark mode"
+      title="Toggle light and dark mode"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+    >
+      <Moon />
+    </Button>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,29 +78,34 @@ export default function LoginPage() {
 
   if (isCheckingInvite) {
     return (
-      <Card className="shadow-lg">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="mt-4 text-sm text-gray-600">Loading...</p>
-        </CardContent>
-      </Card>
+      <main className="fixed inset-0 grid min-h-dvh bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <TemporaryThemeToggle />
+        <BrandPanel />
+        <section className="flex min-h-dvh items-center justify-center px-6 py-12 sm:px-12 lg:px-16">
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <p className="mt-4 text-sm text-gray-600">Loading...</p>
+          </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="space-y-1 text-center pb-2 sm:pb-6">
-        <div className="flex justify-center mb-2 sm:mb-4">
-          <Logo width={80} height={80} />
+    <main className="fixed inset-0 grid min-h-dvh bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <TemporaryThemeToggle />
+      <BrandPanel />
+      <section className="flex min-h-dvh items-center justify-center overflow-y-auto px-6 py-12 sm:px-12 lg:px-16">
+        <div className="w-full max-w-sm">
+          <header className="mb-10 space-y-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">Sign in to Mirai Arcade</h1>
+            <p className="text-sm text-muted-foreground">
+              Sign in to your account to continue
+            </p>
+          </header>
+          <LoginForm />
         </div>
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>
-          Sign in to your account to continue
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <LoginForm />
-      </CardContent>
-    </Card>
+      </section>
+    </main>
   );
 }
