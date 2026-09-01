@@ -1,0 +1,25 @@
+package com.mirai.inventoryservice.identity.infrastructure;
+
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
+
+@Converter(autoApply = true)
+public class UserRoleConverter implements AttributeConverter<UserRole, String> {
+
+    @Override
+    public String convertToDatabaseColumn(UserRole role) {
+        if (role == null) return null;
+        return switch (role) {
+            case ADMIN -> "admin";
+            case ASSISTANT_MANAGER -> "assistant_manager";
+            case EMPLOYEE -> "employee";
+        };
+    }
+
+    @Override
+    public UserRole convertToEntityAttribute(String dbValue) {
+        if (dbValue == null) return null;
+        return UserRole.valueOf(dbValue.toUpperCase());
+    }
+}

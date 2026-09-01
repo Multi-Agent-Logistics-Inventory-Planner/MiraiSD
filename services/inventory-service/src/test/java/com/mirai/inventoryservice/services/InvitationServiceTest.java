@@ -1,7 +1,10 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.models.audit.Invitation;
-import com.mirai.inventoryservice.repositories.InvitationRepository;
+import com.mirai.inventoryservice.identity.domain.Invitation;
+import com.mirai.inventoryservice.identity.infrastructure.InvitationRepository;
+import com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService;
+import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

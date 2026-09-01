@@ -1,10 +1,10 @@
 package com.mirai.inventoryservice.auth;
 
-import com.mirai.inventoryservice.dtos.mappers.UserMapper;
-import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.services.InvitationService;
-import com.mirai.inventoryservice.services.UserService;
+import com.mirai.inventoryservice.identity.api.UserMapper;
+import com.mirai.inventoryservice.identity.api.UserResponseDTO;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

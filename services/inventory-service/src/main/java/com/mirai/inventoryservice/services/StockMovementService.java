@@ -6,15 +6,22 @@ import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
+import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
+import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.Site;
+import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
-import com.mirai.inventoryservice.models.storage.Location;
-import com.mirai.inventoryservice.models.storage.StorageLocation;
+import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.domain.StorageLocation;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
+import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
@@ -956,7 +963,7 @@ public class StockMovementService {
             String productSummary,
             String notes
     ) {
-        com.mirai.inventoryservice.models.audit.User user = null;
+        com.mirai.inventoryservice.identity.domain.User user = null;
         String actorName = null;
         if (actorId != null) {
             user = userRepository.findById(actorId).orElse(null);

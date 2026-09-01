@@ -2,9 +2,9 @@ package com.mirai.inventoryservice.auth;
 
 import com.mirai.inventoryservice.auth.JwtAuthenticationFilter;
 import com.mirai.inventoryservice.auth.JwtService;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.services.UserService;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.application.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

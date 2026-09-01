@@ -12,7 +12,7 @@ import com.mirai.inventoryservice.repositories.LootboxPlayRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
 import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

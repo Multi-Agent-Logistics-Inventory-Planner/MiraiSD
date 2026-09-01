@@ -2,9 +2,9 @@ package com.mirai.inventoryservice.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;

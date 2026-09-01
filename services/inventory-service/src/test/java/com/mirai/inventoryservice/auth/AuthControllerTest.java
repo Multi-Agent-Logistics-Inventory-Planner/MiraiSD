@@ -1,11 +1,11 @@
 package com.mirai.inventoryservice.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mirai.inventoryservice.dtos.mappers.UserMapper;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.services.InvitationService;
-import com.mirai.inventoryservice.services.UserService;
+import com.mirai.inventoryservice.identity.api.UserMapper;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

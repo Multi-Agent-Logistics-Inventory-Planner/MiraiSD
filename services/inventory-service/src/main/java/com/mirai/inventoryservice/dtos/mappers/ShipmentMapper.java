@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.dtos.mappers;
 import com.mirai.inventoryservice.dtos.responses.ShipmentItemAllocationResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentItemResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
+import com.mirai.inventoryservice.identity.api.UserMapper;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;

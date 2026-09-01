@@ -1,10 +1,10 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.LootboxException;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.repositories.CoinEconomyConfigRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

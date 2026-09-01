@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.models.kuji;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.Product;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
-import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.sites.domain.Location;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

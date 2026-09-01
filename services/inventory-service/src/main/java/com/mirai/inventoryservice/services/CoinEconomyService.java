@@ -1,11 +1,11 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.exceptions.LootboxException;
-import com.mirai.inventoryservice.exceptions.UserNotFoundException;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.repositories.CoinEconomyConfigRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

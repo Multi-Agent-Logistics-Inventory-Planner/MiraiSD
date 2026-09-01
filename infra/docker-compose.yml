@@ -62,7 +62,7 @@ services:
       - mirai
     # H1: Healthcheck to detect broker readiness
     # Note: Using lightweight nc (netcat) instead of kafka-broker-api-versions.sh
-    # which spawns a JVM and causes OOM issues on 2GB droplets
+    # which spawns a JVM and causes OOM issues under the CPX21's memory limits
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "9092"]
       interval: 10s
@@ -90,7 +90,7 @@ services:
       - ../.env
     environment:
       # JVM memory limits optimized for 896M container on the CPX21
-      # - Heap: 512m max (raised from 192m; the old cap was sized for a 2GB droplet)
+      # - Heap: 512m max
       # - MaxMetaspaceSize: 256m (increased to avoid OkHttp / Resend metaspace OOM)
       # - ReservedCodeCacheSize: 32m (caps JIT compiler memory)
       # - UseContainerSupport: respect container memory limits
@@ -111,7 +111,7 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    # Note: Spring Boot on 2GB droplet takes 2-3 minutes to fully initialize
+    # Note: Spring Boot takes 2-3 minutes to fully initialize on the CPX21
     # start_period: time before healthchecks count against retries
     # Total allowed: start_period + (retries * interval) = 180 + 150 = 330s
     healthcheck:

@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.models.review;
 
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
