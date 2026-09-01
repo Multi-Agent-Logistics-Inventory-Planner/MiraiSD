@@ -1,14 +1,15 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.exceptions.DuplicateLocationCodeException;
-import com.mirai.inventoryservice.exceptions.LocationNotFoundException;
-import com.mirai.inventoryservice.exceptions.StorageLocationNotFoundException;
-import com.mirai.inventoryservice.models.Site;
-import com.mirai.inventoryservice.models.storage.Location;
-import com.mirai.inventoryservice.models.storage.StorageLocation;
-import com.mirai.inventoryservice.repositories.LocationRepository;
-import com.mirai.inventoryservice.repositories.SiteRepository;
-import com.mirai.inventoryservice.repositories.StorageLocationRepository;
+import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;
+import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
+import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.domain.StorageLocation;
+import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
+import com.mirai.inventoryservice.sites.application.LocationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

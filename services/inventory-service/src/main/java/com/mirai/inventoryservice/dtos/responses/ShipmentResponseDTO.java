@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.identity.api.UserResponseDTO;
 import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import lombok.AllArgsConstructor;

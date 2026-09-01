@@ -223,7 +223,8 @@ export function LoginForm() {
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        This system is invite-only. Contact your administrator for access.
+        <span className="block">This system is invite-only.</span>
+        <span className="block">Contact your administrator for access.</span>
       </p>
     </form>
   );

@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.models.shipment;
 
 import com.mirai.inventoryservice.models.Supplier;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import jakarta.persistence.*;

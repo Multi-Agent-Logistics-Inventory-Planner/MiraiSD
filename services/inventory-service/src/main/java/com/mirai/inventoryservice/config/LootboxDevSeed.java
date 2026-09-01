@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.config;
 
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
 import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPrize;
@@ -10,7 +10,7 @@ import com.mirai.inventoryservice.repositories.CoinEconomyConfigRepository;
 import com.mirai.inventoryservice.repositories.LootboxPrizeRepository;
 import com.mirai.inventoryservice.repositories.LootboxRepository;
 import com.mirai.inventoryservice.repositories.LootboxTierRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

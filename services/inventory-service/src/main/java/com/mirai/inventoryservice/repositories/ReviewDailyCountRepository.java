@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.repositories;
 
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

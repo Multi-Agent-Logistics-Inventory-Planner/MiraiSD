@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.models.inventory;
 
 import com.mirai.inventoryservice.models.Product;
-import com.mirai.inventoryservice.models.Site;
-import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.domain.Location;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

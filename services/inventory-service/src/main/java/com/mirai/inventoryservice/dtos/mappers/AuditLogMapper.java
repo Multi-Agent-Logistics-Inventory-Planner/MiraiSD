@@ -2,11 +2,11 @@ package com.mirai.inventoryservice.dtos.mappers;
 
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.models.audit.StockMovement;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.storage.Location;
-import com.mirai.inventoryservice.repositories.LocationRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Component;

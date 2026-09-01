@@ -1,11 +1,11 @@
 package com.mirai.inventoryservice.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mirai.inventoryservice.dtos.mappers.UserMapper;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
-import com.mirai.inventoryservice.services.InvitationService;
-import com.mirai.inventoryservice.services.UserService;
+import com.mirai.inventoryservice.identity.api.UserMapper;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,6 +13,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
@@ -50,6 +51,7 @@ class AuthControllerTest {
         String tokenWithoutBearer = "valid.jwt.token";
         String email = "admin@example.com";
         UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID sub = UUID.fromString("11111111-1111-1111-1111-111111111111");
         User user = User.builder()
                 .id(userId)
                 .email(email)
@@ -61,8 +63,8 @@ class AuthControllerTest {
         when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("ADMIN");
         when(jwtService.extractName(tokenWithoutBearer)).thenReturn("Admin User");
         when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
-        when(userService.existsByEmail(email)).thenReturn(true);
-        when(userService.getUserByEmail(email)).thenReturn(user);
+        when(jwtService.extractPersonId(tokenWithoutBearer)).thenReturn(sub.toString());
+        when(userService.resolveBySupabaseIdOrEmail(sub, email)).thenReturn(Optional.of(user));
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/validate")
@@ -80,7 +82,7 @@ class AuthControllerTest {
         // Arrange
         String invalidToken = "Bearer invalid.jwt.token";
         String tokenWithoutBearer = "invalid.jwt.token";
-        
+
         when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(false);
 
         // Act & Assert
@@ -105,7 +107,7 @@ class AuthControllerTest {
         // Arrange
         String expiredToken = "Bearer expired.jwt.token";
         String tokenWithoutBearer = "expired.jwt.token";
-        
+
         when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(false);
 
         // Act & Assert
@@ -123,6 +125,7 @@ class AuthControllerTest {
         String tokenWithoutBearer = "employee.jwt.token";
         String email = "employee@example.com";
         UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+        UUID sub = UUID.fromString("22222222-2222-2222-2222-222222222222");
         User user = User.builder()
                 .id(userId)
                 .email(email)
@@ -134,8 +137,8 @@ class AuthControllerTest {
         when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("EMPLOYEE");
         when(jwtService.extractName(tokenWithoutBearer)).thenReturn("Employee User");
         when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
-        when(userService.existsByEmail(email)).thenReturn(true);
-        when(userService.getUserByEmail(email)).thenReturn(user);
+        when(jwtService.extractPersonId(tokenWithoutBearer)).thenReturn(sub.toString());
+        when(userService.resolveBySupabaseIdOrEmail(sub, email)).thenReturn(Optional.of(user));
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/validate")
@@ -152,12 +155,14 @@ class AuthControllerTest {
         String token = "Bearer new.user.token";
         String tokenWithoutBearer = "new.user.token";
         String email = "newuser@example.com";
+        UUID sub = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
         when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(true);
         when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("EMPLOYEE");
         when(jwtService.extractName(tokenWithoutBearer)).thenReturn("New User");
         when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
-        when(userService.existsByEmail(email)).thenReturn(false);
+        when(jwtService.extractPersonId(tokenWithoutBearer)).thenReturn(sub.toString());
+        when(userService.resolveBySupabaseIdOrEmail(sub, email)).thenReturn(Optional.empty());
 
         // Act & Assert - personId should be null if user not in database
         mockMvc.perform(post("/api/auth/validate")
@@ -178,6 +183,7 @@ class AuthControllerTest {
         String tokenWithoutBearer = "valid.jwt.token";
         String email = "admin@example.com";
         UUID userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+        UUID sub = UUID.fromString("11111111-1111-1111-1111-111111111111");
         User user = User.builder()
                 .id(userId)
                 .email(email)
@@ -189,8 +195,8 @@ class AuthControllerTest {
         when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("ADMIN");
         when(jwtService.extractName(tokenWithoutBearer)).thenReturn("Admin User");
         when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
-        when(userService.existsByEmail(email)).thenReturn(true);
-        when(userService.getUserByEmail(email)).thenReturn(user);
+        when(jwtService.extractPersonId(tokenWithoutBearer)).thenReturn(sub.toString());
+        when(userService.resolveBySupabaseIdOrEmail(sub, email)).thenReturn(Optional.of(user));
 
         // Act & Assert
         mockMvc.perform(get("/api/auth/session")
@@ -226,12 +232,14 @@ class AuthControllerTest {
         String token = "Bearer new.user.token";
         String tokenWithoutBearer = "new.user.token";
         String email = "newuser@example.com";
+        UUID sub = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
         when(jwtService.validateToken(tokenWithoutBearer)).thenReturn(true);
         when(jwtService.extractRole(tokenWithoutBearer)).thenReturn("EMPLOYEE");
         when(jwtService.extractName(tokenWithoutBearer)).thenReturn("New User");
         when(jwtService.extractEmail(tokenWithoutBearer)).thenReturn(email);
-        when(userService.existsByEmail(email)).thenReturn(false);
+        when(jwtService.extractPersonId(tokenWithoutBearer)).thenReturn(sub.toString());
+        when(userService.resolveBySupabaseIdOrEmail(sub, email)).thenReturn(Optional.empty());
 
         // Act & Assert - user should be null if not in database
         mockMvc.perform(get("/api/auth/session")

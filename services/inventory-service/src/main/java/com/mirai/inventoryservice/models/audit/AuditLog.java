@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models.audit;
 
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;

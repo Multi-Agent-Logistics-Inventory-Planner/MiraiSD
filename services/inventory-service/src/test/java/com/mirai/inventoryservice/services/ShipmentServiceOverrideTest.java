@@ -36,13 +36,13 @@ class ShipmentServiceOverrideTest {
     @Mock private com.mirai.inventoryservice.repositories.ShipmentItemRepository shipmentItemRepository;
     @Mock private com.mirai.inventoryservice.repositories.ProductRepository productRepository;
     @Mock private com.mirai.inventoryservice.services.ProductService productService;
-    @Mock private com.mirai.inventoryservice.services.UserService userService;
-    @Mock private com.mirai.inventoryservice.repositories.UserRepository userRepository;
+    @Mock private com.mirai.inventoryservice.identity.application.UserService userService;
+    @Mock private com.mirai.inventoryservice.identity.infrastructure.UserRepository userRepository;
     @Mock private com.mirai.inventoryservice.repositories.StockMovementRepository stockMovementRepository;
     @Mock private com.mirai.inventoryservice.repositories.LocationInventoryRepository locationInventoryRepository;
-    @Mock private com.mirai.inventoryservice.repositories.LocationRepository locationRepository;
-    @Mock private com.mirai.inventoryservice.repositories.StorageLocationRepository storageLocationRepository;
-    @Mock private com.mirai.inventoryservice.repositories.SiteRepository siteRepository;
+    @Mock private com.mirai.inventoryservice.sites.infrastructure.LocationRepository locationRepository;
+    @Mock private com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository storageLocationRepository;
+    @Mock private com.mirai.inventoryservice.sites.infrastructure.SiteRepository siteRepository;
     @Mock private NotificationService notificationService;
     @Mock private StockMovementService stockMovementService;
     @Mock private AuditLogService auditLogService;

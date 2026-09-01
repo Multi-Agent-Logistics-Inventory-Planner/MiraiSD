@@ -2,13 +2,13 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
-import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.identity.api.UserResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserReviewStatsResponseDTO;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

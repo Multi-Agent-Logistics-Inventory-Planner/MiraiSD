@@ -9,7 +9,7 @@ import com.mirai.inventoryservice.dtos.responses.RecentLootboxPlayResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.WalletBreakdownResponseDTO;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
 import com.mirai.inventoryservice.exceptions.LootboxException;
-import com.mirai.inventoryservice.models.audit.User;
+import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.lootbox.CoinAdjustment;
 import com.mirai.inventoryservice.models.lootbox.Lootbox;
 import com.mirai.inventoryservice.models.lootbox.LootboxPlay;

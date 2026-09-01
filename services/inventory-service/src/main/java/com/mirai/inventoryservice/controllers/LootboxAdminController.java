@@ -17,11 +17,12 @@ import com.mirai.inventoryservice.dtos.responses.LootboxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.LootboxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.PlayerCoinRowDTO;
 import com.mirai.inventoryservice.dtos.responses.UserCoinProfileResponseDTO;
-import com.mirai.inventoryservice.exceptions.UserNotFoundException;
-import com.mirai.inventoryservice.models.audit.User;
-import com.mirai.inventoryservice.models.enums.UserRole;
+import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
+import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.models.lootbox.CoinEconomyConfig;
-import com.mirai.inventoryservice.repositories.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import com.mirai.inventoryservice.services.CoinAdminDashboardService;
 import com.mirai.inventoryservice.services.CoinEconomyService;
 import com.mirai.inventoryservice.services.LootboxAdminService;
@@ -39,7 +40,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -220,8 +220,8 @@ public class LootboxAdminController {
     }
 
     private UUID resolveUserId(Authentication auth) {
-        String email = extractEmail(auth);
-        if (email == null) {
+        UUID backendUserId = extractBackendUserId(auth);
+        if (backendUserId == null) {
             // Dev fallback (see LootboxController.resolveUserId).
             return userRepository.findAll().stream()
                     .filter(u -> u.getRole() == UserRole.ADMIN)
@@ -230,18 +230,14 @@ public class LootboxAdminController {
                     .orElseThrow(() -> new UserNotFoundException(
                             "No authenticated user and no ADMIN user in DB to fall back to."));
         }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("Admin user not found: " + email));
-        return user.getId();
+        return backendUserId;
     }
 
-    @SuppressWarnings("unchecked")
-    private static String extractEmail(Authentication auth) {
+    private static UUID extractBackendUserId(Authentication auth) {
         if (auth == null) return null;
         Object principal = auth.getPrincipal();
-        if (principal instanceof Map<?, ?> map) {
-            Object email = map.get("email");
-            return email instanceof String s ? s : null;
+        if (principal instanceof AuthenticatedPrincipal authenticatedPrincipal) {
+            return authenticatedPrincipal.backendUserId();
         }
         return null;
     }

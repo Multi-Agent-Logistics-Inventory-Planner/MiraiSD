@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.controllers;
 import com.mirai.inventoryservice.dtos.requests.UserReviewTrackingRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ReviewSummaryResponseDTO;
-import com.mirai.inventoryservice.dtos.responses.UserResponseDTO;
+import com.mirai.inventoryservice.identity.api.UserResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.UserReviewStatsResponseDTO;
 import com.mirai.inventoryservice.services.ReviewService;
 import org.springframework.data.domain.Page;

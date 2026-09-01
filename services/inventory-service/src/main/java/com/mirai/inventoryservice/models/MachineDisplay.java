@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.models;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.models.storage.Location;
+import com.mirai.inventoryservice.sites.domain.Location;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

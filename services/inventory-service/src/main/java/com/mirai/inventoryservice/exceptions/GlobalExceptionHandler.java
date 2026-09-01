@@ -1,5 +1,10 @@
 package com.mirai.inventoryservice.exceptions;
 
+import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
+import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;
+import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
+import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
+import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
