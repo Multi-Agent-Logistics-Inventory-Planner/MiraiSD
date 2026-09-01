@@ -97,11 +97,8 @@ export default function LoginPage() {
       <BrandPanel />
       <section className="flex min-h-dvh items-center justify-center overflow-y-auto px-6 py-12 sm:px-12 lg:px-16">
         <div className="w-full max-w-sm">
-          <header className="mb-10 space-y-2 text-center">
+          <header className="mb-6 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">Sign in to Mirai Arcade</h1>
-            <p className="text-sm text-muted-foreground">
-              Sign in to your account to continue
-            </p>
           </header>
           <LoginForm />
         </div>
