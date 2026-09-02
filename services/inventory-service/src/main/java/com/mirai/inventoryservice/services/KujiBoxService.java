@@ -284,6 +284,7 @@ public class KujiBoxService {
         // location; auto-created prize children are birthed directly at the box location
         // (no source — they didn't exist anywhere before).
         Set<UUID> affectedProductIds = new HashSet<>();
+        String resolvedActorName = resolveActorName(request.getActorId());
         for (int i = 0; i < request.getTiers().size(); i++) {
             NewKujiBoxTierDTO dto = request.getTiers().get(i);
             KujiBoxTier tier = box.getTiers().get(i);
@@ -317,6 +318,7 @@ public class KujiBoxService {
                         .quantityChange(0)
                         .reason(StockMovementReason.INITIAL_STOCK)
                         .actorId(request.getActorId())
+                        .actorName(resolvedActorName)
                         .at(now)
                         .metadata(metadata)
                         .build();
@@ -374,6 +376,7 @@ public class KujiBoxService {
         }
 
         Set<UUID> affectedProductIds = new HashSet<>();
+        String resolvedActorName = resolveActorName(request.getActorId());
         for (KujiBoxTier tier : box.getTiers()) {
             int active = tier.getActiveCount() != null ? tier.getActiveCount() : 0;
             int inactive = tier.getInactiveCount() != null ? tier.getInactiveCount() : 0;
@@ -399,6 +402,7 @@ public class KujiBoxService {
                             .quantityChange(0)
                             .reason(StockMovementReason.REMOVED)
                             .actorId(request.getActorId())
+                            .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
                             .build();
@@ -510,6 +514,7 @@ public class KujiBoxService {
         OffsetDateTime closedAt = box.getClosedAt();
         Set<UUID> affectedProductIds = new HashSet<>();
         if (closedAt != null) {
+            String resolvedActorName = resolveActorName(actorId);
             List<StockMovement> closeMovements = findKujiBoxMovementsAtOrAfter(boxId, closedAt);
 
             for (StockMovement mv : closeMovements) {
@@ -583,6 +588,7 @@ public class KujiBoxService {
                             .quantityChange(-qty)
                             .reason(StockMovementReason.TRANSFER)
                             .actorId(actorId)
+                            .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
                             .build();
@@ -1417,6 +1423,7 @@ public class KujiBoxService {
                         .quantityChange(0)
                         .reason(StockMovementReason.INITIAL_STOCK)
                         .actorId(request.getActorId())
+                        .actorName(resolveActorName(request.getActorId()))
                         .at(OffsetDateTime.now())
                         .metadata(metadata)
                         .build();

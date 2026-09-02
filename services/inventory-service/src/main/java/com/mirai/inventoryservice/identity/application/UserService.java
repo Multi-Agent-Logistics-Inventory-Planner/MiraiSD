@@ -104,8 +104,16 @@ public class UserService {
         // Delete invitation record if exists
         invitationRepository.deleteByEmail(email);
 
-        // Delete user from Supabase auth
-        supabaseAdminService.deleteUserByEmail(email);
+        // Delete user from Supabase auth. deleteUserByEmail swallows its own errors and reports
+        // failure through the return value, so an unchecked call would let the backend row be
+        // deleted while a still-valid Supabase account survives - a ghost that can authenticate
+        // but resolves to no backend user, and that no admin screen lists. Fail the transaction
+        // instead so the backend delete rolls back and the operation can be retried.
+        if (!supabaseAdminService.deleteUserByEmail(email)) {
+            throw new IllegalStateException(
+                    "Deleted backend user " + id + " but failed to delete the matching Supabase "
+                            + "auth account; rolling back so the two stores stay consistent.");
+        }
     }
 
     public boolean existsByEmail(String email) {

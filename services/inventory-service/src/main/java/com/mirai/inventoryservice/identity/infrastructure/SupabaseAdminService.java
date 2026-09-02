@@ -27,8 +27,13 @@ public class SupabaseAdminService {
     @Value("${invitation.redirect.url:http://localhost:3000/auth/accept-invite}")
     private String invitationRedirectUrl;
 
-    public SupabaseAdminService() {
-        this.restTemplate = new RestTemplate();
+    /**
+     * Takes RestTemplate via the app's shared bean (RestTemplateConfig) rather than
+     * constructing its own, so tests can substitute a mock - the pagination behavior below is
+     * easy to get wrong silently (see USER_LOOKUP_PAGE_SIZE) and needs direct coverage.
+     */
+    public SupabaseAdminService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -73,31 +78,78 @@ public class SupabaseAdminService {
      * @return the Supabase user ID, or null if not found
      */
     public String getSupabaseUserId(String email) {
-        String url = supabaseUrl + "/auth/v1/admin/users";
+        try {
+            return lookupSupabaseUserId(email);
+        } catch (Exception e) {
+            log.warn("Failed to get Supabase user ID: {}", e.getMessage());
+            return null;
+        }
+    }
 
+    /**
+     * Supabase's admin list-users endpoint is paginated (default page size 50). Fetching only
+     * page 1 previously meant a match on a later page looked identical to "account does not
+     * exist" - deleteUserByEmail would then report success without actually deleting anything,
+     * leaving a ghost account past user #50. A generous page size keeps this to one request for
+     * any installation this app's scale will realistically reach, while MAX_PAGES bounds the
+     * loop against a runaway response instead of assuming that holds forever.
+     */
+    private static final int USER_LOOKUP_PAGE_SIZE = 200;
+    private static final int USER_LOOKUP_MAX_PAGES = 50;
+
+    /**
+     * Looks up a Supabase user ID, returning null only when the account genuinely does not
+     * exist and propagating anything else. {@link #getSupabaseUserId} collapses both outcomes
+     * to null, which is fine for existence checks but unsafe for callers that must not treat a
+     * failed lookup as "confirmed absent".
+     */
+    private String lookupSupabaseUserId(String email) throws Exception {
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", serviceRoleKey);
         headers.setBearerAuth(serviceRoleKey);
 
-        try {
+        for (int page = 1; page <= USER_LOOKUP_MAX_PAGES; page++) {
+            String url = supabaseUrl + "/auth/v1/admin/users?page=" + page
+                    + "&per_page=" + USER_LOOKUP_PAGE_SIZE;
+
             ResponseEntity<String> response = restTemplate.exchange(
                     url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
 
             JsonNode responseJson = objectMapper.readTree(response.getBody());
             JsonNode users = responseJson.get("users");
+            if (users == null || !users.isArray()) {
+                // A 200 with a missing/non-array "users" field (e.g. {} or {"users": null}) is
+                // an unexpected shape, not evidence the account is absent - conflating the two
+                // would let deleteUserByEmail treat a malformed response as confirmed absence
+                // and proceed to delete the local user while a real Supabase account survives.
+                throw new IllegalStateException(
+                        "Unexpected Supabase list-users response shape (page " + page + "): "
+                                + response.getBody());
+            }
+            if (users.isEmpty()) {
+                // A genuinely empty array - on page 1 there are no users at all; on a later
+                // page it means the previous page already covered everyone. Either way this is
+                // real confirmation of absence, not a malformed response.
+                return null;
+            }
 
-            if (users != null && users.isArray()) {
-                for (JsonNode user : users) {
-                    if (email.equalsIgnoreCase(user.get("email").asText())) {
-                        return user.get("id").asText();
-                    }
+            for (JsonNode user : users) {
+                if (email.equalsIgnoreCase(user.get("email").asText())) {
+                    return user.get("id").asText();
                 }
             }
-            return null;
-        } catch (Exception e) {
-            log.warn("Failed to get Supabase user ID: {}", e.getMessage());
-            return null;
+
+            if (users.size() < USER_LOOKUP_PAGE_SIZE) {
+                // Short page: this was the last one.
+                return null;
+            }
         }
+
+        // Giving up here is not the same as confirming absence - returning null would let a
+        // caller (e.g. deleteUserByEmail) treat an inconclusive search as "account does not
+        // exist", the exact bug this pagination fix addresses. Fail instead.
+        throw new IllegalStateException("Exceeded " + USER_LOOKUP_MAX_PAGES
+                + " pages while searching Supabase users for " + email);
     }
 
     /**
@@ -107,10 +159,21 @@ public class SupabaseAdminService {
      * @return true if deleted successfully, false otherwise
      */
     public boolean deleteUserByEmail(String email) {
-        String userId = getSupabaseUserId(email);
-        if (userId == null) {
-            log.info("No Supabase user found for email: {}", email);
+        String userId;
+        try {
+            userId = lookupSupabaseUserId(email);
+        } catch (Exception e) {
+            // A failed lookup is not proof the account is gone - report failure rather than
+            // letting a caller conclude the delete succeeded.
+            log.error("Failed to look up Supabase user before delete: {}", e.getMessage());
             return false;
+        }
+
+        if (userId == null) {
+            // Idempotent: the account is confirmed absent, so the desired end state already
+            // holds and callers gating on the result must not treat this as a failure.
+            log.info("No Supabase user found for email: {}", email);
+            return true;
         }
 
         String url = supabaseUrl + "/auth/v1/admin/users/" + userId;

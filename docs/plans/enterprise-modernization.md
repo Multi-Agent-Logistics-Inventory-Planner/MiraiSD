@@ -20,8 +20,8 @@ package move.
 | 0 | Approve scope and record baseline | Complete |
 | 1 | Security, CI and database safety | Substantially complete (Flyway not yet canonical) |
 | 2 | Reliable events and GHCR artifacts | Substantially complete (4 gaps reviewed and deferred, §5) |
-| 3 | Architecture and contract foundation | In progress (ArchUnit + package skeleton done, §6) |
-| 4 | Identity and sites | Not started |
+| 3 | Architecture and contract foundation | Substantially complete (Track D deferred behind Phase 4, §6) |
+| 4 | Identity and sites | In progress (packages + sub-based identity done; memberships outstanding, §7) |
 | 5 | Catalog and site assortment | Not started |
 | 6 | Inventory and stock movements | Not started |
 | 7 | Shipments and remaining site operations | Not started |
@@ -33,7 +33,9 @@ package move.
 Phases 1, 2 and 10 were substantially delivered together as one CI/CD and hosting migration effort
 (PRs #299, #300, #303-#310) rather than strictly in the order this plan lists, since the security,
 event-reliability and hosting-cutover deliverables shared the same underlying pipeline work. Phase 3
-onward has not started and still follows this plan's stated execution order.
+onward follows this plan's stated execution order, with one documented exception: Phase 3's Track D
+(adopting the generated client in a web workflow) is deferred until Phase 4 provides real
+`/api/v1/sites/{siteId}/...` routes to adopt (§6).
 
 ## 3. Phase 0 — Approve scope and record the baseline
 
@@ -323,12 +325,91 @@ vertical slice. Existing business domains stay in place until their phase.
 - Introduce trusted `AuthorizedSiteContext`.
 - Migrate locations/storage locations as the reference site-owned vertical slice.
 - Add membership lifecycle, invitation and foreign-site UUID tests.
+- Decide and record user lifecycle semantics (deactivate vs delete), since a membership's
+  `active` flag is only meaningful once the account-level answer is settled.
 
 ### Exit gate
 
 - Active backend membership controls site access.
 - Users with no membership receive no implicit MAIN access.
 - `identity` and `sites` repositories are not accessed outside their modules.
+- A departed user's past actions remain attributable.
+
+### Phase 4 status (2026-09-01)
+
+- [x] `identity` and `sites` domain packages created with `api`/`application`/`domain`/
+      `infrastructure` subpackages (PR #312). 31 classes relocated: `User`, `Invitation`,
+      `UserRole`, their services/controllers/mappers/DTOs/repositories and
+      `SupabaseAdminService`/`UserRoleConverter` into `identity`; `Site`, `Location`,
+      `StorageLocation`, their exceptions, `LocationService`, both location controllers and
+      three repositories into `sites`. Deliberately not moved: `LocationInventory*` (belongs to
+      `inventory`, Phase 6) and `LocationAggregateController/Service/Repository` (a cross-module
+      read model). The three strict module-boundary ArchUnit rules passed unchanged throughout;
+      the frozen legacy stores were regenerated only because renaming classes rewrites the
+      violation text of already-accepted debt.
+- [x] Identity resolves by Supabase `sub` rather than email (PR #312). `V50` adds a nullable
+      `users.supabase_user_id` plus a partial unique index; applied to live Supabase 2026-08-31.
+      Existing rows are backfilled lazily on each user's first authenticated request rather than
+      by a bulk admin-API script. Two properties are load-bearing and easy to regress, so they
+      are recorded here rather than left to the diff: (1) an email match NEVER rebinds a row
+      already bound to a different non-null `sub` - it returns no match and logs, because email
+      is reusable and would otherwise let a signed token for one Supabase account inherit
+      another's role; (2) the backfill is an atomic conditional `UPDATE ... WHERE
+      supabase_user_id IS NULL`, and a zero-row result re-resolves by `sub` instead of trusting
+      the request's now-stale read, since `User` has no version column or row lock.
+- [x] Mutable `Map<String,String>` principal replaced by the immutable `AuthenticatedPrincipal`
+      record required by `authentication-and-authorization.md` §4, carrying the backend user ID
+      so downstream controllers stop re-querying by email.
+- [ ] `user_site_memberships`, MAIN backfill, second site, site-selection/effective-permission
+      APIs, `AuthorizedSiteContext`, the locations vertical slice, and membership lifecycle
+      tests - all still outstanding. These are what unblock Phase 3's deferred Track D (adopting
+      the generated client), which needs real `/api/v1/sites/{siteId}/...` routes to exist.
+
+### User lifecycle decision (2026-09-01)
+
+Hard delete is retained as the offboarding path for now; deactivation is deferred, not rejected.
+
+`UserService.deleteUser` deletes the backend row, the invitation record and the Supabase auth
+account. `V47`/`V48` were written specifically to make that survivable: `lootbox_plays` and
+`coin_adjustments` owned by the user CASCADE-delete, acting-admin references and
+`shipments.created_by` become NULL, and the `audit_logs`/`stock_movements` actor FKs were
+dropped so history rows survive as bare UUIDs.
+
+The enterprise-standard choice is deactivation (SCIM's deprovisioning signal is `active: false`,
+not `DELETE`), and it is the better fit for audit integrity, temporary revocation and rehire
+continuity. It is deferred because at this scale the one problem that actually bites - losing
+the ability to attribute past actions - is fixed far more cheaply by capturing the actor's name
+at write time, which is now done (see below). What remains accepted: lootbox/coin history is
+destroyed on delete, there is no way to suspend access without destroying the record, and a
+returning employee starts as a new person.
+
+Revisit when suspension or rehire continuity is actually needed. If deactivation is adopted
+later, two constraints found while scoping it must carry forward:
+
+- Ban the Supabase account (`ban_duration`), never delete it. Deleting it while keeping the
+  backend row means a returning user signs up to a NEW `sub`, and the rebind guard above will
+  correctly refuse to match them by email - leaving an account no normal flow can repair.
+- Backend must reject inactive users on every request. Banning in Supabase does not invalidate
+  already-issued JWTs, so an unexpired token would otherwise keep working. `JwtAuthenticationFilter`
+  already does a fresh per-request lookup, so the check belongs there.
+- An ADMIN-only, audited "rebind identity" action is the one legitimate way to point an existing
+  backend user at a new Supabase account.
+
+### Actor attribution on stock movements (2026-09-01)
+
+`V51` adds `stock_movements.actor_name` and backfills it from `users`, mirroring what
+`audit_logs` has had since `V1`. The name is captured at write time in `StockMovement`'s
+`@PrePersist`, inherited from the linked `AuditLog` (which `AuditLogService` always resolves),
+so all ~31 movement creation sites are covered without touching each one; the four KujiBox paths
+that persist a movement with no parent audit log set it explicitly.
+
+Ordering constraint, not merely a nice-to-have: a name cannot be backfilled for a user who has
+already been deleted. With hard delete retained above, this had to land before any further
+offboarding, or that history would be permanently unattributable. It also fixes the Actor column
+in the web movement history table, which rendered truncated UUIDs even for existing users.
+`multi-site-data-and-api.md`'s worksheet already anticipated this (`stock_movements` "add
+non-null `site_id`, actor, correlation and idempotency context"); the `site_id` half remains
+Phase 6 work.
 
 ## 8. Phase 5 — Catalog and site assortment
 

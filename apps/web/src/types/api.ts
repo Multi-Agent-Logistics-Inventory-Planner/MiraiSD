@@ -529,6 +529,8 @@ export interface StockMovement {
   quantityChange: number;
   reason: StockMovementReason;
   actorId?: string;
+  /** Actor's name captured when the movement was written; survives the actor's deletion. */
+  actorName?: string;
   at: string;
   metadata?: StockMovementMetadata;
 }

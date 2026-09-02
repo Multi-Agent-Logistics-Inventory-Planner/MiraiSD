@@ -170,8 +170,12 @@ export function MovementHistoryTable({
                   <TableCell className="font-mono text-xs">
                     {formatLocation(movement)}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {formatId(movement.actorId)}
+                  <TableCell
+                    className={
+                      movement.actorName ? "text-xs" : "font-mono text-xs"
+                    }
+                  >
+                    {movement.actorName ?? formatId(movement.actorId)}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground rounded-r-lg">
                     {movement.metadata?.notes ?? "—"}
