@@ -12,11 +12,8 @@ import { Button } from "@/components/ui/button";
 
 function BrandPanel() {
   return (
-    <aside className="relative hidden overflow-hidden bg-brand-primary p-8 lg:block">
+    <aside className="relative hidden overflow-hidden bg-brand-primary lg:block">
       <PitoAsciiArt />
-      <div className="relative z-10">
-        <Logo width={64} height={64} />
-      </div>
     </aside>
   );
 }
@@ -78,11 +75,11 @@ export default function LoginPage() {
 
   if (isCheckingInvite) {
     return (
-      <main className="fixed inset-0 grid min-h-dvh bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <main className="fixed inset-0 grid h-dvh overflow-hidden bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <TemporaryThemeToggle />
         <BrandPanel />
-        <section className="flex min-h-dvh items-center justify-center px-6 py-12 sm:px-12 lg:px-16">
-          <div className="flex flex-col items-center justify-center py-12">
+        <section className="flex min-h-0 items-center justify-center overflow-y-auto px-6 py-12 sm:px-12 lg:px-16">
+          <div className="my-auto flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             <p className="mt-4 text-sm text-gray-600">Loading...</p>
           </div>
@@ -92,12 +89,15 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="fixed inset-0 grid min-h-dvh bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <main className="fixed inset-0 grid h-dvh overflow-hidden bg-background lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <TemporaryThemeToggle />
       <BrandPanel />
-      <section className="flex min-h-dvh items-center justify-center overflow-y-auto px-6 py-12 sm:px-12 lg:px-16">
-        <div className="w-full max-w-sm">
+      <section className="flex min-h-0 items-center justify-center overflow-y-auto px-6 py-12 sm:px-12 lg:px-16">
+        <div className="my-auto w-full max-w-sm">
           <header className="mb-6 text-center">
+            <div className="mb-3 flex justify-center">
+              <Logo width={100} height={56} />
+            </div>
             <h1 className="text-2xl font-semibold tracking-tight">Sign in to Mirai Arcade</h1>
           </header>
           <LoginForm />

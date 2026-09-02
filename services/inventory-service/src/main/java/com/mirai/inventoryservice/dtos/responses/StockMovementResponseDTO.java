@@ -24,6 +24,7 @@ public class StockMovementResponseDTO {
     private Integer quantityChange;
     private StockMovementReason reason;
     private UUID actorId;
+    private String actorName;
     private OffsetDateTime at;
     private Map<String, Object> metadata;
 }

@@ -4256,6 +4256,7 @@ export interface components {
         StockMovementResponseDTO: {
             /** Format: uuid */
             actorId?: string;
+            actorName?: string;
             /** Format: date-time */
             at?: string;
             /** Format: uuid */

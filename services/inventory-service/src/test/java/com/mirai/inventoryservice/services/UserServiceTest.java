@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -155,5 +156,32 @@ class UserServiceTest {
         Optional<User> result = userService.resolveBySupabaseIdOrEmail(null, null);
 
         assertFalse(result.isPresent());
+    }
+
+    @Test
+    void deleteUser_SupabaseDeleteSucceeds_DeletesBackendUser() {
+        UUID userId = UUID.randomUUID();
+        User user = userWithId(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(supabaseAdminService.deleteUserByEmail("user@example.com")).thenReturn(true);
+
+        userService.deleteUser(userId);
+
+        verify(userRepository).delete(user);
+        verify(invitationRepository).deleteByEmail("user@example.com");
+    }
+
+    @Test
+    void deleteUser_SupabaseDeleteFails_ThrowsSoBackendDeleteRollsBack() {
+        // deleteUserByEmail reports failure by return value rather than throwing. Left
+        // unchecked, the backend row would be deleted and committed while a still-valid
+        // Supabase account survived - a ghost that authenticates but resolves to no backend
+        // user, and that no admin screen lists.
+        UUID userId = UUID.randomUUID();
+        User user = userWithId(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(supabaseAdminService.deleteUserByEmail("user@example.com")).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> userService.deleteUser(userId));
     }
 }

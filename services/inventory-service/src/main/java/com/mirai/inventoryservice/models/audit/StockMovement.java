@@ -66,6 +66,15 @@ public class StockMovement {
     @Column(name = "actor_id")
     private UUID actorId;
 
+    /**
+     * Actor's display name captured at write time. actor_id has no FK (V48 dropped it so users
+     * can be deleted), so the UUID alone becomes unresolvable once the user row is gone. This
+     * mirrors audit_logs.actor_name, and is populated automatically from the linked AuditLog in
+     * {@link #prePersist()} rather than at each of the ~31 StockMovement creation sites.
+     */
+    @Column(name = "actor_name")
+    private String actorName;
+
     @NotNull
     @Column(nullable = false)
     private OffsetDateTime at;
@@ -73,10 +82,19 @@ public class StockMovement {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
+    /**
+     * Package-private rather than private so the actor-name fallback can be unit tested without
+     * a persistence context; JPA does not require any particular visibility here.
+     */
     @PrePersist
-    private void prePersist() {
+    void prePersist() {
         if (at == null) {
             at = OffsetDateTime.now();
+        }
+        // AuditLogService always resolves actorName when it builds an AuditLog, so the linked
+        // log is an in-memory source for the name - no extra query during flush.
+        if (actorName == null && auditLog != null) {
+            actorName = auditLog.getActorName();
         }
     }
 }

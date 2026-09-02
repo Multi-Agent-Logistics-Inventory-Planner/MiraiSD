@@ -15718,6 +15718,9 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "actorName" : {
+            "type" : "string"
+          },
           "at" : {
             "type" : "string",
             "format" : "date-time"
