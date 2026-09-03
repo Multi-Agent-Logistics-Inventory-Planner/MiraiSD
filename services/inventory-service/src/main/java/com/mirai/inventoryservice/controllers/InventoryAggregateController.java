@@ -2,10 +2,13 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
+import com.mirai.inventoryservice.identity.domain.Permission;
+import com.mirai.inventoryservice.identity.domain.RolePermissions;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.services.InventoryAggregateService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,6 +46,16 @@ public class InventoryAggregateController {
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<InventoryTotalDTO>> getInventoryTotals() {
         List<InventoryTotalDTO> totals = inventoryTotalsRepository.findAllInventoryTotals();
+        // Authentication is read from the SecurityContext rather than taken as a method
+        // parameter: this method is one of ArchUnit's frozen legacy violations (a controller
+        // reaching a repository directly), and changing its signature would rewrite that
+        // frozen entry. Retiring the violation properly means moving this call behind
+        // InventoryAggregateService, which is Phase 6 inventory-module work - not something
+        // to smuggle into a redaction fix.
+        if (!RolePermissions.hasPermission(
+                SecurityContextHolder.getContext().getAuthentication(), Permission.COSTS_VIEW)) {
+            totals.forEach(dto -> dto.setUnitCost(null));
+        }
         return ResponseEntity.ok(totals);
     }
 

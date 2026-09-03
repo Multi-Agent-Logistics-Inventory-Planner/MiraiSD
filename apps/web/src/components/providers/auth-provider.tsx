@@ -18,6 +18,7 @@ import {
   clearSessionCache,
 } from "@/lib/auth-cache";
 import { UserRole } from "@/types/api";
+import type { PermissionKey } from "@/lib/rbac";
 
 export interface AuthUser {
   id: string;
@@ -25,6 +26,8 @@ export interface AuthUser {
   role: UserRole;
   personId?: string;
   personName?: string;
+  /** Backend-resolved permissions for this session (see SessionResponse.permissions). */
+  permissions?: PermissionKey[];
 }
 
 interface AuthContextType {
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               role: cached.user?.role ?? cached.role,
               personId: cached.user?.id ?? cached.personId,
               personName: cached.user?.fullName ?? cached.personName,
+              permissions: cached.permissions,
             });
             return;
           }
@@ -83,6 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             personId: sessionResponse.user?.id ?? sessionResponse.personId,
             personName:
               sessionResponse.user?.fullName ?? sessionResponse.personName,
+            permissions: sessionResponse.permissions,
           });
           // Cache the successful response
           setCachedSession(accessToken, sessionResponse);

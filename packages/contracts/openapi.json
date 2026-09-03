@@ -12431,7 +12431,8 @@
             "format" : "int32"
           },
           "valueWon" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the kuji_prices:view permission - the value is redacted server-side, so clients must handle its absence rather than assuming a number."
           }
         }
       },
@@ -12989,7 +12990,8 @@
           },
           "unitCost" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "description" : "Omitted when the caller lacks the costs:view permission - redacted server-side."
           }
         }
       },
@@ -13282,10 +13284,12 @@
             "format" : "int32"
           },
           "linkedProductPrice" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the kuji_prices:view permission - redacted server-side."
           },
           "price" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the kuji_prices:view permission - redacted server-side."
           },
           "totalCount" : {
             "type" : "integer",
@@ -14756,7 +14760,8 @@
             "type" : "string"
           },
           "msrp" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the msrp:view permission - redacted server-side."
           },
           "name" : {
             "type" : "string"
@@ -14799,7 +14804,8 @@
             "format" : "int32"
           },
           "unitCost" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the costs:view permission - redacted server-side."
           },
           "updatedAt" : {
             "type" : "string",
@@ -14956,7 +14962,8 @@
             "type" : "string"
           },
           "msrp" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the msrp:view permission - redacted server-side."
           },
           "name" : {
             "type" : "string"
@@ -15012,7 +15019,8 @@
             "format" : "int32"
           },
           "unitCost" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the costs:view permission - redacted server-side."
           },
           "updatedAt" : {
             "type" : "string",
@@ -15514,7 +15522,8 @@
             "format" : "int32"
           },
           "unitCost" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the costs:view permission - redacted server-side."
           },
           "updatedAt" : {
             "type" : "string",
@@ -15631,7 +15640,8 @@
             "type" : "string"
           },
           "totalCost" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the costs:view permission - redacted server-side."
           },
           "trackingId" : {
             "type" : "string"
@@ -15923,7 +15933,8 @@
             "format" : "int32"
           },
           "valueWon" : {
-            "type" : "number"
+            "type" : "number",
+            "description" : "Omitted when the caller lacks the kuji_prices:view permission - the value is redacted server-side, so clients must handle its absence rather than assuming a number."
           }
         }
       },

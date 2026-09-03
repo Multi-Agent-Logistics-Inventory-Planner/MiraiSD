@@ -3,14 +3,7 @@
 import { useMemo } from "react";
 import { useAuth } from "./use-auth";
 import { UserRole } from "@/types/api";
-import {
-  Permission,
-  ROUTE_PERMISSIONS,
-  hasPermission,
-  hasAllPermissions,
-  hasAnyPermission,
-  type PermissionKey,
-} from "@/lib/rbac";
+import { Permission, ROUTE_PERMISSIONS, type PermissionKey } from "@/lib/rbac";
 
 export interface UsePermissionsResult {
   /** Check if user has a specific permission */
@@ -37,35 +30,45 @@ export interface UsePermissionsResult {
 
 /**
  * Hook for checking user permissions.
- * Wraps the RBAC permission checks with the current user's role.
+ *
+ * The permission set is resolved exclusively by the backend (RolePermissions.java) and
+ * delivered on the session response - this hook is a lookup against that resolved set,
+ * never a local recomputation from role. There is deliberately no role-based fallback
+ * table here: a second frontend-side definition of "who can do what" is exactly the
+ * drift risk this port was meant to close, since two independently-passing test suites
+ * can't prove two independent matrices stay identical. When the session hasn't supplied
+ * permissions yet (still loading, or a stale cache from before this field existed), every
+ * check safely denies rather than trusting a local guess - callers already gate on
+ * useAuth().isLoading to avoid a flash of "no access" during the load window.
  */
 export function usePermissions(): UsePermissionsResult {
   const { user } = useAuth();
   const role = user?.role;
+  const sessionPermissions = user?.permissions;
 
-  return useMemo(
-    () => ({
-      can: (permission: PermissionKey) => hasPermission(role, permission),
+  return useMemo(() => {
+    const can = (permission: PermissionKey): boolean =>
+      sessionPermissions?.includes(permission) ?? false;
+
+    return {
+      can,
       canAll: (permissions: readonly PermissionKey[]) =>
-        hasAllPermissions(role, permissions),
+        permissions.every((p) => can(p)),
       canAny: (permissions: readonly PermissionKey[]) =>
-        hasAnyPermission(role, permissions),
+        permissions.some((p) => can(p)),
       canAccessRoute: (route: string) => {
         const requiredPermission = ROUTE_PERMISSIONS[route];
         if (!requiredPermission) return true;
-        return hasPermission(role, requiredPermission);
+        return can(requiredPermission);
       },
       isAdmin: role === UserRole.ADMIN,
-      canViewCosts: role === UserRole.ADMIN,
-      canViewMsrp:
-        role === UserRole.ADMIN || role === UserRole.ASSISTANT_MANAGER,
-      canViewKujiPrices:
-        role === UserRole.ADMIN || role === UserRole.ASSISTANT_MANAGER,
-      canManageUsers: role === UserRole.ADMIN,
+      canViewCosts: can(Permission.COSTS_VIEW),
+      canViewMsrp: can(Permission.MSRP_VIEW),
+      canViewKujiPrices: can(Permission.KUJI_PRICES_VIEW),
+      canManageUsers: can(Permission.USERS_MANAGE),
       role,
-    }),
-    [role]
-  );
+    };
+  }, [role, sessionPermissions]);
 }
 
 export { Permission };

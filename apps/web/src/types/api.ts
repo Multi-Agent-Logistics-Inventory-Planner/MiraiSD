@@ -998,7 +998,8 @@ export interface KujiBoxTier {
 
 export interface KujiDailyPayoutPoint {
   date: string;
-  valueWon: number;
+  /** Omitted when the caller lacks kuji_prices:view - redacted server-side. */
+  valueWon?: number;
   slipCount: number;
 }
 
@@ -1008,7 +1009,8 @@ export interface KujiDailyPayoutsResponse {
   to: string;
   tz: string;
   series: KujiDailyPayoutPoint[];
-  total: { valueWon: number; slipCount: number };
+  /** valueWon is omitted when the caller lacks kuji_prices:view. */
+  total: { valueWon?: number; slipCount: number };
 }
 
 export interface KujiBox {

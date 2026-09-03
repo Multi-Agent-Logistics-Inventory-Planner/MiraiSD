@@ -3,6 +3,8 @@ package com.mirai.inventoryservice.dtos.responses;
 import com.mirai.inventoryservice.identity.api.UserResponseDTO;
 import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +31,8 @@ public class ShipmentResponseDTO {
     private LocalDate orderDate;
     private LocalDate expectedDeliveryDate;
     private LocalDate actualDeliveryDate;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the costs:view permission - redacted server-side.")
     private BigDecimal totalCost;
     private String notes;
     private String trackingId;

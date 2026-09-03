@@ -20,13 +20,15 @@ Email and display name are profile attributes, not stable authorization identifi
 
 Authorization consists of:
 
-- an optional backend-controlled global role such as `SYSTEM_ADMIN`;
-- zero or more `user_site_memberships`;
-- one site role and active status per membership.
+- one backend-controlled role per user (`ADMIN`, `ASSISTANT_MANAGER` or `EMPLOYEE`), or the
+  separate global `SYSTEM_ADMIN` flag;
+- zero or more `user_site_memberships`, each granting access to one site.
 
-The initial site roles are `ADMIN`, `ASSISTANT_MANAGER` and `EMPLOYEE`. Their permission matrix MUST
-be defined once in backend code and covered by parameterized tests. Clients receive effective
-permissions for presentation but cannot grant them.
+Role is a property of the person, not the site: a user's role is the same at every site they can
+access. `user_site_memberships` answers a different question — which sites a user may reach at
+all, and whether that access is currently active — not what they may do once there. The permission
+matrix for each role MUST be defined once in backend code and covered by parameterized tests.
+Clients receive effective permissions for presentation but cannot grant them.
 
 ## 3. JWT validation
 
@@ -58,20 +60,21 @@ the transition.
 
 ## 5. Membership authorization
 
-`user_site_memberships` is unique on `(user_id, site_id)` and contains role, active status,
-timestamps and an optimistic version. Membership and global-role changes are audited.
+`user_site_memberships` is unique on `(user_id, site_id)` and contains active status, timestamps
+and an optimistic version — no role column. Membership and role changes are audited.
 
 For `/api/v1/sites/{siteId}/...` the backend MUST:
 
 1. Authenticate the JWT.
-2. Resolve the backend user by subject.
-3. Load the target site and active membership.
-4. Evaluate the required permission.
+2. Resolve the backend user by subject, including their role.
+3. Load the target site and confirm an active membership exists.
+4. Evaluate the required permission against the user's role.
 5. Produce `AuthorizedSiteContext`.
 6. Execute a site-scoped use case and repository query.
 
-`AuthorizedSiteContext` contains backend user ID, site ID, effective role/permissions, system-admin
-indicator and correlation ID. It cannot be constructed solely from headers or DTO values.
+`AuthorizedSiteContext` contains backend user ID, site ID, the user's role/effective permissions,
+system-admin indicator and correlation ID. It cannot be constructed solely from headers or DTO
+values.
 
 System-administrator bypasses MUST be explicit and audited. They MUST NOT silently create a normal
 site membership.
@@ -84,8 +87,8 @@ site membership.
 - A user with no active sites receives an authenticated response with an empty site list, not access
   to MAIN by default.
 - Duplicate invitation acceptance is idempotent.
-- Role changes and membership deactivation record actor, target user, site, previous value and new
-  value.
+- Role changes (on the user record) and membership activation/deactivation (per site) each record
+  actor, target user, site where applicable, previous value and new value.
 
 Authorization caches, if introduced, MUST use bounded TTLs and explicit invalidation on membership
 changes. Security correctness must not depend on a client refreshing its token.
@@ -111,7 +114,7 @@ storage on mobile. Logs, analytics and error reports MUST redact tokens.
 - Valid, expired, premature, malformed and incorrectly signed tokens.
 - Incorrect issuer, audience and missing subject.
 - Forged `user_metadata.role=ADMIN` grants no authority.
-- Every permission across each site role.
+- Every permission across each role.
 - Active, inactive, absent and foreign-site memberships.
 - Suspended/deleted backend user.
 - System administrator access and auditing.
