@@ -365,6 +365,20 @@ vertical slice. Existing business domains stay in place until their phase.
       tests - all still outstanding. These are what unblock Phase 3's deferred Track D (adopting
       the generated client), which needs real `/api/v1/sites/{siteId}/...` routes to exist.
 
+### Role model decision (2026-09-01)
+
+Role stays a single global property of the user (`users.role`), not a per-membership field. The
+draft spec originally put `ADMIN`/`ASSISTANT_MANAGER`/`EMPLOYEE` on each `user_site_membership`
+row, allowing a user's role to differ by site. Revisited: at this org's scale, role reflects a
+person's job function, not their location, and per-site role only adds a bookkeeping hazard
+(promoting someone requires updating every membership row, or their role silently diverges across
+sites). `user_site_memberships` is access-only - `(user_id, site_id, active, timestamps, version)`,
+no `role` column - answering "which sites can this user reach," while `AuthorizedSiteContext`'s
+role/permissions come from the user record. Company-wide override for someone who should bypass
+per-site access entirely remains the separate global `SYSTEM_ADMIN` flag, not a repeated per-site
+`ADMIN` role. Revisit only if a real case emerges where trust should NOT follow the person across
+sites (e.g. a temporary or restricted assignment at one location).
+
 ### User lifecycle decision (2026-09-01)
 
 Hard delete is retained as the offboarding path for now; deactivation is deferred, not rejected.

@@ -3,6 +3,8 @@ package com.mirai.inventoryservice.auth;
 import com.mirai.inventoryservice.identity.api.UserMapper;
 import com.mirai.inventoryservice.identity.api.UserResponseDTO;
 import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
+import com.mirai.inventoryservice.identity.domain.Permission;
+import com.mirai.inventoryservice.identity.domain.RolePermissions;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.InvitationService;
 import com.mirai.inventoryservice.identity.application.UserService;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -100,6 +103,7 @@ public class AuthController {
             response.put("personName", personName);
             response.put("personId", null);
             response.put("user", null);
+            response.put("permissions", Set.<Permission>of());
 
             // Resolve user and include full user data in response
             Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(supabaseUserId, email);
@@ -108,6 +112,7 @@ public class AuthController {
                 response.put("personId", user.getId().toString());
                 response.put("role", user.getRole().name()); // Override with DB role
                 response.put("user", userMapper.toResponseDTO(user));
+                response.put("permissions", RolePermissions.forRole(user.getRole()));
             }
 
             return ResponseEntity.ok(response);

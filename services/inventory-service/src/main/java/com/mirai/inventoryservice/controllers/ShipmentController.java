@@ -4,8 +4,11 @@ import com.mirai.inventoryservice.dtos.mappers.ShipmentMapper;
 import com.mirai.inventoryservice.dtos.mappers.ShipmentMapperDecorator;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
+import com.mirai.inventoryservice.dtos.responses.ShipmentItemResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
 import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
+import com.mirai.inventoryservice.identity.domain.Permission;
+import com.mirai.inventoryservice.identity.domain.RolePermissions;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.shipment.Shipment;
@@ -64,10 +67,11 @@ public class ShipmentController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
-    public ResponseEntity<ShipmentResponseDTO> createShipment(@Valid @RequestBody ShipmentRequestDTO requestDTO) {
+    public ResponseEntity<ShipmentResponseDTO> createShipment(@Valid @RequestBody ShipmentRequestDTO requestDTO, Authentication authentication) {
         Shipment shipment = shipmentService.createShipment(requestDTO);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     @GetMapping
@@ -78,7 +82,8 @@ public class ShipmentController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false, defaultValue = "createdAt") String sortBy,
-            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
+            @RequestParam(required = false, defaultValue = "desc") String sortDir,
+            Authentication authentication) {
         // If pagination params are provided, use paginated response
         if (page != null && size != null) {
             Sort sort = sortDir.equalsIgnoreCase("asc")
@@ -95,6 +100,7 @@ public class ShipmentController {
             }
 
             List<ShipmentResponseDTO> dtos = shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipmentPage.getContent());
+            dtos.forEach(dto -> applyCostVisibility(dto, authentication));
             Page<ShipmentResponseDTO> dtoPage = new PageImpl<>(dtos, pageable, shipmentPage.getTotalElements());
             return ResponseEntity.ok(dtoPage);
         }
@@ -102,7 +108,9 @@ public class ShipmentController {
         List<Shipment> shipments = status != null
                 ? shipmentService.listShipmentsByStatus(status)
                 : shipmentService.listShipments();
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments));
+        List<ShipmentResponseDTO> dtos = shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments);
+        dtos.forEach(dto -> applyCostVisibility(dto, authentication));
+        return ResponseEntity.ok(dtos);
     }
 
     @GetMapping("/display-status-counts")
@@ -111,15 +119,35 @@ public class ShipmentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ShipmentResponseDTO> getShipmentById(@PathVariable UUID id) {
+    public ResponseEntity<ShipmentResponseDTO> getShipmentById(@PathVariable UUID id, Authentication authentication) {
         Shipment shipment = shipmentService.getShipmentById(id);
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/by-product/{productId}")
-    public ResponseEntity<List<ShipmentResponseDTO>> getShipmentsByProduct(@PathVariable UUID productId) {
+    public ResponseEntity<List<ShipmentResponseDTO>> getShipmentsByProduct(@PathVariable UUID productId, Authentication authentication) {
         List<Shipment> shipments = shipmentService.getShipmentsContainingProduct(productId);
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments));
+        List<ShipmentResponseDTO> dtos = shipmentMapperDecorator.toResponseDTOListWithLocationCodes(shipments);
+        dtos.forEach(dto -> applyCostVisibility(dto, authentication));
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Null out cost fields the caller's role isn't permitted to see - same gap and same fix as
+     * ProductController.applyCostVisibility.
+     */
+    private void applyCostVisibility(ShipmentResponseDTO dto, Authentication authentication) {
+        if (dto == null || RolePermissions.hasPermission(authentication, Permission.COSTS_VIEW)) {
+            return;
+        }
+        dto.setTotalCost(null);
+        if (dto.getItems() != null) {
+            for (ShipmentItemResponseDTO item : dto.getItems()) {
+                item.setUnitCost(null);
+            }
+        }
     }
 
     @PutMapping("/{id}")
@@ -130,7 +158,9 @@ public class ShipmentController {
             Authentication authentication) {
         ActorInfo actor = getActorInfo(authentication);
         Shipment shipment = shipmentService.updateShipment(id, requestDTO, actor.id(), actor.name());
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     @DeleteMapping("/{id}")
@@ -145,9 +175,12 @@ public class ShipmentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<ShipmentResponseDTO> receiveShipment(
             @PathVariable UUID id,
-            @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO) {
+            @Valid @RequestBody ReceiveShipmentRequestDTO requestDTO,
+            Authentication authentication) {
         Shipment shipment = shipmentService.receiveShipment(id, requestDTO);
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/{shipmentId}/items/{itemId}/undo-receive")
@@ -159,7 +192,9 @@ public class ShipmentController {
         ActorInfo actor = getActorInfo(authentication);
         Shipment shipment = shipmentService.undoReceiveShipmentItem(
                 shipmentId, itemId, actor.id(), actor.name());
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     public record UndoReceiveRequest(java.util.List<UUID> itemIds) {}
@@ -173,7 +208,9 @@ public class ShipmentController {
         ActorInfo actor = getActorInfo(authentication);
         Shipment shipment = shipmentService.undoReceiveShipmentItems(
                 shipmentId, request.itemIds(), actor.id(), actor.name());
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     public record StatusOverrideRequest(ShipmentStatus status, String reason) {}
@@ -187,6 +224,8 @@ public class ShipmentController {
         ActorInfo actor = getActorInfo(authentication);
         Shipment shipment = shipmentService.overrideShipmentStatus(
                 id, request.status(), request.reason(), actor.id(), actor.name());
-        return ResponseEntity.ok(shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment));
+        ShipmentResponseDTO dto = shipmentMapperDecorator.toResponseDTOWithLocationCodes(shipment);
+        applyCostVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 }

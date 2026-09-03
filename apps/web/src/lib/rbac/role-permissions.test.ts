@@ -42,6 +42,17 @@ describe("ROLE_PERMISSIONS", () => {
     expect(employeePermissions.has(Permission.STORAGE_UPDATE)).toBe(false);
     expect(employeePermissions.has(Permission.STORAGE_DELETE)).toBe(false);
   });
+
+  it("should give ASSISTANT_MANAGER MSRP and kuji price visibility but not costs", () => {
+    // Regression: these two permissions were added to the Permission enum without being
+    // added here, so ASSISTANT_MANAGER silently lost them in the fallback path (see
+    // use-permissions.test.ts's "assistant manager fallback" test for the user-facing case).
+    const assistantManagerPermissions = ROLE_PERMISSIONS[UserRole.ASSISTANT_MANAGER];
+
+    expect(assistantManagerPermissions.has(Permission.MSRP_VIEW)).toBe(true);
+    expect(assistantManagerPermissions.has(Permission.KUJI_PRICES_VIEW)).toBe(true);
+    expect(assistantManagerPermissions.has(Permission.COSTS_VIEW)).toBe(false);
+  });
 });
 
 describe("hasPermission", () => {

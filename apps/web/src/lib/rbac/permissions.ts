@@ -58,6 +58,10 @@ export const Permission = {
   // Cost visibility (admin-only)
   COSTS_VIEW: "costs:view",
 
+  // MSRP / kuji price visibility (admin + assistant manager)
+  MSRP_VIEW: "msrp:view",
+  KUJI_PRICES_VIEW: "kuji_prices:view",
+
   // User management (admin-only)
   USERS_MANAGE: "users:manage",
 } as const;

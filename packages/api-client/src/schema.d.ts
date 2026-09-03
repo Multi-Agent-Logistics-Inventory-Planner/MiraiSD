@@ -2933,6 +2933,7 @@ export interface components {
             date?: string;
             /** Format: int32 */
             slipCount?: number;
+            /** @description Omitted when the caller lacks the kuji_prices:view permission - the value is redacted server-side, so clients must handle its absence rather than assuming a number. */
             valueWon?: number;
         };
         DailyRollupPoint: {
@@ -3146,7 +3147,10 @@ export interface components {
             sku?: string;
             /** Format: int32 */
             totalQuantity?: number;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Omitted when the caller lacks the costs:view permission - redacted server-side.
+             */
             unitCost?: number;
         };
         InvitationRequestDTO: {
@@ -3268,7 +3272,9 @@ export interface components {
             linkedProductName?: string;
             /** Format: int32 */
             linkedProductPacksPerBox?: number;
+            /** @description Omitted when the caller lacks the kuji_prices:view permission - redacted server-side. */
             linkedProductPrice?: number;
+            /** @description Omitted when the caller lacks the kuji_prices:view permission - redacted server-side. */
             price?: number;
             /** Format: int32 */
             totalCount?: number;
@@ -3867,6 +3873,7 @@ export interface components {
             /** Format: int32 */
             leadTimeDays?: number;
             letter?: string;
+            /** @description Omitted when the caller lacks the msrp:view permission - redacted server-side. */
             msrp?: number;
             name?: string;
             /** Format: int32 */
@@ -3886,6 +3893,7 @@ export interface components {
             targetStockLevel?: number;
             /** Format: int32 */
             templateQuantity?: number;
+            /** @description Omitted when the caller lacks the costs:view permission - redacted server-side. */
             unitCost?: number;
             /** Format: date-time */
             updatedAt?: string;
@@ -3946,6 +3954,7 @@ export interface components {
             /** Format: int32 */
             leadTimeDays?: number;
             letter?: string;
+            /** @description Omitted when the caller lacks the msrp:view permission - redacted server-side. */
             msrp?: number;
             name?: string;
             notes?: string;
@@ -3970,6 +3979,7 @@ export interface components {
             templateQuantity?: number;
             /** Format: int32 */
             totalChildStock?: number;
+            /** @description Omitted when the caller lacks the costs:view permission - redacted server-side. */
             unitCost?: number;
             /** Format: date-time */
             updatedAt?: string;
@@ -4175,6 +4185,7 @@ export interface components {
             receivedQuantity?: number;
             /** Format: int32 */
             shopQuantity?: number;
+            /** @description Omitted when the caller lacks the costs:view permission - redacted server-side. */
             unitCost?: number;
             /** Format: date-time */
             updatedAt?: string;
@@ -4222,6 +4233,7 @@ export interface components {
             /** Format: uuid */
             supplierId?: string;
             supplierName?: string;
+            /** @description Omitted when the caller lacks the costs:view permission - redacted server-side. */
             totalCost?: number;
             trackingId?: string;
             /** Format: date-time */
@@ -4340,6 +4352,7 @@ export interface components {
         Totals: {
             /** Format: int32 */
             slipCount?: number;
+            /** @description Omitted when the caller lacks the kuji_prices:view permission - the value is redacted server-side, so clients must handle its absence rather than assuming a number. */
             valueWon?: number;
         };
         TrackingEventDTO: {

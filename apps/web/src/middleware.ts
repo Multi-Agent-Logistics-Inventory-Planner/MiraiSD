@@ -13,7 +13,12 @@ export async function middleware(request: NextRequest) {
   // Update session and get user
   const { user, supabaseResponse } = await updateSession(request);
 
-  // Extract user role from user object (normalize to uppercase to match UserRole enum)
+  // TEMPORARY: UX routing only - decides which page to redirect a browser to, never what
+  // data anyone can reach. `user_metadata.role` is client-editable and explicitly
+  // non-authoritative (authentication-and-authorization.md §3): the backend ignores it and
+  // resolves role from the database per request, so a tampered value here changes only
+  // which page renders first, and every endpoint behind it still authorizes server-side.
+  // Replace with Phase 4's GET /api/v1/me effective permissions when that lands.
   const rawRole = user?.user_metadata?.role as string | undefined;
   const userRole = rawRole?.toUpperCase() as UserRole | undefined;
 

@@ -1,5 +1,6 @@
 import { apiGet } from "./client";
 import { User, UserRole } from "@/types/api";
+import type { PermissionKey } from "@/lib/rbac";
 
 /**
  * Combined session response from /api/auth/session endpoint.
@@ -11,6 +12,12 @@ export interface SessionResponse {
   personId?: string;
   personName?: string;
   user?: User;
+  /**
+   * Backend-resolved permission set for the session's role (RolePermissions.java).
+   * Optional because a cached SessionResponse from before this field existed won't
+   * have it - callers fall back to locally computing from role in that case.
+   */
+  permissions?: PermissionKey[];
   message?: string;
 }
 

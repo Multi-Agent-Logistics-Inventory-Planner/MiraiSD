@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -136,8 +137,9 @@ public class SupplierController {
      * Get all products assigned to a supplier.
      */
     @GetMapping("/{id}/products")
-    public ResponseEntity<List<ProductResponseDTO>> getSupplierProducts(@PathVariable UUID id) {
+    public ResponseEntity<List<ProductResponseDTO>> getSupplierProducts(@PathVariable UUID id, Authentication authentication) {
         List<ProductResponseDTO> products = supplierService.getProductsBySupplierId(id);
+        ProductController.applyCostVisibility(products, authentication);
         return ResponseEntity.ok(products);
     }
 }

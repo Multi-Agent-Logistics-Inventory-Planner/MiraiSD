@@ -1,6 +1,8 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.mirai.inventoryservice.models.enums.KujiType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -32,7 +34,11 @@ public class ProductListItemDTO {
     private Integer reorderPoint;
     private Integer targetStockLevel;
     private Integer leadTimeDays;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the costs:view permission - redacted server-side.")
     private BigDecimal unitCost;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the msrp:view permission - redacted server-side.")
     private BigDecimal msrp;
     private UUID preferredSupplierId;
     private String preferredSupplierName;

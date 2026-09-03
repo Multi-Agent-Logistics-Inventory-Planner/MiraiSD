@@ -12,6 +12,11 @@ vi.mock("@/hooks/use-auth", () => ({
 import { useAuth } from "@/hooks/use-auth";
 const mockUseAuth = vi.mocked(useAuth);
 
+// usePermissions() reads exclusively from this array now (no local role-table
+// fallback - see hooks/use-permissions.ts), so mocks must supply it explicitly.
+const ADMIN_PERMISSIONS = Object.values(Permission);
+const EMPLOYEE_PERMISSIONS = [Permission.PRODUCTS_VIEW, Permission.STORAGE_VIEW];
+
 describe("Can component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -20,7 +25,7 @@ describe("Can component", () => {
   describe("when user is ADMIN", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: "admin-1", role: UserRole.ADMIN, email: "admin@test.com" },
+        user: { id: "admin-1", role: UserRole.ADMIN, email: "admin@test.com", permissions: ADMIN_PERMISSIONS },
         session: null,
         isLoading: false,
         signOut: vi.fn(),
@@ -41,7 +46,7 @@ describe("Can component", () => {
   describe("when user is EMPLOYEE", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com", permissions: EMPLOYEE_PERMISSIONS },
         session: null,
         isLoading: false,
         signOut: vi.fn(),
@@ -84,7 +89,7 @@ describe("Can component", () => {
   describe("with multiple permissions", () => {
     beforeEach(() => {
       mockUseAuth.mockReturnValue({
-        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com" },
+        user: { id: "employee-1", role: UserRole.EMPLOYEE, email: "employee@test.com", permissions: EMPLOYEE_PERMISSIONS },
         session: null,
         isLoading: false,
         signOut: vi.fn(),

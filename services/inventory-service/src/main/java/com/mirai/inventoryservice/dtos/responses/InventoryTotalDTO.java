@@ -1,5 +1,7 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +26,8 @@ public class InventoryTotalDTO {
     private String categoryName;
     private UUID parentCategoryId;
     private String parentCategoryName;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the costs:view permission - redacted server-side.")
     private Double unitCost;
     private Boolean isActive;
     private int totalQuantity;

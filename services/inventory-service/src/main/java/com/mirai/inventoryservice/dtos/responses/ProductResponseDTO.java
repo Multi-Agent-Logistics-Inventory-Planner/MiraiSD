@@ -1,6 +1,8 @@
 package com.mirai.inventoryservice.dtos.responses;
 
 import com.mirai.inventoryservice.models.enums.KujiType;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -44,7 +46,11 @@ public class ProductResponseDTO {
     // Last delivered supplier for "Use Auto" feature (only populated for single product fetch)
     private UUID lastDeliveredSupplierId;
     private String lastDeliveredSupplierName;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the costs:view permission - redacted server-side.")
     private BigDecimal unitCost;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the msrp:view permission - redacted server-side.")
     private BigDecimal msrp;
     private Boolean isActive;
     private Boolean forecastingEnabled;

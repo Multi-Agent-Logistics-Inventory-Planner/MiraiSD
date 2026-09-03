@@ -6,6 +6,22 @@ import { Permission, type PermissionKey } from "./permissions";
  * ADMIN has all permissions.
  * ASSISTANT_MANAGER has most admin permissions except cost visibility and user management.
  * EMPLOYEE has limited permissions.
+ *
+ * TEMPORARY - this is UX routing only, not an authorization mechanism, and it is not an
+ * approved exception to the single-source rule.
+ *
+ * Its only consumer is lib/middleware/route-guards.ts, which is fed a role read from
+ * Supabase `user_metadata` in middleware.ts. Per authentication-and-authorization.md §3,
+ * `user_metadata.role` is explicitly NON-AUTHORITATIVE and must never grant authority -
+ * the backend ignores it entirely and resolves role from the database on every request.
+ * So this table decides only which page a browser is redirected to before any data loads;
+ * every endpoint behind those pages is independently authorized server-side, and
+ * usePermissions() (the real in-app gate) reads exclusively from backend-resolved
+ * permissions with a deny-all fallback.
+ *
+ * Remove this table and the role-based routing in middleware.ts once Phase 4's
+ * GET /api/v1/me effective-permissions flow exists, so route gating uses backend-returned
+ * permissions like everything else. Do not add new call sites in the meantime.
  */
 export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
   [UserRole.ADMIN]: new Set(Object.values(Permission)),
@@ -61,6 +77,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<PermissionKey>> = {
     // Machine Displays - full access
     Permission.MACHINE_DISPLAYS_VIEW,
     Permission.MACHINE_DISPLAYS_MANAGE,
+
+    // MSRP / kuji price visibility (not admin-only, unlike COSTS_VIEW below)
+    Permission.MSRP_VIEW,
+    Permission.KUJI_PRICES_VIEW,
 
     // EXCLUDED (Admin-only):
     // - Permission.COSTS_VIEW

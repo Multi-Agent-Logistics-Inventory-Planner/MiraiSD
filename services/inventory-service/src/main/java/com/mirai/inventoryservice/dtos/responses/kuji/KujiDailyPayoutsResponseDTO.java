@@ -1,5 +1,8 @@
 package com.mirai.inventoryservice.dtos.responses.kuji;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -17,6 +20,18 @@ public record KujiDailyPayoutsResponseDTO(
         List<DailyPoint> series,
         Totals total
 ) {
-    public record DailyPoint(LocalDate date, BigDecimal valueWon, Integer slipCount) {}
-    public record Totals(BigDecimal valueWon, Integer slipCount) {}
+    private static final String REDACTED_NOTE =
+            "Omitted when the caller lacks the kuji_prices:view permission - the value is redacted "
+                    + "server-side, so clients must handle its absence rather than assuming a number.";
+
+    public record DailyPoint(
+            LocalDate date,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(description = REDACTED_NOTE) BigDecimal valueWon,
+            Integer slipCount) {}
+
+    public record Totals(
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @Schema(description = REDACTED_NOTE) BigDecimal valueWon,
+            Integer slipCount) {}
 }

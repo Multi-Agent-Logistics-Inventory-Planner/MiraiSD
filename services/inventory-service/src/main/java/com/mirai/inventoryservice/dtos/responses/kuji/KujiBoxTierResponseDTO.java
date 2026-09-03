@@ -1,5 +1,7 @@
 package com.mirai.inventoryservice.dtos.responses.kuji;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,8 +31,12 @@ public class KujiBoxTierResponseDTO {
     private Integer drawnCount;
     /** Convenience: activeCount + inactiveCount. */
     private Integer totalCount;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the kuji_prices:view permission - redacted server-side.")
     private BigDecimal price;
     /** Price of the linked product, when tier.price is unset. Pure pass-through; client picks the effective price. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the kuji_prices:view permission - redacted server-side.")
     private BigDecimal linkedProductPrice;
     /** True when the linked product was created inline at open-box for this tier. */
     private Boolean autoCreatedProduct;

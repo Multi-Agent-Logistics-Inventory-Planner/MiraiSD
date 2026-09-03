@@ -9,7 +9,7 @@ export type DailyPayoutRange = "week" | "all";
 
 interface DailyPayoutChartProps {
   readonly data: readonly KujiDailyPayoutPoint[];
-  readonly totals?: { valueWon: number; slipCount: number };
+  readonly totals?: { valueWon?: number; slipCount: number };
   readonly isLoading?: boolean;
   readonly isError?: boolean;
   readonly selectedDate?: string | null;
@@ -30,7 +30,8 @@ interface DailyPayoutChartProps {
 interface ChartRow {
   date: string;
   label: string;
-  valueWon: number;
+  /** Omitted when redacted server-side (caller lacks kuji_prices:view). */
+  valueWon?: number;
   slipCount: number;
   isToday: boolean;
   isYesterday: boolean;
@@ -74,11 +75,20 @@ export function DailyPayoutChart({
     [data, todayIso, yesterdayIso, compact],
   );
 
-  const total = totals?.valueWon ?? rows.reduce((s, r) => s + r.valueWon, 0);
-  const avg = rows.length > 0 ? total / rows.length : 0;
+  // With prices hidden the API omits valueWon entirely, so there is no monetary
+  // figure to total, average, or scale bars by. Fall back to draw counts (which the
+  // caller is allowed to see) rather than treating a missing value as 0 and rendering an empty
+  // chart plus misleading $0.00 labels.
+  const total = showPrices
+    ? (totals?.valueWon ?? rows.reduce((s, r) => s + (r.valueWon ?? 0), 0))
+    : undefined;
+  const avg =
+    showPrices && total !== undefined && rows.length > 0 ? total / rows.length : undefined;
+  const barValue = (r: ChartRow): number =>
+    showPrices ? (r.valueWon ?? 0) : r.slipCount;
   const max = useMemo(
-    () => rows.reduce((m, r) => Math.max(m, r.valueWon), 0),
-    [rows],
+    () => rows.reduce((m, r) => Math.max(m, showPrices ? (r.valueWon ?? 0) : r.slipCount), 0),
+    [rows, showPrices],
   );
 
   const isClickable = typeof onSelectDate === "function";
@@ -87,18 +97,20 @@ export function DailyPayoutChart({
   const baseSubtitle =
     range === "all" ? "All time" : `Last ${rows.length || 7} days`;
   const subtitle = compact
-    ? showPrices
+    ? total !== undefined
       ? `${baseSubtitle} · ${formatMoney(total)} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
       : `${baseSubtitle} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`
-    : showPrices
+    : total !== undefined
       ? `${baseSubtitle} · ${formatMoney(total)} total`
-      : baseSubtitle;
+      : `${baseSubtitle} · ${totalSlips} ${totalSlips === 1 ? "draw" : "draws"}`;
 
   return (
     <div className="rounded-xl border bg-card p-4 dark:border-none">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">Value paid out per day</div>
+          <div className="text-sm font-medium">
+            {showPrices ? "Value paid out per day" : "Draws per day"}
+          </div>
           <div className="text-[11px] text-muted-foreground tabular-nums">
             {subtitle}
           </div>
@@ -140,7 +152,7 @@ export function DailyPayoutChart({
               </button>
             </div>
           ) : null}
-          {showPrices ? (
+          {avg !== undefined ? (
             <div className="text-right">
               <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">
                 Avg / day
@@ -183,8 +195,9 @@ export function DailyPayoutChart({
             </div>
             {rows.map((r, idx) => {
               const denom = max > 0 ? max : 1;
-              const heightPct = (r.valueWon / denom) * 100;
-              const minHeight = r.valueWon > 0 ? 2 : 0;
+              const value = barValue(r);
+              const heightPct = (value / denom) * 100;
+              const minHeight = value > 0 ? 2 : 0;
               const isSelected = selectedDate === r.date;
               const hasSelection = selectedDate !== null && selectedDate !== undefined;
               const dimmed = hasSelection && !isSelected;
@@ -215,7 +228,11 @@ export function DailyPayoutChart({
                     onSelectDate(isSelected ? null : r.date);
                   }}
                   aria-pressed={isClickable ? isSelected : undefined}
-                  aria-label={`${r.label} — ${formatMoney(r.valueWon)} paid out, ${r.slipCount} ${r.slipCount === 1 ? "draw" : "draws"}`}
+                  aria-label={
+                    showPrices && r.valueWon !== undefined
+                      ? `${r.label} — ${formatMoney(r.valueWon)} paid out, ${r.slipCount} ${r.slipCount === 1 ? "draw" : "draws"}`
+                      : `${r.label} — ${r.slipCount} ${r.slipCount === 1 ? "draw" : "draws"}`
+                  }
                   className={cn(
                     "relative z-10 flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5",
                     isClickable && "cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40",
@@ -228,7 +245,7 @@ export function DailyPayoutChart({
                     className="text-[11px] tabular-nums"
                     style={{ height: 14 }}
                   >
-                    {showPrices && r.valueWon > 0 && (!compact || isSelected) ? (
+                    {showPrices && r.valueWon !== undefined && r.valueWon > 0 && (!compact || isSelected) ? (
                       <span
                         className={
                           isSelected || r.isToday
@@ -240,6 +257,16 @@ export function DailyPayoutChart({
                       </span>
                     ) : showPrices && !compact && r.valueWon === 0 ? (
                       <span className="text-muted-foreground/40">—</span>
+                    ) : !showPrices && r.slipCount > 0 && (!compact || isSelected) ? (
+                      <span
+                        className={
+                          isSelected || r.isToday
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {r.slipCount}
+                      </span>
                     ) : null}
                   </div>
                   <div

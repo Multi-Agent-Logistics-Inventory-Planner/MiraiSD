@@ -197,7 +197,7 @@ least:
 
 - authenticated backend user ID;
 - selected site ID;
-- effective site role or system-level authorization;
+- the user's role or system-level authorization;
 - correlation ID.
 
 The context MUST be produced by trusted authentication and membership resolution. It MUST NOT be
