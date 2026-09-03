@@ -31,6 +31,7 @@
         <lombok.version>1.18.34</lombok.version>
         <hypersistence.version>3.7.0</hypersistence.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <tomcat.version>10.1.59</tomcat.version>
     </properties>
     <dependencies>
         <dependency>
