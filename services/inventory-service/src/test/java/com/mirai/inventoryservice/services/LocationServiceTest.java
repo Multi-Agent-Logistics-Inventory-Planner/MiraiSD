@@ -307,4 +307,183 @@ class LocationServiceTest {
             assertEquals(2, result.size());
         }
     }
+
+    @Nested
+    @DisplayName("getLocationById(siteId, id) - site-scoped")
+    class GetLocationByIdSiteScopedTests {
+
+        @Test
+        @DisplayName("should return location when it belongs to the given site")
+        void shouldReturnLocationWhenInSite() {
+            when(locationRepository.findByIdAndSite_Id(locationId, siteId))
+                    .thenReturn(Optional.of(testLocation));
+
+            Location result = locationService.getLocationById(siteId, locationId);
+
+            assertEquals(testLocation, result);
+        }
+
+        @Test
+        @DisplayName("should 404 when the location belongs to a different site (foreign-site UUID)")
+        void shouldThrowWhenLocationBelongsToAnotherSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(locationRepository.findByIdAndSite_Id(locationId, otherSiteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(LocationNotFoundException.class, () ->
+                    locationService.getLocationById(otherSiteId, locationId));
+        }
+    }
+
+    @Nested
+    @DisplayName("getLocationsByStorageLocation(siteId, storageLocationId) - site-scoped")
+    class GetLocationsByStorageLocationSiteScopedTests {
+
+        @Test
+        @DisplayName("should return locations when storage location belongs to the given site")
+        void shouldReturnLocationsWhenStorageLocationInSite() {
+            when(storageLocationRepository.existsByIdAndSite_Id(storageLocationId, siteId))
+                    .thenReturn(true);
+            when(locationRepository.findByStorageLocation_Id(storageLocationId))
+                    .thenReturn(List.of(testLocation));
+
+            List<Location> result = locationService.getLocationsByStorageLocation(siteId, storageLocationId);
+
+            assertEquals(1, result.size());
+        }
+
+        @Test
+        @DisplayName("should 404 when the storage location belongs to a different site")
+        void shouldThrowWhenStorageLocationBelongsToAnotherSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(storageLocationRepository.existsByIdAndSite_Id(storageLocationId, otherSiteId))
+                    .thenReturn(false);
+
+            assertThrows(StorageLocationNotFoundException.class, () ->
+                    locationService.getLocationsByStorageLocation(otherSiteId, storageLocationId));
+        }
+    }
+
+    @Nested
+    @DisplayName("createLocation(siteId, storageLocationId, code) - site-scoped")
+    class CreateLocationSiteScopedTests {
+
+        @Test
+        @DisplayName("should create location when storage location belongs to the given site")
+        void shouldCreateLocationWhenStorageLocationInSite() {
+            when(storageLocationRepository.findByIdAndSite_Id(storageLocationId, siteId))
+                    .thenReturn(Optional.of(testStorageLocation));
+            when(locationRepository.existsByLocationCodeAndStorageLocation_Id("B2", storageLocationId))
+                    .thenReturn(false);
+            when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> {
+                Location loc = invocation.getArgument(0);
+                loc.setId(UUID.randomUUID());
+                return loc;
+            });
+
+            Location result = locationService.createLocation(siteId, storageLocationId, "B2");
+
+            assertEquals("B2", result.getLocationCode());
+        }
+
+        @Test
+        @DisplayName("should 404 when storage location belongs to a different site")
+        void shouldThrowWhenStorageLocationBelongsToAnotherSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(storageLocationRepository.findByIdAndSite_Id(storageLocationId, otherSiteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(StorageLocationNotFoundException.class, () ->
+                    locationService.createLocation(otherSiteId, storageLocationId, "B2"));
+        }
+    }
+
+    @Nested
+    @DisplayName("updateLocation(siteId, id, code) / deleteLocation(siteId, id) - site-scoped")
+    class UpdateDeleteLocationSiteScopedTests {
+
+        @Test
+        @DisplayName("should update location when it belongs to the given site")
+        void shouldUpdateLocationWhenInSite() {
+            when(locationRepository.findByIdAndSite_Id(locationId, siteId))
+                    .thenReturn(Optional.of(testLocation));
+            when(locationRepository.existsByLocationCodeAndStorageLocation_Id("B99", storageLocationId))
+                    .thenReturn(false);
+            when(locationRepository.save(any(Location.class))).thenReturn(testLocation);
+
+            locationService.updateLocation(siteId, locationId, "B99");
+
+            verify(locationRepository).save(any(Location.class));
+        }
+
+        @Test
+        @DisplayName("should 404 updating a location belonging to a different site")
+        void shouldThrowUpdatingLocationInAnotherSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(locationRepository.findByIdAndSite_Id(locationId, otherSiteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(LocationNotFoundException.class, () ->
+                    locationService.updateLocation(otherSiteId, locationId, "B99"));
+        }
+
+        @Test
+        @DisplayName("should delete location when it belongs to the given site")
+        void shouldDeleteLocationWhenInSite() {
+            when(locationRepository.findByIdAndSite_Id(locationId, siteId))
+                    .thenReturn(Optional.of(testLocation));
+
+            locationService.deleteLocation(siteId, locationId);
+
+            verify(locationRepository).delete(testLocation);
+        }
+
+        @Test
+        @DisplayName("should 404 deleting a location belonging to a different site")
+        void shouldThrowDeletingLocationInAnotherSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(locationRepository.findByIdAndSite_Id(locationId, otherSiteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(LocationNotFoundException.class, () ->
+                    locationService.deleteLocation(otherSiteId, locationId));
+        }
+    }
+
+    @Nested
+    @DisplayName("site-scoped storage location queries")
+    class SiteScopedStorageLocationTests {
+
+        @Test
+        @DisplayName("getAllStorageLocations(siteId) should delegate to the site-id query")
+        void shouldReturnAllStorageLocationsForSite() {
+            when(storageLocationRepository.findBySite_IdOrderByDisplayOrder(siteId))
+                    .thenReturn(List.of(testStorageLocation));
+
+            List<StorageLocation> result = locationService.getAllStorageLocations(siteId);
+
+            assertEquals(1, result.size());
+        }
+
+        @Test
+        @DisplayName("getStorageLocationByCode(siteId, code) should 404 when not in that site")
+        void shouldThrowWhenStorageLocationCodeNotInSite() {
+            when(storageLocationRepository.findByCodeAndSite_Id("BOX_BINS", siteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(StorageLocationNotFoundException.class, () ->
+                    locationService.getStorageLocationByCode(siteId, "BOX_BINS"));
+        }
+
+        @Test
+        @DisplayName("getStorageLocationById(siteId, id) should 404 when it belongs to a different site")
+        void shouldThrowWhenStorageLocationIdNotInSite() {
+            UUID otherSiteId = UUID.randomUUID();
+            when(storageLocationRepository.findByIdAndSite_Id(storageLocationId, otherSiteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(StorageLocationNotFoundException.class, () ->
+                    locationService.getStorageLocationById(otherSiteId, storageLocationId));
+        }
+    }
 }

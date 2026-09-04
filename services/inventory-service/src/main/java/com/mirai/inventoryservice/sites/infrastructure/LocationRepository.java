@@ -29,6 +29,9 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
     @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE sl.site.id = :siteId")
     List<Location> findBySite_Id(@Param("siteId") UUID siteId);
 
+    @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE l.id = :id AND sl.site.id = :siteId")
+    Optional<Location> findByIdAndSite_Id(@Param("id") UUID id, @Param("siteId") UUID siteId);
+
     @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE sl.code = :storageLocationCode AND sl.site.id = :siteId")
     List<Location> findByStorageLocationCodeAndSiteId(@Param("storageLocationCode") String storageLocationCode, @Param("siteId") UUID siteId);
 }

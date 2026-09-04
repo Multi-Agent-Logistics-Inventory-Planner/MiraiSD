@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.exceptions;
 
+import com.mirai.inventoryservice.identity.domain.MembershipNotFoundException;
 import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
 import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
@@ -32,6 +33,7 @@ public class GlobalExceptionHandler {
             SiteNotFoundException.class,
             InventoryNotFoundException.class,
             UserNotFoundException.class,
+            MembershipNotFoundException.class,
             ProductNotFoundException.class,
             ShipmentNotFoundException.class,
             ShipmentItemNotFoundException.class,
