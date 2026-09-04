@@ -78,7 +78,7 @@ class UserSiteMembershipRepositoryIT extends BaseKafkaIntegrationTest {
         CountDownLatch go = new CountDownLatch(1);
         try {
             List<Future<?>> futures = IntStream.range(0, callers)
-                    .mapToObj(i -> executor.submit(() -> {
+                    .<Future<?>>mapToObj(i -> executor.submit(() -> {
                         ready.countDown();
                         try {
                             go.await();
