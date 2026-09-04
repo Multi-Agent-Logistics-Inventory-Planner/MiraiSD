@@ -13,6 +13,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import lombok.AllArgsConstructor;
+import com.mirai.inventoryservice.identity.infrastructure.SiteAccessAuthorizationFilter;
 import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
 import com.mirai.inventoryservice.shared.correlation.CorrelationIdFilter;
 
@@ -26,6 +27,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final CorrelationIdFilter correlationIdFilter;
+    private final SiteAccessAuthorizationFilter siteAccessAuthorizationFilter;
     private final Environment environment;
 
     @Bean
@@ -84,6 +86,9 @@ public class SecurityConfig {
         // outbox events created during this request) can be tied back to the request.
         http.addFilterBefore(correlationIdFilter, RateLimitingFilter.class);
         http.addFilterAfter(jwtAuthenticationFilter, RateLimitingFilter.class);
+        // Runs after JWT auth so it can read the resolved AuthenticatedPrincipal, per
+        // docs/specs/authentication-and-authorization.md section 5's resolution order.
+        http.addFilterAfter(siteAccessAuthorizationFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -7,6 +7,7 @@ import com.mirai.inventoryservice.identity.domain.Permission;
 import com.mirai.inventoryservice.identity.domain.RolePermissions;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.MembershipAuthorizer;
 import com.mirai.inventoryservice.identity.application.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,13 +27,16 @@ public class AuthController {
     private final UserService userService;
     private final InvitationService invitationService;
     private final UserMapper userMapper;
+    private final MembershipAuthorizer membershipAuthorizer;
 
     public AuthController(JwtService jwtService, UserService userService,
-                         InvitationService invitationService, UserMapper userMapper) {
+                         InvitationService invitationService, UserMapper userMapper,
+                         MembershipAuthorizer membershipAuthorizer) {
         this.jwtService = jwtService;
         this.userService = userService;
         this.invitationService = invitationService;
         this.userMapper = userMapper;
+        this.membershipAuthorizer = membershipAuthorizer;
     }
 
     /**
@@ -158,10 +162,14 @@ public class AuthController {
 
         Optional<User> existing = userService.resolveBySupabaseIdOrEmail(principal.supabaseUserId(), email);
         if (existing.isPresent()) {
+            // Idempotent - a user synced more than once (e.g. a retried request) must not end up
+            // with duplicate membership rows or lose an already-deactivated one.
+            membershipAuthorizer.grantMainSiteMembershipIfAbsent(existing.get().getId());
             return ResponseEntity.ok(userMapper.toResponseDTO(existing.get()));
         }
 
         User user = userService.createFromJwt(email, name, role, principal.supabaseUserId());
+        membershipAuthorizer.grantMainSiteMembershipIfAbsent(user.getId());
 
         invitationService.markInvitationAccepted(email);
 

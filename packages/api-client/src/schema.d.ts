@@ -2516,6 +2516,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMySites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/webhooks/easypost": {
         parameters: {
             query?: never;
@@ -3474,6 +3522,15 @@ export interface components {
             /** Format: date-time */
             startedAt?: string;
         };
+        MeResponseDTO: {
+            email?: string;
+            fullName?: string;
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            role?: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
+            systemAdmin?: boolean;
+        };
         MonthlySalesDTO: {
             month?: string;
             totalCost?: number;
@@ -4254,6 +4311,17 @@ export interface components {
             state?: string;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        SiteMembershipDTO: {
+            siteCode?: string;
+            /** Format: uuid */
+            siteId?: string;
+            siteName?: string;
+        };
+        SitePermissionsDTO: {
+            permissions?: string[];
+            role?: string;
+            systemAdmin?: boolean;
         };
         SortObject: {
             empty?: boolean;
@@ -13579,6 +13647,146 @@ export interface operations {
                 };
                 content: {
                     "*/*": string;
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MeResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMySites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteMembershipDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SitePermissionsDTO"];
                 };
             };
             /** @description Authentication required */

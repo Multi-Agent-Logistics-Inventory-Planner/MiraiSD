@@ -60,6 +60,13 @@ public class User {
     @Builder.Default
     private Boolean isReviewTracked = false;
 
+    // Global break-glass bypass, orthogonal to role (ADMIN/ASSISTANT_MANAGER/EMPLOYEE reflect
+    // job function; this is a separate axis) - see
+    // docs/specs/authentication-and-authorization.md section 2.
+    @Column(name = "is_system_admin", nullable = false)
+    @Builder.Default
+    private Boolean isSystemAdmin = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
