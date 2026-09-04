@@ -35,7 +35,7 @@ class KujiBoxControllerPriceVisibilityTest {
     private static Authentication authWithRole(String role) {
         Authentication authentication = mock(Authentication.class);
         AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
-                UUID.randomUUID(), UUID.randomUUID(), "test@test.internal", "Test User", role);
+                UUID.randomUUID(), UUID.randomUUID(), "test@test.internal", "Test User", role, false);
         when(authentication.getPrincipal()).thenReturn(principal);
         return authentication;
     }

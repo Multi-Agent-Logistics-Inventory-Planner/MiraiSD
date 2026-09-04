@@ -360,10 +360,34 @@ vertical slice. Existing business domains stay in place until their phase.
 - [x] Mutable `Map<String,String>` principal replaced by the immutable `AuthenticatedPrincipal`
       record required by `authentication-and-authorization.md` §4, carrying the backend user ID
       so downstream controllers stop re-querying by email.
-- [ ] `user_site_memberships`, MAIN backfill, second site, site-selection/effective-permission
-      APIs, `AuthorizedSiteContext`, the locations vertical slice, and membership lifecycle
-      tests - all still outstanding. These are what unblock Phase 3's deferred Track D (adopting
-      the generated client), which needs real `/api/v1/sites/{siteId}/...` routes to exist.
+- [x] `user_site_memberships` (`V52`, access-only per the role model decision below - unique
+      `(user_id, site_id)`, `is_active`, `version` for optimistic locking), MAIN backfill
+      (`V53`, expand/backfill per `multi-site-data-and-api.md` §5, fails loudly rather than
+      silently backfilling zero rows if no MAIN site exists yet), and a second site seeded with
+      placeholder `code = 'SECOND'` (`V54` - real name/code still needed from the business, safe
+      to rename later since nothing else references it). `V55` adds `users.is_system_admin` as a
+      flag orthogonal to `UserRole`, per the "or the separate global SYSTEM_ADMIN flag" wording in
+      `authentication-and-authorization.md` §2. Implemented on `refactor/multi-site`, not yet
+      merged.
+- [x] `AuthorizedSiteContext` (`shared.web`, permission keys as `Set<String>` so `shared` stays
+      free of a business-module dependency) resolved by a new `identity`-owned
+      `SiteAccessAuthorizationFilter` for every `/api/v1/sites/{siteId}/**` request, stashed in a
+      `ThreadLocal` holder (`AuthorizedSiteContextHolder`) that `sites` controllers read without
+      creating a `sites -> identity` dependency. `MembershipAuthorizer` (`identity`) and
+      `SiteDirectory` (`sites`) are the facades named in the migration doc. System-admin bypass is
+      explicit, logged, and never creates a membership row (`AuthorizedSiteContextFactoryTest`
+      asserts this).
+- [x] Site-selection/effective-permission APIs: `GET /api/v1/me`, `GET /api/v1/me/sites` (empty
+      list for a user with no active memberships, never implicit MAIN access), and
+      `GET /api/v1/sites/{siteId}/permissions` - the first real `/api/v1/sites/{siteId}/...`
+      routes, unblocking Phase 3's deferred Track D. Covered by
+      `MeAndSitePermissionsIT` (active/inactive/absent/foreign-site membership, unknown site,
+      system-admin bypass) and `UserSiteMembershipRepositoryIT` (unique constraint, cascade
+      delete, optimistic-lock conflict - needs Docker/Testcontainers to run, not exercised by
+      plain `mvn test`).
+- [ ] The locations vertical slice (`LocationService.DEFAULT_SITE_CODE` is still hardcoded to
+      `"MAIN"`) and full membership lifecycle mutation endpoints (grant/revoke/deactivate) remain
+      outstanding - deferred to the next workstream.
 
 ### Role model decision (2026-09-01)
 

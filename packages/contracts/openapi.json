@@ -11401,6 +11401,165 @@
         "tags" : [ "user-controller" ]
       }
     },
+    "/api/v1/me" : {
+      "get" : {
+        "operationId" : "getMe",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MeResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "me-controller" ]
+      }
+    },
+    "/api/v1/me/sites" : {
+      "get" : {
+        "operationId" : "getMySites",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteMembershipDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "me-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/permissions" : {
+      "get" : {
+        "operationId" : "getPermissions",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SitePermissionsDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-permissions-controller" ]
+      }
+    },
     "/api/webhooks/easypost" : {
       "post" : {
         "operationId" : "handleEasyPostWebhook",
@@ -13756,6 +13915,28 @@
           }
         }
       },
+      "MeResponseDTO" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "ASSISTANT_MANAGER", "EMPLOYEE" ]
+          },
+          "systemAdmin" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "MonthlySalesDTO" : {
         "type" : "object",
         "properties" : {
@@ -15692,6 +15873,39 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "SiteMembershipDTO" : {
+        "type" : "object",
+        "properties" : {
+          "siteCode" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "siteName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SitePermissionsDTO" : {
+        "type" : "object",
+        "properties" : {
+          "permissions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "uniqueItems" : true
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "systemAdmin" : {
+            "type" : "boolean"
           }
         }
       },

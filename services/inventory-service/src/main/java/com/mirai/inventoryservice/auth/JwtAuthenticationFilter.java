@@ -76,13 +76,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Optional<User> resolved = userService.resolveBySupabaseIdOrEmail(supabaseUserId, personEmail);
                 String dbRole = resolved.map(u -> u.getRole().name()).orElse(null);
                 UUID backendUserId = resolved.map(User::getId).orElse(null);
+                boolean systemAdmin = resolved.map(User::getIsSystemAdmin).orElse(false);
 
                 AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
                         supabaseUserId,
                         backendUserId,
                         personEmail,
                         personName != null ? personName : "Unknown",
-                        dbRole);
+                        dbRole,
+                        systemAdmin);
 
                 // No matching backend user record grants no elevated role, never a
                 // JWT-claimed one.

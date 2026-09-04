@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.identity.api.UserMapper;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.application.AuthorizedSiteContextFactory;
 import com.mirai.inventoryservice.identity.application.InvitationService;
+import com.mirai.inventoryservice.identity.application.MembershipAuthorizer;
 import com.mirai.inventoryservice.identity.application.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,14 @@ class AuthControllerTest {
 
     @MockBean
     private UserMapper userMapper;
+
+    @MockBean
+    private MembershipAuthorizer membershipAuthorizer;
+
+    // Not used by AuthController directly, but @WebMvcTest auto-detects every Filter bean
+    // (including SiteAccessAuthorizationFilter), which needs this to construct.
+    @MockBean
+    private AuthorizedSiteContextFactory authorizedSiteContextFactory;
 
     @Test
     void testValidateToken_Success() throws Exception {

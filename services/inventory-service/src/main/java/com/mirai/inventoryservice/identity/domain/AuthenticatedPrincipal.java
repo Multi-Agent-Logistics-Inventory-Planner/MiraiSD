@@ -13,5 +13,6 @@ public record AuthenticatedPrincipal(
         UUID backendUserId,
         String email,
         String personName,
-        String role) {
+        String role,
+        boolean systemAdmin) {
 }
