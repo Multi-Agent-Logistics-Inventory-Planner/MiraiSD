@@ -31,11 +31,17 @@ public interface UserSiteMembershipRepository extends JpaRepository<UserSiteMemb
      * interface is not implicitly transactional, so a caller with no transaction of its own
      * (e.g. a repository-level test invoking this directly) would otherwise fail with
      * {@code TransactionRequiredException} rather than exercising the intended race.
+     * <p>
+     * {@code id} is generated inline with {@code gen_random_uuid()} rather than relying on the
+     * column's {@code DEFAULT} (set by V52's migration): this bypasses Hibernate's normal
+     * app-side {@code @GeneratedValue} id assignment, and test databases built via
+     * {@code ddl-auto=create-drop} (see {@code BaseKafkaIntegrationTest}) don't carry that
+     * migration-only default, so a bare column list would insert a null id there.
      */
     @Transactional
     @Modifying(clearAutomatically = true)
-    @Query(value = "INSERT INTO user_site_memberships (user_id, site_id, is_active) "
-            + "VALUES (:userId, :siteId, TRUE) ON CONFLICT (user_id, site_id) DO NOTHING",
+    @Query(value = "INSERT INTO user_site_memberships (id, user_id, site_id, is_active) "
+            + "VALUES (gen_random_uuid(), :userId, :siteId, TRUE) ON CONFLICT (user_id, site_id) DO NOTHING",
             nativeQuery = true)
     void insertActiveIfAbsent(@Param("userId") UUID userId, @Param("siteId") UUID siteId);
 }

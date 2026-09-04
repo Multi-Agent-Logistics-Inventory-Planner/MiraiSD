@@ -6,9 +6,11 @@ import com.mirai.inventoryservice.identity.domain.UserSiteMembership;
 import com.mirai.inventoryservice.integration.BaseKafkaIntegrationTest;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.List;
@@ -37,6 +39,30 @@ class UserSiteMembershipRepositoryIT extends BaseKafkaIntegrationTest {
 
     @Autowired
     private SiteRepository siteRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private static boolean foreignKeysAdded = false;
+
+    /**
+     * The shared test schema is Hibernate {@code ddl-auto=create-drop}, not V52's migration SQL
+     * (see application-integration.properties) - and {@code UserSiteMembership} deliberately
+     * has no JPA relation for {@code userId}/{@code siteId} (ArchUnit rule 8), so Hibernate never
+     * emits the {@code ON DELETE CASCADE} foreign keys V52 defines. Add them by hand, once, so
+     * this class's cascade-delete assertion exercises the same constraint production actually has.
+     */
+    @BeforeEach
+    void addForeignKeyConstraintsOnce() {
+        if (foreignKeysAdded) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE user_site_memberships "
+                + "ADD CONSTRAINT fk_usm_user_it FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+        jdbcTemplate.execute("ALTER TABLE user_site_memberships "
+                + "ADD CONSTRAINT fk_usm_site_it FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE");
+        foreignKeysAdded = true;
+    }
 
     @Test
     void rejectsADuplicateUserSitePair() {
