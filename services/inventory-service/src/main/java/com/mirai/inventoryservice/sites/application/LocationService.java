@@ -82,10 +82,42 @@ public class LocationService {
     }
 
     /**
-     * Get a location by ID.
+     * Create a new location within a storage location by ID, scoped to the given site - the
+     * storage location must belong to that site.
+     */
+    public Location createLocation(UUID siteId, UUID storageLocationId, String locationCode) {
+        StorageLocation storageLocation = storageLocationRepository.findByIdAndSite_Id(storageLocationId, siteId)
+                .orElseThrow(() -> new StorageLocationNotFoundException(
+                        "Storage location not found: " + storageLocationId));
+
+        if (locationRepository.existsByLocationCodeAndStorageLocation_Id(locationCode, storageLocationId)) {
+            throw new DuplicateLocationCodeException(
+                    "Location with code '" + locationCode + "' already exists in " + storageLocation.getName());
+        }
+
+        Location location = Location.builder()
+                .storageLocation(storageLocation)
+                .locationCode(locationCode)
+                .build();
+
+        return locationRepository.save(location);
+    }
+
+    /**
+     * Get a location by ID. No site check - kept only for the legacy, unscoped
+     * {@code /api/locations} routes; do not add new callers.
      */
     public Location getLocationById(UUID id) {
         return locationRepository.findById(id)
+                .orElseThrow(() -> new LocationNotFoundException("Location not found with id: " + id));
+    }
+
+    /**
+     * Get a location by ID, scoped to the given site - 404s if the location exists but belongs
+     * to a different site.
+     */
+    public Location getLocationById(UUID siteId, UUID id) {
+        return locationRepository.findByIdAndSite_Id(id, siteId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found with id: " + id));
     }
 
@@ -101,35 +133,68 @@ public class LocationService {
     }
 
     /**
-     * Get all locations.
+     * Get all locations. No site check - kept only for the legacy, unscoped
+     * {@code /api/locations} routes; do not add new callers.
      */
     public List<Location> getAllLocations() {
         UUID siteId = getDefaultSiteId();
         return locationRepository.findBySite_Id(siteId);
     }
 
+    /** Get all locations for the given site. */
+    public List<Location> getAllLocations(UUID siteId) {
+        return locationRepository.findBySite_Id(siteId);
+    }
+
     /**
-     * Get all locations within a storage location type.
+     * Get all locations within a storage location type. No site check - kept only for the
+     * legacy, unscoped {@code /api/locations} routes; do not add new callers.
      */
     public List<Location> getLocationsByStorageLocation(UUID storageLocationId) {
         return locationRepository.findByStorageLocation_Id(storageLocationId);
     }
 
     /**
-     * Get all locations within a storage location type by code.
+     * Get all locations within a storage location type, scoped to the given site - 404s if the
+     * storage location isn't in this site.
+     */
+    public List<Location> getLocationsByStorageLocation(UUID siteId, UUID storageLocationId) {
+        if (!storageLocationRepository.existsByIdAndSite_Id(storageLocationId, siteId)) {
+            throw new StorageLocationNotFoundException("Storage location not found: " + storageLocationId);
+        }
+        return locationRepository.findByStorageLocation_Id(storageLocationId);
+    }
+
+    /**
+     * Get all locations within a storage location type by code. No site check - kept only for
+     * the legacy, unscoped {@code /api/locations} routes; do not add new callers.
      */
     public List<Location> getLocationsByStorageLocationCode(String storageLocationCode) {
         UUID siteId = getDefaultSiteId();
         return locationRepository.findByStorageLocationCodeAndSiteId(storageLocationCode, siteId);
     }
 
+    /** Get all locations within a storage location type by code, scoped to the given site. */
+    public List<Location> getLocationsByStorageLocationCode(UUID siteId, String storageLocationCode) {
+        return locationRepository.findByStorageLocationCodeAndSiteId(storageLocationCode, siteId);
+    }
+
     /**
-     * Update a location's code.
+     * Update a location's code. No site check - kept only for the legacy, unscoped
+     * {@code /api/locations} routes; do not add new callers.
      */
     public Location updateLocation(UUID id, String locationCode) {
         Location location = getLocationById(id);
+        return applyLocationCodeUpdate(location, locationCode);
+    }
 
-        // Check for duplicate code if changing
+    /** Update a location's code, scoped to the given site. */
+    public Location updateLocation(UUID siteId, UUID id, String locationCode) {
+        Location location = getLocationById(siteId, id);
+        return applyLocationCodeUpdate(location, locationCode);
+    }
+
+    private Location applyLocationCodeUpdate(Location location, String locationCode) {
         if (!locationCode.equals(location.getLocationCode()) &&
                 locationRepository.existsByLocationCodeAndStorageLocation_Id(
                         locationCode, location.getStorageLocation().getId())) {
@@ -143,10 +208,17 @@ public class LocationService {
     }
 
     /**
-     * Delete a location.
+     * Delete a location. No site check - kept only for the legacy, unscoped
+     * {@code /api/locations} routes; do not add new callers.
      */
     public void deleteLocation(UUID id) {
         Location location = getLocationById(id);
+        locationRepository.delete(location);
+    }
+
+    /** Delete a location, scoped to the given site. */
+    public void deleteLocation(UUID siteId, UUID id) {
+        Location location = getLocationById(siteId, id);
         locationRepository.delete(location);
     }
 
@@ -164,14 +236,21 @@ public class LocationService {
     // Use DevSeedController.seedCoreEntities() to create all standard types.
 
     /**
-     * Get all storage locations for the default site.
+     * Get all storage locations for the default site. No site check - kept only for the legacy,
+     * unscoped {@code /api/storage-locations} routes; do not add new callers.
      */
     public List<StorageLocation> getAllStorageLocations() {
         return storageLocationRepository.findBySite_CodeOrderByDisplayOrder(DEFAULT_SITE_CODE);
     }
 
+    /** Get all storage locations for the given site. */
+    public List<StorageLocation> getAllStorageLocations(UUID siteId) {
+        return storageLocationRepository.findBySite_IdOrderByDisplayOrder(siteId);
+    }
+
     /**
-     * Get a storage location by code.
+     * Get a storage location by code. No site check - kept only for the legacy, unscoped
+     * {@code /api/storage-locations} routes; do not add new callers.
      */
     public StorageLocation getStorageLocationByCode(String code) {
         return storageLocationRepository.findByCodeAndSite_Code(code, DEFAULT_SITE_CODE)
@@ -179,8 +258,16 @@ public class LocationService {
                         "Storage location not found: " + code));
     }
 
+    /** Get a storage location by code, scoped to the given site. */
+    public StorageLocation getStorageLocationByCode(UUID siteId, String code) {
+        return storageLocationRepository.findByCodeAndSite_Id(code, siteId)
+                .orElseThrow(() -> new StorageLocationNotFoundException(
+                        "Storage location not found: " + code));
+    }
+
     /**
-     * Get a storage location by ID.
+     * Get a storage location by ID. No site check - kept only for the legacy, unscoped
+     * {@code /api/storage-locations} routes; do not add new callers.
      */
     public StorageLocation getStorageLocationById(UUID id) {
         return storageLocationRepository.findById(id)
@@ -189,18 +276,41 @@ public class LocationService {
     }
 
     /**
-     * Get storage locations that support inventory (not display-only).
+     * Get a storage location by ID, scoped to the given site - 404s if it exists but belongs to
+     * a different site.
+     */
+    public StorageLocation getStorageLocationById(UUID siteId, UUID id) {
+        return storageLocationRepository.findByIdAndSite_Id(id, siteId)
+                .orElseThrow(() -> new StorageLocationNotFoundException(
+                        "Storage location not found: " + id));
+    }
+
+    /**
+     * Get storage locations that support inventory (not display-only). No site check - kept
+     * only for the legacy, unscoped {@code /api/storage-locations} routes; do not add new
+     * callers.
      */
     public List<StorageLocation> getInventoryStorageLocations() {
         UUID siteId = getDefaultSiteId();
         return storageLocationRepository.findInventoryLocationsBySite_Id(siteId);
     }
 
+    /** Get storage locations that support inventory (not display-only) for the given site. */
+    public List<StorageLocation> getInventoryStorageLocations(UUID siteId) {
+        return storageLocationRepository.findInventoryLocationsBySite_Id(siteId);
+    }
+
     /**
-     * Get storage locations that support display tracking.
+     * Get storage locations that support display tracking. No site check - kept only for the
+     * legacy, unscoped {@code /api/storage-locations} routes; do not add new callers.
      */
     public List<StorageLocation> getDisplayStorageLocations() {
         UUID siteId = getDefaultSiteId();
+        return storageLocationRepository.findDisplayLocationsBySite_Id(siteId);
+    }
+
+    /** Get storage locations that support display tracking for the given site. */
+    public List<StorageLocation> getDisplayStorageLocations(UUID siteId) {
         return storageLocationRepository.findDisplayLocationsBySite_Id(siteId);
     }
 

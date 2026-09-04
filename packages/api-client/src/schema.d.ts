@@ -68,6 +68,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/users/{userId}/site-memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMemberships"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{userId}/site-memberships/{siteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["grantMembership"];
+        post?: never;
+        delete: operations["revokeMembership"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analytics/action-center": {
         parameters: {
             query?: never;
@@ -2548,6 +2580,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{siteId}/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteLocations"];
+        put?: never;
+        post: operations["createSiteLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteLocationById"];
+        put: operations["updateSiteLocation"];
+        post?: never;
+        delete: operations["deleteSiteLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{siteId}/permissions": {
         parameters: {
             query?: never;
@@ -2556,6 +2620,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/storage-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteStorageLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/storage-locations/by-code/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteStorageLocationByCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/storage-locations/display-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteDisplayStorageLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/storage-locations/inventory-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteInventoryStorageLocations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2972,6 +3100,11 @@ export interface components {
             rank?: number;
         };
         CreateLocationRequest: {
+            locationCode?: string;
+            /** Format: uuid */
+            storageLocationId: string;
+        };
+        CreateSiteLocationRequest: {
             locationCode?: string;
             /** Format: uuid */
             storageLocationId: string;
@@ -4489,6 +4622,9 @@ export interface components {
         UpdateLocationRequest: {
             locationCode?: string;
         };
+        UpdateSiteLocationRequest: {
+            locationCode?: string;
+        };
         UpsertLootboxRequestDTO: {
             active?: boolean;
             /** Format: int32 */
@@ -4578,6 +4714,15 @@ export interface components {
             canonicalName?: string;
             isReviewTracked?: boolean;
             nameVariants?: string[];
+        };
+        UserSiteMembershipStatusDTO: {
+            active?: boolean;
+            siteCode?: string;
+            /** Format: uuid */
+            siteId?: string;
+            siteName?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         WalletBreakdownResponseDTO: {
             expiringSoon?: components["schemas"]["ExpirationBucket"][];
@@ -4819,6 +4964,150 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["InvitationResponseDTO"];
                 };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getMemberships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserSiteMembershipStatusDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    grantMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserSiteMembershipStatusDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    revokeMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {
@@ -13769,6 +14058,257 @@ export interface operations {
             };
         };
     };
+    getSiteLocations: {
+        parameters: {
+            query?: {
+                storageLocation?: string;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createSiteLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSiteLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteLocationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateSiteLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSiteLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Location"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteSiteLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
     getPermissions: {
         parameters: {
             query?: never;
@@ -13787,6 +14327,199 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SitePermissionsDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteStorageLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteStorageLocationByCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteDisplayStorageLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteInventoryStorageLocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StorageLocation"][];
                 };
             };
             /** @description Authentication required */

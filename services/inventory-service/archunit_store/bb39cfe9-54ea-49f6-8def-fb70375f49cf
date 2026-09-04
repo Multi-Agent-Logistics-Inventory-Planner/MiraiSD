@@ -492,6 +492,7 @@ Cycle detected: Slice dtos -> \
     - Method <com.mirai.inventoryservice.services.StockMovementService.rejectIfKujiPrizeChild(com.mirai.inventoryservice.models.Product)> calls constructor <com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException.<init>(java.lang.String)> in (StockMovementService.java:134)\
     (65 further dependencies have been omitted...)\
   3. Dependencies of Slice exceptions\
+    - Method <com.mirai.inventoryservice.exceptions.GlobalExceptionHandler.handleNotFoundException(java.lang.RuntimeException)> has annotation member of type <com.mirai.inventoryservice.identity.domain.MembershipNotFoundException> in (GlobalExceptionHandler.java:0)\
     - Method <com.mirai.inventoryservice.exceptions.GlobalExceptionHandler.handleNotFoundException(java.lang.RuntimeException)> has annotation member of type <com.mirai.inventoryservice.identity.domain.UserNotFoundException> in (GlobalExceptionHandler.java:0)\
   4. Dependencies of Slice identity\
     - Constructor <com.mirai.inventoryservice.identity.application.UserService.<init>(com.mirai.inventoryservice.identity.infrastructure.UserRepository, com.mirai.inventoryservice.repositories.StockMovementRepository, com.mirai.inventoryservice.identity.infrastructure.InvitationRepository, com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService)> has parameter of type <com.mirai.inventoryservice.repositories.StockMovementRepository> in (UserService.java:0)\
@@ -930,6 +931,7 @@ Cycle detected: Slice exceptions -> \
                 Slice services -> \
                 Slice exceptions\
   1. Dependencies of Slice exceptions\
+    - Method <com.mirai.inventoryservice.exceptions.GlobalExceptionHandler.handleNotFoundException(java.lang.RuntimeException)> has annotation member of type <com.mirai.inventoryservice.identity.domain.MembershipNotFoundException> in (GlobalExceptionHandler.java:0)\
     - Method <com.mirai.inventoryservice.exceptions.GlobalExceptionHandler.handleNotFoundException(java.lang.RuntimeException)> has annotation member of type <com.mirai.inventoryservice.identity.domain.UserNotFoundException> in (GlobalExceptionHandler.java:0)\
   2. Dependencies of Slice identity\
     - Constructor <com.mirai.inventoryservice.identity.application.InvitationService.<init>(com.mirai.inventoryservice.identity.infrastructure.InvitationRepository, com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService, com.mirai.inventoryservice.services.EmailService, com.mirai.inventoryservice.identity.application.UserService)> has parameter of type <com.mirai.inventoryservice.services.EmailService> in (InvitationService.java:0)\

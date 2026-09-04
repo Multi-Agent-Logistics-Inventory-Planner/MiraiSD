@@ -26,6 +26,11 @@ public interface StorageLocationRepository extends JpaRepository<StorageLocation
 
     boolean existsByCodeAndSite_Id(String code, UUID siteId);
 
+    boolean existsByIdAndSite_Id(UUID id, UUID siteId);
+
+    @Query("SELECT sl FROM StorageLocation sl JOIN FETCH sl.site WHERE sl.id = :id AND sl.site.id = :siteId")
+    Optional<StorageLocation> findByIdAndSite_Id(@Param("id") UUID id, @Param("siteId") UUID siteId);
+
     @Query("SELECT sl FROM StorageLocation sl JOIN FETCH sl.site WHERE sl.hasDisplay = true AND sl.site.id = :siteId ORDER BY sl.displayOrder")
     List<StorageLocation> findDisplayLocationsBySite_Id(@Param("siteId") UUID siteId);
 

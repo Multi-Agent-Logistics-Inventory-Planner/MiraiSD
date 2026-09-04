@@ -306,6 +306,190 @@
         "tags" : [ "invitation-controller" ]
       }
     },
+    "/api/admin/users/{userId}/site-memberships" : {
+      "get" : {
+        "operationId" : "getMemberships",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserSiteMembershipStatusDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "user-site-membership-controller" ]
+      }
+    },
+    "/api/admin/users/{userId}/site-memberships/{siteId}" : {
+      "delete" : {
+        "operationId" : "revokeMembership",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "user-site-membership-controller" ]
+      },
+      "put" : {
+        "operationId" : "grantMembership",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserSiteMembershipStatusDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "user-site-membership-controller" ]
+      }
+    },
     "/api/analytics/action-center" : {
       "get" : {
         "operationId" : "getActionCenter",
@@ -11502,6 +11686,337 @@
         "tags" : [ "me-controller" ]
       }
     },
+    "/api/v1/sites/{siteId}/locations" : {
+      "get" : {
+        "operationId" : "getSiteLocations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "storageLocation",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Location"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-controller" ]
+      },
+      "post" : {
+        "operationId" : "createSiteLocation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateSiteLocationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Location"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/locations/{id}" : {
+      "delete" : {
+        "operationId" : "deleteSiteLocation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-controller" ]
+      },
+      "get" : {
+        "operationId" : "getSiteLocationById",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Location"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-controller" ]
+      },
+      "put" : {
+        "operationId" : "updateSiteLocation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateSiteLocationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Location"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-controller" ]
+      }
+    },
     "/api/v1/sites/{siteId}/permissions" : {
       "get" : {
         "operationId" : "getPermissions",
@@ -11558,6 +12073,254 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "site-permissions-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/storage-locations" : {
+      "get" : {
+        "operationId" : "getSiteStorageLocations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/StorageLocation"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-storage-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/storage-locations/by-code/{code}" : {
+      "get" : {
+        "operationId" : "getSiteStorageLocationByCode",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StorageLocation"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-storage-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/storage-locations/display-locations" : {
+      "get" : {
+        "operationId" : "getSiteDisplayStorageLocations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/StorageLocation"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-storage-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/storage-locations/inventory-locations" : {
+      "get" : {
+        "operationId" : "getSiteInventoryStorageLocations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/StorageLocation"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-storage-location-controller" ]
       }
     },
     "/api/webhooks/easypost" : {
@@ -12565,6 +13328,20 @@
         }
       },
       "CreateLocationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "locationCode" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "storageLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "storageLocationId" ]
+      },
+      "CreateSiteLocationRequest" : {
         "type" : "object",
         "properties" : {
           "locationCode" : {
@@ -16320,6 +17097,15 @@
           }
         }
       },
+      "UpdateSiteLocationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "locationCode" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        }
+      },
       "UpsertLootboxRequestDTO" : {
         "type" : "object",
         "properties" : {
@@ -16555,6 +17341,28 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "UserSiteMembershipStatusDTO" : {
+        "type" : "object",
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "siteCode" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "siteName" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

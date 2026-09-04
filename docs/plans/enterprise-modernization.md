@@ -21,12 +21,12 @@ package move.
 | 1 | Security, CI and database safety | Substantially complete (Flyway not yet canonical) |
 | 2 | Reliable events and GHCR artifacts | Substantially complete (4 gaps reviewed and deferred, §5) |
 | 3 | Architecture and contract foundation | Substantially complete (Track D deferred behind Phase 4, §6) |
-| 4 | Identity and sites | In progress (packages + sub-based identity done; memberships outstanding, §7) |
+| 4 | Identity and sites | Substantially complete (all deliverables landed, not yet merged, §7) |
 | 5 | Catalog and site assortment | Not started |
 | 6 | Inventory and stock movements | Not started |
 | 7 | Shipments and remaining site operations | Not started |
-| 8 | Audited inter-site transfers | Not started |
-| 9 | Focused Expo mobile client | Not started |
+| 8 | Audited inter-site transfers | Deferred - no second site actually operating yet, §11 |
+| 9 | Focused Expo mobile client | Deferred - gated behind Phases 5-8, §12 |
 | 10 | Lean Hetzner cutover | Complete |
 | 11 | Close the migration | Not started |
 
@@ -385,9 +385,47 @@ vertical slice. Existing business domains stay in place until their phase.
       system-admin bypass) and `UserSiteMembershipRepositoryIT` (unique constraint, cascade
       delete, optimistic-lock conflict - needs Docker/Testcontainers to run, not exercised by
       plain `mvn test`).
-- [ ] The locations vertical slice (`LocationService.DEFAULT_SITE_CODE` is still hardcoded to
-      `"MAIN"`) and full membership lifecycle mutation endpoints (grant/revoke/deactivate) remain
-      outstanding - deferred to the next workstream.
+- [x] The locations vertical slice: `sites.application.LocationService` gained explicit-`siteId`
+      overloads of every method that previously resolved `DEFAULT_SITE_CODE` internally
+      (`sites.infrastructure.LocationRepository`/`StorageLocationRepository` gained the matching
+      `findByIdAndSite_Id`/`existsByIdAndSite_Id` queries), exposed via new
+      `sites.api.SiteLocationController`/`SiteStorageLocationController` under
+      `/api/v1/sites/{siteId}/locations`/`.../storage-locations` - the second reference vertical
+      slice after `/permissions`, and the first real business resource gated by
+      `SiteAccessAuthorizationFilter`. Also fixes a latent foreign-site-UUID leak: the old
+      unscoped `getLocationById(UUID)`/`getLocationsByStorageLocation(UUID)` trusted any caller's
+      UUID regardless of site; the new site-scoped overloads 404 when the UUID belongs to a
+      different site (`SiteLocationControllerIT`). The legacy `/api/locations`/
+      `/api/storage-locations` routes, and the other four independent `DEFAULT_SITE_CODE` copies
+      in `LocationInventoryService`/`StockMovementService`/`ShipmentService`/`DevSeedController`,
+      are deliberately untouched - those resolve a default/"not-assigned" location for
+      inventory/shipments/dev-seeding, which is Phase 6 territory, not this slice.
+- [x] Membership lifecycle mutation endpoints: `UserSiteMembershipRepository` gained `activate`/
+      `deactivate` (JPQL bulk updates - `updatedAt`/`version` are bound parameters, not
+      `CURRENT_TIMESTAMP`, since that resolves to `java.sql.Timestamp` and Hibernate refuses to
+      assign it to the entity's `OffsetDateTime` field) and `findByUserId`.
+      `MembershipAuthorizer` gained `grantMembership`/`revokeMembership` (pairing
+      `insertActiveIfAbsent` with `activate` to reactivate a previously revoked row - the former
+      alone is a no-op on conflict, not a true upsert) and `membershipsFor`. New
+      `identity.api.UserSiteMembershipController` at `/api/admin/users/{userId}/site-memberships`
+      (`GET`/`PUT /{siteId}`/`DELETE /{siteId}`) is ADMIN-only throughout, including the list
+      endpoint - `SecurityConfig` gates all of `/api/admin/**` to `ADMIN` at the URL-matcher
+      level, ahead of any controller's own `@PreAuthorize`, so a broader
+      `hasAnyRole('ADMIN','ASSISTANT_MANAGER')` read gate (as `InvitationController`'s `GET` uses)
+      would be unreachable there too - an existing, previously undetected inconsistency, not
+      something newly introduced here. Deliberately not nested under
+      `/api/v1/sites/{siteId}/**`: `SiteAccessAuthorizationFilter` would require the acting ADMIN
+      to already be a member of the target site, which is wrong for granting a user's first
+      access to one. Grant/revoke are logged (actor, target user, site, action), not written to
+      `AuditLogService` - that service's `StockMovementReason`/location/shipment-shaped fields
+      don't fit a membership event, matching how the system-admin bypass is already only logged,
+      not audited into a table.
+      Covered by `UserSiteMembershipControllerIT` (role gates, not-found handling, list) and
+      `UserSiteMembershipControllerKafkaIT` (grant success path, revoke-then-grant reactivation -
+      split out because granting exercises `insertActiveIfAbsent`'s native `ON CONFLICT` clause,
+      which needs real Postgres and isn't supported by H2 outside compatibility mode).
+      This closes Phase 4's exit gate for a real business resource, not just the `/permissions`
+      introspection endpoint. Implemented on `refactor/multi-site`, not yet merged.
 
 ### Role model decision (2026-09-01)
 
@@ -506,6 +544,12 @@ complete. Cross-service writes to another service's tables are removed.
 
 ## 11. Phase 8 — Audited inter-site transfers
 
+**Deferred (2026-09-04).** The second site (seeded `code = 'SECOND'` in Phase 4) is still a
+placeholder - no real name from the business yet, no memberships granted, no data owned by it.
+An audited transfer ledger between two sites is speculative work while only one site actually
+operates. *Trigger:* the second site goes live with real staff/inventory and stock genuinely
+needs to move between locations.
+
 ### Deliverables
 
 - Add `transfers` domain folders and the transfer aggregate/line ledger.
@@ -523,7 +567,10 @@ complete. Cross-service writes to another service's tables are removed.
 
 ## 12. Phase 9 — Focused Expo mobile client
 
-This phase starts only after the store-floor workflows and API v1 are stable.
+**Deferred (2026-09-04).** This phase starts only after the store-floor workflows and API v1 are
+stable - i.e. after Phases 5-8 land, per its own gate below. Not an independent decision until
+then. *Trigger:* Phases 5-8 complete and there is an actual staff-workflow driver for a native
+mobile client over the existing web app.
 
 ### Deliverables
 
