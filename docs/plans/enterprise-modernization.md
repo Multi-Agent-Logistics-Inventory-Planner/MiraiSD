@@ -25,8 +25,8 @@ package move.
 | 5 | Catalog and site assortment | Not started |
 | 6 | Inventory and stock movements | Not started |
 | 7 | Shipments and remaining site operations | Not started |
-| 8 | Audited inter-site transfers | Not started |
-| 9 | Focused Expo mobile client | Not started |
+| 8 | Audited inter-site transfers | Deferred - no second site actually operating yet, §11 |
+| 9 | Focused Expo mobile client | Deferred - gated behind Phases 5-8, §12 |
 | 10 | Lean Hetzner cutover | Complete |
 | 11 | Close the migration | Not started |
 
@@ -544,6 +544,12 @@ complete. Cross-service writes to another service's tables are removed.
 
 ## 11. Phase 8 — Audited inter-site transfers
 
+**Deferred (2026-09-04).** The second site (seeded `code = 'SECOND'` in Phase 4) is still a
+placeholder - no real name from the business yet, no memberships granted, no data owned by it.
+An audited transfer ledger between two sites is speculative work while only one site actually
+operates. *Trigger:* the second site goes live with real staff/inventory and stock genuinely
+needs to move between locations.
+
 ### Deliverables
 
 - Add `transfers` domain folders and the transfer aggregate/line ledger.
@@ -561,7 +567,10 @@ complete. Cross-service writes to another service's tables are removed.
 
 ## 12. Phase 9 — Focused Expo mobile client
 
-This phase starts only after the store-floor workflows and API v1 are stable.
+**Deferred (2026-09-04).** This phase starts only after the store-floor workflows and API v1 are
+stable - i.e. after Phases 5-8 land, per its own gate below. Not an independent decision until
+then. *Trigger:* Phases 5-8 complete and there is an actual staff-workflow driver for a native
+mobile client over the existing web app.
 
 ### Deliverables
 
