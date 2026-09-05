@@ -1,8 +1,9 @@
-# Build context is the repo root (not apps/web) - apps/web depends on the local,
-# unpublished @mirai/api-client package at packages/api-client (see package.json's
-# "file:../../packages/api-client" dependency), which must be present alongside
-# apps/web for npm to resolve and symlink it, and for Next's standalone output
-# tracing (outputFileTracingRoot in next.config.mjs) to include its files.
+# Build context is the repo root (not apps/web) - the repo is an npm workspace
+# (root package.json's "workspaces": ["apps/web", "packages/*"]), and apps/web depends
+# on the local, unpublished @mirai/api-client package at packages/api-client. Both must
+# be present alongside apps/web for npm to resolve and symlink it, and for Next's
+# standalone output tracing (outputFileTracingRoot in next.config.mjs) to include its
+# files.
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -20,26 +21,22 @@ ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_R2_PUBLIC_BASE_URL=$NEXT_PUBLIC_R2_PUBLIC_BASE_URL
 
-# Copy package manifests first for better layer caching - both apps/web and the
-# local package it depends on. packages/api-client is not part of an npm workspace,
-# so it needs its own `npm ci` too: apps/web's install only symlinks
-# node_modules/@mirai/api-client to ../../packages/api-client, it does not hoist
-# that package's own dependencies (openapi-fetch) anywhere Node would resolve them
-# from packages/api-client's own location.
-COPY apps/web/package*.json ./apps/web/
-COPY packages/api-client/package*.json ./packages/api-client/
+# Copy package manifests first for better layer caching - the root manifest/lockfile
+# plus every workspace member's package.json (npm ci validates the on-disk workspace
+# layout against what the lockfile expects). One `npm ci` at the repo root installs and
+# correctly hoists every workspace member's dependencies (including packages/api-client's
+# own openapi-fetch) into one node_modules tree - no per-package install needed.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/contracts/package.json ./packages/contracts/
 
-WORKDIR /app/packages/api-client
 RUN npm ci
-
-WORKDIR /app/apps/web
-RUN npm ci
-
-WORKDIR /app
 
 # Copy source code
 COPY apps/web ./apps/web
 COPY packages/api-client ./packages/api-client
+COPY packages/contracts ./packages/contracts
 
 WORKDIR /app/apps/web
 

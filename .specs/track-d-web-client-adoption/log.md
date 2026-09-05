@@ -578,6 +578,106 @@ errors in the logs. Image and container removed after verification.
   clean install: `tsc --noEmit`, `vitest run`, `eslint` all clean.
 - Result: pass.
 
+### T-13 — Convert to a real npm workspace (added on user request, planned separately)
+
+Prompted by a direct question during review: why wasn't this a real npm
+workspace from the start, given every problem in T-9/T-10/T-11 traced back
+to the same root cause (a `file:` dependency outside a workspace doesn't
+hoist its own dependencies anywhere Node resolves them from that package's
+location)? Planned via `EnterPlanMode`/`ExitPlanMode` before implementing,
+given the repo-wide blast radius (see the approved plan for full rationale).
+
+- Changed: new root `package.json` (`"workspaces": ["apps/web",
+  "packages/*"]`); `apps/web/package.json`'s `"@mirai/api-client"` changed
+  from `"file:../../packages/api-client"` to `"*"`; `apps/web/package-lock.json`
+  and `packages/api-client/package-lock.json` deleted - the root
+  `package-lock.json` (previously the empty `{"packages": {}}` stub) is now
+  the one real, authoritative lockfile; `apps/web/Dockerfile` collapsed the
+  two-stage `npm ci` (`packages/api-client` then `apps/web`) into one `npm
+  ci` at the repo root; `ci.yml`'s `unit-test-web`/`build-web`/`static-analysis`
+  jobs same collapse. `scripts/` (a one-off-script package, "not part of the
+  app build") deliberately left outside the workspace.
+- **A real, caught problem along the way**: the first attempt (`rm -rf`
+  every `node_modules` + `npm install`) let all 43 of `apps/web`'s directly
+  declared dependencies (plus ~280 transitive ones) float to whatever
+  satisfied their existing caret ranges on the registry *today* - including
+  `next` itself (16.2.3 -> 16.3.4) - and two of those newer versions
+  (`eslint-config-next`, `eslint-plugin-react-hooks`) introduced new lint
+  errors (React Compiler rule violations) in files this branch never
+  touches (`tab-reviews.tsx`, a shipment dialog). Root cause: with the old
+  lockfiles and `node_modules` both gone, npm had nothing to prefer and
+  re-resolved the entire graph fresh - this is normal `npm install` behavior
+  whenever a lockfile is regenerated from scratch, not something specific
+  to workspaces, but doing it as part of this PR would have silently bundled
+  an unrelated, unreviewed dependency bump (including the app's own
+  framework version) into a "convert to workspaces" change.
+- **Decision, not a full revert**: reconstructing the entire old dependency
+  graph exactly (a full manual lockfile merge preserving all 326 drifted
+  entries) was judged not worth the risk of getting the merge subtly wrong
+  versus the value - most of that drift is patch/minor-level movement in
+  transitive dependencies nobody explicitly pinned or reviewed, and is
+  exactly what would happen to any contributor running `npm install` today
+  regardless of this PR. Instead: pinned only the two packages that caused
+  a concrete, verified failure (`eslint-config-next` back to `16.2.3`,
+  `eslint-plugin-react-hooks` back to `7.0.1`) via a root `package.json`
+  `overrides` block - restoring the 0-lint-errors baseline without touching
+  unrelated files. Everything else, including `next` moving to `16.3.4`, is
+  disclosed here rather than silently absorbed; recommend a human decision
+  on whether that specific bump needs its own dedicated verification pass
+  before merge (flagged to the user directly, not just recorded here).
+- Tests: full clean-install verification, twice - once confirming the
+  drift/lint-break (diagnostic, not the final state) and once from a
+  genuine `rm -rf node_modules && npm ci` at the repo root after the
+  `overrides` fix: `tsc --noEmit` clean, `vitest run` 292/292, `eslint` 0
+  errors/50 pre-existing warnings (identical baseline to before this task).
+  Confirmed `openapi-fetch` now resolves via ordinary Node module
+  resolution with one install, no second `npm ci` needed - the actual bug
+  this task set out to fix. Real `docker build --no-cache` +
+  `docker run` + `curl` with the collapsed single-`npm ci` Dockerfile -
+  succeeded, no tracing-root warning, expected `307` response. Confirmed
+  `scripts/` untouched (`git status --short scripts/` empty).
+- Result: pass, with one disclosed, un-pinned side effect (`next`
+  16.2.3 -> 16.3.4) flagged for a human decision rather than resolved
+  unilaterally.
+
+### T-14 — `next` pin attempted, then reverted on a security finding; `contracts-check` fix
+
+Asked to pin `next` back to `16.2.3` (full version-parity with pre-migration
+state). Did so via the same `overrides` mechanism, then ran `npm audit`
+before considering it done - it reported 3 new high-severity findings:
+`next@16.2.3` falls inside a documented vulnerable range
+(`9.3.4-canary.0 - 16.3.0-preview.10`) covering ~20 CVEs/advisories (DoS,
+XSS, SSRF, cache poisoning, middleware bypass), all fixed in `16.3.4`.
+Did not leave the pin in place - reverted the override, flagged the finding
+to the user instead of silently completing "pin back" as literally asked,
+per "never compromise on security." Re-resolving `next` back up to `16.3.4`
+needed an explicit `npm update next --workspace=apps/web` - removing the
+override alone did not re-trigger resolution, since `16.2.3` still
+satisfied the declared `^16.1.6` range and npm had no reason to move it on
+its own. Final state: `next` at `16.3.4`, `eslint-config-next`/
+`eslint-plugin-react-hooks` still pinned to their pre-migration versions
+(pure tooling, not shipped in the app - no security relevance), `npm audit`
+clean (0 vulnerabilities), re-verified with a genuine `rm -rf node_modules
+&& npm ci`.
+
+Separately, a review caught a real gap T-13 missed: `contracts-check`
+(regenerates `packages/contracts/openapi.json` and
+`packages/api-client/src/schema.d.ts`, fails on drift or breaking API
+changes) still referenced the deleted `packages/api-client/package-lock.json`
+in its `cache-dependency-path` and ran `npm ci` from inside
+`packages/api-client` - the same per-package-install pattern every other
+job had already been fixed to drop. This job wasn't touched in T-13 because
+the earlier pass focused only on the three "web" jobs; `contracts-check`
+lives in a different part of `ci.yml` and was missed. Fixed the same way:
+one `npm ci` at the repo root, `npm run generate`/`npm run typecheck` still
+run with `working-directory: packages/api-client` (correct - those are
+package-specific scripts whose relative paths depend on that cwd).
+Verified by running both commands locally exactly as CI would: `npm run
+typecheck` clean, `npm run generate` produced zero diff on
+`schema.d.ts` (confirming the checked-in generated client is still fresh
+after the pin changes above).
+- Result: pass.
+
 ## Test plan
 
 - AC-1: `auth-token.test.ts` + `generated-client.test.ts` (9 tests) —

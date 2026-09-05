@@ -43,26 +43,18 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web_or_packages_changed == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: |
-            apps/web/package-lock.json
-            packages/api-client/package-lock.json
-      # packages/api-client is not an npm workspace member: `npm ci` in apps/web only
-      # symlinks node_modules/@mirai/api-client to ../../packages/api-client, it does not
-      # install that package's own dependencies (openapi-fetch) anywhere Node would
-      # resolve them from packages/api-client's actual location. Mirrors apps/web/Dockerfile.
-      - run: npm ci
-        working-directory: packages/api-client
+      # The repo is an npm workspace (root package.json), so one `npm ci` at the repo
+      # root installs and hoists every workspace member's dependencies - including
+      # packages/api-client's own openapi-fetch - into one node_modules tree.
       - run: npm ci
       - run: npm run test:run
+        working-directory: apps/web
 
   unit-test-inventory-service:
     name: "unit-test / inventory-service"
@@ -122,12 +114,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: packages/api-client/package-lock.json
+      # The repo is an npm workspace (root package.json), so one `npm ci` at the repo
+      # root installs packages/api-client's dependencies too - no separate install
+      # inside packages/api-client needed.
+      - run: npm ci
       - name: Regenerate packages/api-client/src/schema.d.ts
         working-directory: packages/api-client
-        run: |
-          npm ci
-          npm run generate
+        run: npm run generate
       - name: Fail if the checked-in generated client is stale
         run: git diff --exit-code packages/api-client/src/schema.d.ts
       - name: Typecheck the generated client
@@ -227,23 +220,16 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web_or_packages_changed == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: |
-            apps/web/package-lock.json
-            packages/api-client/package-lock.json
-      - run: npm ci
-        working-directory: packages/api-client
       - run: npm ci
       # No "typecheck" npm script exists; run tsc directly against the project config.
       - run: npx tsc --noEmit
+        working-directory: apps/web
 
   # ---------------------------------------------------------------------
   # static-analysis: lint + free dependency scan. Container image scanning
@@ -258,17 +244,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install packages/api-client (web dependency)
+      - name: Install (web)
         if: needs.changes.outputs.web_or_packages_changed == 'true'
-        working-directory: packages/api-client
         run: npm ci
 
       - name: ESLint (web)
         if: needs.changes.outputs.web_or_packages_changed == 'true'
         working-directory: apps/web
-        run: |
-          npm ci
-          npm run lint
+        run: npm run lint
 
       # No Checkstyle/Spotless plugin is currently bound in
       # services/inventory-service/pom.xml, so there is no Java lint step
