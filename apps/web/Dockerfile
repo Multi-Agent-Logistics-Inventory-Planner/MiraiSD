@@ -1,3 +1,9 @@
+# Build context is the repo root (not apps/web) - the repo is an npm workspace
+# (root package.json's "workspaces": ["apps/web", "packages/*"]), and apps/web depends
+# on the local, unpublished @mirai/api-client package at packages/api-client. Both must
+# be present alongside apps/web for npm to resolve and symlink it, and for Next's
+# standalone output tracing (outputFileTracingRoot in next.config.mjs) to include its
+# files.
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -15,14 +21,24 @@ ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_R2_PUBLIC_BASE_URL=$NEXT_PUBLIC_R2_PUBLIC_BASE_URL
 
-# Copy package files
-COPY package*.json ./
+# Copy package manifests first for better layer caching - the root manifest/lockfile
+# plus every workspace member's package.json (npm ci validates the on-disk workspace
+# layout against what the lockfile expects). One `npm ci` at the repo root installs and
+# correctly hoists every workspace member's dependencies (including packages/api-client's
+# own openapi-fetch) into one node_modules tree - no per-package install needed.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/contracts/package.json ./packages/contracts/
 
-# Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY apps/web ./apps/web
+COPY packages/api-client ./packages/api-client
+COPY packages/contracts ./packages/contracts
+
+WORKDIR /app/apps/web
 
 # Build the application
 RUN npm run build
@@ -45,10 +61,12 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy necessary files from builder. outputFileTracingRoot (set to the repo root in
+# next.config.mjs) makes the standalone output mirror apps/web's monorepo-relative
+# path, so server.js lands at apps/web/server.js, not ./server.js.
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
 # Switch to non-root user
 USER nextjs
@@ -61,4 +79,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Start the application
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

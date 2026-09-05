@@ -22,6 +22,14 @@ outputs:
   packages_changed:
     description: "true if packages/** changed"
     value: ${{ steps.diff.outputs.packages_changed }}
+  web_or_packages_changed:
+    description: >
+      true if apps/web/** or packages/** changed - apps/web depends on the
+      local packages/api-client package, so anything that rebuilds/tests/
+      deploys the web image on web_changed must also run on a packages-only
+      change. One place to compute this instead of five copies of the same
+      OR (see docs/runbooks/ci-cd-pipeline.md §1).
+    value: ${{ steps.diff.outputs.web_or_packages_changed }}
   compose_changed:
     description: "true if infra/docker-compose.yml changed"
     value: ${{ steps.diff.outputs.compose_changed }}
@@ -89,6 +97,13 @@ runs:
         if echo "$CHANGED_FILES" | grep -q "^apps/web/"; then
           WEB_CHANGED=true
         fi
+        # The root .dockerignore governs the web image's build context (apps/web's Docker
+        # build runs from the repo root) - a change to it must rebuild web the same as an
+        # apps/web/** change would, or the built image's contents could silently diverge
+        # from what .dockerignore now says they should be.
+        if echo "$CHANGED_FILES" | grep -q "^\.dockerignore$"; then
+          WEB_CHANGED=true
+        fi
         if echo "$CHANGED_FILES" | grep -q "^packages/"; then
           PACKAGES_CHANGED=true
         fi
@@ -104,6 +119,11 @@ runs:
         echo "messaging_changed=$MESSAGING_CHANGED" >> "$GITHUB_OUTPUT"
         echo "web_changed=$WEB_CHANGED" >> "$GITHUB_OUTPUT"
         echo "packages_changed=$PACKAGES_CHANGED" >> "$GITHUB_OUTPUT"
+        if [ "$WEB_CHANGED" = "true" ] || [ "$PACKAGES_CHANGED" = "true" ]; then
+          echo "web_or_packages_changed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "web_or_packages_changed=false" >> "$GITHUB_OUTPUT"
+        fi
         echo "compose_changed=$COMPOSE_CHANGED" >> "$GITHUB_OUTPUT"
         echo "caddy_changed=$CADDY_CHANGED" >> "$GITHUB_OUTPUT"
 

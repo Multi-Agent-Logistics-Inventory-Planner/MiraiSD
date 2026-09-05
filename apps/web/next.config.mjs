@@ -7,9 +7,17 @@ const __dirname = path.dirname(__filename);
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // apps/web depends on the local, unpublished @mirai/api-client package (packages/api-client),
+  // resolved as an npm-managed symlink outside apps/web. Without this, standalone output tracing
+  // stops at apps/web and silently omits that package, breaking `node server.js` at runtime.
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   reactCompiler: true,
+  // Must match outputFileTracingRoot - Next warns ("Both outputFileTracingRoot and
+  // turbopack.root are set, but they must have the same value") and silently widens
+  // Turbopack's project root to whatever outputFileTracingRoot says anyway, which would
+  // otherwise mean the two configs disagree by accident rather than by explicit choice.
   turbopack: {
-    root: __dirname,
+    root: path.join(__dirname, "../.."),
   },
   typescript: {
     ignoreBuildErrors: false,

@@ -20,6 +20,7 @@ jobs:
       forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
       messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
       web_changed: ${{ steps.detect.outputs.web_changed }}
+      web_or_packages_changed: ${{ steps.detect.outputs.web_or_packages_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,8 +67,9 @@ jobs:
             context: services/messaging-service
             changed: ${{ needs.changes.outputs.messaging_changed }}
           - service: web
-            context: apps/web
-            changed: ${{ needs.changes.outputs.web_changed }}
+            context: .
+            dockerfile: apps/web/Dockerfile
+            changed: ${{ needs.changes.outputs.web_or_packages_changed }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +81,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile || format('{0}/Dockerfile', matrix.context) }}
           push: false
           platforms: linux/amd64
           # web needs real values here to get past `npm run build`, but this

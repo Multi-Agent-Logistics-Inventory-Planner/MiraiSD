@@ -38,6 +38,7 @@ import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.application.MembershipAuthorizer;
 import com.mirai.inventoryservice.services.AnalyticsSeedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +86,7 @@ public class DevSeedController {
     private static final int NOTES_INTERVAL = 5;
     private static final String DEV_SEED_AUDIT_SOURCE = "dev_seed_audit";
     private static final String DEFAULT_SITE_CODE = "MAIN";
+    private static final String DEV_EMPLOYEE_EMAIL = "mjpark019@gmail.com";
 
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
@@ -102,6 +104,7 @@ public class DevSeedController {
     private final ReviewDailyCountRepository reviewDailyCountRepository;
     private final MachineDisplayRepository machineDisplayRepository;
     private final AnalyticsSeedService analyticsSeedService;
+    private final MembershipAuthorizer membershipAuthorizer;
 
     private final Random random = new Random();
 
@@ -210,15 +213,18 @@ public class DevSeedController {
 
     @PostMapping("/seed/all")
     public ResponseEntity<Map<String, Object>> seedAll() {
+        // Ensure the normal Supabase login used for local development has a
+        // backend role and MAIN membership, even when inventory was seeded before.
+        ensureCoreEntitiesExist();
+        User devEmployee = ensureDevEmployee();
+
         if (productRepository.count() > 0) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                "error", "Seed data already exists.",
-                "hint", "Reset with: docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d"
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "alreadySeeded", true,
+                "employeeEmail", devEmployee.getEmail()
             ));
         }
-
-        // Ensure core entities exist first (MAIN site, NOT_ASSIGNED, NA location)
-        ensureCoreEntitiesExist();
 
         // 1. Products (15)
         List<Category> categories = categoryRepository.findByParentIsNullAndIsActiveTrueOrderByDisplayOrderAsc();
@@ -371,12 +377,27 @@ public class DevSeedController {
 
         return ResponseEntity.ok(Map.of(
             "success", true,
+            "employeeEmail", devEmployee.getEmail(),
             "productsCreated", products.size(),
             "locationsCreated", locations.size(),
             "inventoryRecordsCreated", inventoryRecords.size(),
             "shipmentsCreated", shipments.size(),
             "salesCreated", movements.size()
         ));
+    }
+
+    private User ensureDevEmployee() {
+        User user = userRepository.findByEmail(DEV_EMPLOYEE_EMAIL).orElseGet(() ->
+            userRepository.save(User.builder()
+                .email(DEV_EMPLOYEE_EMAIL)
+                .fullName("Matthew Park")
+                .role(UserRole.EMPLOYEE)
+                .build())
+        );
+        user.setRole(UserRole.EMPLOYEE);
+        User saved = userRepository.save(user);
+        membershipAuthorizer.grantMainSiteMembershipIfAbsent(saved.getId());
+        return saved;
     }
 
     @PostMapping("/seed/sales")

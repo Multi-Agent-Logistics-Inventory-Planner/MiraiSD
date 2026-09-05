@@ -1,6 +1,6 @@
-import { getSupabaseClient } from "@/lib/supabase";
 import { ApiError } from "@/types/api";
 import { BACKEND_BASE_URL } from "@/lib/api/backend-url";
+import { getAuthToken, redirectToLogin } from "@/lib/api/auth-token";
 
 const API_BASE_URL = BACKEND_BASE_URL;
 
@@ -16,16 +16,6 @@ export class ApiClientError extends Error {
     this.error = apiError.error;
     this.fieldErrors = apiError.fieldErrors;
   }
-}
-
-async function getAuthToken(): Promise<string | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
 }
 
 interface FetchOptions extends RequestInit {
@@ -78,8 +68,8 @@ export async function apiClient<T>(
 
     // Handle 401 Unauthorized - redirect to login (unless skipAuthRedirect is set)
     if (response.status === 401) {
-      if (!skipAuthRedirect && typeof window !== "undefined") {
-        window.location.href = "/login";
+      if (!skipAuthRedirect) {
+        redirectToLogin();
       }
       throw new ApiClientError({
         timestamp: new Date().toISOString(),

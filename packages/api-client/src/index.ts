@@ -1,7 +1,7 @@
 import createFetchClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema.js";
 
-export type { paths } from "./schema.js";
+export type { paths, components } from "./schema.js";
 
 export interface CreateApiClientOptions {
   /** Base URL of the inventory-service, e.g. https://api.mirai-inventory.com */
