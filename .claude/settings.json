@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(pwd)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(java -version)",
+      "Bash(mvn -v)",
+      "Bash(npm run test:*)",
+      "Bash(npm run test:run:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest *)",
+      "Bash(npx eslint:*)",
+      "Bash(npx next lint:*)",
+      "Bash(./mvnw compile:*)",
+      "Bash(./mvnw test-compile:*)",
+      "Bash(./mvnw test:*)",
+      "Bash(python3:*)",
+      "mcp__ide__getDiagnostics",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__get_logs",
+      "mcp__supabase__get_project_url"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git clean:*)",
+      "Bash(git restore:*)",
+      "Bash(git filter-repo:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}

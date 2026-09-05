@@ -23,6 +23,7 @@ the final source of truth.
 | [Tenant-migration worksheet](baseline/tenant-migration-worksheet.md) | Classifies current and planned tables as global, site-owned or platform-owned | Baseline |
 | [API v1 map](baseline/api-v1-map.md) | Classifies all current Spring controller mappings and defines target route families | Baseline |
 | [Phase cost-impact template](templates/phase-cost-impact.md) | Required cost review for each implementation phase | Template |
+| [SDD workflow](sdd-workflow.md) | Feature-level specification, implementation, validation and review lifecycle | Active |
 
 ## Document conventions
 
