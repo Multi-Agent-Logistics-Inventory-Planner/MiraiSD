@@ -24,6 +24,7 @@ jobs:
       messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
       web_changed: ${{ steps.detect.outputs.web_changed }}
       packages_changed: ${{ steps.detect.outputs.packages_changed }}
+      web_or_packages_changed: ${{ steps.detect.outputs.web_or_packages_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,7 +41,7 @@ jobs:
   unit-test-web:
     name: "unit-test / web"
     needs: changes
-    if: needs.changes.outputs.web_changed == 'true'
+    if: needs.changes.outputs.web_or_packages_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,7 +52,15 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            packages/api-client/package-lock.json
+      # packages/api-client is not an npm workspace member: `npm ci` in apps/web only
+      # symlinks node_modules/@mirai/api-client to ../../packages/api-client, it does not
+      # install that package's own dependencies (openapi-fetch) anywhere Node would
+      # resolve them from packages/api-client's actual location. Mirrors apps/web/Dockerfile.
+      - run: npm ci
+        working-directory: packages/api-client
       - run: npm ci
       - run: npm run test:run
 
@@ -216,7 +225,7 @@ jobs:
   build-web:
     name: "build / web (typecheck)"
     needs: changes
-    if: needs.changes.outputs.web_changed == 'true'
+    if: needs.changes.outputs.web_or_packages_changed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -227,7 +236,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            packages/api-client/package-lock.json
+      - run: npm ci
+        working-directory: packages/api-client
       - run: npm ci
       # No "typecheck" npm script exists; run tsc directly against the project config.
       - run: npx tsc --noEmit
@@ -245,8 +258,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install packages/api-client (web dependency)
+        if: needs.changes.outputs.web_or_packages_changed == 'true'
+        working-directory: packages/api-client
+        run: npm ci
+
       - name: ESLint (web)
-        if: needs.changes.outputs.web_changed == 'true'
+        if: needs.changes.outputs.web_or_packages_changed == 'true'
         working-directory: apps/web
         run: |
           npm ci

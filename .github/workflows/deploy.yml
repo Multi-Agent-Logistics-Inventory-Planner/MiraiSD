@@ -6,7 +6,9 @@ on:
     paths:
       - 'services/**'
       - 'apps/web/**'
+      - 'packages/**'
       - 'infra/**'
+      - '.dockerignore'
       - '.github/workflows/deploy.yml'
       - '.github/actions/detect-changes/**'
   workflow_dispatch:
@@ -36,6 +38,7 @@ jobs:
       forecasting_changed: ${{ steps.detect.outputs.forecasting_changed }}
       messaging_changed: ${{ steps.detect.outputs.messaging_changed }}
       web_changed: ${{ steps.detect.outputs.web_changed }}
+      web_or_packages_changed: ${{ steps.detect.outputs.web_or_packages_changed }}
       caddy_changed: ${{ steps.detect.outputs.caddy_changed }}
     steps:
       - uses: actions/checkout@v4
@@ -148,7 +151,7 @@ jobs:
   build-push-web:
     name: "build-push / web"
     needs: changes
-    if: needs.changes.outputs.web_changed == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.web_or_packages_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -164,7 +167,10 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
-          context: apps/web
+          # Repo root, not apps/web - apps/web depends on the local packages/api-client
+          # package, which must be visible in the build context. See apps/web/Dockerfile.
+          context: .
+          file: apps/web/Dockerfile
           push: true
           platforms: linux/amd64
           # NEXT_PUBLIC_* values come from the protected `production`

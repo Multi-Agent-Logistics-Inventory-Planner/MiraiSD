@@ -54,7 +54,7 @@ interface LocationTabsProps {
 }
 
 export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
-  const { data: storageLocations, isLoading } = useStorageLocations();
+  const { data: storageLocations, isLoading, error } = useStorageLocations();
 
   // Create a set of existing storage location codes from the API
   const existingCodes = useMemo(() => {
@@ -79,6 +79,18 @@ export function LocationTabs({ value, onValueChange }: LocationTabsProps) {
       <div className="flex items-center gap-2 py-2">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span className="text-sm text-muted-foreground">Loading storage locations...</span>
+      </div>
+    );
+  }
+
+  // A site-resolution or fetch failure is not the same as "no storage locations exist yet" -
+  // pointing the user at the database seeder for an actual error hides the real problem.
+  if (error) {
+    return (
+      <div className="rounded-lg border border-dashed border-destructive/50 p-4">
+        <div className="text-sm text-destructive">
+          Unable to load storage locations. Please try again or contact support if this persists.
+        </div>
       </div>
     );
   }

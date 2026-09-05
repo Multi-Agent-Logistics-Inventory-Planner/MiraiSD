@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getAuthSession } from "@/lib/api/auth";
@@ -46,6 +47,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,8 +94,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Cache the successful response
           setCachedSession(accessToken, sessionResponse);
         } else {
-          // Backend validation failed - clear auth state
+          // Backend validation failed - clear auth state. Also clears the query cache
+          // (not just local user/session state): an invalidated session means any
+          // site-scoped data already cached (e.g. useCurrentSite's ["me","sites"],
+          // staleTime: Infinity) must not survive for whoever signs in next in this tab.
           clearSessionCache();
+          queryClient.clear();
           const supabase = getSupabaseClient();
           if (supabase) {
             await supabase.auth.signOut();
@@ -104,11 +110,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch {
         // Validation failed - clear cache and auth state
         clearSessionCache();
+        queryClient.clear();
         setUser(null);
         setSession(null);
       }
     },
-    []
+    [queryClient]
   );
 
   useEffect(() => {
@@ -153,6 +160,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (event === "SIGNED_OUT") {
         setUser(null);
         clearSessionCache();
+        // This handler is the only path for an externally triggered sign-out (token
+        // expiry, revocation, or a sign-out in another tab) - the explicit signOut()
+        // callback below already clears the query cache, but that call is never reached
+        // for these cases, so the same clear() must happen here too. Without it, a stale
+        // ["me","sites"] entry (staleTime: Infinity) can survive into whichever user
+        // signs in next in this tab.
+        queryClient.clear();
         initialAuthProcessedRef.current = false;
         router.push("/login");
       } else if (
@@ -173,7 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router, validateAndSetUser]);
+  }, [router, validateAndSetUser, queryClient]);
 
   const signOut = useCallback(async () => {
     clearSessionCache();
@@ -183,8 +197,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     setUser(null);
     setSession(null);
+    // router.push is a client-side navigation, not a reload - the QueryClient is a
+    // browser-lifetime singleton (see query-provider.tsx), so a second user signing in in
+    // the same tab would otherwise inherit the first user's cached queries. This matters
+    // most for site-scoped data with a long staleTime (useCurrentSite's ["me","sites"]
+    // is staleTime: Infinity) that would never refetch on its own.
+    queryClient.clear();
     router.push("/login");
-  }, [router]);
+  }, [router, queryClient]);
 
   const refreshAuth = useCallback(async () => {
     const supabase = getSupabaseClient();

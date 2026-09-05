@@ -1,0 +1,34 @@
+# Repo-root Docker build context (apps/web depends on packages/api-client, so its
+# build context must include both - see apps/web/Dockerfile). Without this, a locally
+# present node_modules or build output collides with what the image itself installs/builds,
+# and - since the context is now the whole repo, not just apps/web - secrets nested
+# anywhere in the tree (infra/.env, apps/web/.env.local, TLS keys, local tool config)
+# would otherwise reach the Docker daemon. Patterns must match nested paths, not just
+# repo-root files: `.env` only excludes the root file, `**/.env` excludes every one.
+.git
+.claude
+.mcp.json
+**/.env
+**/.env.*
+!**/.env.example
+
+infra/certs
+
+**/node_modules
+**/.next
+**/dist
+**/build
+**/coverage
+**/.turbo
+**/.vercel
+*.tsbuildinfo
+
+# Backend build/venv output - irrelevant to the web image but sizable, and not excluded
+# by the patterns above.
+**/target
+**/.venv
+**/__pycache__
+**/*.egg-info
+
+.specs
+docs

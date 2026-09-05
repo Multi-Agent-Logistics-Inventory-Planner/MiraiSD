@@ -155,8 +155,10 @@ services:
   frontend:
     container_name: frontend-dev
     build:
-      context: ../apps/web
-      dockerfile: Dockerfile
+      # Repo root, not apps/web - apps/web depends on the local packages/api-client
+      # package, which must be visible in the build context. See apps/web/Dockerfile.
+      context: ..
+      dockerfile: apps/web/Dockerfile
       args:
         - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
         - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}

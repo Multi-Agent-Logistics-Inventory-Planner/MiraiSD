@@ -134,7 +134,11 @@ venv.bak/
 # ============================================
 # DOCKER
 # ============================================
+# The root .dockerignore is committed - the repo-root web Docker build context
+# (apps/web/Dockerfile) depends on it to exclude node_modules/.git/.env from
+# what gets sent to the Docker daemon. Re-included below.
 .dockerignore
+!/.dockerignore
 infra/docker-compose.override.yml
 
 # ============================================
