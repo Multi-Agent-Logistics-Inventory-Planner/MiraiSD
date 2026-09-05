@@ -191,21 +191,23 @@ a restatement of `log.md`'s narrative.
   `use-not-assigned-inventory.ts`, and the three real consumers
   (`shipment-receive-dialog.tsx`, `location-selector.tsx`,
   `transfer-display-dialog.tsx`) show zero diff from `main`. **No gaps.**
-- [Spec] AC-7: **gap, act on before merge (not blocking this review, but
-  blocking "fully validated").** No Playwright smoke check exists, and the
-  Locations page's tab bar was not manually verified against a running
-  `inventory-service` backend — only a placeholder-build-arg Docker image
-  serving an unauthenticated `307` was verified, which does not exercise
-  the actual `/api/v1/sites/{siteId}/storage-locations` read path against
-  real data. Tracked as the feature's one remaining open item; see
-  `validation.md`.
+- [Spec] AC-7: **Closed.** No Playwright smoke check was added, but the
+  user verified the Locations page's tab bar against their own running
+  `inventory-service` (via `docker compose -f infra/docker-compose.dev.yml
+  up -d --build`) and confirmed `GET /api/v1/sites/{siteId}/storage-locations`
+  returns `200` with real data for the real `MAIN` site UUID — the actual
+  read path this AC requires, not just a placeholder-arg Docker
+  build/run. See `validation.md`.
 
 ## Residual risk
 
-- AC-7 (Playwright/manual verification of the tab bar against a live
-  backend) is still open — the CI/Docker/security fixes in this round are
-  independently verified, but the feature's actual read-path behavior
-  against a real `inventory-service` has not been exercised end-to-end.
+- ~~AC-7 (Playwright/manual verification of the tab bar against a live
+  backend)~~ — **closed**: verified by the user against their own local
+  dev stack (real `200` on the site-scoped endpoint, legacy inventory
+  endpoints confirmed still unscoped alongside it). No automated
+  Playwright coverage was added, so a future regression here would only
+  be caught manually — worth a follow-up if this workflow becomes higher
+  traffic.
 - The `packages_changed`/`web_or_packages_changed` CI wiring is verified by
   local reasoning, a real Docker build, and YAML-syntax validation, but not
   by an actual GitHub Actions run (no CI access from this session) — worth

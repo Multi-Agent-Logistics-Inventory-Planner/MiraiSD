@@ -62,37 +62,36 @@ python3 -c "import yaml; yaml.safe_load(open(f))" for each of:
 | `docker run` + `curl /` | Pass — container starts (`✓ Ready in 0ms`), serves `307` redirect to `/login` (expected unauthenticated behavior), no module-resolution or tracing-root warnings in logs |
 | YAML syntax (4 changed workflow/action files) | Pass — all parse |
 | `.dockerignore` secrets exclusion | Pass — verified with a synthetic `alpine` image (`COPY . /ctx` + `find`): no `.env*`, `*.pem`, `.mcp.json`, or `.claude` reach the build context |
-| AC-7 (Locations page tab bar against a live `inventory-service`) | **Blocked — see below** |
+| AC-7 (Locations page tab bar against a live `inventory-service`) | **Closed — see below** |
 
 Three full end-to-end Docker build/run/curl passes were done across the
 review rounds (T-9, T-10, T-11), each after a distinct set of fixes; the
 one recorded above is the final state.
 
-### AC-7 blocker (environment, not a failure)
+### AC-7 — closed by the user against their own local dev stack
 
-Verifying the tab bar against a live backend requires
-`infra/docker-compose.dev.yml`'s `postgres-dev`, `kafka`, and
-`inventory-service` services, which need real Supabase project credentials
-and a database connection string (`infra/.env`, `apps/web/.env.local`).
-Those files exist in the main checkout (`/Users/mjpark019/code/MiraiSD/`,
-not this worktree) and point at what appears to be the project's actual
-Supabase project and other live-adjacent infrastructure — not a disposable
-local-only credential set. Spinning up an authenticated backend with those
-credentials from this session, without the user's explicit authorization to
-use them, is not something this validation pass did.
+This was left open in every prior round because verifying the tab bar
+against a live backend requires `infra/docker-compose.dev.yml`'s
+`postgres-dev`, `kafka`, and `inventory-service` services, which need real
+Supabase project credentials (`infra/.env`, `apps/web/.env.local`) that
+point at live-adjacent infrastructure — not something this session used
+without explicit authorization (see prior rounds' reasoning).
 
-This is a concrete, named blocker, not a skipped step: the placeholder-arg
-Docker build/run above proves the image builds and the process starts, but
-does not exercise `GET /api/v1/sites/{siteId}/storage-locations` against
-real data — that is exactly what AC-7 asks for and it remains open.
+The user closed it themselves: checked out `refactor/new-site-apis`,
+ran `docker compose -f infra/docker-compose.dev.yml up -d --build`, logged
+into the app, and opened `/storage` with the browser's Network tab open.
+Evidence (screenshots reviewed in-session, 2026-09-05):
 
-Two ways to close it, either requiring the user:
-1. Explicit authorization to use the existing `infra/.env`/
-   `apps/web/.env.local` credentials to run
-   `docker compose -f infra/docker-compose.dev.yml up` locally and hit
-   `/storage` in a browser or via a Playwright script.
-2. A disposable test Supabase project's credentials, if the existing ones
-   are not meant to be used from an agent session.
+- `GET http://localhost:4000/api/v1/sites/9f2886d4-6991-4399-bec4-3973d5f37a6b/storage-locations`
+  → `200 OK` — the real site-scoped endpoint, with a real `MAIN` site UUID,
+  confirming the migrated tab-bar read path works end-to-end against a live
+  backend, not just a placeholder-arg Docker build.
+- Alongside it, in the same request list: `GET /api/storage-locations/{id}/inventory`
+  and `GET /api/locations/{id}/inventory` — both still the legacy, unscoped
+  paths (no `/api/v1/sites/{siteId}` prefix), `200 OK`. This confirms AC-5's
+  "legacy paths unchanged" claim held up under a real, live-backend session
+  too, not just in the diff: the row-level inventory data still resolves via
+  the untouched legacy endpoints, exactly as designed.
 
 ## Acceptance criteria evidence
 
@@ -116,7 +115,7 @@ Two ways to close it, either requiring the user:
 - AC-6: `git diff --stat -- packages/contracts packages/api-client` shows
   only the one documented `index.ts` line; `tests/contracts` unaffected
   (no file under it touched).
-- AC-7: **Open — see blocker above.**
+- AC-7: **Closed** — live-backend verification by the user, see above.
 - AC-8: `docker build`/`docker run`/`curl` above; CI wiring
   (`web_or_packages_changed`) verified by direct reading of the final
   `detect-changes/action.yml`/`ci.yml`/`pr-gate.yml`/`deploy.yml` diffs and
