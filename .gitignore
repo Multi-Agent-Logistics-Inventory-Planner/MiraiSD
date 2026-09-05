@@ -170,6 +170,7 @@ secrets/
 
 *.md
 !README.md
+!AGENTS.md
 
 # ============================================
 # SCRIPT OUTPUTS (local analysis artifacts)
@@ -179,8 +180,17 @@ scripts/*_summary.txt
 scripts/package-lock.json
 apps/web/pnpm-lock.yaml
 .context/
-.claude/
 .mcp.json
+
+# ============================================
+# CLAUDE CODE PROJECT CONFIG
+# Track shared agents/commands/skills; keep local-only settings and
+# ephemeral worktree state out.
+# ============================================
+!.claude/
+!.claude/**
+.claude/settings.local.json
+.claude/worktrees/
 
 # ============================================
 # Personal documentation
@@ -227,6 +237,11 @@ docs/baseline/*
 !docs/templates/
 docs/templates/*
 !docs/templates/phase-cost-impact.md
+!docs/sdd-workflow.md
+
+# SDD execution records are committed feature artifacts.
+!.specs/
+!.specs/**
 
 # ============================================
 # Experiment data & results
