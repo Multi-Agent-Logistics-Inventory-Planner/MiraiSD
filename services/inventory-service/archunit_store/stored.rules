@@ -1,5 +1,5 @@
 #
-#Tue Sep 01 21:48:33 EDT 2026
+#Mon Sep 07 01:05:20 EDT 2026
+classes\ that\ reside\ outside\ a\ services/repositories\ layer\ or\ a\ domain\ module's\ application/infrastructure\ package\ should\ not\ depend\ on\ a\ repository=f0384129-86fc-4bd9-82d5-4e8a25995a22
 no\ classes\ should\ reside\ in\ any\ package\ ['com.mirai.inventoryservice.controllers..',\ 'com.mirai.inventoryservice.services..',\ 'com.mirai.inventoryservice.repositories..',\ 'com.mirai.inventoryservice.models..',\ 'com.mirai.inventoryservice.dtos..',\ 'com.mirai.inventoryservice.converters..'],\ because\ business\ code\ belongs\ in\ its\ owning\ domain\ package,\ not\ a\ legacy\ technical-layer\ package=1bf5f779-3438-4a5e-b29d-b0f29a9060f3
-no\ classes\ that\ reside\ outside\ of\ package\ 'com.mirai.inventoryservice.services..'\ and\ reside\ outside\ of\ package\ 'com.mirai.inventoryservice.repositories..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ 'com.mirai.inventoryservice.repositories..',\ because\ repository\ access\ must\ go\ through\ a\ service,\ not\ a\ controller\ or\ DTO\ mapper=c75e2913-527d-4613-bb40-e5c8da72583c
-slices\ matching\ 'com.mirai.inventoryservice.(*)..'\ should\ be\ free\ of\ cycles=bb39cfe9-54ea-49f6-8def-fb70375f49cf
+slices\ matching\ 'com.mirai.inventoryservice.(*)..'\ should\ be\ free\ of\ cycles=9d1ae9e1-8eea-430d-b08b-cbde0727a51b

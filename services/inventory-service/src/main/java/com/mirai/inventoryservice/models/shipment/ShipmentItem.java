@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.models.shipment;
 
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;

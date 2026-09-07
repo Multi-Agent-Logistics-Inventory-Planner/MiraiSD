@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.models.audit;
 
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.persistence.*;

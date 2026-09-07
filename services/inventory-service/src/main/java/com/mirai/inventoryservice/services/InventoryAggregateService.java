@@ -2,11 +2,11 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
-import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

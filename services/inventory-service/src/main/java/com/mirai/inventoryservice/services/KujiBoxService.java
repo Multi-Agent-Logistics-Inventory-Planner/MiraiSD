@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.DeletePrizeRequestDTO;
@@ -18,15 +19,15 @@ import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDT
 import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
-import com.mirai.inventoryservice.exceptions.ProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.models.MachineDisplay;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
-import com.mirai.inventoryservice.models.enums.KujiType;
+import com.mirai.inventoryservice.catalog.domain.KujiType;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
@@ -41,7 +42,7 @@ import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;

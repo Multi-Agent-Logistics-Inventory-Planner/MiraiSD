@@ -5,6 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -16,6 +17,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.repository.Repository;
 
 class ArchitectureTest {
 
@@ -56,19 +58,87 @@ class ArchitectureTest {
         freeze(rule).check(importedClasses);
     }
 
+    // Amended for Phase 5a (docs: .specs/phase-5a-catalog-module-move/spec.md AC-3) to cover
+    // domain-module repositories on both sides:
+    //  - target: a repository is no longer only "anything under the legacy `repositories`
+    //    package" -- a domain module's own repository (e.g. catalog.infrastructure.ProductRepository)
+    //    must be caught too, or moving a repository out of `repositories..` would silently drop
+    //    it out of this rule's coverage while the build stays green. Detected as: resides in the
+    //    legacy `repositories` package (preserved exactly, since a couple of legacy repositories
+    //    like LocationAggregateRepository/InventoryTotalsRepository are plain @Repository classes
+    //    over EntityManager, not Spring Data interfaces), OR is assignable to Spring Data's
+    //    Repository marker interface (catches real repository interfaces wherever they live,
+    //    without misclassifying non-repository infrastructure -- identity.infrastructure also
+    //    holds SupabaseAdminService, UserRoleConverter and SiteAccessAuthorizationFilter, none of
+    //    which are repositories).
+    //  - caller: a domain module's own `application`/`infrastructure` class reaching a repository
+    //    (its own, or the legacy package) is allowed, matching how the legacy `services` package
+    //    was already exempt. Cross-module infrastructure access (module A reaching module B's
+    //    repository) is a different concern, addressed separately by Phase 5b's
+    //    noModuleDependsOnAnotherModulesInfrastructure rule -- this rule only asks whether a
+    //    repository was reached by something that isn't a service/application layer at all.
     @Test
     void repositoriesAreOnlyAccessedByServicesOrRepositories() {
-        ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage(BASE_PACKAGE + ".services..")
-                .and()
-                .resideOutsideOfPackage(BASE_PACKAGE + ".repositories..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage(BASE_PACKAGE + ".repositories..")
-                .because("repository access must go through a service, not a controller or DTO mapper");
+        freeze(repositoryAccessRule()).check(importedClasses);
+    }
 
-        freeze(rule).check(importedClasses);
+    /**
+     * Package-visible so {@code ArchitectureTestRepositoryRuleProbeTest} can evaluate the exact
+     * unfrozen rule (not a re-typed copy) against fixture classes before the frozen store is
+     * regenerated. See the amendment note above {@link #repositoriesAreOnlyAccessedByServicesOrRepositories()}.
+     */
+    static ArchRule repositoryAccessRule() {
+        return classes()
+                .that(new DescribedPredicate<JavaClass>(
+                        "reside outside a services/repositories layer or a domain module's "
+                                + "application/infrastructure package") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !isAllowedRepositoryCaller(javaClass);
+                    }
+                })
+                .should(new ArchCondition<JavaClass>("not depend on a repository") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                            JavaClass target = dependency.getTargetClass();
+                            if (isRepositoryClass(target)) {
+                                events.add(SimpleConditionEvent.violated(
+                                        javaClass,
+                                        dependency.getDescription()
+                                                + " -- repository access must go through a service"
+                                                + " or application layer, not a controller or DTO mapper"));
+                            }
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
+
+    private static boolean isAllowedRepositoryCaller(JavaClass javaClass) {
+        String packageName = javaClass.getPackageName();
+        if (isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".services")
+                || isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".repositories")) {
+            return true;
+        }
+        String module = moduleOf(javaClass);
+        for (String candidate : BUSINESS_MODULES) {
+            if (candidate.equals(module)) {
+                return isPackageOrSubpackageOf(packageName, BASE_PACKAGE + "." + module + ".application")
+                        || isPackageOrSubpackageOf(packageName, BASE_PACKAGE + "." + module + ".infrastructure");
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRepositoryClass(JavaClass target) {
+        return isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".repositories")
+                || target.isAssignableTo(Repository.class);
+    }
+
+    /** Exact package match or a strict dot-delimited descendant -- never a substring match. */
+    private static boolean isPackageOrSubpackageOf(String packageName, String rootPackage) {
+        return packageName.equals(rootPackage) || packageName.startsWith(rootPackage + ".");
     }
 
     @Test

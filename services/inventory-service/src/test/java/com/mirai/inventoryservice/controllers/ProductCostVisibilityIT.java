@@ -2,8 +2,8 @@ package com.mirai.inventoryservice.controllers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mirai.inventoryservice.BaseIntegrationTest;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 

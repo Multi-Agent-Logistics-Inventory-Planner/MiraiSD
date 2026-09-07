@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.models;
 
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.domain.Location;
 import jakarta.persistence.*;

@@ -1,7 +1,0 @@
-package com.mirai.inventoryservice.exceptions;
-
-public class DuplicateCategoryException extends RuntimeException {
-    public DuplicateCategoryException(String message) {
-        super(message);
-    }
-}

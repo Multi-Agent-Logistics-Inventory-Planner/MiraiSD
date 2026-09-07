@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.kafka.KafkaProducer;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.EventDeadLetter;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
 import com.mirai.inventoryservice.models.audit.StockMovement;

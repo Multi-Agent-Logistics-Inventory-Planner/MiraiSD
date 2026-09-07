@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.catalog.application.SupplierService;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -34,8 +35,8 @@ class ShipmentServiceOverrideTest {
 
     @Mock private ShipmentRepository shipmentRepository;
     @Mock private com.mirai.inventoryservice.repositories.ShipmentItemRepository shipmentItemRepository;
-    @Mock private com.mirai.inventoryservice.repositories.ProductRepository productRepository;
-    @Mock private com.mirai.inventoryservice.services.ProductService productService;
+    @Mock private com.mirai.inventoryservice.catalog.infrastructure.ProductRepository productRepository;
+    @Mock private com.mirai.inventoryservice.catalog.application.ProductService productService;
     @Mock private com.mirai.inventoryservice.identity.application.UserService userService;
     @Mock private com.mirai.inventoryservice.identity.infrastructure.UserRepository userRepository;
     @Mock private com.mirai.inventoryservice.repositories.StockMovementRepository stockMovementRepository;

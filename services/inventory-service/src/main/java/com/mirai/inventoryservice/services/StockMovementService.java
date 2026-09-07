@@ -9,7 +9,7 @@ import com.mirai.inventoryservice.exceptions.*;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -22,6 +22,7 @@ import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.*;
 import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
@@ -111,7 +112,7 @@ public class StockMovementService {
      */
     public void rejectIfCustomKujiParent(Product product) {
         if (product != null
-                && product.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+                && product.getKujiType() == com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM) {
             throw new InvalidInventoryOperationException(
                     "Custom kuji parent products do not track location inventory. "
                             + "Open a kuji box to manage prize stock instead.");
@@ -130,7 +131,7 @@ public class StockMovementService {
         if (product == null) return;
         Product parent = product.getParent();
         if (parent != null
-                && parent.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+                && parent.getKujiType() != com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM) {
             throw new InvalidInventoryOperationException(
                     "Kuji prize children do not track location inventory. "
                             + "Edit the shipment item to correct received counts.");

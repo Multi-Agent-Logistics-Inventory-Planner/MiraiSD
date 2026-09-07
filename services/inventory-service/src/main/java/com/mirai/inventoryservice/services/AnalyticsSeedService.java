@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.analytics.CategoryDemandRollup;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.analytics.MonthlyPerformanceRollup;
@@ -9,12 +9,12 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.CategoryDemandRollupRepository;
-import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MonthlyPerformanceRollupRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;

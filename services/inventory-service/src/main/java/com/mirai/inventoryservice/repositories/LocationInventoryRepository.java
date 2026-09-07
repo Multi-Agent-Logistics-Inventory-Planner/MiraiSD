@@ -28,7 +28,7 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
         JOIN FETCH li.product p
         WHERE li.location.id = :locationId
           AND p.parent IS NULL
-          AND (p.kujiType IS NULL OR p.kujiType <> com.mirai.inventoryservice.models.enums.KujiType.CUSTOM)
+          AND (p.kujiType IS NULL OR p.kujiType <> com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM)
         """)
     List<LocationInventory> findByLocation_Id(@Param("locationId") UUID locationId);
 

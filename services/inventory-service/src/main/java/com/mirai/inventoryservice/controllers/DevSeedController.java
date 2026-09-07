@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.controllers;
 
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
@@ -24,13 +24,13 @@ import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
@@ -275,7 +275,7 @@ public class DevSeedController {
         List<LocationInventory> inventoryRecords = new ArrayList<>();
         for (int i = 0; i < products.size(); i++) {
             Product product = products.get(i);
-            if (product.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+            if (product.getKujiType() == com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM) {
                 continue;
             }
             Location location = locations.get(i % locations.size());

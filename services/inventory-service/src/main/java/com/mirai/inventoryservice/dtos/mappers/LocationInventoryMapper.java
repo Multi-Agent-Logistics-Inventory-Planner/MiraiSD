@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.mappers;
 
+import com.mirai.inventoryservice.catalog.api.ProductMapper;
 import com.mirai.inventoryservice.dtos.responses.LocationInventoryResponseDTO;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import org.mapstruct.Mapper;

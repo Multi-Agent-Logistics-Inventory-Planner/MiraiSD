@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.dtos.mappers;
 
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;

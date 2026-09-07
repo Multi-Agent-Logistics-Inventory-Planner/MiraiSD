@@ -2,11 +2,11 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.responses.ForecastExplanationDTO;
 import com.mirai.inventoryservice.dtos.responses.ForecastPredictionResponseDTO;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
