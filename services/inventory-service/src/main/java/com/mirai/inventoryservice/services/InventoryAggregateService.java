@@ -2,11 +2,10 @@ package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
-import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
-import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +21,13 @@ import java.util.UUID;
 @Service
 public class InventoryAggregateService {
 
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
     private final LocationInventoryRepository locationInventoryRepository;
 
     public InventoryAggregateService(
-            ProductRepository productRepository,
+            CatalogQueries catalogQueries,
             LocationInventoryRepository locationInventoryRepository) {
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
         this.locationInventoryRepository = locationInventoryRepository;
     }
 
@@ -40,8 +39,7 @@ public class InventoryAggregateService {
      * @return ProductInventoryResponseDTO containing all inventory entries
      */
     public ProductInventoryResponseDTO getInventoryByProduct(UUID productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException("Product not found: " + productId));
+        ProductRef product = catalogQueries.getById(productId);
 
         List<LocationInventory> inventories = locationInventoryRepository.findByProduct_Id(productId);
 
@@ -55,9 +53,9 @@ public class InventoryAggregateService {
                 .sum();
 
         return ProductInventoryResponseDTO.builder()
-                .productId(product.getId())
-                .productSku(product.getSku())
-                .productName(product.getName())
+                .productId(product.id())
+                .productSku(product.sku())
+                .productName(product.name())
                 .totalQuantity(totalQuantity)
                 .entries(entries)
                 .build();

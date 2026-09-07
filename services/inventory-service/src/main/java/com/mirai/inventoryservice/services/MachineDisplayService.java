@@ -20,7 +20,9 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -39,7 +41,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MachineDisplayService {
     private final MachineDisplayRepository machineDisplayRepository;
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogEntityAccess catalogEntityAccess;
     private final UserRepository userRepository;
     private final StockMovementRepository stockMovementRepository;
     private final LocationRepository locationRepository;
@@ -52,7 +55,8 @@ public class MachineDisplayService {
 
     public MachineDisplayService(
             MachineDisplayRepository machineDisplayRepository,
-            ProductRepository productRepository,
+            CatalogQueries catalogQueries,
+            CatalogEntityAccess catalogEntityAccess,
             UserRepository userRepository,
             StockMovementRepository stockMovementRepository,
             LocationRepository locationRepository,
@@ -60,7 +64,8 @@ public class MachineDisplayService {
             AuditLogService auditLogService,
             NotificationService notificationService) {
         this.machineDisplayRepository = machineDisplayRepository;
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
+        this.catalogEntityAccess = catalogEntityAccess;
         this.userRepository = userRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.locationRepository = locationRepository;
@@ -75,7 +80,7 @@ public class MachineDisplayService {
      */
     @Transactional
     public MachineDisplay setDisplay(SetMachineDisplayRequestDTO request) {
-        Product product = productRepository.findById(request.getProductId())
+        ProductRef product = catalogQueries.findById(request.getProductId())
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getProductId()));
 
         List<MachineDisplay> existingDisplays = machineDisplayRepository
@@ -97,7 +102,7 @@ public class MachineDisplayService {
                 .location(location)
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
-                .product(product)
+                .product(catalogEntityAccess.getReference(product.id()))
                 .startedAt(now)
                 .actorId(request.getActorId())
                 .build();
@@ -111,14 +116,14 @@ public class MachineDisplayService {
                 null, null,
                 request.getMachineId(), machineCode,
                 1, 0,
-                product.getName(),
+                product.name(),
                 null
         );
 
         // Create StockMovement entry for the display set
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
-                .item(product)
+                .item(catalogEntityAccess.getReference(product.id()))
                 .locationType(request.getLocationType())
                 .fromLocationId(null)
                 .toLocationId(request.getMachineId())
@@ -135,7 +140,7 @@ public class MachineDisplayService {
                 .map(d -> d.getProduct().getName())
                 .collect(Collectors.toList());
         List<String> currentNames = new ArrayList<>(previousNames);
-        currentNames.add(product.getName());
+        currentNames.add(product.name());
         emitDisplayNotification(
                 NotificationType.DISPLAY_SET,
                 request.getActorId(),
@@ -176,8 +181,8 @@ public class MachineDisplayService {
         }
 
         // Batch fetch all products (1 query instead of N)
-        Map<UUID, Product> productsById = productRepository.findAllById(newProductIds).stream()
-                .collect(Collectors.toMap(Product::getId, p -> p));
+        Map<UUID, ProductRef> productsById = catalogQueries.findAllByIds(newProductIds).stream()
+                .collect(Collectors.toMap(ProductRef::id, p -> p));
 
         // Validate all products exist
         for (UUID productId : newProductIds) {
@@ -197,7 +202,7 @@ public class MachineDisplayService {
                         .location(location)
                         .locationType(request.getLocationType())
                         .machineId(request.getMachineId())
-                        .product(productsById.get(productId))
+                        .product(catalogEntityAccess.getReference(productId))
                         .startedAt(now)
                         .actorId(request.getActorId())
                         .build())
@@ -207,7 +212,7 @@ public class MachineDisplayService {
 
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
         List<String> productNames = newProductIds.stream()
-                .map(id -> productsById.get(id).getName())
+                .map(id -> productsById.get(id).name())
                 .collect(Collectors.toList());
         AuditLog auditLog = auditLogService.createAuditLog(
                 request.getActorId(),
@@ -223,7 +228,7 @@ public class MachineDisplayService {
         List<StockMovement> movements = newProductIds.stream()
                 .map(productId -> StockMovement.builder()
                         .auditLog(auditLog)
-                        .item(productsById.get(productId))
+                        .item(catalogEntityAccess.getReference(productId))
                         .locationType(request.getLocationType())
                         .fromLocationId(null)
                         .toLocationId(request.getMachineId())
@@ -431,7 +436,7 @@ public class MachineDisplayService {
         outgoing.setEndedAt(OffsetDateTime.now());
         machineDisplayRepository.save(outgoing);
 
-        Product incoming = productRepository.findById(request.getIncomingProductId())
+        ProductRef incoming = catalogQueries.findById(request.getIncomingProductId())
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getIncomingProductId()));
 
         List<MachineDisplay> currentDisplays = machineDisplayRepository
@@ -452,14 +457,14 @@ public class MachineDisplayService {
                 .location(location)
                 .locationType(request.getLocationType())
                 .machineId(request.getMachineId())
-                .product(incoming)
+                .product(catalogEntityAccess.getReference(incoming.id()))
                 .startedAt(OffsetDateTime.now())
                 .actorId(request.getActorId())
                 .build();
         machineDisplayRepository.save(newDisplay);
 
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
-        String productSummary = outgoingProductName + " → " + incoming.getName();
+        String productSummary = outgoingProductName + " → " + incoming.name();
         auditLogService.createAuditLog(
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SWAP,
@@ -475,7 +480,7 @@ public class MachineDisplayService {
                 .collect(Collectors.toList());
         // currentDisplays was queried AFTER ending the outgoing display, so it already excludes it.
         List<String> currentNames = new ArrayList<>(previousNames);
-        currentNames.add(incoming.getName());
+        currentNames.add(incoming.name());
         // Reconstruct the true "previously" by adding the outgoing back in.
         List<String> trulyPrevious = new ArrayList<>(previousNames);
         trulyPrevious.add(outgoingProductName);
@@ -562,8 +567,8 @@ public class MachineDisplayService {
                     .collect(Collectors.toList());
 
             if (!newProductIds.isEmpty()) {
-                Map<UUID, Product> productsById = productRepository.findAllById(newProductIds).stream()
-                        .collect(Collectors.toMap(Product::getId, p -> p));
+                Map<UUID, ProductRef> productsById = catalogQueries.findAllByIds(newProductIds).stream()
+                        .collect(Collectors.toMap(ProductRef::id, p -> p));
 
                 // Look up location by machineId (UUIDs preserved during migration)
                 Location location = locationRepository.findById(request.getMachineId())
@@ -571,10 +576,11 @@ public class MachineDisplayService {
 
                 List<MachineDisplay> toAdd = new ArrayList<>(newProductIds.size());
                 for (UUID productId : newProductIds) {
-                    Product product = productsById.get(productId);
-                    if (product == null) {
+                    ProductRef productRef = productsById.get(productId);
+                    if (productRef == null) {
                         throw new IllegalArgumentException("Product not found: " + productId);
                     }
+                    Product product = catalogEntityAccess.getReference(productId);
 
                     toAdd.add(MachineDisplay.builder()
                             .location(location)
@@ -590,7 +596,7 @@ public class MachineDisplayService {
                             null,
                             request.getMachineId()
                     ));
-                    allProductNames.add(product.getName());
+                    allProductNames.add(productRef.name());
                 }
                 machineDisplayRepository.saveAll(toAdd);
             }

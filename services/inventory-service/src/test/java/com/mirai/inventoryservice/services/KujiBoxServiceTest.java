@@ -1,6 +1,9 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductService;
+import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.RecordDrawRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.TransferInMoreRequestDTO;
@@ -23,7 +26,6 @@ import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -60,7 +62,9 @@ class KujiBoxServiceTest {
 
     @Mock private KujiBoxRepository kujiBoxRepository;
     @Mock private KujiBoxTierRepository kujiBoxTierRepository;
-    @Mock private ProductRepository productRepository;
+    @Mock private CatalogQueries catalogQueries;
+    @Mock private CatalogEntityAccess catalogEntityAccess;
+    @Mock private ProductStockStateWriter productStockStateWriter;
     @Mock private LocationRepository locationRepository;
     @Mock private LocationInventoryRepository locationInventoryRepository;
     @Mock private MachineDisplayRepository machineDisplayRepository;
@@ -99,7 +103,9 @@ class KujiBoxServiceTest {
         service = new KujiBoxService(
                 kujiBoxRepository,
                 kujiBoxTierRepository,
-                productRepository,
+                catalogQueries,
+                catalogEntityAccess,
+                productStockStateWriter,
                 locationRepository,
                 locationInventoryRepository,
                 machineDisplayRepository,

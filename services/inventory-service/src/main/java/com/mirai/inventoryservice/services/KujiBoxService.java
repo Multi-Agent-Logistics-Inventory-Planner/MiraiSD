@@ -1,6 +1,10 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductService;
+import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.DeletePrizeRequestDTO;
@@ -42,7 +46,6 @@ import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -93,7 +96,9 @@ public class KujiBoxService {
 
     private final KujiBoxRepository kujiBoxRepository;
     private final KujiBoxTierRepository kujiBoxTierRepository;
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogEntityAccess catalogEntityAccess;
+    private final ProductStockStateWriter productStockStateWriter;
     private final LocationRepository locationRepository;
     private final LocationInventoryRepository locationInventoryRepository;
     private final MachineDisplayRepository machineDisplayRepository;
@@ -111,7 +116,9 @@ public class KujiBoxService {
     public KujiBoxService(
             KujiBoxRepository kujiBoxRepository,
             KujiBoxTierRepository kujiBoxTierRepository,
-            ProductRepository productRepository,
+            CatalogQueries catalogQueries,
+            CatalogEntityAccess catalogEntityAccess,
+            ProductStockStateWriter productStockStateWriter,
             LocationRepository locationRepository,
             LocationInventoryRepository locationInventoryRepository,
             MachineDisplayRepository machineDisplayRepository,
@@ -127,7 +134,9 @@ public class KujiBoxService {
     ) {
         this.kujiBoxRepository = kujiBoxRepository;
         this.kujiBoxTierRepository = kujiBoxTierRepository;
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
+        this.catalogEntityAccess = catalogEntityAccess;
+        this.productStockStateWriter = productStockStateWriter;
         this.locationRepository = locationRepository;
         this.locationInventoryRepository = locationInventoryRepository;
         this.machineDisplayRepository = machineDisplayRepository;
@@ -146,15 +155,15 @@ public class KujiBoxService {
 
     @Transactional
     public KujiBoxResponseDTO openBox(OpenKujiBoxRequestDTO request) {
-        Product product = productRepository.findByIdWithCategories(request.getProductId())
+        ProductRef productRef = catalogQueries.findById(request.getProductId())
                 .orElseThrow(() -> new ProductNotFoundException("Product not found: " + request.getProductId()));
 
-        if (product.getKujiType() != KujiType.CUSTOM) {
+        if (productRef.kujiType() != KujiType.CUSTOM) {
             throw new IllegalArgumentException(
-                    "Product is not a custom kuji (kujiType must be CUSTOM): " + product.getName());
+                    "Product is not a custom kuji (kujiType must be CUSTOM): " + productRef.name());
         }
 
-        kujiBoxRepository.findByProductIdAndStatus(product.getId(), KujiBoxStatus.OPEN)
+        kujiBoxRepository.findByProductIdAndStatus(productRef.id(), KujiBoxStatus.OPEN)
                 .ifPresent(b -> {
                     throw new IllegalStateException(
                             "An OPEN box already exists for this kuji: " + b.getId());
@@ -187,20 +196,20 @@ public class KujiBoxService {
                     .findActiveByLocationTypeAndMachineId(locationType, boxLocation.getId())
                     .stream()
                     .filter(d -> d.getProduct() != null
-                            && d.getProduct().getId().equals(product.getId()))
+                            && d.getProduct().getId().equals(productRef.id()))
                     .findFirst()
                     .orElseGet(() -> machineDisplayRepository.save(MachineDisplay.builder()
                             .location(boxLocation)
                             .locationType(locationType)
                             .machineId(boxLocation.getId())
-                            .product(product)
+                            .product(catalogEntityAccess.getReference(productRef.id()))
                             .startedAt(now)
                             .actorId(request.getActorId())
                             .build()));
         }
 
         KujiBox box = KujiBox.builder()
-                .product(product)
+                .product(catalogEntityAccess.getReference(productRef.id()))
                 .location(boxLocation)
                 .machineDisplay(machineDisplay)
                 .status(KujiBoxStatus.OPEN)
@@ -231,9 +240,10 @@ public class KujiBoxService {
 
             Product linkedProduct = null;
             if (tierDto.getLinkedProductId() != null) {
-                linkedProduct = productRepository.findById(tierDto.getLinkedProductId())
+                ProductRef linkedRef = catalogQueries.findById(tierDto.getLinkedProductId())
                         .orElseThrow(() -> new ProductNotFoundException(
                                 "Linked product not found: " + tierDto.getLinkedProductId()));
+                linkedProduct = catalogEntityAccess.getReference(linkedRef.id());
             } else if (autoCreate) {
                 // Birth a child product under the kuji parent. Quantity stays 0 on the
                 // Product entity — the prize stock lives only on the tier counters
@@ -241,7 +251,7 @@ public class KujiBoxService {
                 linkedProduct = productService.createProduct(
                         null,                                       // sku
                         null,                                       // categoryId — inherits from parent
-                        product.getId(),                            // parentId
+                        productRef.id(),                            // parentId
                         tierDto.getLetter(),                        // letter
                         null,                                       // templateQuantity
                         tierDto.getProductName().trim(),            // name
@@ -259,8 +269,7 @@ public class KujiBoxService {
                         null,                                       // packsPerBox
                         null                                        // forecastingEnabled — defaults to true
                 );
-                linkedProduct.setIsActive(true);
-                linkedProduct = productRepository.save(linkedProduct);
+                productStockStateWriter.setActive(linkedProduct.getId(), true);
             }
 
             KujiBoxTier tier = KujiBoxTier.builder()
@@ -412,8 +421,7 @@ public class KujiBoxService {
                 tier.setActiveCount(0);
                 tier.setInactiveCount(0);
                 kujiBoxTierRepository.save(tier);
-                child.setIsActive(false);
-                productRepository.save(child);
+                productStockStateWriter.setActive(child.getId(), false);
                 affectedProductIds.add(child.getId());
                 continue;
             }
@@ -637,8 +645,7 @@ public class KujiBoxService {
                     && tier.getLinkedProduct() != null
                     && Boolean.FALSE.equals(tier.getLinkedProduct().getIsActive())) {
                 Product child = tier.getLinkedProduct();
-                child.setIsActive(true);
-                productRepository.save(child);
+                productStockStateWriter.setActive(child.getId(), true);
                 affectedProductIds.add(child.getId());
             }
         }
@@ -1297,12 +1304,9 @@ public class KujiBoxService {
 
         // Auto-create children only ever live at this one location, so the denormalized
         // Product.quantity equals LocationInventory.quantity. Update directly to avoid
-        // a syncProductTotals SUM query downstream.
-        child.setQuantity(prev + quantity);
-        if (!Boolean.TRUE.equals(child.getIsActive())) {
-            child.setIsActive(true);
-        }
-        productRepository.save(child);
+        // a syncProductTotals SUM query downstream. Always active once minted, whether it
+        // was already active or reactivating from a soft-deleted state.
+        productStockStateWriter.applyStockState(child.getId(), prev + quantity, true);
 
         AuditLog auditLog = createAuditLog(
                 actorId,
@@ -1357,9 +1361,10 @@ public class KujiBoxService {
 
         Product linkedProduct = null;
         if (request.getLinkedProductId() != null) {
-            linkedProduct = productRepository.findById(request.getLinkedProductId())
+            ProductRef linkedRef = catalogQueries.findById(request.getLinkedProductId())
                     .orElseThrow(() -> new ProductNotFoundException(
                             "Linked product not found: " + request.getLinkedProductId()));
+            linkedProduct = catalogEntityAccess.getReference(linkedRef.id());
         } else if (autoCreate) {
             // Auto-created prize: product entity only. Quantity lives in tier counters.
             linkedProduct = productService.createProduct(
@@ -1383,8 +1388,7 @@ public class KujiBoxService {
                     null,                                       // packsPerBox
                     null                                        // forecastingEnabled — defaults to true
             );
-            linkedProduct.setIsActive(true);
-            linkedProduct = productRepository.save(linkedProduct);
+            productStockStateWriter.setActive(linkedProduct.getId(), true);
         }
 
         KujiBoxTier tier = KujiBoxTier.builder()
@@ -1538,11 +1542,12 @@ public class KujiBoxService {
                 tier.setLinkedProduct(null);
                 changes.add("cleared linked product");
             } else {
-                Product newLinked = productRepository.findById(request.getLinkedProductId())
+                ProductRef newLinkedRef = catalogQueries.findById(request.getLinkedProductId())
                         .orElseThrow(() -> new ProductNotFoundException(
                                 "Linked product not found: " + request.getLinkedProductId()));
+                Product newLinked = catalogEntityAccess.getReference(newLinkedRef.id());
                 tier.setLinkedProduct(newLinked);
-                changes.add("changed linked product to " + newLinked.getName());
+                changes.add("changed linked product to " + newLinkedRef.name());
 
                 // Optional: bring in initial counts of the new product in the same operation.
                 int newActiveIn = request.getNewProductActiveCount() != null

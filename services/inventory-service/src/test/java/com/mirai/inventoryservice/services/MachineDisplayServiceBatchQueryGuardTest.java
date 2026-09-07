@@ -10,7 +10,9 @@ import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -49,7 +51,8 @@ import static org.mockito.Mockito.when;
 class MachineDisplayServiceBatchQueryGuardTest {
 
     @Mock private MachineDisplayRepository machineDisplayRepository;
-    @Mock private ProductRepository productRepository;
+    @Mock private CatalogQueries catalogQueries;
+    @Mock private CatalogEntityAccess catalogEntityAccess;
     @Mock private UserRepository userRepository;
     @Mock private StockMovementRepository stockMovementRepository;
     @Mock private LocationRepository locationRepository;
@@ -64,7 +67,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
     @BeforeEach
     void setUp() {
         service = new MachineDisplayService(
-                machineDisplayRepository, productRepository, userRepository,
+                machineDisplayRepository, catalogQueries, catalogEntityAccess, userRepository,
                 stockMovementRepository, locationRepository, entityManager,
                 auditLogService, notificationService);
 
@@ -164,7 +167,12 @@ class MachineDisplayServiceBatchQueryGuardTest {
 
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
                 .thenReturn(List.of());
-        when(productRepository.findAllById(any())).thenReturn(products);
+        when(catalogQueries.findAllByIds(any()))
+                .thenReturn(products.stream().map(ProductRef::from).toList());
+        when(catalogEntityAccess.getReference(any())).thenAnswer(inv -> {
+            UUID id = inv.getArgument(0);
+            return products.stream().filter(p -> p.getId().equals(id)).findFirst().orElse(null);
+        });
 
         BatchDisplaySwapRequestDTO req = BatchDisplaySwapRequestDTO.builder()
                 .locationType(LocationType.SINGLE_CLAW_MACHINE)

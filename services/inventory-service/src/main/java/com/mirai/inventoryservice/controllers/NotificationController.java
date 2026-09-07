@@ -5,8 +5,8 @@ import com.mirai.inventoryservice.dtos.requests.NotificationFilterDTO;
 import com.mirai.inventoryservice.dtos.responses.NotificationResponseDTO;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.models.enums.NotificationType;
-import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.services.NotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,15 +31,15 @@ import java.util.stream.Collectors;
 public class NotificationController {
     private final NotificationService notificationService;
     private final NotificationMapper notificationMapper;
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
 
     public NotificationController(
             NotificationService notificationService,
             NotificationMapper notificationMapper,
-            ProductRepository productRepository) {
+            CatalogQueries catalogQueries) {
         this.notificationService = notificationService;
         this.notificationMapper = notificationMapper;
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
     }
 
     @GetMapping
@@ -152,8 +152,8 @@ public class NotificationController {
 
     private void populateItemName(NotificationResponseDTO dto) {
         if (dto == null || dto.getItemId() == null) return;
-        productRepository.findById(dto.getItemId())
-                .ifPresent(product -> dto.setItemName(product.getName()));
+        catalogQueries.findById(dto.getItemId())
+                .ifPresent(product -> dto.setItemName(product.name()));
     }
 
     private void populateItemNames(List<NotificationResponseDTO> dtos) {
@@ -165,8 +165,8 @@ public class NotificationController {
                 .collect(Collectors.toSet());
         if (itemIds.isEmpty()) return;
 
-        Map<UUID, String> itemNameById = productRepository.findAllById(itemIds).stream()
-                .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
+        Map<UUID, String> itemNameById = catalogQueries.findAllByIds(itemIds).stream()
+                .collect(Collectors.toMap(ProductRef::id, ProductRef::name, (a, b) -> a));
 
         for (NotificationResponseDTO dto : dtos) {
             UUID itemId = dto.getItemId();

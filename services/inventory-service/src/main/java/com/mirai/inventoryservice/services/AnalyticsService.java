@@ -18,16 +18,17 @@ import com.mirai.inventoryservice.dtos.responses.InsightsDTO.PeriodSummary;
 import com.mirai.inventoryservice.dtos.responses.MonthlySalesDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
-import com.mirai.inventoryservice.catalog.domain.Category;
-import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogPricing;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CategoryRef;
+import com.mirai.inventoryservice.catalog.application.ProductPricing;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
-import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +61,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AnalyticsService {
 
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogPricing catalogPricing;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
     private final DailySalesRollupRepository dailySalesRollupRepository;
@@ -276,28 +277,43 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public List<CategoryInventoryDTO> getInventoryByCategory() {
-        List<Product> products = productRepository.findAllWithCategories().stream()
-                .filter(p -> p.getParentId() == null)
+        List<ProductRef> products = catalogQueries.allProductRefs().stream()
+                .filter(p -> p.parentId() == null)
                 .toList();
         Map<UUID, Integer> stockTotals = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, CategoryRef> categoriesById = loadCategoriesById();
 
-        Map<Category, List<Product>> productsByCategory = products.stream()
-                .collect(Collectors.groupingBy(Product::getCategory));
+        Map<UUID, List<ProductRef>> productsByCategoryId = products.stream()
+                .collect(Collectors.groupingBy(ProductRef::categoryId));
 
         List<CategoryInventoryDTO> result = new ArrayList<>();
 
-        for (Map.Entry<Category, List<Product>> entry : productsByCategory.entrySet()) {
-            String categoryName = entry.getKey().getName();
-            List<Product> categoryProducts = entry.getValue();
+        for (Map.Entry<UUID, List<ProductRef>> entry : productsByCategoryId.entrySet()) {
+            CategoryRef category = categoriesById.get(entry.getKey());
+            String categoryName = category != null ? category.name() : null;
+            List<ProductRef> categoryProducts = entry.getValue();
 
             int totalStock = categoryProducts.stream()
-                    .mapToInt(p -> stockTotals.getOrDefault(p.getId(), 0))
+                    .mapToInt(p -> stockTotals.getOrDefault(p.id(), 0))
                     .sum();
 
             result.add(new CategoryInventoryDTO(categoryName, (long) categoryProducts.size(), totalStock));
         }
 
         return result;
+    }
+
+    private Map<UUID, CategoryRef> loadCategoriesById() {
+        return catalogQueries.allCategoryRefs().stream()
+                .collect(Collectors.toMap(CategoryRef::id, c -> c));
+    }
+
+    private static String categoryNameOrUncategorized(Map<UUID, CategoryRef> categoriesById, UUID categoryId) {
+        if (categoryId == null) {
+            return "Uncategorized";
+        }
+        CategoryRef category = categoriesById.get(categoryId);
+        return category != null ? category.name() : "Uncategorized";
     }
 
     @Cacheable(CacheConfig.PERFORMANCE_METRICS_CACHE)
@@ -320,13 +336,13 @@ public class AnalyticsService {
             avgAccuracy = avgAccuracy.divide(BigDecimal.valueOf(accuracyCount), 1, RoundingMode.HALF_UP);
         }
 
-        List<Product> allProducts = productRepository.findAll().stream()
-                .filter(p -> p.getParentId() == null)
+        List<ProductRef> allProducts = catalogQueries.allProductRefs().stream()
+                .filter(p -> p.parentId() == null)
                 .toList();
         Map<UUID, Integer> stockByProduct = inventoryTotalsRepository.findAllStockTotalsMap();
 
         long outOfStockCount = allProducts.stream()
-                .filter(p -> stockByProduct.getOrDefault(p.getId(), 0) == 0)
+                .filter(p -> stockByProduct.getOrDefault(p.id(), 0) == 0)
                 .count();
 
         BigDecimal stockoutRate = BigDecimal.ZERO;
@@ -461,11 +477,16 @@ public class AnalyticsService {
         Set<UUID> itemIds = latestPredictions.stream()
             .map(ForecastPrediction::getItemId)
             .collect(Collectors.toSet());
-        List<Product> products = itemIds.isEmpty()
+        List<ProductRef> products = itemIds.isEmpty()
             ? List.of()
-            : productRepository.findByIdInWithCategories(itemIds);
-        Map<UUID, Product> productMap = products.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
+            : catalogQueries.findAllByIds(itemIds);
+        Map<UUID, ProductRef> productMap = products.stream()
+            .collect(Collectors.toMap(ProductRef::id, Function.identity()));
+        Map<UUID, ProductPricing> pricingMap = itemIds.isEmpty()
+            ? Map.of()
+            : catalogPricing.findPricingForIds(itemIds).stream()
+                .collect(Collectors.toMap(ProductPricing::productId, Function.identity()));
+        Map<UUID, CategoryRef> categoriesById = loadCategoriesById();
 
         List<ActionItem> actionItems = new ArrayList<>();
         int critical = 0, urgent = 0, attention = 0, healthy = 0;
@@ -475,11 +496,11 @@ public class AnalyticsService {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
         for (ForecastPrediction prediction : latestPredictions) {
-            Product product = productMap.get(prediction.getItemId());
-            if (product == null || !product.getIsActive() || product.getParentId() != null) {
+            ProductRef product = productMap.get(prediction.getItemId());
+            if (product == null || !product.isActive() || product.parentId() != null) {
                 continue;
             }
-            if (Boolean.FALSE.equals(product.getForecastingEnabled())) {
+            if (Boolean.FALSE.equals(product.forecastingEnabled())) {
                 continue;
             }
 
@@ -495,9 +516,9 @@ public class AnalyticsService {
             }
 
             int currentStock = stockMap.getOrDefault(prediction.getItemId(), 0);
-            int leadTimeDays = product.getLeadTimeDays() != null ? product.getLeadTimeDays() : 14;
-            int rp = product.getReorderPoint() != null ? product.getReorderPoint() : 10;
-            int targetStock = product.getTargetStockLevel() != null ? product.getTargetStockLevel() : 50;
+            int leadTimeDays = product.leadTimeDays() != null ? product.leadTimeDays() : 14;
+            int rp = product.reorderPoint() != null ? product.reorderPoint() : 10;
+            int targetStock = product.targetStockLevel() != null ? product.targetStockLevel() : 50;
 
             boolean isDrop = policyApplied && "drop".equals(features.demandSegment());
             // Drop items: the honest demand rate is units/day while in stock,
@@ -515,8 +536,9 @@ public class AnalyticsService {
             int suggestedReorderQty = recalculateSuggestedReorderQty(
                 currentStock, targetStock, effectiveMu, leadTimeDays, features.safetyStock(),
                 features.onOrderQty());
+            ProductPricing pricing = pricingMap.get(product.id());
             BigDecimal revenueAtRisk = calculateRevenueAtRisk(
-                product.getMsrp(), effectiveMu, daysToStockout, leadTimeDays);
+                pricing != null ? pricing.msrp() : null, effectiveMu, daysToStockout, leadTimeDays);
             // Use recalculated date so overdue badge is consistent with displayed order date
             boolean overdue = isOverdue(suggestedOrderDate, currentStock, rp, today);
 
@@ -547,11 +569,11 @@ public class AnalyticsService {
             }
 
             actionItems.add(new ActionItem(
-                product.getId(),
-                product.getName(),
-                product.getSku(),
-                product.getImageUrl(),
-                product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                product.id(),
+                product.name(),
+                product.sku(),
+                product.imageUrl(),
+                categoryNameOrUncategorized(categoriesById, product.categoryId()),
                 currentStock,
                 rp,
                 targetStock,
@@ -658,11 +680,12 @@ public class AnalyticsService {
         }
 
         // Load products once and share across movers computation (exclude child products)
-        List<Product> allProducts = productRepository.findAllWithCategories().stream()
-            .filter(p -> p.getParentId() == null)
+        List<ProductRef> allProducts = catalogQueries.allProductRefs().stream()
+            .filter(p -> p.parentId() == null)
             .toList();
-        Map<UUID, Product> productMap = allProducts.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
+        Map<UUID, ProductRef> productMap = allProducts.stream()
+            .collect(Collectors.toMap(ProductRef::id, Function.identity()));
+        Map<UUID, CategoryRef> categoriesById = loadCategoriesById();
 
         // Fetch display days for current period (for ACV-weighted velocity)
         OffsetDateTime currentStartOdt = currentPeriodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
@@ -676,8 +699,8 @@ public class AnalyticsService {
             ));
 
         List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
-        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap, featuresMap, currentDisplayDays);
-        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false, productMap, featuresMap, currentDisplayDays);
+        List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap, categoriesById, featuresMap, currentDisplayDays);
+        List<Mover> bottomMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, false, productMap, categoriesById, featuresMap, currentDisplayDays);
         PeriodSummary currentPeriod = computePeriodSummaryWithDemand(rollups, currentPeriodStart, today, "Last 30 Days", featuresMap);
         PeriodSummary previousPeriod = computePeriodSummaryWithDemand(rollups, previousPeriodStart, currentPeriodStart.minusDays(1), "Previous 30 Days", featuresMap);
 
@@ -737,7 +760,8 @@ public class AnalyticsService {
     private List<Mover> computeMoversFromRollups(
             List<DailySalesRollup> rollups,
             LocalDate currentStart, LocalDate previousStart, LocalDate endDate,
-            boolean topMovers, Map<UUID, Product> productMap,
+            boolean topMovers, Map<UUID, ProductRef> productMap,
+            Map<UUID, CategoryRef> categoriesById,
             Map<UUID, ForecastFeatures> featuresMap,
             Map<UUID, Double> currentDisplayDays) {
 
@@ -785,15 +809,15 @@ public class AnalyticsService {
                 direction = change > 5 ? MoverDirection.UP : (change < -5 ? MoverDirection.DOWN : MoverDirection.STABLE);
             }
 
-            Product product = productMap.get(itemId);
+            ProductRef product = productMap.get(itemId);
             if (product == null) continue;
 
             movers.add(new Mover(
                 0, // rank assigned after sorting
                 itemId,
-                product.getName(),
-                product.getImageUrl(),
-                product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                product.name(),
+                product.imageUrl(),
+                categoryNameOrUncategorized(categoriesById, product.categoryId()),
                 current,
                 previous,
                 percentChange,
@@ -920,12 +944,14 @@ public class AnalyticsService {
         Set<UUID> itemIds = latestPredictions.stream()
             .map(ForecastPrediction::getItemId)
             .collect(Collectors.toSet());
-        List<Product> products = itemIds.isEmpty()
+        List<ProductRef> products = itemIds.isEmpty()
             ? List.of()
-            : productRepository.findByIdInWithCategories(itemIds);
-        Map<UUID, Product> productMap = products.stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
-        List<Category> categories = categoryRepository.findAll();
+            : catalogQueries.findAllByIds(itemIds);
+        Map<UUID, ProductRef> productMap = products.stream()
+            .collect(Collectors.toMap(ProductRef::id, Function.identity()));
+        List<CategoryRef> categories = catalogQueries.allCategoryRefs();
+        Map<UUID, CategoryRef> categoriesById = categories.stream()
+            .collect(Collectors.toMap(CategoryRef::id, c -> c));
         Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
 
         // Fetch rollups for both current and previous periods in a single query
@@ -954,31 +980,31 @@ public class AnalyticsService {
         BigDecimal totalAccuracy = BigDecimal.ZERO;
         int accuracyCount = 0;
 
-        for (Product product : products) {
+        for (ProductRef product : products) {
             // Skip child products (prizes) - only process parent products
-            if (product.getParentId() != null) {
+            if (product.parentId() != null) {
                 continue;
             }
-            ForecastFeatures features = featuresMap.get(product.getId());
+            ForecastFeatures features = featuresMap.get(product.id());
             if (features != null && features.muHat() != null) {
                 BigDecimal muHat = features.muHat();
-                demandVelocityByItem.put(product.getId(), muHat);
+                demandVelocityByItem.put(product.id(), muHat);
                 totalDemandVelocity = totalDemandVelocity.add(muHat);
 
-                int stock = stockMap.getOrDefault(product.getId(), 0);
+                int stock = stockMap.getOrDefault(product.id(), 0);
                 if (stock > 0) {
                     BigDecimal stockVelocity = muHat.divide(BigDecimal.valueOf(stock), 4, RoundingMode.HALF_UP);
-                    stockVelocityByItem.put(product.getId(), stockVelocity);
+                    stockVelocityByItem.put(product.id(), stockVelocity);
                 }
 
                 BigDecimal volatility = calculateDemandVolatility(muHat, features.sigmaDHat());
                 if (volatility != null) {
-                    volatilityByItem.put(product.getId(), volatility);
+                    volatilityByItem.put(product.id(), volatility);
                 }
 
                 BigDecimal accuracy = calculateForecastAccuracy(features.mape());
                 if (accuracy != null) {
-                    accuracyByItem.put(product.getId(), accuracy);
+                    accuracyByItem.put(product.id(), accuracy);
                     totalAccuracy = totalAccuracy.add(accuracy);
                     accuracyCount++;
                 }
@@ -992,7 +1018,7 @@ public class AnalyticsService {
             .limit(MOVERS_LIMIT)
             .map(entry -> {
                 UUID itemId = entry.getKey();
-                Product product = productMap.get(itemId);
+                ProductRef product = productMap.get(itemId);
                 if (product == null) return null;
 
                 BigDecimal demandVelocity = entry.getValue();
@@ -1004,10 +1030,10 @@ public class AnalyticsService {
                 return new DemandLeader(
                     0,
                     itemId,
-                    product.getName(),
-                    product.getSku(),
-                    product.getImageUrl(),
-                    product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                    product.name(),
+                    product.sku(),
+                    product.imageUrl(),
+                    categoryNameOrUncategorized(categoriesById, product.categoryId()),
                     unitsByItem.getOrDefault(itemId, 0),
                     demandVelocity.setScale(2, RoundingMode.HALF_UP),
                     volatilityByItem.getOrDefault(itemId, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
@@ -1030,7 +1056,7 @@ public class AnalyticsService {
             .limit(MOVERS_LIMIT)
             .map(entry -> {
                 UUID itemId = entry.getKey();
-                Product product = productMap.get(itemId);
+                ProductRef product = productMap.get(itemId);
                 if (product == null) return null;
 
                 BigDecimal demandVelocity = demandVelocityByItem.getOrDefault(itemId, BigDecimal.ZERO);
@@ -1042,10 +1068,10 @@ public class AnalyticsService {
                 return new DemandLeader(
                     0,
                     itemId,
-                    product.getName(),
-                    product.getSku(),
-                    product.getImageUrl(),
-                    product.getCategory() != null ? product.getCategory().getName() : "Uncategorized",
+                    product.name(),
+                    product.sku(),
+                    product.imageUrl(),
+                    categoryNameOrUncategorized(categoriesById, product.categoryId()),
                     unitsByItem.getOrDefault(itemId, 0),
                     demandVelocity.setScale(2, RoundingMode.HALF_UP),
                     volatilityByItem.getOrDefault(itemId, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP),
@@ -1066,29 +1092,29 @@ public class AnalyticsService {
         Map<UUID, BigDecimal> demandVelocityByCategory = new HashMap<>();
         Map<UUID, Integer> unitsByCategory = new HashMap<>();
         for (UUID itemId : demandVelocityByItem.keySet()) {
-            Product product = productMap.get(itemId);
-            if (product == null || product.getCategory() == null) continue;
-            UUID categoryId = product.getCategory().getId();
+            ProductRef product = productMap.get(itemId);
+            if (product == null || product.categoryId() == null) continue;
+            UUID categoryId = product.categoryId();
             demandVelocityByCategory.merge(categoryId, demandVelocityByItem.get(itemId), BigDecimal::add);
             unitsByCategory.merge(categoryId, unitsByItem.getOrDefault(itemId, 0), Integer::sum);
         }
 
         // Pre-compute item counts by category to avoid O(n*m) stream filtering
         Map<UUID, Integer> itemCountByCategory = new HashMap<>();
-        for (Product product : products) {
-            if (product.getCategory() != null) {
-                itemCountByCategory.merge(product.getCategory().getId(), 1, Integer::sum);
+        for (ProductRef product : products) {
+            if (product.categoryId() != null) {
+                itemCountByCategory.merge(product.categoryId(), 1, Integer::sum);
             }
         }
 
         final BigDecimal finalTotalDemandVelocity2 = totalDemandVelocity;
         List<CategoryRanking> categoryRankings = categories.stream()
-            .filter(cat -> demandVelocityByCategory.containsKey(cat.getId()))
-            .sorted(Comparator.comparing((Category cat) ->
-                demandVelocityByCategory.getOrDefault(cat.getId(), BigDecimal.ZERO)).reversed())
+            .filter(cat -> demandVelocityByCategory.containsKey(cat.id()))
+            .sorted(Comparator.comparing((CategoryRef cat) ->
+                demandVelocityByCategory.getOrDefault(cat.id(), BigDecimal.ZERO)).reversed())
             .limit(CATEGORY_RANKINGS_LIMIT)
             .map(cat -> {
-                UUID catId = cat.getId();
+                UUID catId = cat.id();
                 BigDecimal catDemandVelocity = demandVelocityByCategory.getOrDefault(catId, BigDecimal.ZERO);
                 int catUnits = unitsByCategory.getOrDefault(catId, 0);
                 int totalItems = itemCountByCategory.getOrDefault(catId, 0);
@@ -1097,7 +1123,7 @@ public class AnalyticsService {
                         .divide(finalTotalDemandVelocity2, 1, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-                return new CategoryRanking(0, catId, cat.getName(), totalItems, catUnits,
+                return new CategoryRanking(0, catId, cat.name(), totalItems, catUnits,
                     catDemandVelocity.setScale(2, RoundingMode.HALF_UP), percentOfTotal);
             })
             .toList();

@@ -141,6 +141,55 @@ class ArchitectureTest {
         return packageName.equals(rootPackage) || packageName.startsWith(rootPackage + ".");
     }
 
+    // Phase 5b (docs: .specs/phase-5b-catalog-facade/spec.md AC-3). Deliberately does NOT reuse
+    // modulesDoNotDependOnAnotherModulesApi's source selector (businessModulePackages() -- only
+    // the named domain modules): every one of the twelve consumers this record migrates still
+    // lives in legacy services/controllers, which are not in that list, so mirroring it would
+    // select vacuously against exactly the classes this rule exists to catch. The source here is
+    // instead "every class outside catalog" (legacy packages included), and the target is
+    // catalog.infrastructure as a whole -- which already covers ProductRepository,
+    // CategoryRepository, and SupplierRepository (AC-3b) without naming them individually, since
+    // all three already live in that one package. Initially frozen with whatever violation count
+    // the freeze records (T-2); AC-6's DevSeedController/AnalyticsSeedService exemption is added
+    // later, at T-5, not here -- T-2 only adds and freezes the rule.
+    @Test
+    void noProductionClassOutsideCatalogDependsOnCatalogInfrastructure() {
+        freeze(outsideCatalogToCatalogInfrastructureRule()).check(importedClasses);
+    }
+
+    /**
+     * Package-visible so {@code ArchitectureTestCatalogInfrastructureRuleProbeTest} can evaluate
+     * the exact unfrozen rule (not a re-typed copy) against fixture classes before the frozen
+     * store is regenerated, matching the probe discipline used for
+     * {@link #repositoryAccessRule()} in Phase 5a.
+     */
+    static ArchRule outsideCatalogToCatalogInfrastructureRule() {
+        return classes()
+                .that(new DescribedPredicate<JavaClass>("reside outside catalog") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !"catalog".equals(moduleOf(javaClass));
+                    }
+                })
+                .should(new ArchCondition<JavaClass>("not depend on catalog.infrastructure") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                            JavaClass target = dependency.getTargetClass();
+                            if (isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".catalog.infrastructure")) {
+                                events.add(SimpleConditionEvent.violated(
+                                        javaClass,
+                                        dependency.getDescription()
+                                                + " -- catalog.infrastructure must only be accessed from within"
+                                                + " catalog, via CatalogQueries/CatalogPricing/CatalogCommands/"
+                                                + "ProductStockStateWriter/CatalogEntityAccess"));
+                            }
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
+
     @Test
     void topLevelPackagesAreFreeOfCycles() {
         ArchRule rule = slices()

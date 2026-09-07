@@ -39,6 +39,19 @@ behavior (it would alter kuji Active/Closed tabs and forecasting's `WHERE p.is_a
 5c records the intended semantics and Phase 6 owns the actual split when `quantity` moves to
 `inventory`.
 
+## Carried-forward debt (not this record's scope)
+
+- `catalog.api.CostVisibilityPolicy → identity.domain.{Permission,RolePermissions}`, recorded in
+  [5a's spec.md](../phase-5a-catalog-module-move/spec.md) AC-2. Its removal condition has two
+  parts, both required: an `identity.application` permission-check facade must exist (closes the
+  §4.1 "callers go through a documented facade" violation), **and**
+  `docs/specs/spring-domain-modular-monolith.md` §6.2's target graph must be amended to list
+  `identity` as an intended dependency of `catalog` (closes the "edge isn't in the intended graph
+  at all" gap). Neither alone resolves it — building the facade without amending §6.2 leaves the
+  edge itself still unsanctioned; amending §6.2 without the facade leaves the direct
+  domain-type-access violation in place. This record does not build that facade or touch §6.2 —
+  not in this record's task list, and the facade's shape is identity's decision, not catalog's.
+
 ## Durable context
 
 - Plan: [Enterprise modernization](../../docs/plans/enterprise-modernization.md) §8 (Phase 5), §9

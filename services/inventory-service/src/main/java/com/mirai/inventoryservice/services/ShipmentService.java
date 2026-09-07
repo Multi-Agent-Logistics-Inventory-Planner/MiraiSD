@@ -1,5 +1,9 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.catalog.application.CatalogCommands;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.catalog.application.SupplierService;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
@@ -35,7 +39,6 @@ import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;
 import com.mirai.inventoryservice.sites.domain.Location;
-import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.*;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
@@ -48,6 +51,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -58,7 +62,9 @@ import java.util.stream.Collectors;
 public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentItemRepository shipmentItemRepository;
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogEntityAccess catalogEntityAccess;
+    private final CatalogCommands catalogCommands;
     private final ProductService productService;
     private final UserService userService;
     private final UserRepository userRepository;
@@ -79,7 +85,9 @@ public class ShipmentService {
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             ShipmentItemRepository shipmentItemRepository,
-            ProductRepository productRepository,
+            CatalogQueries catalogQueries,
+            CatalogEntityAccess catalogEntityAccess,
+            CatalogCommands catalogCommands,
             ProductService productService,
             UserService userService,
             UserRepository userRepository,
@@ -96,7 +104,9 @@ public class ShipmentService {
             SupplierService supplierService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
+        this.catalogEntityAccess = catalogEntityAccess;
+        this.catalogCommands = catalogCommands;
         this.productService = productService;
         this.userService = userService;
         this.userRepository = userRepository;
@@ -143,15 +153,15 @@ public class ShipmentService {
         Set<UUID> productIds = requestDTO.getItems().stream()
                 .map(ShipmentItemRequestDTO::getItemId)
                 .collect(Collectors.toSet());
-        Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity()));
+        Map<UUID, ProductRef> productMap = catalogQueries.findAllByIds(productIds).stream()
+                .collect(Collectors.toMap(ProductRef::id, Function.identity()));
 
         List<ShipmentItem> items = new ArrayList<>();
         for (ShipmentItemRequestDTO itemDTO : requestDTO.getItems()) {
-            Product product = productMap.get(itemDTO.getItemId());
-            if (product == null) {
+            if (!productMap.containsKey(itemDTO.getItemId())) {
                 throw new ProductNotFoundException("Product not found with id: " + itemDTO.getItemId());
             }
+            Product product = catalogEntityAccess.getReference(itemDTO.getItemId());
 
             ShipmentItem item = ShipmentItem.builder()
                     .shipment(shipment)
@@ -303,8 +313,8 @@ public class ShipmentService {
             Set<UUID> productIds = requestDTO.getItems().stream()
                     .map(ShipmentItemRequestDTO::getItemId)
                     .collect(Collectors.toSet());
-            Map<UUID, Product> productMap = productRepository.findAllById(productIds).stream()
-                    .collect(Collectors.toMap(Product::getId, Function.identity()));
+            Map<UUID, ProductRef> productMap = catalogQueries.findAllByIds(productIds).stream()
+                    .collect(Collectors.toMap(ProductRef::id, Function.identity()));
 
             // Separate existing items into received (must preserve) and unreceived (can replace)
             Map<UUID, ShipmentItem> receivedItemsByProductId = new HashMap<>();
@@ -344,10 +354,10 @@ public class ShipmentService {
                     continue;
                 }
 
-                Product product = productMap.get(productId);
-                if (product == null) {
+                if (!productMap.containsKey(productId)) {
                     throw new ProductNotFoundException("Product not found with id: " + productId);
                 }
+                Product product = catalogEntityAccess.getReference(productId);
 
                 ShipmentItem item = ShipmentItem.builder()
                         .shipment(shipment)
@@ -1158,24 +1168,16 @@ public class ShipmentService {
             return;
         }
 
-        List<Product> productsToUpdate = new ArrayList<>();
+        // Eligibility (no supplier yet, or not explicitly manual) is CatalogCommands' own
+        // decision now, not pre-filtered here -- catalog owns products.preferred_supplier_id.
+        Set<UUID> candidateProductIds = shipment.getItems().stream()
+                .map(ShipmentItem::getItem)
+                .filter(Objects::nonNull)
+                .map(Product::getId)
+                .collect(Collectors.toSet());
 
-        for (ShipmentItem item : shipment.getItems()) {
-            Product product = item.getItem();
-            if (product != null) {
-                // Only auto-assign if no supplier OR not explicitly manual
-                // Treats null as "auto" for backward compatibility with existing data
-                if (product.getPreferredSupplierId() == null ||
-                    !Boolean.FALSE.equals(product.getPreferredSupplierAuto())) {
-                    product.setPreferredSupplier(supplier);
-                    product.setPreferredSupplierAuto(true);
-                    productsToUpdate.add(product);
-                }
-            }
-        }
-
-        if (!productsToUpdate.isEmpty()) {
-            productRepository.saveAll(productsToUpdate);
+        if (!candidateProductIds.isEmpty()) {
+            catalogCommands.assignPreferredSupplierFromDelivery(supplier.getId(), candidateProductIds);
         }
     }
 

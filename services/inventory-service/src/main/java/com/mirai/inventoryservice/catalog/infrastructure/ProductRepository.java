@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.catalog.infrastructure;
 
 import com.mirai.inventoryservice.catalog.application.ProductListItemDTO;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -161,4 +162,20 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     @Query(LIST_ITEM_SELECT + "WHERE p.parent.id = :parentId AND p.isActive = true ORDER BY p.sku")
     List<ProductListItemDTO> findByParentIdActiveAsListItems(@Param("parentId") UUID parentId);
+
+    // ==================== Slim Projection Query (CatalogQueries.allProductRefs) ====================
+    // Same egress-cutting rationale as LIST_ITEM_SELECT above: constructs ProductRef directly
+    // (a record, so its canonical constructor's parameter order/types must match exactly) rather
+    // than loading full Product entities via findAll(), which pulls description/notes/parent
+    // entity/children/createdAt across the wire for fields ProductRef never exposes. Never
+    // includes unitCost/msrp (ProductRef.from()'s own javadoc rule, enforced separately here too).
+
+    @Query("SELECT new com.mirai.inventoryservice.catalog.application.ProductRef("
+            + "p.id, p.sku, p.name, p.imageUrl, p.isActive, "
+            + "p.quantity, p.letter, p.templateQuantity, p.packsPerBox, p.parentId, "
+            + "p.kujiType, p.kujiSlackWebhookUrl, "
+            + "p.reorderPoint, p.targetStockLevel, p.leadTimeDays, p.forecastingEnabled, "
+            + "p.category.id, p.preferredSupplierId, p.preferredSupplierAuto) "
+            + "FROM Product p")
+    List<ProductRef> findAllProductRefs();
 }

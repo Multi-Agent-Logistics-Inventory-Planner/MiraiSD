@@ -119,10 +119,17 @@ The move surfaces two structural traps that must be fixed as part of the move, n
     did not introduce it), and building a new `identity.application` permission-check facade to
     remove it is out of this record's scope — a Full-tier record's own scope discipline argues
     against expanding a package-move task into designing a new cross-module facade.
-    **Removal condition**: when `identity.application` publishes a documented permission-check
-    facade (e.g. a method alongside `MembershipAuthorizer`'s existing role), `catalog.api`
-    should be updated to call that facade instead of `identity.domain` directly, closing this gap.
-    Not scheduled to a specific phase; tracked here so it isn't silently forgotten.
+    **Removal condition — two parts, both required, neither alone closes the gap**: (1)
+    `identity.application` publishes a documented permission-check facade (e.g. a method alongside
+    `MembershipAuthorizer`'s existing role), and `catalog.api` is updated to call that facade
+    instead of `identity.domain` directly — this alone only fixes the §4.1 "callers must go through
+    a documented `application`-package facade" violation; it does not by itself make `catalog →
+    identity` a sanctioned edge. (2) §6.2's target graph is amended to list `identity` as an
+    intended dependency of `catalog` (it currently states `catalog ──► shared` only) — this alone
+    only legitimizes the edge on paper without fixing the direct-domain-access violation. Both must
+    land together for this debt to actually close. Not scheduled to a specific phase; tracked here
+    so it isn't silently forgotten, and carried forward into
+    [5b](../phase-5b-catalog-facade/spec.md) unresolved.
 - AC-3: `ArchitectureTest.repositoriesAreOnlyAccessedByServicesOrRepositories` is amended in **both**
   directions, not just the caller side:
   - **Target selector expanded.** The rule currently targets only
