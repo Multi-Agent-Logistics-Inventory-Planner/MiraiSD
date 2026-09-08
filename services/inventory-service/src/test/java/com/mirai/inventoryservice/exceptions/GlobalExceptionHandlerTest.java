@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.exceptions;
 
+import com.mirai.inventoryservice.catalog.domain.SiteProductVersionConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,5 +53,18 @@ class GlobalExceptionHandlerTest {
         assertThat(body.getError()).isEqualTo("Internal Server Error");
         assertThat(body.getStatus()).isEqualTo(500);
         assertThat(body.getTimestamp()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("SiteProductVersionConflictException should return HTTP 409 naming the current version")
+    void handleConflictException_siteProductVersionConflict_shouldReturn409() {
+        var response = handler.handleConflictException(
+                new SiteProductVersionConflictException("expected version 2 but current version is 3"));
+        var body = response.getBody();
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(body).isNotNull();
+        assertThat(body.getError()).isEqualTo("Conflict");
+        assertThat(body.getMessage()).contains("current version is 3");
     }
 }

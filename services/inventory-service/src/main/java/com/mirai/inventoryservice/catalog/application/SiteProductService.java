@@ -4,8 +4,10 @@ import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.SiteProduct;
 import com.mirai.inventoryservice.catalog.domain.SiteProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.SiteProductVersionConflictException;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.SiteProductRepository;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +32,11 @@ import java.util.UUID;
  * explicit {@code null} field in {@link #updateSettings}) is the deliberate exception - it never
  * dual-writes, since that would clear the very global fallback the cleared field is about to
  * depend on. The reverse direction - legacy writes syncing back into MAIN's row - is
- * {@link #syncExistingMainOverrides}, called from {@code ProductService}. The full version/
- * tri-state settings contract (AC-6) is T-4b, layered on top of this baseline.
+ * {@link #syncExistingMainOverrides}, called from {@code ProductService}.
+ * <p>
+ * {@link #updateSettings} also enforces AC-6's version contract: the caller's
+ * {@code expectedVersion} must match the row's current version, and a missing version is
+ * rejected the same way a stale one is (never last-write-wins).
  */
 @Service
 @Transactional
@@ -41,16 +46,19 @@ public class SiteProductService {
     private final ProductRepository productRepository;
     private final MainSiteResolver mainSiteResolver;
     private final ForecastPurgePort forecastPurgePort;
+    private final SiteProductVersionReader siteProductVersionReader;
 
     public SiteProductService(
             SiteProductRepository siteProductRepository,
             ProductRepository productRepository,
             MainSiteResolver mainSiteResolver,
-            ForecastPurgePort forecastPurgePort) {
+            ForecastPurgePort forecastPurgePort,
+            SiteProductVersionReader siteProductVersionReader) {
         this.siteProductRepository = siteProductRepository;
         this.productRepository = productRepository;
         this.mainSiteResolver = mainSiteResolver;
         this.forecastPurgePort = forecastPurgePort;
+        this.siteProductVersionReader = siteProductVersionReader;
     }
 
     public SiteProduct setStocked(UUID siteId, UUID productId, boolean isStocked) {
@@ -93,22 +101,63 @@ public class SiteProductService {
                 .orElseThrow(() -> new SiteProductNotFoundException(
                         "No site_products row for site " + siteId + " and product " + productId));
 
-        if (update.forecastingEnabled() != null) {
-            siteProduct.setForecastingEnabled(update.forecastingEnabled());
-        }
-        siteProduct.setUnitCost(update.unitCost());
-        siteProduct.setMsrp(update.msrp());
-        siteProduct.setReorderPoint(update.reorderPoint());
-        siteProduct.setTargetStockLevel(update.targetStockLevel());
-        siteProduct.setLeadTimeDays(update.leadTimeDays());
+        requireCurrentVersion(siteId, productId, siteProduct, update.expectedVersion());
 
-        SiteProduct saved = siteProductRepository.save(siteProduct);
+        if (update.forecastingEnabled().isPresent() && update.forecastingEnabled().value() != null) {
+            siteProduct.setForecastingEnabled(update.forecastingEnabled().value());
+        }
+        if (update.unitCost().isPresent()) {
+            siteProduct.setUnitCost(update.unitCost().value());
+        }
+        if (update.msrp().isPresent()) {
+            siteProduct.setMsrp(update.msrp().value());
+        }
+        if (update.reorderPoint().isPresent()) {
+            siteProduct.setReorderPoint(update.reorderPoint().value());
+        }
+        if (update.targetStockLevel().isPresent()) {
+            siteProduct.setTargetStockLevel(update.targetStockLevel().value());
+        }
+        if (update.leadTimeDays().isPresent()) {
+            siteProduct.setLeadTimeDays(update.leadTimeDays().value());
+        }
+
+        SiteProduct saved;
+        try {
+            saved = siteProductRepository.saveAndFlush(siteProduct);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // The flush failed, so this transaction's persistence context must be treated as
+            // unusable for further work - re-querying through it here risks a second failure,
+            // surfacing as a 500 instead of the intended 409 (review finding). Read the winner's
+            // current version through a fresh, independent transaction instead.
+            Long currentVersion = siteProductVersionReader.currentVersion(siteId, productId);
+            throw versionConflict(siteId, productId, update.expectedVersion(), currentVersion);
+        }
 
         if (mainSiteResolver.isMain(siteId)) {
             dualWriteToGlobalProduct(productId, update);
         }
 
         return saved;
+    }
+
+    /**
+     * AC-6: rejects a stale version and a missing one identically - a settings write must never
+     * fall back to last-write-wins just because the caller didn't send a version. The row is
+     * already loaded here (no flush has been attempted yet), so its in-memory version is safe to
+     * use directly - no need to re-query.
+     */
+    private void requireCurrentVersion(UUID siteId, UUID productId, SiteProduct siteProduct, Long expectedVersion) {
+        if (expectedVersion == null || !expectedVersion.equals(siteProduct.getVersion())) {
+            throw versionConflict(siteId, productId, expectedVersion, siteProduct.getVersion());
+        }
+    }
+
+    private SiteProductVersionConflictException versionConflict(
+            UUID siteId, UUID productId, Long expectedVersion, Long currentVersion) {
+        return new SiteProductVersionConflictException(
+                "Version conflict updating site product settings for site " + siteId + " and product " + productId
+                        + ": expected version " + expectedVersion + " but current version is " + currentVersion);
     }
 
     /**
@@ -128,30 +177,30 @@ public class SiteProductService {
 
         boolean changed = false;
         boolean turningForecastingOff = false;
-        if (update.forecastingEnabled() != null) {
+        if (update.forecastingEnabled().isPresent() && update.forecastingEnabled().value() != null) {
             boolean wasForecastingEnabled = !Boolean.FALSE.equals(product.getForecastingEnabled());
-            turningForecastingOff = wasForecastingEnabled && Boolean.FALSE.equals(update.forecastingEnabled());
-            product.setForecastingEnabled(update.forecastingEnabled());
+            turningForecastingOff = wasForecastingEnabled && Boolean.FALSE.equals(update.forecastingEnabled().value());
+            product.setForecastingEnabled(update.forecastingEnabled().value());
             changed = true;
         }
-        if (update.unitCost() != null) {
-            product.setUnitCost(update.unitCost());
+        if (update.unitCost().isPresent() && update.unitCost().value() != null) {
+            product.setUnitCost(update.unitCost().value());
             changed = true;
         }
-        if (update.msrp() != null) {
-            product.setMsrp(update.msrp());
+        if (update.msrp().isPresent() && update.msrp().value() != null) {
+            product.setMsrp(update.msrp().value());
             changed = true;
         }
-        if (update.reorderPoint() != null) {
-            product.setReorderPoint(update.reorderPoint());
+        if (update.reorderPoint().isPresent() && update.reorderPoint().value() != null) {
+            product.setReorderPoint(update.reorderPoint().value());
             changed = true;
         }
-        if (update.targetStockLevel() != null) {
-            product.setTargetStockLevel(update.targetStockLevel());
+        if (update.targetStockLevel().isPresent() && update.targetStockLevel().value() != null) {
+            product.setTargetStockLevel(update.targetStockLevel().value());
             changed = true;
         }
-        if (update.leadTimeDays() != null) {
-            product.setLeadTimeDays(update.leadTimeDays());
+        if (update.leadTimeDays().isPresent() && update.leadTimeDays().value() != null) {
+            product.setLeadTimeDays(update.leadTimeDays().value());
             changed = true;
         }
 
@@ -172,7 +221,7 @@ public class SiteProductService {
      * A no-op (never creates a row) when MAIN has never carried the product - legacy writes never
      * manufacture assortment, only {@link #setStocked} does.
      */
-    public void syncExistingMainOverrides(UUID mainSiteId, UUID productId, SiteProductSettingsUpdate changedFields) {
+    public void syncExistingMainOverrides(UUID mainSiteId, UUID productId, ProductFieldChanges changedFields) {
         siteProductRepository.findBySiteIdAndProductId(mainSiteId, productId).ifPresent(siteProduct -> {
             boolean changed = false;
             if (changedFields.forecastingEnabled() != null) {
