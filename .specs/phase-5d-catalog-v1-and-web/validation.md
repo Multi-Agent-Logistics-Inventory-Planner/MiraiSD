@@ -146,3 +146,38 @@ JDK 21, from services/inventory-service:
 `/private/tmp/phase5d-t2-final-review.log`. OpenAPI and generated TypeScript
 nullable unions inspected directly. Full suites/oasdiff not rerun in this
 follow-up; their results remain implementer-reported.
+
+
+## T-3 independent review validation
+
+From `services/inventory-service`:
+
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./mvnw -o test -Dtest=LegacyCatalogDeprecationHeadersIT`
+
+4 tests, zero failures/errors, BUILD SUCCESS. The sandbox run could not attach
+Mockito to the JVM; the authorized outside-sandbox rerun passed. Evidence:
+`/private/tmp/catalog-t3-review.log`. These assertions compare the emitted value
+with the implementation constant, so passing does not validate RFC 9745 syntax.
+Full integration/unit suites were not rerun; their counts remain implementer-reported.
+
+## T-3 review fix validation
+
+`DEPRECATION_DATE` changed to `"@1788825600"`; `LegacyCatalogDeprecationHeadersIT` now decodes
+the raw header via an independent regex (`^@(-?\d+)$` for Deprecation, RFC 8288 syntax for Link)
+and asserts the resulting `Instant` against a separately-parsed `2026-09-08T00:00:00Z`, rather
+than reusing the implementation constant.
+
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./mvnw -o test -Dtest=LegacyCatalogDeprecationHeadersIT`
+— 4/4, BUILD SUCCESS. `./mvnw -o test -Dtest='*IT'` — 374/374 (no regressions).
+`./mvnw -o test` (unit) — 404/404. T-3 is closed; proceeding to T-4.
+
+## T-3 independent fix follow-up validation
+
+From `services/inventory-service`, JDK 21:
+
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./mvnw -o test -Dtest=LegacyCatalogDeprecationHeadersIT`
+
+4 tests, zero failures/errors, BUILD SUCCESS. Used the previously authorized
+outside-sandbox command for Mockito JVM attachment. Log:
+`/private/tmp/catalog-t3-review.log`. Full suites were not rerun in this
+follow-up; their results above remain implementer-reported.

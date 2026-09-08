@@ -2,11 +2,14 @@
 
 ## Current handoff
 
-- Status: T-1 and T-2 complete. T-1's review findings and both rounds of T-2's review findings
-  (five total: search filtering, parentId mapping, unusable settings schema, malformed-version
-  coercion, incomplete auth proof; then a second round: missing nullable unions, fractional-version
-  coercion) are all fixed. T-3 through T-6 not started.
-- Next action: T-3 (Deprecation/Sunset/Link headers on legacy catalog routes).
+- Status: T-1, T-2, and T-3 complete. T-3's one P2 review finding (Deprecation header used an
+  HTTP-date instead of RFC 9745's structured-fields Date syntax) is fixed. T-1's review findings
+  and both rounds of T-2's review findings (five total: search filtering, parentId mapping,
+  unusable settings schema, malformed-version coercion, incomplete auth proof; then a second
+  round: missing nullable unions, fractional-version coercion) are all fixed. T-4 through T-6 not
+  started.
+- Next action: T-4 (AC-5 exit-gate integration test: one global product carried independently at
+  both MAIN and SECOND).
 - Decisions that must survive compaction:
   - **This project's springdoc emits OpenAPI 3.1, and `@Schema(nullable = true)` is silently a
     no-op under this swagger-core version's 3.1 output** (verified empirically, with and without
@@ -50,14 +53,23 @@
     mirror their legacy controllers 1:1 (including `GET /{id}/products` on suppliers, which still
     returns the legacy `ProductResponseDTO` shape with `CostVisibilityPolicy` applied) — spec.md
     calls these "wholly global," so no field narrowing applies to them.
-- Last verified: `./mvnw -o test -Dtest='*IT'` — 351/351, Maven exit 0 (was 340/340 baseline from
-  5c + this record's 11 new `CatalogProductControllerIT` tests). `./mvnw -o test` (unit) —
-  404/404, Maven exit 0. `oasdiff breaking --fail-on ERR` against the pre-change contract — no
-  breaking changes. `packages/api-client` `npm run generate` + `npm run typecheck` — clean.
+- Last verified: `./mvnw -o test -Dtest='*IT'` — 374/374, Maven exit 0 (370 T-2 baseline + 4 new
+  `LegacyCatalogDeprecationHeadersIT` tests). `./mvnw -o test` (unit) — 404/404, Maven exit 0 (no
+  architecture-baseline change needed — the new filter/config classes stayed in `catalog.api` and
+  introduced no new module dependency edge).
 - Open risks/questions: T-1's categories/suppliers routes were not given their own dedicated IT
   file (they mirror already-tested legacy behavior 1:1 through the same service layer); if T-5/T-6
   web migration surfaces a gap, add targeted coverage then rather than duplicating
   `CategoryControllerSecurityIT`/`SupplierController` tests preemptively.
+  - **Pre-existing, unrelated to T-3:** `GET /api/suppliers` 500s under this project's `test`
+    profile (H2, `ddl-auto=create-drop`) because `SupplierRepository`'s query reads the
+    `mv_lead_time_stats` materialized view, which V20/V30's raw-SQL Flyway migrations create in
+    Postgres but which never exists here (this profile doesn't run Flyway). Confirmed pre-existing
+    by temporarily removing T-3's new files from the working tree and re-probing the same route —
+    it 500s identically with zero T-3 code present. Out of scope for this header-only task;
+    `LegacyCatalogDeprecationHeadersIT.getSuppliers_carriesDeprecationHeaders` asserts header
+    presence without asserting a 200 for this reason. Flag for a future record if `/api/suppliers`
+    coverage is ever added for real.
 
 ## Assumptions and decisions
 
@@ -344,3 +356,81 @@
 - Last independently verified: JDK 21 `./mvnw -o test
   -Dtest=SiteProductControllerIT` — 17/17, BUILD SUCCESS. Generated nullable
   override types verified in both contract artifacts.
+
+## T-3 — Deprecation/Sunset/Link headers on legacy catalog routes
+
+- Changed:
+  - Added `catalog/api/LegacyCatalogDeprecationFilter.java` (`OncePerRequestFilter`): sets
+    `Deprecation` (a fixed HTTP-date, since this commit is when deprecation begins) and `Link`
+    (`rel="deprecation"`, pointing at `docs/baseline/api-v1-map.md` — the document that classifies
+    every legacy route and its v1 replacement, per AGENTS.md's sources-of-truth list) on every
+    response. `Sunset` is intentionally omitted: no removal date has been decided, and spec.md
+    AC-3 says "where known."
+  - Added `catalog/api/LegacyCatalogDeprecationConfig.java`: a `FilterRegistrationBean` scoping the
+    filter to `/api/products/*`, `/api/categories/*`, `/api/suppliers/*` only — not a `@Component`
+    on the filter itself, which would have registered it for every route including the new
+    `/api/v1/catalog/**` and `/api/v1/sites/**` families this same record just added.
+  - No changes to `ProductController`/`CategoryController`/`SupplierController` or any DTO: the
+    filter runs entirely outside the handler methods, so response bodies and status codes are
+    unchanged (verified below), satisfying AC-3's "behavior is otherwise byte-identical to today."
+  - No contract regeneration: this is transport-level header metadata, not part of the OpenAPI
+    request/response schema springdoc emits, and AC-3 doesn't call for it (unlike AC-1/AC-1b/AC-2
+    in T-1/T-2, which changed the actual route/DTO surface).
+- Tests: `catalog/api/LegacyCatalogDeprecationHeadersIT.java` (new, 4 tests) — `GET /api/products`
+  and `GET /api/categories` assert 200 plus both headers present with the exact expected values
+  (and `Sunset` absent); `GET /api/suppliers` asserts both headers present without asserting a 200
+  (see below); `GET /api/v1/catalog/products` asserts neither header is present, proving the filter
+  doesn't leak onto the new v1 routes.
+  - Pre-existing, unrelated failure discovered while writing this test: `GET /api/suppliers` 500s
+    under the `test` profile because `SupplierRepository`'s list query reads the
+    `mv_lead_time_stats` materialized view, which V20/V30's Flyway migrations create in Postgres
+    but this profile never creates (H2, `ddl-auto=create-drop`, no Flyway run). Confirmed
+    pre-existing, not caused by this task: temporarily moved both new main-source files and the
+    new test out of the working tree and re-ran an ad hoc probe hitting `GET /api/suppliers` with
+    zero T-3 code present — same 500, same `mv_lead_time_stats` `SQLGrammarException`. Left
+    unfixed as out of scope for a header-only task; recorded as an open risk above.
+- Result: Pass. `./mvnw -o test -Dtest='LegacyCatalogDeprecationHeadersIT'` — 4/4.
+  `./mvnw -o test -Dtest='*IT'` — 374/374 (370 baseline + 4 new). `./mvnw -o test` (unit) —
+  404/404 (no architecture-baseline edit needed: the new classes stayed in `catalog.api` and
+  introduced no new module dependency edge).
+- Next action: T-4 (AC-5 exit-gate integration test).
+
+
+## T-3 independent review handoff
+
+- Status: review complete; one P2 remains before T-3 can be considered complete.
+- Next action: correct `Deprecation` to RFC 9745 Structured Field Date syntax
+  (`@1788825600`) and add an independent format assertion, then proceed to T-4.
+- Last independently verified: JDK 21 `./mvnw -o test
+  -Dtest=LegacyCatalogDeprecationHeadersIT` — 4/4, BUILD SUCCESS.
+- Implementation and the unrelated `.claude/scheduled_tasks.lock` left untouched.
+
+## T-3 review finding fixed
+
+- Finding (P2, RFC 9745 header syntax): `LegacyCatalogDeprecationFilter.DEPRECATION_DATE` was an
+  HTTP-date string (`"Tue, 08 Sep 2026 00:00:00 GMT"`). RFC 9745 (which obsoletes the earlier
+  draft this record's implementation had followed) defines the `Deprecation` header's value as
+  an RFC 8941 Structured Fields Date, written `@<unix-timestamp>` — not an HTTP-date. Changed the
+  constant to `"@1788825600"` (the same instant, 2026-09-08T00:00:00Z, re-expressed in the
+  required syntax) and corrected the class doc comment to cite RFC 9745/RFC 8941 instead of
+  implying an HTTP-date was correct.
+- Also addressed the review's "test its format independently" note: the previous test asserted
+  `header().string("Deprecation", LegacyCatalogDeprecationFilter.DEPRECATION_DATE)`, which would
+  pass even if the implementation constant were wrong in the same way the test's expectation was
+  wrong. `LegacyCatalogDeprecationHeadersIT` now parses the raw header value against a
+  independently-written regex for RFC 8941's `sf-date` syntax (`^@(-?\d+)$`) and RFC 8288's Link
+  syntax, decodes the epoch seconds, and asserts the resulting `Instant` equals
+  `2026-09-08T00:00:00Z` computed from an independent `ZonedDateTime.parse` call — not from the
+  implementation's constant. A regression back to an HTTP-date (or any other non-conforming
+  value) now fails the format assertion regardless of what the implementation constant contains.
+- Result: Pass. `./mvnw -o test -Dtest='LegacyCatalogDeprecationHeadersIT'` — 4/4.
+  `./mvnw -o test -Dtest='*IT'` — 374/374 (no regressions). `./mvnw -o test` (unit) — 404/404.
+- T-3 is now fully resolved. Next action: T-4 (AC-5 exit-gate integration test).
+
+## T-3 independent fix follow-up handoff
+
+- Status: P2 independently verified resolved; T-3 review closed.
+- Next action: T-4, the AC-5 independent configuration integration test.
+- Last verified: JDK 21 `./mvnw -o test -Dtest=LegacyCatalogDeprecationHeadersIT`
+  — 4/4, BUILD SUCCESS.
+- No implementation changes; unrelated lock file untouched.

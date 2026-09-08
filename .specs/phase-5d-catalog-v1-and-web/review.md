@@ -135,3 +135,38 @@ StrictLongDeserializer is scoped to expectedVersion and accepts only integer
 tokens, using getLongValue() for range checking. The permanent controller suite
 passes 17/17, including the fractional-version regression. No new findings in
 this follow-up; T-2 review is clear to proceed to T-3.
+
+
+## T-3 independent review
+
+Parallel Standards and Spec passes reviewed the legacy deprecation filter,
+registration, tests, and AC-3 migration documentation.
+
+- [Standards] P2 (AC-3): `LegacyCatalogDeprecationFilter.java:18` emits an HTTP-date
+  for `Deprecation`. RFC 9745 section 2.1 requires a Structured Field Date:
+  the selected instant must be `@1788825600`. Standards-compliant consumers cannot
+  parse the current value. **act on** — use the structured date and verify its
+  format independently of the implementation constant in the integration test.
+  Source: https://www.rfc-editor.org/rfc/rfc9745.html#section-2.1
+- [Spec] Registration runs after Spring Security, so authentication short-circuits
+  may omit these headers. **consider** — no runtime probe was performed, and AC-3
+  does not explicitly settle whether authentication failures need deprecation
+  metadata. Not promoted to a blocking finding in this review.
+
+The linked migration map covers the three families; omission of an unknown
+Sunset is permitted. Disposition: correct the P2 header format before closing T-3.
+
+**Fixed:** `DEPRECATION_DATE` is now `"@1788825600"` (RFC 8941 Structured Fields Date), and
+`LegacyCatalogDeprecationHeadersIT` parses the raw header against an independently-written
+regex for the `sf-date`/Link syntax and decodes the epoch value, rather than comparing against
+the implementation constant. `./mvnw -o test -Dtest='LegacyCatalogDeprecationHeadersIT'` — 4/4;
+`-Dtest='*IT'` — 374/374; unit — 404/404. T-3 is closed. The non-blocking "consider" note above
+(headers on auth-short-circuited responses) was not acted on, per its own disposition.
+
+## T-3 independent fix follow-up
+
+The P2 is resolved: the emitted structured date is `@1788825600`, and the
+permanent test independently checks syntax and the intended UTC instant.
+Focused suite passes 4/4; no new blocking findings. T-3 is clear for T-4.
+Minor documentation correction: the Date type comes from RFC 9651 (referenced
+by RFC 9745), rather than RFC 8941 as the new comments state.
