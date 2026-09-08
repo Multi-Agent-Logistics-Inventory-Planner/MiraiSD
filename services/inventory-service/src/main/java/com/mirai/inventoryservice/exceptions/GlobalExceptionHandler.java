@@ -1,5 +1,12 @@
 package com.mirai.inventoryservice.exceptions;
 
+import com.mirai.inventoryservice.catalog.domain.CategoryInUseException;
+import com.mirai.inventoryservice.catalog.domain.CategoryNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.DuplicateCategoryException;
+import com.mirai.inventoryservice.catalog.domain.DuplicateSkuException;
+import com.mirai.inventoryservice.catalog.domain.ProductInUseException;
+import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.SupplierNotFoundException;
 import com.mirai.inventoryservice.identity.domain.MembershipNotFoundException;
 import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
 import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;

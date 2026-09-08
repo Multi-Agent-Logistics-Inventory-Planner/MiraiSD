@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.catalog.api.ProductSummaryDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

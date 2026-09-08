@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.models.MachineDisplay;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.identity.domain.User;
@@ -14,7 +14,9 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -48,7 +50,8 @@ import static org.mockito.Mockito.*;
 class MachineDisplayServiceNotificationTest {
 
     @Mock private MachineDisplayRepository machineDisplayRepository;
-    @Mock private ProductRepository productRepository;
+    @Mock private CatalogQueries catalogQueries;
+    @Mock private CatalogEntityAccess catalogEntityAccess;
     @Mock private UserRepository userRepository;
     @Mock private StockMovementRepository stockMovementRepository;
     @Mock private LocationRepository locationRepository;
@@ -66,7 +69,8 @@ class MachineDisplayServiceNotificationTest {
     void setUp() {
         service = new MachineDisplayService(
                 machineDisplayRepository,
-                productRepository,
+                catalogQueries,
+                catalogEntityAccess,
                 userRepository,
                 stockMovementRepository,
                 locationRepository,
@@ -127,7 +131,7 @@ class MachineDisplayServiceNotificationTest {
 
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
                 .thenReturn(List.of(display(machineId, existing)));
-        when(productRepository.findById(newProduct.getId())).thenReturn(Optional.of(newProduct));
+        when(catalogQueries.findById(newProduct.getId())).thenReturn(Optional.of(ProductRef.from(newProduct)));
         when(machineDisplayRepository.save(any(MachineDisplay.class))).thenAnswer(inv -> inv.getArgument(0));
 
         SetMachineDisplayRequestDTO req = SetMachineDisplayRequestDTO.builder()
@@ -278,7 +282,7 @@ class MachineDisplayServiceNotificationTest {
         Product newProduct = product("Sonny V3");
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
                 .thenReturn(List.of());
-        when(productRepository.findById(newProduct.getId())).thenReturn(Optional.of(newProduct));
+        when(catalogQueries.findById(newProduct.getId())).thenReturn(Optional.of(ProductRef.from(newProduct)));
         when(machineDisplayRepository.save(any(MachineDisplay.class))).thenAnswer(inv -> inv.getArgument(0));
         // ...but make the notification insert blow up.
         doThrow(new RuntimeException("simulated DB outage"))

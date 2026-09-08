@@ -1,8 +1,10 @@
 package com.mirai.inventoryservice.repositories;
 
 import com.mirai.inventoryservice.integration.BaseKafkaIntegrationTest;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;

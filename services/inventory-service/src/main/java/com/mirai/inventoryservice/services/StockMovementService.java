@@ -9,7 +9,10 @@ import com.mirai.inventoryservice.exceptions.*;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
+import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.StockMovement;
@@ -54,7 +57,8 @@ import java.util.stream.Collectors;
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
     private final AuditLogRepository auditLogRepository;
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
+    private final ProductStockStateWriter productStockStateWriter;
     private final UserRepository userRepository;
     private final LocationInventoryRepository locationInventoryRepository;
     private final LocationRepository locationRepository;
@@ -71,7 +75,8 @@ public class StockMovementService {
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
             AuditLogRepository auditLogRepository,
-            ProductRepository productRepository,
+            CatalogQueries catalogQueries,
+            ProductStockStateWriter productStockStateWriter,
             UserRepository userRepository,
             LocationInventoryRepository locationInventoryRepository,
             LocationRepository locationRepository,
@@ -83,7 +88,8 @@ public class StockMovementService {
             @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
         this.stockMovementRepository = stockMovementRepository;
         this.auditLogRepository = auditLogRepository;
-        this.productRepository = productRepository;
+        this.catalogQueries = catalogQueries;
+        this.productStockStateWriter = productStockStateWriter;
         this.userRepository = userRepository;
         this.locationInventoryRepository = locationInventoryRepository;
         this.locationRepository = locationRepository;
@@ -111,7 +117,7 @@ public class StockMovementService {
      */
     public void rejectIfCustomKujiParent(Product product) {
         if (product != null
-                && product.getKujiType() == com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+                && product.getKujiType() == com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM) {
             throw new InvalidInventoryOperationException(
                     "Custom kuji parent products do not track location inventory. "
                             + "Open a kuji box to manage prize stock instead.");
@@ -130,7 +136,7 @@ public class StockMovementService {
         if (product == null) return;
         Product parent = product.getParent();
         if (parent != null
-                && parent.getKujiType() != com.mirai.inventoryservice.models.enums.KujiType.CUSTOM) {
+                && parent.getKujiType() != com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM) {
             throw new InvalidInventoryOperationException(
                     "Kuji prize children do not track location inventory. "
                             + "Edit the shipment item to correct received counts.");
@@ -352,24 +358,12 @@ public class StockMovementService {
         if (productIds == null || productIds.isEmpty()) {
             return List.of();
         }
-        List<UUID> changed = new ArrayList<>();
-        List<Product> toSave = new ArrayList<>();
-        for (Product p : productRepository.findAllById(productIds)) {
-            int total = totals.getOrDefault(p.getId(), 0);
-            boolean shouldBeActive = total > 0;
-            boolean hasChange = !Objects.equals(p.getQuantity(), total)
-                    || !Objects.equals(p.getIsActive(), shouldBeActive);
-            if (hasChange) {
-                p.setQuantity(total);
-                p.setIsActive(shouldBeActive);
-                toSave.add(p);
-                changed.add(p.getId());
-            }
+        Map<UUID, ProductStockStateWriter.StockState> stateByProductId = new HashMap<>();
+        for (UUID productId : productIds) {
+            int total = totals.getOrDefault(productId, 0);
+            stateByProductId.put(productId, new ProductStockStateWriter.StockState(total, total > 0));
         }
-        if (!toSave.isEmpty()) {
-            productRepository.saveAll(toSave);
-        }
-        return changed;
+        return productStockStateWriter.applyStockStateBatch(stateByProductId);
     }
 
     /**
@@ -880,18 +874,7 @@ public class StockMovementService {
     private boolean updateProductActiveStatus(Product product) {
         int totalInventory = calculateTotalInventory(product.getId());
         boolean shouldBeActive = totalInventory > 0;
-
-        boolean changed = !Objects.equals(product.getQuantity(), totalInventory)
-                || !Objects.equals(product.getIsActive(), shouldBeActive);
-
-        if (!changed) {
-            return false;
-        }
-
-        product.setQuantity(totalInventory);
-        product.setIsActive(shouldBeActive);
-        productRepository.save(product);
-        return true;
+        return productStockStateWriter.applyStockState(product.getId(), totalInventory, shouldBeActive);
     }
 
     /**
@@ -903,12 +886,21 @@ public class StockMovementService {
             return;
         }
 
-        List<Product> products = productRepository.findAllById(productIds);
+        // Silently skip ids that no longer exist (a product deleted concurrently), matching the
+        // previous productRepository.findAllById(...) behavior exactly.
+        Set<UUID> existingIds = catalogQueries.findAllByIds(productIds).stream()
+                .map(ProductRef::id)
+                .collect(Collectors.toSet());
         List<String> changedIds = new ArrayList<>();
 
-        for (Product p : products) {
-            if (updateProductActiveStatus(p)) {
-                changedIds.add(p.getId().toString());
+        for (UUID productId : productIds) {
+            if (!existingIds.contains(productId)) {
+                continue;
+            }
+            int totalInventory = calculateTotalInventory(productId);
+            boolean shouldBeActive = totalInventory > 0;
+            if (productStockStateWriter.applyStockState(productId, totalInventory, shouldBeActive)) {
+                changedIds.add(productId.toString());
             }
         }
 

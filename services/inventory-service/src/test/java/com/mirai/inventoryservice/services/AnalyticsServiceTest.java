@@ -3,16 +3,19 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.dtos.responses.DemandLeadersDTO;
 import com.mirai.inventoryservice.dtos.responses.InsightsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogPricing;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CategoryRef;
+import com.mirai.inventoryservice.catalog.application.ProductPricing;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
-import com.mirai.inventoryservice.repositories.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -42,10 +45,10 @@ import static org.mockito.Mockito.*;
 class AnalyticsServiceTest {
 
     @Mock
-    private ProductRepository productRepository;
+    private CatalogQueries catalogQueries;
 
     @Mock
-    private CategoryRepository categoryRepository;
+    private CatalogPricing catalogPricing;
 
     @Mock
     private ForecastPredictionRepository forecastPredictionRepository;
@@ -107,7 +110,7 @@ class AnalyticsServiceTest {
     class GetInsights {
 
         @Test
-        @DisplayName("calls productRepository.findAllWithCategories exactly once")
+        @DisplayName("calls catalogQueries.allProductRefs exactly once")
         void callsFindAllWithCategoriesOnce() {
             UUID productId = UUID.randomUUID();
             Category category = buildCategory(UUID.randomUUID(), "Figures");
@@ -117,15 +120,18 @@ class AnalyticsServiceTest {
                     .thenReturn(Collections.emptyList());
             when(forecastPredictionRepository.findAllLatest())
                     .thenReturn(Collections.emptyList());
-            when(productRepository.findAllWithCategories())
-                    .thenReturn(List.of(product));
+            when(catalogQueries.allProductRefs())
+                    .thenReturn(List.of(ProductRef.from(product)));
+            when(catalogQueries.allCategoryRefs())
+                    .thenReturn(List.of(CategoryRef.from(category)));
             when(machineDisplayRepository.calculateDisplayDaysByProduct(any(), any()))
                     .thenReturn(Collections.emptyList());
 
             analyticsService.getInsights();
 
-            verify(productRepository, times(1)).findAllWithCategories();
-            verifyNoMoreInteractions(productRepository);
+            verify(catalogQueries, times(1)).allProductRefs();
+            verify(catalogQueries, times(1)).allCategoryRefs();
+            verifyNoMoreInteractions(catalogQueries);
         }
 
         @Test
@@ -135,7 +141,9 @@ class AnalyticsServiceTest {
                     .thenReturn(Collections.emptyList());
             when(forecastPredictionRepository.findAllLatest())
                     .thenReturn(Collections.emptyList());
-            when(productRepository.findAllWithCategories())
+            when(catalogQueries.allProductRefs())
+                    .thenReturn(Collections.emptyList());
+            when(catalogQueries.allCategoryRefs())
                     .thenReturn(Collections.emptyList());
             when(machineDisplayRepository.calculateDisplayDaysByProduct(any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -163,10 +171,10 @@ class AnalyticsServiceTest {
 
             when(forecastPredictionRepository.findAllLatest())
                     .thenReturn(List.of(buildPrediction(productId)));
-            when(productRepository.findByIdInWithCategories(any()))
-                    .thenReturn(List.of(product));
-            when(categoryRepository.findAll())
-                    .thenReturn(List.of(category));
+            when(catalogQueries.findAllByIds(any()))
+                    .thenReturn(List.of(ProductRef.from(product)));
+            when(catalogQueries.allCategoryRefs())
+                    .thenReturn(List.of(CategoryRef.from(category)));
             when(inventoryTotalsRepository.findAllStockTotalsMap())
                     .thenReturn(Map.of(productId, 30));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
@@ -182,8 +190,8 @@ class AnalyticsServiceTest {
         @DisplayName("uses different date ranges for different periods")
         void usesDifferentDateRangesForDifferentPeriods() {
             when(forecastPredictionRepository.findAllLatest()).thenReturn(Collections.emptyList());
-            // When no predictions, findByIdInWithCategories won't be called (empty ID set)
-            when(categoryRepository.findAll()).thenReturn(Collections.emptyList());
+            // When no predictions, catalogQueries.findAllByIds won't be called (empty ID set)
+            when(catalogQueries.allCategoryRefs()).thenReturn(Collections.emptyList());
             when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Collections.emptyMap());
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -206,8 +214,8 @@ class AnalyticsServiceTest {
 
             when(forecastPredictionRepository.findAllLatest())
                     .thenReturn(List.of(buildPrediction(productId)));
-            when(productRepository.findByIdInWithCategories(any())).thenReturn(List.of(product));
-            when(categoryRepository.findAll()).thenReturn(List.of(category));
+            when(catalogQueries.findAllByIds(any())).thenReturn(List.of(ProductRef.from(product)));
+            when(catalogQueries.allCategoryRefs()).thenReturn(List.of(CategoryRef.from(category)));
             when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Map.of(productId, 50));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -312,7 +320,9 @@ class AnalyticsServiceTest {
             Map<UUID, Integer> stockMap = new HashMap<>();
             stockMap.put(product.getId(), stock);
             when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(stockMap);
-            when(productRepository.findByIdInWithCategories(any())).thenReturn(List.of(product));
+            when(catalogQueries.findAllByIds(any())).thenReturn(List.of(ProductRef.from(product)));
+            when(catalogQueries.allCategoryRefs()).thenReturn(Collections.emptyList());
+            when(catalogPricing.findPricingForIds(any())).thenReturn(List.of(ProductPricing.from(product)));
         }
 
         @Test

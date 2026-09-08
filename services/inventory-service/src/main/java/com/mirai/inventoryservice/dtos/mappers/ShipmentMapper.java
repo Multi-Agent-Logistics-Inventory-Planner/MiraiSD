@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.mappers;
 
+import com.mirai.inventoryservice.catalog.api.ProductMapper;
 import com.mirai.inventoryservice.dtos.responses.ShipmentItemAllocationResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentItemResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;

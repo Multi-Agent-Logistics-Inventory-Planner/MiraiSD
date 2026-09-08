@@ -4,7 +4,8 @@ import com.mirai.inventoryservice.exceptions.*;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -33,7 +34,7 @@ public class LocationInventoryService {
     private final LocationRepository locationRepository;
     private final StorageLocationRepository storageLocationRepository;
     private final SiteRepository siteRepository;
-    private final ProductRepository productRepository;
+    private final CatalogEntityAccess catalogEntityAccess;
     private final StockMovementService stockMovementService;
 
     private static final String DEFAULT_SITE_CODE = "MAIN";
@@ -43,13 +44,13 @@ public class LocationInventoryService {
             LocationRepository locationRepository,
             StorageLocationRepository storageLocationRepository,
             SiteRepository siteRepository,
-            ProductRepository productRepository,
+            CatalogEntityAccess catalogEntityAccess,
             StockMovementService stockMovementService) {
         this.locationInventoryRepository = locationInventoryRepository;
         this.locationRepository = locationRepository;
         this.storageLocationRepository = storageLocationRepository;
         this.siteRepository = siteRepository;
-        this.productRepository = productRepository;
+        this.catalogEntityAccess = catalogEntityAccess;
         this.stockMovementService = stockMovementService;
     }
 
@@ -80,8 +81,7 @@ public class LocationInventoryService {
                     location.getStorageLocation().getName() + " is display-only and does not support inventory");
         }
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException("Product not found: " + productId));
+        Product product = catalogEntityAccess.requireManagedProduct(productId);
 
         stockMovementService.rejectIfCustomKujiParent(product);
 

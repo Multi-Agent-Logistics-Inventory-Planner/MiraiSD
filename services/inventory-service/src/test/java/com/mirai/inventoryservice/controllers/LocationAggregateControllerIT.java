@@ -1,16 +1,16 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
-import com.mirai.inventoryservice.repositories.CategoryRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
+import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import org.junit.jupiter.api.BeforeEach;

@@ -3,8 +3,8 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.exceptions.InventoryNotFoundException;
 import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
-import com.mirai.inventoryservice.models.Category;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.domain.Category;
+import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.inventory.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
@@ -12,6 +12,7 @@ import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -50,7 +53,7 @@ class LocationInventoryServiceTest {
     private SiteRepository siteRepository;
 
     @Mock
-    private ProductRepository productRepository;
+    private CatalogEntityAccess catalogEntityAccess;
 
     @Mock
     private StockMovementService stockMovementService;
@@ -187,6 +190,62 @@ class LocationInventoryServiceTest {
 
             assertThrows(LocationNotFoundException.class, () ->
                     locationInventoryService.listInventoryAtLocation(locationId));
+        }
+    }
+
+    @Nested
+    @DisplayName("addInventory")
+    class AddInventoryTests {
+
+        @Test
+        @DisplayName("should look up the product via CatalogEntityAccess.requireManagedProduct and create tracked inventory")
+        void shouldCreateInventoryViaCatalogFacades() {
+            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
+            when(catalogEntityAccess.requireManagedProduct(productId)).thenReturn(testProduct);
+            when(locationInventoryRepository.findByLocation_IdAndProduct_Id(locationId, productId))
+                    .thenReturn(Optional.empty());
+            when(stockMovementService.createInventoryWithTracking(
+                    any(), eq(locationId), eq(testProduct), eq(10),
+                    any(), any(), any(), any(), any()))
+                    .thenReturn(inventoryId);
+            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.of(testInventory));
+
+            LocationInventory result = locationInventoryService.addInventory(
+                    locationId, productId, 10, UUID.randomUUID(), null);
+
+            assertEquals(testInventory, result);
+            verify(catalogEntityAccess, times(1)).requireManagedProduct(productId);
+            verify(catalogEntityAccess, never()).getReference(any());
+            verify(stockMovementService, times(1)).rejectIfCustomKujiParent(testProduct);
+        }
+
+        @Test
+        @DisplayName("should propagate ProductNotFoundException from CatalogEntityAccess.requireManagedProduct when product does not exist")
+        void shouldThrowWhenProductNotFound() {
+            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
+            when(catalogEntityAccess.requireManagedProduct(productId))
+                    .thenThrow(new com.mirai.inventoryservice.catalog.domain.ProductNotFoundException(
+                            "Product not found: " + productId));
+
+            assertThrows(com.mirai.inventoryservice.catalog.domain.ProductNotFoundException.class, () ->
+                    locationInventoryService.addInventory(locationId, productId, 10, UUID.randomUUID(), null));
+
+            verify(stockMovementService, never()).rejectIfCustomKujiParent(any());
+        }
+
+        @Test
+        @DisplayName("should throw InvalidInventoryOperationException when inventory already exists at the location")
+        void shouldThrowWhenInventoryAlreadyExists() {
+            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
+            when(catalogEntityAccess.requireManagedProduct(productId)).thenReturn(testProduct);
+            when(locationInventoryRepository.findByLocation_IdAndProduct_Id(locationId, productId))
+                    .thenReturn(Optional.of(testInventory));
+
+            assertThrows(InvalidInventoryOperationException.class, () ->
+                    locationInventoryService.addInventory(locationId, productId, 10, UUID.randomUUID(), null));
+
+            verify(stockMovementService, never()).createInventoryWithTracking(
+                    any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
         }
     }
 

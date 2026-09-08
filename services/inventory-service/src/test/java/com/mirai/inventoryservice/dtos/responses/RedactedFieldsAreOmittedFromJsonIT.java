@@ -2,6 +2,8 @@ package com.mirai.inventoryservice.dtos.responses;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.catalog.api.ProductResponseDTO;
+import com.mirai.inventoryservice.catalog.application.ProductListItemDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
 import org.junit.jupiter.api.Test;

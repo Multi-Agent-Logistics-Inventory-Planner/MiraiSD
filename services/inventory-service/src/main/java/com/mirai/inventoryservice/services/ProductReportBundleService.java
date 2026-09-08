@@ -6,7 +6,11 @@ import com.mirai.inventoryservice.dtos.assistant.HeaderBundleDTO;
 import com.mirai.inventoryservice.dtos.assistant.MovementRowDTO;
 import com.mirai.inventoryservice.dtos.assistant.MovementSummaryDTO;
 import com.mirai.inventoryservice.models.MachineDisplay;
-import com.mirai.inventoryservice.models.Product;
+import com.mirai.inventoryservice.catalog.application.CatalogPricing;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CategoryRef;
+import com.mirai.inventoryservice.catalog.application.ProductPricing;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -16,7 +20,6 @@ import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.ProductRepository;
 import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
 import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
@@ -57,7 +60,8 @@ public class ProductReportBundleService {
     private static final int MOVEMENTS_MAX_LIMIT = 200;
     private static final int MAX_DATE_RANGE_DAYS = 365;
 
-    private final ProductRepository productRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogPricing catalogPricing;
     private final LocationInventoryRepository locationInventoryRepository;
     private final DailySalesRollupRepository dailySalesRollupRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
@@ -69,7 +73,7 @@ public class ProductReportBundleService {
 
     @Transactional(readOnly = true)
     public HeaderBundleDTO getHeader(UUID productId) {
-        Product product = productRepository.findById(productId)
+        ProductRef product = catalogQueries.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
 
         Integer currentStock = Optional
@@ -114,11 +118,11 @@ public class ProductReportBundleService {
 
         boolean onDisplay = !machineDisplayRepository.findActiveByProduct_Id(productId).isEmpty();
 
-        String categoryName = product.getCategory() != null ? product.getCategory().getName() : null;
+        String categoryName = categoryNameOf(product.categoryId());
 
         return new HeaderBundleDTO(
                 productId,
-                product.getName(),
+                product.name(),
                 categoryName,
                 currentStock,
                 unitsSoldLast30,
@@ -129,7 +133,14 @@ public class ProductReportBundleService {
                 lastRestockAt,
                 damageLast30,
                 onDisplay,
-                !Boolean.FALSE.equals(product.getForecastingEnabled()));
+                !Boolean.FALSE.equals(product.forecastingEnabled()));
+    }
+
+    private String categoryNameOf(UUID categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return catalogQueries.findCategoryById(categoryId).map(CategoryRef::name).orElse(null);
     }
 
     // ---------- detail ----------
@@ -137,8 +148,9 @@ public class ProductReportBundleService {
     @Transactional(readOnly = true)
     public DetailBundleDTO getDetail(UUID productId, int days) {
         int clampedDays = Math.max(1, Math.min(days, 365));
-        Product product = productRepository.findById(productId)
+        ProductRef product = catalogQueries.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
+        BigDecimal unitCost = catalogPricing.findPricing(productId).map(ProductPricing::unitCost).orElse(null);
 
         Integer currentStock = Optional
                 .ofNullable(locationInventoryRepository.sumQuantityByProductId(productId))
@@ -158,20 +170,20 @@ public class ProductReportBundleService {
                 .findRecentByItemIdWithShipment(productId, today.minusDays(SHIPMENT_WINDOW_DAYS));
         List<MachineDisplay> displays = machineDisplayRepository.findActiveByProduct_Id(productId);
 
-        String categoryName = product.getCategory() != null ? product.getCategory().getName() : null;
+        String categoryName = categoryNameOf(product.categoryId());
 
         DetailBundleDTO.ProductSummary productSummary = new DetailBundleDTO.ProductSummary(
-                product.getId(),
-                product.getSku(),
-                product.getName(),
+                product.id(),
+                product.sku(),
+                product.name(),
                 categoryName,
-                product.getImageUrl(),
-                product.getReorderPoint(),
-                product.getTargetStockLevel(),
-                product.getLeadTimeDays(),
-                product.getUnitCost(),
+                product.imageUrl(),
+                product.reorderPoint(),
+                product.targetStockLevel(),
+                product.leadTimeDays(),
+                unitCost,
                 currentStock,
-                !Boolean.FALSE.equals(product.getForecastingEnabled()));
+                !Boolean.FALSE.equals(product.forecastingEnabled()));
 
         List<DetailBundleDTO.InventoryByLocation> inventoryByLocation = inventoryRows.stream()
                 .map(li -> new DetailBundleDTO.InventoryByLocation(
@@ -320,16 +332,16 @@ public class ProductReportBundleService {
     @Transactional(readOnly = true)
     public List<ComparisonRowDTO> getComparison(UUID productId, String metric, int limit) {
         int clampedLimit = Math.max(1, Math.min(limit, 20));
-        Product anchor = productRepository.findById(productId)
+        ProductRef anchor = catalogQueries.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
-        UUID categoryId = anchor.getCategory() != null ? anchor.getCategory().getId() : null;
+        UUID categoryId = anchor.categoryId();
         if (categoryId == null) {
             return List.of();
         }
 
-        List<Product> categoryPeers = productRepository.findByCategoryIdAndIsActiveTrue(categoryId);
-        Map<UUID, Product> productsById = categoryPeers.stream()
-                .collect(Collectors.toMap(Product::getId, p -> p, (a, b) -> a));
+        List<ProductRef> categoryPeers = catalogQueries.findByCategoryIdActive(categoryId);
+        Map<UUID, ProductRef> productsById = categoryPeers.stream()
+                .collect(Collectors.toMap(ProductRef::id, p -> p, (a, b) -> a));
         List<UUID> peerIds = new java.util.ArrayList<>(productsById.keySet());
         List<ForecastPrediction> latestAll = peerIds.isEmpty()
                 ? List.of()
@@ -360,14 +372,14 @@ public class ProductReportBundleService {
         List<ComparisonRowDTO> result = new java.util.ArrayList<>(filtered.size());
         for (int i = 0; i < filtered.size(); i++) {
             ForecastPrediction fp = filtered.get(i);
-            Product p = productsById.get(fp.getItemId());
+            ProductRef p = productsById.get(fp.getItemId());
             BigDecimal value = switch (metric) {
                 case "sales_velocity" -> fp.getAvgDailyDelta() == null
                         ? BigDecimal.ZERO : fp.getAvgDailyDelta().negate();
                 case "days_to_stockout" -> fp.getDaysToStockout();
                 default -> null;
             };
-            result.add(new ComparisonRowDTO(p.getId(), p.getName(), value, i + 1));
+            result.add(new ComparisonRowDTO(p.id(), p.name(), value, i + 1));
         }
         return result;
     }

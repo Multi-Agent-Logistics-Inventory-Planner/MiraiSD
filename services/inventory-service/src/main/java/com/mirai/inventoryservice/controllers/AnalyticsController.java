@@ -12,7 +12,7 @@ import com.mirai.inventoryservice.dtos.responses.InsightsDTO;
 import com.mirai.inventoryservice.dtos.responses.PerformanceMetricsDTO;
 import com.mirai.inventoryservice.dtos.responses.SalesSummaryDTO;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.services.AnalyticsSeedService;
+import com.mirai.inventoryservice.analytics.application.SalesRollupRecomputeService;
 import com.mirai.inventoryservice.services.AnalyticsService;
 import com.mirai.inventoryservice.services.ProductReportBundleService;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
-    private final AnalyticsSeedService analyticsSeedService;
+    private final SalesRollupRecomputeService salesRollupRecomputeService;
     private final ProductReportBundleService productReportBundleService;
 
     @GetMapping("/inventory-by-category")
@@ -72,7 +72,7 @@ public class AnalyticsController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> recomputeRollups(
             @RequestParam(defaultValue = "24") @Min(1) @Max(36) int monthsBack) {
-        int count = analyticsSeedService.recomputeAllRollups(monthsBack);
+        int count = salesRollupRecomputeService.recomputeAllRollups(monthsBack);
         return ResponseEntity.ok(Map.of(
             "success", true,
             "rollupsRecomputed", count,

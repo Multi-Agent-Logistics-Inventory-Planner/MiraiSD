@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.catalog.api.ProductSummaryDTO;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
