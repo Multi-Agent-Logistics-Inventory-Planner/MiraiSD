@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.architecture;
 import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
@@ -15,6 +15,11 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
@@ -214,14 +219,70 @@ class ArchitectureTest {
         return false;
     }
 
+    // Replaces a FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` cycle check (removed;
+    // see git history and .specs/phase-5c-site-products/log.md). That rule froze the full,
+    // multi-line cycle-path text (including specific example call-site edges, subject to
+    // ArchUnit's own truncation) for the pre-existing catalog/dtos/exceptions/identity/models/
+    // repositories/services/validation cyclic legacy component - dozens of such violations, each
+    // spanning many lines. Auditing or hand-updating that text on a genuine review is impractical:
+    // a single new class anywhere in that already-cyclic component can change which concrete
+    // example edges ArchUnit happens to print for an unrelated cycle instance, without changing
+    // which modules actually participate. (The underlying cycle computation itself is
+    // deterministic for a fixed set of imported classes - verified by independently diffing raw,
+    // sorted violation output across separate JVM runs. What is impractical is keeping a
+    // hand-reviewable frozen *text* snapshot in sync with a violation this large and verbose.)
+    //
+    // This check instead asserts something coarser, exactly deterministic, and directly
+    // reviewable: the checked-in set of distinct (source module -> target module) dependency
+    // edges must not gain any edge that wasn't explicitly approved. A new cross-module cycle
+    // cannot form without at least one new edge, so rejecting every unapproved new edge also
+    // rejects every new cycle - PROVIDED module-dependency-edges-baseline.txt is kept pruned: if
+    // module A genuinely stops depending on B, that line must be deleted from the baseline as
+    // part of the same review, not just left in place. An unpruned baseline would let that edge
+    // return later without review, silently reopening exactly the case this check exists to
+    // catch - so the guarantee holds only as long as reviewers prune on removal, not automatically.
+    //
+    // A rejected addition here always means: either the new dependency needs a different
+    // seam (a port/facade per docs/specs/spring-domain-modular-monolith.md section 7), or the
+    // edge is real, intentional, and reviewed - in which case add the line to
+    // module-dependency-edges-baseline.txt as part of that same review, recording why (see that
+    // file's header for the `catalog -> sites` precedent from T-4).
     @Test
-    void topLevelPackagesAreFreeOfCycles() {
-        ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".(*)..")
-                .should()
-                .beFreeOfCycles();
+    void moduleDependencyEdgesMatchApprovedBaseline() throws IOException {
+        Set<String> currentEdges = new TreeSet<>();
+        for (JavaClass javaClass : importedClasses) {
+            String sourceModule = moduleOf(javaClass);
+            if (sourceModule.isEmpty()) {
+                continue;
+            }
+            for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                String targetModule = moduleOf(dependency.getTargetClass());
+                if (targetModule.isEmpty() || targetModule.equals(sourceModule)) {
+                    continue;
+                }
+                currentEdges.add(sourceModule + " -> " + targetModule);
+            }
+        }
 
-        freeze(rule).check(importedClasses);
+        Set<String> approvedEdges = new TreeSet<>();
+        try (InputStream in = ArchitectureTest.class.getClassLoader()
+                .getResourceAsStream("module-dependency-edges-baseline.txt")) {
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                String trimmed = line.trim();
+                if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                    approvedEdges.add(trimmed);
+                }
+            }
+        }
+
+        Set<String> newUnapprovedEdges = new TreeSet<>(currentEdges);
+        newUnapprovedEdges.removeAll(approvedEdges);
+
+        assertThat(newUnapprovedEdges)
+                .as("new module dependency edge(s) not in module-dependency-edges-baseline.txt -"
+                        + " review and either introduce a proper seam instead, or add the"
+                        + " reviewed edge to that file with a justification")
+                .isEmpty();
     }
 
     // No legacy code has moved into the new domain module skeleton yet, so these three rules

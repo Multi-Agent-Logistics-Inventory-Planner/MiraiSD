@@ -2,4 +2,3 @@
 #Mon Sep 07 19:37:21 EDT 2026
 classes\ that\ reside\ outside\ a\ services/repositories\ layer\ or\ a\ domain\ module's\ application/infrastructure\ package\ should\ not\ depend\ on\ a\ repository=f0384129-86fc-4bd9-82d5-4e8a25995a22
 no\ classes\ should\ reside\ in\ any\ package\ ['com.mirai.inventoryservice.controllers..',\ 'com.mirai.inventoryservice.services..',\ 'com.mirai.inventoryservice.repositories..',\ 'com.mirai.inventoryservice.models..',\ 'com.mirai.inventoryservice.dtos..',\ 'com.mirai.inventoryservice.converters..'],\ because\ business\ code\ belongs\ in\ its\ owning\ domain\ package,\ not\ a\ legacy\ technical-layer\ package=1bf5f779-3438-4a5e-b29d-b0f29a9060f3
-slices\ matching\ 'com.mirai.inventoryservice.(*)..'\ should\ be\ free\ of\ cycles=4a7f0213-1d52-4f43-b486-70e3aefbca9a

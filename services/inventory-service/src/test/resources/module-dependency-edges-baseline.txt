@@ -1,0 +1,104 @@
+# Reviewed, approved set of (source top-level package -> target top-level package) dependency
+# edges for com.mirai.inventoryservice production code. See
+# ArchitectureTest.moduleDependencyEdgesMatchApprovedBaseline for how this is enforced: a new
+# edge here requires deliberate review and an explicit addition to this file, matching
+# docs/specs/spring-domain-modular-monolith.md's dependency rules; a *removed* edge (module A no
+# longer depends on module B at all) never fails the check.
+#
+# IMPORTANT - pruning is a review responsibility, not automatic: when a reviewed change removes
+# an edge (module A no longer depends on module B anywhere), delete that line from this file in
+# the SAME review. The check does not do this for you - it only rejects new edges, so a stale
+# line left behind after a real removal would let that dependency return later, unreviewed and
+# undetected, if some other change reintroduces it. Leaving stale lines in place quietly weakens
+# this file from "what's currently approved" to "everything ever approved," which is not the same
+# guarantee.
+#
+# Generated 2026-09-08 as (edges on commit 85032cd, immediately pre-Phase-5c-T4) plus exactly one
+# reviewed addition: `catalog -> sites`, from catalog.application.MainSiteResolver depending on
+# sites.application.SiteDirectory (.specs/phase-5c-site-products AC-5's MAIN-resolution seam,
+# T-4). Verified before approval: `sites` has zero outgoing edges into `catalog` or anything that
+# reaches it (only `sites -> shared`), so this addition is a DAG leaf edge, not a new cycle -
+# confirmed both by grepping every import in sites/** (only sites.* and shared.* appear) and by
+# this file having no `sites -> catalog` (or `sites -> <anything but shared>`) entry.
+#
+# This replaces the previous FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` check, which
+# froze the full, multi-line cycle-path text (including specific example call-site edges, capped
+# by ArchUnit's own truncation) for the pre-existing catalog/dtos/exceptions/identity/models/
+# repositories/services/validation cyclic legacy component - dozens of such violations, each many
+# lines long. That made hand-review and maintenance of the frozen text impractical: an unrelated
+# new class anywhere in that already-cyclic component can change which concrete example edges get
+# printed for a given cycle instance without changing which modules actually participate. (The
+# underlying cycle computation itself is deterministic for a fixed set of imported classes -
+# verified by independently diffing raw, sorted violation output across separate JVM runs; the
+# problem was the practicality of keeping a reviewable frozen snapshot of that much text in sync,
+# not nondeterminism in the computation.) A new edge cannot be added without at least one class
+# actually referencing another module, so - as long as this file is pruned on every genuine
+# removal, per the note above - rejecting every unapproved new edge also rejects every new
+# cross-module cycle, while staying small enough to actually read during review. It does not by
+# itself resolve the pre-existing tangle within this edge set - that is unchanged, already-accepted
+# debt.
+analytics -> catalog
+analytics -> models
+analytics -> repositories
+auth -> identity
+auth -> shared
+catalog -> identity
+catalog -> services
+catalog -> sites
+config -> identity
+config -> models
+config -> repositories
+controllers -> analytics
+controllers -> catalog
+controllers -> dtos
+controllers -> identity
+controllers -> models
+controllers -> repositories
+controllers -> services
+controllers -> sites
+displays -> catalog
+displays -> repositories
+dtos -> catalog
+dtos -> identity
+dtos -> models
+dtos -> services
+dtos -> sites
+dtos -> validation
+exceptions -> catalog
+exceptions -> identity
+exceptions -> sites
+identity -> models
+identity -> repositories
+identity -> services
+identity -> shared
+identity -> sites
+inventory -> catalog
+inventory -> models
+inventory -> repositories
+inventory -> services
+jobs -> repositories
+jobs -> services
+kuji -> catalog
+kuji -> models
+kuji -> repositories
+models -> catalog
+models -> identity
+models -> sites
+repositories -> dtos
+repositories -> identity
+repositories -> models
+repositories -> utils
+services -> catalog
+services -> dtos
+services -> exceptions
+services -> identity
+services -> kafka
+services -> models
+services -> repositories
+services -> shared
+services -> sites
+shipments -> catalog
+shipments -> repositories
+sites -> shared
+validation -> dtos
+validation -> models
