@@ -149,13 +149,27 @@ class ArchitectureTest {
     // instead "every class outside catalog" (legacy packages included), and the target is
     // catalog.infrastructure as a whole -- which already covers ProductRepository,
     // CategoryRepository, and SupplierRepository (AC-3b) without naming them individually, since
-    // all three already live in that one package. Initially frozen with whatever violation count
-    // the freeze records (T-2); AC-6's DevSeedController/AnalyticsSeedService exemption is added
-    // later, at T-5, not here -- T-2 only adds and freezes the rule.
+    // all three already live in that one package.
+    //
+    // T-6: freeze lifted -- all twelve production consumers are migrated (T-3/T-4/T-4b), so this
+    // rule now runs live rather than against a frozen baseline. This is Phase 5's module-boundary
+    // exit-gate proof (AC-8). The two remaining callers, DevSeedController and
+    // AnalyticsSeedService, are exempted by class name (T-5/AC-6) -- dev-profile-only seeding code
+    // with no production equivalent (docs/baseline/api-v1-map.md), not a seeding port for two
+    // throwaway consumers. The exemption is by class name, not a package wildcard, so a new
+    // production class reaching catalog.infrastructure still fails the build.
     @Test
     void noProductionClassOutsideCatalogDependsOnCatalogInfrastructure() {
-        freeze(outsideCatalogToCatalogInfrastructureRule()).check(importedClasses);
+        outsideCatalogToCatalogInfrastructureRule().check(importedClasses);
     }
+
+    // AC-6: dev-profile-only seeding controllers/services exempted by name from
+    // noProductionClassOutsideCatalogDependsOnCatalogInfrastructure. No production equivalent
+    // exists for either class (docs/baseline/api-v1-map.md); building a seeding port for two
+    // throwaway consumers is not worth the indirection.
+    private static final String[] CATALOG_INFRASTRUCTURE_ACCESS_EXEMPTIONS = {
+        BASE_PACKAGE + ".controllers.DevSeedController", BASE_PACKAGE + ".services.AnalyticsSeedService"
+    };
 
     /**
      * Package-visible so {@code ArchitectureTestCatalogInfrastructureRuleProbeTest} can evaluate
@@ -165,10 +179,10 @@ class ArchitectureTest {
      */
     static ArchRule outsideCatalogToCatalogInfrastructureRule() {
         return classes()
-                .that(new DescribedPredicate<JavaClass>("reside outside catalog") {
+                .that(new DescribedPredicate<JavaClass>("reside outside catalog and are not exempted") {
                     @Override
                     public boolean test(JavaClass javaClass) {
-                        return !"catalog".equals(moduleOf(javaClass));
+                        return !"catalog".equals(moduleOf(javaClass)) && !isExemptFromCatalogInfrastructureRule(javaClass);
                     }
                 })
                 .should(new ArchCondition<JavaClass>("not depend on catalog.infrastructure") {
@@ -188,6 +202,16 @@ class ArchitectureTest {
                     }
                 })
                 .allowEmptyShould(true);
+    }
+
+    private static boolean isExemptFromCatalogInfrastructureRule(JavaClass javaClass) {
+        String name = javaClass.getName();
+        for (String exempt : CATALOG_INFRASTRUCTURE_ACCESS_EXEMPTIONS) {
+            if (exempt.equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

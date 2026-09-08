@@ -1078,12 +1078,219 @@ intended round-3 state exactly, no leftover mutation code.
   `./mvnw test -Dtest='*IT'` (298 tests) both green, zero failures/errors.
 - Result: **pass**, pending user review of this round.
 
-### Remaining tasks (T-5 onward)
+### T-5: Class-scoped exemption for DevSeedController/AnalyticsSeedService (AC-6)
 
-Not started this session. T-5 (add the class-scoped exemption for `DevSeedController`/
-`AnalyticsSeedService`), T-6 (remove the freeze on `noModuleDependsOnAnotherModulesInfrastructure`,
-confirm it passes live), and T-7 (reconcile and record the `SupplierService` bookkeeping note) are
-next, per spec.md's task list.
+Before touching the rule, re-verified against the live 28-line frozen store
+(`archunit_store/af02cbd2-...`) that every remaining violation belongs to exactly these two
+classes — confirmed by inspection, not assumed from spec.md's plan. **Corrected per review**: an
+initial pass here mis-split this as 17/11 by a naive `grep -c` on class name, which double-counts
+`AnalyticsSeedService` wherever it appears as one of the many constructor-parameter types listed on
+`DevSeedController`'s own constructor-injection violation lines (it is one of `DevSeedController`'s
+dependencies). Counting only lines whose **origin** (the `Constructor`/`Field`/`Method` the
+violation is reported against) is each class gives the correct split: all 28 lines have an origin
+of either `DevSeedController` (**16** lines: 2 constructor-parameter, 2 field, 12 call-site) or
+`AnalyticsSeedService` (**12** lines: 2 constructor-parameter, 2 field, 8 call-site). No other class
+appears, so the exemption list needs exactly these two names, not a third.
+
+Added `ArchitectureTest.CATALOG_INFRASTRUCTURE_ACCESS_EXEMPTIONS` (an array of two fully-qualified
+class names: `controllers.DevSeedController`, `services.AnalyticsSeedService`) and
+`isExemptFromCatalogInfrastructureRule(JavaClass)`, checked by exact class-name equality (not a
+package wildcard, per AC-6's explicit instruction — a new production class added to `controllers`
+or `services` is still caught). Wired into `outsideCatalogToCatalogInfrastructureRule()`'s source
+predicate: a class now only enters the rule's scope if it is both outside `catalog` **and** not
+one of the two named exemptions.
+
+### T-6: Remove the freeze on `noProductionClassOutsideCatalogDependsOnCatalogInfrastructure`, confirm it passes live (AC-8)
+
+**Naming correction:** spec.md's AC-8 and T-6 both name the rule under review as
+`noModuleDependsOnAnotherModulesInfrastructure`. No rule by that name exists anywhere in
+`ArchitectureTest.java` or the codebase (confirmed by grep) — this is spec-drafting drift for T-2's
+actual rule, `noProductionClassOutsideCatalogDependsOnCatalogInfrastructure`, which is Phase 5b's
+one and only outside-catalog-to-infrastructure boundary rule and the obvious referent of AC-8's
+"this rule now runs live... Phase 5's module-boundary exit-gate proof" language (T-2's own comment
+already reads nearly verbatim). Treated as the same rule under two names, not a missing task.
+
+Removed the `freeze(...)` wrapper from `noProductionClassOutsideCatalogDependsOnCatalogInfrastructure()`
+— the test now calls `outsideCatalogToCatalogInfrastructureRule().check(importedClasses)` directly.
+Deleted the now-orphaned frozen store file (`archunit_store/af02cbd2-0c1a-4bcb-9d26-fc138e429b56`,
+87→50→39→28 across T-2/T-3/T-4/T-4b) and its line in `stored.rules`, rather than leaving a stale
+file nothing reads once the rule is unfrozen.
+
+**Confirmed live, not assumed:** ran `ArchitectureTest` alone — all 7 methods pass, including the
+now-unfrozen rule with zero violations (the two exemptions cover exactly the remaining 28-line
+baseline, per T-5). Then `./mvnw clean test` — **380 tests, zero failures**, unchanged from T-4b's
+count (this round changed test infrastructure only, not production code, so no test was
+added/removed). Then `./mvnw test -Dtest='*IT'` — **298 tests, zero failures**, also unchanged from
+T-4b. This satisfies AC-8: the rule runs live against the real codebase, not a frozen snapshot,
+proving Phase 5's module-boundary exit gate (catalog repository ownership enforced by ArchUnit) is
+actually true today, not just true against a point-in-time freeze.
+
+- Changed: `ArchitectureTest.java` (freeze removed, exemption list + predicate added);
+  `archunit_store/stored.rules` (orphaned line removed); deleted
+  `archunit_store/af02cbd2-0c1a-4bcb-9d26-fc138e429b56`.
+- Tests: `ArchitectureTest` alone (7/7 pass); `./mvnw clean test` (380, zero failures);
+  `./mvnw test -Dtest='*IT'` (298, zero failures).
+- Result: **pass.**
+
+### T-7: Reconcile and record the SupplierService bookkeeping note (AC-7)
+
+Confirmed `SupplierService` is not one of this record's twelve migrated consumers and needs no
+migration here: `grep -n "^package" .../catalog/application/SupplierService.java` shows it already
+lives in `catalog.application`, placed there by Phase 5a's move (86ce983, "move catalog domain
+(product/category/supplier) into modular package") — it is `catalog`'s own class, not an external
+caller of `catalog.infrastructure`, so it was correctly excluded from T-0's twelve-consumer count
+and never appears as an origin-class in any frozen-store diff this record produced (T-2 through
+T-6). `ShipmentService.createShipment`/`updateShipment` call
+`supplierService.resolveOrCreate(supplierName)` — an existing, legitimate same-module-boundary-safe
+call from `shipments` into `catalog`'s own facade (recorded already in T-0's "Write consumers, not
+entity-access consumers" section) — which is the one place this record's write-surface table
+touches `SupplierService` at all, and that call needed no change.
+
+**Count reconciliation (AC-7's explicit ask):** T-0/T-2's "twelve consumers" arithmetic already
+excludes `SupplierService`. Of the twelve, ten are migrated consumers — the 7 read-only consumers
+(T-3) plus `StockMovementService`/`ShipmentService` (T-4) plus `KujiBoxService` (T-4b) — and the
+remaining two, `DevSeedController`/`AnalyticsSeedService`, are exempted rather than migrated
+(T-5/T-6). **Corrected per review**: an earlier version of this entry said "eleven other named
+consumers plus" the two exemptions, which both double-counts against the twelve-consumer total
+(ten migrated + two exempted = twelve, not eleven + two = thirteen) and mislabels the two exempted
+classes as "named consumers" alongside the migrated ones. Every store-shrink entry recorded across
+T-2 (87), T-3 (87→50), T-4 (50→39), and T-4b (39→28) is attributable entirely to those ten migrated
+consumers, with the remaining 28→0 (T-5/T-6) attributable to the two exempted consumers — each of
+those rounds' own
+log entries above (T-2 through T-4b) names exactly which class's constructor/field/call-site lines
+were removed at each step, and `SupplierService` never appears in any of them. The final 28-line
+store, read in full during T-5 (above) before its deletion in T-6, also names only
+`DevSeedController` and `AnalyticsSeedService`. The intermediate 87/50/39-line stores were
+overwritten by later rounds and are not separately recoverable in this session, so this
+reconciliation rests on the prior rounds' own recorded diffs plus the final store's contents, not
+on re-diffing files that no longer exist. The twelve-minus-`SupplierService` accounting in
+spec.md's "Problem and outcome" section reconciles against what's recorded; nothing about the
+migration produced a `SupplierService`-related violation or required a `SupplierService` change.
+
+- Changed: nothing (this task is a bookkeeping confirmation, not a code change).
+- Tests: none added — no code changed.
+- Result: **pass.**
+
+### T-5/T-6 review round: exemption included a production class, and count reconciliation was wrong
+
+Two findings from review, both confirmed real:
+
+- **P2 — the AC-6 exemption's "dev-only, no production equivalent" claim was false for
+  `AnalyticsSeedService`.** `AnalyticsController` (a plain `@RestController`, no `@Profile` guard)
+  injected `AnalyticsSeedService` and called `recomputeAllRollups(monthsBack)` from its
+  `POST /api/analytics/recompute-rollups` endpoint — a real, always-registered production route,
+  not gated the way `DevSeedController` (`@Profile("dev")`) and `AnalyticsRollupScheduler`
+  (`@Profile("dev")`) are. A class-wide exemption on `AnalyticsSeedService` therefore also exempted
+  a production-reachable class from the outside-catalog-to-infrastructure rule, not just the two
+  throwaway dev-seed consumers AC-6 and T-2's own rule comment describe. Adding `@Profile("dev")`
+  to `AnalyticsSeedService` itself, as a quick fix, would have broken `AnalyticsController`'s
+  dependency injection in every non-dev profile (the class the reviewer explicitly flagged as
+  wrong to reach for).
+  <br>**Fixed by splitting responsibilities, not by broadening the exemption's documentation.**
+  Traced `recomputeAllRollups`/`recomputeRollupsOptimized` (the only path
+  `AnalyticsController` calls) and confirmed neither method touches `ProductRepository` or
+  `CategoryRepository` at all — the recompute path aggregates purely over
+  `StockMovementRepository`/`DailySalesRollupRepository` plus a cache clear. Extracted both methods
+  into a new `SalesRollupRecomputeService` (`analytics.application` — not the legacy `services`
+  package, which is itself frozen against new classes by
+  `legacyTechnicalLayerPackagesDoNotGrow`; confirmed by trying `services` first and hitting that
+  frozen rule immediately) with its own three constructor dependencies
+  (`DailySalesRollupRepository`, `StockMovementRepository`, `CacheManager`) — no
+  `ProductRepository`/`CategoryRepository` dependency, so it needs no exemption at all. Repointed
+  `AnalyticsController` to depend on `SalesRollupRecomputeService` instead of
+  `AnalyticsSeedService`, removing the latter import/field entirely — `AnalyticsController` no
+  longer references `AnalyticsSeedService` in any form. Removed the now-dead `CacheManager` field
+  (and its now-unused `CacheConfig`/`CacheManager` imports) from `AnalyticsSeedService`, since
+  nothing in the class uses it once the two extracted methods are gone (checked by grepping every
+  remaining `cacheManager`/`CacheConfig` reference in the file — zero). `AnalyticsSeedService`'s
+  remaining callers are now exactly `DevSeedController` and `AnalyticsRollupScheduler`, both
+  `@Profile("dev")` — the exemption's "dev-only, no production equivalent" claim is now literally
+  true, not just asserted.
+  <br>**ArchUnit fallout, resolved with the same discipline as every prior round.** Placing the new
+  class under `services` first tripped `legacyTechnicalLayerPackagesDoNotGrow` (a new class in a
+  frozen-against-growth legacy package) — fixed by moving it to `analytics.application` (the
+  existing `analytics` module skeleton already used by `ForecastPurgeAdapter` for the same
+  legacy-repository-from-a-domain-module shape). `topLevelPackagesAreFreeOfCycles`'s frozen
+  evidence text then needed regeneration, same delete-file + recreate mechanism as every T-2/T-3/
+  T-4/T-4b round: deleted the store file and its `stored.rules` line, toggled
+  `archunit.properties`' `allowStoreCreation`/`allowStoreUpdate` to `true` for one scoped run of
+  `ArchitectureTest#topLevelPackagesAreFreeOfCycles`, reverted both flags to `false`, and re-ran to
+  confirm the rule still passes against the finalized store. New store: same **4605 lines, same 66
+  cycle blocks** as every prior round — diffed against the pre-round file (recovered via
+  `git show HEAD:...`, since it was still committed at the session's start): exactly 124 lines
+  changed on each side, all attributable to `AnalyticsSeedService`'s constructor losing its
+  `CacheManager` parameter (a 1:1 evidence-text substitution); `AnalyticsController` and
+  `SalesRollupRecomputeService` do not appear in the new store at all — neither participates in any
+  frozen cycle.
+  <br>Full `./mvnw clean test` (**380 tests**, zero failures — unchanged from T-4b/T-6, since no
+  test was added or removed) and `./mvnw test -Dtest='*IT'` (**298 tests**, zero failures,
+  likewise unchanged) both green after the fix. No pre-existing test exercised
+  `AnalyticsController`'s `/recompute-rollups` route or `AnalyticsSeedService.recomputeAllRollups`
+  by name (confirmed by grep across `src/test`), so this fix could not regress an existing
+  assertion about that behavior — flagged here as a pre-existing coverage gap the fix inherits,
+  not one it introduces or was asked to close.
+- **P3 — the reconciliation counts were wrong.** T-5's entry originally reported a 17/11 split
+  between `DevSeedController` and `AnalyticsSeedService`, and T-7's entry said "eleven other named
+  consumers plus" the two exemptions. Both wrong: the 17/11 split came from a naive
+  `grep -c "AnalyticsSeedService"` over the deleted store, which double-counts every line where
+  `AnalyticsSeedService` appears as one of `DevSeedController`'s own listed constructor-parameter
+  types (not `AnalyticsSeedService`'s own violation). Counting by **origin**
+  (`Constructor`/`Field`/`Method` the violation is reported against) instead — recovered via
+  `git show HEAD:services/inventory-service/archunit_store/af02cbd2-...` since the file itself was
+  already deleted in T-6 — gives the correct split: `DevSeedController` **16** (2
+  constructor-parameter, 2 field, 12 call-site), `AnalyticsSeedService` **12** (2
+  constructor-parameter, 2 field, 8 call-site), summing to the true 28. Separately, "eleven other
+  named consumers plus two exemptions" both miscounts against the twelve-consumer total (eleven
+  plus two is thirteen, not twelve) and mislabels the two exempted classes as migrated consumers:
+  the correct accounting is **ten** migrated consumers (7 read-only in T-3, `StockMovementService`/
+  `ShipmentService` in T-4, `KujiBoxService` in T-4b) plus **two** exempted consumers
+  (`DevSeedController`/`AnalyticsSeedService`, T-5/T-6) = twelve, matching spec.md's baseline
+  exactly. Both corrections are recorded in place in the T-5 and T-7 entries above rather than as a
+  separate restated table, so the reasoning trail isn't duplicated.
+- Changed (this round): `AnalyticsSeedService.java` (methods extracted, `CacheManager` field/import
+  removed); `AnalyticsController.java` (dependency swapped); new
+  `analytics/application/SalesRollupRecomputeService.java`; `ArchitectureTest.java` unchanged by
+  this round (the T-5/T-6 exemption code itself was correct — only its supporting class-placement
+  needed the split); `archunit_store/stored.rules` and the cycle-rule store file regenerated (new
+  id, same 4605 lines/66 blocks); T-5/T-7 log entries corrected in place.
+- Tests: `ArchitectureTest` alone (7/7 pass, including the now-materially-true dev-only exemption
+  and the regenerated cycle store); full `./mvnw clean test` (380, zero failures); full
+  `./mvnw test -Dtest='*IT'` (298, zero failures).
+- Result: **pass.**
+
+### Final validation
+
+- `./mvnw clean test`: **380 tests, 0 failures, 0 errors, 0 skipped.** Matches T-4b's count exactly
+  — the T-5/T-6 review round's `AnalyticsSeedService`/`SalesRollupRecomputeService` split changed
+  production code, not test counts (no test named either method by name).
+- `./mvnw test -Dtest='*IT'`: **298 tests, 0 failures, 0 errors, 0 skipped.** Matches T-4b's count
+  exactly, for the same reason.
+- `ArchitectureTest` run in isolation: all 7 methods pass, including
+  `noProductionClassOutsideCatalogDependsOnCatalogInfrastructure` now running unfrozen with zero
+  violations against the real codebase (the AC-8 exit-gate proof), with the AC-6 exemption now
+  genuinely limited to two classes with no production-reachable path — see the T-5/T-6 review
+  round above, which moved `AnalyticsController`'s only production dependency
+  (`recomputeAllRollups`) off `AnalyticsSeedService` entirely.
+- All acceptance criteria (AC-1 through AC-8) are satisfied: the facade classes and their recorded
+  signatures (AC-1), the temporary write surface exactly as enumerated with no `save(Product)`
+  escape hatch (AC-2), preserved `shouldBeActive`/kuji-flip behavior with a pinning test (AC-2b),
+  the live (unfrozen) outside-catalog-to-infrastructure rule covering all three catalog
+  repositories with a probe-verified selector (AC-3, AC-3b), correct baseline arithmetic (AC-3c,
+  corrected in the T-5/T-6 review round after an initial miscount), all 7 read-only consumers
+  migrated with the N+1/egress check (AC-4), all 3 write consumers migrated with atomic-commit
+  coverage (AC-5), `CatalogEntityAccess`'s caller set matching T-0's inventory exactly, including
+  the one documented `requireManagedProduct` exception (AC-5b), the named class-scoped dev-seed
+  exemption now covering only genuinely dev-only classes (AC-6, corrected in the T-5/T-6 review
+  round after `AnalyticsSeedService` was found to have a production caller), and
+  `SupplierService`'s exclusion reconciled (AC-7).
+- `LocationInventoryService.addInventory`'s `requireManagedProduct` call (T-3's documented
+  exception to every other origin's `getReference` strategy) is preserved unchanged through T-5/T-6/
+  T-7 — neither task touched `LocationInventoryService`, and `CatalogEntityAccessCallerSetTest`'s
+  `requireManagedProductHasExactlyTheDocumentedT3Exception` assertion (added in T-4b round 3) still
+  passes as part of the 380-test run above, continuing to enforce that this is the *only*
+  `requireManagedProduct` caller in the codebase.
+- Phase 5b is complete. Its public contract (the final signatures recorded in T-1) is Phase 6's
+  external contract to plan against, per spec.md's "Feeds" section.
 
 ## Test plan
 
