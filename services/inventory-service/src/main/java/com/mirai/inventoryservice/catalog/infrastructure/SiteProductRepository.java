@@ -20,4 +20,11 @@ public interface SiteProductRepository extends JpaRepository<SiteProduct, UUID> 
      */
     @Query("SELECT sp.productId FROM SiteProduct sp WHERE sp.siteId = :siteId AND sp.isStocked = true")
     List<UUID> findStockedProductIdsBySiteId(@Param("siteId") UUID siteId);
+
+    /**
+     * Every row (stocked or de-assorted-with-overrides) for one site - used to bulk-resolve
+     * {@link com.mirai.inventoryservice.catalog.application.EffectiveProductSettings} for a
+     * site's whole product list in one query instead of one lookup per product.
+     */
+    List<SiteProduct> findBySiteId(UUID siteId);
 }

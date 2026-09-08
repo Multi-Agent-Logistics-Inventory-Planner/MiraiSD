@@ -146,6 +146,64 @@ public class ProductService {
         return savedProduct;
     }
 
+    /**
+     * Creates a global product identity only - no {@code site_products} row at any site
+     * (spec.md phase-5d "New-product onboarding"). Deliberately narrower than
+     * {@link #createProduct}: no initial stock, no MAIN dual-write. The product starts inactive
+     * ({@code is_active = false}) and forecasting-enabled by default, matching "not carried
+     * anywhere until an explicit assortment mutation adds it to a site."
+     */
+    public Product createGlobalProduct(String sku, UUID categoryId, UUID parentId,
+                                        String letter, Integer templateQuantity, String name, String description,
+                                        String imageUrl, String notes,
+                                        com.mirai.inventoryservice.catalog.domain.KujiType kujiType,
+                                        Integer packsPerBox) {
+        Product parent = null;
+        Category category;
+        if (parentId != null) {
+            parent = getProductById(parentId);
+            if (parent.getParentId() != null) {
+                throw new IllegalArgumentException("Cannot create child of a child product. Only single-level hierarchy allowed.");
+            }
+            category = categoryId != null
+                    ? categoryService.getCategoryById(categoryId)
+                    : parent.getCategory();
+        } else {
+            if (categoryId == null) {
+                throw new IllegalArgumentException("Category is required for root products.");
+            }
+            category = categoryService.getCategoryById(categoryId);
+        }
+
+        if (sku != null && productRepository.existsBySku(sku)) {
+            throw new DuplicateSkuException("Product with SKU already exists: " + sku);
+        }
+
+        if (parentId != null && kujiType != null) {
+            throw new IllegalArgumentException("kujiType can only be set on root products.");
+        }
+
+        Product product = Product.builder()
+                .sku(sku)
+                .letter(letter != null && !letter.isBlank() ? letter.trim().substring(0, Math.min(50, letter.trim().length())) : null)
+                .templateQuantity(templateQuantity)
+                .kujiType(kujiType)
+                .packsPerBox(packsPerBox)
+                .category(category)
+                .parent(parent)
+                .name(name)
+                .description(description)
+                .imageUrl(imageUrl)
+                .notes(notes)
+                .isActive(false)
+                .forecastingEnabled(Boolean.TRUE)
+                .build();
+
+        Product savedProduct = productRepository.save(product);
+        broadcastService.broadcastProductUpdated(List.of(savedProduct.getId().toString()));
+        return savedProduct;
+    }
+
     public Product getProductById(UUID id) {
         return productRepository.findByIdWithCategories(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + id));
@@ -182,6 +240,14 @@ public class ProductService {
 
     public List<Product> searchProducts(String query) {
         return productRepository.searchWithCategories(query);
+    }
+
+    /**
+     * Global-identity search - see {@link ProductRepository#searchAllWithCategories}: no
+     * {@code isActive} filter, since a global catalog product need not be stocked anywhere yet.
+     */
+    public List<Product> searchAllProducts(String query) {
+        return productRepository.searchAllWithCategories(query);
     }
 
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
@@ -306,6 +372,29 @@ public class ProductService {
         // Re-fetch to ensure preferredSupplier is eagerly loaded via JOIN FETCH
         return productRepository.findByIdWithCategories(product.getId())
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with id: " + product.getId()));
+    }
+
+    /**
+     * Updates only master-identity fields via the global v1 route. Delegates to
+     * {@link #updateProduct} with every site-owned/legacy-only parameter fixed at its no-op value,
+     * so this never touches {@code site_products} or a site-owned {@code products.*} column.
+     */
+    public Product updateGlobalProduct(UUID id, String sku, UUID categoryId, UUID parentId,
+                                        String letter, Integer templateQuantity, String name, String description,
+                                        String imageUrl, String notes,
+                                        com.mirai.inventoryservice.catalog.domain.KujiType kujiType,
+                                        Integer packsPerBox) {
+        return updateProduct(
+                id, sku, categoryId, parentId,
+                letter, templateQuantity, name, description,
+                null, null, null,
+                null, null, imageUrl, notes,
+                false, null,
+                null, null,
+                false,
+                kujiType, null,
+                packsPerBox, false,
+                null);
     }
 
     public void deactivateProduct(UUID id) {

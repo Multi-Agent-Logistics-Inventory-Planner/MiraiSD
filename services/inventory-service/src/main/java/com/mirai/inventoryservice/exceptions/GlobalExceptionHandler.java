@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -170,6 +171,28 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Bad Request")
                 .message(ex.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * A malformed request body, including a {@code @JsonAnySetter} rejection of an unrecognized
+     * field (see {@code CatalogProductRequest}), previously fell through to the generic 500
+     * handler below since nothing here mapped this exception - the request is the caller's fault,
+     * not a server error.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.warn("Bad request (malformed body): {}", ex.getMessage());
+        Throwable cause = ex.getMostSpecificCause();
+        String message = cause != null && cause.getMessage() != null
+                ? cause.getMessage()
+                : "Malformed request body";
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .message(message)
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }

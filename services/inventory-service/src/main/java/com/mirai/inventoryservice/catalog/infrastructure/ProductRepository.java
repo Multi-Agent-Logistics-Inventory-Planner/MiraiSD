@@ -44,6 +44,17 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Product> searchWithCategories(@Param("query") String query);
 
+    /**
+     * Global-identity search with no {@code isActive} filter - {@code isActive} is a site-derived
+     * signal ("has stock somewhere"), not a catalog-identity concept, and a freshly-created global
+     * product (phase-5d) starts inactive with no {@code site_products} row anywhere, so the
+     * isActive-filtered {@link #searchWithCategories} would never find it.
+     */
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent WHERE " +
+            "(LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')))")
+    List<Product> searchAllWithCategories(@Param("query") String query);
+
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.id = :id")
     Optional<Product> findByIdWithCategories(@Param("id") UUID id);
 
