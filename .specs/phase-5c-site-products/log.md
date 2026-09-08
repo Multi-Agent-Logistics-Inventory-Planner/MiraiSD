@@ -2,15 +2,32 @@
 
 ## Current handoff
 
-- Status: T-4b complete (AC-6's version/tri-state settings contract, AC-6b's shared-default
-  inherited-vs-overridden behavior). T-1 through T-4 were already complete from PR #320.
-  Remaining: T-5 (operational — apply to production, out of scope for this session per
-  instruction), T-6 (concurrency IT for AC-6 — the deterministic staleness-rejection path T-4b
-  built is what T-6's concurrent-race test will exercise), T-7 (CONTEXT.md isActive/isStocked
-  glossary entry).
-- Next action: T-6 (a genuine two-thread/two-transaction concurrency IT) or T-7
-  (CONTEXT.md entry), whichever the next session picks up; T-5 requires explicit approval and a
-  fresh Supabase backup first, per AGENTS.md scope-and-safety rules.
+- Status: T-4b and T-6 complete (AC-6's version/tri-state settings contract, AC-6b's
+  shared-default inherited-vs-overridden behavior, and a real two-transaction concurrency IT).
+  T-1 through T-4 were already complete from PR #320. Remaining: T-7 (CONTEXT.md
+  isActive/isStocked glossary entry), T-5 (operational — apply to production, out of scope for
+  this session per instruction).
+- Next action: T-7 (CONTEXT.md entry); T-5 requires explicit approval and a fresh Supabase backup
+  first, per AGENTS.md scope-and-safety rules.
+- **Correction to this record's own earlier verification claims:** every "Full `./mvnw test` —
+  N/N" line written earlier in this session (T-4b's first two Result entries, this section's
+  prior revision) was inaccurate. This project has no `maven-failsafe-plugin` configured, so
+  plain `mvn test` (Surefire's default include pattern, `**/*Test.java`) silently excludes every
+  `*IT.java` class — confirmed empirically (`grep -c tc.postgres` on a plain `./mvnw test` log
+  returns 0; no Testcontainers container ever starts) and independently confirmed already known
+  and documented in this repo's own CI: `.github/workflows/ci.yml` runs `mvn -B test` for unit
+  tests only, with a comment explaining exactly this gap, while `.github/workflows/pr-gate.yml`
+  runs integration tests separately via `mvn -B test -Dtest='*IT'`. So "Full `./mvnw test` —
+  403/403" and "404/404" earlier in this file did not exercise `SiteAssortmentIT`,
+  `SiteProductLegacyCompatibilityIT`, `SiteProductsMigrationIT`, `SiteProductBackfillIT`,
+  `SiteProductRepositoryIT`, `ProductLifecycleTransactionBehaviorIT`, or
+  `SiteProductConcurrencyIT` at all, despite the surrounding prose implying full coverage. Those
+  IT classes were, however, separately verified correctly via explicit `-Dtest=` lists naming
+  them (recorded in each task's own Result line) - the individual results in this file are
+  accurate; only the "full suite" framing around them was wrong. Re-verified with the two
+  commands that actually match CI: `mvn -B test` (404/404) and `mvn -B test -Dtest='*IT'`
+  (340/340), both Maven exit 0, zero failures/errors either way. Use these two commands, not a
+  bare `./mvnw test`, to claim full local coverage in this project going forward.
 - Decisions that must survive compaction:
   - `SiteProductSettingsUpdate` now carries `expectedVersion` (required `Long`) plus
     `FieldUpdate<T>` for its six settable fields, replacing the old plain-nullable shape.
@@ -42,20 +59,14 @@
     `SiteProductServiceTest.updateSettings_translatesAConcurrentFlushFailureIntoAVersionConflictUsingAFreshRead`
     (mocks a `saveAndFlush` failure and asserts the conflict message uses the reader's fresh
     value, not the stale in-memory entity).
-- Last verified: `./mvnw test -Dtest=SiteProductServiceTest,SiteAssortmentIT,SiteProductLegacyCompatibilityIT,`
-  `GlobalExceptionHandlerTest,ArchitectureTest,SiteAssortmentTest,EffectiveProductSettingsTest,`
-  `ProductServiceForecastingToggleTest,SiteProductRepositoryIT,SiteProductsMigrationIT,`
-  `SiteProductBackfillIT,ProductLifecycleTransactionBehaviorIT,SiteProductNotFoundExceptionMappingTest`
-  - 86/86, Maven exit 0 (`ArchitectureTest`, including the fragile frozen slice-cycle rule, passed
-  cleanly). Full `./mvnw test` after the P2 fix - 404/404, Maven exit 0.
+- Last verified: `mvn -B test` (matches `ci.yml`) - 404/404, Maven exit 0. `mvn -B test -Dtest='*IT'`
+  (matches `pr-gate.yml`) - 340/340, Maven exit 0, including `SiteAssortmentIT`,
+  `SiteProductLegacyCompatibilityIT`, `SiteProductsMigrationIT`, `SiteProductBackfillIT`,
+  `SiteProductRepositoryIT`, `ProductLifecycleTransactionBehaviorIT`, `SiteProductConcurrencyIT`,
+  and `ArchitectureTest` (the fragile frozen slice-cycle rule passed cleanly).
   `git status --porcelain packages/ services/inventory-service/src/main/resources/` - clean (no
   `openapi.json`/migration drift).
-- Open risks/questions:
-  - T-6 (a real two-thread/two-transaction concurrency IT proving "one succeeds, one gets 409, no
-    lost update") has not been written yet - `updateSettings`'s `saveAndFlush` +
-    `ObjectOptimisticLockingFailureException` handling (now reading the conflict version through
-    `SiteProductVersionReader`'s fresh transaction) is what that IT will exercise.
-  - None otherwise.
+- Open risks/questions: None.
 
 ## Assumptions and decisions
 
@@ -495,12 +506,60 @@ finding P2).
   `ProductServiceForecastingToggleTest,SiteAssortmentIT,SiteProductRepositoryIT,SiteProductsMigrationIT,`
   `SiteProductBackfillIT,SiteProductLegacyCompatibilityIT,ProductLifecycleTransactionBehaviorIT,`
   `SiteProductNotFoundExceptionMappingTest,GlobalExceptionHandlerTest,ArchitectureTest` — 85/85,
-  Maven exit 0 (`ArchitectureTest`, including the frozen slice-cycle rule, passed cleanly). Full
-  `./mvnw test` — 403/403, Maven exit 0 (no pre-existing failures reproduced in this run).
+  Maven exit 0 (`ArchitectureTest`, including the frozen slice-cycle rule, passed cleanly).
+  (An earlier revision of this line claimed "Full `./mvnw test` — 403/403" as additional coverage;
+  that was inaccurate — see the corrected verification note in "Current handoff" above. The two
+  commands that actually cover everything, `mvn -B test` and `mvn -B test -Dtest='*IT'`, were run
+  after T-6, below.)
   `./mvnw -q -DskipTests compile` and `test-compile` — clean.
   `git status --porcelain packages/ services/inventory-service/src/main/resources/` — clean (no
   `openapi.json` or migration drift; no REST controller was added, per instruction to keep 5d's
   API/frontend work separate).
+
+### T-6 — concurrency IT for AC-6
+
+- Changed: none (production code). Test only.
+  - Added `SiteProductConcurrencyIT` (new, real Spring context + Testcontainers Postgres): a
+    genuine two-transaction race, not the mocked exception-translation test in
+    `SiteProductServiceTest`. A third, independently-managed transaction (`TransactionTemplate`
+    over the real `PlatformTransactionManager`) takes `SELECT ... FOR UPDATE` on the target row
+    and holds it open on its own thread. Two `SiteProductService.updateSettings` calls, both
+    carrying the same `expectedVersion`, run concurrently on a two-thread pool - their own reads
+    are non-blocking under Postgres MVCC, so both observe the same starting version, then both
+    block trying to `UPDATE` inside `saveAndFlush`, held by the lock. The test polls
+    `pg_stat_activity` (`wait_event_type = 'Lock'`, `state = 'active'`) until both backends are
+    confirmed blocked, then releases the lock, letting Postgres itself decide which `UPDATE`
+    wins.
+  - First attempt tried to force the same interleaving by stubbing
+    `SiteProductRepository.findBySiteIdAndProductId` via `@SpyBean` + `doAnswer(...).callRealMethod()`
+    to pause one thread mid-read. Rejected: Mockito cannot `callRealMethod()` through an
+    interface-backed Spring Data proxy (the method is abstract from Mockito's perspective -
+    confirmed via `MockitoException: Cannot call abstract real method`); falling back to
+    `Mockito.mockingDetails(spy).getMockCreationSettings().getSpiedInstance()` to reach the
+    delegate directly also failed (`getSpiedInstance()` returned `null` for this Spring Boot
+    `@SpyBean`). The real row-lock approach avoids Mockito internals entirely and exercises
+    genuine Postgres blocking semantics, which is closer to what "concurrent" should mean for
+    this AC anyway.
+  - Assertions are winner-agnostic (the DB, not the test, decides which of the two concurrent
+    writes wins the race): exactly one of the two calls returns successfully, the other throws
+    `ExecutionException` wrapping `SiteProductVersionConflictException` whose message names the
+    row's new current version (`startingVersion + 1`); the final row's `unitCost` matches
+    whichever call succeeded (never a merge of both), and its `version` has advanced by exactly
+    one - proving no lost update and no double-advance.
+- Result: pass, run 5 times consecutively alone with no flakes:
+  `./mvnw test -Dtest=SiteProductConcurrencyIT` — 1/1 each run. Combined with T-4b's suite:
+  `./mvnw test -Dtest=SiteProductServiceTest,SiteAssortmentIT,SiteProductLegacyCompatibilityIT,`
+  `SiteProductConcurrencyIT,GlobalExceptionHandlerTest,ArchitectureTest,SiteAssortmentTest,`
+  `EffectiveProductSettingsTest,ProductServiceForecastingToggleTest,SiteProductRepositoryIT,`
+  `SiteProductsMigrationIT,SiteProductBackfillIT,ProductLifecycleTransactionBehaviorIT,`
+  `SiteProductNotFoundExceptionMappingTest` — 87/87, Maven exit 0 (`ArchitectureTest` clean). Then
+  verified against the two commands that actually match this project's CI (this file's earlier
+  "Full `./mvnw test`" lines were wrong — `*IT.java` classes are excluded from plain `mvn test`
+  by Surefire's default include pattern with no failsafe plugin configured; see the correction in
+  "Current handoff"): `mvn -B test` (matches `ci.yml`) — 404/404, Maven exit 0; `mvn -B test
+  -Dtest='*IT'` (matches `pr-gate.yml`) — 340/340, Maven exit 0, including `SiteProductConcurrencyIT`
+  and every other IT class this record depends on. Both commands: zero failures, zero errors.
+  `git status --porcelain packages/ services/inventory-service/src/main/resources/` — clean.
 
 ## Test plan
 
@@ -556,8 +615,9 @@ finding P2).
   omitted-forms behave identically for the one NOT-NULL field). Row-exists-vs-stocked was already
   covered by T-3's `updateSettings_onARetainedDeAssortedRowIsAccepted`/`updateSettings_throwsWhenNoRowExistsForThisSite`,
   updated for the new construction. `GlobalExceptionHandlerTest.handleConflictException_siteProductVersionConflict_shouldReturn409`
-  (409 shape). Concurrency IT (two concurrent writes, one 409, no lost update) is T-6, not yet
-  written.
+  (409 shape). `SiteProductConcurrencyIT.concurrentSettingsUpdatesOneSucceedsOneConflictsWithNoLostUpdate`
+  (T-6) — a real two-transaction race against Postgres: one write succeeds, the other 409s, no
+  lost update.
 - AC-6b: `SiteProductLegacyCompatibilityIT.mainSettingsChangeMovesAnInheritingSitesEffectiveValue`/
   `mainSettingsChangeDoesNotMoveAnOverridingSitesEffectiveValue` — a MAIN settings change moves an
   inheriting site's effective value but not an overriding site's, tested against real Postgres
