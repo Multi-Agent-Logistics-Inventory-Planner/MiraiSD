@@ -512,6 +512,10 @@ Phase 6 work.
 - Add an `InventoryOperations` facade.
 - Add site/version/correlation/actor context to inventory events.
 - Migrate inventory API and web workflows to API v1.
+- Reduce inventory-totals database egress in separately reviewable Phase 6 slices: first a slim,
+  site-scoped totals query/contract, then targeted web refreshes for affected products. Preserve
+  legacy compatibility and full-refresh recovery when affected IDs are unknown. Detailed scope and
+  measurement gates live in [Stage E: Inventory totals egress reduction](spring-domain-modular-monolith-migration.md#inventory-totals-egress-reduction).
 - Run foreign-site, concurrency, idempotency and migration tests.
 
 ### Exit gate
@@ -519,6 +523,9 @@ Phase 6 work.
 - Inventory cannot be read or mutated through a foreign-site ID.
 - Mutation, movement, audit and outbox records commit atomically.
 - The legacy inventory technical-layer files have been removed or reduced to documented adapters.
+- Inventory totals omit duplicated catalog metadata at the database projection and v1 response;
+  known-product updates avoid whole-catalog totals refetches. Before/after measurements demonstrate
+  lower returned data for the same workload, with site isolation and recovery tests passing.
 
 ## 10. Phase 7 — Shipments and remaining site operations
 

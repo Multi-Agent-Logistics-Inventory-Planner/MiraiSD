@@ -127,6 +127,48 @@ These modules establish the tenancy boundary required by every later site-owned 
 6. Include site, actor, correlation, event version and idempotency context in outbox events.
 7. Use the outbox claim and consumer-idempotency foundation completed in parent Phase 2.
 8. Migrate existing `/api` behavior through compatibility adapters while adding `/api/v1`.
+9. Deliver the inventory-totals egress reduction below as separate query/contract and client-refresh
+   slices after the site-scoped inventory boundary is available.
+
+### Inventory totals egress reduction
+
+The September 2026 investigation identified repeated whole-catalog reads as an existing
+inefficiency: `/api/inventory/totals` queries every product and repeats catalog metadata, while
+`inventory_updated` broadcasts invalidate the full totals query even within the client's five-minute
+freshness window. Active browsers can each refetch that data. Supabase logs show broadcast requests
+increased from 106 on September 4 to 230 on September 5 (UTC), but broadcasts are not all necessarily
+inventory updates. Historical query counters and these logs do not establish the exact share of the
+daily egress spike. Measure savings rather than treating that attribution as proven.
+
+Keep this work in Phase 6, separate from Phase 5 catalog/site-product changes and from bulk package
+relocation. Before implementation, create Full-tier execution records for the mergeable slices,
+linking [multi-site data/API](../specs/multi-site-data-and-api.md),
+[client applications](../specs/client-applications.md) and
+[event contracts](../specs/events-and-replica-readiness.md).
+
+1. **Slim totals query and contract.** Move the controller's direct repository access behind the
+   inventory application boundary. Provide a site-scoped v1 totals projection containing product ID,
+   total quantity and last update time; do not fetch names, image URLs, categories or costs from
+   Postgres merely to discard them in Java. Read display metadata through the catalog contract.
+   Preserve zero-stock products and existing quantity semantics. Inventory existing consumers and
+   retain the legacy response through documented compatibility adapters until they migrate;
+   regenerate `packages/contracts/openapi.json` and `packages/api-client/src/schema.d.ts`.
+2. **Targeted refreshes.** Add a bounded, batched totals read for known affected product IDs using
+   `AuthorizedSiteContext` and site-qualified cache keys. Route local mutation and realtime refreshes
+   through the same strategy, coalescing repeated notifications and updating only affected totals
+   from authoritative API results. A known-product change must not trigger a full totals read or one
+   query per product. Keep a full selected-site refresh for initial load, reconnect/missed-event
+   recovery and batch events whose affected IDs are unknown. Site switching must cancel old-site
+   requests and prevent late responses from updating the new site's state. Version and validate any
+   required event payload changes; do not assume existing broadcasts always carry complete IDs.
+3. **Measure and verify.** Record before/after database rows, projected payload bytes (explicitly
+   label estimates), API response bytes and request/query counts for the same catalog size, inventory
+   changes and number of active browsers. Use controlled workloads or timed query-statistic deltas;
+   cumulative lifetime counters and query counts alone do not prove egress savings. Run JDK 21
+   PostgreSQL integration/authorization tests, contract compatibility checks and web tests covering
+   single-product updates, known/unknown-ID batches, duplicate/reordered events, reconnect recovery,
+   zero stock and site switching. Demonstrate that targeted result size follows the affected IDs,
+   not total catalog size, and that all refresh paths converge to current authorized stock.
 
 ### Exit gate
 
@@ -134,6 +176,8 @@ These modules establish the tenancy boundary required by every later site-owned 
 - Inventory mutations, movement records, audits and outbox records commit atomically.
 - Concurrent publisher tests show exclusive claims; crash/retry tests show consumer idempotency.
 - No external module accesses inventory repositories.
+- The slim v1 totals projection and targeted refresh path meet the measurement and correctness
+  criteria above; legacy consumers remain compatible until migrated.
 
 ## 8. Stage F: Shipments module (parent Phase 7)
 

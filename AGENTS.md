@@ -26,9 +26,12 @@ For non-trivial work, classify the tier before editing:
 
 Use the lifecycle: specify, review, plan, implement with TDD where a meaningful
 local test is available, test, validate, review, and commit. Record material
-assumptions in `log.md`. Ask the user only for material product, security,
-data-loss, or irreversible-deployment decisions; otherwise proceed with a
-recorded assumption.
+assumptions in `log.md`. For work that may span sessions, keep a concise
+`Current handoff` section in `log.md` updated at task boundaries with status,
+next action, surviving decisions, last verified command, and open risks.
+Ask the user only for material product, security, data-loss, or
+irreversible-deployment decisions; otherwise proceed with a recorded
+assumption.
 
 ## Verification
 

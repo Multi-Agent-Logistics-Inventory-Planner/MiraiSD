@@ -79,6 +79,14 @@ Standard | Full
 ```md
 # Implementation log
 
+## Current handoff
+
+- Status: <completed task and in-progress task>
+- Next action: <one concrete action>
+- Decisions that must survive compaction: <short bullets>
+- Last verified: `<command>` — <result>
+- Open risks/questions: <short bullets or "None">
+
 ## Assumptions and decisions
 
 - <assumption, evidence, and outcome>
