@@ -2,14 +2,13 @@
 
 ## Current handoff
 
-- Status: T-1, T-2, and T-3 complete. T-3's one P2 review finding (Deprecation header used an
+- Status: T-1 through T-4 complete. T-3's one P2 review finding (Deprecation header used an
   HTTP-date instead of RFC 9745's structured-fields Date syntax) is fixed. T-1's review findings
   and both rounds of T-2's review findings (five total: search filtering, parentId mapping,
   unusable settings schema, malformed-version coercion, incomplete auth proof; then a second
-  round: missing nullable unions, fractional-version coercion) are all fixed. T-4 through T-6 not
+  round: missing nullable unions, fractional-version coercion) are all fixed. T-5 and T-6 not
   started.
-- Next action: T-4 (AC-5 exit-gate integration test: one global product carried independently at
-  both MAIN and SECOND).
+- Next action: T-5 (review checkpoint: web Products list migration to `getSiteProducts`).
 - Decisions that must survive compaction:
   - **This project's springdoc emits OpenAPI 3.1, and `@Schema(nullable = true)` is silently a
     no-op under this swagger-core version's 3.1 output** (verified empirically, with and without
@@ -53,10 +52,9 @@
     mirror their legacy controllers 1:1 (including `GET /{id}/products` on suppliers, which still
     returns the legacy `ProductResponseDTO` shape with `CostVisibilityPolicy` applied) — spec.md
     calls these "wholly global," so no field narrowing applies to them.
-- Last verified: `./mvnw -o test -Dtest='*IT'` — 374/374, Maven exit 0 (370 T-2 baseline + 4 new
-  `LegacyCatalogDeprecationHeadersIT` tests). `./mvnw -o test` (unit) — 404/404, Maven exit 0 (no
-  architecture-baseline change needed — the new filter/config classes stayed in `catalog.api` and
-  introduced no new module dependency edge).
+- Last verified (T-4): `./mvnw -o test -Dtest='*IT'` — 375/375, Maven exit 0 (374 T-3 baseline + 1
+  new `CatalogMultiSiteExitGateIT` test). `./mvnw -o test` (unit) — 404/404, Maven exit 0 (test-only
+  change, no architecture-baseline edit needed).
 - Open risks/questions: T-1's categories/suppliers routes were not given their own dedicated IT
   file (they mirror already-tested legacy behavior 1:1 through the same service layer); if T-5/T-6
   web migration surfaces a gap, add targeted coverage then rather than duplicating
@@ -140,6 +138,8 @@
   first).
 - Cost visibility: `SiteProductControllerIT.employee_costAndMsrpNulled`,
   `assistantManager_seesMsrpNotUnitCost`, `admin_seesUnitCostAndMsrp`.
+- AC-5: `CatalogMultiSiteExitGateIT.oneGlobalProduct_independentlyConfiguredAtBothSites` (all six
+  exit-gate steps in one end-to-end scenario).
 
 ## T-1 review checkpoint
 
@@ -434,3 +434,74 @@
 - Last verified: JDK 21 `./mvnw -o test -Dtest=LegacyCatalogDeprecationHeadersIT`
   — 4/4, BUILD SUCCESS.
 - No implementation changes; unrelated lock file untouched.
+
+## T-4 — Exit-gate integration test (AC-5)
+
+- Changed: test-only. Added
+  `catalog/api/CatalogMultiSiteExitGateIT.java` — a single end-to-end test walking all six AC-5
+  steps against the real routes added in T-1/T-2 (no production code changed; the test proves
+  existing behavior, it doesn't add new behavior):
+  1. `POST /api/v1/catalog/products` creates one global product (with a seeded category, since root
+     products require one — `newProduct`'s equivalent for this test file).
+  2. `PUT .../assortment` upserts it at both a fresh MAIN-like site and a fresh SECOND-like site
+     (both named via unique site codes rather than reusing the literal `MAIN`/`SECOND` codes, since
+     `BaseIntegrationTest.ensureMainSiteExists()` already seeds a real `MAIN` row per test and this
+     test needs two sites it fully controls).
+  3. Distinct `msrp`/`reorderPoint` settings are set at each site and each site's `GET` is asserted
+     to return its own values.
+  4. MAIN's settings are updated again and SECOND's full `GET` response is asserted **structurally
+     equal (whole-`JsonNode` equality)** to its snapshot from step 3, not just equal on the two
+     fields this test happens to touch — and the reverse for MAIN after SECOND's update. This
+     proves the complete API response is unchanged; it is not a literal byte comparison and not a
+     direct comparison of the persisted database row, only of what the read endpoint serializes
+     from it. It is the actual cross-site non-interference proof AC-5 calls for (not merely "an
+     unwritten row stayed unwritten").
+  5. SECOND's assortment is deactivated (`isStocked: false`); MAIN is asserted still
+     `isStocked: true` with its own settings intact, and SECOND's retained (de-assorted) row is
+     asserted to keep its saved overrides rather than falling back to global values — per AC-2's
+     "retained row with `is_stocked = false` resolves its own saved overrides" rule, distinct from
+     the absent-row global-fallback rule.
+  6. `GET /api/v1/catalog/products/{id}` is asserted, via `JsonNode.has()` (key absence, not
+     `jsonPath(...).doesNotExist()`, which only fails on a present-with-non-null value and would
+     pass even if the response carried e.g. an explicit `"targetStockLevel": null`), to omit every
+     site-owned field from AC-1b's forbidden-field list (`isActive`, `unitCost`, `msrp`,
+     `reorderPoint`, `targetStockLevel`, `leadTimeDays`, `forecastingEnabled`, `quantity`,
+     `initialStock`) plus `isStocked`.
+  - The test needed `rateLimitingFilter.clearBuckets()` calls between phases: this scenario makes
+    ~14 authenticated requests against the `test` profile's `rate.limit.requests.per.minute=10`,
+    which every other existing IT stays under per test. `BaseIntegrationTest` already clears the
+    bucket once per `@BeforeEach`; this test additionally clears it between its numbered phases
+    (a rate-limiter test artifact, not a behavior being asserted) rather than lowering coverage by
+    combining/dropping assertions to fit under 10 requests.
+- Tests: `catalog/api/CatalogMultiSiteExitGateIT.oneGlobalProduct_independentlyConfiguredAtBothSites`
+  (new, 1 test covering all of AC-5's six steps in one scenario, matching AC-5's own framing as a
+  single end-to-end proof rather than six independent unit-style tests).
+- Result: Pass. `./mvnw -o test -Dtest='CatalogMultiSiteExitGateIT'` — 1/1.
+  `./mvnw -o test -Dtest='*IT'` — 375/375 (374 baseline + 1 new). `./mvnw -o test` (unit) —
+  404/404 (test-only change; no architecture-baseline edit needed). No contract regeneration —
+  T-4 adds no route or DTO, only a test exercising existing ones.
+
+## T-4 review findings fixed
+
+- Finding 1 (P2, non-interference not fully asserted): the original step-4 assertions only
+  compared `msrp`, `reorderPoint`, and `version` between sites, so a mutation that leaked into some
+  other field (e.g. `unitCost`, `forecastingEnabled`, `leadTimeDays`) on the untouched site would
+  have passed silently. `setSettings` now returns the full response `JsonNode` (was: just the
+  parsed `version` long) so the test can snapshot the *entire* API response. Step 4 now asserts
+  whole-node equality (`assertThat(secondUnaffected).isEqualTo(secondAfterInitialSet)`, and the
+  mirror for MAIN after SECOND's update) against the complete response captured immediately after
+  the prior settings call on that same site — every field the read endpoint serializes, not a field
+  subset. This is structural equality of the API response, not a literal byte comparison and not a
+  direct comparison of the persisted database row.
+- Finding 2 (P2, global field exclusion incomplete): step 6 previously asserted only five fields
+  via `jsonPath(...).doesNotExist()`, which passes for an explicit JSON `null` as well as a missing
+  key — not what "does not carry this field" should mean, and it omitted `targetStockLevel`,
+  `leadTimeDays`, `forecastingEnabled`, `quantity`, and `initialStock` entirely. Replaced with a
+  loop over AC-1b's complete forbidden-field list plus `isStocked`, asserting `JsonNode.has(field)`
+  is `false` for each — `has()` fails on any key presence regardless of value, closing both gaps at
+  once.
+- No production code changed; both fixes are test-only.
+- Result: Pass. `./mvnw -o test -Dtest='CatalogMultiSiteExitGateIT'` — 1/1.
+  `./mvnw -o test -Dtest='*IT'` — 375/375 (no regressions). `./mvnw -o test` (unit) — 404/404.
+- T-4 is now fully resolved. Next action: T-5 (review checkpoint: web Products list migration to
+  `getSiteProducts`, query-key audit, AC-6b inventory-totals disposition, AC-6c site-switch test).
