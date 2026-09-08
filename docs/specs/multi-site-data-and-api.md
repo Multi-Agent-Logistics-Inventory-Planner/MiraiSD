@@ -20,6 +20,25 @@ Global data includes product identity, SKU, canonical name and global classifica
 `site_products` record keyed by `(site_id, product_id)` owns assortment status, local price/cost
 overrides, reorder policy, forecasting enablement/configuration and local operational settings.
 
+Three related but distinct terms govern whether a product is available, and MUST NOT be conflated:
+
+- **Product active** (`products.is_active`): whether a product currently has stock at any site —
+  recomputed on every stock movement as `total quantity across all sites > 0`. It does not mean
+  "retired from the catalog"; a product with zero stock everywhere is inactive even though it
+  remains a fully valid catalog entry that can be restocked. Kuji's Active/Closed tabs and
+  forecasting both depend on this exact meaning today, so it is preserved as-is rather than
+  redefined.
+- **Stocked** (`site_products.is_stocked`): whether one site currently carries a product in its
+  local assortment, independent of Product active. A product can be Stocked at one site and not
+  another. Un-stocking (de-assorting) a product retains that site's saved price, cost and reorder
+  overrides rather than discarding them — they apply again if the site re-stocks the product
+  later.
+- **Effective availability**: the resolved, per-site read that combines Stocked with override
+  fallback against the global product. A site that has never carried a product (no `site_products`
+  row) always resolves as not available, falling back to the global product's settings for every
+  other field; a site that has un-stocked a product (Stocked = false, row retained) resolves its
+  own saved overrides instead of the global fallback.
+
 Site-owned operational data includes:
 
 - locations and inventory;

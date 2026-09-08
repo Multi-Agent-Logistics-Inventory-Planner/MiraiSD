@@ -2,13 +2,13 @@
 
 ## Current handoff
 
-- Status: T-4b and T-6 complete (AC-6's version/tri-state settings contract, AC-6b's
-  shared-default inherited-vs-overridden behavior, and a real two-transaction concurrency IT).
-  T-1 through T-4 were already complete from PR #320. Remaining: T-7 (CONTEXT.md
-  isActive/isStocked glossary entry), T-5 (operational — apply to production, out of scope for
-  this session per instruction).
-- Next action: T-7 (CONTEXT.md entry); T-5 requires explicit approval and a fresh Supabase backup
-  first, per AGENTS.md scope-and-safety rules.
+- Status: T-4b, T-6, and T-7 complete (AC-6's version/tri-state settings contract, AC-6b's
+  shared-default inherited-vs-overridden behavior, a real two-transaction concurrency IT, and the
+  CONTEXT.md glossary entry). T-1 through T-4 were already complete from PR #320. Remaining: T-5
+  only (operational — apply to production; out of scope for this session, requires explicit
+  approval and a fresh Supabase backup first, per AGENTS.md scope-and-safety rules).
+- Next action: T-5, when separately authorized. Nothing else in this record's scope is
+  outstanding.
 - **Correction to this record's own earlier verification claims:** every "Full `./mvnw test` —
   N/N" line written earlier in this session (T-4b's first two Result entries, this section's
   prior revision) was inaccurate. This project has no `maven-failsafe-plugin` configured, so
@@ -560,6 +560,36 @@ finding P2).
   -Dtest='*IT'` (matches `pr-gate.yml`) — 340/340, Maven exit 0, including `SiteProductConcurrencyIT`
   and every other IT class this record depends on. Both commands: zero failures, zero errors.
   `git status --porcelain packages/ services/inventory-service/src/main/resources/` — clean.
+
+### T-7 — isActive/isStocked/effective-availability glossary entry
+
+- Changed: first attempt created a new root `/CONTEXT.md` per the domain-modeling skill's default
+  structure (no `CONTEXT.md`/`CONTEXT-MAP.md` existed yet). Reviewed and redirected: this repo's
+  `.gitignore` ignores root `*.md` except `README.md`/`AGENTS.md` (`.gitignore:175-177`) —
+  deliberately limiting the repo to two canonical root docs — so a new tracked root `CONTEXT.md`
+  would either silently fail `git add` or require widening that policy unasked. Deleted the
+  untracked file and added the same distinction to
+  [`docs/specs/multi-site-data-and-api.md`](../../docs/specs/multi-site-data-and-api.md) §2
+  instead, which already defines `site_products` and is the existing durable owner of this
+  vocabulary — a skill's preferred filename doesn't justify a second canonical document. Added
+  three paragraphs there (`Product active`/`Stocked`/`Effective availability`), matching the
+  spec's own terms:
+  - **Product active** (`products.is_active`): "has stock somewhere" (`total quantity > 0`,
+    recomputed on every stock movement by `StockMovementService`), explicitly not "retired from
+    the catalog" — the conflation Kuji's Active/Closed tabs and forecasting both depend on today
+    (this record's "Product decisions", `StockMovementService:360`).
+  - **Stocked** (`site_products.is_stocked`): one site's local assortment flag, independent of
+    Product active - de-assorting (un-stocking) retains the row's saved overrides rather than
+    discarding them.
+  - **Effective availability**: the resolved, per-site read (`EffectiveProductSettings`) - an
+    absent row always resolves not-available with global fallback for every other field; a
+    retained row with Stocked = false resolves its own saved overrides instead.
+  - Updated this record's own spec.md (two references) to point at
+    `docs/specs/multi-site-data-and-api.md` §2 instead of `CONTEXT.md`, recording why.
+- Tests: none (documentation only).
+- Result: `docs/specs/multi-site-data-and-api.md` §2 updated and reviewed for accuracy against
+  `EffectiveProductSettings`/`SiteProduct` javadoc and this record's own "Product decisions"
+  phrasing; no stray untracked `CONTEXT.md` left behind (`git status --porcelain` clean of it).
 
 ## Test plan
 
