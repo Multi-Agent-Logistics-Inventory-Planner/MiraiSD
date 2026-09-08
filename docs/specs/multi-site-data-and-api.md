@@ -27,7 +27,10 @@ Three related but distinct terms govern whether a product is available, and MUST
   "retired from the catalog"; a product with zero stock everywhere is inactive even though it
   remains a fully valid catalog entry that can be restocked. Kuji's Active/Closed tabs and
   forecasting both depend on this exact meaning today, so it is preserved as-is rather than
-  redefined.
+  redefined. Stock recalculation is not this column's only writer: a MAIN-site assortment change
+  (`SiteProductService.setStocked`) and legacy product activation/deactivation also write it
+  directly, dual-writing MAIN's `site_products.is_stocked` and `products.is_active` together so
+  both stay consistent.
 - **Stocked** (`site_products.is_stocked`): whether one site currently carries a product in its
   local assortment, independent of Product active. A product can be Stocked at one site and not
   another. Un-stocking (de-assorting) a product retains that site's saved price, cost and reorder
