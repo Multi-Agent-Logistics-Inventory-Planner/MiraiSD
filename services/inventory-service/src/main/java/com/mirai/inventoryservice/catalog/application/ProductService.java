@@ -296,7 +296,7 @@ public class ProductService {
         siteProductService.syncExistingMainOverrides(
                 mainSiteResolver.resolve(),
                 product.getId(),
-                new SiteProductSettingsUpdate(
+                new ProductFieldChanges(
                         forecastingEnabled, unitCost, msrp, reorderPoint, targetStockLevel, leadTimeDays));
 
         if (turningForecastingOff) {

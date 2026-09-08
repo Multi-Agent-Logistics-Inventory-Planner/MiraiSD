@@ -85,6 +85,23 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
                 unitCost, msrp, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
+    private Long mainVersion(UUID productId) {
+        return siteProductRepository.findBySiteIdAndProductId(mainSiteId(), productId).orElseThrow().getVersion();
+    }
+
+    /** {@code null} for a field here means "omitted" (leave unchanged), matching the raw parameters below. */
+    private SiteProductSettingsUpdate settingsUpdate(long version, Boolean forecastingEnabled, BigDecimal unitCost,
+            BigDecimal msrp, Integer reorderPoint, Integer targetStockLevel, Integer leadTimeDays) {
+        return new SiteProductSettingsUpdate(
+                version,
+                forecastingEnabled == null ? FieldUpdate.omitted() : FieldUpdate.of(forecastingEnabled),
+                unitCost == null ? FieldUpdate.omitted() : FieldUpdate.of(unitCost),
+                msrp == null ? FieldUpdate.omitted() : FieldUpdate.of(msrp),
+                reorderPoint == null ? FieldUpdate.omitted() : FieldUpdate.of(reorderPoint),
+                targetStockLevel == null ? FieldUpdate.omitted() : FieldUpdate.of(targetStockLevel),
+                leadTimeDays == null ? FieldUpdate.omitted() : FieldUpdate.of(leadTimeDays));
+    }
+
     // ---- Legacy create (AC-5) ----
 
     @Test
@@ -135,8 +152,8 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
     void siteWriteOnMainDualWritesSettingsToProductsAtomically() {
         UUID productId = createProduct("SiteWriteDual", null);
 
-        siteProductService.updateSettings(mainSiteId(), productId, new SiteProductSettingsUpdate(
-                false, new BigDecimal("11.11"), new BigDecimal("22.22"), 15, 40, 7));
+        siteProductService.updateSettings(mainSiteId(), productId,
+                settingsUpdate(mainVersion(productId), false, new BigDecimal("11.11"), new BigDecimal("22.22"), 15, 40, 7));
 
         Product product = productRepository.findById(productId).orElseThrow();
         assertThat(product.getUnitCost()).isEqualByComparingTo("11.11");
@@ -163,9 +180,9 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
                 .name("Compat IT SECOND").code("CI-" + Long.toString(System.nanoTime(), 36).toUpperCase())
                 .build());
 
-        siteProductService.setStocked(second.getId(), productId, true);
+        SiteProduct secondRow = siteProductService.setStocked(second.getId(), productId, true);
         siteProductService.updateSettings(second.getId(), productId,
-                new SiteProductSettingsUpdate(null, new BigDecimal("99.99"), null, null, null, null));
+                settingsUpdate(secondRow.getVersion(), null, new BigDecimal("99.99"), null, null, null, null));
 
         Product product = productRepository.findById(productId).orElseThrow();
         assertThat(product.getIsActive()).isFalse();
@@ -180,7 +197,7 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
 
         // Set a MAIN override; dual-writes products.reorder_point too.
         siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(null, null, null, 20, null, null));
+                settingsUpdate(mainVersion(productId), null, null, null, 20, null, null));
         assertThat(productRepository.findById(productId).orElseThrow().getReorderPoint()).isEqualTo(20);
 
         // Simulate forecasting-service's nightly write straight to products.reorder_point.
@@ -188,9 +205,11 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
         product.setReorderPoint(99);
         productRepository.save(product);
 
-        // Clear the MAIN override: must update site_products only.
-        siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(null, null, null, null, null, null));
+        // Clear the MAIN override: must update site_products only. An explicit FieldUpdate.of(null)
+        // for reorderPoint, not omitted() - this is the AC-6 clear, distinct from "not provided".
+        siteProductService.updateSettings(mainSiteId(), productId, new SiteProductSettingsUpdate(
+                mainVersion(productId), FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted(),
+                FieldUpdate.of(null), FieldUpdate.omitted(), FieldUpdate.omitted()));
 
         assertThat(productRepository.findById(productId).orElseThrow().getReorderPoint())
                 .as("the clear must not revert products.reorder_point back to the old override value")
@@ -216,7 +235,7 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
 
         // MAIN overrides unitCost only; msrp/reorderPoint stay NULL (inherited).
         siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(null, new BigDecimal("5.00"), null, null, null, null));
+                settingsUpdate(mainVersion(productId), null, new BigDecimal("5.00"), null, null, null, null));
 
         // Legacy PUT changes unitCost (overridden) and msrp (not overridden) together.
         updateUnitCostMsrpReorderPoint(productId, new BigDecimal("6.00"), new BigDecimal("30.00"), null);
@@ -247,6 +266,48 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
                 .isNull();
     }
 
+    // ---- AC-6b: shared-default policy - a MAIN settings change moves an inheriting site's
+    // effective value, but not one that has overridden the field itself ----
+
+    @Test
+    void mainSettingsChangeMovesAnInheritingSitesEffectiveValue() {
+        UUID productId = createProduct("SharedDefaultInherit", null);
+        Site second = siteRepository.save(Site.builder()
+                .name("Compat IT SharedDefault SECOND")
+                .code("CI-" + Long.toString(System.nanoTime(), 36).toUpperCase())
+                .build());
+        // SECOND never carries this product (AC-4b's normal starting state) - it still inherits
+        // products.* for the effective-value view even without a site_products row.
+        // ProductService.createProduct defaults reorderPoint to 10 when not provided.
+        assertThat(siteAssortment.effectiveSettingsFor(second.getId(), productId).reorderPoint()).isEqualTo(10);
+
+        siteProductService.updateSettings(mainSiteId(), productId,
+                settingsUpdate(mainVersion(productId), null, null, null, 25, null, null));
+
+        assertThat(siteAssortment.effectiveSettingsFor(second.getId(), productId).reorderPoint())
+                .as("SECOND has not overridden reorderPoint, so MAIN's dual-write to products.* moves its effective value")
+                .isEqualTo(25);
+    }
+
+    @Test
+    void mainSettingsChangeDoesNotMoveAnOverridingSitesEffectiveValue() {
+        UUID productId = createProduct("SharedDefaultOverride", null);
+        Site second = siteRepository.save(Site.builder()
+                .name("Compat IT SharedDefault Override SECOND")
+                .code("CI-" + Long.toString(System.nanoTime(), 36).toUpperCase())
+                .build());
+        SiteProduct secondRow = siteProductService.setStocked(second.getId(), productId, true);
+        siteProductService.updateSettings(second.getId(), productId,
+                settingsUpdate(secondRow.getVersion(), null, null, null, 99, null, null));
+
+        siteProductService.updateSettings(mainSiteId(), productId,
+                settingsUpdate(mainVersion(productId), null, null, null, 25, null, null));
+
+        assertThat(siteAssortment.effectiveSettingsFor(second.getId(), productId).reorderPoint())
+                .as("SECOND overrides reorderPoint itself, so MAIN's global change must not move it")
+                .isEqualTo(99);
+    }
+
     // ---- Forecasting-service writes never create manual overrides (AC-5) ----
 
     @Test
@@ -271,7 +332,7 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
         UUID productId = createProduct("ForecastPurgeOn", null, null, null);
 
         siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(false, null, null, null, null, null));
+                settingsUpdate(mainVersion(productId), false, null, null, null, null, null));
 
         verify(forecastPurgePort).purgeForecastsForProduct(eq(productId));
         assertThat(productRepository.findById(productId).orElseThrow().getForecastingEnabled()).isFalse();
@@ -282,7 +343,7 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
         UUID productId = createProduct("ForecastPurgeOff", null, null, false);
 
         siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(true, null, null, null, null, null));
+                settingsUpdate(mainVersion(productId), true, null, null, null, null, null));
 
         verify(forecastPurgePort, never()).purgeForecastsForProduct(any());
     }
@@ -293,8 +354,9 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
         doThrow(new RuntimeException("simulated forecast-purge failure"))
                 .when(forecastPurgePort).purgeForecastsForProduct(eq(productId));
 
+        long version = mainVersion(productId);
         assertThatThrownBy(() -> siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(false, new BigDecimal("12.34"), null, null, null, null)))
+                settingsUpdate(version, false, new BigDecimal("12.34"), null, null, null, null)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("simulated forecast-purge failure");
 
@@ -319,11 +381,12 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
     void siteWriteRollsBackAtomicallyWhenTheProductsDualWriteFails() {
         UUID productId = createProduct("RollbackSiteWrite", null);
 
+        long version = mainVersion(productId);
         doThrow(new RuntimeException("simulated products dual-write failure"))
                 .when(productRepository).save(any(Product.class));
 
         assertThatThrownBy(() -> siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(null, new BigDecimal("50.00"), null, null, null, null)))
+                settingsUpdate(version, null, new BigDecimal("50.00"), null, null, null, null)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("simulated products dual-write failure");
 
@@ -336,7 +399,7 @@ class SiteProductLegacyCompatibilityIT extends BaseKafkaIntegrationTest {
     void legacyWriteRollsBackAtomicallyWhenTheMainSyncFails() {
         UUID productId = createProduct("RollbackLegacyWrite", null);
         siteProductService.updateSettings(mainSiteId(), productId,
-                new SiteProductSettingsUpdate(null, new BigDecimal("5.00"), null, null, null, null));
+                settingsUpdate(mainVersion(productId), null, new BigDecimal("5.00"), null, null, null, null));
 
         doThrow(new RuntimeException("simulated site_products sync failure"))
                 .when(siteProductRepository).save(any());

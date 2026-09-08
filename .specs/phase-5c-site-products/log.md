@@ -1,5 +1,73 @@
 # Implementation log
 
+## Current handoff
+
+- Status: T-4b, T-6, and T-7 complete (AC-6's version/tri-state settings contract, AC-6b's
+  shared-default inherited-vs-overridden behavior, a real two-transaction concurrency IT, and the
+  CONTEXT.md glossary entry). T-1 through T-4 were already complete from PR #320. Remaining: T-5
+  only (operational — apply to production; out of scope for this session, requires explicit
+  approval and a fresh Supabase backup first, per AGENTS.md scope-and-safety rules).
+- Next action: T-5, when separately authorized. Nothing else in this record's scope is
+  outstanding.
+- **Correction to this record's own earlier verification claims:** every "Full `./mvnw test` —
+  N/N" line written earlier in this session (T-4b's first two Result entries, this section's
+  prior revision) was inaccurate. This project has no `maven-failsafe-plugin` configured, so
+  plain `mvn test` (Surefire's default include pattern, `**/*Test.java`) silently excludes every
+  `*IT.java` class — confirmed empirically (`grep -c tc.postgres` on a plain `./mvnw test` log
+  returns 0; no Testcontainers container ever starts) and independently confirmed already known
+  and documented in this repo's own CI: `.github/workflows/ci.yml` runs `mvn -B test` for unit
+  tests only, with a comment explaining exactly this gap, while `.github/workflows/pr-gate.yml`
+  runs integration tests separately via `mvn -B test -Dtest='*IT'`. So "Full `./mvnw test` —
+  403/403" and "404/404" earlier in this file did not exercise `SiteAssortmentIT`,
+  `SiteProductLegacyCompatibilityIT`, `SiteProductsMigrationIT`, `SiteProductBackfillIT`,
+  `SiteProductRepositoryIT`, `ProductLifecycleTransactionBehaviorIT`, or
+  `SiteProductConcurrencyIT` at all, despite the surrounding prose implying full coverage. Those
+  IT classes were, however, separately verified correctly via explicit `-Dtest=` lists naming
+  them (recorded in each task's own Result line) - the individual results in this file are
+  accurate; only the "full suite" framing around them was wrong. Re-verified with the two
+  commands that actually match CI: `mvn -B test` (404/404) and `mvn -B test -Dtest='*IT'`
+  (340/340), both Maven exit 0, zero failures/errors either way. Use these two commands, not a
+  bare `./mvnw test`, to claim full local coverage in this project going forward.
+- Decisions that must survive compaction:
+  - `SiteProductSettingsUpdate` now carries `expectedVersion` (required `Long`) plus
+    `FieldUpdate<T>` for its six settable fields, replacing the old plain-nullable shape.
+  - `FieldUpdate<T>` (new, `catalog.application`) is the tri-state wrapper: `omitted()` (leave
+    unchanged) vs. `of(value)` where `value` may itself be `null` (explicit clear/set).
+  - The legacy-sync direction (`syncExistingMainOverrides`) now takes a separate, simpler,
+    unversioned `ProductFieldChanges` record (plain nullable fields, null = not provided) rather
+    than reusing `SiteProductSettingsUpdate` - conflating the two would have forced an internal,
+    unversioned sync to carry a version and a clear/omit distinction it has no use for.
+  - `SiteProductVersionConflictException` maps to `409 Conflict` via `GlobalExceptionHandler`'s
+    existing conflict-exception group (`ProductInUseException` et al.), naming the row's current
+    version in the message body - no new DTO shape, matching that group's existing precedent of a
+    message-only conflict body.
+  - No REST controller/DTO was added - AC-6's "on the wire" tri-state language is Phase 5d's
+    concern (the actual `/settings` endpoint and its request DTO). T-4b is scoped to the service
+    contract 5d's controller will call.
+  - **Review fix (P2): the optimistic-lock catch must not reuse the failed persistence context.**
+    `updateSettings`'s `catch (ObjectOptimisticLockingFailureException e)` originally re-queried
+    the current version through the same `siteProductRepository`/transaction whose `saveAndFlush`
+    had just failed - once a flush throws, the JPA provider requires that persistence context to
+    be treated as unusable, so the re-query could fail again (surfacing as a 500 instead of the
+    intended 409) and could not reliably report the winner's version. Fixed by adding
+    `catalog.application.SiteProductVersionReader` (new, package-private `@Component`), a single
+    `@Transactional(propagation = REQUIRES_NEW, readOnly = true)` method that reads the row's
+    current version through a fresh, independent transaction, called only from the catch block.
+    The pre-flush mismatch path (`requireCurrentVersion`, called before any write is attempted)
+    was left alone except to stop re-querying at all - the row is already loaded in memory there,
+    so its version is safe to read directly. New test:
+    `SiteProductServiceTest.updateSettings_translatesAConcurrentFlushFailureIntoAVersionConflictUsingAFreshRead`
+    (mocks a `saveAndFlush` failure and asserts the conflict message uses the reader's fresh
+    value, not the stale in-memory entity).
+- Last verified: `mvn -B test` (matches `ci.yml`) - 404/404, Maven exit 0. `mvn -B test -Dtest='*IT'`
+  (matches `pr-gate.yml`) - 340/340, Maven exit 0, including `SiteAssortmentIT`,
+  `SiteProductLegacyCompatibilityIT`, `SiteProductsMigrationIT`, `SiteProductBackfillIT`,
+  `SiteProductRepositoryIT`, `ProductLifecycleTransactionBehaviorIT`, `SiteProductConcurrencyIT`,
+  and `ArchitectureTest` (the fragile frozen slice-cycle rule passed cleanly).
+  `git status --porcelain packages/ services/inventory-service/src/main/resources/` - clean (no
+  `openapi.json`/migration drift).
+- Open risks/questions: None.
+
 ## Assumptions and decisions
 
 - **Review fix (P2): MAIN forecasting disable via the site-write path skipped forecast purge.**
@@ -348,6 +416,181 @@ the `products.*`/`site_products` writes — matching the legacy path's existing 
 neither write path can leave stale predictions visible after forecasting is turned off (review
 finding P2).
 
+### T-4b — AC-6 settings contract (version/tri-state) + AC-6b shared-default tests
+
+- Changed:
+  - Added `catalog.application.FieldUpdate<T>` (new): the tri-state wrapper -
+    `FieldUpdate.omitted()` (field not part of the request, leave stored value unchanged) vs.
+    `FieldUpdate.of(value)` where `value` may itself be `null` (explicit clear/set) - a plain
+    nullable field cannot distinguish these two states, which AC-6 requires.
+  - `SiteProductSettingsUpdate` now carries `expectedVersion` (`Long`, required - `null` means the
+    caller omitted it) and `FieldUpdate<T>` for each of its six fields, replacing the previous
+    plain-nullable shape. A compact constructor rejects a `null` `FieldUpdate` reference itself
+    (callers must pass `FieldUpdate.omitted()`, never bare `null`, for "not provided").
+  - Added `catalog.application.ProductFieldChanges` (new): a separate, simpler, unversioned record
+    (plain nullable fields, `null` = not provided) for `syncExistingMainOverrides`'s internal
+    legacy-sync direction, which needs neither a version nor a clear/omit distinction - kept
+    distinct from `SiteProductSettingsUpdate` rather than forcing the versioned/tri-state contract
+    onto an unversioned internal call. `ProductService.updateProduct`'s call site
+    (`syncExistingMainOverrides`) updated to construct this instead.
+  - `SiteProductService.updateSettings`: applies each field only when its `FieldUpdate` is present
+    (`isPresent()`), checks `expectedVersion` against the row's current version before writing
+    (missing or mismatched both throw `SiteProductVersionConflictException`), and uses
+    `siteProductRepository.saveAndFlush` inside a `try/catch` for
+    `ObjectOptimisticLockingFailureException` so a genuine concurrent version race (not just the
+    explicit pre-check) also maps to the same conflict exception - built for T-6's concurrency IT,
+    which has not been written yet. `forecastingEnabled`'s NOT-NULL invariant is preserved: both
+    omitted and an explicit `FieldUpdate.of(null)` leave the current value, since the column can
+    never be cleared.
+  - `dualWriteToGlobalProduct` updated to the same present-and-non-null gating (a present-but-null
+    field is a clear, which must not dual-write, matching AC-5's existing exception unchanged).
+  - Added `catalog.domain.SiteProductVersionConflictException` (extends `RuntimeException`,
+    `catalog.domain` per the T-3 precedent for keeping exceptions in-module) and registered it in
+    `GlobalExceptionHandler`'s existing conflict-exception `@ExceptionHandler` group (alongside
+    `ProductInUseException` et al.) - `409 Conflict`, message names the row's current version. No
+    new DTO shape: the existing group's `ErrorResponse.message` (a plain string) already satisfies
+    "a body naming the current version"; a dedicated `currentVersion` field is left to 5d's actual
+    controller/DTO if that turns out to matter to the frontend.
+  - **Review fix (P2):** added `catalog.application.SiteProductVersionReader` (new,
+    package-private `@Component`, injected into `SiteProductService`) - a single
+    `@Transactional(propagation = REQUIRES_NEW, readOnly = true)` method reading a row's current
+    version through a fresh, independent persistence context. `updateSettings`'s
+    `ObjectOptimisticLockingFailureException` catch now calls this instead of re-querying through
+    `siteProductRepository` directly: once `saveAndFlush` fails, the enclosing transaction's
+    persistence context must be treated as unusable for further work, so reusing it for the
+    recovery query risked a second failure there (surfacing as an unhandled 500 instead of the
+    intended 409) and could not reliably report the actual winner's version. The unrelated
+    pre-flush mismatch path (`requireCurrentVersion`, called before any write is attempted) was
+    simplified to read the already-loaded entity's in-memory version directly instead of
+    re-querying at all - that path never touches a poisoned context, so the extra query was both
+    unnecessary and, per the same finding's reasoning, best avoided on principle.
+- Tests:
+  - `SiteProductServiceTest` (Mockito, updated + new): version-missing and version-stale rejection
+    (no save attempted, verified via `never()` on both `save` and `saveAndFlush`), a matching
+    version accepted; omitted vs. explicit-null forecastingEnabled both leave the current value
+    unchanged (two separate tests, since AC-6 explicitly calls out this column can't be cleared);
+    explicit-null override field clears to inherit; omitted override field leaves the stored value
+    untouched (distinct test from the clear case, proving the two are not conflated); existing
+    row-exists/de-assorted-row tests updated to the new tri-state construction.
+    `updateSettings_translatesAConcurrentFlushFailureIntoAVersionConflictUsingAFreshRead` (review
+    fix P2) - mocks `saveAndFlush` throwing `ObjectOptimisticLockingFailureException` and asserts
+    the resulting conflict message's current-version comes from `SiteProductVersionReader` (a
+    distinct mock returning a different value than the stale in-memory entity would), proving the
+    fresh-read path is actually exercised, not just present in the code.
+  - `SiteAssortmentIT` (real Spring context + Testcontainers Postgres, updated + new):
+    `updateSettings_rejectsAStaleVersionAndAppliesNoWrite`,
+    `updateSettings_rejectsAMissingVersionAndAppliesNoWrite` (both assert the effective value is
+    unchanged, not just that the exception is thrown - the "applies no write" half of AC-6),
+    `updateSettings_acceptsAMatchingVersionAndAdvancesIt` (proves the row's `@Version` actually
+    advances on a real save, not just that the application-level check passes). All prior tests in
+    this file updated to thread the real row's version returned by `setStocked`/`updateSettings`
+    through subsequent calls, since a matching version is now required end-to-end.
+  - `SiteProductLegacyCompatibilityIT` (real Spring context + Testcontainers Postgres, updated +
+    new): every existing `updateSettings` call site updated to pass a real current version (via a
+    new `mainVersion(productId)` helper reading the MAIN row, or a `setStocked`/`updateSettings`
+    return value) and the new tri-state construction (a `settingsUpdate(...)` test helper
+    preserves each pre-existing test's original null-means-omitted intent, except
+    `clearingMainOverrideDoesNotDualWriteAndPreservesGlobalFallback`'s second call, which now uses
+    an explicit `FieldUpdate.of(null)` for `reorderPoint` to keep proving AC-5's clearing exception
+    under the new, more precise vocabulary). Two new tests for AC-6b:
+    `mainSettingsChangeMovesAnInheritingSitesEffectiveValue` (SECOND never carries the product, so
+    it inherits `products.*` - a MAIN dual-write moves SECOND's effective value) and
+    `mainSettingsChangeDoesNotMoveAnOverridingSitesEffectiveValue` (SECOND sets its own override
+    for the same field first - the same MAIN dual-write must not move it). Both assert against the
+    real `ProductService.createProduct` default (`reorderPoint` defaults to 10 when not supplied),
+    not an assumed `null`.
+  - `GlobalExceptionHandlerTest` (updated): direct-call test proving `SiteProductVersionConflictException`
+    maps to `409`/`"Conflict"` through `handleConflictException`, with the message naming the
+    current version in the body.
+- Result: pass. `./mvnw test -Dtest=SiteProductServiceTest,SiteAssortmentTest,EffectiveProductSettingsTest,`
+  `ProductServiceForecastingToggleTest,SiteAssortmentIT,SiteProductRepositoryIT,SiteProductsMigrationIT,`
+  `SiteProductBackfillIT,SiteProductLegacyCompatibilityIT,ProductLifecycleTransactionBehaviorIT,`
+  `SiteProductNotFoundExceptionMappingTest,GlobalExceptionHandlerTest,ArchitectureTest` — 85/85,
+  Maven exit 0 (`ArchitectureTest`, including the frozen slice-cycle rule, passed cleanly).
+  (An earlier revision of this line claimed "Full `./mvnw test` — 403/403" as additional coverage;
+  that was inaccurate — see the corrected verification note in "Current handoff" above. The two
+  commands that actually cover everything, `mvn -B test` and `mvn -B test -Dtest='*IT'`, were run
+  after T-6, below.)
+  `./mvnw -q -DskipTests compile` and `test-compile` — clean.
+  `git status --porcelain packages/ services/inventory-service/src/main/resources/` — clean (no
+  `openapi.json` or migration drift; no REST controller was added, per instruction to keep 5d's
+  API/frontend work separate).
+
+### T-6 — concurrency IT for AC-6
+
+- Changed: none (production code). Test only.
+  - Added `SiteProductConcurrencyIT` (new, real Spring context + Testcontainers Postgres): a
+    genuine two-transaction race, not the mocked exception-translation test in
+    `SiteProductServiceTest`. A third, independently-managed transaction (`TransactionTemplate`
+    over the real `PlatformTransactionManager`) takes `SELECT ... FOR UPDATE` on the target row
+    and holds it open on its own thread. Two `SiteProductService.updateSettings` calls, both
+    carrying the same `expectedVersion`, run concurrently on a two-thread pool - their own reads
+    are non-blocking under Postgres MVCC, so both observe the same starting version, then both
+    block trying to `UPDATE` inside `saveAndFlush`, held by the lock. The test polls
+    `pg_stat_activity` (`wait_event_type = 'Lock'`, `state = 'active'`) until both backends are
+    confirmed blocked, then releases the lock, letting Postgres itself decide which `UPDATE`
+    wins.
+  - First attempt tried to force the same interleaving by stubbing
+    `SiteProductRepository.findBySiteIdAndProductId` via `@SpyBean` + `doAnswer(...).callRealMethod()`
+    to pause one thread mid-read. Rejected: Mockito cannot `callRealMethod()` through an
+    interface-backed Spring Data proxy (the method is abstract from Mockito's perspective -
+    confirmed via `MockitoException: Cannot call abstract real method`); falling back to
+    `Mockito.mockingDetails(spy).getMockCreationSettings().getSpiedInstance()` to reach the
+    delegate directly also failed (`getSpiedInstance()` returned `null` for this Spring Boot
+    `@SpyBean`). The real row-lock approach avoids Mockito internals entirely and exercises
+    genuine Postgres blocking semantics, which is closer to what "concurrent" should mean for
+    this AC anyway.
+  - Assertions are winner-agnostic (the DB, not the test, decides which of the two concurrent
+    writes wins the race): exactly one of the two calls returns successfully, the other throws
+    `ExecutionException` wrapping `SiteProductVersionConflictException` whose message names the
+    row's new current version (`startingVersion + 1`); the final row's `unitCost` matches
+    whichever call succeeded (never a merge of both), and its `version` has advanced by exactly
+    one - proving no lost update and no double-advance.
+- Result: pass, run 5 times consecutively alone with no flakes:
+  `./mvnw test -Dtest=SiteProductConcurrencyIT` — 1/1 each run. Combined with T-4b's suite:
+  `./mvnw test -Dtest=SiteProductServiceTest,SiteAssortmentIT,SiteProductLegacyCompatibilityIT,`
+  `SiteProductConcurrencyIT,GlobalExceptionHandlerTest,ArchitectureTest,SiteAssortmentTest,`
+  `EffectiveProductSettingsTest,ProductServiceForecastingToggleTest,SiteProductRepositoryIT,`
+  `SiteProductsMigrationIT,SiteProductBackfillIT,ProductLifecycleTransactionBehaviorIT,`
+  `SiteProductNotFoundExceptionMappingTest` — 87/87, Maven exit 0 (`ArchitectureTest` clean). Then
+  verified against the two commands that actually match this project's CI (this file's earlier
+  "Full `./mvnw test`" lines were wrong — `*IT.java` classes are excluded from plain `mvn test`
+  by Surefire's default include pattern with no failsafe plugin configured; see the correction in
+  "Current handoff"): `mvn -B test` (matches `ci.yml`) — 404/404, Maven exit 0; `mvn -B test
+  -Dtest='*IT'` (matches `pr-gate.yml`) — 340/340, Maven exit 0, including `SiteProductConcurrencyIT`
+  and every other IT class this record depends on. Both commands: zero failures, zero errors.
+  `git status --porcelain packages/ services/inventory-service/src/main/resources/` — clean.
+
+### T-7 — isActive/isStocked/effective-availability glossary entry
+
+- Changed: first attempt created a new root `/CONTEXT.md` per the domain-modeling skill's default
+  structure (no `CONTEXT.md`/`CONTEXT-MAP.md` existed yet). Reviewed and redirected: this repo's
+  `.gitignore` ignores root `*.md` except `README.md`/`AGENTS.md` (`.gitignore:175-177`) —
+  deliberately limiting the repo to two canonical root docs — so a new tracked root `CONTEXT.md`
+  would either silently fail `git add` or require widening that policy unasked. Deleted the
+  untracked file and added the same distinction to
+  [`docs/specs/multi-site-data-and-api.md`](../../docs/specs/multi-site-data-and-api.md) §2
+  instead, which already defines `site_products` and is the existing durable owner of this
+  vocabulary — a skill's preferred filename doesn't justify a second canonical document. Added
+  three paragraphs there (`Product active`/`Stocked`/`Effective availability`), matching the
+  spec's own terms:
+  - **Product active** (`products.is_active`): "has stock somewhere" (`total quantity > 0`,
+    recomputed on every stock movement by `StockMovementService`), explicitly not "retired from
+    the catalog" — the conflation Kuji's Active/Closed tabs and forecasting both depend on today
+    (this record's "Product decisions", `StockMovementService:360`).
+  - **Stocked** (`site_products.is_stocked`): one site's local assortment flag, independent of
+    Product active - de-assorting (un-stocking) retains the row's saved overrides rather than
+    discarding them.
+  - **Effective availability**: the resolved, per-site read (`EffectiveProductSettings`) - an
+    absent row always resolves not-available with global fallback for every other field; a
+    retained row with Stocked = false resolves its own saved overrides instead.
+  - Updated this record's own spec.md (two references) to point at
+    `docs/specs/multi-site-data-and-api.md` §2 instead of `CONTEXT.md`, recording why.
+- Tests: none (documentation only).
+- Result: `docs/specs/multi-site-data-and-api.md` §2 updated and reviewed for accuracy against
+  `EffectiveProductSettings`/`SiteProduct` javadoc and this record's own "Product decisions"
+  phrasing; no stray untracked `CONTEXT.md` left behind (`git status --porcelain` clean of it).
+
 ## Test plan
 
 - AC-1: `SiteProductsMigrationIT` executes `V56` itself and verifies its columns, nullability,
@@ -389,3 +632,23 @@ finding P2).
   `siteWriteOnMainForecastingTransitionRollsBackProductAndSiteProductRowsWhenPurgeFails`
   (P2 review fix: MAIN forecasting disable purges predictions, and a purge failure rolls back both
   `products.*` and `site_products`).
+- AC-6: `SiteProductServiceTest.updateSettings_throwsWhenVersionIsMissing`/
+  `updateSettings_throwsWhenVersionIsStale`/`updateSettings_acceptsWhenVersionMatches` (unit-level
+  staleness/missing-version rejection and message content) plus
+  `SiteAssortmentIT.updateSettings_rejectsAStaleVersionAndAppliesNoWrite`/
+  `updateSettings_rejectsAMissingVersionAndAppliesNoWrite`/`updateSettings_acceptsAMatchingVersionAndAdvancesIt`
+  (real Postgres: rejection applies no write, and a matching version advances the row's real
+  `@Version`). Tri-state: `SiteProductServiceTest.updateSettings_explicitNullOverrideFieldClearsItToInherit`/
+  `updateSettings_omittedOverrideFieldLeavesTheStoredValueUntouched` (clear vs. leave-unchanged,
+  as separate tests) and `updateSettings_omittedForecastingEnabledLeavesTheCurrentValueUnchanged`/
+  `updateSettings_explicitNullForecastingEnabledAlsoLeavesTheCurrentValueUnchanged` (both
+  omitted-forms behave identically for the one NOT-NULL field). Row-exists-vs-stocked was already
+  covered by T-3's `updateSettings_onARetainedDeAssortedRowIsAccepted`/`updateSettings_throwsWhenNoRowExistsForThisSite`,
+  updated for the new construction. `GlobalExceptionHandlerTest.handleConflictException_siteProductVersionConflict_shouldReturn409`
+  (409 shape). `SiteProductConcurrencyIT.concurrentSettingsUpdatesOneSucceedsOneConflictsWithNoLostUpdate`
+  (T-6) — a real two-transaction race against Postgres: one write succeeds, the other 409s, no
+  lost update.
+- AC-6b: `SiteProductLegacyCompatibilityIT.mainSettingsChangeMovesAnInheritingSitesEffectiveValue`/
+  `mainSettingsChangeDoesNotMoveAnOverridingSitesEffectiveValue` — a MAIN settings change moves an
+  inheriting site's effective value but not an overriding site's, tested against real Postgres
+  with a genuine SECOND site.

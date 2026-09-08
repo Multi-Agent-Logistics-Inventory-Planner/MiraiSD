@@ -49,7 +49,10 @@ configuration real, using expand/backfill/verify (constrain is explicitly deferr
   reorder point for that site — surfaced as a UI note in the settings screen (5d), not a functional
   bug.
 - Naming: `site_products.is_stocked`, not `is_active` — overloading `active` across both tables
-  would make every future query ambiguous. Record this distinction in `CONTEXT.md` (T-7).
+  would make every future query ambiguous. Record this distinction in
+  [`docs/specs/multi-site-data-and-api.md`](../../docs/specs/multi-site-data-and-api.md) §2 (T-7)
+  — not a new root `CONTEXT.md`, since this repo's `.gitignore` only tracks `README.md` and
+  `AGENTS.md` at the root and a durable spec already exists that owns this exact vocabulary.
 - **`products.is_active` does not currently mean what this record needs it to mean.**
   `StockMovementService:360` computes `shouldBeActive = total > 0` and writes it to
   `products.is_active` on every stock recalculation, so today the column effectively means "has
@@ -205,4 +208,5 @@ configuration real, using expand/backfill/verify (constrain is explicitly deferr
 - T-5: **Operational checkpoint — irreversible on production data.** Take a fresh Supabase backup;
   apply V56/V57 to live Supabase; record applied timestamp and row counts in `log.md`.
 - T-6: Concurrency IT for AC-6.
-- T-7: Add the `isActive` vs. `isStocked` vs. effective-availability distinction to `CONTEXT.md`.
+- T-7: Add the `isActive` vs. `isStocked` vs. effective-availability distinction to
+  `docs/specs/multi-site-data-and-api.md` §2.

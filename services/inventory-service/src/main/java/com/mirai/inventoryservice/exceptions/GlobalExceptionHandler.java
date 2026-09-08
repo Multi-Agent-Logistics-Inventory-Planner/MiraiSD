@@ -6,6 +6,7 @@ import com.mirai.inventoryservice.catalog.domain.DuplicateCategoryException;
 import com.mirai.inventoryservice.catalog.domain.DuplicateSkuException;
 import com.mirai.inventoryservice.catalog.domain.ProductInUseException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.SiteProductVersionConflictException;
 import com.mirai.inventoryservice.catalog.domain.SupplierNotFoundException;
 import com.mirai.inventoryservice.identity.domain.MembershipNotFoundException;
 import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
@@ -80,7 +81,8 @@ public class GlobalExceptionHandler {
             DuplicateLocationCodeException.class,
             DuplicateCategoryException.class,
             ProductInUseException.class,
-            KujiAllocationViolationException.class
+            KujiAllocationViolationException.class,
+            SiteProductVersionConflictException.class
     })
     public ResponseEntity<ErrorResponse> handleConflictException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()

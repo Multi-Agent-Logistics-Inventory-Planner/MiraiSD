@@ -2,7 +2,9 @@ package com.mirai.inventoryservice.catalog.application;
 
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.catalog.domain.SiteProduct;
 import com.mirai.inventoryservice.catalog.domain.SiteProductNotFoundException;
+import com.mirai.inventoryservice.catalog.domain.SiteProductVersionConflictException;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.integration.BaseKafkaIntegrationTest;
@@ -70,7 +72,9 @@ class SiteAssortmentIT extends BaseKafkaIntegrationTest {
     void settingsWriteAgainstAProductTheSiteHasNeverCarriedIsRejected() {
         Product product = newProduct("NeverCarried");
         Site second = newSite("NeverCarried-SECOND");
-        SiteProductSettingsUpdate update = new SiteProductSettingsUpdate(null, new BigDecimal("5.00"), null, null, null, null);
+        SiteProductSettingsUpdate update = new SiteProductSettingsUpdate(
+                0L, FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("5.00")), FieldUpdate.omitted(),
+                FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted());
 
         assertThatThrownBy(() -> siteProductService.updateSettings(second.getId(), product.getId(), update))
                 .isInstanceOf(SiteProductNotFoundException.class);
@@ -99,11 +103,13 @@ class SiteAssortmentIT extends BaseKafkaIntegrationTest {
         Product product = newProduct("RoundTrip");
         Site site = newSite("RoundTrip");
 
-        siteProductService.setStocked(site.getId(), product.getId(), true);
+        SiteProduct carried = siteProductService.setStocked(site.getId(), product.getId(), true);
         siteProductService.updateSettings(site.getId(), product.getId(),
-                new SiteProductSettingsUpdate(null, new BigDecimal("7.77"), null, 30, null, null));
+                new SiteProductSettingsUpdate(
+                        carried.getVersion(), FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("7.77")),
+                        FieldUpdate.omitted(), FieldUpdate.of(30), FieldUpdate.omitted(), FieldUpdate.omitted()));
 
-        siteProductService.setStocked(site.getId(), product.getId(), false);
+        SiteProduct deAssorted = siteProductService.setStocked(site.getId(), product.getId(), false);
 
         EffectiveProductSettings whileDeAssorted = siteAssortment.effectiveSettingsFor(site.getId(), product.getId());
         assertThat(whileDeAssorted.isStocked()).isFalse();
@@ -112,7 +118,9 @@ class SiteAssortmentIT extends BaseKafkaIntegrationTest {
 
         // Still editable while de-assorted.
         siteProductService.updateSettings(site.getId(), product.getId(),
-                new SiteProductSettingsUpdate(null, new BigDecimal("8.88"), null, 30, null, null));
+                new SiteProductSettingsUpdate(
+                        deAssorted.getVersion(), FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("8.88")),
+                        FieldUpdate.omitted(), FieldUpdate.of(30), FieldUpdate.omitted(), FieldUpdate.omitted()));
 
         siteProductService.setStocked(site.getId(), product.getId(), true);
 
@@ -163,5 +171,60 @@ class SiteAssortmentIT extends BaseKafkaIntegrationTest {
         assertThat(siteAssortment.isStockedAt(siteA.getId(), product.getId())).isTrue();
         assertThat(siteAssortment.isStockedAt(siteB.getId(), product.getId())).isFalse();
         assertThat(siteAssortment.stockedProductIds(siteB.getId())).isEmpty();
+    }
+
+    // ---- AC-6: version staleness ----
+
+    /** AC-6: a stale expectedVersion is rejected with 409-mapped SiteProductVersionConflictException, no write applied. */
+    @Test
+    void updateSettings_rejectsAStaleVersionAndAppliesNoWrite() {
+        Product product = newProduct("StaleVersion");
+        Site site = newSite("StaleVersion");
+        SiteProduct carried = siteProductService.setStocked(site.getId(), product.getId(), true);
+        long staleVersion = carried.getVersion() - 1;
+
+        assertThatThrownBy(() -> siteProductService.updateSettings(site.getId(), product.getId(),
+                new SiteProductSettingsUpdate(
+                        staleVersion, FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("50.00")),
+                        FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted())))
+                .isInstanceOf(SiteProductVersionConflictException.class)
+                .hasMessageContaining("current version is " + carried.getVersion());
+
+        // No override was ever applied, so the effective value stays at newProduct()'s global default.
+        assertThat(siteAssortment.effectiveSettingsFor(site.getId(), product.getId()).unitCost())
+                .isEqualByComparingTo("1.00");
+    }
+
+    /** AC-6: a missing expectedVersion on an existing row is rejected the same way, never last-write-wins. */
+    @Test
+    void updateSettings_rejectsAMissingVersionAndAppliesNoWrite() {
+        Product product = newProduct("MissingVersion");
+        Site site = newSite("MissingVersion");
+        siteProductService.setStocked(site.getId(), product.getId(), true);
+
+        assertThatThrownBy(() -> siteProductService.updateSettings(site.getId(), product.getId(),
+                new SiteProductSettingsUpdate(
+                        null, FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("50.00")),
+                        FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted())))
+                .isInstanceOf(SiteProductVersionConflictException.class);
+
+        assertThat(siteAssortment.effectiveSettingsFor(site.getId(), product.getId()).unitCost())
+                .isEqualByComparingTo("1.00");
+    }
+
+    /** AC-6: a matching expectedVersion is accepted and advances the row's version. */
+    @Test
+    void updateSettings_acceptsAMatchingVersionAndAdvancesIt() {
+        Product product = newProduct("MatchingVersion");
+        Site site = newSite("MatchingVersion");
+        SiteProduct carried = siteProductService.setStocked(site.getId(), product.getId(), true);
+
+        SiteProduct updated = siteProductService.updateSettings(site.getId(), product.getId(),
+                new SiteProductSettingsUpdate(
+                        carried.getVersion(), FieldUpdate.omitted(), FieldUpdate.of(new BigDecimal("50.00")),
+                        FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted(), FieldUpdate.omitted()));
+
+        assertThat(updated.getUnitCost()).isEqualByComparingTo("50.00");
+        assertThat(updated.getVersion()).isGreaterThan(carried.getVersion());
     }
 }
