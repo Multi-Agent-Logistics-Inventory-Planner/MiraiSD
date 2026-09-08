@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,9 +28,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * phase 5d), so this uses {@link SiteProductNotFoundThrowingTestController}, a minimal throwaway
  * controller purely to exercise real dispatch - delete both once a real controller endpoint
  * covers the same mapping.
+ * <p>
+ * {@code @ActiveProfiles} activates that controller's {@code @Profile} guard so it exists only in
+ * this test's own context - see its class javadoc for why a plain, unguarded
+ * {@code @RestController} would otherwise leak into every full-context {@code @SpringBootTest} on
+ * the test classpath, including the one that regenerates the checked-in OpenAPI contract.
  */
 @WebMvcTest(controllers = SiteProductNotFoundThrowingTestController.class,
         excludeAutoConfiguration = {org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class})
+@ActiveProfiles(SiteProductNotFoundThrowingTestController.ACTIVATION_PROFILE)
 class SiteProductNotFoundExceptionMappingTest {
 
     @Autowired

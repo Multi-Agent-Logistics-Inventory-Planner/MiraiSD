@@ -24,8 +24,14 @@ import java.util.UUID;
  *       partial row for a product the site has never carried (AC-4b). A row retained with
  *       {@code isStocked = false} satisfies "row exists" and stays editable (AC-4c).</li>
  * </ul>
- * Dual-write to legacy {@code products.*} columns (AC-5) and the version/tri-state settings
- * contract (AC-6) are later tasks (T-4/T-4b) layered on top of these two operations.
+ * AC-5's MAIN dual-write lives here too: when the target site is MAIN, both operations also
+ * update {@code products.*} in the same transaction, so forecasting-service and the legacy
+ * {@code /api/products} readers keep seeing MAIN's current values. Clearing an override (an
+ * explicit {@code null} field in {@link #updateSettings}) is the deliberate exception - it never
+ * dual-writes, since that would clear the very global fallback the cleared field is about to
+ * depend on. The reverse direction - legacy writes syncing back into MAIN's row - is
+ * {@link #syncExistingMainOverrides}, called from {@code ProductService}. The full version/
+ * tri-state settings contract (AC-6) is T-4b, layered on top of this baseline.
  */
 @Service
 @Transactional
@@ -33,10 +39,18 @@ public class SiteProductService {
 
     private final SiteProductRepository siteProductRepository;
     private final ProductRepository productRepository;
+    private final MainSiteResolver mainSiteResolver;
+    private final ForecastPurgePort forecastPurgePort;
 
-    public SiteProductService(SiteProductRepository siteProductRepository, ProductRepository productRepository) {
+    public SiteProductService(
+            SiteProductRepository siteProductRepository,
+            ProductRepository productRepository,
+            MainSiteResolver mainSiteResolver,
+            ForecastPurgePort forecastPurgePort) {
         this.siteProductRepository = siteProductRepository;
         this.productRepository = productRepository;
+        this.mainSiteResolver = mainSiteResolver;
+        this.forecastPurgePort = forecastPurgePort;
     }
 
     public SiteProduct setStocked(UUID siteId, UUID productId, boolean isStocked) {
@@ -46,7 +60,14 @@ public class SiteProductService {
         SiteProduct siteProduct = siteProductRepository.findBySiteIdAndProductId(siteId, product.getId())
                 .orElseGet(() -> newSiteProductSeededFromGlobal(siteId, product));
         siteProduct.setIsStocked(isStocked);
-        return siteProductRepository.save(siteProduct);
+        SiteProduct saved = siteProductRepository.save(siteProduct);
+
+        if (mainSiteResolver.isMain(siteId)) {
+            product.setIsActive(isStocked);
+            productRepository.save(product);
+        }
+
+        return saved;
     }
 
     /**
@@ -81,6 +102,106 @@ public class SiteProductService {
         siteProduct.setTargetStockLevel(update.targetStockLevel());
         siteProduct.setLeadTimeDays(update.leadTimeDays());
 
-        return siteProductRepository.save(siteProduct);
+        SiteProduct saved = siteProductRepository.save(siteProduct);
+
+        if (mainSiteResolver.isMain(siteId)) {
+            dualWriteToGlobalProduct(productId, update);
+        }
+
+        return saved;
+    }
+
+    /**
+     * AC-5: a MAIN settings write updates {@code products.*} atomically, for every field this
+     * call actually sets. Deliberately excludes a {@code null} field (clearing an override) -
+     * clearing must restore inheritance from the current global value, not erase it at the same
+     * moment MAIN starts depending on it (AC-5's dual-write exception).
+     * <p>
+     * Mirrors {@code ProductService.updateProduct}'s forecast-purge behavior: a
+     * {@code forecastingEnabled} true -> false transition purges existing forecast predictions in
+     * the same transaction, so a MAIN settings write doesn't leave stale predictions visible
+     * through unfiltered forecast reads the way the legacy path already guards against.
+     */
+    private void dualWriteToGlobalProduct(UUID productId, SiteProductSettingsUpdate update) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Product not found: " + productId));
+
+        boolean changed = false;
+        boolean turningForecastingOff = false;
+        if (update.forecastingEnabled() != null) {
+            boolean wasForecastingEnabled = !Boolean.FALSE.equals(product.getForecastingEnabled());
+            turningForecastingOff = wasForecastingEnabled && Boolean.FALSE.equals(update.forecastingEnabled());
+            product.setForecastingEnabled(update.forecastingEnabled());
+            changed = true;
+        }
+        if (update.unitCost() != null) {
+            product.setUnitCost(update.unitCost());
+            changed = true;
+        }
+        if (update.msrp() != null) {
+            product.setMsrp(update.msrp());
+            changed = true;
+        }
+        if (update.reorderPoint() != null) {
+            product.setReorderPoint(update.reorderPoint());
+            changed = true;
+        }
+        if (update.targetStockLevel() != null) {
+            product.setTargetStockLevel(update.targetStockLevel());
+            changed = true;
+        }
+        if (update.leadTimeDays() != null) {
+            product.setLeadTimeDays(update.leadTimeDays());
+            changed = true;
+        }
+
+        if (changed) {
+            productRepository.save(product);
+        }
+        if (turningForecastingOff) {
+            forecastPurgePort.purgeForecastsForProduct(productId);
+        }
+    }
+
+    /**
+     * AC-5's reverse direction: a legacy {@code /api/products} write ({@code ProductService})
+     * calls this after saving {@code products.*} so MAIN's overrides stay in sync - but only for
+     * fields MAIN currently overrides. A field MAIN inherits (NULL on the row) is left untouched:
+     * the new global value already reaches MAIN through {@code EffectiveProductSettings}'
+     * fallback, and touching it here would manufacture an override the site never asked for.
+     * A no-op (never creates a row) when MAIN has never carried the product - legacy writes never
+     * manufacture assortment, only {@link #setStocked} does.
+     */
+    public void syncExistingMainOverrides(UUID mainSiteId, UUID productId, SiteProductSettingsUpdate changedFields) {
+        siteProductRepository.findBySiteIdAndProductId(mainSiteId, productId).ifPresent(siteProduct -> {
+            boolean changed = false;
+            if (changedFields.forecastingEnabled() != null) {
+                siteProduct.setForecastingEnabled(changedFields.forecastingEnabled());
+                changed = true;
+            }
+            if (changedFields.unitCost() != null && siteProduct.getUnitCost() != null) {
+                siteProduct.setUnitCost(changedFields.unitCost());
+                changed = true;
+            }
+            if (changedFields.msrp() != null && siteProduct.getMsrp() != null) {
+                siteProduct.setMsrp(changedFields.msrp());
+                changed = true;
+            }
+            if (changedFields.reorderPoint() != null && siteProduct.getReorderPoint() != null) {
+                siteProduct.setReorderPoint(changedFields.reorderPoint());
+                changed = true;
+            }
+            if (changedFields.targetStockLevel() != null && siteProduct.getTargetStockLevel() != null) {
+                siteProduct.setTargetStockLevel(changedFields.targetStockLevel());
+                changed = true;
+            }
+            if (changedFields.leadTimeDays() != null && siteProduct.getLeadTimeDays() != null) {
+                siteProduct.setLeadTimeDays(changedFields.leadTimeDays());
+                changed = true;
+            }
+            if (changed) {
+                siteProductRepository.save(siteProduct);
+            }
+        });
     }
 }

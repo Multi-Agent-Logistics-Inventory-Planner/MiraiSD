@@ -5,6 +5,8 @@ import com.mirai.inventoryservice.auth.RateLimitingFilter;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +78,9 @@ public abstract class BaseKafkaIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private SiteRepository siteRepository;
+
     @Value("${supabase.jwt.secret}")
     private String jwtSecret;
 
@@ -88,6 +93,17 @@ public abstract class BaseKafkaIntegrationTest {
     @BeforeEach
     void clearRateLimits() {
         rateLimitingFilter.clearBuckets();
+    }
+
+    /**
+     * Every product write now touches MAIN's site_products row (.specs/phase-5c-site-products
+     * AC-5). This class does not wrap tests in a rolled-back transaction, so seeding is
+     * idempotent (find-or-create) rather than per-test.
+     */
+    @BeforeEach
+    void ensureMainSiteExists() {
+        siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder().code("MAIN").name("Main").build()));
     }
 
     protected String generateTestToken(String personId, String role) {

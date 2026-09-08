@@ -7,6 +7,8 @@ import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +61,9 @@ class ProductLifecycleTransactionBehaviorIT {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private SiteRepository siteRepository;
+
     @MockBean
     private InitialStockPort initialStockPort;
 
@@ -90,6 +95,12 @@ class ProductLifecycleTransactionBehaviorIT {
         when(shipmentUsageGuardPort.isUsedInShipment(any())).thenReturn(false);
         when(kujiBoxCleanupPort.deleteBoxesAndTiersForProduct(any()))
                 .thenReturn(new KujiBoxCleanupPort.Result(0, 0));
+
+        // Every product write now touches MAIN's site_products row (.specs/
+        // phase-5c-site-products AC-5); this class doesn't extend BaseIntegrationTest, so MAIN
+        // isn't seeded automatically.
+        siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder().code("MAIN").name("Main").build()));
 
         Category category = categoryRepository.save(Category.builder()
                 .name("Tx Behavior Test Category " + System.nanoTime())

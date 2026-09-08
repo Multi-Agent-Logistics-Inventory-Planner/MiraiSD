@@ -29,6 +29,10 @@ public class SiteDirectory {
         return siteRepository.findById(siteId).map(SiteDirectory::toSummary);
     }
 
+    public Optional<SiteSummary> findByCode(String code) {
+        return siteRepository.findByCode(code).map(SiteDirectory::toSummary);
+    }
+
     public boolean exists(UUID siteId) {
         return siteRepository.existsById(siteId);
     }

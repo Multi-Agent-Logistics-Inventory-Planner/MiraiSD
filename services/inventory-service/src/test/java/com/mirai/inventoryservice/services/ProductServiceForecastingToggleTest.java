@@ -3,8 +3,10 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.catalog.application.CategoryService;
 import com.mirai.inventoryservice.catalog.application.ForecastPurgePort;
 import com.mirai.inventoryservice.catalog.application.InitialStockPort;
+import com.mirai.inventoryservice.catalog.application.MainSiteResolver;
 import com.mirai.inventoryservice.catalog.application.OpenKujiBoxPort;
 import com.mirai.inventoryservice.catalog.application.ProductService;
+import com.mirai.inventoryservice.catalog.application.SiteProductService;
 import com.mirai.inventoryservice.catalog.application.SupplierDeliveryHistoryPort;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
@@ -45,6 +47,8 @@ class ProductServiceForecastingToggleTest {
     @Mock private ForecastPurgePort forecastPurgePort;
     @Mock private SupplierDeliveryHistoryPort supplierDeliveryHistoryPort;
     @Mock private OpenKujiBoxPort openKujiBoxPort;
+    @Mock private SiteProductService siteProductService;
+    @Mock private MainSiteResolver mainSiteResolver;
 
     private ProductService service;
     private UUID productId;
@@ -59,7 +63,9 @@ class ProductServiceForecastingToggleTest {
                 initialStockPort,
                 forecastPurgePort,
                 supplierDeliveryHistoryPort,
-                openKujiBoxPort);
+                openKujiBoxPort,
+                siteProductService,
+                mainSiteResolver);
         productId = UUID.randomUUID();
     }
 

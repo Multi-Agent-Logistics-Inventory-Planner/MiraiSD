@@ -30,6 +30,8 @@ public class ProductService {
     private final ForecastPurgePort forecastPurgePort;
     private final SupplierDeliveryHistoryPort supplierDeliveryHistoryPort;
     private final OpenKujiBoxPort openKujiBoxPort;
+    private final SiteProductService siteProductService;
+    private final MainSiteResolver mainSiteResolver;
 
     public ProductService(
             ProductRepository productRepository,
@@ -39,7 +41,9 @@ public class ProductService {
             InitialStockPort initialStockPort,
             ForecastPurgePort forecastPurgePort,
             SupplierDeliveryHistoryPort supplierDeliveryHistoryPort,
-            OpenKujiBoxPort openKujiBoxPort) {
+            OpenKujiBoxPort openKujiBoxPort,
+            SiteProductService siteProductService,
+            MainSiteResolver mainSiteResolver) {
         this.productRepository = productRepository;
         this.categoryService = categoryService;
         this.broadcastService = broadcastService;
@@ -48,6 +52,8 @@ public class ProductService {
         this.forecastPurgePort = forecastPurgePort;
         this.supplierDeliveryHistoryPort = supplierDeliveryHistoryPort;
         this.openKujiBoxPort = openKujiBoxPort;
+        this.siteProductService = siteProductService;
+        this.mainSiteResolver = mainSiteResolver;
     }
 
     public Product createProduct(String sku, UUID categoryId, UUID parentId,
@@ -131,6 +137,11 @@ public class ProductService {
                 savedProduct = productRepository.save(savedProduct);
             }
         }
+
+        // AC-5 (legacy create): every product gets a MAIN site_products row with NULL overrides,
+        // matching V57's backfill shape - is_stocked seeded from the same startsActive derivation
+        // used for products.is_active, not a request field ProductRequestDTO doesn't have.
+        siteProductService.setStocked(mainSiteResolver.resolve(), savedProduct.getId(), startsActive);
 
         return savedProduct;
     }
@@ -275,6 +286,19 @@ public class ProductService {
         }
 
         productRepository.save(product);
+
+        // AC-5 (legacy-write -> site-read): sync this call's changed fields into MAIN's
+        // site_products row, but only where MAIN already holds an override for that field -
+        // a field MAIN inherits is left alone so this edit doesn't manufacture an override it
+        // never asked for. Uses the raw request values, not the entity's post-update state, so
+        // "field not provided in this call" and "field provided" keep the same meaning here as
+        // they do for products.* just above.
+        siteProductService.syncExistingMainOverrides(
+                mainSiteResolver.resolve(),
+                product.getId(),
+                new SiteProductSettingsUpdate(
+                        forecastingEnabled, unitCost, msrp, reorderPoint, targetStockLevel, leadTimeDays));
+
         if (turningForecastingOff) {
             forecastPurgePort.purgeForecastsForProduct(product.getId());
         }
@@ -286,16 +310,16 @@ public class ProductService {
 
     public void deactivateProduct(UUID id) {
         Product product = getProductById(id);
-        product.setIsActive(false);
-        Product saved = productRepository.save(product);
-        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
+        // AC-5: setStocked both saves products.is_active and syncs MAIN's site_products.is_stocked
+        // atomically, upserting the MAIN row if this product somehow doesn't have one yet.
+        siteProductService.setStocked(mainSiteResolver.resolve(), id, false);
+        broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
     }
 
     public void activateProduct(UUID id) {
         Product product = getProductById(id);
-        product.setIsActive(true);
-        Product saved = productRepository.save(product);
-        broadcastService.broadcastProductUpdated(List.of(saved.getId().toString()));
+        siteProductService.setStocked(mainSiteResolver.resolve(), id, true);
+        broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
     }
 
     // deleteProduct moved to ProductDeletionCoordinator (docs:

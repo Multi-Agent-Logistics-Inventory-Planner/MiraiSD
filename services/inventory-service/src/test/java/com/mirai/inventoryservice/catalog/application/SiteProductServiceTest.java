@@ -29,6 +29,8 @@ class SiteProductServiceTest {
 
     @Mock private SiteProductRepository siteProductRepository;
     @Mock private ProductRepository productRepository;
+    @Mock private MainSiteResolver mainSiteResolver;
+    @Mock private ForecastPurgePort forecastPurgePort;
 
     private SiteProductService siteProductService;
     private UUID siteId;
@@ -37,7 +39,8 @@ class SiteProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        siteProductService = new SiteProductService(siteProductRepository, productRepository);
+        siteProductService = new SiteProductService(
+                siteProductRepository, productRepository, mainSiteResolver, forecastPurgePort);
         siteId = UUID.randomUUID();
         productId = UUID.randomUUID();
         product = Product.builder().id(productId).name("Widget").build();
