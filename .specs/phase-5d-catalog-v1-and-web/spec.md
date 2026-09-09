@@ -138,6 +138,40 @@ site-scoped endpoints exist together.
   new key shape in this same task. The Products page renders end-to-end against the new path
   (manual or Playwright smoke, per Track D's AC-7 precedent). Kuji Active/Closed tab behavior,
   the `excludeCustomKuji` filter, and cost/MSRP nulling in the UI are unchanged.
+- AC-6a (data-source split, since `SiteProductResponse`/`CatalogProductResponse` don't carry every
+  field the page renders): the joined product row a T-5 hook produces draws each field from exactly
+  one source, never a fallback chain between them:
+  - **`site_products`-owned fields — `getSiteProducts` only, no legacy fallback ever:**
+    `isStocked` (assortment eligibility, AC-6d), `unitCost`, `msrp`, `reorderPoint`,
+    `targetStockLevel`, `leadTimeDays`, `forecastingEnabled`, `version`. A product the current site
+    does not carry still renders (AC-2's absent-row/global-fallback rule resolves these server-side
+    inside `SiteProductResponse` itself), so there is no case where the UI needs to reach past this
+    endpoint for these fields.
+  - **Global catalog identity — legacy `getProducts()` for now, since `CatalogProductResponse`
+    already has these but the join needs `id` as the correlation key and the legacy shape is what
+    every consuming component (`ProductTable`, `ProductModal`, category filter, sort utils) already
+    expects:** `name`, `sku`, `imageUrl`, `category`, `kujiType`, `letter`, `templateQuantity`,
+    `packsPerBox`, `parentId`, `updatedAt`. Swapping this half to `getCatalogProducts` is future
+    work (tracked, not blocking T-5) once a component-level shape migration is scoped separately —
+    T-5 does not touch `ProductListItem`'s shape, only which endpoints feed it.
+  - **`hasChildren`, `preferredSupplierId/Name/Auto`, `kujiSlackWebhookUrl` — legacy `getProducts()`
+    only,** because neither v1 endpoint exposes them at all today (not narrowed out by AC-1b's
+    site-owned-field list — simply not yet built). Adding them is out of scope for a web-migration
+    task per this record's precedent (Track D's scope discipline) and is tracked as backend
+    follow-up work, not silently deferred.
+  - **`hasActiveBox` — legacy `getProducts()`, and this is a known migration gap, not the intended
+    end state:** `KujiBoxRepository`/the `kuji_boxes` table carry no `site_id` column yet (verified
+    directly: `KujiOpenBoxAdapter.findProductIdsWithOpenBox` calls
+    `KujiBoxRepository.findProductIdsWithStatus`, which has no site predicate). Kuji (and lootbox,
+    the same shape of gap) have not yet been migrated to per-site state — that migration is Phase 7's
+    scope, not this record's, and T-5 does not pull it forward. Until Phase 7, "has an open Kuji box"
+    is unavoidably global/org-wide. **AC-6e** constrains how this gap may surface in a multi-site UI
+    in the meantime (see below) — the Active/Closed Kuji tabs are not simply left showing global data
+    unconditionally.
+  - This split must be implemented as **two distinct queries joined client-side** (legacy
+    `getProducts` for catalog/kuji display fields, `getSiteProducts` for site-scoped fields), not a
+    single hook that silently prefers one source over the other per field — the source for each
+    field is fixed, not negotiated at read time.
 - AC-6b (the page must not mix scoped and unscoped data): migrating the product query alone is
   **not sufficient**. `hooks/queries/use-product-inventory.ts` separately fetches
   `/api/inventory/totals` under the unscoped key `["inventoryTotals"]` and joins by product ID, and
@@ -157,10 +191,38 @@ site-scoped endpoints exist together.
   that the list request carried a `siteId`: rendered quantities and stock status (or their
   documented absence under AC-6b), product detail state, and which mutations are offered/enabled
   for the current role. A test asserting only the outgoing request URL would pass against the
-  mixed-data bug above.
+  mixed-data bug above. It must also cover AC-6a's join directly: a product carried (assorted) at
+  site A but not at site B renders with A's `isStocked`/settings at A and B's own (or global
+  fallback) values at B, while `name`/`category`/`imageUrl` stay identical across the switch —
+  proving the two queries are actually joined by product ID and not accidentally rendering one
+  site's site-scoped fields against the other site's catalog rows. Kuji-tab placement is *not*
+  asserted identical across the switch — see AC-6e, which governs it separately at a non-MAIN site.
 - AC-6d: No Phase 5 site view uses `products.is_active` as assortment eligibility — that column
   still means "has stock somewhere" (see 5b's recorded hazard). Site assortment eligibility comes
   only from `site_products.is_stocked`.
+- AC-6e (Kuji/lootbox are not site-isolated yet — the UI must not imply they are): `hasActiveBox`
+  and every other Kuji/lootbox fact this page reads stay backed by the legacy, global
+  `getProducts()`/box-status data through this record (per AC-6a) because Phase 7, not this record,
+  migrates kuji/lootbox to per-site state. Left unguarded, that global data would render inside a
+  page whose surrounding chrome (a site-scoped product list, site-scoped settings) implies
+  everything on screen belongs to the current site — at a non-MAIN site this would present another
+  site's (or the org's undifferentiated) Kuji box activity as if it were this site's own. To prevent
+  that misrepresentation before Phase 7 does the real migration:
+  - The Custom Kuji tab and its Active/Closed split render normally at MAIN (today's only reachable
+    site, `useCurrentSite`'s current hard-coded resolution) — behavior is unchanged from before this
+    record for the one site anyone can actually view.
+  - At any resolved site whose `siteCode !== "MAIN"`, the Custom Kuji tab renders a explicit
+    "Kuji is not yet available per-site" unavailable state instead of the (globally-scoped, and
+    therefore untrustworthy-per-site) tab content — never the real Kuji rows relabeled as if they
+    belonged to that site.
+  - This is a client-side display gate only, not a new authorization boundary and not a backend
+    change — `hasActiveBox`/box data keep coming from the same global source either way; the gate
+    only decides whether the page is allowed to *present* that data as this site's own.
+  - Once Phase 7 gives kuji/lootbox real per-site state, this gate and its "not yet available"
+    affordance are removed and the tab goes back to rendering unconditionally, now backed by
+    genuinely site-scoped data.
+  - Tested alongside the AC-6c site-switch test: a non-MAIN `siteCode` renders the unavailable state
+    and does not fetch/display Kuji tab content; MAIN renders it exactly as before.
 - AC-7: `useCategories` migrates to `/api/v1/catalog/categories` (global, no `siteId`); the products
   page category filter, `manage-categories-dialog`, and subcategory grouping in
   `product-sort-utils` are unchanged.
@@ -177,7 +239,13 @@ site-scoped endpoints exist together.
 - T-3: Deprecation/Sunset/Link headers on legacy catalog routes.
 - T-4: Exit-gate integration test (AC-5).
 - T-5: **Review checkpoint (busiest list; query-key invalidation audit).** Web Products list
-  migration: `getSiteProducts`, query-key change, `invalidateQueries` audit, AC-6b's chosen
-  inventory-totals disposition (withhold vs. scoped read — recorded explicitly in `log.md`), and
-  AC-6c's site-switch test covering quantities, status, detail state and offered mutations.
+  migration: `getSiteProducts`, AC-6a's two-source client-side join (site-scoped fields from
+  `getSiteProducts` only, catalog/Kuji display fields from legacy `getProducts()`, `hasActiveBox`
+  documented as a Phase 7 migration gap, not this record's intended end state), query-key change,
+  `invalidateQueries` audit, AC-6b's chosen inventory-totals disposition (withhold vs. scoped read —
+  recorded explicitly in `log.md`), AC-6e's non-MAIN Kuji-tab unavailable gate (kuji/lootbox
+  site-scoping itself stays out of scope, deferred to Phase 7 — T-5 only prevents the unmigrated
+  global data from being presented as site data), and AC-6c's site-switch test covering quantities,
+  status, detail state, offered mutations, the join itself (a product assorted at one site but not
+  the other), and the AC-6e Kuji-tab gate.
 - T-6: Web categories migration (`useCategories` → v1).

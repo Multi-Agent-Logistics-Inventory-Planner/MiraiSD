@@ -2,12 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { getCategories } from "@/lib/api/categories";
+import { getCatalogCategories } from "@/lib/api/categories";
 
 export function useCategories() {
   return useQuery({
     queryKey: ["categories"],
-    queryFn: getCategories,
+    // Categories are wholly global (no siteId) - spec.md phase-5d AC-7. Unlike products, this
+    // is a straight endpoint swap, not a join: every consumer of useCategories/useChildCategories
+    // moves to v1 at once, with no query-key change needed.
+    queryFn: getCatalogCategories,
     staleTime: 5 * 60 * 1000, // Categories change infrequently
     select: (data) =>
       [...data]

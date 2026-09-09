@@ -170,3 +170,84 @@ permanent test independently checks syntax and the intended UTC instant.
 Focused suite passes 4/4; no new blocking findings. T-3 is clear for T-4.
 Minor documentation correction: the Date type comes from RFC 9651 (referenced
 by RFC 9745), rather than RFC 8941 as the new comments state.
+
+## T-5 independent review — 2026-09-09
+
+Parallel Standards and Spec passes reviewed the dirty-worktree web migration,
+the accepted AC-6a data-source split, AC-6b withholding, query invalidation,
+detail state, and the AC-6e Kuji gate. Disposition: **changes required**.
+
+- [Standards|Spec] **P2 — act on (AC-6c):**
+  `apps/web/src/app/(dashboard)/products/page.tsx:263` passes a selected row
+  snapshot to ProductModal. Selection is only updated on a row click; changing
+  the site/list does not clear or rebind it. Open detail at MAIN, then change the
+  current-site result to SECOND: the table adopts SECOND's settings while the
+  open modal still shows MAIN's price/settings. Clear transient dialog state on
+  site changes or resolve selection against the current site's rows, including
+  the loading/error transition. The present resolver only exposes MAIN, so this
+  is a failure of the explicitly required site-switch behavior, not a claim of
+  an available production switcher.
+- [Standards|Spec] **P2 — act on (AC-6b/AC-6d):**
+  `apps/web/src/components/products/product-modal.tsx:304` still renders global
+  `p.isActive` even with `showInventory={false}`. For `isStocked=false` and
+  `isActive=true`, the table says "Not Stocked" while detail says "Active".
+  Withholding the Current Stock section does not withhold this global,
+  stock-derived status. Render site assortment from `product.isStocked` on
+  this path, or withhold the global status.
+- [Spec] **P2 — act on (AC-6/AC-6c):**
+  `apps/web/src/hooks/queries/__tests__/use-site-product-inventory.test.ts:124`
+  switches mocked hook data to an empty site list. It does not exercise the
+  real absent-assortment response (a product row with effective fallback
+  settings), the rendered table/modal, role-dependent offered actions, or
+  inventory withholding. The implementation log explicitly omits the whole-page
+  test and records no completed manual/Playwright smoke. Add the required page
+  switch proof using realistic A/B responses, an open detail modal, withheld
+  quantity/status, relevant role actions, and the Kuji gate. Typecheck and hook
+  tests do not establish those rendered behaviors.
+
+The fixed field-source join, site-qualified query, prefix invalidation audit,
+and fail-closed Kuji panel have no additional blocking findings. Existing tests
+pass, but do not close the findings above. No implementation edits made during
+this review; T-6 has not started.
+
+## T-5 independent fix follow-up — 2026-09-09
+
+Parallel Standards and Spec passes confirm all three P2 findings are resolved.
+Selection stores a product ID and resolves the row from current joined items;
+an uncached site transition produces a null selection rather than retaining the
+old site's row. ProductModal explicitly distinguishes undefined `isStocked`
+from false, preserving legacy status only on the unscoped path.
+
+The four new rendered-page tests execute the actual list/join hooks, table,
+and detail modal. They cover inventory withholding, role-dependent Edit and
+money visibility, and an open modal adopting SECOND's distinct MSRP and
+assortment status. Together with the existing Kuji boundary tests, this closes
+the missing acceptance-proof finding. No new blocking findings; **T-5 is clear
+to proceed to T-6**.
+
+Non-blocking limitations: the switch test supplies a new QueryClient on rerender
+rather than retaining one cache, and Kuji is tested separately from the page.
+A future extension can retain the same client and assert the intermediate
+loading state and all post-switch table fields. No browser smoke was run.
+The edit form remains on its existing legacy product query; ID-only edit state
+does not itself migrate that form's settings to site-scoped data.
+
+Lint passes with 51 warnings, not 50: the new selection memo adds one warning
+about the unstable `items` fallback dependency. This is non-blocking.
+
+## T-6 final web review — 2026-09-09
+
+Parallel Standards and Spec passes reviewed the category API adapter, query
+swap, new category API/hook tests, added site-product API tests, and the
+Products page test's updated category mock. **No findings; T-6 satisfies AC-7.**
+
+Both category controllers call the same service and mapper. The new client
+mapper preserves every Category field and maps children recursively. The
+global query key, alphabetical selection, child-category lookup, consumers,
+and legacy mutation invalidation remain compatible. The existing published
+contract supplies the response type; no regeneration is needed.
+
+T-1 through T-6 implementation tasks are complete with no outstanding blocking
+web review findings. Commit and the PR gate remain pending. This final web
+review retains earlier backend/contract evidence without rerunning it and
+retains T-5's documented limitation that no browser smoke was performed.

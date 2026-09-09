@@ -61,15 +61,9 @@ const TransferStockDialog = dynamic(
   { ssr: false }
 );
 
-const CustomKujiTabs = dynamic(
-  () =>
-    import("@/components/kuji").then((m) => ({
-      default: m.CustomKujiTabs,
-    })),
-  { ssr: false }
-);
+import { KujiTabPanel } from "@/components/products/kuji-tab-panel";
 import {
-  useProductInventory,
+  useSiteProductInventory,
   type ProductWithInventory,
 } from "@/hooks/queries/use-product-inventory";
 import { useCategories } from "@/hooks/queries/use-categories";
@@ -95,7 +89,7 @@ function ProductsContent() {
   const currentTab = tabValue ?? "products";
 
   // Show only root products (no parent) by default
-  const list = useProductInventory(true);
+  const list = useSiteProductInventory(true);
   const { data: categories } = useCategories();
 
   const [filters, setFilters] = useState<ProductFiltersState>(
@@ -105,10 +99,15 @@ function ProductsContent() {
   const [page, setPage] = useState(0);
 
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selected, setSelected] = useState<ProductWithInventory | null>(null);
+  // Identity only - the row itself is looked up fresh from `items` on every render (below),
+  // rather than snapshotted at select time. A snapshot would freeze the modal on whichever
+  // site's isStocked/settings were current when the row was clicked: since useSiteProductInventory
+  // refetches on a site change (its query key includes siteId), an id-only selection re-resolves
+  // against the new site's data automatically, while a snapshotted row object would not.
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<ProductWithInventory | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -119,6 +118,14 @@ function ProductsContent() {
     useState<PreselectedProductInfo | null>(null);
 
   const items = list.data ?? [];
+
+  // Re-resolved from `items` every render (not a stale snapshot) - see selectedProductId's
+  // comment above. Also covers the product no longer appearing in `items` at all (e.g. a very
+  // stale id after navigating away and back): resolves to null rather than showing nothing.
+  const selected = useMemo(
+    () => (selectedProductId ? items.find((row) => row.product.id === selectedProductId) ?? null : null),
+    [items, selectedProductId],
+  );
 
   const filteredItems = useMemo(() => {
     return items.filter((row) => {
@@ -193,7 +200,7 @@ function ProductsContent() {
   };
 
   const handleSelect = (row: ProductWithInventory) => {
-    setSelected(row);
+    setSelectedProductId(row.product.id);
     setDetailOpen(true);
   };
 
@@ -206,7 +213,7 @@ function ProductsContent() {
         onChange={handleFiltersChange}
         categories={categories ?? []}
         onAddClick={() => {
-          setEditing(null);
+          setEditingProductId(null);
           setFormOpen(true);
         }}
         onManageCategoriesClick={() => setManageCategoriesOpen(true)}
@@ -243,6 +250,7 @@ function ProductsContent() {
                   kujiCategoryIds={kujiCategoryIds}
                   sort={sort}
                   onSortChange={handleSortChange}
+                  showQuantity={false}
                 />
               </CardContent>
             </Card>
@@ -257,7 +265,7 @@ function ProductsContent() {
           </TabsContent>
 
           <TabsContent value="custom-kuji" className="mt-3">
-            <CustomKujiTabs items={customKujiItems} />
+            <KujiTabPanel siteCode={list.siteCode} items={customKujiItems} />
           </TabsContent>
         </Tabs>
       )}
@@ -266,6 +274,7 @@ function ProductsContent() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         product={selected}
+        showInventory={false}
         onAdjustClick={(preselectedProduct) => {
           setAdjustPreselectedProduct(preselectedProduct);
           setAdjustOpen(true);
@@ -276,7 +285,7 @@ function ProductsContent() {
         }}
         onEditClick={() => {
           if (selected) {
-            setEditing(selected);
+            setEditingProductId(selected.product.id);
             setFormOpen(true);
           }
         }}
@@ -285,7 +294,7 @@ function ProductsContent() {
       <ProductForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        initialProductId={editing?.product?.id ?? null}
+        initialProductId={editingProductId}
       />
 
       <ManageCategoriesDialog

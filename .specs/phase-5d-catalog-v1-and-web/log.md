@@ -6,9 +6,73 @@
   HTTP-date instead of RFC 9745's structured-fields Date syntax) is fixed. T-1's review findings
   and both rounds of T-2's review findings (five total: search filtering, parentId mapping,
   unusable settings schema, malformed-version coercion, incomplete auth proof; then a second
-  round: missing nullable unions, fractional-version coercion) are all fixed. T-5 and T-6 not
-  started.
-- Next action: T-5 (review checkpoint: web Products list migration to `getSiteProducts`).
+  round: missing nullable unions, fractional-version coercion) are all fixed. T-5 re-scoped (see
+  below) before implementation started; T-5 and T-6 are now implemented and reviewed.
+- **T-5 re-scope (before any code was written):** starting T-5 surfaced that `SiteProductResponse`
+  (T-2) and `CatalogProductResponse` (T-1) together don't carry every field the Products page
+  renders — `hasChildren`, `hasActiveBox`, `preferredSupplierId/Name/Auto`, `kujiSlackWebhookUrl`
+  exist on neither. A pure "migrate the query, keep the component" approach as AC-6 originally
+  implied wasn't reachable without either silently degrading the page or expanding the backend
+  contract mid-task. Raised to the user rather than assumed; user chose to update spec.md's AC-6
+  first (now AC-6a) rather than either silently picking a disposition or expanding the backend.
+  Added AC-6a: a fixed, field-by-field data-source split — `site_products`-owned fields
+  (`isStocked`, money fields, `version`) come from `getSiteProducts` only, ever; catalog/Kuji
+  display fields (`name`, `category`, `imageUrl`, `kujiType`, `hasChildren`,
+  `preferredSupplier*`, `kujiSlackWebhookUrl`) come from legacy `getProducts()` for now (tracked
+  backend follow-up, not blocking); `hasActiveBox` also comes from legacy `getProducts()` —
+  `kuji_boxes` has no `site_id` column yet (`KujiOpenBoxAdapter.findProductIdsWithOpenBox` →
+  `KujiBoxRepository.findProductIdsWithStatus` has no site predicate), so Kuji box state is
+  genuinely global/org-wide today. **Correction to this record's own earlier framing:** an
+  interim draft of this note called that "not a compromise" — on further review that undersold
+  it. It is a real migration gap: kuji/lootbox site-scoping is Phase 7's scope, not yet done, and
+  T-5 deliberately does not pull that migration forward. Left unguarded, a page that otherwise
+  reads as site-scoped could present that global Kuji data as if it belonged to whichever site is
+  selected. Added **AC-6e**: the Custom Kuji tab renders normally at MAIN (today's only reachable
+  site — `useCurrentSite` always resolves to MAIN, no switcher UI exists yet) and renders an
+  explicit "not yet available per-site" state at any other resolved `siteCode`, so unmigrated Kuji
+  data can never surface labeled as another site's own. This is a client-side display gate only —
+  no backend change, no new authorization boundary — removed once Phase 7 gives kuji real per-site
+  state. T-5 is a **two-query client-side join by product ID**, not a single hook that silently
+  prefers one source per field. AC-6c is widened to require the site-switch test prove the join
+  itself (a product carried at one site but not the other renders correctly at both) and the AC-6e
+  Kuji-tab gate.
+- T-5 implemented (see "T-5" task record below for the full diff, AC-6b disposition, the
+  `invalidateQueries` audit conclusion, and test list). Independently reviewed 2026-09-09:
+  changes required; see review.md's T-5 section. All three P2 findings fixed (see "T-5 review
+  findings fixed" below): stale detail-modal state across a site change (rebind by id instead of
+  snapshotting the row), the modal's second Status line still reading `p.isActive`, and a missing
+  rendered whole-page acceptance test.
+- Independent fix follow-up: all three P2 findings closed; T-5 review is clear.
+- T-6 implemented (see "T-6" task record below): `useCategories` now reads through
+  `getCatalogCategories` (`/api/v1/catalog/categories`), a straight endpoint swap (categories
+  are wholly global, no join needed) rather than T-5's two-query pattern. Category mutations
+  stay on the legacy routes, unchanged. Independently reviewed 2026-09-09 with no findings.
+- Status of task list: T-1 through T-6 implementation complete; T-6 final review clear.
+  Commit and the authoritative PR gate remain pending; this is not a merged/deployed claim.
+- **Final pre-commit validation** (full record, see validation.md's matching entry): unlike the
+  T-6 review's web-only rerun, this pass also reran the full backend suite (rather than relying
+  on T-1-T4 checkpoint-time counts) as the last local gate before commit - JDK 21, from
+  `services/inventory-service`: `./mvnw -o test` (unit) 404/404, `./mvnw -o test -Dtest='*IT'`
+  (integration) 375/375, both BUILD SUCCESS. `git status --short services/inventory-service
+  packages/contracts packages/api-client` — empty, confirming T-5/T-6 made no backend or contract
+  changes, so the T-1/T-2 `oasdiff breaking --fail-on ERR` (no breaking changes) and
+  `packages/api-client` generate/typecheck results remain valid without rerunning them.
+  `apps/web`: `npm run test:run --workspace apps/web` — 318/318; `npx tsc --noEmit -p
+  apps/web/tsconfig.json` — pass; `npm run lint --workspace apps/web` — 0 errors, 51 warnings
+  (unchanged, all pre-existing); `git diff --check` — pass.
+- Next action: commit the scoped feature changes and obtain the PR gate's independent proof.
+- Latest verification (T-6 review, repository root):
+  `npm run test:run --workspace apps/web` — 318/318;
+  `npx tsc --noEmit -p apps/web/tsconfig.json` — pass;
+  `npm run lint --workspace apps/web` — 0 errors, 51 warnings;
+  `git diff --check` — pass. Prior backend/contract evidence retained, not rerun for T-6.
+- Latest fix verification: `npx vitest run` (whole `apps/web` suite) — 307/307 (4 new in
+  `products/__tests__/page.test.tsx`); `npx tsc --noEmit -p tsconfig.json` — clean;
+  `npm run lint` — implementer reported 0 errors, 50 warnings. Independent rerun:
+  `npm run test:run --workspace apps/web` — 307/307;
+  `npx tsc --noEmit -p apps/web/tsconfig.json` — pass;
+  `npm run lint --workspace apps/web` — 0 errors, **51 warnings** (one additional
+  dependency warning for the new selection memo); `git diff --check` — pass.
 - Decisions that must survive compaction:
   - **This project's springdoc emits OpenAPI 3.1, and `@Schema(nullable = true)` is silently a
     no-op under this swagger-core version's 3.1 output** (verified empirically, with and without
@@ -505,3 +569,245 @@
   `./mvnw -o test -Dtest='*IT'` — 375/375 (no regressions). `./mvnw -o test` (unit) — 404/404.
 - T-4 is now fully resolved. Next action: T-5 (review checkpoint: web Products list migration to
   `getSiteProducts`, query-key audit, AC-6b inventory-totals disposition, AC-6c site-switch test).
+
+## T-5 — Web Products list migration (review checkpoint)
+
+- Re-scoped before any code was written; see "T-5 re-scope" in the Current handoff section above
+  for AC-6a (data-source split) and AC-6e (Kuji-tab gate), both added to spec.md before
+  implementation.
+- Changed:
+  - `apps/web/src/lib/api/products.ts`: added `getSiteProducts(siteId)` (calls `GET
+    /api/v1/sites/{siteId}/products`) and the `SiteProduct` type, alongside the untouched legacy
+    `getProducts`/`ProductListItem` - mirrors `getSiteStorageLocations`'s precedent in
+    `lib/api/locations.ts` (drop-invalid-records `toSiteProduct` mapper, same shape as
+    `toStorageLocationSummary`).
+  - Added `hooks/queries/use-site-products.ts` (`useSiteProducts`): wraps `getSiteProducts` with
+    `useCurrentSite()`, keyed `["products", siteId, "site"]`, disabled via `skipToken` until
+    `siteId` resolves - mirrors `use-storage-locations.ts`'s precedent exactly, including its
+    disabled-query-still-loading and unresolved-membership-is-an-error handling.
+  - `hooks/queries/use-product-inventory.ts`: added `useSiteProductInventory(rootOnly)` - joins
+    the untouched legacy `useProducts` (catalog/Kuji display fields) with the new
+    `useSiteProducts` (site-owned fields only) by product ID, per AC-6a. `ProductWithInventory`
+    widened additively: `totalQuantity`/`lastUpdatedAt`/`status` now optional (undefined on
+    site-scoped rows - AC-6b withholds them, never zeroed), plus new optional `isStocked` and
+    `siteProductVersion` fields. The pre-existing `useProductInventory` (still used by
+    `location-detail-sheet.tsx`, out of this record's scope) is untouched.
+  - `types/api.ts`: added `ProductListItem.forecastingEnabled?: boolean` (site-scoped-only field
+    the join needed to carry; every other AC-6a site-owned field already existed on the type).
+  - `components/products/product-table.tsx`: added `showQuantity` prop (default `true`). When
+    `false`: the Stock column and its skeleton cells are removed entirely (not zeroed), and a
+    `"Quantity and stock status are available after inventory is migrated per site (Phase 6)"`
+    note renders below the table. The Status badge/sort now reads `row.isStocked ?? row.product.
+    isActive` (falls back to the legacy field only when a row has no site data at all) instead of
+    always reading `isActive` - AC-6d's "assortment eligibility only from is_stocked" made
+    concrete as the one place the page shows an eligibility-like signal.
+  - `components/products/product-sort-utils.ts`: `compareProducts`'s `"status"` case updated to
+    the same `isStocked ?? isActive` fallback (existing `isActive`-only tests still pass unchanged,
+    since they never set `isStocked`); `"stock"` case guards `totalQuantity ?? 0` since it's
+    unreachable via the site view's UI (no Stock header to sort by there) but must not throw
+    `NaN` if called directly.
+  - `components/products/product-modal.tsx`: added `showInventory` prop (default `true`,
+    `location-detail-sheet.tsx`'s usage untouched). When `false`, the "Current Stock" section
+    renders a withheld-state card with the same explanatory copy instead of the quantity/location
+    breakdown table. Adjust/Transfer buttons are **not** gated by this prop - they still use their
+    own `useProductInventoryEntries`/`useKujiAllocationsByProduct` fetches, which stay unscoped;
+    stock mutation itself is inventory work, out of this record's "no inventory work" boundary
+    (spec.md AC-6b only withholds *display* of quantity/stock-status, not the ability to adjust
+    it).
+  - New `components/products/kuji-tab-panel.tsx` (`KujiTabPanel`, exports `MAIN_SITE_CODE`):
+    AC-6e's gate, extracted into its own component (rather than left inline in `page.tsx`) so it's
+    independently unit-testable without the page's Sidebar/permissions/router provider stack.
+    Renders `CustomKujiTabs` (moved here from `page.tsx`'s own `dynamic()` call) only when
+    `siteCode === "MAIN"`; otherwise renders a "Kuji is not yet available per-site" card and never
+    mounts `CustomKujiTabs` at all (no request, no dynamic import triggered). **Fails closed**: an
+    unresolved `siteCode` (`undefined`, e.g. while `/api/v1/me/sites` is still loading) also
+    renders the unavailable state rather than assuming MAIN - Kuji data is never shown before the
+    site is confirmed.
+  - `app/(dashboard)/products/page.tsx`: swapped `useProductInventory(true)` for
+    `useSiteProductInventory(true)`; `ProductTable` gets `showQuantity={false}`; `ProductModal`
+    gets `showInventory={false}`; the Custom Kuji tab content is now `<KujiTabPanel
+    siteCode={list.siteCode} items={customKujiItems} />` in place of the previous unconditional
+    `<CustomKujiTabs items={customKujiItems} />`. Filtering (search/category), pagination, the
+    `excludeCustomKuji`-equivalent split (`productsTabItems`/`customKujiItems`), and money-field
+    visibility (`canViewCosts`/`canViewMsrp` gating in `ProductModal`, unaffected by this change)
+    are otherwise unchanged - they all operate on fields the join leaves untouched or correctly
+    overrides.
+  - `components/stock/adjust/types.ts`: `createNormalizedInventory` (dead code - exported but
+    called nowhere in the app, confirmed by grep) now defaults `quantity: totalQuantity ?? 0`
+    since `totalQuantity` became optional; no behavior change for its only real inputs (the
+    legacy view, where it's always a number).
+- AC-6b disposition: **(a) Withhold**, as spec.md assumes by default. No site-scoped inventory-
+  totals endpoint exists yet (Phase 6). Quantity/stock-status are removed from both the list
+  (Stock column) and the detail view (Current Stock section), each replaced with the same
+  "available after inventory is migrated per site (Phase 6)" explanation - never a zeroed value.
+- `invalidateQueries` audit (AC-6): every `hooks/mutations/*.ts` call site invalidating products
+  uses a bare `queryKey: ["products"]` (7 call sites across `use-not-assigned-mutations.ts`,
+  `use-location-mutations.ts`, `use-stock-mutations.ts`, `use-product-mutations.ts`,
+  `use-supplier-mutations.ts`, `use-shipment-mutations.ts`) plus a few product-ID-scoped keys in
+  `use-stock-mutations.ts`/`use-product-mutations.ts` (`["products", id]`,
+  `["products", id, "with-children"]`, `["products", id, "children"]`) that target the unrelated
+  single-product/children queries, not the list. TanStack Query's default `invalidateQueries`
+  matches by array-prefix (`exact: false`), so a bare `["products"]` call already invalidates
+  every query whose key starts with `"products"` - both the legacy list (`["products", opts]`)
+  and the new site-scoped list (`["products", siteId, "site"]`) - with no code change needed.
+  Verified empirically, not assumed: a scratch `QueryClient` test seeded all three key shapes plus
+  an unrelated key, called `invalidateQueries({ queryKey: ["products"] })`, and asserted all three
+  product keys were marked invalidated while the unrelated key was not (run once to confirm, then
+  discarded - not a permanent regression test, since it tests TanStack's own documented behavior
+  rather than this codebase's code). **No `hooks/mutations/` files were changed for T-5** - the
+  audit's conclusion is that the existing keys already cover the new query.
+- Tests:
+  - `hooks/queries/__tests__/use-site-products.test.ts` (new, 4 tests): disabled-until-resolved,
+    calls through with the resolved `siteId`, site-resolution error propagation, unresolved-
+    membership-with-no-error surfaces as an error - mirrors `use-storage-locations.test.ts`.
+  - `hooks/queries/__tests__/use-site-product-inventory.test.ts` (new, 4 tests): stays `null`
+    until both queries load; AC-6a's field-source split (money/settings fields only from the site
+    response even when the legacy catalog object carries different values for the same field
+    names, catalog fields only from legacy, quantity fields always `undefined`); a simulated site
+    switch (rerender with a different `useSiteProducts` result) proves the row's site-owned fields
+    change while catalog fields stay identical, and that an absent-from-site-list product safely
+    degrades to `isStocked: false`/`siteProductVersion: null` rather than throwing; site-error
+    propagation.
+  - `components/products/__tests__/kuji-tab-panel.test.tsx` (new, 3 tests, the AC-6e boundary
+    test the user explicitly asked to see alongside the assortment/settings behavior): MAIN
+    renders `CustomKujiTabs` with the given items; a non-MAIN `siteCode` renders the unavailable
+    card and never calls/mounts `CustomKujiTabs`; an unresolved (`undefined`) `siteCode` also
+    fails closed to the unavailable card. Uses a local `next/dynamic` stand-in (resolves the
+    loader asynchronously via `useEffect`, same shape as the real implementation) so the test
+    exercises the same dynamic-import wiring the page uses, not a bypassed one.
+  - No dedicated AC-6c "whole page" test: reaching `ProductsContent` requires a `SidebarProvider`
+    (`ProductHeader`'s `SidebarTrigger` throws without one) and full RBAC/auth context
+    (`usePermissions` inside `ProductFilters`/`ProductModal`), neither of which any existing test
+    in this codebase currently provides a harness for. Per Track D's AC-7 precedent (already
+    invoked by spec.md's own AC-6 for this exact page), page-level end-to-end coverage is manual/
+    Playwright smoke rather than a from-scratch provider harness built for this one page. The
+    join and the AC-6e boundary - the two behaviors AC-6c is actually protecting against
+    regressing - are covered directly by the hook and `KujiTabPanel` tests above; what remains
+    untested at the unit level is wiring (`ProductTable`/`ProductModal` prop plumbing in
+    `page.tsx`), verified instead by reading the diff and by `tsc --noEmit` (no untyped prop
+    mismatches) plus the full existing suite staying green.
+- Result: Pass. `npx vitest run` (whole `apps/web` suite) — 303/303 (11 new: 4 + 4 + 3 above).
+  `npx tsc --noEmit -p tsconfig.json` — clean. `npm run lint` — 0 errors, 50 warnings (all
+  pre-existing, none in a file this task touched beyond the one pre-existing warning already
+  present on `products/page.tsx`'s unrelated `items` useMemo dependency, confirmed unchanged from
+  before this task). No contract regeneration - T-5 is web-only, calls only endpoints T-1/T-2
+  already published.
+- Next action: T-6 (web categories migration, `useCategories` → `/api/v1/catalog/categories`).
+
+## T-5 independent review result
+
+- Status: changes requested; see review.md for three P2 findings (stale detail-modal state
+  across a site change, the modal's Status line still reading global `isActive`, missing
+  whole-page acceptance proof).
+- Verified by the reviewer: `npm run test:run --workspace apps/web` — 303/303;
+  `npx tsc --noEmit -p apps/web/tsconfig.json` — pass; `npm run lint --workspace apps/web` —
+  0 errors, 50 warnings.
+- Next action: fix all three findings, then rerun the review checkpoint before T-6.
+
+## T-5 review findings fixed
+
+- Finding 1 (P2, modal retains the previous site's settings — `page.tsx`): `selected` was a
+  `ProductWithInventory` object snapshotted at click time (`setSelected(row)`), so once
+  `useSiteProductInventory` refetched on a site change, the open modal kept showing whichever
+  site's `isStocked`/money fields were current *when the row was clicked*, not the new site's.
+  Changed the page to hold only `selectedProductId`/`editingProductId` (`string | null`) and
+  derive `selected`/`editing` via `useMemo(() => items.find(row => row.product.id === id) ??
+  null, [items, id])` on every render - since `items` comes from the same `list.data` that
+  refetches on a site change, an open modal now automatically re-resolves to the new site's row
+  the next time `items` updates, with no explicit "clear on site change" needed. The `editing`
+  local variable was fully replaced by this derivation (`ProductForm` only ever needed the id,
+  not the row object, so `editingProductId` is passed directly). Also fixes the same staleness
+  for the edit form's `initialProductId` and for `onAddClick`'s `setEditing(null)` reset
+  (now `setEditingProductId(null)`).
+- Finding 2 (P2, modal still displays global stock status — `product-modal.tsx`): a second,
+  separate "Status:" row (distinct from the one in `product-table.tsx`, already fixed in the
+  initial T-5 pass) still rendered `p.isActive` unconditionally - missed in the original pass.
+  Now reads `product.isStocked` when present (site-scoped rows) and falls back to `p.isActive`
+  with its original "Active"/"Inactive" copy only when `isStocked` is `undefined` (the legacy,
+  unscoped `location-detail-sheet.tsx` path, left unchanged). The site-scoped path now always
+  shows "Stocked"/"Not Stocked", matching the table badge for the same row - they can no longer
+  disagree.
+- Finding 3 (P2, missing whole-page acceptance proof): added
+  `app/(dashboard)/products/__tests__/page.test.tsx` (4 tests), a real rendered-page test
+  (`SidebarProvider` + `QueryClientProvider` around the actual `ProductsPage`, with `next/dynamic`
+  stubbed via the same async loader shim as `kuji-tab-panel.test.tsx` so `ProductModal` still
+  loads through its real dynamic-import wiring) rather than only hook-level mocks:
+  - list withholds quantity/Stock column and shows the withheld-inventory affordance, and the
+    legacy site-blind `quantity: 999` value never renders anywhere;
+  - opening the detail modal also withholds inventory and hides Edit for an EMPLOYEE-shaped
+    permission set;
+  - a role with `PRODUCTS_UPDATE` sees Edit and its cost/MSRP fields (gated correctly per
+    permission, sourced from the site response, not any legacy value);
+  - the AC-6c site-switch scenario Finding 1 above fixes: opens the modal at MAIN (`Stocked`,
+    `$20.00` msrp), then re-renders with `useCurrentSite` resolving to a `SECOND` site whose
+    `getSiteProducts` mock returns **realistic, distinct** fallback settings (`isStocked: false`,
+    `msrp: 99`, different `unitCost`/`reorderPoint`/`leadTimeDays` - not an empty/placeholder
+    stand-in), and asserts the *same open modal* now shows `Not Stocked`/`$99.00`, that MAIN's
+    `$20.00` is gone, and that inventory stays withheld throughout.
+  - `window.matchMedia` polyfilled at the top of the file (`SidebarProvider`'s `useIsMobile`
+    reads it; jsdom doesn't implement it) - a test-environment gap, not a product code change.
+  - `ProductForm`/`ManageCategoriesDialog`/`AdjustStockDialog`/`TransferStockDialog`/
+    `KujiTabPanel` are stubbed (not under test here - opening them, and the AC-6e Kuji gate, are
+    covered elsewhere); `usePermissions`, `useCurrentSite`, and the `@/lib/api/products`/
+    `@/lib/api/categories` network functions are mocked; `useSiteProducts`, `useProducts`,
+    `useSiteProductInventory`, and `ProductModal` itself all run for real.
+- No production code behavior changed beyond Findings 1 and 2 above.
+- Result: Pass. `npx vitest run` (whole `apps/web` suite) — 307/307 (4 new). `npx tsc --noEmit -p
+  tsconfig.json` — clean. `npm run lint` — 0 errors, 50 warnings (all pre-existing; the `items`
+  useMemo dependency warning on `page.tsx` now appears twice, once per derived-state `useMemo`
+  that reads it, same pre-existing warning class as before, not a new issue).
+- Next action: T-5 review re-verification, then T-6 (web categories migration).
+
+## T-6 — Web categories migration
+
+- Changed:
+  - `apps/web/src/lib/api/categories.ts`: added `getCatalogCategories()` (calls `GET
+    /api/v1/catalog/categories`) alongside the untouched legacy `getCategories` (now marked
+    `@deprecated` in its doc comment only - not removed, since `use-category-mutations.ts` and
+    any other lingering caller stay on it). Added `toCategory`, a recursive mapper (categories
+    nest via `children`) matching the drop-invalid-records pattern used by `toSiteProduct`/
+    `toStorageLocationSummary` - a record missing `id` or `name` (and, since mapping recurses,
+    its whole subtree) is dropped rather than defaulted.
+  - `apps/web/src/hooks/queries/use-categories.ts`: `useCategories`'s `queryFn` swapped from
+    `getCategories` to `getCatalogCategories`. Unlike T-5's products, this is a straight
+    swap, not a join: categories are wholly global (verified directly -
+    `CatalogCategoryController.getCatalogCategories` calls the same
+    `categoryService.getRootCategoriesWithChildren()` the legacy `CategoryController` uses, so
+    the two routes return identical data), so there is no siteId to key on and no second query
+    to merge. The `["categories"]` query key is unchanged - every consumer
+    (`useChildCategories`/`useSubcategories`, and every component using `useCategories`
+    directly: the Products page, `manage-categories-dialog`, `product-form`,
+    `adjust-stock-dialog`) moves to v1 in this one change, with no per-caller edits needed.
+  - Category **mutations** (`use-category-mutations.ts`: create/update/delete,
+    `manage-categories-dialog.tsx`) are untouched - still call the legacy
+    `createCategory`/`updateCategory`/`deleteCategory`, per spec.md's T-6 task description
+    ("`useCategories` migrates to v1... `manage-categories-dialog`... unchanged"). Their
+    `invalidateQueries(["categories"])` calls still correctly invalidate the (unchanged) read
+    query key - no audit needed here the way T-5 needed one, since the key itself didn't change.
+  - `app/(dashboard)/products/__tests__/page.test.tsx`: the `@/lib/api/categories` mock gained
+    `getCatalogCategories` (routed through the same `mockGetCategories` spy) so the page's
+    `useCategories` call keeps resolving in that test.
+- Tests:
+  - `lib/api/categories.test.ts` (new, 4 tests): calls the v1 route with no `siteId` param;
+    recursively maps nested children, dropping only the invalid node (not its valid siblings);
+    drops root records missing `id`/`name`; propagates a `GeneratedApiError` on an API error.
+    Closes a gap T-5 should have had too (see below).
+  - `hooks/queries/__tests__/use-categories.test.ts` (new, 3 tests): confirms `useCategories`
+    calls `getCatalogCategories` and never `getCategories`; the existing alphabetical-sort
+    `select` behavior is unchanged for both root and child categories; `useChildCategories`
+    resolves correctly from the v1-backed data.
+  - `lib/api/products.test.ts` (new, 4 tests): backfills the same API-layer coverage for T-5's
+    `getSiteProducts` that `getSiteStorageLocations`/`getCatalogCategories` have -
+    `getSiteProducts` was only covered indirectly (via the hook-level join tests) before this;
+    added directly here since I was already in this area. Covers the request shape, the
+    `version: null` mapping for an absent/undefined version (AC-2: no version to compare against
+    means `null`, not `0` or `undefined`), dropping records missing `productId`, and API-error
+    propagation.
+- Result: Pass. `npx vitest run` (whole `apps/web` suite) — 318/318 (11 new: 4 + 3 + 4 above).
+  `npx tsc --noEmit -p tsconfig.json` — clean. `npm run lint` — 0 errors, 51 warnings (same set
+  as T-5's last verified count; none new). No contract regeneration - T-6 calls only the
+  `/api/v1/catalog/categories` route T-1 already published; no backend change.
+- Independent review: completed 2026-09-09, no Standards or Spec findings. Full-tier final
+  review applies even without a separately named T-6 checkpoint. Verified 318/318 tests,
+  typecheck pass, lint 0 errors/51 warnings, and clean diff whitespace. See review.md and
+  validation.md. Implementation task list complete; commit and PR gate remain pending.

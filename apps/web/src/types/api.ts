@@ -221,6 +221,9 @@ export interface ProductListItem {
   leadTimeDays?: number;
   unitCost?: number;
   msrp?: number;
+  /** Site-scoped (site_products.forecasting_enabled) on rows from useSiteProductInventory
+   * (phase-5d T-5); undefined for the legacy, unscoped product read path. */
+  forecastingEnabled?: boolean;
   preferredSupplierId?: string | null;
   preferredSupplierName?: string | null;
   preferredSupplierAuto?: boolean;

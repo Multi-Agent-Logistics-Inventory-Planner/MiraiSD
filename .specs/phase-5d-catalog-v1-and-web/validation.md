@@ -181,3 +181,89 @@ From `services/inventory-service`, JDK 21:
 outside-sandbox command for Mockito JVM attachment. Log:
 `/private/tmp/catalog-t3-review.log`. Full suites were not rerun in this
 follow-up; their results above remain implementer-reported.
+
+## T-5 independent review validation — 2026-09-09
+
+From the repository root:
+
+- `npm run test:run --workspace apps/web` — PASS, 39 files, 303/303 tests.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` — PASS, exit 0.
+- `npm run lint --workspace apps/web` — PASS, exit 0; 0 errors, 50 warnings.
+
+The new test files contain 11 tests (4 site query, 4 join, 3 Kuji panel), not
+14. Static review identified the modal's global status and retained selected
+row snapshot; no browser smoke or page-level site-switch test was run. AC-6c
+remains unproven by the passing suite and requires the follow-up recorded in
+review.md. Backend/contract checks were not rerun for this web-only review.
+
+## T-5 independent fix follow-up validation — 2026-09-09
+
+From the repository root:
+
+- `npm run test:run --workspace apps/web` — PASS, 40 files, 307/307 tests.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` — PASS, exit 0.
+- `npm run lint --workspace apps/web` — PASS, 0 errors, **51 warnings**.
+  Output: `/private/tmp/t5-rereview-lint.log`. One additional warning concerns
+  the new selection memo's `items` dependency; the prior reported count of 50
+  and claim that every warning was pre-existing are not accurate for this diff.
+- `git diff --check` — PASS.
+
+The rendered-page test now supplies direct evidence for the reviewed detail,
+status, permission display, and inventory-withholding behaviors. Kuji gating
+remains covered by its separate component tests. No browser smoke or backend
+checks were run. All three prior P2 findings are closed; see review.md for
+non-blocking coverage limitations.
+
+## T-6 final web review validation — 2026-09-09
+
+From the repository root:
+
+- `npm run test:run --workspace apps/web` — PASS, 43 files, 318/318 tests.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` — PASS, exit 0.
+- `npm run lint --workspace apps/web` — PASS, 0 errors, 51 warnings.
+  Output: `/private/tmp/t6-review-lint.log`.
+- `git diff --check` — PASS.
+
+AC-7 evidence: category API tests verify the v1 request, recursive mapping,
+invalid-record handling, and error propagation; hook tests verify v1 selection,
+unchanged root/child sorting, and child lookup. Static comparison confirms
+legacy and v1 controllers share the category service/mapper and unchanged
+mutation hooks invalidate the same global cache key. Added site-product API
+tests cover the request path, absent version, invalid identity, and API errors.
+
+No backend or contract changes in T-6; their earlier evidence is retained,
+not independently rerun here. No browser smoke run. Implementation and local
+web review are complete; commit and authoritative PR-gate proof remain pending.
+
+## Final pre-commit validation (T-1 through T-6, all tasks reviewed clean) — 2026-09-09
+
+JDK 21 (`JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`), from
+`services/inventory-service` — a full backend rerun rather than relying on the T-1-T4
+checkpoint-time counts, since this is the last local gate before commit/PR:
+
+- `./mvnw -o test` (unit) — 404/404, BUILD SUCCESS.
+- `./mvnw -o test -Dtest='*IT'` (integration) — 375/375, BUILD SUCCESS.
+- `git status --short services/inventory-service packages/contracts packages/api-client` — no
+  output: confirms T-5/T-6 made no backend or contract changes, so the T-1/T-2 `oasdiff breaking
+  --fail-on ERR` (no breaking changes) and `packages/api-client` generate/typecheck results
+  remain valid without rerunning them.
+
+From the repository root, `apps/web`:
+
+- `npm run test:run --workspace apps/web` — PASS, 43 files, 318/318 tests.
+- `npx tsc --noEmit -p apps/web/tsconfig.json` — PASS, exit 0.
+- `npm run lint --workspace apps/web` — PASS, 0 errors, 51 warnings (unchanged from the T-6
+  review count; all pre-existing, none in a file this phase's tasks touched beyond the ones
+  already attributed to T-5's own diff).
+- `git diff --check` — PASS (no whitespace/conflict-marker issues across the full diff).
+
+No browser/Playwright smoke was run for this record (per Track D's AC-7 precedent, invoked by
+this record's own AC-6 - see log.md's T-5 entry for why a from-scratch provider harness for a
+full browser session was judged out of proportion to this task). This is a known, recorded gap,
+not an unexamined one.
+
+Full-tier lifecycle status: specify, review, plan, implement, test, and (this entry) validate are
+complete for T-1 through T-6. Review is complete for every task with a named checkpoint (T-2, T-5)
+plus T-6 (reviewed on request, though spec.md doesn't name it a checkpoint). Commit and the
+authoritative PR-gate run remain the only steps left before this record can be considered fully
+closed - this local validation is independent evidence, not a substitute for the PR gate.
