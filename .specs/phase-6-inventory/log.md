@@ -14,6 +14,11 @@
   access) is the next concrete implementation step.
 - Next action: implement T-5 through T-8 (see 6a task list below) with TDD per task, on
   `refactor/inventory-stock` (already checked out, clean).
+- Committed 2026-09-09: `dbc2c1d` "feat(inventory): establish inventory module boundary (Phase 6a,
+  T-0-T-4)" — T-0 through T-4 as one commit. The reviewer asked for a three-way split (guard/facade
+  prep; mechanical entity/service moves; R-8 consolidation/dead-injection removal); the user then
+  asked to commit it all as one instead, so the split was not carried out. T-5 onward should start
+  its own commit(s) rather than accumulate further into this one.
 - Surviving decisions: one branch/PR and one Full-tier record; five logical commits/review
   checkpoints with fix commits allowed. A production prerequisite can require a separate PR.
 - Last verified: `./mvnw -q clean test-compile` (clean build, not incremental — this distinction
