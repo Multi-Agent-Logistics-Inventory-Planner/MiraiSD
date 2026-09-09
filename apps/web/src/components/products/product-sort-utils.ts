@@ -104,9 +104,12 @@ export function compareProducts(
       return dir * a.product.name.localeCompare(b.product.name);
 
     case "status": {
-      // Active (true) = 0, Inactive (false) = 1 => active first when ascending
-      const aVal = a.product.isActive ? 0 : 1;
-      const bVal = b.product.isActive ? 0 : 1;
+      // Stocked/Active (true) = 0, Not-stocked/Inactive (false) = 1 => stocked first when
+      // ascending. Site-scoped rows (phase-5d T-5) carry isStocked and sort by assortment
+      // eligibility (spec.md AC-6d); rows without it (the legacy, unscoped view) fall back to
+      // product.isActive, preserving prior behavior there.
+      const aVal = (a.isStocked ?? a.product.isActive) ? 0 : 1;
+      const bVal = (b.isStocked ?? b.product.isActive) ? 0 : 1;
       return dir * (aVal - bVal);
     }
 
@@ -126,7 +129,10 @@ export function compareProducts(
     }
 
     case "stock":
-      return dir * (a.totalQuantity - b.totalQuantity);
+      // Unreachable via the site-scoped view's UI (its Stock column/header don't render, per
+      // AC-6b), since totalQuantity is withheld there - guarded here only so a stray call
+      // doesn't produce NaN.
+      return dir * ((a.totalQuantity ?? 0) - (b.totalQuantity ?? 0));
 
     default:
       return 0;

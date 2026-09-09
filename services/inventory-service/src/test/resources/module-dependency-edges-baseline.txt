@@ -21,6 +21,13 @@
 # confirmed both by grepping every import in sites/** (only sites.* and shared.* appear) and by
 # this file having no `sites -> catalog` (or `sites -> <anything but shared>`) entry.
 #
+# Second reviewed addition: `catalog -> shared`, from catalog.api.SiteProductController reading
+# shared.web.AuthorizedSiteContextHolder (.specs/phase-5d-catalog-v1-and-web T-2, the same
+# site-scoped-controller pattern sites.api.SiteStorageLocationController already uses via
+# `sites -> shared`). Safe for the same reason as the `catalog -> sites` addition above: `shared`
+# has zero outgoing edges in this file (it is a pure leaf, same as it is for every other module
+# already depending on it - auth, identity, services, sites), so this cannot create a new cycle.
+#
 # This replaces the previous FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` check, which
 # froze the full, multi-line cycle-path text (including specific example call-site edges, capped
 # by ArchUnit's own truncation) for the pre-existing catalog/dtos/exceptions/identity/models/
@@ -44,6 +51,7 @@ auth -> identity
 auth -> shared
 catalog -> identity
 catalog -> services
+catalog -> shared
 catalog -> sites
 config -> identity
 config -> models

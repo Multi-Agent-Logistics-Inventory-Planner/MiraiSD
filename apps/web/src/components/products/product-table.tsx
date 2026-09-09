@@ -25,15 +25,21 @@ interface ProductTableProps {
   readonly kujiCategoryIds: ReadonlySet<string>;
   readonly sort: ProductSort;
   readonly onSortChange: (sort: ProductSort) => void;
+  /**
+   * Whether to render the Stock column. False for the site-scoped Products view, which
+   * withholds quantity/stock-status until Phase 6 provides site-scoped inventory
+   * (.specs/phase-5d-catalog-v1-and-web/spec.md AC-6b) - the column is removed, not zeroed.
+   */
+  readonly showQuantity?: boolean;
 }
 
-function getProductStatusColor(isActive: boolean) {
-  return isActive
+function getProductStatusColor(isStocked: boolean) {
+  return isStocked
     ? "bg-[#20d760] text-black"
     : "bg-[#e50815] text-white";
 }
 
-function TableSkeleton() {
+function TableSkeleton({ showQuantity }: { readonly showQuantity: boolean }) {
   return (
     <>
       {Array.from({ length: 10 }).map((_, i) => (
@@ -50,12 +56,19 @@ function TableSkeleton() {
           <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
+          <TableCell
+            className={cn(
+              "hidden sm:table-cell max-w-0 overflow-hidden",
+              showQuantity ? "pl-4" : "pl-4 rounded-r-lg sm:rounded-none",
+            )}
+          >
             <Skeleton className="h-4 w-24" />
           </TableCell>
-          <TableCell className="text-right pr-4 rounded-r-lg sm:rounded-none tabular-nums">
-            <Skeleton className="h-4 w-8 ml-auto" />
-          </TableCell>
+          {showQuantity && (
+            <TableCell className="text-right pr-4 rounded-r-lg sm:rounded-none tabular-nums">
+              <Skeleton className="h-4 w-8 ml-auto" />
+            </TableCell>
+          )}
           <TableCell className="hidden sm:table-cell sm:rounded-r-lg">
             <Skeleton className="h-8 w-8" />
           </TableCell>
@@ -117,7 +130,9 @@ export function ProductTable({
   kujiCategoryIds,
   sort,
   onSortChange,
+  showQuantity = true,
 }: ProductTableProps) {
+  const columnCount = showQuantity ? 6 : 5;
   return (
     <div className="overflow-hidden sm:overflow-visible w-full">
       <Table className="border-none table-fixed w-full">
@@ -125,13 +140,24 @@ export function ProductTable({
           <SortableHeader column="product" label="Product" sort={sort} onSortChange={onSortChange} className="text-left rounded-l-lg" />
           <SortableHeader column="status" label="Status" sort={sort} onSortChange={onSortChange} className="hidden sm:table-cell w-24 text-center" />
           <SortableHeader column="category" label="Category" sort={sort} onSortChange={onSortChange} className="hidden sm:table-cell w-36 pl-4" />
-          <SortableHeader column="subcategory" label="Subcategory" sort={sort} onSortChange={onSortChange} className="hidden sm:table-cell w-36 pl-4" />
-          <SortableHeader column="stock" label="Stock" sort={sort} onSortChange={onSortChange} className="w-20 text-right pr-4 rounded-r-lg sm:rounded-none" />
+          <SortableHeader
+            column="subcategory"
+            label="Subcategory"
+            sort={sort}
+            onSortChange={onSortChange}
+            className={cn(
+              "hidden sm:table-cell w-36 pl-4",
+              !showQuantity && "rounded-r-lg sm:rounded-none",
+            )}
+          />
+          {showQuantity && (
+            <SortableHeader column="stock" label="Stock" sort={sort} onSortChange={onSortChange} className="w-20 text-right pr-4 rounded-r-lg sm:rounded-none" />
+          )}
           <TableHead className="hidden sm:table-cell rounded-r-lg w-14"></TableHead>
         </DataTableHeader>
         <TableBody>
           {isLoading ? (
-            <TableSkeleton />
+            <TableSkeleton showQuantity={showQuantity} />
           ) : items.length === 0 ? (
             <TableRow>
               <TableCell
@@ -141,7 +167,7 @@ export function ProductTable({
                 No products found
               </TableCell>
               <TableCell
-                colSpan={6}
+                colSpan={columnCount}
                 className="h-24 text-center text-muted-foreground hidden sm:table-cell"
               >
                 No products found
@@ -150,6 +176,7 @@ export function ProductTable({
           ) : (
             items.map((row) => {
               const showKujiIcon = row.product.hasChildren || kujiCategoryIds.has(row.product.category.id);
+              const isStocked = row.isStocked ?? row.product.isActive;
               return (
                 <TableRow
                   key={row.product.id}
@@ -176,9 +203,9 @@ export function ProductTable({
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-center">
                     <Badge
-                      className={cn("text-xs", getProductStatusColor(row.product.isActive))}
+                      className={cn("text-xs", getProductStatusColor(isStocked))}
                     >
-                      {row.product.isActive ? "Active" : "Inactive"}
+                      {isStocked ? "Stocked" : "Not Stocked"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
@@ -186,14 +213,21 @@ export function ProductTable({
                       {parentNameMap.get(row.product.category.id) ?? row.product.category.name}
                     </span>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
+                  <TableCell
+                    className={cn(
+                      "hidden sm:table-cell pl-4 max-w-0 overflow-hidden",
+                      !showQuantity && "rounded-r-lg sm:rounded-none",
+                    )}
+                  >
                     <span className="truncate block">
                       {parentNameMap.get(row.product.category.id) !== row.product.category.name
                         ? row.product.category.name
                         : "-"}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right pr-4 rounded-r-lg sm:rounded-none tabular-nums">{row.totalQuantity}</TableCell>
+                  {showQuantity && (
+                    <TableCell className="text-right pr-4 rounded-r-lg sm:rounded-none tabular-nums">{row.totalQuantity}</TableCell>
+                  )}
                   <TableCell className="hidden sm:table-cell rounded-r-lg">
                     <Button
                       variant="ghost"
@@ -214,6 +248,11 @@ export function ProductTable({
           )}
         </TableBody>
       </Table>
+      {!showQuantity && (
+        <p className="mt-2 px-1 text-xs text-muted-foreground">
+          Quantity and stock status are available after inventory is migrated per site (Phase 6).
+        </p>
+      )}
     </div>
   );
 }
