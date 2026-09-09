@@ -1,11 +1,11 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.inventory.application;
 
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

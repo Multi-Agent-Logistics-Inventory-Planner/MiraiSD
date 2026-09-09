@@ -1,7 +1,7 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.inventory.infrastructure;
 
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import org.springframework.data.jpa.domain.Specification;
 
 public final class StockMovementSpecifications {

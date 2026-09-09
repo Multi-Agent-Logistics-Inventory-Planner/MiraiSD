@@ -1,8 +1,7 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.inventory.infrastructure;
 
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;

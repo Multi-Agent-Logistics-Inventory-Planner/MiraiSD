@@ -125,7 +125,7 @@ calculation rules.
 catalog ────────────────► shared
 sites ──────────────────► shared
 identity ───────────────► sites, shared
-inventory ──────────────► catalog, sites, shared
+inventory ──────────────► catalog, sites, identity, shared
 shipments ──────────────► inventory, catalog, sites, audit, shared
 transfers ──────────────► inventory, sites, audit, shared
 displays ───────────────► inventory, catalog, sites, audit, shared
@@ -139,6 +139,17 @@ audit ──────────────────► shared
 
 This graph is a starting constraint, not permission to couple freely. A dependency MUST correspond
 to an actual use case and a narrow contract.
+
+`inventory ──► identity` is narrow and one-directional by construction: `identity.application`
+declares `LastActorActivityPort` (a two-method read contract — a user's last stock-movement
+activity timestamp, single and bulk), and `inventory.application.LastActorActivityAdapter`
+implements it, backed by inventory's own stock-movement storage. `identity` depends on nothing
+from `inventory` — the port lives in the consumer, the adapter in the provider, per the
+synchronous-facade/port pattern in section 7.1 — so this cannot combine with any dependency in the
+other direction to form a cycle (rule 7), and `identity` gained no new outgoing edge from this
+change. See .specs/phase-6-inventory/log.md (T-2, R-3) for the caller this replaced
+(`identity.application.UserService` importing `inventory`'s `StockMovementRepository` directly,
+before this port existed).
 
 ## 7. Module interaction patterns
 

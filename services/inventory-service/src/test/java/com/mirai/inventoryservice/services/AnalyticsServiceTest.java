@@ -14,7 +14,7 @@ import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.InventoryTotalsRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

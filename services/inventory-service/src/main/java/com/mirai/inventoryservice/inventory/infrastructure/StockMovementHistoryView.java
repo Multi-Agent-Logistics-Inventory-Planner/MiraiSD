@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.repositories.projections;
+package com.mirai.inventoryservice.inventory.infrastructure;
 
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 

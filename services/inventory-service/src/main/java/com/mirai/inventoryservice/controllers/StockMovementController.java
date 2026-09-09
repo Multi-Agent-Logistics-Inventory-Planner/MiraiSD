@@ -8,9 +8,9 @@ import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.dtos.responses.StockMovementResponseDTO;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.services.StockMovementService;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

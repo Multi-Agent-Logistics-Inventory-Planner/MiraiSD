@@ -2,8 +2,8 @@ package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
 import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
-import com.mirai.inventoryservice.services.InventoryAggregateService;
+import com.mirai.inventoryservice.inventory.infrastructure.InventoryTotalsRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryAggregateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

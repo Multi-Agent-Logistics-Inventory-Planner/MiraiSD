@@ -13,7 +13,7 @@ import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;

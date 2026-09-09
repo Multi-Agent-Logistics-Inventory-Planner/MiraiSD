@@ -136,9 +136,23 @@ class ArchitectureTest {
         return false;
     }
 
+    // Amended for Phase 6a (docs: .specs/phase-6-inventory/log.md, T-0) to add a third arm: a
+    // plain class annotated @Repository that does not implement Spring Data's Repository marker
+    // interface -- e.g. LocationAggregateRepository/InventoryTotalsRepository, which are
+    // EntityManager-backed native-SQL classes, not Spring Data interfaces. The legacy-package arm
+    // (first) currently catches both of those, but only because they still live in
+    // `repositories..`; once Phase 6a relocates them out of that package -- InventoryTotalsRepository
+    // into inventory.infrastructure (T-3), LocationAggregateRepository into sites.infrastructure
+    // per R-1's cross-module-read-projection assignment -- they would be neither in the legacy
+    // package nor assignable to Repository, silently dropping out of this rule's coverage while
+    // the build stays green -- the same failure mode the class-level comment above already
+    // documents for the first two arms. Checked against every current @Repository-annotated class
+    // in the codebase (all in repositories.., catalog/identity/sites.infrastructure) to confirm
+    // none is a non-repository class that this new arm would misclassify.
     private static boolean isRepositoryClass(JavaClass target) {
         return isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".repositories")
-                || target.isAssignableTo(Repository.class);
+                || target.isAssignableTo(Repository.class)
+                || target.isAnnotatedWith(org.springframework.stereotype.Repository.class);
     }
 
     /** Exact package match or a strict dot-delimited descendant -- never a substring match. */

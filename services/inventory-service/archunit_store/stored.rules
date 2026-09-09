@@ -1,4 +1,4 @@
 #
-#Mon Sep 07 19:37:21 EDT 2026
-classes\ that\ reside\ outside\ a\ services/repositories\ layer\ or\ a\ domain\ module's\ application/infrastructure\ package\ should\ not\ depend\ on\ a\ repository=f0384129-86fc-4bd9-82d5-4e8a25995a22
-no\ classes\ should\ reside\ in\ any\ package\ ['com.mirai.inventoryservice.controllers..',\ 'com.mirai.inventoryservice.services..',\ 'com.mirai.inventoryservice.repositories..',\ 'com.mirai.inventoryservice.models..',\ 'com.mirai.inventoryservice.dtos..',\ 'com.mirai.inventoryservice.converters..'],\ because\ business\ code\ belongs\ in\ its\ owning\ domain\ package,\ not\ a\ legacy\ technical-layer\ package=1bf5f779-3438-4a5e-b29d-b0f29a9060f3
+#Wed Sep 09 13:06:55 EDT 2026
+classes\ that\ reside\ outside\ a\ services/repositories\ layer\ or\ a\ domain\ module's\ application/infrastructure\ package\ should\ not\ depend\ on\ a\ repository=1fd43e8d-e95c-4ce4-943b-6205a6665195
+no\ classes\ should\ reside\ in\ any\ package\ ['com.mirai.inventoryservice.controllers..',\ 'com.mirai.inventoryservice.services..',\ 'com.mirai.inventoryservice.repositories..',\ 'com.mirai.inventoryservice.models..',\ 'com.mirai.inventoryservice.dtos..',\ 'com.mirai.inventoryservice.converters..'],\ because\ business\ code\ belongs\ in\ its\ owning\ domain\ package,\ not\ a\ legacy\ technical-layer\ package=70c8a087-7cd2-4f3d-9759-3e537729cc15

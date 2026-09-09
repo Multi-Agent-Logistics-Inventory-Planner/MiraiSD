@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.dtos.mappers.AuditLogDTOMapper;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

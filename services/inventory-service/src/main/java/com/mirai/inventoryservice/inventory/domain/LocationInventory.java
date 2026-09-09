@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.models.inventory;
+package com.mirai.inventoryservice.inventory.domain;
 
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;

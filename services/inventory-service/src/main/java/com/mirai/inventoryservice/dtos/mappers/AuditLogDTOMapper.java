@@ -3,8 +3,8 @@ package com.mirai.inventoryservice.dtos.mappers;
 import com.mirai.inventoryservice.dtos.responses.AuditLogDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogDetailDTO;
 import com.mirai.inventoryservice.models.audit.AuditLog;
-import com.mirai.inventoryservice.models.audit.StockMovement;
-import com.mirai.inventoryservice.services.StockMovementService;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

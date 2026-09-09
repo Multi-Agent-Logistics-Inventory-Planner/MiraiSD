@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.analytics.application;
 import com.mirai.inventoryservice.config.CacheConfig;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;

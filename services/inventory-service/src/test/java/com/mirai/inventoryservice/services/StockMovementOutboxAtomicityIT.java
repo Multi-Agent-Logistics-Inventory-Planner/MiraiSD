@@ -1,6 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
@@ -8,13 +9,13 @@ import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.dtos.requests.BatchAdjustLineDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;

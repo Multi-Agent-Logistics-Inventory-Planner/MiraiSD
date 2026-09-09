@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.services;
 import com.mirai.inventoryservice.dtos.responses.ActivityFeedEventDTO;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.models.shipment.Shipment;

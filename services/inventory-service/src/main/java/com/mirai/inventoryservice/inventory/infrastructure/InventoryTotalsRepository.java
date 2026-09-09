@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.inventory.infrastructure;
 
 import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
 import com.mirai.inventoryservice.utils.TimestampUtils;

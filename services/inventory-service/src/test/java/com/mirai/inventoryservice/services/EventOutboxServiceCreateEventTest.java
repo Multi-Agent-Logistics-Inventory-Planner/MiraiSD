@@ -1,9 +1,10 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import com.mirai.inventoryservice.kafka.KafkaProducer;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.catalog.domain.KujiType;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;

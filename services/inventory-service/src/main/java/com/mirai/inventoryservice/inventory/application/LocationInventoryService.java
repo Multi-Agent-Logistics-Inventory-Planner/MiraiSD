@@ -1,21 +1,20 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.inventory.application;
 
-import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
-import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
-import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
-import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
-import com.mirai.inventoryservice.repositories.*;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,23 +32,21 @@ public class LocationInventoryService {
     private final LocationInventoryRepository locationInventoryRepository;
     private final LocationRepository locationRepository;
     private final StorageLocationRepository storageLocationRepository;
-    private final SiteRepository siteRepository;
+    private final LocationService locationService;
     private final CatalogEntityAccess catalogEntityAccess;
     private final StockMovementService stockMovementService;
-
-    private static final String DEFAULT_SITE_CODE = "MAIN";
 
     public LocationInventoryService(
             LocationInventoryRepository locationInventoryRepository,
             LocationRepository locationRepository,
             StorageLocationRepository storageLocationRepository,
-            SiteRepository siteRepository,
+            LocationService locationService,
             CatalogEntityAccess catalogEntityAccess,
             StockMovementService stockMovementService) {
         this.locationInventoryRepository = locationInventoryRepository;
         this.locationRepository = locationRepository;
         this.storageLocationRepository = storageLocationRepository;
-        this.siteRepository = siteRepository;
+        this.locationService = locationService;
         this.catalogEntityAccess = catalogEntityAccess;
         this.stockMovementService = stockMovementService;
     }
@@ -139,7 +136,7 @@ public class LocationInventoryService {
      * List all inventory by storage location code (e.g., "BOX_BINS")
      */
     public List<LocationInventory> listInventoryByStorageLocationCode(String storageLocationCode) {
-        UUID siteId = getDefaultSiteId();
+        UUID siteId = locationService.getDefaultSiteId();
         return locationInventoryRepository.findByStorageLocationCodeAndSiteId(storageLocationCode, siteId);
     }
 
@@ -209,14 +206,14 @@ public class LocationInventoryService {
      * Get all storage locations for the default site, ordered by display order
      */
     public List<StorageLocation> getStorageLocations() {
-        return storageLocationRepository.findBySite_CodeOrderByDisplayOrder(DEFAULT_SITE_CODE);
+        return storageLocationRepository.findBySite_CodeOrderByDisplayOrder(LocationService.DEFAULT_SITE_CODE);
     }
 
     /**
      * Get a storage location by code
      */
     public StorageLocation getStorageLocationByCode(String code) {
-        return storageLocationRepository.findByCodeAndSite_Code(code, DEFAULT_SITE_CODE)
+        return storageLocationRepository.findByCodeAndSite_Code(code, LocationService.DEFAULT_SITE_CODE)
                 .orElseThrow(() -> new StorageLocationNotFoundException(
                         "Storage location not found: " + code));
     }
@@ -232,7 +229,7 @@ public class LocationInventoryService {
      * Get a specific location by code within a storage location type
      */
     public Location getLocationByCode(String storageLocationCode, String locationCode) {
-        UUID siteId = getDefaultSiteId();
+        UUID siteId = locationService.getDefaultSiteId();
         return locationRepository.findByLocationCodeAndStorageLocationCodeAndSiteId(
                         locationCode, storageLocationCode, siteId)
                 .orElseThrow(() -> new LocationNotFoundException(
@@ -240,12 +237,6 @@ public class LocationInventoryService {
     }
 
     // ========= Helper Methods =========
-
-    private UUID getDefaultSiteId() {
-        return siteRepository.findByCode(DEFAULT_SITE_CODE)
-                .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE))
-                .getId();
-    }
 
     /**
      * Maps storage location code to LocationType enum for backward compatibility.

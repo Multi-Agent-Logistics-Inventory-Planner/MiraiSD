@@ -10,6 +10,9 @@ import com.mirai.inventoryservice.catalog.domain.SiteProductVersionConflictExcep
 import com.mirai.inventoryservice.catalog.domain.SupplierNotFoundException;
 import com.mirai.inventoryservice.identity.domain.MembershipNotFoundException;
 import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
+import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;

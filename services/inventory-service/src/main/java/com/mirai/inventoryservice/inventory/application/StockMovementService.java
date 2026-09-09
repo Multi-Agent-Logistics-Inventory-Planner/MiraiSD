@@ -1,32 +1,35 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.inventory.application;
 
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchAdjustLineDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
-import com.mirai.inventoryservice.exceptions.*;
+import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
-import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
-import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
-import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.repositories.*;
-import static com.mirai.inventoryservice.repositories.StockMovementSpecifications.withFilters;
+import com.mirai.inventoryservice.services.EventOutboxService;
+import com.mirai.inventoryservice.services.SupabaseBroadcastService;
+import static com.mirai.inventoryservice.inventory.infrastructure.StockMovementSpecifications.withFilters;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -62,15 +65,10 @@ public class StockMovementService {
     private final UserRepository userRepository;
     private final LocationInventoryRepository locationInventoryRepository;
     private final LocationRepository locationRepository;
-    private final StorageLocationRepository storageLocationRepository;
-    private final SiteRepository siteRepository;
-    private final KujiBoxTierRepository kujiBoxTierRepository;
+    private final LocationService locationService;
     private final EntityManager entityManager;
     private final SupabaseBroadcastService broadcastService;
     private final EventOutboxService eventOutboxService;
-
-    // Default site code - will be used until multi-site support is implemented
-    private static final String DEFAULT_SITE_CODE = "MAIN";
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
@@ -80,9 +78,7 @@ public class StockMovementService {
             UserRepository userRepository,
             LocationInventoryRepository locationInventoryRepository,
             LocationRepository locationRepository,
-            StorageLocationRepository storageLocationRepository,
-            SiteRepository siteRepository,
-            KujiBoxTierRepository kujiBoxTierRepository,
+            LocationService locationService,
             EntityManager entityManager,
             SupabaseBroadcastService broadcastService,
             @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
@@ -93,9 +89,7 @@ public class StockMovementService {
         this.userRepository = userRepository;
         this.locationInventoryRepository = locationInventoryRepository;
         this.locationRepository = locationRepository;
-        this.storageLocationRepository = storageLocationRepository;
-        this.siteRepository = siteRepository;
-        this.kujiBoxTierRepository = kujiBoxTierRepository;
+        this.locationService = locationService;
         this.entityManager = entityManager;
         this.broadcastService = broadcastService;
         this.eventOutboxService = eventOutboxService;
@@ -633,15 +627,12 @@ public class StockMovementService {
     }
 
     /**
-     * Get the NOT_ASSIGNED location ID for the default site
+     * Get the NOT_ASSIGNED location ID for the default site.
+     * Delegates to {@link LocationService#getNotAssignedLocation()} (R-8,
+     * .specs/phase-6-inventory/log.md T-4) rather than duplicating the lookup.
      */
     private UUID getNotAssignedLocationId() {
-        return storageLocationRepository.findByCodeAndSite_Code("NOT_ASSIGNED", DEFAULT_SITE_CODE)
-                .map(sl -> locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", sl.getSite().getId())
-                        .stream().findFirst()
-                        .orElseThrow(() -> new LocationNotFoundException("NOT_ASSIGNED location not found"))
-                        .getId())
-                .orElseThrow(() -> new StorageLocationNotFoundException("NOT_ASSIGNED storage location not found"));
+        return locationService.getNotAssignedLocation().getId();
     }
 
     /**
@@ -676,7 +667,7 @@ public class StockMovementService {
                     .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
         } else {
             // NOT_ASSIGNED case
-            location = locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", getDefaultSiteId())
+            location = locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", locationService.getDefaultSiteId())
                     .stream().findFirst()
                     .orElseThrow(() -> new LocationNotFoundException("NOT_ASSIGNED location not found"));
         }
@@ -836,15 +827,6 @@ public class StockMovementService {
     }
 
     // ========= Helper Methods =========
-
-    /**
-     * Get the default site ID
-     */
-    private UUID getDefaultSiteId() {
-        return siteRepository.findByCode(DEFAULT_SITE_CODE)
-                .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE))
-                .getId();
-    }
 
     /**
      * Maps storage location code to LocationType enum for backward compatibility.

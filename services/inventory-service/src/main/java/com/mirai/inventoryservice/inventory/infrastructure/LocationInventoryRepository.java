@@ -1,6 +1,6 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.inventory.infrastructure;
 
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
