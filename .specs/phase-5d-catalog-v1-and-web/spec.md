@@ -172,6 +172,9 @@ site-scoped endpoints exist together.
     `getProducts` for catalog/kuji display fields, `getSiteProducts` for site-scoped fields), not a
     single hook that silently prefers one source over the other per field — the source for each
     field is fixed, not negotiated at read time.
+- Temporary exception (2026-09-10, user authorized): MAIN restores legacy counts
+  without additional UI copy until Phase 6; all other sites still withhold them.
+  See [temporary restoration](../temp-restore-legacy-inventory-counts/spec.md).
 - AC-6b (the page must not mix scoped and unscoped data): migrating the product query alone is
   **not sufficient**. `hooks/queries/use-product-inventory.ts` separately fetches
   `/api/inventory/totals` under the unscoped key `["inventoryTotals"]` and joins by product ID, and

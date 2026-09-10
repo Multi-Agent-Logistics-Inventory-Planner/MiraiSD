@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { ProductListItem } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
@@ -10,11 +10,7 @@ import { getInventoryTotals } from "@/lib/api/inventory";
 
 export interface ProductWithInventory {
   product: ProductListItem;
-  /**
-   * Undefined when this row comes from the site-scoped view (useSiteProductInventory), which
-   * withholds quantity until Phase 6 provides site-scoped inventory (phase-5d spec.md AC-6b) -
-   * never present-but-zeroed. Always a number for the legacy, unscoped view.
-   */
+  /** Legacy totals for MAIN; undefined when inventory display is withheld. */
   totalQuantity?: number;
   lastUpdatedAt?: string;
   status?: StockStatus;
@@ -86,25 +82,34 @@ export function useProductInventory(rootOnly = false) {
 // imageUrl, kujiType, hasChildren, hasActiveBox, preferredSupplier*) with getSiteProducts (the
 // *only* source for site_products-owned fields - isStocked, money/settings fields, version).
 // See .specs/phase-5d-catalog-v1-and-web/spec.md AC-6a: each field's source is fixed, never a
-// fallback chain. Quantity/lastUpdatedAt/status are intentionally left undefined (AC-6b).
+// fallback chain. Temporary MAIN inventory exception: see temp-restore-legacy-inventory-counts.
 
 /**
- * Site-scoped product list for the Products page. Unlike useProductInventory, this never falls
- * back to unscoped inventory totals - quantity/stock-status are withheld entirely until Phase 6.
+ * Site-owned settings with temporary legacy counts for MAIN until Phase 6 scoped reads.
+ * Never join cached or late legacy totals into another site.
  */
 export function useSiteProductInventory(rootOnly = false) {
   const productsQuery = useProducts(rootOnly);
   const siteProductsQuery = useSiteProducts();
+  const showInventory = siteProductsQuery.siteCode === "MAIN" &&
+    Boolean(siteProductsQuery.siteId) && !siteProductsQuery.isLoading && !siteProductsQuery.error;
+  const totalsQuery = useQuery({
+    queryKey: ["inventoryTotals"],
+    queryFn: showInventory ? getInventoryTotals : skipToken,
+  });
 
   const data: ProductWithInventory[] | null = useMemo(() => {
     const products = productsQuery.data;
     const siteProducts = siteProductsQuery.data;
-    if (!products || !siteProducts) return null;
+    if (!products || !siteProducts || (showInventory && !totalsQuery.data)) return null;
+
+    const totalsById = new Map((showInventory ? totalsQuery.data ?? [] : []).map((t) => [t.itemId, t]));
 
     const bySiteProductId = new Map(siteProducts.map((sp) => [sp.productId, sp]));
 
     return products.map((p) => {
       const sp = bySiteProductId.get(p.id);
+      const total = totalsById.get(p.id);
       return {
         product: {
           ...p,
@@ -115,17 +120,22 @@ export function useSiteProductInventory(rootOnly = false) {
           leadTimeDays: sp?.leadTimeDays,
           forecastingEnabled: sp?.forecastingEnabled,
         },
+        ...(showInventory ? {
+          totalQuantity: total?.totalQuantity ?? 0,
+          lastUpdatedAt: total?.lastUpdatedAt ?? p.updatedAt,
+        } : {}),
         isStocked: sp?.isStocked ?? false,
         siteProductVersion: sp?.version ?? null,
       };
     });
-  }, [productsQuery.data, siteProductsQuery.data]);
+  }, [productsQuery.data, siteProductsQuery.data, showInventory, totalsQuery.data]);
 
   return {
     data,
     siteCode: siteProductsQuery.siteCode,
-    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading,
-    error: productsQuery.error ?? siteProductsQuery.error,
+    showInventory,
+    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || (showInventory && totalsQuery.isLoading),
+    error: productsQuery.error ?? siteProductsQuery.error ?? (showInventory ? totalsQuery.error : null),
   };
 }
 
