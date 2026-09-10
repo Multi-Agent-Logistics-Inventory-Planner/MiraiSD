@@ -1,13 +1,8 @@
-package com.mirai.inventoryservice.controllers;
+package com.mirai.inventoryservice.inventory.api;
 
 import com.mirai.inventoryservice.dtos.mappers.AuditLogMapper;
-import com.mirai.inventoryservice.dtos.mappers.StockMovementMapper;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
-import com.mirai.inventoryservice.dtos.responses.StockMovementResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.inventory.application.StockMovementService;

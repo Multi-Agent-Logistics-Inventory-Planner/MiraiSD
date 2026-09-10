@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.responses;
+package com.mirai.inventoryservice.sites.api;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

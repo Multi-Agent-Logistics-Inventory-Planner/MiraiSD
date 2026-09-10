@@ -127,6 +127,11 @@ Use the parent plan's 6a–6e sequence and the single Full-tier
 foundation (6b), scoped backend/contracts (6c), web adoption (6d), and targeted refresh/exit proof
 (6e) remain separately reviewable commits within one draft PR. The task list below describes the
 required outcomes; it does not create additional PRs. Extra fix commits are permitted.
+Each checkpoint is one slice: T-numbered tasks proceed continuously within it, with focused
+checks during implementation and independent review after the completed slice passes its gate.
+Tasks do not require separate approval, review, or commit cycles. Follow the
+[shared review cadence](../sdd-workflow.md#slice-level-review-cadence); retain material-decision
+and migration prerequisites before dependent work.
 
 The schema expansion and enforcement steps need a proven rollout sequence, not just ordered Git
 commits. Apply the parent plan's separate-release exception if an earlier writer/backfill deployment

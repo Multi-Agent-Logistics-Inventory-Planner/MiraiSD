@@ -510,7 +510,11 @@ Use one working branch and one draft PR for Phase 6. Work through five logical c
 6a–6e are implementation and review checkpoints, not separately merged releases. Additional fix
 commits are allowed. Keep mechanical movement distinct from behavioral edits within the history.
 Each checkpoint must pass its relevant native checks and review before the next begins; the whole
-phase exit gate must pass before merging the PR.
+phase exit gate must pass before merging the PR. Each checkpoint is one implementation slice:
+complete its T-numbered checklist continuously and request review at the end of the slice, not
+after each task. Use focused checks during implementation and the required gate at completion,
+following the [shared review cadence](../sdd-workflow.md#slice-level-review-cadence). Material
+decisions and migration prerequisites still precede dependent implementation.
 
 One Full-tier execution record, [Phase 6 inventory](../../.specs/phase-6-inventory/spec.md), owns
 the spec, log, review and validation for this mergeable unit. Refine each checkpoint's concrete

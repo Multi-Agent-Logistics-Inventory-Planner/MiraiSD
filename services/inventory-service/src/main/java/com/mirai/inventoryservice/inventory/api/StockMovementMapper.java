@@ -1,6 +1,5 @@
-package com.mirai.inventoryservice.dtos.mappers;
+package com.mirai.inventoryservice.inventory.api;
 
-import com.mirai.inventoryservice.dtos.responses.StockMovementResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

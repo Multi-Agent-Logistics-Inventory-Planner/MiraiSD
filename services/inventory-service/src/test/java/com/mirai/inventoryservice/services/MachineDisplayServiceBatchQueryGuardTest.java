@@ -13,7 +13,7 @@ import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
-import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
     @Mock private CatalogQueries catalogQueries;
     @Mock private CatalogEntityAccess catalogEntityAccess;
     @Mock private UserRepository userRepository;
-    @Mock private StockMovementRepository stockMovementRepository;
+    @Mock private InventoryOperations inventoryOperations;
     @Mock private LocationRepository locationRepository;
     @Mock private EntityManager entityManager;
     @Mock private AuditLogService auditLogService;
@@ -68,7 +68,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
     void setUp() {
         service = new MachineDisplayService(
                 machineDisplayRepository, catalogQueries, catalogEntityAccess, userRepository,
-                stockMovementRepository, locationRepository, entityManager,
+                inventoryOperations, locationRepository, entityManager,
                 auditLogService, notificationService);
 
         actorId = UUID.randomUUID();
@@ -128,7 +128,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
 
         verify(machineDisplayRepository, never()).save(any(MachineDisplay.class));
         verify(machineDisplayRepository, times(1)).saveAll(any());
-        verify(stockMovementRepository, times(1)).saveAll(any());
+        verify(inventoryOperations, times(1)).saveMovements(any());
     }
 
     @Test
@@ -154,7 +154,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
 
         verify(machineDisplayRepository, never()).save(any(MachineDisplay.class));
         verify(machineDisplayRepository, times(1)).saveAll(any());
-        verify(stockMovementRepository, times(1)).saveAll(any());
+        verify(inventoryOperations, times(1)).saveMovements(any());
     }
 
     @Test
@@ -185,7 +185,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
 
         verify(machineDisplayRepository, never()).save(any(MachineDisplay.class));
         verify(machineDisplayRepository, times(1)).saveAll(any());
-        verify(stockMovementRepository, times(1)).saveAll(any());
+        verify(inventoryOperations, times(1)).saveMovements(any());
     }
 
     @Test

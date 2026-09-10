@@ -1,8 +1,7 @@
-package com.mirai.inventoryservice.controllers;
+package com.mirai.inventoryservice.sites.api;
 
-import com.mirai.inventoryservice.dtos.responses.LocationWithCountsDTO;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.services.LocationAggregateService;
+import com.mirai.inventoryservice.sites.application.LocationAggregateService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +14,12 @@ import java.util.List;
 /**
  * Controller for aggregated location endpoints.
  * Provides optimized batch endpoints to reduce N+1 API calls from the frontend.
+ *
+ * <p>Owned by {@code sites} per .specs/phase-6-inventory/log.md R-1 (2026-09-09): its repository's
+ * native query reads {@code locations}/{@code storage_locations} (sites), {@code location_inventory}
+ * (inventory) and {@code machine_display} (displays) in one statement -- an approved cross-module
+ * read projection under docs/specs/spring-domain-modular-monolith.md §7.4, not decomposed or moved
+ * into any of the three owning modules individually.
  */
 @RestController
 @RequestMapping("/api/locations")

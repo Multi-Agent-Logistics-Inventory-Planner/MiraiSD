@@ -85,9 +85,9 @@ is used by two modules.
 | Module | Owns | Initial code mapped into the module |
 | --- | --- | --- |
 | `catalog` | Global product master, categories, suppliers, SKU rules | Product, Category, Supplier and their controllers/services/repositories |
-| `sites` | Sites and physical location topology | Site, Location, StorageLocation and location aggregate behavior |
+| `sites` | Sites and physical location topology | Site, Location, StorageLocation and location aggregate behavior. Also owns the `locations/with-counts` cross-module read projection (R-1, §7.4 and §6.2) even though its query reads `inventory`- and `displays`-owned tables. |
 | `identity` | Backend users, invitations, memberships and authorization policies | User, UserRole, Invitation, UserService, InvitationService, Supabase admin adapter |
-| `inventory` | Site stock, stock movements, adjustment/transfer primitives and totals | LocationInventory, StockMovement, inventory aggregates and stock services |
+| `inventory` | Site stock, stock movements, adjustment/transfer primitives and totals | LocationInventory, StockMovement, inventory aggregates and stock services. `StockMovement` moved here from `models.audit` (R-2, Phase 6a T-3); its `AuditLog` association is an accepted existing relationship carried across the boundary (§6.1 rule 8) until `audit` itself migrates. |
 | `transfers` | Audited inter-site transfer aggregate and workflow | New transfer aggregate, commands, policies and APIs |
 | `shipments` | Inbound shipments, allocations, receiving and carrier tracking | Shipment, ShipmentItem, ShipmentItemAllocation, tracking and EasyPost webhook behavior |
 | `displays` | Machine display assignments and lifecycle | MachineDisplay and related behavior |
@@ -150,6 +150,14 @@ other direction to form a cycle (rule 7), and `identity` gained no new outgoing 
 change. See .specs/phase-6-inventory/log.md (T-2, R-3) for the caller this replaced
 (`identity.application.UserService` importing `inventory`'s `StockMovementRepository` directly,
 before this port existed).
+
+`sites.api.LocationAggregateController` (R-1, Phase 6a) is the one approved exception to "one
+module MUST NOT query another module's repository" (§7.4): its native SQL joins
+`locations`/`storage_locations` (`sites`), `location_inventory` (`inventory`), and
+`machine_display` (`displays`) in a single statement to avoid an N+1 read. This is a documented
+cross-module read projection owned by `sites`, not decomposed across the three modules or
+reassigned to any single one of them — see .specs/phase-6-inventory/log.md (2026-09-09 R-1
+decision, and T-6 for the actual move into `sites.api`/`sites.application`/`sites.infrastructure`).
 
 ## 7. Module interaction patterns
 
@@ -244,6 +252,10 @@ The following are required:
 - Production-like integration tests use PostgreSQL through Testcontainers for JSONB, enum, locking,
   index and constraint behavior.
 - Each table has one owning module documented in this specification or a later ADR.
+  `location_inventory` and `stock_movements` are owned by `inventory` (Phase 6a T-3/R-2); writes
+  flow only through `inventory.application.InventoryOperations` (§7.1). `sites.api
+  .LocationAggregateController`'s native query is the one documented read-only exception reading
+  across module-owned tables in one statement (R-1, §6.2, §7.4) — it does not write any of them.
 - Cross-module foreign keys MAY exist inside the monolith, but writes flow through the owning module.
 - Expand/backfill/verify/constrain is required for non-null tenant migrations.
 - Migration scripts MUST be forward-safe for a rolling or rollback-capable deployment; destructive

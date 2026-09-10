@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.inventory.application;
 
-import com.mirai.inventoryservice.dtos.responses.ProductInventoryEntryDTO;
-import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
+import com.mirai.inventoryservice.inventory.api.ProductInventoryEntryDTO;
+import com.mirai.inventoryservice.inventory.api.ProductInventoryResponseDTO;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;

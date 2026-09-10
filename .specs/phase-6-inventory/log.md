@@ -9,11 +9,47 @@
   three inventory exceptions into `inventory.domain`/`inventory.infrastructure`). T-4 done (moved
   `StockMovementService`/`LocationInventoryService`/`InventoryAggregateService` into
   `inventory.application`; dropped the dead `KujiBoxTierRepository` injection; consolidated the
-  R-8 `DEFAULT_SITE_CODE` duplication through `LocationService`). T-5 (introduce
-  `InventoryOperations`/`InventoryQueries` and migrate external callers off direct repository
-  access) is the next concrete implementation step.
-- Next action: implement T-5 through T-8 (see 6a task list below) with TDD per task, on
-  `refactor/inventory-stock` (already checked out, clean).
+  R-8 `DEFAULT_SITE_CODE` duplication through `LocationService`). T-5 done: introduced
+  `InventoryOperations`/`InventoryQueries` in `inventory.application` and migrated all eight named
+  external callers (`ShipmentService`, `KujiBoxService`, `MachineDisplayService`,
+  `ProductReportBundleService`, `ForecastService`, `AnalyticsService`, `AuditLogService`,
+  `SalesRollupRecomputeService`) off direct `LocationInventoryRepository`/`StockMovementRepository`/
+  `InventoryTotalsRepository` access. Independent review of T-5 found two P2s, both fixed in the
+  same session: (1) `InventoryQueries.findHistoryByItemId` returned the infrastructure-layer
+  `StockMovementHistoryView` projection to callers outside `inventory` — added an
+  application-owned `StockMovementHistoryEntry` record and mapped to it, so `ForecastService`/
+  `ProductReportBundleService` no longer import anything from `inventory.infrastructure`; (2) the
+  6a task list's own test plan required a Testcontainers-or-equivalent IT proving `applyDelta`
+  inside a caller-opened transaction rolls back inventory + movement + outbox together (AC-1)
+  before 6a closes — this had been deferred to 6c, which the review correctly flagged as
+  premature; added `InventoryOperationsCallerTransactionIT` (an `@SpringBootTest` against the H2
+  `test` profile, same class of proof `StockMovementOutboxAtomicityIT` already uses — no actual
+  Testcontainers/Postgres needed for a transaction-propagation proof) and it passes. A second
+  independent review pass confirmed both fixes and flagged one more gap: the 6a task list's
+  delete-on-zero/find-or-create IT (covering the now-shared `ShipmentService`/`KujiBoxService`
+  path) was still outstanding, and the log's own summary still read "unit-level proof only" after
+  the transaction-proof fix landed. Added `InventoryOperationsSharedCallerPathIT` — see the task
+  record and second "Review-driven fix" entry below — and corrected the stale summary.
+- T-6 done: moved `InventoryAggregateController`/`StockMovementController` and their DTOs/mappers
+  into `inventory.api`; `InventoryAggregateController.getInventoryTotals` now goes through a new
+  `InventoryQueries.findAllInventoryTotals`, retiring one of `ArchitectureTest`'s frozen
+  `repositoriesAreOnlyAccessedByServicesOrRepositories` violations. `LocationAggregateController`/
+  `Service`/`Repository`/`LocationWithCountsDTO` moved into `sites.api`/`sites.application`/
+  `sites.infrastructure` per R-1. `packages/contracts/openapi.json` re-verified byte-identical
+  after the move (regenerated via `OpenApiContractExportTest`, `diff` against the pre-move copy is
+  empty). `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+  `InventoryRequestDTO` deliberately NOT moved — new R-9, see below. T-7 done: added the live
+  (never frozen) `noProductionClassOutsideInventoryDependsOnInventoryInfrastructure` rule (exempts
+  only `DevSeedController`/`AnalyticsSeedService` by FQN, the same two as catalog's version) and
+  `InventoryOperationsCallerSetTest` pinning the exact eight-class origin set from T-5. No
+  `identity -> inventory` edge exists (confirmed by grep against the baseline file). T-8 done:
+  recorded R-1/R-2 and the `inventory -> identity` (R-4/R-3) edge in
+  `docs/specs/spring-domain-modular-monolith.md` §5/§6.2/§11 and in `inventory`'s and `sites'`
+  `package-info.java`.
+- Next action: 6a's own checklist (T-0 through T-8) is now fully done. Request independent review
+  of the completed 6a slice before moving to 6b. R-9 (LocationInventoryController's catalog.api
+  coupling) is recorded as new open debt, not a 6a blocker — no acceptance criterion required
+  moving it.
 - Committed 2026-09-09: `dbc2c1d` "feat(inventory): establish inventory module boundary (Phase 6a,
   T-0-T-4)" — T-0 through T-4 as one commit. The reviewer asked for a three-way split (guard/facade
   prep; mechanical entity/service moves; R-8 consolidation/dead-injection removal); the user then
@@ -21,23 +57,54 @@
   its own commit(s) rather than accumulate further into this one.
 - Surviving decisions: one branch/PR and one Full-tier record; five logical commits/review
   checkpoints with fix commits allowed. A production prerequisite can require a separate PR.
-- Last verified: `./mvnw -q clean test-compile` (clean build, not incremental — this distinction
-  matters, see the T-3 and T-4 fix entries below) then `./mvnw -q -Dtest=ArchitectureTest,
-  LocationServiceTest,UserServiceTest,LastActorActivityAdapterTest,LocationInventoryServiceTest,
-  StockMovementServiceActiveStatusDerivationTest,KujiBoxServiceTest,
-  KujiBoxServiceCatalogFacadeMigrationTest,ShipmentServiceOverrideTest,StockMovementActorNameTest,
-  EventOutboxServicePublishTest,EventOutboxServiceCreateEventTest,EventOutboxServiceDeadLetterTest,
-  CatalogEntityAccessCallerSetTest,InventoryServiceApplicationTests test` — all pass
-  (services/inventory-service). Confirmed `ArchitectureTest` stable across two independent clean
-  rebuilds for both T-3 and T-4's store regenerations (see their task records below). No frozen
-  ArchUnit store regeneration needed by T-0, T-1 or T-2 (T-2 changed the live
-  `module-dependency-edges-baseline.txt`, not a frozen store). Doc-level `git diff --check` and
-  local-link checks from the planning pass still hold.
+- Last verified (post-review fixes, both rounds): `./mvnw -q clean test-compile` clean, then
+  `./mvnw -q clean test` (full unrestricted suite) — exit 0, zero failures/errors across every
+  surefire report. `./mvnw -q -Dtest=ArchitectureTest test` re-run standalone after a second
+  independent clean `test-compile` — 7/7 pass, stable across two independent clean rebuilds, **no
+  frozen-store regeneration needed** (T-5's new cross-module edges fall under the `-> inventory`
+  edges already approved at T-3/T-4). `InventoryOperationsCallerTransactionIT` — 2/2 pass, proving
+  `applyDelta` inside a caller-opened `@Transactional` harness both rolls back
+  `LocationInventory`/`StockMovement`/`EventOutbox` together on a later failure and commits all
+  three together on success. `InventoryOperationsSharedCallerPathIT` — 2/2 pass, proving the
+  find-or-create/delete-on-zero path through the real `ShipmentService.receiveShipment` /
+  `undoReceiveShipmentItem` round trip and the real `KujiBoxService.openBox` /
+  `closeBox` round trip (source drained to exactly zero and deleted; a destination that never had
+  inventory gets created). Doc-level `git diff --check` and local-link checks from the planning
+  pass still hold. T-6/T-7/T-8: `./mvnw -q clean test-compile` + `./mvnw -q clean test` (full
+  unrestricted suite) both clean/green; `ArchitectureTest` (now 8 rules, up from 7) stable across
+  two independent clean rebuilds after regenerating the two frozen stores it needed (see T-6
+  section below); `InventoryOperationsCallerSetTest` and `CatalogEntityAccessCallerSetTest` both
+  pass; `OpenApiContractExportTest` confirms `packages/contracts/openapi.json` byte-identical.
 - Open risks: actual migration mechanism and old-writer compatibility (6b); global quantity/activity
   semantics and downstream consumers (still to reconcile before 6c); event payload coverage and
-  targeted-refresh baseline (6c/6e). R-4 through R-8 below remain open, not yet resolved.
+  targeted-refresh baseline (6c/6e). R-4 through R-8 below remain open, not yet resolved. New for
+  T-5: `KujiBoxService`'s `undoDraw` legacy-inventory-restore branch (pre-decoupling draws that
+  decremented `LocationInventory` at the box location) and `reopenBox`'s legacy/new-model reversal
+  branches were migrated by mechanical call-site substitution only and are covered by
+  `KujiBoxServiceTest`/`KujiBoxServiceCatalogFacadeMigrationTest` (Mockito) plus the generic
+  transaction-propagation proof in `InventoryOperationsCallerTransactionIT`, but not by their own
+  real-database round trip the way `openBox`'s source-removal and `closeBox`'s leftover-transfer-out
+  branches now are via `InventoryOperationsSharedCallerPathIT`. No open AC requires that specific
+  additional coverage; noted here as available future hardening, not a closing blocker. New for
+  T-6 (R-9): `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+  `InventoryRequestDTO` were not moved into `inventory.api` — `LocationInventoryResponseDTO.item` is
+  `catalog.api.ProductSummaryDTO` and `LocationInventoryMapper` `uses` `catalog.api.ProductMapper`;
+  moving them would create an `inventory.api -> catalog.api` edge, which
+  `ArchitectureTest.modulesDoNotDependOnAnotherModulesApi` forbids unconditionally (no
+  baseline/exemption mechanism for that specific rule, unlike the frozen-store or module-edge
+  checks). Resolving it properly needs a catalog-owned `catalog.application`-level product-summary
+  read contract `inventory.api` can consume instead of catalog's own transport DTO — real design
+  work, not a mechanical move; left in the legacy `controllers`/`dtos` packages, out of 6a's scope,
+  flagged for a later checkpoint.
 
 ## Assumptions and decisions
+
+- 2026-09-10: user agreed to slice-level implementation and review cadence. Checkpoints 6a–6e
+  retain their existing scope and acceptance gates; T-numbered tasks are internal checklists,
+  not user handoffs or separate review/commit gates. Batch mechanical work, use focused checks,
+  and review after each completed slice. Keep required proof at the slice gate and resolve
+  material decisions/migration prerequisites before dependent work. Updated the shared workflow,
+  Phase 6 spec, and both parent plans; no application behavior or acceptance criteria changed.
 
 - 2026-09-09: user chose five checkpoints within one branch/PR, superseding the proposed separate
   slice PRs. Updated both durable plans and created this single execution record.
@@ -164,19 +231,47 @@ Mechanical moves and behavioral edits are kept in separate commits per the plan'
   `InventoryAggregateService` into `inventory.application`; dropped the dead `KujiBoxTierRepository`
   injection; consolidated the two inventory `DEFAULT_SITE_CODE` copies (R-8) through
   `LocationService`, without changing site-resolution behavior.
-- **T-5**: introduce `InventoryOperations` (`applyDelta`, `recordMovement`, `syncProductTotals`)
-  and `InventoryQueries`; migrate all external callers off direct repository access. Assert
-  identical outbox payloads and identical `location_inventory` end-states (behavioral commit).
-- **T-6**: move controllers/DTOs/mappers into `inventory.api`; `InventoryAggregateController`
-  goes through `InventoryQueries`. `packages/contracts/openapi.json` stays byte-identical; run
-  `tests/contracts`. `LocationAggregateController` stays owned by `sites` per R-1 and gets a named
-  ArchUnit exemption as an approved cross-module read projection.
-- **T-7**: add `noProductionClassOutsideInventoryDependsOnInventoryInfrastructure` (live, exempt
-  only `DevSeedController`/`AnalyticsSeedService` by FQN) + an `InventoryOperationsCallerSetTest`
-  pinning the origin set. Prune/extend `module-dependency-edges-baseline.txt` with justifications;
-  do not approve an `identity -> inventory` edge (R-3).
-- **T-8**: record R-1/R-2 resolutions and the `inventory -> identity` edge (R-4) in
-  `docs/specs/spring-domain-modular-monolith.md` §5/§6.2/§11 and the module `package-info`.
+- **T-5** (done): introduced `InventoryOperations` (`applyDelta`, `adjustQuantity`, `recordMovement`
+  in field and pre-built-`StockMovement` forms, `saveMovement`/`saveMovements`, `findInventory`/
+  `saveInventory`/`deleteInventory`, `syncProductTotals`) and `InventoryQueries` in
+  `inventory.application`; migrated all eight named external callers off direct
+  `LocationInventoryRepository`/`StockMovementRepository`/`InventoryTotalsRepository` access, by
+  mechanical call-site substitution (no business-logic changes). Unit tests, the real-caller
+  transaction IT, and the delete-on-zero/find-or-create shared-path IT all pass (see both
+  review-driven fix records below) — nothing from T-5's own scope remains on the 6a closing
+  checklist.
+- **T-6** (done): moved `InventoryAggregateController`/`StockMovementController` and their
+  DTOs/mappers into `inventory.api`; `InventoryAggregateController.getInventoryTotals` now goes
+  through the new `InventoryQueries.findAllInventoryTotals` instead of `InventoryTotalsRepository`
+  directly. `packages/contracts/openapi.json` re-verified byte-identical via
+  `OpenApiContractExportTest`. `LocationAggregateController`/`Service`/`Repository` moved into
+  `sites.api`/`sites.application`/`sites.infrastructure` per R-1, documented in both classes'
+  Javadoc and the `sites` `package-info.java` as an approved cross-module read projection — no
+  ArchUnit exemption entry was mechanically required for the move itself, since the repository
+  reaches its three modules' tables via raw native SQL string literals (no Java-level import
+  ArchUnit can see), not a cross-module class dependency; the "named exemption" this task
+  originally anticipated turned out to be documentation, not a rule-list entry. `LocationInventoryController`/
+  `LocationInventoryMapper`/`LocationInventoryResponseDTO`/`InventoryRequestDTO` deliberately NOT
+  moved — new R-9 (see "Open risks" above): they depend on `catalog.api.ProductSummaryDTO`/
+  `ProductMapper`, and moving them into `inventory.api` would violate the live
+  `modulesDoNotDependOnAnotherModulesApi` rule (no exemption mechanism for it). Two new module edges
+  needed baseline approval (`inventory -> validation`, `sites -> models`/`sites -> utils`,
+  `validation -> inventory` — all mechanical, same underlying dependency as before the move under a
+  different source-package name); see the baseline file's sixth reviewed-addition entry.
+- **T-7** (done): added the live `noProductionClassOutsideInventoryDependsOnInventoryInfrastructure`
+  rule (exempts only `DevSeedController`/`AnalyticsSeedService` by FQN, confirmed by grep to be the
+  only two remaining direct `inventory.infrastructure` callers outside `inventory` — matches the
+  catalog precedent exactly, no frozen baseline needed since T-5 already retired every other direct
+  caller). Added `InventoryOperationsCallerSetTest`, mirroring `CatalogEntityAccessCallerSetTest`'s
+  role but at class (not per-method) granularity: pins the exact eight classes calling
+  `InventoryOperations`/`InventoryQueries` from outside `inventory`, confirmed by grep to match
+  T-5's list with zero drift. No `identity -> inventory` edge exists in the baseline file
+  (confirmed by grep — R-3 still holds).
+- **T-8** (done): recorded R-1 (sites' cross-module read projection), R-2 (`StockMovement`'s move
+  and its transitional `AuditLog` association), and the `inventory -> identity` edge (R-4/R-3) in
+  `docs/specs/spring-domain-modular-monolith.md` §5 (module ownership table), §6.2 (dependency
+  graph), and §11 (persistence/table-ownership rules); also documented in `inventory`'s and
+  `sites`'s `package-info.java`.
 
 Test plan: reuse `StockMovementOutboxAtomicityIT`/`AdjustToKafkaIT` unchanged as the atomicity/event
 proof; add a Testcontainers IT proving `applyDelta` inside a caller-opened transaction rolls back
@@ -564,3 +659,342 @@ move, matching the plan's "keep mechanical movement distinct from behavioral edi
   CatalogEntityAccessCallerSetTest,InventoryServiceApplicationTests test` — all green, including
   the full `@SpringBootTest` context boot. `git status` confirms the three production moves
   recorded as renames, no stray leftover files.
+
+### T-5 — Introduce `InventoryOperations`/`InventoryQueries`; migrate external callers
+
+**Design (recorded before implementation):** two new classes in `inventory.application`, both
+thin over the existing `inventory.infrastructure` repositories — no new query behavior, only a
+narrower documented entry point for callers outside the `inventory` module (AC-1). `applyDelta`/
+`adjustQuantity`/`recordMovement` intentionally do **not** validate the resulting quantity (e.g.
+reject a delta that would go negative); every existing caller already validates before calling its
+inline add/remove helper with its own message/exception type, and centralizing that check here
+would have silently changed several callers' error messages — a behavior change T-5's "mechanical
+call-site substitution" scope does not license. `recordMovement` has two overloads: one taking
+individual fields (mirrors `StockMovementService`'s own movement-building shape, used by
+`ShipmentService`) and one taking an already-built `StockMovement` (used by `KujiBoxService`, which
+already assembles the full builder inline with kuji-specific metadata — decomposing back into
+fields would risk a transcription bug across ~10 builder properties per call site for no benefit).
+`saveMovement`/`saveMovements` are separate, deliberately outbox-free methods: `MachineDisplayService`
+writes zero-quantity ledger rows today with **no** `eventOutboxService.createStockMovementEvent`
+call (confirmed by reading every call site before migrating), and two `KujiBoxService` "birth"
+sites (auto-create mint rows) share that same no-outbox shape — using `recordMovement` there would
+have added outbox publishing where none exists today, an unintended behavior change.
+
+- **Scope decision**: the spec's own Delivery decisions note ("Kuji/lootbox site migration...
+  remain in their later phases. Necessary inventory facade/event integration may update those
+  callers without migrating their entire domain") governs `KujiBoxService`'s and
+  `MachineDisplayService`'s inclusion here: T-5 rewires their `location_inventory`/
+  `stock_movements` call sites onto the new facade, but does not touch their own domain logic,
+  package location, or control flow otherwise — full migration into a `kuji`/`displays` module
+  remains Phase 7. R-5's `aggregateKujiDailyPayouts` debt (the query's kuji-flavored shape living
+  inside `inventory`'s own repository, not `kuji`'s) is preserved as-is; the call site was moved
+  from `KujiBoxService` calling `StockMovementRepository` directly to calling it through
+  `InventoryQueries.aggregateKujiDailyPayouts` — satisfying "off direct repository access"
+  without resolving the underlying debt, exactly as R-5 anticipated.
+- **`syncProductTotals` consolidation**: `ShipmentService` and `KujiBoxService` already called
+  `StockMovementService.syncProductTotals(...)` directly (legitimate — `StockMovementService` is
+  already `inventory.application`, not a repository). Routed both through
+  `InventoryOperations.syncProductTotals` instead (which delegates to
+  `StockMovementService.syncProductTotals`) so the two migrated callers depend only on the new
+  narrow facade, not on `StockMovementService`'s full internal API surface — consistent with T-5's
+  own task text naming `syncProductTotals` as one of `InventoryOperations`'s three methods.
+- Changed (production):
+  - New: `inventory/application/InventoryOperations.java`, `inventory/application/InventoryQueries.java`.
+  - `services/ShipmentService.java`: `addToInventory`/`addToNotAssignedInventory` now call
+    `inventoryOperations.adjustQuantity` + `.recordMovement(fields...)` (metadata needs the
+    post-save inventory id, so these use the two-step form, not `applyDelta`).
+    `removeFromInventory`/`removeFromNotAssignedInventory` use `inventoryOperations.findInventory`
+    (preserving the existing `.orElseThrow(...)` custom messages exactly) +
+    `.recordMovement(fields...)` + `.saveInventory`/`.deleteInventory`. Dropped the now-unused
+    `StockMovementRepository`/`LocationInventoryRepository`/`EventOutboxService`/
+    `StockMovementService` fields and constructor params.
+  - `services/KujiBoxService.java`: all ~28 call sites across `executeKujiSourceRemoval`,
+    `executeKujiCounterReturn`, `executeKujiTransfer`, `reopenBox`'s new/legacy-model reversal
+    branches, `mintAutoCreatedAtBox`, `recordDraw`, `undoDraw`, `openBox`'s auto-create/source-removal
+    branches, `closeBox`'s auto-remove branch, `addTier`'s auto-create branch, `patchTier`, and
+    `getDailyPayouts` migrated to `inventoryOperations`/`inventoryQueries` equivalents, one-for-one,
+    with no control-flow changes. Dropped the now-unused `LocationInventoryRepository`/
+    `StockMovementRepository`/`EventOutboxService`/`StockMovementService` fields and constructor
+    params.
+  - `services/MachineDisplayService.java`: all `stockMovementRepository.save`/`.saveAll` sites
+    (all no-outbox, zero-quantity display-lifecycle rows) now call
+    `inventoryOperations.saveMovement`/`.saveMovements` — pure pass-through, confirmed no behavior
+    change (no outbox call added or removed).
+  - `services/ProductReportBundleService.java`, `services/ForecastService.java`,
+    `services/AnalyticsService.java`, `services/AuditLogService.java`,
+    `analytics/application/SalesRollupRecomputeService.java`: read-only repository fields replaced
+    1:1 with `InventoryQueries` equivalents (`sumQuantityByProductId`, `findByProductId`,
+    `findAllStockTotalsMap`, `findHistoryByItemId`, `findByAuditLogIdWithItem`,
+    `aggregateSalesByItemAndDate`) — every call site's arguments are unchanged, only the receiver.
+- **Out of scope for T-5** (not in the argument list, left as direct repository access for a later
+  checkpoint): `ActivityFeedService`, `EventOutboxService`'s own internal repository use,
+  `AuditLogMapper`/`AuditLogDTOMapper`/`StockMovementMapper`, and `AuditLogSpecifications`/
+  `StockMovementSpecifications` (the `JpaSpecificationExecutor`-based `getAuditLog`/
+  `findAll(spec, pageable)` pattern needs a genuinely scoped-repository redesign, which is 6c's
+  "trusted context, scoped repositories" territory (AC-2/AC-3), not 6a's boundary work).
+- Tests:
+  - New `InventoryOperationsTest` (10 cases): `adjustQuantity` create/update/delete-on-zero;
+    `recordMovement` both overloads save + publish outbox; `applyDelta` sign-based from/to-location
+    assignment for both directions; `saveMovement`/`saveMovements` save without publishing outbox;
+    `syncProductTotals` delegates to `StockMovementService`. Pins the exact sequence every migrated
+    caller relied on inline.
+  - Updated constructor wiring and mock types (repository mocks -> `InventoryOperations`/
+    `InventoryQueries` mocks, with `verify`/`when` call sites remapped to the matching facade
+    method) in `AuditLogServiceShipmentEventTest`, `MachineDisplayServiceBatchQueryGuardTest`
+    (also fixed an accidental blanket-regex rename that briefly renamed the unrelated
+    `machineDisplayRepository.saveAll` call — caught and reverted before running),
+    `MachineDisplayServiceNotificationTest`, `ShipmentServiceOverrideTest`, `KujiBoxServiceTest`,
+    `KujiBoxServiceCatalogFacadeMigrationTest`, `AnalyticsServiceTest`. `KujiBoxServiceTest`'s
+    `toResponseDTO_batchesTierInventoryLookupIntoSingleQuery` test and its `addSlip` stub for
+    `findByLocation_IdAndProduct_IdIn` were already dead against current production code (that
+    repository method isn't called anywhere in `KujiBoxService` any more — kuji prize counts live
+    on the tier, not `location_inventory`, per the test's own comment) — removed the stale stub,
+    kept the `never()` assertions rewritten against `inventoryOperations`.
+  - IT-level coverage for the task list's originally-scoped caller-transaction rollback proof was
+    initially deferred to 6c; independent review correctly flagged that as premature (the 6a test
+    plan itself requires it). Added in a follow-up fix — see "Review-driven fix: T-5 P2 findings"
+    below.
+- Result: pass. `./mvnw -q clean test` (full suite, unrestricted) — exit 0, zero failures/errors,
+  run twice independently. `./mvnw -q clean test-compile` + `./mvnw -q -Dtest=ArchitectureTest
+  test` — 7/7 rules pass, stable across two independent clean rebuilds, **no frozen-store
+  regeneration needed** (new edges fall under already-approved `-> inventory` target-module
+  coverage from T-3/T-4). Targeted suite (T-3/T-4's list plus every T-5-touched test class) also
+  green standalone. `git status` confirms two new production files, one new test file, and the
+  eight caller files plus seven test files modified in place — matches the expected T-5 footprint.
+
+## Review-driven fix: T-5 P2 findings (2026-09-09)
+
+Independent review of T-5 found two P2s. No business-behavior regression found; the limited
+Kuji/display migration scope was confirmed supported by the spec. Both P2s fixed same-session.
+
+- **P2-1, infrastructure leak**: `InventoryQueries.findHistoryByItemId` returned
+  `inventory.infrastructure.StockMovementHistoryView` (a Spring Data projection interface) to
+  callers outside `inventory` — `ForecastService` and `ProductReportBundleService` both imported
+  it directly, which would fail T-7's planned `noProductionClassOutsideInventoryDependsOn
+  InventoryInfrastructure` rule once added.
+  - Fix: new `inventory/application/StockMovementHistoryEntry.java` — a record mirroring
+    `StockMovementHistoryView` field-for-field (`id`, `at`, `reason`, `quantityChange`,
+    `previousQuantity`, `currentQuantity`, `fromLocationId`, `toLocationId`), with a
+    package-private `from(StockMovementHistoryView)` factory. `InventoryQueries
+    .findHistoryByItemId` now maps the repository's result through it before returning.
+    `ForecastService`/`ProductReportBundleService` updated to the new type and record-accessor
+    call sites (`.getAt()` -> `.at()` etc. — mechanical, no logic change; verified every read-only
+    call site the type touches, not just the ones that happened to compile).
+  - Verified: `./mvnw -q -DskipTests compile` clean (production only, isolates this fix from the
+    IT fix below). No test referenced `StockMovementHistoryView`/`StockMovementHistoryEntry`
+    directly, so no test-side churn.
+- **P2-2, missing 6a-closing IT proof**: the 6a task list's own test plan required a Testcontainers
+  (or equivalent real-transaction) IT proving `applyDelta` inside a caller-opened transaction
+  rolls back `LocationInventory`/`StockMovement`/`EventOutbox` together — Mockito unit tests
+  cannot verify real transaction propagation. The original T-5 entry deferred this to 6c; review
+  correctly identified that as premature since 6a's own plan requires it before closing, and
+  `./mvnw clean test` doesn't select `*IT` classes so its absence wasn't caught by "all green."
+  - Fix: new `inventory/application/InventoryOperationsCallerTransactionIT.java`. Mirrors
+    `StockMovementOutboxAtomicityIT`'s shape (a real `@SpringBootTest` against the `test` profile's
+    H2 database, deliberately not wrapped in an outer rolled-back test transaction so the
+    harness's own commit/rollback is real) rather than `AdjustToKafkaIT`'s Kafka-focused one, since
+    this proof is about transaction propagation, not Kafka delivery. A nested `@TestComponent`
+    (`CallerTransactionHarness`, registered via `@Import` since Spring Boot's component scan
+    doesn't pick up test-source classes automatically) stands in for a production caller: its own
+    `@Transactional` method calls `inventoryOperations.applyDelta(...)` partway through, then
+    either returns or throws. Two cases: (1) throws after `applyDelta` — asserts the
+    `LocationInventory` row, `StockMovement` row and `EventOutbox` row are all absent afterward;
+    (2) returns normally — asserts all three persisted together with the expected end-state
+    (quantity 5, one movement with `quantityChange=5`, one `stock_movement`-typed outbox row).
+  - Design note: confirmed no Testcontainers/Postgres container was actually needed — this class
+    of proof (does `@Transactional`'s default `REQUIRED` propagation actually join the caller's
+    transaction) only needs a real relational transaction, and the project's own `test` profile
+    already runs against H2 for exactly this reason (`StockMovementOutboxAtomicityIT` does the
+    same). Reserved the heavier Testcontainers-Postgres path for whatever 6c/6e work genuinely
+    needs Postgres-specific behavior (e.g. native SQL, JSONB), not used here.
+  - Verified: `./mvnw -q -Dtest=InventoryOperationsCallerTransactionIT test` — 2/2 pass. Then the
+    full suite re-run (`./mvnw -q clean test-compile` + `./mvnw -q clean test`, exit 0) and
+    `ArchitectureTest` re-checked stable across a second independent clean rebuild (7/7, no store
+    regeneration needed — the new IT and its nested `@TestComponent` both live in the
+    already-approved `inventory.application` package).
+- Result: pass. Both fixes verified together in one final `./mvnw -q clean test` run (exit 0,
+  zero failures across every surefire report) plus the standalone `ArchitectureTest`
+  double-clean-rebuild check described above.
+
+## Review-driven fix: T-5 delete-on-zero/find-or-create IT (2026-09-10)
+
+A second independent review pass — after re-running the full targeted suite standalone with JDK
+21 (27 tests, zero failures/skips, `git diff --check` clean) — confirmed both P2 fixes above and
+found one more gap: the 6a task list's own test plan (see "Test plan" under "6a task list") called
+for a delete-on-zero/find-or-create IT covering the now-shared `ShipmentService`/`KujiBoxService`
+path specifically, distinct from the transaction-propagation proof
+`InventoryOperationsCallerTransactionIT` already gave via a synthetic harness. That coverage was
+still outstanding, and the "Current handoff" summary hadn't been updated to say so after the first
+review round — it still read "Unit-level proof only," which was stale once the transaction IT
+landed and inaccurate about what was still missing.
+
+- Fix: new `inventory/application/InventoryOperationsSharedCallerPathIT.java`. Unlike
+  `InventoryOperationsCallerTransactionIT`'s synthetic `@TestComponent` harness, this drives the
+  real, already-production-reachable public API of both callers end to end against the H2 `test`
+  profile:
+  - `ShipmentService.createShipment` + `.receiveShipment` (with an explicit destination allocation
+    to a location that has no existing `LocationInventory` row) proves `addToInventory`'s
+    find-or-create; `.undoReceiveShipmentItem` reversing the full received quantity proves
+    `removeFromInventory`'s delete-on-zero.
+  - `KujiBoxService.openBox` (one linked-existing-product tier, `sourceLocationId` pointing at a
+    source row pre-seeded to exactly the tier's total quantity) proves `executeKujiSourceRemoval`'s
+    delete-on-zero; the subsequent `.closeBox` with a `transferOutTargets` entry pointing the
+    leftover at a *different* location that never had inventory for that product proves
+    `executeKujiCounterReturn`'s find-or-create.
+  - Needed one fixture correction mid-write: `openBox` rejects a parent product whose `kujiType`
+    isn't `CUSTOM` (`"Product is not a custom kuji"`) — the initial seed didn't set it; caught by
+    the test's own first run, not by review, and fixed before the test was considered done.
+  - Confirmed `KujiBoxService.mintAutoCreatedAtBox` (migrated mechanically in T-5, per the original
+    task record) has zero production callers — `addTier`'s and `transferInMore`'s auto-create
+    branches both bypass `location_inventory` entirely (kuji counters are the source of truth for
+    auto-created prizes), so this pre-existing dead method was not a viable find-or-create proof
+    target and isn't exercised here. Not a T-5 regression or a new finding to act on — recorded so
+    a future reader doesn't re-derive the same dead-end.
+- Also fixed: the stale "Unit-level proof only" sentence in the "Current handoff" section and the
+  T-5 bullet under "6a task list" — both now reflect that the delete-on-zero/find-or-create IT
+  exists and passes.
+- Verified: `./mvnw -q clean test-compile` clean, `./mvnw -q -Dtest=
+  InventoryOperationsSharedCallerPathIT test` — 2/2 pass. Full suite re-run
+  (`./mvnw -q clean test`, exit 0, zero failures) and `ArchitectureTest` re-checked stable across
+  a second independent clean rebuild (7/7, no store regeneration needed — the new IT lives in the
+  already-approved `inventory.application` package and only autowires existing `services`-package
+  beans, the same pattern `InventoryOperationsCallerTransactionIT` and
+  `StockMovementOutboxAtomicityIT` already use).
+- Result: pass. All three of T-5's test classes (`InventoryOperationsTest`,
+  `InventoryOperationsCallerTransactionIT`, `InventoryOperationsSharedCallerPathIT`) plus the full
+  unrestricted suite pass together in one final `./mvnw -q clean test` run.
+
+### T-6 — Move inventory/location-aggregate controllers, DTOs, mappers into their owning modules
+
+- Changed (production):
+  - `git mv` into `inventory/api/`: `InventoryAggregateController.java`, `StockMovementController.java`,
+    `InventoryTotalDTO.java`, `ProductInventoryResponseDTO.java`, `ProductInventoryEntryDTO.java`,
+    `StockMovementMapper.java`, `StockMovementResponseDTO.java`, `BatchAdjustStockRequestDTO.java`,
+    `BatchAdjustLineDTO.java`, `TransferInventoryRequestDTO.java`, `BatchTransferInventoryRequestDTO.java`.
+  - `git mv` into `sites/api/`, `sites/application/`, `sites/infrastructure/` respectively:
+    `LocationAggregateController.java`, `LocationAggregateService.java`, `LocationAggregateRepository.java`,
+    plus `LocationWithCountsDTO.java` into `sites/api/`.
+  - `InventoryQueries.java`: added `findAllInventoryTotals()`, a pass-through to
+    `InventoryTotalsRepository.findAllInventoryTotals()`.
+  - `InventoryAggregateController.getInventoryTotals()`: now calls `inventoryQueries
+    .findAllInventoryTotals()` instead of holding an `InventoryTotalsRepository` field directly —
+    retires the method's frozen `repositoriesAreOnlyAccessedByServicesOrRepositories` violation
+    (confirmed by diffing the regenerated store against the saved pre-move copy: exactly the three
+    lines for this one call site dropped, nothing else).
+  - `InventoryTotalsRepository.java`: import fix only (`InventoryTotalDTO`'s new package) — no
+    logic change. Left returning `InventoryTotalDTO` (an `inventory.api` type) directly from
+    `inventory.infrastructure`, matching its pre-existing shape; not refactored further, out of
+    T-6's mechanical scope.
+  - `LocationAggregateController`/`Service`/`Repository`: package-declaration and import fixes
+    only, plus a Javadoc note each recording the R-1 decision. No logic changed — the repository's
+    three native SQL strings (`ALL_LOCATIONS_WITH_COUNTS_SQL` etc.) are untouched.
+  - **Not moved (new R-9)**: `LocationInventoryController`, `LocationInventoryMapper`,
+    `LocationInventoryResponseDTO`, `InventoryRequestDTO` — see "Open risks" above for the full
+    reasoning (an `inventory.api -> catalog.api` edge `modulesDoNotDependOnAnotherModulesApi`
+    forbids unconditionally).
+  - `docs/specs/spring-domain-modular-monolith.md`: §5, §6.2, §11 updated (T-8, done in the same
+    pass — see below).
+- Same-package-without-import sweep: grepped every file matching each moved class's simple name,
+  cross-referenced against files living in the pre-move legacy package with no explicit import
+  (the T-3-established discipline) — found two: `RedactedFieldsAreOmittedFromJsonIT` (in
+  `dtos.responses`, used `InventoryTotalDTO` bare) and
+  `InventoryAggregateControllerCostVisibilityTest` (in `controllers`, constructed
+  `InventoryAggregateController` directly, and needed its constructor-signature update from
+  `InventoryTotalsRepository` to `InventoryQueries` regardless). Both fixed. `InventoryAggregateControllerIT`/
+  `LocationAggregateControllerIT`/`StockMovementControllerSecurityIT`/`RBACAlignmentIT` only
+  reference the moved class names in `@DisplayName`/Javadoc prose (verified by grep), not as Java
+  symbols — no import needed, confirmed by a clean `./mvnw clean test-compile`.
+- ArchUnit: `module-dependency-edges-baseline.txt` needed a sixth reviewed addition (four new
+  edges: `inventory -> validation`, `validation -> inventory`, `sites -> models`, `sites -> utils`
+  — all mechanical, the same underlying dependency as before the move under the old source-package
+  name; see the file's own sixth-addition entry for the full reasoning, including why
+  `sites -> models` paired with the pre-existing `models -> sites` isn't a new business-module
+  cycle). Two frozen stores needed regeneration
+  (`repositoriesAreOnlyAccessedByServicesOrRepositories`, `legacyTechnicalLayerPackagesDoNotGrow`):
+  followed the established clean-rebuild-twice-independently discipline (delete store + `stored.rules`
+  entry, `allowStoreCreation=true`/`allowStoreUpdate=true`, regenerate against a from-scratch
+  compile, revert both flags, re-verify stable across two more independent clean rebuilds). Diffed
+  both new stores against saved pre-T6 copies: the legacy-package store lost exactly the eleven
+  lines for the moved classes and gained none; the repository-access store lost exactly the three
+  lines for `InventoryAggregateController`'s retired direct-repository-access violation (144 -> 141
+  lines) and gained none. Zero `lambda$` references in either regenerated store.
+- Contract: regenerated `packages/contracts/openapi.json` via `./mvnw -q -Dtest=
+  OpenApiContractExportTest test` and diffed it against a pre-move copy — byte-identical (`diff`
+  exit 0), confirming the package move changed no endpoint shape. `tests/contracts` (the Python
+  suite) covers the Kafka event-envelope schema, not the REST/OpenAPI contract, so it wasn't
+  relevant to this task's "byte-identical" claim; confirmed by reading its test files first.
+- Result: pass. `./mvnw -q clean test-compile` clean; `./mvnw -q clean test` (full unrestricted
+  suite) exit 0, zero failures across every surefire report; `./mvnw -q -Dtest=ArchitectureTest
+  test` 8/8 rules pass (T-7's new rule included), stable across two independent clean rebuilds.
+  Targeted suite (`InventoryAggregateControllerCostVisibilityTest`, `RedactedFieldsAreOmittedFromJsonIT`,
+  `StockMovementServiceActiveStatusDerivationTest`, `StockMovementOutboxAtomicityIT`, plus every
+  `*IT`/`*Test` class named above) green. Also ran the broader `-Dtest='*IT'` sweep across the
+  whole suite: zero actual failures/errors anywhere, though a pre-existing, broad sandbox quirk
+  (affecting ~17 test classes this session never touched, e.g. `AnalyticsServiceTest`,
+  `LocationServiceTest`, `AuditLogMapperTest` — confirmed via `git diff` that none of these files
+  changed) reports "Tests run: 0" for some `@Nested`-only classes under that specific invocation
+  pattern; reproduced identically on files with zero diff from HEAD, so this is pre-existing
+  environment behavior, not a T-6 regression. `git diff --check` passed.
+
+### T-7 — Live inventory-infrastructure boundary rule + caller-set pin
+
+- Changed: `ArchitectureTest.java` — added `noProductionClassOutsideInventoryDependsOnInventoryInfrastructure`
+  (mirrors `noProductionClassOutsideCatalogDependsOnCatalogInfrastructure`'s shape exactly:
+  `outsideInventoryToInventoryInfrastructureRule()`, `INVENTORY_INFRASTRUCTURE_ACCESS_EXEMPTIONS`,
+  `isExemptFromInventoryInfrastructureRule`). New `InventoryOperationsCallerSetTest.java` in
+  `architecture/`, pinning the eight-class origin set (class-level granularity, not per-method
+  like `CatalogEntityAccessCallerSetTest` — T-7's task text asked for "the origin set," and a
+  method-level pin would have meant hand-enumerating every call site across eight classes for
+  marginal extra precision T-5's own `InventoryOperationsTest`/the two new ITs already cover from
+  the behavior side).
+- Verified before writing the exemption list: grepped every `com.mirai.inventoryservice.inventory
+  .infrastructure.` reference outside `inventory/**` — exactly `DevSeedController` and
+  `AnalyticsSeedService`, matching the catalog precedent's two names exactly. Verified the caller
+  set: grepped every `inventoryOperations.`/`inventoryQueries.` call site outside `inventory/**` —
+  exactly the same eight classes T-5 named, zero drift.
+- Tests: `./mvnw -q -Dtest=ArchitectureTest,InventoryOperationsCallerSetTest,
+  CatalogEntityAccessCallerSetTest test` — `ArchitectureTest` now 8/8 (was 7/7), both caller-set
+  tests pass. `moduleDependencyEdgesMatchApprovedBaseline` unaffected by this task on its own (no
+  new edges from adding a live rule and a caller-set test, both of which only read the compiled
+  graph, they don't add dependencies). Confirmed no `identity -> inventory` line exists in
+  `module-dependency-edges-baseline.txt` (grep) — R-3 still holds after T-6/T-7.
+- Result: pass. `./mvnw -q clean test-compile` + `./mvnw -q -Dtest=ArchitectureTest test` stable
+  across two independent clean rebuilds (no frozen-store regeneration needed for this task — both
+  new tests are live/unfrozen).
+
+### T-8 — Record R-1/R-2/R-4 in the durable spec and package-info
+
+- Changed: `docs/specs/spring-domain-modular-monolith.md` — §5's module-ownership table: `sites`
+  row now notes its R-1 cross-module read projection; `inventory` row now notes `StockMovement`'s
+  R-2 move and its transitional `AuditLog` association. §6.2: added a paragraph documenting R-1
+  (`LocationAggregateController` as the one approved exception to "no cross-module repository
+  reads," per §7.4). §11: added a bullet naming `inventory` as the owner of `location_inventory`/
+  `stock_movements`, and `LocationAggregateController`'s query as the one documented read-only
+  cross-module exception. `inventory/package-info.java` and `sites/package-info.java`: extended
+  from one-line summaries to document each module's public facade/exception (matching the level of
+  detail the doc's own module-layout section describes, not inventing a new documentation
+  convention).
+- Result: pass — documentation-only change, verified by `git diff --check` and a read-through
+  confirming no factual drift from what T-2/T-3/T-6 actually did.
+
+## Review-driven fix: T-6–T-8 P3 findings (2026-09-10)
+
+Independent review of the completed T-6–T-8 slice found two P3s. No runtime regression found.
+
+- **P3-1, caller guard could collide on simple name**: `InventoryOperationsCallerSetTest` compared
+  origins by `getSimpleName()`, so a future same-named class in a different package (e.g. a
+  `kuji.application.AnalyticsService`) would silently collapse into the existing
+  `services.AnalyticsService` entry instead of failing as an unexpected new caller.
+  - Fix: switched `actualOrigins()`/`expectedOrigins()` to fully qualified names
+    (`getFullName()`, and the eight expected entries spelled out as FQNs), added a class-Javadoc
+    note explaining why. Re-verified: `./mvnw -q -Dtest=InventoryOperationsCallerSetTest,
+    ArchitectureTest test` — both pass (ArchitectureTest still 8/8).
+- **P3-2, checkpoint evidence was planning-only**: `.specs/phase-6-inventory/validation.md` and
+  `review.md` still held only the original planning-stage content (five-checkpoint structure,
+  no runtime tests claimed) even though 6a's actual implementation and review had completed.
+  - Fix: added a "6a — Inventory module boundary (AC-1)" section to each, recording the actual
+    commands/results (validation.md) and the four independent-review rounds' findings/disposition
+    (review.md), without altering the original planning-stage content above them.
+- Verified: `./mvnw -q clean test-compile` clean; `./mvnw -q clean test` (full unrestricted suite)
+  exit 0, zero failures across every surefire report; `git diff --check` passed.
+- Result: pass. Both P3s fixed same session; no files committed.

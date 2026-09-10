@@ -95,6 +95,43 @@
 # (the edge check is module-level, not package-level, and `inventory -> sites` was already
 # approved).
 #
+# Sixth reviewed addition (2026-09-10, .specs/phase-6-inventory/log.md T-6): moved
+# InventoryAggregateController/StockMovementController and their DTOs/mappers into inventory.api,
+# and LocationAggregateController/Service/Repository (+ LocationWithCountsDTO) into
+# sites.api/sites.application/sites.infrastructure per R-1. Four new edges, all mechanical (same
+# underlying dependency as before the move, only the source module's name changed):
+#   `inventory -> validation`  (TransferInventoryRequestDTO's @ValidTransferDestination annotation
+#                                 -- was `dtos -> validation`, already approved, before the move)
+#   `validation -> inventory`  (TransferDestinationValidator's ConstraintValidator<..,
+#                                 TransferInventoryRequestDTO> -- was `validation -> dtos`, already
+#                                 approved, before the move)
+#   `sites -> models`          (LocationAggregateController/Service use models.enums.LocationType --
+#                                 was `controllers -> models`/`services -> models`, both already
+#                                 approved, before the move)
+#   `sites -> utils`           (LocationAggregateRepository uses utils.TimestampUtils -- was
+#                                 `repositories -> utils`, already approved, before the move)
+# `sites -> models` combined with the pre-existing `models -> sites` edge (AuditLog-era R-2
+# precedent) is a third bidirectional pair in this file, alongside `models <-> inventory` and
+# `inventory <-> dtos` above -- same already-accepted legacy-technical-package tangle character,
+# not a new business-module cycle: `models` here is exactly the legacy `models.enums` package
+# (LocationType), not a real aggregate relationship, and `sites` gains no new edge into any real
+# business module from this move.
+# InventoryAggregateController's `getInventoryTotals` also stopped reaching
+# InventoryTotalsRepository directly (now goes through InventoryQueries), so no new
+# `inventory -> inventory` edge (same-module, not tracked) and the pre-existing
+# `controllers -> inventory` edge for this specific call site is retired (a controller reaching a
+# repository directly used to be one of ArchitectureTest's frozen
+# repositoriesAreOnlyAccessedByServicesOrRepositories violations; regenerating that store shrank
+# it by exactly one entry for this reason).
+# `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+# `InventoryRequestDTO` were deliberately NOT moved in T-6 (R-9, new): LocationInventoryResponseDTO
+# .item is catalog.api.ProductSummaryDTO, and LocationInventoryMapper `uses` catalog.api.ProductMapper
+# -- moving them into inventory.api would create an inventory.api -> catalog.api edge, which
+# modulesDoNotDependOnAnotherModulesApi forbids unconditionally (no baseline/exemption mechanism,
+# unlike the frozen-store or module-edge rules). Resolving it properly needs a catalog-owned
+# application-layer product-summary read contract inventory.api can consume instead of catalog's
+# own transport DTO -- real design work, not a mechanical move. Deferred; see log.md T-6 entry.
+#
 # This replaces the previous FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` check, which
 # froze the full, multi-line cycle-path text (including specific example call-site edges, capped
 # by ArchUnit's own truncation) for the pre-existing catalog/dtos/exceptions/identity/models/
@@ -157,6 +194,7 @@ inventory -> repositories
 inventory -> services
 inventory -> sites
 inventory -> utils
+inventory -> validation
 jobs -> repositories
 jobs -> services
 kuji -> catalog
@@ -182,6 +220,9 @@ services -> shared
 services -> sites
 shipments -> catalog
 shipments -> repositories
+sites -> models
 sites -> shared
+sites -> utils
 validation -> dtos
+validation -> inventory
 validation -> models

@@ -233,6 +233,63 @@ class ArchitectureTest {
         return false;
     }
 
+    // Phase 6a T-7 (docs: .specs/phase-6-inventory/spec.md, log.md): the inventory-module mirror
+    // of noProductionClassOutsideCatalogDependsOnCatalogInfrastructure above. Runs live, never
+    // frozen: T-5 already migrated every named production caller off direct
+    // LocationInventoryRepository/StockMovementRepository/InventoryTotalsRepository access onto
+    // InventoryOperations/InventoryQueries, so there is no pre-existing debt to grandfather in --
+    // unlike the still-frozen repositoriesAreOnlyAccessedByServicesOrRepositories rule above, which
+    // predates this migration and carries genuine legacy debt this rule does not need to repeat.
+    @Test
+    void noProductionClassOutsideInventoryDependsOnInventoryInfrastructure() {
+        outsideInventoryToInventoryInfrastructureRule().check(importedClasses);
+    }
+
+    // Same two dev-profile-only seeding classes exempted from the catalog version of this rule,
+    // for the same reason: no production equivalent (docs/baseline/api-v1-map.md), so a seeding
+    // port for two throwaway consumers is not worth the indirection. Verified by grep (2026-09-10)
+    // that these are the only two production classes outside `inventory` reaching
+    // inventory.infrastructure directly.
+    private static final String[] INVENTORY_INFRASTRUCTURE_ACCESS_EXEMPTIONS = {
+        BASE_PACKAGE + ".controllers.DevSeedController", BASE_PACKAGE + ".services.AnalyticsSeedService"
+    };
+
+    static ArchRule outsideInventoryToInventoryInfrastructureRule() {
+        return classes()
+                .that(new DescribedPredicate<JavaClass>("reside outside inventory and are not exempted") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !"inventory".equals(moduleOf(javaClass)) && !isExemptFromInventoryInfrastructureRule(javaClass);
+                    }
+                })
+                .should(new ArchCondition<JavaClass>("not depend on inventory.infrastructure") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                            JavaClass target = dependency.getTargetClass();
+                            if (isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".inventory.infrastructure")) {
+                                events.add(SimpleConditionEvent.violated(
+                                        javaClass,
+                                        dependency.getDescription()
+                                                + " -- inventory.infrastructure must only be accessed from within"
+                                                + " inventory, via InventoryOperations/InventoryQueries"));
+                            }
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
+
+    private static boolean isExemptFromInventoryInfrastructureRule(JavaClass javaClass) {
+        String name = javaClass.getName();
+        for (String exempt : INVENTORY_INFRASTRUCTURE_ACCESS_EXEMPTIONS) {
+            if (exempt.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Replaces a FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` cycle check (removed;
     // see git history and .specs/phase-5c-site-products/log.md). That rule froze the full,
     // multi-line cycle-path text (including specific example call-site edges, subject to

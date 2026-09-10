@@ -1,6 +1,6 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.sites.infrastructure;
 
-import com.mirai.inventoryservice.dtos.responses.LocationWithCountsDTO;
+import com.mirai.inventoryservice.sites.api.LocationWithCountsDTO;
 import com.mirai.inventoryservice.utils.TimestampUtils;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

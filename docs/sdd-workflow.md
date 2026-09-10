@@ -29,9 +29,10 @@ native checks before completion, and the PR gate is the independent proof.
    feature record and link the durable documents that constrain it.
 2. **Review and plan.** Resolve requirements, identify affected boundaries,
    write acceptance criteria, and split the change into verifiable tasks.
-3. **Implement.** Work one task at a time. Start with a failing test when a
-   meaningful local test path exists. Record material assumptions and results
-   as the work proceeds.
+3. **Implement.** Work continuously through the agreed slice, batching related
+   tasks where useful. Use test-first work for behavior changes when a meaningful
+   local test exists; use existing regression and architecture checks for
+   mechanical moves. Record material assumptions and results as work proceeds.
 4. **Test and validate.** Run the native checks relevant to the changed
    deployables and boundaries. The PR gate runs the independent merge checks.
 5. **Review and commit.** Full work records an explicit review and validation
@@ -41,6 +42,34 @@ native checks before completion, and the PR gate is the independent proof.
 Codex proceeds through routine implementation uncertainty and records its
 assumptions. It pauses for material product, security, data-loss, or
 irreversible-deployment decisions.
+
+## Slice-level review cadence
+
+A slice is an agreed implementation checkpoint with a coherent outcome and an
+acceptance gate. T-numbered tasks are an internal checklist within that slice;
+they do not each require a separate spec, approval, review cycle, or commit.
+After the slice's scope and prerequisites are established, implement its tasks
+continuously, run focused checks as needed, and present the completed slice for
+review after its required native checks pass. For Full work, run the independent
+Standards and Spec passes at that boundary. Fix findings and recheck affected
+behavior before advancing to the next slice.
+
+Missing checkpoint evidence may remain on the checklist while other tasks in
+the same slice proceed; it must be completed before closing the slice. Do not
+confuse this with a prerequisite that must be resolved before dependent work,
+such as migration compatibility or a material authorization decision. Ask the
+user only for material product, security, data-loss, or irreversible-deployment
+decisions, or an explicitly required approval.
+
+Keep one execution record and concise handoff per mergeable feature. Record
+material decisions, remaining gate work, and actual commands/results; do not
+create a new record for each task. Commit boundaries follow coherent changes,
+not task counts. Run the full relevant gate at slice completion; repeat or
+broaden checks only when changes, failures, or unresolved risks warrant it.
+Repeated clean builds and independent review after every mechanical edit are
+not default requirements. Tenant isolation, migration compatibility, API/event
+contracts, transaction atomicity, and the independent PR gate retain their
+required proof.
 
 ## Templates
 

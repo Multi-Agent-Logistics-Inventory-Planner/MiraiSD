@@ -33,6 +33,14 @@ wholesale merely because they call inventory.
   commits are allowed; the count is not a reason to combine unrelated behavior or skip review.
 - This one record owns execution; the plans own the phase sequence. Validate and review each
   checkpoint before proceeding, then run the complete phase exit gate before merge.
+- Each checkpoint (6a–6e) is one implementation slice. T-numbered tasks are internal
+  checklists, not additional approval/review gates. Once scope and prerequisites are settled,
+  implement the slice continuously, batch related mechanical changes, and run focused checks.
+  Request review after the slice's required checks pass; fix findings before the next slice.
+  Outstanding checkpoint tests do not prevent unrelated work within that slice, but must pass
+  before it closes. Material decisions and migration prerequisites still precede dependent work.
+  Follow the [shared review cadence](../../docs/sdd-workflow.md#slice-level-review-cadence);
+  no per-task record, commit, repeated clean build, or independent review is required.
 - Ordered commits do not provide separate deployments. Before 6b implementation, document the
   actual migration mechanism, compatibility with currently deployed writers, deterministic backfill,
   verification, rollback compatibility, and when enforcement is safe. If enforcement requires an

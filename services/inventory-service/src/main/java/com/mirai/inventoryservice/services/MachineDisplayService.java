@@ -23,7 +23,7 @@ import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
-import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +44,7 @@ public class MachineDisplayService {
     private final CatalogQueries catalogQueries;
     private final CatalogEntityAccess catalogEntityAccess;
     private final UserRepository userRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final InventoryOperations inventoryOperations;
     private final LocationRepository locationRepository;
     private final EntityManager entityManager;
     private final AuditLogService auditLogService;
@@ -58,7 +58,7 @@ public class MachineDisplayService {
             CatalogQueries catalogQueries,
             CatalogEntityAccess catalogEntityAccess,
             UserRepository userRepository,
-            StockMovementRepository stockMovementRepository,
+            InventoryOperations inventoryOperations,
             LocationRepository locationRepository,
             EntityManager entityManager,
             AuditLogService auditLogService,
@@ -67,7 +67,7 @@ public class MachineDisplayService {
         this.catalogQueries = catalogQueries;
         this.catalogEntityAccess = catalogEntityAccess;
         this.userRepository = userRepository;
-        this.stockMovementRepository = stockMovementRepository;
+        this.inventoryOperations = inventoryOperations;
         this.locationRepository = locationRepository;
         this.entityManager = entityManager;
         this.auditLogService = auditLogService;
@@ -134,7 +134,7 @@ public class MachineDisplayService {
                 .actorId(request.getActorId())
                 .at(now)
                 .build();
-        stockMovementRepository.save(movement);
+        inventoryOperations.saveMovement(movement);
 
         List<String> previousNames = existingDisplays.stream()
                 .map(d -> d.getProduct().getName())
@@ -240,7 +240,7 @@ public class MachineDisplayService {
                         .at(now)
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         List<String> previousNames = existingDisplays.stream()
                 .map(d -> d.getProduct().getName())
@@ -303,7 +303,7 @@ public class MachineDisplayService {
                         .at(now)
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_REMOVED,
@@ -398,7 +398,7 @@ public class MachineDisplayService {
                         .at(now)
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         Set<UUID> removedIds = displays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
         List<String> previousNames = activeBefore.stream()
@@ -760,7 +760,7 @@ public class MachineDisplayService {
                             .at(now)
                             .build())
                     .collect(Collectors.toList());
-            stockMovementRepository.saveAll(movements);
+            inventoryOperations.saveMovements(movements);
 
             List<MachineSnapshot> snapshots = new ArrayList<>();
             snapshots.add(new MachineSnapshot(
@@ -859,7 +859,7 @@ public class MachineDisplayService {
                         .at(now)
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_RENEWED,

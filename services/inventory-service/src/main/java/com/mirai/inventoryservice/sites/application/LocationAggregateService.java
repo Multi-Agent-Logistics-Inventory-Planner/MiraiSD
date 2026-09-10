@@ -1,8 +1,8 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.sites.application;
 
-import com.mirai.inventoryservice.dtos.responses.LocationWithCountsDTO;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.repositories.LocationAggregateRepository;
+import com.mirai.inventoryservice.sites.api.LocationWithCountsDTO;
+import com.mirai.inventoryservice.sites.infrastructure.LocationAggregateRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

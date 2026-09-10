@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.inventory.infrastructure;
 
-import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
+import com.mirai.inventoryservice.inventory.api.InventoryTotalDTO;
 import com.mirai.inventoryservice.utils.TimestampUtils;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

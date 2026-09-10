@@ -1,10 +1,10 @@
 package com.mirai.inventoryservice.inventory.application;
 
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchAdjustLineDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchTransferInventoryRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
+import com.mirai.inventoryservice.inventory.api.BatchAdjustLineDTO;
+import com.mirai.inventoryservice.inventory.api.BatchAdjustStockRequestDTO;
+import com.mirai.inventoryservice.inventory.api.BatchTransferInventoryRequestDTO;
+import com.mirai.inventoryservice.inventory.api.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
 import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;

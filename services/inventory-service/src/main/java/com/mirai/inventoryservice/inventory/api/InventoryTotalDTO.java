@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.responses;
+package com.mirai.inventoryservice.inventory.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;

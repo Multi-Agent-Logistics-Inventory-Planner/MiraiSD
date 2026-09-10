@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.analytics.application;
 import com.mirai.inventoryservice.config.CacheConfig;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
-import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -32,7 +32,7 @@ import java.util.UUID;
 public class SalesRollupRecomputeService {
 
     private final DailySalesRollupRepository dailySalesRollupRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final InventoryQueries inventoryQueries;
     private final CacheManager cacheManager;
 
     /**
@@ -77,7 +77,7 @@ public class SalesRollupRecomputeService {
         OffsetDateTime endDateTime = endDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         // Use native SQL aggregation - much faster than loading all entities
-        List<Object[]> aggregatedData = stockMovementRepository.aggregateSalesByItemAndDate(
+        List<Object[]> aggregatedData = inventoryQueries.aggregateSalesByItemAndDate(
             startDateTime, endDateTime);
 
         if (aggregatedData.isEmpty()) {

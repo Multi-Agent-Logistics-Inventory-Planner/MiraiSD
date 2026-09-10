@@ -1,11 +1,9 @@
-package com.mirai.inventoryservice.controllers;
+package com.mirai.inventoryservice.inventory.api;
 
-import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
-import com.mirai.inventoryservice.dtos.responses.ProductInventoryResponseDTO;
 import com.mirai.inventoryservice.identity.domain.Permission;
 import com.mirai.inventoryservice.identity.domain.RolePermissions;
-import com.mirai.inventoryservice.inventory.infrastructure.InventoryTotalsRepository;
 import com.mirai.inventoryservice.inventory.application.InventoryAggregateService;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,13 +24,13 @@ import java.util.UUID;
 public class InventoryAggregateController {
 
     private final InventoryAggregateService inventoryAggregateService;
-    private final InventoryTotalsRepository inventoryTotalsRepository;
+    private final InventoryQueries inventoryQueries;
 
     public InventoryAggregateController(
             InventoryAggregateService inventoryAggregateService,
-            InventoryTotalsRepository inventoryTotalsRepository) {
+            InventoryQueries inventoryQueries) {
         this.inventoryAggregateService = inventoryAggregateService;
-        this.inventoryTotalsRepository = inventoryTotalsRepository;
+        this.inventoryQueries = inventoryQueries;
     }
 
     /**
@@ -45,13 +43,10 @@ public class InventoryAggregateController {
     @GetMapping("/totals")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<InventoryTotalDTO>> getInventoryTotals() {
-        List<InventoryTotalDTO> totals = inventoryTotalsRepository.findAllInventoryTotals();
+        List<InventoryTotalDTO> totals = inventoryQueries.findAllInventoryTotals();
         // Authentication is read from the SecurityContext rather than taken as a method
-        // parameter: this method is one of ArchUnit's frozen legacy violations (a controller
-        // reaching a repository directly), and changing its signature would rewrite that
-        // frozen entry. Retiring the violation properly means moving this call behind
-        // InventoryAggregateService, which is Phase 6 inventory-module work - not something
-        // to smuggle into a redaction fix.
+        // parameter: keeps the redaction check colocated with the query, matching how this
+        // method already worked before T-6 routed it through InventoryQueries.
         if (!RolePermissions.hasPermission(
                 SecurityContextHolder.getContext().getAuthentication(), Permission.COSTS_VIEW)) {
             totals.forEach(dto -> dto.setUnitCost(null));

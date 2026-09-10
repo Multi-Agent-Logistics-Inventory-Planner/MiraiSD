@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.catalog.application.SupplierService;
-import com.mirai.inventoryservice.inventory.application.StockMovementService;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -42,16 +42,13 @@ class ShipmentServiceOverrideTest {
     @Mock private com.mirai.inventoryservice.catalog.application.ProductService productService;
     @Mock private com.mirai.inventoryservice.identity.application.UserService userService;
     @Mock private com.mirai.inventoryservice.identity.infrastructure.UserRepository userRepository;
-    @Mock private com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository stockMovementRepository;
-    @Mock private com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository locationInventoryRepository;
+    @Mock private InventoryOperations inventoryOperations;
     @Mock private com.mirai.inventoryservice.sites.infrastructure.LocationRepository locationRepository;
     @Mock private com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository storageLocationRepository;
     @Mock private com.mirai.inventoryservice.sites.infrastructure.SiteRepository siteRepository;
     @Mock private NotificationService notificationService;
-    @Mock private StockMovementService stockMovementService;
     @Mock private AuditLogService auditLogService;
     @Mock private SupabaseBroadcastService broadcastService;
-    @Mock private EventOutboxService eventOutboxService;
     @Mock private SupplierService supplierService;
 
     private ShipmentService service;
@@ -62,9 +59,9 @@ class ShipmentServiceOverrideTest {
         service = new ShipmentService(
                 shipmentRepository, shipmentItemRepository, catalogQueries, catalogEntityAccess,
                 catalogCommands, productService,
-                userService, userRepository, stockMovementRepository, locationInventoryRepository,
+                userService, userRepository, inventoryOperations,
                 locationRepository, storageLocationRepository, siteRepository, notificationService,
-                stockMovementService, auditLogService, broadcastService, eventOutboxService, supplierService);
+                auditLogService, broadcastService, supplierService);
         shipmentId = UUID.randomUUID();
     }
 
@@ -148,7 +145,6 @@ class ShipmentServiceOverrideTest {
         service.overrideShipmentStatus(
                 shipmentId, ShipmentStatus.RECEIVED, "manual close-out", null, null);
         // No stock movement, no inventory mutation
-        verify(stockMovementRepository, never()).save(any());
-        verify(locationInventoryRepository, never()).save(any());
+        verifyNoInteractions(inventoryOperations);
     }
 }

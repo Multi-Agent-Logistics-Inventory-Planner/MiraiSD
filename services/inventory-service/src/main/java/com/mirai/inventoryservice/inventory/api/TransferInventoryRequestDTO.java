@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.requests;
+package com.mirai.inventoryservice.inventory.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.validation.ValidTransferDestination;
