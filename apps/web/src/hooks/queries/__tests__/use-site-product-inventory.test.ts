@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import type { ReactNode } from "react";
+
+const mockGetInventoryTotals = vi.fn();
+vi.mock("@/lib/api/inventory", () => ({
+  getInventoryTotals: () => mockGetInventoryTotals(),
+}));
 
 const mockUseProducts = vi.fn();
 const mockUseSiteProducts = vi.fn();
@@ -44,6 +49,67 @@ const catalogProduct = (overrides: Record<string, unknown> = {}) => ({
 describe("useSiteProductInventory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetInventoryTotals.mockResolvedValue([]);
+  });
+
+  function mainSite() {
+    mockUseProducts.mockReturnValue({ data: [catalogProduct()], isLoading: false, error: null });
+    mockUseSiteProducts.mockReturnValue({
+      data: [{ productId: "p-1", isStocked: false, msrp: 20 }],
+      siteId: "main-id", siteCode: "MAIN", isLoading: false, error: null,
+    });
+  }
+
+  it("joins MAIN totals without changing assortment/settings and uses zero for a missing total", async () => {
+    mainSite();
+    mockGetInventoryTotals.mockResolvedValue([{ itemId: "p-1", totalQuantity: 15 }]);
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.data?.[0].totalQuantity).toBe(15));
+    expect(result.current.data?.[0]).toMatchObject({ isStocked: false, product: { msrp: 20 } });
+    mockGetInventoryTotals.mockResolvedValue([]);
+    const empty = renderHook(() => useSiteProductInventory(true), { wrapper: createWrapper() });
+    await waitFor(() => expect(empty.result.current.data?.[0].totalQuantity).toBe(0));
+  });
+
+  it("does not invent zero totals while loading or on failure", async () => {
+    mainSite();
+    let reject!: (error: Error) => void;
+    mockGetInventoryTotals.mockReturnValue(new Promise((_, r) => { reject = r; }));
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper: createWrapper() });
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.data).toBeNull();
+    await act(async () => reject(new Error("Inventory unavailable")));
+    await waitFor(() => expect(result.current.error?.message).toBe("Inventory unavailable"));
+    expect(result.current.data).toBeNull();
+  });
+
+  it("ignores late MAIN totals after switching sites with the same cache", async () => {
+    mainSite();
+    let resolve!: (value: unknown[]) => void;
+    mockGetInventoryTotals.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const { result, rerender } = renderHook(() => useSiteProductInventory(true), { wrapper: createWrapper() });
+    mockUseSiteProducts.mockReturnValue({
+      data: [], siteId: "second-id", siteCode: "SECOND", isLoading: false, error: null,
+    });
+    rerender();
+    await act(async () => resolve([{ itemId: "p-1", totalQuantity: 15 }]));
+    expect(result.current.showInventory).toBe(false);
+    expect(result.current.data?.[0].totalQuantity).toBeUndefined();
+    expect(mockGetInventoryTotals).toHaveBeenCalledTimes(1);
+    mainSite();
+    rerender();
+    await waitFor(() => expect(result.current.data?.[0].totalQuantity).toBe(15));
+    mockUseSiteProducts.mockReturnValue({ data: [], siteId: "second-id", siteCode: "SECOND", isLoading: false, error: null });
+    rerender();
+    expect(result.current.data?.[0].totalQuantity).toBeUndefined();
+  });
+
+  it.each([undefined, "SECOND"])("does not fetch legacy totals for site %s", (siteCode) => {
+    mainSite();
+    mockUseSiteProducts.mockReturnValue({ data: [], siteId: siteCode ? "second-id" : undefined, siteCode, isLoading: false, error: null });
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper: createWrapper() });
+    expect(result.current.showInventory).toBe(false);
+    expect(mockGetInventoryTotals).not.toHaveBeenCalled();
   });
 
   it("stays null until both the catalog list and the site list have loaded", () => {

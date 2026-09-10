@@ -72,6 +72,11 @@ vi.mock("@/lib/api/products", () => ({
   deleteProduct: vi.fn(),
 }));
 
+const mockGetInventoryTotals = vi.fn();
+vi.mock("@/lib/api/inventory", () => ({
+  getInventoryTotals: () => mockGetInventoryTotals(),
+}));
+
 const mockGetCategories = vi.fn();
 vi.mock("@/lib/api/categories", () => ({
   getCatalogCategories: (...args: unknown[]) => mockGetCategories(...args),
@@ -94,7 +99,7 @@ vi.mock("@/hooks/use-permissions", () => ({
 // --- ProductModal's own tangential data (not part of what T-5 changed) - stubbed to keep this
 // test focused on list/detail/role/site behavior, not the modal's unrelated sub-sections. ---
 vi.mock("@/hooks/queries/use-product-inventory-entries", () => ({
-  useProductInventoryEntries: () => ({ data: { entries: [] }, isLoading: false }),
+  useProductInventoryEntries: () => ({ data: { entries: [{ inventoryId: "inv-1", locationId: "rack-16", locationCode: "R16", locationType: "RACK", quantity: 15 }] }, isLoading: false }),
 }));
 vi.mock("@/hooks/queries/use-kuji-box", () => ({
   useKujiAllocationsByProduct: () => ({ data: [] }),
@@ -174,6 +179,7 @@ function renderPage() {
 describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetInventoryTotals.mockResolvedValue([{ itemId: "p-1", totalQuantity: 15 }]);
     mockGetProducts.mockResolvedValue([CATALOG_PRODUCT]);
     mockGetCategories.mockResolvedValue([CATEGORY]);
     mockGetSiteProducts.mockImplementation((siteId: string) =>
@@ -194,29 +200,32 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     });
   });
 
-  it("withholds quantity/stock-status in the list and shows MAIN's assortment status", async () => {
+  it("shows legacy totals in the list and MAIN's assortment status", async () => {
     renderPage();
 
     expect(await screen.findByText("Widget")).toBeInTheDocument();
     expect(screen.getByText("Stocked")).toBeInTheDocument();
-    // AC-6b: no Stock/quantity column, and the legacy, site-blind quantity (999) never renders.
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    // Counts come from inventory totals, never the catalog quantity field.
+    expect(screen.getByText("Stock")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
     expect(screen.queryByText("999")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/available after inventory is migrated per site/i),
+    ).not.toBeInTheDocument();
   });
 
-  it("opens the detail modal with withheld inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
+  it("opens the detail modal with inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
     renderPage();
 
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/current stock/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/current stock/i)).toHaveTextContent("15");
+    expect(within(dialog).getByText("R16")).toBeInTheDocument();
+    expect(within(dialog).getByText("15")).toBeInTheDocument();
     expect(
-      within(dialog).getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+      within(dialog).queryByText(/available after inventory is migrated per site/i),
+    ).not.toBeInTheDocument();
     expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
     // canViewMsrp/canViewCosts are false for this EMPLOYEE mock - money fields stay hidden,
     // proving this row's site-scoped msrp isn't leaking around the permission gate.
@@ -290,9 +299,11 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
     expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
     expect(within(dialogAfter).queryByText("$20.00")).not.toBeInTheDocument();
-    // Quantity stays withheld across the switch too.
+    // Quantity disappears across the switch too.
+    expect(within(dialogAfter).queryByText(/current stock/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Stock" })).not.toBeInTheDocument();
     expect(
-      within(dialogAfter).getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+      within(dialogAfter).queryByText(/available after inventory is migrated per site/i),
+    ).not.toBeInTheDocument();
   });
 });

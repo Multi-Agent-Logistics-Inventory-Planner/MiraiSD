@@ -67,12 +67,7 @@ interface ProductModalProps {
   onEditClick?: () => void;
   /** Hide the delete button (e.g. when opened from the location detail sheet) */
   hideDelete?: boolean;
-  /**
-   * Whether to render the Current Stock section's quantity/location breakdown. False for the
-   * site-scoped Products view, which withholds quantity/stock-status until Phase 6 provides
-   * site-scoped inventory (.specs/phase-5d-catalog-v1-and-web/spec.md AC-6b) - Adjust/Transfer
-   * still work normally either way, since stock mutation itself is out of this record's scope.
-   */
+  /** Whether inventory counts are available for this view. */
   showInventory?: boolean;
 }
 
@@ -464,19 +459,7 @@ export function ProductModal({
         </div>
 
         {/* Current Stock Section */}
-        {!showInventory ? (
-          <div className="mt-4 sm:mt-6 min-w-0">
-            <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
-              Current Stock
-            </h3>
-            <Card className="p-3 border-none">
-              <CardContent className="p-0 text-sm text-muted-foreground">
-                Quantity and stock status are available after inventory is migrated per site
-                (Phase 6).
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
+        {showInventory && (
         <div className="mt-4 sm:mt-6 min-w-0">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Current Stock{" "}
