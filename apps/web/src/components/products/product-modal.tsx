@@ -296,14 +296,7 @@ export function ProductModal({
                 Status:
               </span>
               <span className="text-xs sm:text-sm">
-                {/* isStocked (site assortment) is only present on rows from the site-scoped
-                    view (phase-5d T-5) - must be read in preference to isActive there, so this
-                    can't disagree with the table's "Stocked"/"Not Stocked" badge for the same
-                    row. The legacy, unscoped view (location-detail-sheet) has no isStocked and
-                    keeps its original "Active"/"Inactive" copy, unchanged by this record. */}
-                {product.isStocked !== undefined
-                  ? (product.isStocked ? "Stocked" : "Not Stocked")
-                  : (p.isActive ? "Active" : "Inactive")}
+                {p.isActive ? "Active" : "Inactive"}
               </span>
             </div>
             {isKuji && can(Permission.PRODUCTS_UPDATE) && (

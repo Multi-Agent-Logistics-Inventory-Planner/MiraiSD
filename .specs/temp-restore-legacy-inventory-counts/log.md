@@ -2,14 +2,14 @@
 
 ## Current handoff
 
-- Status: implemented and reviewed; all required local checks passed; ready to commit.
-- Next action: commit on `temp/restore-legacy-inventory-counts`.
-- Decisions: temporary MAIN-only legacy totals; existing stock UI restored and
-  migration text removed, with no new labels. Site settings and permissions unchanged.
-- Last verified: focused final regression run — 13/13 pass; `git diff --check` clean.
-- Open risks: legacy totals remain site-blind. Replace this temporary exception
-  when Phase 6 supplies scoped inventory. The MAIN condition is a display gate,
-  not an authorization boundary. PR gate has not run.
+- Status: count restoration already pushed; status restoration implemented and validated.
+- Next action: commit and push status restoration to `temp/restore-legacy-inventory-counts`.
+- Decisions: table/modal Active/Inactive and status sorting use legacy global isActive;
+  MAIN totals, site settings, stored assortment and permissions remain unchanged.
+- Last verified: full web suite 325/325; TypeScript clean; lint 0 errors / 51 warnings;
+  `git diff --check` clean.
+- Open risks: legacy status and totals remain global; this is temporary stabilization,
+  not completed multi-site inventory. Independent PR gate remains required for merge.
 
 ## Assumptions and decisions
 
@@ -39,3 +39,17 @@
   Initial attempt lacked workspace-local eslint-config-next; linked the existing
   installed package and reran successfully.
 - `git diff --check` — passed.
+
+## Status restoration — validated
+
+- Standard UI behavior fix authorized on `temp/restore-legacy-inventory-counts`.
+- Reusing its clean existing worktree; remote and local start at a969bb2.
+- Restore legacy status display/sorting, preserve site-owned settings and data.
+- Regression baseline: 7 failures / 21 passes before implementation, including conflicting
+  status flags in table/modal and ascending/descending sorting.
+- `npm run test:run --workspace=apps/web`: 43 files / 325 tests passed.
+- `npx tsc --noEmit` (apps/web): passed.
+- `npm run lint --workspace=apps/web`: passed, 0 errors / 51 existing warnings.
+- `git diff --check`: passed. Reviewed source diff: only status display/sort behavior changed.
+- Reused existing workspace dependencies via a temporary node_modules symlink (removed after validation) after the
+  first test command found no vitest executable in this worktree.

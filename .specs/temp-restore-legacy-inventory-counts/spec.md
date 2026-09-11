@@ -32,3 +32,14 @@ adding labels or redesigning the UI, as requested by the user on 2026-09-10.
 - T-1: Update regression tests for MAIN, other sites, loading and failure.
 - T-2: Restore the existing stock UI with a MAIN-only legacy totals join.
 - T-3: Run native web checks, review and commit the scoped change.
+
+## Status restoration (2026-09-10)
+
+User authorized restoring legacy status on this branch before further refactor testing.
+- AC-5: Products table and detail modal display Active/Inactive from global
+  `product.isActive`, even when `isStocked` disagrees. Preserve green/red colors.
+- AC-6: Status sorting uses the same legacy flag in both directions.
+- AC-7: Preserve MAIN quantity restoration, site settings, stored assortment,
+  permissions and database schema. This temporary global status is not site availability.
+
+This supersedes Phase 5d's assortment-driven status presentation only.

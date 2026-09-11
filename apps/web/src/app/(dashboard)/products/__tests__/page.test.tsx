@@ -200,11 +200,23 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     });
   });
 
-  it("shows legacy totals in the list and MAIN's assortment status", async () => {
+  it.each([true, false])("uses legacy isActive=%s despite conflicting assortment in table and modal", async (isActive) => {
+    mockGetProducts.mockResolvedValue([{ ...CATALOG_PRODUCT, isActive }]);
+    mockGetSiteProducts.mockResolvedValue([{ productId: "p-1", name: "Widget", isStocked: !isActive }]);
+    renderPage();
+    const label = isActive ? "Active" : "Inactive";
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("Widget"));
+    expect(within(screen.getByRole("dialog")).getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText("Stocked")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not Stocked")).not.toBeInTheDocument();
+  });
+
+  it("shows legacy totals and active status", async () => {
     renderPage();
 
     expect(await screen.findByText("Widget")).toBeInTheDocument();
-    expect(screen.getByText("Stocked")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
     // Counts come from inventory totals, never the catalog quantity field.
     expect(screen.getByText("Stock")).toBeInTheDocument();
     expect(screen.getByText("15")).toBeInTheDocument();
@@ -226,7 +238,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     expect(
       within(dialog).queryByText(/available after inventory is migrated per site/i),
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
+    expect(within(dialog).getByText("Active")).toBeInTheDocument();
     // canViewMsrp/canViewCosts are false for this EMPLOYEE mock - money fields stay hidden,
     // proving this row's site-scoped msrp isn't leaking around the permission gate.
     expect(within(dialog).queryByText(/MSRP:/i)).not.toBeInTheDocument();
@@ -276,7 +288,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
+    expect(within(dialog).getByText("Active")).toBeInTheDocument();
     expect(within(dialog).getByText("$20.00")).toBeInTheDocument();
 
     // Simulate the site resolving to SECOND (the only way this can happen today, since there's
@@ -293,7 +305,8 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
 
     await waitFor(() => {
       const dialogAfter = screen.getByRole("dialog");
-      expect(within(dialogAfter).getByText("Not Stocked")).toBeInTheDocument();
+      expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
+      expect(within(dialogAfter).getByText("Active")).toBeInTheDocument();
     });
     const dialogAfter = screen.getByRole("dialog");
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
