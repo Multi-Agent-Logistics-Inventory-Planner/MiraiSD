@@ -200,6 +200,9 @@ site-scoped endpoints exist together.
   proving the two queries are actually joined by product ID and not accidentally rendering one
   site's site-scoped fields against the other site's catalog rows. Kuji-tab placement is *not*
   asserted identical across the switch — see AC-6e, which governs it separately at a non-MAIN site.
+- Temporary status exception (2026-09-10, user authorized): Products status labels and
+  sorting use legacy global `isActive` pending further refactor testing. Site assortment
+  storage/settings are unchanged. See [status restoration](../temp-restore-legacy-inventory-counts/spec.md).
 - AC-6d: No Phase 5 site view uses `products.is_active` as assortment eligibility — that column
   still means "has stock somewhere" (see 5b's recorded hazard). Site assortment eligibility comes
   only from `site_products.is_stocked`.

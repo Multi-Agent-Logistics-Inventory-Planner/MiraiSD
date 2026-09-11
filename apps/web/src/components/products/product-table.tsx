@@ -29,8 +29,8 @@ interface ProductTableProps {
   readonly showQuantity?: boolean;
 }
 
-function getProductStatusColor(isStocked: boolean) {
-  return isStocked
+function getProductStatusColor(isActive: boolean) {
+  return isActive
     ? "bg-[#20d760] text-black"
     : "bg-[#e50815] text-white";
 }
@@ -172,7 +172,7 @@ export function ProductTable({
           ) : (
             items.map((row) => {
               const showKujiIcon = row.product.hasChildren || kujiCategoryIds.has(row.product.category.id);
-              const isStocked = row.isStocked ?? row.product.isActive;
+              const isActive = row.product.isActive;
               return (
                 <TableRow
                   key={row.product.id}
@@ -199,9 +199,9 @@ export function ProductTable({
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-center">
                     <Badge
-                      className={cn("text-xs", getProductStatusColor(isStocked))}
+                      className={cn("text-xs", getProductStatusColor(isActive))}
                     >
-                      {isStocked ? "Stocked" : "Not Stocked"}
+                      {isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
