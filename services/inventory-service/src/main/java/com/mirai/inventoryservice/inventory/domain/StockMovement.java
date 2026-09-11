@@ -4,6 +4,7 @@ import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.sites.domain.Site;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -48,6 +49,18 @@ public class StockMovement {
 
     @Column(name = "to_location_id")
     private UUID toLocationId;
+
+    /**
+     * The site this movement belongs to. Nullable at the JPA level because the underlying column
+     * (V59) is expand-phase nullable pending a separate constraining migration (V61,
+     * .specs/phase-6-inventory 6b worksheet) once every writer is confirmed to set it; every
+     * production write path (InventoryOperations, .specs/phase-6-inventory log) sets it
+     * explicitly, either derived from the movement's Location or supplied by the caller for
+     * location-less ledger rows.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "site_id")
+    private Site site;
 
     @Column(name = "previous_quantity")
     private Integer previousQuantity;

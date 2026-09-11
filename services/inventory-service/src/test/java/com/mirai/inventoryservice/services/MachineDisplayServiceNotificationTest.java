@@ -12,12 +12,15 @@ import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +67,8 @@ class MachineDisplayServiceNotificationTest {
     private UUID actorId;
     private UUID machineId;
     private UUID targetMachineId;
+    private Location loc;
+    private Location targetLoc;
 
     @BeforeEach
     void setUp() {
@@ -86,13 +91,25 @@ class MachineDisplayServiceNotificationTest {
         when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
                 .thenReturn(AuditLog.builder().id(UUID.randomUUID()).build());
 
-        // Location lookups return a placeholder
-        Location loc = new Location();
+        // Location lookups return a placeholder, with enough of a storageLocation/site chain
+        // for .specs/phase-6-inventory 6b's StockMovement.site derivation. loc and targetLoc are
+        // deliberately given DISTINCT sites (not shared) so a swap-site-selection bug -
+        // resolveMachineSite picking the wrong machine's site - is actually detectable by
+        // targetSiteIsUsedForCrossSiteSwapMovement below, rather than passing either way.
+        Site site = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();
+        Site targetSite = Site.builder().id(UUID.randomUUID()).code("SECOND").name("Second").build();
+        StorageLocation storageLocation = StorageLocation.builder()
+                .id(UUID.randomUUID()).site(site).code("SINGLE_CLAW_MACHINE").name("Claw Machines").build();
+        StorageLocation targetStorageLocation = StorageLocation.builder()
+                .id(UUID.randomUUID()).site(targetSite).code("SINGLE_CLAW_MACHINE").name("Claw Machines").build();
+        loc = new Location();
         loc.setId(machineId);
         loc.setLocationCode("R2");
-        Location targetLoc = new Location();
+        loc.setStorageLocation(storageLocation);
+        targetLoc = new Location();
         targetLoc.setId(targetMachineId);
         targetLoc.setLocationCode("S5");
+        targetLoc.setStorageLocation(targetStorageLocation);
         when(locationRepository.findById(machineId)).thenReturn(Optional.of(loc));
         when(locationRepository.findById(targetMachineId)).thenReturn(Optional.of(targetLoc));
 
@@ -113,6 +130,7 @@ class MachineDisplayServiceNotificationTest {
         return MachineDisplay.builder()
                 .id(UUID.randomUUID())
                 .machineId(machine)
+                .location(machine.equals(machineId) ? loc : targetLoc)
                 .locationType(LocationType.SINGLE_CLAW_MACHINE)
                 .product(p)
                 .startedAt(OffsetDateTime.now())
@@ -229,6 +247,25 @@ class MachineDisplayServiceNotificationTest {
         assertEquals(List.of("Sonny V2"), source.get("currently"));
         assertEquals(List.of("Sonny V2"), target.get("previously"));
         assertEquals(List.of("Sonny V1"), target.get("currently"));
+
+        // .specs/phase-6-inventory 6b: resolveMachineSite must pick each movement's own
+        // destination site, not always the same machine's site - loc and targetLoc are wired to
+        // distinct sites above precisely so a wrong pick here is detectable.
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StockMovement>> movementsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryOperations).saveMovements(movementsCaptor.capture());
+        List<StockMovement> movements = movementsCaptor.getValue();
+        assertEquals(2, movements.size());
+
+        StockMovement p1Movement = movements.stream()
+                .filter(m -> "Sonny V1".equals(m.getItem().getName())).findFirst().orElseThrow();
+        StockMovement p2Movement = movements.stream()
+                .filter(m -> "Sonny V2".equals(m.getItem().getName())).findFirst().orElseThrow();
+
+        // p1 moves from machineId (loc/MAIN) to targetMachineId (targetLoc/SECOND).
+        assertEquals("SECOND", p1Movement.getSite().getCode());
+        // p2 moves from targetMachineId (targetLoc/SECOND) to machineId (loc/MAIN).
+        assertEquals("MAIN", p2Movement.getSite().getCode());
     }
 
     @Test

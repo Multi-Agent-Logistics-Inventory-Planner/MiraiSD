@@ -944,7 +944,8 @@ public class ShipmentService {
         inventoryOperations.recordMovement(
                 parentAuditLog, product, locationType, null, locationId,
                 change.previousQuantity(), change.currentQuantity(), quantity,
-                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata);
+                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata,
+                location.getStorageLocation().getSite());
     }
 
     /**
@@ -973,7 +974,8 @@ public class ShipmentService {
         inventoryOperations.recordMovement(
                 parentAuditLog, product, LocationType.NOT_ASSIGNED, null, notAssignedLocation.getId(),
                 change.previousQuantity(), change.currentQuantity(), quantity,
-                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata);
+                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata,
+                notAssignedLocation.getStorageLocation().getSite());
     }
 
     /**
@@ -1018,7 +1020,8 @@ public class ShipmentService {
         inventoryOperations.recordMovement(
                 parentAuditLog, product, locationType, locationId, null,
                 currentQuantity, newQuantity, -quantity,
-                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata);
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata,
+                inventory.getSite());
 
         // Update or delete inventory
         if (newQuantity == 0) {
@@ -1063,7 +1066,8 @@ public class ShipmentService {
         inventoryOperations.recordMovement(
                 parentAuditLog, product, LocationType.NOT_ASSIGNED, notAssignedLocation.getId(), null,
                 currentQuantity, newQuantity, -quantity,
-                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata);
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata,
+                inventory.getSite());
 
         if (newQuantity == 0) {
             inventoryOperations.deleteInventory(inventory);

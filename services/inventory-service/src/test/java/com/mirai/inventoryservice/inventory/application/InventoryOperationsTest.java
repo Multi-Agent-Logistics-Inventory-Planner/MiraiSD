@@ -57,6 +57,7 @@ class InventoryOperationsTest {
 
     private Product product;
     private Location location;
+    private Site site;
     private UUID locationId;
     private UUID productId;
 
@@ -70,7 +71,7 @@ class InventoryOperationsTest {
         product.setId(productId);
         product.setName("Widget");
 
-        Site site = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();
+        site = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();
         StorageLocation storageLocation = StorageLocation.builder()
                 .id(UUID.randomUUID()).site(site).code("RACKS").name("Racks").build();
         locationId = UUID.randomUUID();
@@ -151,7 +152,8 @@ class InventoryOperationsTest {
 
         StockMovement saved = inventoryOperations.recordMovement(
                 auditLog, product, LocationType.RACK, null, locationId,
-                0, 5, 5, StockMovementReason.SHIPMENT_RECEIPT, UUID.randomUUID(), metadata);
+                0, 5, 5, StockMovementReason.SHIPMENT_RECEIPT, UUID.randomUUID(), metadata,
+                location.getStorageLocation().getSite());
 
         assertEquals(5, saved.getQuantityChange());
         ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
@@ -159,6 +161,7 @@ class InventoryOperationsTest {
         assertEquals(metadata, captor.getValue().getMetadata());
         assertEquals(locationId, captor.getValue().getToLocationId());
         assertNull(captor.getValue().getFromLocationId());
+        assertEquals(location.getStorageLocation().getSite(), captor.getValue().getSite());
         verify(eventOutboxService, times(1)).createStockMovementEvent(saved);
     }
 
@@ -168,6 +171,7 @@ class InventoryOperationsTest {
                 .item(product).locationType(LocationType.NOT_ASSIGNED)
                 .previousQuantity(0).currentQuantity(0).quantityChange(0)
                 .reason(StockMovementReason.KUJI_PRIZE_WON)
+                .site(site)
                 .build();
 
         StockMovement saved = inventoryOperations.recordMovement(movement);
@@ -192,6 +196,7 @@ class InventoryOperationsTest {
         assertNull(saved.getFromLocationId());
         assertEquals(0, saved.getPreviousQuantity());
         assertEquals(7, saved.getCurrentQuantity());
+        assertEquals(location.getStorageLocation().getSite(), saved.getSite());
         verify(eventOutboxService, times(1)).createStockMovementEvent(saved);
     }
 
@@ -210,6 +215,7 @@ class InventoryOperationsTest {
         assertNull(saved.getToLocationId());
         assertEquals(8, saved.getPreviousQuantity());
         assertEquals(0, saved.getCurrentQuantity());
+        assertEquals(location.getStorageLocation().getSite(), saved.getSite());
         verify(locationInventoryRepository, times(1)).delete(existing);
     }
 
@@ -218,7 +224,7 @@ class InventoryOperationsTest {
     @Test
     void saveMovement_savesWithoutPublishingOutbox() {
         StockMovement movement = StockMovement.builder()
-                .item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).build();
+                .item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).site(site).build();
 
         StockMovement saved = inventoryOperations.saveMovement(movement);
 
@@ -229,8 +235,8 @@ class InventoryOperationsTest {
 
     @Test
     void saveMovements_batchSavesWithoutPublishingOutbox() {
-        StockMovement m1 = StockMovement.builder().item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).build();
-        StockMovement m2 = StockMovement.builder().item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).build();
+        StockMovement m1 = StockMovement.builder().item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).site(site).build();
+        StockMovement m2 = StockMovement.builder().item(product).previousQuantity(0).currentQuantity(0).quantityChange(0).site(site).build();
         when(stockMovementRepository.saveAll(List.of(m1, m2))).thenReturn(List.of(m1, m2));
 
         List<StockMovement> saved = inventoryOperations.saveMovements(List.of(m1, m2));

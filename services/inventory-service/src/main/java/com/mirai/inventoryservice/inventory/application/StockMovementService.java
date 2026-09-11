@@ -247,6 +247,7 @@ public class StockMovementService {
                     .actorId(request.getActorId())
                     .at(now)
                     .metadata(metadata)
+                    .site(inv.getSite())
                     .build());
 
             affectedProductIds.add(inv.getProduct().getId());
@@ -578,6 +579,7 @@ public class StockMovementService {
                 .actorId(request.getActorId())
                 .at(OffsetDateTime.now())
                 .metadata(withdrawalMetadata)
+                .site(sourceInventory.getSite())
                 .build();
 
         StockMovement deposit = StockMovement.builder()
@@ -593,6 +595,7 @@ public class StockMovementService {
                 .actorId(request.getActorId())
                 .at(OffsetDateTime.now())
                 .metadata(depositMetadata)
+                .site(destinationInventory.getSite())
                 .build();
 
         StockMovement savedWithdrawal = stockMovementRepository.save(withdrawal);
@@ -726,6 +729,7 @@ public class StockMovementService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(location.getStorageLocation().getSite())
                 .build();
 
         StockMovement savedMovement = stockMovementRepository.save(movement);
@@ -794,6 +798,7 @@ public class StockMovementService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(inventory.getSite())
                 .build();
 
         StockMovement savedMovement = stockMovementRepository.save(movement);

@@ -133,6 +133,7 @@ public class MachineDisplayService {
                 .reason(StockMovementReason.DISPLAY_SET)
                 .actorId(request.getActorId())
                 .at(now)
+                .site(location.getStorageLocation().getSite())
                 .build();
         inventoryOperations.saveMovement(movement);
 
@@ -238,6 +239,7 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_SET)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(location.getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
         inventoryOperations.saveMovements(movements);
@@ -301,6 +303,7 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_REMOVED)
                         .actorId(actorId)
                         .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
         inventoryOperations.saveMovements(movements);
@@ -396,6 +399,7 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_REMOVED)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
         inventoryOperations.saveMovements(movements);
@@ -503,6 +507,16 @@ public class MachineDisplayService {
             UUID fromMachineId,
             UUID toMachineId
     ) {}
+
+    /**
+     * Resolve the site for a machine (location) id, for the swap StockMovement's site
+     * (.specs/phase-6-inventory 6b) — destination-first, matching V60's backfill convention.
+     */
+    private com.mirai.inventoryservice.sites.domain.Site resolveMachineSite(UUID machineId) {
+        return locationRepository.findById(machineId)
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + machineId))
+                .getStorageLocation().getSite();
+    }
 
     /**
      * Batch display swap operation that handles both swap modes in a single transaction:
@@ -758,6 +772,8 @@ public class MachineDisplayService {
                             .reason(StockMovementReason.DISPLAY_SWAP)
                             .actorId(request.getActorId())
                             .at(now)
+                            .site(resolveMachineSite(
+                                    change.toMachineId() != null ? change.toMachineId() : change.fromMachineId()))
                             .build())
                     .collect(Collectors.toList());
             inventoryOperations.saveMovements(movements);
@@ -857,6 +873,7 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_SWAP)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(location.getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
         inventoryOperations.saveMovements(movements);

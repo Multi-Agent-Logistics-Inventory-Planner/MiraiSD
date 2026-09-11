@@ -1,5 +1,30 @@
 # Review
 
+## 6b re-review — 2026-09-10
+
+Reviewed the complete uncommitted 6b slice, including V58–V60, all changed movement writers,
+site persistence and display fixtures, against AC-2 and the rollout worksheet. Independent
+Standards and Spec passes ran in parallel and were synthesized after completion.
+
+- [Standards] The sign-aware V60 fix agrees with transfer withdrawal/deposit writers. Dev seed
+  paths set a real site, display swap assertions distinguish the two sites, and all three
+  prebuilt movement entry points reject a null site before saving. **No blocking findings.**
+- [Spec] Nullable expansion and deferred enforcement preserve old-writer compatibility within
+  the agreed 6b scope. Trusted context, scoped queries and event changes remain 6c work.
+  **No blocking findings.**
+- [Spec] **Consider — recorded:** the concurrent site test uses different locations/products;
+  same-row contention and inventory-row site assertions remain unproven and are explicitly
+  carried into 6c's concurrency gate. Existing concurrency behavior was not changed by 6b.
+
+**Disposition: fixed 6b implementation approved for progression to 6c planning.** Focused native
+validation passed 40 tests (validation.md). This review did not repeat the previously reported
+332-test unit suite or 537-test IT sweep.
+
+Residual risks: V58 SQL execution coverage remains absent; production schema/trigger checks,
+backfill counts and MAIN-fallback assumptions still require operator verification. V61 must
+remain a separate release after the writer prerequisite and verification are satisfied. This
+disposition is not production deployment or constraint-enforcement approval.
+
 ## Scope reviewed
 
 Planning structure only: one Phase 6 PR with five ordered implementation/review checkpoints,

@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.inventory.infrastructure.StockMovementReposito
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.services.EventOutboxService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -111,6 +113,11 @@ public class InventoryOperations {
      * Use this directly for movements with no {@code location_inventory} change (e.g. a
      * KUJI ledger row); compose with {@link #adjustQuantity} for movements that also change
      * on-hand quantity.
+     *
+     * <p>{@code site} is required (.specs/phase-6-inventory 6b): every caller of this overload
+     * already has a resolvable location (see {@link #applyDelta}) or a site from other context
+     * (e.g. {@code ShipmentService}'s destination/source location), so it is supplied explicitly
+     * rather than re-derived here from the raw location ids, which carry no FK to look up.
      */
     @Transactional
     public StockMovement recordMovement(
@@ -124,7 +131,8 @@ public class InventoryOperations {
             int quantityChange,
             StockMovementReason reason,
             UUID actorId,
-            Map<String, Object> metadata) {
+            Map<String, Object> metadata,
+            Site site) {
         StockMovement movement = StockMovement.builder()
                 .auditLog(auditLog)
                 .item(product)
@@ -138,6 +146,7 @@ public class InventoryOperations {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(site)
                 .build();
         return recordMovement(movement);
     }
@@ -147,10 +156,13 @@ public class InventoryOperations {
      * that already assembles the full {@code StockMovement.builder()} inline (e.g. KUJI ledger
      * rows with kuji-specific metadata), this avoids re-decomposing the movement into individual
      * fields just to hand them back to {@link #recordMovement(AuditLog, Product, LocationType,
-     * UUID, UUID, int, int, int, StockMovementReason, UUID, Map)}.
+     * UUID, UUID, int, int, int, StockMovementReason, UUID, Map, Site)}. Such callers must set
+     * {@code .site(...)} on the builder themselves (.specs/phase-6-inventory 6b) — this method
+     * does not infer one.
      */
     @Transactional
     public StockMovement recordMovement(StockMovement movement) {
+        Objects.requireNonNull(movement.getSite(), "StockMovement.site must be set before recordMovement");
         StockMovement saved = stockMovementRepository.save(movement);
         eventOutboxService.createStockMovementEvent(saved);
         return saved;
@@ -179,7 +191,8 @@ public class InventoryOperations {
         UUID toLocationId = quantityDelta > 0 ? location.getId() : null;
         return recordMovement(
                 auditLog, product, locationType, fromLocationId, toLocationId,
-                change.previousQuantity(), change.currentQuantity(), quantityDelta, reason, actorId, metadata);
+                change.previousQuantity(), change.currentQuantity(), quantityDelta, reason, actorId, metadata,
+                location.getStorageLocation().getSite());
     }
 
     /**
@@ -190,12 +203,15 @@ public class InventoryOperations {
      */
     @Transactional
     public StockMovement saveMovement(StockMovement movement) {
+        Objects.requireNonNull(movement.getSite(), "StockMovement.site must be set before saveMovement");
         return stockMovementRepository.save(movement);
     }
 
     /** Batch form of {@link #saveMovement}, same no-outbox behavior. */
     @Transactional
     public List<StockMovement> saveMovements(List<StockMovement> movements) {
+        movements.forEach(movement -> Objects.requireNonNull(
+                movement.getSite(), "StockMovement.site must be set before saveMovements"));
         return stockMovementRepository.saveAll(movements);
     }
 

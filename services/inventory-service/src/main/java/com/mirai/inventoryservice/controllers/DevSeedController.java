@@ -367,6 +367,7 @@ public class DevSeedController {
                     .reason(StockMovementReason.SALE)
                     .at(saleDate)
                     .metadata(Map.of("source", "dev_seed"))
+                    .site(site)
                     .build());
             }
         }
@@ -419,6 +420,7 @@ public class DevSeedController {
 
         int totalSales = 0;
         List<StockMovement> movements = new ArrayList<>();
+        Site site = analyticsSeedService.getDefaultSite();
 
         for (Product product : products) {
             int salesCount = salesPerProduct / 2 + random.nextInt(salesPerProduct);
@@ -433,9 +435,13 @@ public class DevSeedController {
 
                 int quantity = 1 + random.nextInt(5);
 
+                // Synthetic seed row with no real location to derive a site from
+                // (.specs/phase-6-inventory 6b) - MAIN is the correct default here since this
+                // controller is @Profile("dev")-only and always seeds against the default site.
                 StockMovement movement = StockMovement.builder()
                     .locationType(LocationType.BOX_BIN)
                     .item(product)
+                    .site(site)
                     .quantityChange(-quantity)
                     .previousQuantity(quantity)
                     .currentQuantity(0)
@@ -1158,6 +1164,7 @@ public class DevSeedController {
                     .actorId(actorId)
                     .at(timestamp)
                     .metadata(Map.of("source", DEV_SEED_AUDIT_SOURCE))
+                    .site(toLoc.getStorageLocation().getSite())
                     .build();
 
                 movements.add(movement);

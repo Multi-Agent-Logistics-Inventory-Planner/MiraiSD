@@ -46,10 +46,28 @@
   recorded R-1/R-2 and the `inventory -> identity` (R-4/R-3) edge in
   `docs/specs/spring-domain-modular-monolith.md` §5/§6.2/§11 and in `inventory`'s and `sites'`
   `package-info.java`.
-- Next action: 6a's own checklist (T-0 through T-8) is now fully done. Request independent review
-  of the completed 6a slice before moving to 6b. R-9 (LocationInventoryController's catalog.api
-  coupling) is recorded as new open debt, not a 6a blocker — no acceptance criterion required
-  moving it.
+- 6a independent review completed and both P3 findings fixed (see "Review-driven fix" entry
+  below). 6a committed as `dbc2c1d`/`2c94a20`.
+- 6b done: worksheet finalized (user confirmed 5c's V56/V57 are already applied to production,
+  resolving the worksheet's F-2 escalation), then V58/V59/V60 migrations, `StockMovement.site`,
+  and every production writer updated to set it — see "6b implementation" section. `V61`
+  (constrain) deliberately not written; split into its own PR/record per the worksheet.
+- 6b independent review (mirai-spring-reviewer) returned **Block**: one blocker (V60's backfill
+  silently assigned the wrong site to a transfer's withdrawal leg — latent today since every row is
+  MAIN, but would freeze wrong data once Phase 7 inter-site transfers exist) plus three required
+  findings (a factually-wrong comment blocking a one-line `DevSeedController` fix; no test could
+  have caught the blocker; nothing failed fast on a null site before `V61` would). All four fixed
+  same session — see "Review-driven fix: 6b findings" below. Re-verified independently: full suite
+  and `*IT` sweep both green, `ArchitectureTest` stable with **zero** frozen-store changes needed
+  (the `DevSeedController` fix was rerouted through an already-injected service instead of adding a
+  constructor parameter, specifically to avoid the store-regeneration problem hit and abandoned
+  mid-session — see that section for the mechanic worth remembering).
+- 6b re-review completed: independent Standards and Spec passes found no remaining blocking
+  findings. Focused JDK 21 verification passed 40 tests, with zero failures/errors/skips and no
+  ArchUnit store changes; see review.md and validation.md for scope and actual command.
+- Next action: move to 6c planning (scoped inventory backend — trusted context, scoped
+  repositories/constraints, v1 endpoints). `DevSeedController.seedSalesData`'s no-site gap is now
+  closed. R-9 (LocationInventoryController's catalog.api coupling) still open, not a 6a/6b blocker.
 - Committed 2026-09-09: `dbc2c1d` "feat(inventory): establish inventory module boundary (Phase 6a,
   T-0-T-4)" — T-0 through T-4 as one commit. The reviewer asked for a three-way split (guard/facade
   prep; mechanical entity/service moves; R-8 consolidation/dead-injection removal); the user then
@@ -75,9 +93,33 @@
   two independent clean rebuilds after regenerating the two frozen stores it needed (see T-6
   section below); `InventoryOperationsCallerSetTest` and `CatalogEntityAccessCallerSetTest` both
   pass; `OpenApiContractExportTest` confirms `packages/contracts/openapi.json` byte-identical.
-- Open risks: actual migration mechanism and old-writer compatibility (6b); global quantity/activity
-  semantics and downstream consumers (still to reconcile before 6c); event payload coverage and
-  targeted-refresh baseline (6c/6e). R-4 through R-8 below remain open, not yet resolved. New for
+- Last verified (6b, independently re-run this session, not just as claimed in the "6b
+  implementation" section): `./mvnw -q clean test-compile` clean. `./mvnw -q clean test` (full
+  unrestricted suite, plain `test` — skips `*IT.java` by design) — exit 0, 332 tests, zero
+  failures/errors/skips across every surefire report. `./mvnw -q test -Dtest='*IT'` — exit 0, 537
+  tests, zero failures/errors/skips, including the three new ITs individually confirmed:
+  `InventoryOperationsSiteIT` 4/4, `StockMovementSiteBackfillIT` 6/6, `StockMovementSiteMigrationIT`
+  2/2 (the latter two run against a real `postgres:16-alpine` Testcontainers instance, not H2 —
+  confirmed by reading both files' `@Container PostgreSQLContainer` setup, and by their
+  sub-second-but-nonzero elapsed times matching container-backed execution, not an instant skip).
+  `./mvnw -q -Dtest=ArchitectureTest test` re-run standalone after an independent clean
+  `test-compile` — 8/8 pass; `git status --porcelain` on `archunit_store/`/`archunit.properties`
+  shows no diff, confirming this pass added no new cross-module edge or repository-access
+  violation requiring a frozen-store update.
+- Open risks: global quantity/activity semantics and downstream consumers (still to reconcile
+  before 6c, per 6b's worksheet Row 4 — `products.quantity`/`products.is_active`/
+  `ProductStockStateWriter` deliberately untouched by 6b); `V61` (constrain `stock_movements.site_id`
+  NOT NULL/FK) not yet written — split into its own PR/record per the worksheet's F-2/enforcement-
+  timing analysis, gated on a writer-release deploy plus a full business day of zero-null
+  production verification; a `V58` IT (nothing currently executes V58's SQL — advisory from the
+  review, recorded debt not a blocker); a same-site precondition on `MachineDisplayService`'s
+  cross-site swap path (advisory, belongs in 6c's trusted-context work); A-1 (confirm
+  `location_inventory.site_id`'s
+  NOT NULL/FK/trigger actually exist in Supabase, not just fresh-container `init-db`) and A-2/A-3
+  (empirical backfill row counts and batching/lock-time consideration against real production
+  `stock_movements` volume) remain unverified against production data. Event payload coverage and
+  targeted-refresh baseline remain 6c/6e's job. R-4 through R-8 below remain open, not yet
+  resolved. New for
   T-5: `KujiBoxService`'s `undoDraw` legacy-inventory-restore branch (pre-decoupling draws that
   decremented `LocationInventory` at the box location) and `reopenBox`'s legacy/new-model reversal
   branches were migrated by mechanical call-site substitution only and are covered by
@@ -96,6 +138,323 @@
   read contract `inventory.api` can consume instead of catalog's own transport DTO — real design
   work, not a mechanical move; left in the legacy `controllers`/`dtos` packages, out of 6a's scope,
   flagged for a later checkpoint.
+
+## 6b planning — site-ownership rollout worksheet (2026-09-10)
+
+Research-only pass (mirai-spring-architect), no code changed. Full findings, per-table worksheet,
+migration file plan, and test plan below. This satisfies the spec's "finalize rollout worksheet
+before editing schema" gate for 6b; implementation has not started.
+
+### Findings that shape 6b's scope
+
+- **F-1**: Flyway is not wired into the running service — no Flyway dependency in
+  `services/inventory-service/pom.xml`, both prod profiles set `spring.jpa.hibernate.ddl-auto=none`.
+  `docs/runbooks/ci-cd-pipeline.md:53-58,240-277` confirms: no migration gate in `deploy.yml`, no
+  `flyway_schema_history`; V-files are a naming/ordering convention, applied by hand against
+  Supabase. `docs/specs/multi-site-data-and-api.md:98`'s "Flyway is canonical in production" is
+  aspirational, not current state. `.specs/phase-5c-site-products/log.md:147-150` records the same
+  for 5c. Consequence: "when enforcement is safe" is an operator action, not something a commit
+  sequence alone establishes; ITs that execute the actual `.sql` text are the only runtime proof
+  these files work at all (5c's `SiteProductsMigrationIT`/`SiteProductBackfillIT` pattern, reused
+  below).
+- **F-2 (escalation, needs user decision before any 6b migration is scheduled)**: 5c's own
+  production-apply task (V56/V57) is still outstanding —
+  `.specs/phase-5c-site-products/log.md:5-11` records it as deferred pending explicit approval and
+  a fresh Supabase backup. 6b's migrations would queue behind that unapplied pair. This is a
+  production-data/operational decision, not an architecture one; no apply is authorized by this
+  record either way.
+- **F-3**: `location_inventory` is already fully site-owned — `site_id UUID NOT NULL REFERENCES
+  sites(id)` plus a `BEFORE INSERT OR UPDATE` trigger (`sync_inventory_site_id()`) that re-derives
+  it from the location's site (`infra/init-db/20-unified-locations.sql:106-169`); the entity and
+  all seven production write sites already set it from `location.getStorageLocation().getSite()`.
+  No expand/backfill needed here — 6b's job on this table is verify + index strengthening only.
+- **F-4**: `stock_movements` is the one genuinely site-blind inventory table, and it predates
+  Flyway entirely (Hibernate-created per `infra/init-db/07-audit-logs.sql:26-39`); its
+  `from_location_id`/`to_location_id` columns carry no FK.
+- **F-5**: a real share of `stock_movements` rows are not location-derivable at all — Kuji ledger
+  rows deliberately set both location ids null (`KujiBoxService.java:318-319,402-403,760-761,
+  942-943,1405-1406,1640-1641`). A backfill keyed only on `COALESCE(to_location_id, from_location_id)`
+  leaves those rows null; needs an explicit MAIN-fallback pass (below).
+
+### Worksheet
+
+**Row 1 — `location_inventory` (owner `inventory`)**: no schema gap; add
+`idx_location_inventory_site_product(site_id, product_id)` only (`V58`, `CREATE INDEX
+CONCURRENTLY` with a paired `.conf`, matching the `V19`/`V44` precedent). Verify: zero rows where
+the location's actual site (via `locations -> storage_locations.site_id`) disagrees with
+`location_inventory.site_id`, zero null `site_id`. Rollback-safe at any point (index-only). Also
+open: confirm in Supabase (not just fresh-container `init-db/*.sql`) that `site_id NOT NULL`, the
+FK, and the trigger actually exist there — `docs/baseline/tenant-migration-worksheet.md:69-73`
+already lists this as required and still open (A-1).
+
+**Row 2 — `stock_movements` (owner `inventory`)**: target shape adds `site_id UUID NOT NULL
+REFERENCES sites(id) ON DELETE RESTRICT` (RESTRICT matches `site_products`'s
+`V56__create_site_products.sql:14` precedent) plus `idx_stock_movements_site_at(site_id, at DESC)`
+and `idx_stock_movements_site_item_at(site_id, item_id, at DESC)`. No uniqueness change — append-only
+ledger, surrogate key; stable event identity/idempotency is AC-4/6c's job, not this table's schema.
+- Migration files (see "Migration file plan" below): `V59` (expand, nullable, no FK/default),
+  `V60` (backfill, two passes), `V61` (constrain — **split into a separate PR/record**, see below).
+- Backfill: pass 1, location-derived —
+  `UPDATE stock_movements sm SET site_id = sl.site_id FROM locations l JOIN storage_locations sl
+  ON sl.id = l.storage_location_id WHERE l.id = COALESCE(sm.to_location_id, sm.from_location_id)
+  AND sm.site_id IS NULL;` pass 2, MAIN fallback for both-null/orphaned-location rows —
+  `UPDATE stock_movements SET site_id = (SELECT id FROM sites WHERE code='MAIN') WHERE site_id IS
+  NULL;`, guarded to fail loudly if MAIN is absent (matches `V53:12-19`/`V57:14-19`). Pass 2 is
+  correct for *existing* data only because SECOND (`V54`) has no `locations` and therefore no
+  movements yet — not a rule new writers may rely on. Record pass-1 vs pass-2 row counts as an
+  observed number, not an assumption.
+- Verify: zero null `site_id`; zero orphans against `sites`; zero conflicting-site rows
+  (movement's derived site vs. its location's actual site); cross-check against sibling
+  `location_inventory.site_id` for the same location/product.
+- Writer compatibility: **all 25 production `StockMovement.builder()` call sites** (KujiBoxService
+  ×12, MachineDisplayService ×6, `inventory.application.StockMovementService` ×5,
+  `inventory.application.InventoryOperations` ×2, plus 4 dev-seed) currently set no site and would
+  break under enforcement today. Because persistence already funnels through
+  `InventoryOperations.recordMovement`/`saveMovement`/`saveMovements` (6a T-5/T-7, pinned by
+  `InventoryOperationsCallerSetTest`), the fix is: add `site` to `StockMovement`, derive it inside
+  `InventoryOperations` from the same `Location` callers already pass, and require an explicit site
+  for the location-less Kuji/display ledger forms. Do not mirror `sync_inventory_site_id()` as a DB
+  trigger here — it cannot derive a site for the both-null rows, and a MAIN-default trigger would
+  silently mis-write once SECOND has real activity.
+- Rollback compatibility: `V59`/`V60` alone are rollback-safe (old image ignores an unknown
+  nullable column). `V61` is not — `deploy.yml` rollback reverts images only, never schema
+  (`docs/runbooks/ci-cd-pipeline.md:271-275`); rolling back past the writer release once `site_id`
+  is `NOT NULL` fails every stock movement in the system.
+- Enforcement safe when: the writer release (StockMovement.site + InventoryOperations derivation)
+  is deployed and healthy, the verify queries return zero against production data collected after
+  at least one full business day on that release, and the operator accepts that a rollback past the
+  writer release now also requires a schema step.
+
+**Row 3 — `locations` (owner `sites`)**: deferred, not in 6b. `locations` has no `site_id` of its
+own (reachable only via `storage_locations.site_id`); the only 6b-relevant payoff would be a
+composite FK from `location_inventory`, which the existing trigger already makes redundant. Record
+as an explicit, reasoned deferral per `docs/specs/multi-site-data-and-api.md:57-58`'s "owner and
+tenant strategy MUST be recorded for every table," not a silent gap.
+
+**Row 4 — `products.quantity`/`products.is_active`**: **out of 6b, deferred to 6c.** Recommendation
+and full reasoning: this is a global-activity-semantics question
+(`docs/specs/multi-site-data-and-api.md:23-43` already fixes `is_active` as "stock at *any* site,"
+deliberately distinct from `site_products.is_stocked`), not a tenancy-column question — adding
+`site_id` to these columns is meaningless. `StockMovementService.calculateTotalInventory` sums
+`location_inventory` with no site predicate today and both Kuji tab semantics
+(`KujiBoxService.java:266,418,641,1291,1372` via `ProductStockStateWriter`) and
+`forecasting-service`'s item-selection/inventory-sum/reorder-write queries
+(`supabase_repo.py:148,180-193,644-645`) depend on the current global meaning, with no Java test
+covering the Python consumer. Writer set is also larger than `ProductStockStateWriter` alone:
+`SiteProductService.java:74` dual-writes `is_active` on MAIN assortment change, and
+`ProductService.java:136,328` write `quantity` directly for prize/child products, bypassing the
+writer facade. `ProductStockStateWriter`'s own Javadoc already schedules its removal for "together
+with the `quantity` column once `inventory` owns quantity" — i.e. gated on 6c's ownership move, not
+6b's tenancy work. Matches the spec's own gating language (`spec.md:49-52`, 6c row `spec.md:99`)
+and 6a's handoff note (`log.md:78-80`). 6b's only obligation here is to record this consumer
+inventory as the durable list 6c inherits and leave `ProductStockStateWriter`/adapters untouched.
+
+**Row 5 — `event_outbox`**: out of 6b (AC-4/6c) — no `site_id`, version, or idempotency key yet;
+listed for worksheet completeness only, omission is deliberate.
+
+### Migration file plan
+
+| File | Step | Release | Rollback-safe |
+| --- | --- | --- | --- |
+| `V58__location_inventory_site_product_index.sql` | strengthen | 6b | yes |
+| `V59__add_site_id_to_stock_movements.sql` | expand (nullable, no FK) | 6b | yes |
+| `V60__backfill_stock_movements_site_main.sql` | backfill + guard | 6b | yes |
+| `V61__constrain_stock_movements_site.sql` | constrain (NOT NULL, FK, indexes) | **separate PR/record** | no |
+
+Writer code (`StockMovement.site` + `InventoryOperations` derivation, 25 call sites) ships with
+`V59`/`V60`, writing `site_id` on every new row while the column is still nullable. `V61` is
+explicitly the spec's "enforcement requires an earlier deployed release" case
+(`spec.md:44-48`) — split into its own PR/record, not part of this one; no production apply
+authorized by this record regardless.
+
+### Test plan (reuses 5c's proven pattern — standalone Testcontainers Postgres executing the
+actual `.sql` text, since Flyway never runs these files at runtime per F-1)
+
+- `StockMovementSiteMigrationIT` — runs `V59` then `V61` against stub tables; asserts
+  column/nullability/FK/index shape; asserts `V61` fails loudly against a table with a null
+  `site_id` row (verify-before-constrain enforced by the SQL itself, not operator memory).
+- `StockMovementSiteBackfillIT` — fixtures: MAIN location-derived row, SECOND location-derived row
+  (proves pass 1 doesn't blanket-MAIN), both-locations-null Kuji row, dangling `to_location_id`,
+  MAIN-absent (must raise), idempotent re-run.
+- Extend/add an `InventoryOperations` IT proving every facade write path populates `site_id` —
+  paired with the existing `InventoryOperationsCallerSetTest` pin against a future 26th builder
+  site being added without one.
+- Concurrency IT: the implemented test proves separate threads writing different locations and
+  products retain their own movement sites. Same `(location, product)` contention with assertions
+  on both movement and inventory rows remains for 6c's concurrency gate; it is not proven by 6b.
+- Keep green: `StockMovementOutboxAtomicityIT`, `AdjustToKafkaIT`,
+  `InventoryOperationsCallerTransactionIT`, `InventoryOperationsSharedCallerPathIT`,
+  `ArchitectureTest` (8 rules).
+- Reminder (memory + `.specs/phase-5c-site-products/log.md:12-20`): plain `./mvnw test` skips every
+  `*IT.java` (no failsafe plugin) — run it and `./mvnw test -Dtest='*IT'`.
+
+### Risks and open assumptions
+
+- **A-1**: `location_inventory.site_id`'s `NOT NULL`/FK/trigger existing in Supabase itself is
+  unverified — `infra/init-db/*.sql` only runs against a fresh container. Verify before `V58`.
+- **A-2**: assumes all existing `stock_movements` rows belong to MAIN (SECOND has no `locations`
+  yet per `V54`, even if `007-seed-standard-storage-locations.sql` seeded `storage_locations` for
+  it). Confirm by recording pass-1/pass-2 backfill counts empirically rather than assuming.
+- **A-3**: production `stock_movements` row count unknown to this pass — if large, batch `V60`'s
+  updates by `at` range, and prefer a `NOT VALID` `CHECK (site_id IS NOT NULL)` validated separately
+  before `V61`'s `SET NOT NULL` to avoid an uninterruptible full-table rewrite/scan.
+- R-9 (LocationInventoryController's `catalog.api` coupling) carries over unaffected by 6b.
+
+## 6b implementation (2026-09-10)
+
+Implements the worksheet above: `location_inventory` index strengthening, `stock_movements`
+expand + backfill, and the writer-release code change. `V61` (constrain) is explicitly not part
+of this pass — split into its own PR/record per the worksheet.
+
+- **V58/V59/V60 migration files**: added per the worksheet's exact shapes.
+  `V58__location_inventory_site_product_index.sql` (+ paired `.conf`,
+  `executeInTransaction=false`) — `CREATE INDEX CONCURRENTLY IF NOT EXISTS
+  idx_location_inventory_site_product ON location_inventory(site_id, product_id)`, matching
+  `V19`'s precedent. `V59__add_site_id_to_stock_movements.sql` — nullable `site_id UUID`, no
+  FK/default. `V60__backfill_stock_movements_site_main.sql` — pass 1 location-derived
+  (`COALESCE(to_location_id, from_location_id)` joined through `locations ->
+  storage_locations.site_id`), pass 2 MAIN-fallback guarded to `RAISE EXCEPTION` if no MAIN site
+  row exists, matching `V53`/`V57`'s precedent exactly.
+- **`StockMovement.site`**: added as a `@ManyToOne(fetch = LAZY) @JoinColumn(name = "site_id")`
+  `Site` field, nullable at the JPA level (matches V59's expand-phase nullability).
+- **`InventoryOperations`**: the `recordMovement(AuditLog, Product, LocationType, fromLocationId,
+  toLocationId, ..., Map)` field-form overload now takes a required `Site site` parameter and
+  sets it on the built movement — every caller of this overload already has a resolvable
+  `Location` (or, for `ShipmentService`'s undo paths, an existing `LocationInventory.getSite()`)
+  in scope. `applyDelta` derives it from `location.getStorageLocation().getSite()` and passes it
+  through. The other write paths (`recordMovement(StockMovement)`, `saveMovement`,
+  `saveMovements`) take no new parameter — callers set `.site(...)` on the `StockMovement` they
+  already build before calling these pass-throughs, so a caller with no `Location` at all (e.g. a
+  KUJI ledger row) supplies the site explicitly rather than having one silently inferred.
+- **Every production `StockMovement.builder()` call site updated** to set `.site(...)`:
+  `KujiBoxService` (12 sites — each traced to the specific `Location`/`Site` already in scope at
+  that call: `box.getLocation()` for box-scoped ledger rows, `destination`/`sourceLocation` for
+  transfers, preferring the destination side to match `V60`'s `COALESCE` convention where a
+  transfer touches two locations); `MachineDisplayService` (6 sites — `location`/
+  `display.getLocation()`, plus a new `resolveMachineSite(UUID)` helper for the swap path's
+  `DisplayChange` records, which carry only raw machine-id UUIDs — preferring
+  `toMachineId`, falling back to `fromMachineId` for a pure-removal change with no destination);
+  `StockMovementService` (5 sites — `inv.getSite()` / `location.getStorageLocation().getSite()` /
+  `sourceInventory.getSite()` / `destinationInventory.getSite()`, all already-loaded entities with
+  a `site` field, no extra query needed); `AnalyticsSeedService` (dev-only, new `SiteRepository`
+  field — already exempt as a `services`-package caller — resolving MAIN once per seed run).
+- **`DevSeedController`'s three `StockMovement.builder()` sites**: two (in
+  `seedComprehensiveData`/the audit-log seed path) reuse an already-in-scope `site`/`toLoc`
+  variable. The third, `seedSalesData`'s pure-synthetic sales-history seed (no real location at
+  all), deliberately does **not** set a site — see "Open risks" below.
+- **Result**: `./mvnw -q clean test-compile` clean. `./mvnw -q clean test` (full unrestricted
+  suite) exit 0, zero failures/errors. `./mvnw -q test -Dtest='*IT'` exit 0 (plain `test` alone
+  would have skipped every `*IT.java`, per the standing memory note — ran both). `ArchitectureTest`
+  re-verified 8/8 across two independent clean rebuilds with **zero changes** to
+  `archunit_store/`/`archunit.properties` (confirmed via `git status --porcelain` showing no diff
+  on either) — this build pass adds no new cross-module dependency edges and no repository access
+  from outside a service/application layer.
+- **Tests added**: `StockMovementSiteMigrationIT` (V59's column shape/nullability/no-FK, against
+  a standalone Testcontainers Postgres executing the real SQL — same pattern as
+  `SiteProductsMigrationIT`, needed because Flyway never runs these files at runtime per the
+  worksheet's F-1; V61 is out of scope so there is nothing to constrain yet in this file).
+  `StockMovementSiteBackfillIT` (6 cases: fails loudly with no MAIN; location-derived resolves to
+  the *actual* location's site, not blanket-MAIN; `to_location_id` preferred over
+  `from_location_id` when both present; both-null falls back to MAIN; a dangling location
+  reference falls back to MAIN; idempotent re-run). `InventoryOperationsSiteIT` (4 cases:
+  `applyDelta` derives site from location; the field-form `recordMovement` persists the supplied
+  site through a real DB round trip; a location-less `recordMovement(StockMovement)` persists an
+  explicitly-supplied site; two concurrent `applyDelta` calls against different sites each derive
+  their own correct, distinct site — proving the derivation isn't read-racy). Existing
+  `InventoryOperationsTest` extended with site assertions on the three affected tests rather than
+  just fixed for the new required parameter.
+- **Fixed as a consequence, not scope creep**: `MachineDisplayServiceNotificationTest` and
+  `MachineDisplayServiceBatchQueryGuardTest`'s `Location`/`MachineDisplay` mock fixtures had no
+  `storageLocation`/`site` chain (they predate this field existing at all) — six tests NPE'd once
+  `MachineDisplayService` started reading `location.getStorageLocation().getSite()`. Fixed by
+  giving the fixtures a real `Site`/`StorageLocation` and wiring `display()`'s built
+  `MachineDisplay` to the matching `Location`. Also fixed a real bug the tests caught: the swap
+  path's `resolveMachineSite(change.toMachineId())` NPE'd/threw `LocationNotFound: null` for a
+  pure-removal `DisplayChange` (`toMachineId` null, `fromMachineId` set) — changed to prefer
+  `toMachineId`, fall back to `fromMachineId`, matching `V60`'s own `COALESCE` convention.
+
+### Open risks / deferred decisions
+
+- ~~`DevSeedController.seedSalesData`'s synthetic sales-history rows have no site.~~ **Resolved**
+  in the review-driven fix pass below — routed through `AnalyticsSeedService.getDefaultSite()`
+  (already an injected field) instead of adding a new constructor parameter, so no ArchUnit store
+  regeneration was needed at all.
+- Carries forward unresolved from the worksheet: A-1 (verify `location_inventory.site_id`'s
+  NOT NULL/FK/trigger actually exist in Supabase, not just fresh-container `init-db`), A-2/A-3
+  (empirical backfill row counts and batching/lock-time consideration once run against real
+  production `stock_movements` volume — this pass only proves the SQL's correctness against
+  synthetic Testcontainers fixtures, not production data shape). `V61` itself, and the F-2
+  production-apply-ordering question, remain fully out of scope per the worksheet and the user's
+  confirmation that V56/V57 are already applied.
+
+## Review-driven fix: 6b findings (2026-09-10)
+
+Independent review (mirai-spring-reviewer) of the 6b implementation above returned a **Block**
+verdict with one blocker and three required findings; advisory items left as recorded open debt.
+All four are fixed in this session; re-verified against real Postgres and the full suite, not just
+compile.
+
+- **Blocker — V60's backfill assigned the *destination* site to a transfer's withdrawal leg.**
+  `COALESCE(sm.to_location_id, sm.from_location_id)` unconditionally preferred `to_location_id`,
+  but a transfer pair carries *both* location ids on *both* rows (`StockMovementService`'s and
+  `KujiBoxService`'s transfer writers independently set `.site(sourceLocation...)` on the
+  withdrawal row and `.site(destinationLocation...)` on the deposit row). The migration comment's
+  claim that "a transfer's destination is the more relevant site... when both are somehow present"
+  was wrong — both being present is the transfer's *normal* shape, not an edge case, and every
+  production row is currently MAIN so the bug was latent (invisible) until a real inter-site
+  transfer exists. Reviewer proved it by executing V60's SQL verbatim against a throwaway Postgres
+  with a synthetic transfer pair: both legs landed on the destination's site.
+  - Fix: made pass 1 sign-aware, matching every writer exactly —
+    `WHEN sm.quantity_change < 0 THEN COALESCE(from_location_id, to_location_id) ELSE
+    COALESCE(to_location_id, from_location_id)`. Added `quantity_change` to
+    `StockMovementSiteBackfillIT`'s stub table (it was missing, which is *why* this case couldn't
+    be expressed as a test before) and replaced the old
+    `toLocationIsPreferredOverFromLocationWhenBothArePresent` test (which had cemented the wrong
+    behavior) with `transferPairResolvesEachLegToItsOwnSiteBySign`, asserting withdrawal→source,
+    deposit→destination.
+- **Required — `DevSeedController.seedSalesData` still wrote a null site**, and the in-code comment
+  explaining why (adding a `SiteRepository`/`LocationService` dependency would trip
+  `ArchitectureTest`'s frozen store) was factually wrong: `AnalyticsSeedService` was already an
+  injected field on the class. Fix: added `AnalyticsSeedService.getDefaultSite()` (mirrors its
+  existing `seedForecastPredictions`-style `siteRepository.findByCode("MAIN")` lookup, exposed as a
+  method) and called it from `DevSeedController` — no constructor signature change, so the frozen
+  ArchUnit store needed no regeneration. (An earlier attempt in this session routed through a new
+  `LocationService` constructor parameter instead; that *did* require touching the frozen store,
+  surfaced the real mechanics of `FreezingArchRule` — `allowStoreUpdate=true` only lets *resolved*
+  violations shrink out of the store, it will not silently admit a new violation shape, so a
+  changed constructor signature needs the store deleted and recreated from scratch, not just
+  updated — and was abandoned once the no-new-dependency fix above made the whole problem moot.
+  Recorded here so a future session doesn't have to rediscover that mechanic.)
+- **Required — no test asserted the site chosen at 21 of the real call sites**, so a wrong
+  derivation (like the blocker above) was undetectable. Specifically, `MachineDisplayServiceNotificationTest`
+  wired `loc` and `targetLoc` to the *same* `StorageLocation`/`Site`, so a swap that picked the
+  wrong machine's site would still pass. Fix: gave `targetLoc` its own distinct `Site`
+  ("SECOND"), and added an assertion in `batchSwapDisplay_machineToMachine_emitsTwoMachineSnapshots`
+  capturing `inventoryOperations.saveMovements(...)` and checking each `DisplayChange`'s movement
+  landed on its own destination site (p1 → SECOND, p2 → MAIN) — this is exactly the site-selection
+  logic the blocker's bug class lives in, just at the `MachineDisplayService.resolveMachineSite`
+  call site rather than the migration SQL.
+- **Required — nothing failed fast on a null site before V61 would.** `InventoryOperations
+  .recordMovement(StockMovement)`, `saveMovement`, and `saveMovements` accepted and persisted a
+  movement with a null site silently; H2's `ddl-auto=create-drop` test schema has no NOT NULL
+  constraint to catch it either. Fix: added `Objects.requireNonNull(movement.getSite(), ...)` to
+  all three funnel methods (the batch form checks every element). Required updating three existing
+  `InventoryOperationsTest` fixtures to set `.site(site)` — they were exercising the pass-through
+  methods with no site, which the new guard now correctly rejects.
+- **Advisory items left as recorded debt, not fixed this pass** (per the review): a `V58` IT
+  (nothing currently executes V58's SQL, since V59/V60's ITs only run those two files — matches the
+  same F-1 "Flyway doesn't run at runtime" gap, just for the one file this pass didn't add explicit
+  coverage for); `CREATE INDEX CONCURRENTLY IF NOT EXISTS` leaving a permanently invalid index on a
+  failed build (matches `V19`'s existing precedent exactly, not a new defect); and a same-site
+  precondition on `MachineDisplayService`'s cross-site swap path (zero-quantity display rows, low
+  impact, belongs in 6c's trusted-context work per the reviewer).
+- **Re-verified after all fixes**: `./mvnw -q clean test-compile` clean; `./mvnw -q clean test`
+  (full unrestricted suite) exit 0, zero failures; `./mvnw -q test -Dtest='*IT'` exit 0, zero
+  failures (confirmed via log grep for `[ERROR]`, not just exit code); `./mvnw -q clean test-compile`
+  + `./mvnw -q test -Dtest=ArchitectureTest` stable on a second independent clean rebuild, **zero
+  diff** on `archunit_store/`/`archunit.properties` (`git status --short` clean on both) — this
+  fix pass, like the original implementation pass, adds no new module edges and needs no frozen-
+  store change.
 
 ## Assumptions and decisions
 

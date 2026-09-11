@@ -325,6 +325,7 @@ public class KujiBoxService {
                         .actorName(resolvedActorName)
                         .at(now)
                         .metadata(metadata)
+                        .site(box.getLocation().getStorageLocation().getSite())
                         .build();
                 inventoryOperations.saveMovement(birth);
                 continue;
@@ -409,6 +410,7 @@ public class KujiBoxService {
                             .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
+                            .site(box.getLocation().getStorageLocation().getSite())
                             .build();
                     inventoryOperations.saveMovement(removal);
                 }
@@ -594,6 +596,7 @@ public class KujiBoxService {
                             .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
+                            .site(destination.getStorageLocation().getSite())
                             .build();
                     inventoryOperations.recordMovement(reverse);
                     affectedProductIds.add(mv.getItem().getId());
@@ -766,6 +769,7 @@ public class KujiBoxService {
                     .actorId(request.getActorId())
                     .at(now)
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
 
             inventoryOperations.recordMovement(movement);
@@ -948,6 +952,7 @@ public class KujiBoxService {
                     .actorId(actorId)
                     .at(now)
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
             inventoryOperations.recordMovement(reverse);
 
@@ -1318,6 +1323,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(boxLocation.getStorageLocation().getSite())
                 .build();
         inventoryOperations.recordMovement(movement);
     }
@@ -1412,6 +1418,7 @@ public class KujiBoxService {
                         .actorName(resolveActorName(request.getActorId()))
                         .at(OffsetDateTime.now())
                         .metadata(metadata)
+                        .site(box.getLocation().getStorageLocation().getSite())
                         .build();
                 inventoryOperations.saveMovement(birth);
             } else {
@@ -1646,6 +1653,7 @@ public class KujiBoxService {
                     .actorId(request.getActorId())
                     .at(OffsetDateTime.now())
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
             inventoryOperations.recordMovement(movement);
         }
@@ -1870,6 +1878,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(sourceLocation.getStorageLocation().getSite())
                 .build();
 
         if (newSourceQty == 0) {
@@ -1945,6 +1954,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(destinationLocation.getStorageLocation().getSite())
                 .build();
         inventoryOperations.recordMovement(deposit);
     }
@@ -2039,6 +2049,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(now)
                 .metadata(withdrawalMetadata)
+                .site(sourceLocation.getStorageLocation().getSite())
                 .build();
 
         StockMovement deposit = StockMovement.builder()
@@ -2054,6 +2065,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(now)
                 .metadata(depositMetadata)
+                .site(destinationLocation.getStorageLocation().getSite())
                 .build();
 
         // Update inventory rows

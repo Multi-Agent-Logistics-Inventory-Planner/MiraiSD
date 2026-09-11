@@ -16,6 +16,8 @@ import com.mirai.inventoryservice.inventory.infrastructure.InventoryTotalsReposi
 import com.mirai.inventoryservice.repositories.MonthlyPerformanceRollupRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -50,8 +52,20 @@ public class AnalyticsSeedService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final CategoryDemandRollupRepository categoryDemandRollupRepository;
     private final InventoryTotalsRepository inventoryTotalsRepository;
+    private final SiteRepository siteRepository;
 
     private final Random random = new Random();
+
+    /**
+     * Resolve the MAIN {@link Site} entity for dev-only synthetic seed paths that have no real
+     * location to derive one from (.specs/phase-6-inventory 6b). Exposed for
+     * {@code DevSeedController}, which already depends on this service, so callers there don't
+     * need their own {@code SiteRepository} dependency.
+     */
+    public Site getDefaultSite() {
+        return siteRepository.findByCode("MAIN")
+            .orElseThrow(() -> new IllegalStateException("MAIN site not found for dev seed"));
+    }
 
     // Day-of-week multipliers: Sunday=0, Monday=1, ..., Saturday=6
     // Higher traffic on weekends (arcade business pattern)
@@ -221,6 +235,8 @@ public class AnalyticsSeedService {
         LocalDate today = LocalDate.now();
         LocalDate startDate = today.minusMonths(monthsBack);
         List<StockMovement> movements = new ArrayList<>();
+        var mainSite = siteRepository.findByCode("MAIN")
+            .orElseThrow(() -> new IllegalStateException("MAIN site not found for dev seed"));
 
         for (Product product : products) {
             // Vary base sales rate per product (simulating top/steady/slow sellers)
@@ -251,6 +267,7 @@ public class AnalyticsSeedService {
                         .reason(StockMovementReason.SALE)
                         .at(saleTime)
                         .metadata(Map.of("source", "analytics_seed", "dow_pattern", true))
+                        .site(mainSite)
                         .build());
                 }
 

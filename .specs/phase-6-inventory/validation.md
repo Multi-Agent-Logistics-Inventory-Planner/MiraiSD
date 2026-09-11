@@ -1,5 +1,27 @@
 # Validation
 
+## 6b re-review — 2026-09-10
+
+From `services/inventory-service`, using JDK 21 and the project wrapper:
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./mvnw -q -Dtest=StockMovementSiteBackfillIT,StockMovementSiteMigrationIT,InventoryOperationsSiteIT,InventoryOperationsTest,MachineDisplayServiceNotificationTest,MachineDisplayServiceBatchQueryGuardTest,ArchitectureTest test
+```
+
+PASS — exit 0; seven Surefire reports total 40 tests, zero failures/errors/skips. Counts:
+backfill 6, expansion 2, site persistence 4, facade unit tests 10, display notifications 6,
+display batch guards 4, architecture 8. Both migration classes executed against PostgreSQL 16
+Testcontainers. No frozen-store or archunit.properties changes appeared.
+
+The first sandboxed attempt failed on Mockito JVM attachment and Docker access. The identical
+command passed after approved execution outside the sandbox. Output:
+`/private/tmp/phase6b-rereview.log` (session-local evidence).
+
+AC-2 evidence covers sign-aware transfer backfill, MAIN fallback/guard/idempotence, nullable
+UUID expansion without FK/default, explicit writer site persistence and separate-thread site
+isolation. Same-row contention, V58 execution and production verification are not proven by
+this focused run. Earlier full-suite totals in log.md were not independently rerun here.
+
 ## Command and scope
 
 Documentation-only update, checked from the repository root on 2026-09-09:
