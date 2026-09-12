@@ -434,6 +434,14 @@ public class MachineDisplayService {
         if (outgoing.getEndedAt() != null) {
             throw new IllegalArgumentException("Display is already ended");
         }
+        // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: the outgoing
+        // display id is looked up globally, so without this check a request naming
+        // request.getMachineId() could end a display that actually lives on a different machine.
+        if (!Objects.equals(outgoing.getMachineId(), request.getMachineId())
+                || outgoing.getLocationType() != request.getLocationType()) {
+            throw new IllegalArgumentException(
+                    "Display does not belong to machine: " + request.getOutgoingDisplayId());
+        }
 
         String outgoingProductName = outgoing.getProduct().getName();
 
@@ -519,6 +527,21 @@ public class MachineDisplayService {
     }
 
     /**
+     * Same-site-only swap precondition (.specs/phase-6-inventory 6c, T-6c-4). Audited
+     * inter-site transfers are Phase 7's; until then a machine-to-machine swap whose two
+     * machines belong to different sites must be rejected explicitly, before any mutation.
+     */
+    private void requireSameSite(UUID sourceMachineId, UUID targetMachineId) {
+        com.mirai.inventoryservice.sites.domain.Site sourceSite = resolveMachineSite(sourceMachineId);
+        com.mirai.inventoryservice.sites.domain.Site targetSite = resolveMachineSite(targetMachineId);
+        if (!Objects.equals(sourceSite.getId(), targetSite.getId())) {
+            throw new com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException(
+                    "Cannot swap displays across sites: source site " + sourceSite.getCode()
+                            + " does not match target site " + targetSite.getCode());
+        }
+    }
+
+    /**
      * Batch display swap operation that handles both swap modes in a single transaction:
      * 1. Swap with products - remove displays and add new products
      * 2. Swap with another machine - trade displays between two machines
@@ -526,6 +549,13 @@ public class MachineDisplayService {
      */
     @Transactional
     public List<MachineDisplayDTO> batchSwapDisplay(BatchDisplaySwapRequestDTO request) {
+        // Fail fast, before any write: reject a cross-site machine-to-machine swap
+        // (.specs/phase-6-inventory 6c, T-6c-4 -- flagged as advisory debt by 6b's review).
+        // Same-site-only in 6c; audited inter-site transfers are Phase 7's.
+        if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
+            requireSameSite(request.getMachineId(), request.getTargetMachineId());
+        }
+
         OffsetDateTime now = OffsetDateTime.now();
         List<DisplayChange> displayChanges = new ArrayList<>();
         List<String> allProductNames = new ArrayList<>();
@@ -558,6 +588,16 @@ public class MachineDisplayService {
             for (MachineDisplay display : toRemove) {
                 if (display.getEndedAt() != null) {
                     throw new IllegalArgumentException("Display is already ended: " + display.getId());
+                }
+                // T-6c-4 P1 fix (round 2): same ownership-mismatch bug as
+                // displayIdsFromTarget/displayIdsToTarget below -- findAllByIdInWithProduct looks
+                // displays up globally by id, so without this check a request naming machineId
+                // could end and attribute a display that actually lives on a different (e.g.
+                // foreign-site) machine.
+                if (!Objects.equals(display.getMachineId(), request.getMachineId())
+                        || display.getLocationType() != request.getLocationType()) {
+                    throw new IllegalArgumentException(
+                            "Display does not belong to source machine: " + display.getId());
                 }
                 Product product = display.getProduct();
                 displayChanges.add(new DisplayChange(
@@ -646,6 +686,16 @@ public class MachineDisplayService {
                     if (d.getEndedAt() != null) {
                         throw new IllegalArgumentException("Display is already ended: " + d.getId());
                     }
+                    // T-6c-4 P1 fix: the machine/site guard above only checks the requested
+                    // machine ids -- it says nothing about which machine a *display id* actually
+                    // belongs to. Without this check, naming two same-site machines while
+                    // supplying a foreign (e.g. cross-site) display id in displayIdsFromTarget
+                    // would pass the site guard and then end/recreate that foreign display here.
+                    if (!Objects.equals(d.getMachineId(), request.getTargetMachineId())
+                            || d.getLocationType() != request.getTargetLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to target machine: " + d.getId());
+                    }
                 }
 
                 List<MachineDisplay> endedOnTarget = new ArrayList<>(fromDisplays.size());
@@ -701,6 +751,14 @@ public class MachineDisplayService {
                 for (MachineDisplay d : toDisplays) {
                     if (d.getEndedAt() != null) {
                         throw new IllegalArgumentException("Display is already ended: " + d.getId());
+                    }
+                    // T-6c-4 P1 fix: same reasoning as displayIdsFromTarget above, mirrored for
+                    // the opposite direction -- a display id here must actually belong to the
+                    // requested source machine, not just any machine the caller can reach by id.
+                    if (!Objects.equals(d.getMachineId(), request.getMachineId())
+                            || d.getLocationType() != request.getLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to source machine: " + d.getId());
                     }
                 }
 
@@ -826,6 +884,14 @@ public class MachineDisplayService {
 
             if (existing.getEndedAt() != null) {
                 throw new IllegalArgumentException("Display is already ended: " + displayId);
+            }
+            // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: a display id
+            // is looked up globally, so without this check a request naming request.getMachineId()
+            // could end and recreate (at that machine) a display that actually lives elsewhere.
+            if (!Objects.equals(existing.getMachineId(), request.getMachineId())
+                    || existing.getLocationType() != request.getLocationType()) {
+                throw new IllegalArgumentException(
+                        "Display does not belong to machine: " + displayId);
             }
 
             Product product = existing.getProduct();

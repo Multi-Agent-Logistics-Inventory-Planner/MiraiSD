@@ -61,5 +61,23 @@ public class EventOutbox {
 
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
+
+    // Envelope context added by V63/V64 (.specs/phase-6-inventory AC-4, T-6c-7). Nullable on
+    // purpose: nothing populates these yet at creation time (that is T-6c-8's job) and old
+    // deployed writers keep inserting rows that simply omit them.
+    @Column(name = "site_id")
+    private UUID siteId;
+
+    @Column(name = "event_version")
+    private Integer eventVersion;
+
+    @Column(name = "correlation_id")
+    private String correlationId;
+
+    @Column(name = "causation_id")
+    private String causationId;
+
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
 }
 

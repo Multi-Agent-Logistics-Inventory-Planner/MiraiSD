@@ -65,9 +65,213 @@
 - 6b re-review completed: independent Standards and Spec passes found no remaining blocking
   findings. Focused JDK 21 verification passed 40 tests, with zero failures/errors/skips and no
   ArchUnit store changes; see review.md and validation.md for scope and actual command.
-- Next action: move to 6c planning (scoped inventory backend — trusted context, scoped
-  repositories/constraints, v1 endpoints). `DevSeedController.seedSalesData`'s no-site gap is now
-  closed. R-9 (LocationInventoryController's catalog.api coupling) still open, not a 6a/6b blocker.
+- 6c planning done and all five open questions resolved by the user (see "User decisions on
+  Q-6c-1 through Q-6c-5" below Q-6c-5 in the "6c planning" section) — production is confirmed NOT
+  yet deployed (Q-6c-1), quantity/active display stays as-is (Q-6c-2), idempotency is a durable
+  site-qualified table with the concrete design recorded there (Q-6c-3), the Kafka partition key
+  changes to `site_id:product_id` in 6c code but its production cutover requires a separate gated
+  authorization (Q-6c-4), and null-site movement rows are surfaced labeled unknown-site rather
+  than hidden (Q-6c-5). `DevSeedController.seedSalesData`'s no-site gap is now closed. R-9
+  (LocationInventoryController's catalog.api coupling) still open, not a 6a/6b blocker.
+- 6c implementation started this session: T-6c-0 (AC-8 baseline measurement), T-6c-1
+  (site-qualified repository methods), T-6c-2 (site-scoped facade overloads) and T-6c-3 (`V62`
+  index migration) are done and independently verified — see "6c implementation (T-6c-0..T-6c-3)"
+  below for what changed, the tests that prove it, and actual command output. T-6c-4 through
+  T-6c-17 are not started; P-5's ordering constraint (repository/facade work before any
+  controller) is now satisfied, so T-6c-4 (same-site transfer preconditions) or T-6c-5 (slim
+  totals projection, gated on T-6c-0's baseline already being captured, which it now is) are both
+  valid next tasks.
+- Independent review of T-6c-0..T-6c-3 returned three P2s, all in the `InventoryEgressBaselineIT`
+  fixture (unisolated catalog hiding accumulation, two measurements over empty data, database-egress
+  dimensions missing) and no production-code finding — fixed same session, see "Review-driven fix:
+  T-6c-0 baseline P2 findings" below. A second review round on that fix found two more P2s
+  (by-product DB egress undercounted; totals filtering measured a different workload than the real
+  unfiltered production query) and one P3 (leaked JDBC connection/unfreed `Array`) — also fixed same
+  session, see "Review-driven fix round 2" below. T-6c-0's recorded numbers changed twice as a
+  result; T-6c-17 must diff against the round-2 numbers (the current, final ones in the task entry
+  above), not either earlier set.
+- T-6c-4 and T-6c-5 done and verified this session — see "6c implementation (T-6c-4..T-6c-5)"
+  below for what changed, the tests that prove it, and actual command output.
+  `StockMovementService.executeTransfer` (shared by `transferInventory`/`batchTransferInventory`)
+  and `MachineDisplayService.batchSwapDisplay`'s machine-to-machine mode now reject a
+  cross-site source/destination pair via the existing `InvalidInventoryOperationException`
+  (→ 400), fail-fast before any write. `InventoryTotalsRepository` gained
+  `findAllInventoryTotalsBySite`/`findInventoryTotalsBySiteAndProductIds` (slim
+  `SiteInventoryTotalDTO`, two deliberately different and separately tested zero-stock contracts —
+  full-catalog mode guarantees a row per product via a `LEFT JOIN ... ON` site predicate; batched
+  mode reuses T-6c-1's existing absence-means-zero contract), with a documented, enforced
+  `MAX_PRODUCT_IDS_BATCH_SIZE = 500` ceiling. `InventoryQueries` gained matching facade overloads.
+  `INVENTORY_TOTALS_SQL`/`STOCK_TOTALS_SQL` (the AC-8 baseline's measured path) are untouched. No
+  routes added, so no contract regeneration this pass. T-6c-6 (row locking) was not started —
+  stopped cleanly per the "don't guess at a large remaining task" ground rule; it is next per
+  P-5's ordering.
+- Independent review of T-6c-4 returned one P1 (the swap guard checked the requested machine ids
+  but never validated that a caller-supplied *display id* actually belongs to the named machine,
+  so naming two same-site machines while supplying a foreign-site display id bypassed the guard
+  entirely) and one P2 (the task's own required machine-swap IT was missing — only Mockito
+  coverage existed). No finding in T-6c-5. Both fixed same session — see "Review-driven fix:
+  T-6c-4 findings" below. The fix is a general ownership-mismatch validation (each moved display
+  must actually belong to the machine the caller claims), not a narrowly site-specific patch.
+- A second review round reproduced the same P1 bug class via a path round 1 didn't touch
+  (`displayIdsToRemove`, which has no `requireSameSite` guard at all to partially rely on). Fixed
+  the same way, and a proactive sweep of every other global-by-id display lookup in
+  `MachineDisplayService` found and fixed the identical bug in `renewDisplays` and `swapDisplay`
+  before a third review round could reproduce them independently; `batchClearDisplays` was checked
+  and confirmed safe (it derives the expected machine from the displays themselves, not from a
+  separately claimed caller field). See "Review-driven fix round 2: T-6c-4 P1 recurrence" below.
+  `MachineDisplayServiceCrossSiteSwapIT` now covers all five bypass paths (5/5 pass).
+- T-6c-6 done and verified this session — see "6c implementation (T-6c-6)" below for what
+  changed, the concurrency test that proves it, and actual command output. `batchAdjustInventory`,
+  `transferInventory` and `batchTransferInventory` now all acquire `PESSIMISTIC_WRITE` locks on
+  every inventory id they are about to read-modify-write, via a new plain (no-join) id-ordered
+  lock query, strictly before the first entity load of any of those ids in the transaction — per
+  F-6c-5's recommended shape (a), not `@Version`. `LocationInventory` is unchanged (still no
+  `@Version` column, as F-6c-5 recommended against). A real-Postgres concurrency IT
+  (`StockMovementServiceConcurrentAdjustIT`) proves the fix: two genuinely concurrent
+  `batchAdjustInventory` calls against the same `(location, product)` row, forced to overlap via
+  an externally held `FOR UPDATE` lock (same technique as `SiteProductConcurrencyIT`), serialize
+  correctly (final quantity is the combined delta, not a lost update), produce exactly two
+  movement rows, and never observe a negative quantity. Confirmed the test actually catches the
+  regression it targets: temporarily disabling the new lock call reproduced the exact lost-update
+  failure (final quantity 80, i.e. only the second write survived, instead of the correct 50) —
+  see "6c implementation (T-6c-6)" for the full before/after transcript.
+- Review-driven fix (T-6c-6 P1) done and verified this session — see "Review-driven fix: T-6c-6
+  P1 findings" below for what changed, why, the pre-fix-failure evidence, and actual command
+  output. `resolveTransferLockIds` now guarantees every id it returns already names a real,
+  about-to-be-locked row: for an implicit destination, it first ensures the row exists (new
+  `LocationInventoryRepository.insertLocationInventoryIfAbsent`, a race-safe `INSERT ... ON
+  CONFLICT DO NOTHING`) before resolving its id, instead of only locking a destination that
+  happened to already exist at planning time. `executeTransfer`'s implicit-destination branch no
+  longer has its own unlocked find-or-create fallback — it now asserts (via `IllegalStateException`
+  on a miss) that the row `resolveTransferLockIds` guaranteed and `lockInventoryRowsForUpdate`
+  already locked is the one it finds. New deterministic concurrency IT
+  (`StockMovementServiceConcurrentTransferNewDestinationIT`) proves two concurrent transfers
+  landing on the same not-yet-existing destination serialize correctly (combined quantity, no lost
+  update, no duplicate row) using the same forced-overlap `pg_stat_activity`-polling technique as
+  `StockMovementServiceConcurrentAdjustIT`. Confirmed the fix matters: temporarily reverting it
+  reproduced a real `DataIntegrityViolationException` (unique-constraint violation) on the same
+  test. The delete-and-recreate sub-case the reviewer also raised was reasoned through and found
+  not independently reachable (subsumed by the `PESSIMISTIC_WRITE` lock hold — Postgres blocks any
+  concurrent `DELETE` of a row this transaction holds locked). One non-material ordering nuance
+  recorded as an assumption, not a `Q-6c-N` (no durable behavior or persisted-data change): the new
+  ensure-step can now write before `executeTransfer`'s cross-site `requireSameSite` check runs,
+  but both are inside the same `@Transactional`, so a rejected cross-site transfer still leaves no
+  trace — see that section for the full reasoning.
+- **Review-driven fix round 2 (T-6c-6 P1 findings, unified locking strategy) done and verified this
+  session — see "Review-driven fix round 2: T-6c-6 P1 findings (unified locking strategy)" below.**
+  Independent review reproduced two P1s in round 1's fix, both stemming from the same design flaw
+  the reviewer named directly: destination creation, identity resolution, and locking used two
+  inconsistent domains (an unlocked existence check racing a no-op `ON CONFLICT`; request-order
+  processing racing the later id-sort). Both are closed by one redesign: every row a transfer or
+  batch-transfer touches — source and destination, existing and new — is now resolved to a
+  `(location, product)` key and locked/created through one routine
+  (`StockMovementService.ensureAndLockInventoryRow`), processed strictly in one global
+  `(location, product)`-sorted order (`planTransfers`/`lockPlannedRows`), replacing the old
+  `resolveTransferLockIds`/`ensureDestinationInventoryExists`/id-based
+  `lockInventoryRowsForUpdate` path for transfers (`lockInventoryRowsForUpdate` itself is kept,
+  unchanged, for `batchAdjustInventory` only — its rows never need creating). New repository method
+  `LocationInventoryRepository.findIdByLocation_IdAndProduct_IdForUpdate` (scalar,
+  `PESSIMISTIC_WRITE`) makes "found" and "locked" the same act, closing bug 1; the removed
+  `findProductIdById`/`findIdByLocation_IdAndProduct_Id` scalar methods were dead after the
+  redesign and deleted. `executeTransfer` no longer has any find-or-create logic of its own — it
+  takes an already-resolved, already-locked `destinationInventoryId` and asserts it exists.
+- **Review-driven fix round 3 (T-6c-6 P1, adjustment/transfer lock-order conflict) done and
+  verified this session — see "Review-driven fix round 3" below.** Round 2 unified the transfer
+  paths onto one `(location, product)`-keyed lock order but left `batchAdjustInventory` locking by
+  ascending row id — two internally-consistent but mutually-conflicting domains, since row id and
+  product id are unrelated random UUIDs. A batch-adjust and a concurrent batch-transfer sharing two
+  rows at one location could acquire them in opposite order and deadlock (reproduced by the
+  reviewer on real Postgres). Fixed by moving `batchAdjustInventory` onto the exact same
+  `LocationProductKey`/`ensureAndLockInventoryRow` routine transfers already use — there is now
+  exactly one lock-ordering domain for every writer in `StockMovementService` capable of holding
+  more than one `LocationInventory` row per transaction. The now fully-unused `lockAllByIdForUpdate`
+  repository method was deleted. T-6c-6 is now considered closed pending any further review.
+- T-6c-7 done and verified this session — see "6c implementation (T-6c-7)" below for what
+  changed, the tests that prove it, and actual command output. `V63`/`V64` add the five nullable
+  AC-4 envelope columns to `event_outbox` (predates Flyway, same as `stock_movements` before V59)
+  and backfill them for unpublished rows; `EventOutbox` gained the matching nullable Java fields.
+  `EventOutboxService` is unmodified (T-6c-8's job).
+- Next action: T-6c-8 (`EventOutboxService` populates `site_id`/`event_version`/`correlation_id`/
+  `causation_id`/`idempotency_key` at creation time and changes the Kafka partition key to
+  `site_id:product_id`) per the task list's ordering — see "6c planning" above for exact scope.
+  The partition-key change itself remains gated on Q-6c-4's cutover mechanics, not merely a code
+  change; T-6c-8's code/test work against Testcontainers/local Kafka is not gated.
+- Last verified (review-driven fix round 2, this session): `./mvnw -q clean test-compile` clean;
+  new tests `StockMovementServiceConcurrentTransferExistingDestinationRaceIT` 1/1 pass (bug 1) and
+  `StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT` 2/2 pass (bug 2, both the
+  service-level no-deadlock proof and the raw-SQL mechanism-reproduction proof); both bugs'
+  pre-fix-failure evidence captured (a real `OptimisticLockException`/`StaleStateException` for bug
+  1, a real `deadlock detected` Postgres error for bug 2's mechanism); previously-existing
+  `StockMovementServiceConcurrentTransferNewDestinationIT` 1/1 still passes unmodified;
+  `StockMovementServiceSameSiteTransferTest` rewritten for the new repository methods, 4/4 pass;
+  `StockMovementServiceConcurrentAdjustIT`/`StockMovementOutboxAtomicityIT`/
+  `InventoryOperationsCallerTransactionIT` all still pass; `ArchitectureTest` 8/8, no
+  `archunit_store/` diff; `./mvnw -q clean test` — 348 tests, 0 failures/errors (unchanged, all new
+  tests are `*IT`); `./mvnw -q test -Dtest='*IT'` — 419 tests (up from 416 by 3 new IT methods), 8
+  failures, all the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+  debt, confirmed not a regression by excluding those two classes (exit 0); `git diff --check`
+  clean; no `archunit_store/` diff. See "Review-driven fix round 2: T-6c-6 P1 findings (unified
+  locking strategy)" below for the full verification list and bug-by-bug mechanism tracing.
+- Last verified (T-6c-6 P1 review-fix round 1, prior session): `./mvnw -q clean test-compile` clean;
+  `StockMovementServiceConcurrentTransferNewDestinationIT` 1/1 pass (real Testcontainers Postgres);
+  pre-fix revert reproduced a real `DataIntegrityViolationException` on the same test, restored fix
+  passes again; `StockMovementServiceConcurrentAdjustIT`/`StockMovementServiceSameSiteTransferTest`/
+  `StockMovementOutboxAtomicityIT`/`InventoryOperationsCallerTransactionIT` all still pass;
+  `ArchitectureTest` 8/8, no `archunit_store/` diff; `./mvnw -q clean test` — 348 tests, 0
+  failures/errors (unchanged, new test is itself an `*IT`); `./mvnw -q test -Dtest='*IT'` — 416
+  tests, 8 failures, all the same pre-existing `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` debt, confirmed not a regression by excluding those two classes
+  (exit 0). See "Review-driven fix: T-6c-6 P1 findings" below for the full verification list.
+- Last verified (T-6c-6, prior session): `./mvnw -q clean test-compile` clean. New concurrency IT
+  alone: `./mvnw -q -Dtest=StockMovementServiceConcurrentAdjustIT test` — 1/1 pass (real
+  Testcontainers Postgres). `./mvnw -q clean test` (full unrestricted suite, plain `test`,
+  excludes `*IT.java` by design) — exit 0, 348 tests summed across every surefire report, zero
+  failures/errors (unchanged from T-6c-4..T-6c-5 since the new class is an `*IT`). `./mvnw -q test
+  -Dtest='*IT'` — `MojoFailureException`, 415 tests (+1 over the prior 414), 8 failures, all still
+  exactly `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` (the pre-existing
+  order-fragile debt, not a regression — confirmed again by `./mvnw -q test
+  -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` exiting 0). `./mvnw -q
+  -Dtest=ArchitectureTest test` after an independent clean `test-compile` — 8/8 pass,
+  `git status --porcelain` on `archunit_store/` shows no diff (the new lock/scalar-lookup
+  repository methods reference only already-approved `inventory`-internal types). Pre-existing
+  tests exercising the changed methods under real persistence stayed green:
+  `StockMovementOutboxAtomicityIT` 2/2, `InventoryOperationsCallerTransactionIT` 2/2,
+  `StockMovementServiceSameSiteTransferTest` 4/4 (Mockito, unaffected by the new lock calls —
+  Mockito's default `Optional`/`List` answers for the unstubbed new repository methods are empty,
+  which is exactly what the production code expects for "nothing to additionally lock").
+- Open risks/questions carried forward: everything in the prior 6c-0..T-6c-3 "Open items" entry
+  below still applies unchanged (the `*IT` order-fragility debt; T-6c-7 through T-6c-17 unstarted).
+  No new open question was raised by T-6c-6 — it was implementable within F-6c-5's already-recorded
+  recommendation (option (a), `PESSIMISTIC_WRITE`). One residual, deliberately-accepted, narrower
+  gap was recorded rather than silently left implicit: a transfer's find-or-create path for a
+  brand-new destination row (never-before-used `(location, product)` pair) was not covered by the
+  new lock, since there was no row to lock yet. **This gap was subsequently found by independent
+  review to be a P1 (not merely the "safe, loud constraint error" this entry originally assumed —
+  the actual hazard was a silent, unlocked read-modify-write, not just a create-time collision) and
+  fixed the same phase — see "Review-driven fix: T-6c-6 P1 findings" below.**
+- **New standing risk discovered this session, not yet fixed (deliberately, see below): the
+  `*IT` Maven suite is order-fragile independent of 6c.** Adding *any* new `*IT` test class to the
+  module — proven with a throwaway no-op `ZZZOrderProbeIT` containing a single empty `@Test`,
+  added and then removed — perturbs JUnit 5's test-class execution order enough to make
+  `AnalyticsControllerSecurityIT` (`demand-leaders`, `performance-metrics`, `inventory-by-category`)
+  and `ForecastControllerSecurityIT` (`getAllForecasts`) fail with 500s. Root cause (from the
+  actual stack traces): `AnalyticsService`/`ForecastService` issue native SQL that is not
+  H2-compatible (a `year` column alias colliding with H2's reserved word, and a Postgres-only JSONB
+  `->>'demand_segment'` operator) — these queries only execute, and only fail, once
+  `analytics_daily_rollup`/`forecast_predictions` actually contain rows, which is itself a function
+  of which other tests happened to run first in the shared, non-isolated, single H2 instance
+  (`DB_CLOSE_DELAY=-1`) the whole `test` profile uses. This is pre-existing debt in
+  `AnalyticsService`/`ForecastService` (not `inventory`, not touched by 6c) that has apparently
+  been surviving on accidental test-ordering luck. Confirmed NOT a 6c regression: reproduced with
+  the no-op probe class alone (`./mvnw clean test -Dtest='*IT'` fails the same 8 tests with zero
+  inventory-related code present), and the full `*IT` sweep is green with only those two
+  pre-existing classes excluded (`./mvnw test -Dtest='*IT,!AnalyticsControllerSecurityIT,
+  !ForecastControllerSecurityIT'` — exit 0). Recorded here as an open risk per the ground rules
+  (a genuine gap, not silently worked around) rather than fixed, since fixing
+  `AnalyticsService`/`ForecastService`'s native SQL is out of `inventory`'s module boundary and
+  out of 6c's scope; a future session/PR should either make those two native queries
+  H2-compatible or give `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` their own
+  isolated persistence context.
 - Committed 2026-09-09: `dbc2c1d` "feat(inventory): establish inventory module boundary (Phase 6a,
   T-0-T-4)" — T-0 through T-4 as one commit. The reviewer asked for a three-way split (guard/facade
   prep; mechanical entity/service moves; R-8 consolidation/dead-injection removal); the user then
@@ -455,6 +659,1705 @@ compile.
   diff** on `archunit_store/`/`archunit.properties` (`git status --short` clean on both) — this
   fix pass, like the original implementation pass, adds no new module edges and needs no frozen-
   store change.
+
+## 6c planning — scoped inventory backend worksheet (2026-09-11)
+
+Research-only pass (mirai-spring-architect), no code changed. Findings, prerequisites, open
+questions and the T-numbered task list below. This is the equivalent of 6b's rollout worksheet for
+6c's scope (trusted context, scoped repositories/constraints, atomic writes, compatible event
+context, v1 routes with slim/batched totals). Nothing here is implementation proof; every claim is
+marked verified (read at the cited file/line) or assumed.
+
+### Findings that shape 6c's scope
+
+- **F-6c-1 (verified): the trusted-site-context mechanism already exists and 6c must not invent a
+  second one.** `identity.infrastructure.SiteAccessAuthorizationFilter:31-96` matches
+  `/api/v1/sites/{siteId}/**` (line 33), resolves through
+  `identity.application.AuthorizedSiteContextFactory:37-72` (authenticated principal -> site exists
+  -> active membership -> audited system-admin bypass), stashes
+  `shared.web.AuthorizedSiteContext` on `AuthorizedSiteContextHolder` and always clears it in a
+  `finally` (lines 91-95). Controller precedent to copy verbatim:
+  `sites/api/SiteLocationController.java:39-98` and `catalog/api/SiteProductController.java:35-114`
+  — declare `@PathVariable UUID siteId` on every handler so springdoc/the generated client expose
+  the URL segment, but read the *trusted* site off `AuthorizedSiteContextHolder.require().siteId()`
+  and never use the raw path variable. The filter authorizes *reachability* only; per-operation
+  role checks stay `@PreAuthorize` on the handler (`SiteProductController:30-33`). 6c adds no new
+  context class, no `HandlerMethodArgumentResolver`, no `@Transactional` site-resolution helper.
+- **F-6c-2 (verified): inventory persistence is still almost entirely site-blind.**
+  `LocationInventoryRepository` has exactly three site-qualified methods — `findBySite_Id` (72-73),
+  `sumQuantityByProductIdAndSiteId` (81-82), `findByStorageLocationCodeAndSiteId` (91-92). The
+  methods the write/read paths actually use — `findByLocation_Id` (24-33),
+  `findByLocation_IdAndProduct_Id` (38-39), `findByLocation_IdAndProduct_IdIn` (41-42),
+  `findAllByIdWithGraph` (50-58), `sumQuantitiesByProductIds` (64-70), `sumQuantityByProductId`
+  (78-79) — carry no site predicate. `StockMovementRepository` has **zero** occurrences of "site"
+  (grep, whole file), and neither does `StockMovementSpecifications` (the audit-log filter path).
+  So AC-3's "site-qualified lookup and composite constraints reject foreign-site identifiers" is
+  entirely 6c work, and it is a *repository-query* change, not a service-level post-load check
+  (multi-site-data-and-api.md:108-110).
+- **F-6c-3 (verified): the slim-projection target is `InventoryTotalsRepository`.**
+  `INVENTORY_TOTALS_SQL` (`inventory/infrastructure/InventoryTotalsRepository.java:27-47`) returns
+  12 columns per product — sku, name, image_url, category id/name, parent category id/name,
+  unit_cost, is_active — for **every product in the catalog**, joining `categories` twice, with a
+  `LEFT JOIN location_inventory` and no site predicate, on every `/api/inventory/totals` call
+  (`inventory/api/InventoryAggregateController.java:43-55`, called by
+  `apps/web/src/lib/api/inventory.ts:217`). AC-5's slim projection is
+  `(product_id, total_quantity, last_updated_at)` scoped by site, optionally narrowed to known
+  product ids. **Zero-stock hazard (verified by reading the SQL):** the `LEFT JOIN` is the only
+  reason zero-stock products appear in the result at all; a site-scoped rewrite that inner-joins or
+  filters on `li.site_id` in the `WHERE` clause silently drops every product with no row at that
+  site, which AC-5 explicitly forbids ("zero-stock products and quantity semantics remain
+  correct"). The site predicate must live in the join condition, or the projection must be defined
+  as "rows that exist" with the client treating absence as zero — that choice has to be made
+  deliberately and tested, not discovered in 6d.
+  `STOCK_TOTALS_SQL` (73-77) is the already-slim sibling and is the better starting shape.
+- **F-6c-4 (verified, Row 4 resolution input): global stock state must not become site-scoped by
+  accident.** `catalog.application.ProductStockStateWriter` (3 methods, all
+  `Propagation.MANDATORY`) is the documented adapter; its own Javadoc schedules deletion for
+  "Phase 6 ... once `inventory` owns quantity". Its inventory-side callers are
+  `StockMovementService.applyProductActiveStatusFromTotals` (352-368),
+  `updateProductActiveStatus` (861-869) and `syncProductTotals` (870-901), all fed by
+  `sumCurrentTotalsByProductIds` (330-344) → `LocationInventoryRepository.sumQuantitiesByProductIds`
+  — a **global, un-scoped** sum. Non-facade writers `SiteProductService:74` and
+  `ProductService:136,328` also write these columns (recorded in 6b Row 4, re-confirmed by grep
+  this pass). Python `forecasting-service` reads `products.quantity`/`is_active` directly
+  (`supabase_repo.py:148,180-193,644-645`, per 6b's worksheet; not re-read this pass) and Kuji's
+  Active/Closed tabs depend on the same meaning. **Recommended rule for 6c, to be recorded as the
+  Row 4 resolution:** the global sum stays global and un-scoped; `ProductStockStateWriter`,
+  `products.quantity` and `products.is_active` are not modified, redefined or dropped in 6c; the
+  site-scoped total is a *new, additional* query path used only by the new v1 read surface. The
+  single concrete failure mode to guard with a test is a well-meaning edit that adds `AND
+  li.site_id = :siteId` to `sumQuantitiesByProductIds`, which would silently turn
+  `products.quantity` into "MAIN quantity" and under-forecast every non-MAIN item. The
+  user-visible consequence of keeping them global is Q-6c-2 below.
+- **F-6c-5 (verified): no concurrency control exists on the read-modify-write path.**
+  `LocationInventory` (`inventory/domain/LocationInventory.java:45-78`) has no `@Version` column;
+  `StockMovementService.batchAdjustInventory` (147-288) preloads rows (153-155), validates
+  (158-183), mutates and saves (215-261) with no lock of any kind, and the transfer path
+  (`executeTransfer`, 485-618) does the same. The only backstop is the database
+  `CHECK (quantity >= 0)` (`infra/init-db/20-unified-locations.sql`, `chk_quantity_non_negative`),
+  which turns a lost update into either silent over-sale or a 500, depending on interleaving. AC-3
+  requires "concurrent writes ... are tested" and 6b's worksheet explicitly deferred same-`(location,
+  product)` contention to 6c's gate. Two viable shapes: (a) `PESSIMISTIC_WRITE` on an id-ordered
+  lock query before the graph fetch — no schema change, deterministic, no client retry contract;
+  (b) `@Version` optimistic locking — needs a `version` column migration *and* a documented retry/409
+  contract on the v1 endpoints. **Recommended: (a).** Implementation hazard to respect:
+  PostgreSQL rejects `FOR UPDATE` applied to the nullable side of an outer join, so the lock query
+  must be a plain `SELECT li ... WHERE li.id IN :ids ORDER BY li.id` and must not reuse
+  `findAllByIdWithGraph`'s `LEFT JOIN FETCH p.parent` (line 55). Ordering by id is what prevents
+  deadlock between two overlapping batches.
+- **F-6c-6 (verified): the event envelope is missing every AC-4 field, and the contract schema has
+  already drifted.** `models/audit/EventOutbox.java:24-64` has no `site_id`, no `event_version`, no
+  `correlation_id`/`causation_id`/`idempotency_key` columns. `EventOutboxService` smuggles
+  correlation into the JSON payload (`:139`) and re-reads it at publish (`:199`); stable event
+  identity today is `entityId = UUID.nameUUIDFromBytes(movement.getId())` (`:145`) plus the unique
+  index on `payload->>'stock_movement_id'` (`V16__fix_duplicate_notifications.sql:12-13`) — dedupe
+  exists, but expressed through JSON rather than a column. The Kafka partition key is `item_id`
+  alone (`:202`); events-and-replica-readiness.md:33-34 requires `site_id + product_id`.
+  **Drift worth knowing before touching the schema:** `tests/contracts/schemas/event_envelope.json`
+  sets `additionalProperties: false` at *both* the envelope (line 89) and payload (line 86) level
+  and does **not** declare `correlation_id`, which the producer has been emitting at both levels
+  for some time — i.e. the contract test validates hand-written `conftest.py` fixtures, not real
+  producer output, so it never caught it. Consequence: every new envelope field is a *required*
+  edit to that schema file, and the producer-contract test as currently written cannot prove the
+  Java producer matches it.
+- **F-6c-7 (verified): both Python consumers tolerate unknown fields.**
+  `services/forecasting-service/src/events.py:14-48` and the messaging-service equivalent declare
+  plain Pydantic `BaseModel`s with no `model_config`/`class Config`, so v2's default
+  `extra='ignore'` applies — adding `site_id`/`event_version`/`causation_id` to the envelope is
+  additive-compatible at the consumer (assumed only in that this reasons from Pydantic's documented
+  default rather than from an executed test; T-6c-9 turns it into an executed one).
+- **F-6c-8 (verified): there is no durable idempotency foundation for inventory commands.**
+  `services/IdempotencyService.java` is a JVM-local Caffeine cache keyed `userId:key` with a 5-minute
+  TTL (lines 19-44) — not durable across restarts, not site-qualified (multi-site-data-and-api.md:68
+  requires site identity in idempotency keys), and used today only by lootbox, which additionally
+  has a real `UNIQUE(user_id, idempotency_key)` column as its actual safety net. AC-3's "idempotent
+  retries are tested" and AC-4's "idempotency context" therefore need a decision, not a reuse
+  (Q-6c-3).
+- **F-6c-9 (verified): R-9 does not block 6c, provided the new v1 DTOs are new.** R-9 exists
+  because `LocationInventoryResponseDTO.item` is `catalog.api.ProductSummaryDTO` and
+  `LocationInventoryMapper` `uses` `catalog.api.ProductMapper`, which would make
+  `inventory.api -> catalog.api` and trip `modulesDoNotDependOnAnotherModulesApi`. 6c's v1 response
+  DTOs are slim by AC-5 anyway (product id + quantity + timestamps, not embedded catalog metadata),
+  so they can live in `inventory.api` without that edge. The legacy
+  `controllers/LocationInventoryController` and its DTOs stay exactly where they are. If a 6c task
+  ever reaches for `ProductSummaryDTO`, stop — that is R-9 becoming a blocker and needs the
+  catalog-owned application-level read contract described in the 6a handoff, not a workaround.
+- **F-6c-10 (verified): AC-8's "before" numbers are only capturable before T-6c-5 changes the
+  totals query.** Once the slim projection exists there is no clean baseline left except by
+  reverting. This forces measurement to be the *first* task, not the last.
+
+### Prerequisites and ordering constraints
+
+- **P-1 (blocking, operational — see Q-6c-1): V59/V60 must be applied to production and the 6b
+  writer release deployed before any site-scoped `stock_movements` read is trusted in production.**
+  A site-qualified movement query (`WHERE sm.site_id = :siteId`) silently excludes every row whose
+  `site_id` is still null. Until the backfill has run and the writer release is live, `/api/v1/
+  sites/{siteId}/inventory/movements` and the scoped audit log would return a *quietly incomplete*
+  history — worse than an error. This does not block writing or testing 6c code (Testcontainers
+  applies the SQL itself), it blocks relying on those endpoints in production and it interacts with
+  Q-6c-5.
+- **P-2 (not blocking, but reorders V61): the two site indexes are 6c's need, the NOT NULL/FK is
+  not.** 6b's worksheet put `idx_stock_movements_site_at` and `idx_stock_movements_site_item_at`
+  inside `V61` alongside `SET NOT NULL` + FK. Only the constrain half is the gated,
+  rollback-unsafe, deploy-ordered step; `CREATE INDEX CONCURRENTLY` is rollback-safe at any point
+  (same reasoning as `V58`). Recommendation: split the two indexes into a 6c index-only migration
+  (`V62`, `CONCURRENTLY` + paired `.conf`, matching `V58`'s precedent) and leave `V61`'s
+  `SET NOT NULL`/FK as the separate gated PR it already is. Without this, 6c's scoped movement
+  reads seq-scan a ledger table.
+- **P-3 (internal ordering): outbox expand migration + writer ship together, constrain is deferred.**
+  Exactly 6b's pattern: `V63` expand (nullable `site_id`, `event_version`, `correlation_id`,
+  `causation_id`, `idempotency_key`), `V64` backfill for unpublished rows, and no constrain step in
+  this record. Old deployed images ignore unknown nullable columns, so expand alone stays
+  rollback-safe.
+- **P-4 (internal ordering): T-6c-0 (baseline measurement) precedes T-6c-5 (slim projection)** per
+  F-6c-10.
+- **P-5 (internal ordering): T-6c-1/T-6c-2 (site-qualified repository methods and facade overloads)
+  precede every controller task**, so no controller ever has a reason to filter by site in Java
+  after loading globally.
+- **P-6**: no production apply and no deployment is authorized by this record, unchanged from 6a/6b.
+
+### Open questions for the user (do not proceed past the dependent task without an answer)
+
+- **Q-6c-1 (deployment/data-visibility, blocks P-1 and Q-6c-5): what is actually applied in
+  production today?** 6b's record has explicit user confirmation for V56/V57 only; V58/V59/V60 were
+  written in 6b but no apply was authorized, and the 6b writer release's deploy status is not
+  recorded. 6c needs the real answer to decide whether the v1 movement endpoints can ship enabled,
+  and whether the P-2 index split can be applied before `V61`.
+- **Q-6c-2 (product): after 6d, the Products page shows a per-site quantity next to a global
+  active status.** Keeping `products.is_active` global (F-6c-4, and multi-site-data-and-api.md:25-33
+  fixes that meaning deliberately) while AC-6 restores quantities "only from scoped totals" means a
+  product with 0 at MAIN and 5 at SECOND renders, at MAIN, as quantity 0 but still Active. That is
+  correct per the durable spec and it is also a visible behavior change users will read as a bug.
+  Confirm the intended presentation (accept as-is / show both numbers / surface an "in stock at
+  another site" affordance) before 6c freezes the totals DTO shape, since the DTO is what 6d can
+  render.
+- **Q-6c-3 (contract + data): idempotency model for inventory mutations.** Three sub-decisions:
+  (a) is `Idempotency-Key` **required** on the v1 mutation routes (a contract requirement the web
+  client must satisfy) or optional-but-honored; (b) durable table keyed `(site_id, user_id, key)`
+  with the response/effect recorded, or the existing JVM-local Caffeine cache (F-6c-8 — not durable,
+  not site-qualified, contradicts multi-site-data-and-api.md:68); (c) does the key also become the
+  event envelope's `idempotency_key` (AC-4) or are they separate concepts. (b) implies another
+  migration in this record.
+- **Q-6c-4 (deployment/ordering risk): change the Kafka partition key from `item_id` to
+  `site_id:product_id` now, or defer?** events-and-replica-readiness.md:33-34 requires the composite
+  key, but changing a partition key remaps existing keys across partitions, so in-flight events for
+  one product can be processed out of order across the switch. Impact is likely nil today (single
+  broker, topic partition count not verified this pass — `infra/docker-compose.yml:150,199` only set
+  the topic name), but "likely nil" on ordering is exactly the kind of thing that should be
+  confirmed rather than assumed, and the safe version needs a drain before the switch.
+- **Q-6c-5 (audit completeness, depends on Q-6c-1): may the v1 movement/audit-log endpoints show
+  rows whose `site_id` is still null?** Options: hide them (clean tenancy, incomplete audit trail
+  until backfill), or treat null as MAIN in the query during the compatibility window (complete
+  history, one documented compatibility clause to remove later). This is an audit-trail
+  completeness decision, not a technical one.
+
+Anything not listed above is a recorded assumption, resolved in the task list: same-site-only
+transfers in 6c (audited inter-site transfers stay Phase 7), legacy routes keep MAIN-resolving
+behavior and gain `Deprecation`/`Link` headers with no `Sunset` (matching
+`LegacyCatalogDeprecationFilter:13-24`), and v1 role requirements mirror the legacy endpoints they
+replace rather than tightening them mid-migration.
+
+### User decisions on Q-6c-1 through Q-6c-5 (2026-09-11)
+
+- **Q-6c-1 resolved: not yet deployed.** V58/V59/V60 and the 6b writer release are confirmed NOT
+  live in production. A-6c-1 stands as written — every 6c claim about scoped movement reads stays
+  proven against Testcontainers only; P-1 blocks relying on `/api/v1/sites/{siteId}/inventory/
+  movements` in production until the user separately confirms deploy + backfill completion.
+- **Q-6c-2 resolved: keep as-is.** Global `products.is_active` next to a site-scoped quantity
+  (e.g. "quantity 0, Active" at a site with no local stock but stock elsewhere) is accepted as
+  correct per spec; no 6c or 6d UI affordance required for the mismatch.
+- **Q-6c-3 resolved: durable, site-qualified idempotency (T-6c-10 supersedes its "shape decided by
+  Q-6c-3" placeholder with this concrete design):**
+  - `Idempotency-Key` header is **required** on the v1 mutation routes (`POST .../adjustments`,
+    `POST .../transfers`); legacy `/api/inventory/*`/`/api/stock-movements/*` are explicitly
+    unaffected (no new requirement on routes T-6c-13 leaves untouched).
+  - New durable table, unique on `(site_id, user_id, idempotency_key)`, using the trusted
+    `AuthorizedSiteContext` site/user, not client-supplied values.
+  - Stores command type, a canonical request fingerprint, and the original result. A replay with
+    the same key and same fingerprint returns the stored result; the same key with a different
+    fingerprint returns 409 Conflict.
+  - The idempotency record commits in the **same transaction** as the inventory/movement/audit/
+    outbox writes it guards — one committed effect per key, and a rolled-back command leaves the
+    key retryable (no idempotency row survives a failed attempt).
+  - Authorization is rechecked before serving a replayed result (a role/membership change between
+    the original call and a retry must not bypass a now-invalid grant).
+  - The command's idempotency key propagates into the event envelope's `idempotency_key` (AC-4);
+    each emitted event still gets its own distinct event id — the command key identifies the
+    command, not the event.
+  - Retention policy must be defined explicitly (not left implicit) and tested: concurrent
+    duplicate submissions, restart-then-replay, rollback-then-retry, payload-conflict (409), and
+    site/user isolation (same key, different site or user, is not a replay).
+  - This adds its own expand migration (a new table), consistent with 6b/6c's expand-only pattern
+    for this record — no constrain step.
+- **Q-6c-4 resolved: change the Kafka partition key to `site_id:product_id` in 6c, gated on an
+  explicit cutover, not a bare code change.** T-6c-8 must additionally, before flipping the
+  partition key in any environment beyond tests:
+  - Verify the actual topic partition count in the target environment before reasoning about
+    ordering risk (A-6c-2 — not yet established; `infra/docker-compose.yml:150,199` only names the
+    topic).
+  - Treat existing Kafka records as immutable: the new key governs routing for events published
+    *after* the switch, including retries. It does not move already-published records, so a
+    coordinated drain is required, not a flag flip: pause inventory mutations, drain the old
+    publisher's outbox and any in-flight sends, let consumers finish processing through recorded
+    partition offsets, then cut the publisher over and resume writes.
+  - Test duplicate delivery, delayed retries and historical replay across the cutover boundary
+    explicitly — event-id dedupe (T-6c-9) does not by itself prevent an older, previously-unseen
+    event from overwriting newer state once ordering guarantees change.
+  - Check every consumer that currently relies on shared partition ordering for one product across
+    sites (global product-state consumers) and confirm each tolerates the loss of that shared
+    ordering once site/product keys replace it.
+  - Keep the partition count unchanged during the cutover; document rollback as its own equally
+    coordinated switch, not an inverse flag flip.
+  - Per P-6, no production apply/deployment is authorized by this record: T-6c-8 implements and
+    tests the new key and the cutover mechanics against Testcontainers/local Kafka; the gated
+    cutover itself is a deploy-time action requiring separate authorization, and AC-4 is not
+    "complete" against production until that gate is actually passed and recorded, not merely
+    coded.
+- **Q-6c-5 resolved: surface null-`site_id` rows as unknown-site, not hidden.** T-6c-11's `GET
+  .../inventory/movements` includes rows whose `site_id` is still null, tagged explicitly (e.g. a
+  `siteAttribution: "UNKNOWN"` field or equivalent) rather than silently omitted, preserving audit
+  completeness during the pre-backfill compatibility window. This is the inverse of what P-1 warned
+  against for *scoped-only* reliance — the chosen behavior is now "include and label," not "filter
+  out," so the earlier "quietly incomplete" risk is replaced by an explicit compatibility marker
+  the client can render. Remove the marker path once Q-6c-1's backfill/deploy is separately
+  confirmed complete (tracked as new debt, not closed by this record).
+
+### 6c task list
+
+Ordered; each is independently testable. Per the slice cadence these are internal checklist items,
+not separate review/commit gates.
+
+- **T-6c-0 — Capture the AC-8 "before" measurement.** Changes: a repeatable harness (Testcontainers
+  or a `@SpringBootTest` with a seeded catalog of fixed size) that records, for `/api/inventory/
+  totals`, `/api/inventory/by-product/{id}` and the audit-log page: SQL statement count, rows
+  returned, and serialized response bytes. Why: F-6c-10 — after T-6c-5 the baseline is
+  unrecoverable, and AC-8 explicitly rejects historical cumulative counters as proof. Test: the
+  harness itself, with the recorded numbers written into this log (not just an assertion).
+- **T-6c-1 — Site-qualified repository methods (no callers yet).** Changes:
+  `LocationInventoryRepository` gains `findByIdAndSite_Id`, `findByLocation_IdAndProduct_IdAndSite_Id`,
+  `findAllByIdInAndSite_Id(...WithGraph)`, `findByLocation_IdAndSite_Id`, and a site-scoped
+  `sumQuantitiesByProductIdsAndSiteId`; `StockMovementRepository` gains site-qualified history/audit
+  variants; `StockMovementSpecifications` gains a mandatory site predicate for the audit-log filter
+  path. The existing global methods stay, untouched (F-6c-4). Why: AC-3 requires the site predicate
+  at the query, not after load. Test: a Testcontainers IT that seeds the same `(location, product)`
+  shape at MAIN and SECOND and asserts each new method returns only its own site's rows and
+  `Optional.empty()`/empty list for a foreign-site id.
+- **T-6c-2 — Site-scoped facade overloads on `InventoryQueries`/`InventoryOperations`.** Changes:
+  `(UUID siteId, ...)`-first overloads mirroring `LocationService`'s existing
+  `getLocationById(siteId, id)` shape; foreign-site ids raise `InventoryNotFoundException` (→ 404 per
+  multi-site-data-and-api.md:63-64), not an authorization error. Existing global methods keep their
+  current signatures so no 6a caller is disturbed. Why: AC-1's facade boundary plus AC-3. Test: unit
+  tests for the mapping-to-404 behavior; the foreign-site rejection proven at the IT level in
+  T-6c-1/T-6c-12 rather than duplicated here.
+- **T-6c-3 — `stock_movements` site index migration (`V62`, `CONCURRENTLY` + paired `.conf`).**
+  Changes: `idx_stock_movements_site_at(site_id, at DESC)` and
+  `idx_stock_movements_site_item_at(site_id, item_id, at DESC)`, split out of `V61` per P-2; `V61`
+  keeps only `SET NOT NULL` + FK and stays a separate gated PR. Why: 6c's scoped reads otherwise
+  seq-scan the ledger, and the index half is rollback-safe while the constrain half is not. Test: a
+  migration IT executing the real `.sql` against Testcontainers Postgres asserting index
+  existence/shape (the `StockMovementSiteMigrationIT` pattern), plus an `EXPLAIN` assertion that the
+  scoped history query uses the index — the cheapest available guard against the index being
+  cosmetically present but unusable because of a column-order mismatch.
+- **T-6c-4 — Same-site preconditions on existing multi-location writes.** Changes: `transferInventory`/
+  `batchTransferInventory` (`StockMovementService:369-618`) reject a source/destination pair whose
+  sites differ; `MachineDisplayService`'s swap path gains the same-site precondition flagged as
+  advisory debt by 6b's review. Why: AC-3's tenant invariants and multi-site-data-and-api.md:67
+  ("cross-site joins prohibited except ... transfer workflows") — audited inter-site transfers are
+  Phase 7's, so until then the correct behavior is an explicit rejection, not a silent cross-site
+  write. Test: unit tests asserting the rejection and its message/type; one IT covering the machine
+  swap path, whose fixtures already carry two distinct sites after 6b's review fix
+  (`MachineDisplayServiceNotificationTest`, MAIN/SECOND).
+- **T-6c-5 — Slim, site-scoped, batched totals projection.** Changes: a new
+  `InventoryTotalsRepository` query returning `(product_id, total_quantity, last_updated_at)` for one
+  site, with an optional bounded `productIds` filter (bound the batch explicitly — a documented
+  maximum, rejected with 400 above it — so AC-7's "neither full-catalog refreshes nor one request
+  per product" has a real ceiling); a matching slim `inventory.api` DTO that embeds no catalog type
+  (F-6c-9). `INVENTORY_TOTALS_SQL` stays for the legacy endpoint. Why: AC-5, and the largest single
+  AC-8 lever (F-6c-3). Test: an IT covering (a) a zero-stock product still appearing with quantity 0
+  — or its documented absence-means-zero contract, whichever is chosen — per F-6c-3's hazard; (b)
+  the same product with different quantities at MAIN and SECOND resolving independently; (c) the
+  batched form returning exactly the requested ids; (d) the over-limit rejection.
+- **T-6c-6 — Row locking on the read-modify-write paths.** Changes: `PESSIMISTIC_WRITE`, id-ordered
+  lock query ahead of the graph fetch in `batchAdjustInventory` and `executeTransfer`, per F-6c-5's
+  recommendation and its `FOR UPDATE`/outer-join hazard. Why: AC-3's concurrent-write requirement;
+  today a concurrent double-subtract is a lost update or a CHECK-constraint 500. Test: a concurrency
+  IT (real Postgres, two threads, same `(location, product)`) asserting the final quantity equals the
+  serialized result, exactly two movement rows exist, and neither thread observes a negative
+  quantity — this is the "proves a real invariant" case, and it is the one 6b explicitly deferred to
+  6c.
+- **T-6c-7 — Outbox envelope expand migration (`V63`) + `EventOutbox` entity fields.** Changes:
+  nullable `site_id`, `event_version`, `correlation_id`, `causation_id`, `idempotency_key` columns
+  and the matching entity fields; `V64` backfills unpublished rows (site from the referenced
+  movement, `event_version` to the initial version, correlation from the existing payload key). No
+  constrain step in this record (P-3). Why: AC-4's durable envelope. Test: migration + backfill ITs
+  executing the real SQL (the `StockMovementSiteBackfillIT` pattern), including a guard case for an
+  outbox row whose movement no longer exists.
+- **T-6c-8 — `EventOutboxService` writes the envelope and the composite partition key.** Changes:
+  populate the new columns at creation time from the movement (`site`, actor, correlation from
+  `CorrelationIdContext`, idempotency per Q-6c-3) instead of/in addition to the JSON payload; publish
+  them at the envelope level; partition key becomes `site_id:product_id` **subject to Q-6c-4**. Why:
+  AC-4 and events-and-replica-readiness.md:19-34. Test: an IT asserting a movement's outbox row
+  carries the movement's site and a stable event identity, that re-running creation for the same
+  movement does not create a second logical event (the `V16` dedupe index, now exercised
+  deliberately), and a key-shape assertion on the produced record.
+- **T-6c-9 — Contract schema and producer/consumer compatibility.** Changes:
+  `tests/contracts/schemas/event_envelope.json` gains the new envelope fields **and** the
+  long-missing `correlation_id` (F-6c-6 drift); fixtures updated; a producer-side test that
+  validates a payload built by the real Java producer path rather than a hand-written fixture, if
+  that is achievable without cross-language plumbing — otherwise record the gap explicitly rather
+  than letting the current false-confidence stand. Why: AC-4's "affected producers and consumers
+  pass compatibility, claim, duplicate, reorder and crash/retry tests". Test: the Python contract
+  suite; plus consumer-side tests proving both services still parse an envelope carrying the new
+  fields (F-6c-7's `extra='ignore'` reasoning turned into an executed assertion) and that duplicate
+  delivery of the same `event_id` produces one effect.
+- **T-6c-10 — Command idempotency (shape decided by Q-6c-3).** Changes: whichever of the three
+  sub-decisions the user takes; if durable, a table keyed `(site_id, user_id, idempotency_key)` with
+  a unique constraint and its own expand migration. Why: AC-3's "idempotent retries are tested" and
+  AC-4's idempotency context; F-6c-8 shows nothing reusable exists. Test: an IT replaying the same
+  batch-adjust twice with one key and asserting exactly one set of inventory/movement/outbox effects,
+  and that the same key at a different site is *not* treated as a replay.
+- **T-6c-11 — v1 read routes.** Changes: `GET /api/v1/sites/{siteId}/inventory/totals`
+  (optional `productIds`), `GET /api/v1/sites/{siteId}/inventory/products/{productId}`,
+  `GET /api/v1/sites/{siteId}/inventory/locations/{locationId}`,
+  `GET /api/v1/sites/{siteId}/inventory/movements` (history + audit-log filters), in a new
+  `inventory.api` controller reading the site off `AuthorizedSiteContextHolder` and declaring the
+  `siteId` path variable for springdoc, per F-6c-1. Distinct handler/DTO names from the legacy
+  controllers so springdoc does not collide operation IDs and silently reassign the legacy ones
+  (`SiteLocationController:27-38` records that trap). Why: AC-5. Test: a security/authorization IT
+  in the `LocationInventoryControllerSecurityIT` family covering the role matrix, a foreign-site
+  `siteId` (403), an unknown `siteId` (404), a valid site with a foreign-site entity id (404), and
+  no-JWT (401, which the filter deliberately leaves to Spring Security —
+  `SiteAccessAuthorizationFilter:65-75`).
+- **T-6c-12 — v1 mutation routes.** Changes: `POST /api/v1/sites/{siteId}/inventory/adjustments`,
+  `POST /api/v1/sites/{siteId}/inventory/transfers` (same-site only per T-6c-4), each through the
+  scoped facade, each with `@PreAuthorize` mirroring the legacy endpoint's role set. Why: AC-3/AC-5.
+  Test: authorization matrix IT; an atomicity IT proving inventory + movement + audit + outbox commit
+  or roll back together through the *controller* path (extending, not duplicating,
+  `InventoryOperationsCallerTransactionIT`/`StockMovementOutboxAtomicityIT`); and a test that a
+  request naming a location belonging to another site is rejected before any write.
+- **T-6c-13 — Legacy compatibility and deprecation.** Changes: legacy `/api/inventory/*` and
+  `/api/stock-movements/*` keep their current MAIN-resolving behavior untouched and gain
+  `Deprecation` + `Link` headers via a filter registered exactly like
+  `LegacyCatalogDeprecationConfig:14-21`, no `Sunset`. `/api/locations/{id}/inventory` is
+  `sites`-shaped legacy routing and is left alone this pass. Why: multi-site-data-and-api.md:126-128
+  and AC-5's "prove legacy compatibility and no unintended contract break". Test: an IT asserting the
+  headers on legacy inventory routes and their **absence** on `/api/v1/**`; existing legacy endpoint
+  tests stay green unmodified, which is the actual compatibility proof.
+- **T-6c-14 — Regenerate the contract and client.** Changes: `packages/contracts/openapi.json` and
+  `packages/api-client/src/schema.d.ts` regenerated via `OpenApiContractExportTest`. Why: AGENTS.md
+  requires both with any endpoint change. Test: `OpenApiContractExportTest`; a reviewed diff showing
+  only additions (new v1 paths/schemas) and no modification to existing legacy operation IDs,
+  parameters or response shapes — the 6a precedent used byte-identity, which no longer applies now
+  that endpoints are genuinely being added.
+- **T-6c-15 — Stock-state compatibility guard.** Changes: none to production code by design; a test
+  that pins `sumQuantitiesByProductIds`/`syncProductTotals`/`calculateTotalInventory` as **global**
+  (a product stocked at two sites yields the sum of both in `products.quantity`), plus a
+  `ProductStockStateWriter` caller-set pin in the style of `InventoryOperationsCallerSetTest`. Why:
+  F-6c-4 — this is the Row 4 resolution's enforcement, and the failure mode it guards is silent.
+  Test: the above, run against real Postgres with two sites.
+- **T-6c-16 — Boundary and documentation updates.** Changes: ArchUnit stays at its current 8 rules
+  unless a new edge appears (the v1 controllers depend only on `inventory.application`,
+  `shared.web` and `identity.domain` — all already-approved edges, so **expect no frozen-store
+  regeneration**; if one is demanded, that is a signal a DTO reached into another module's `api`,
+  i.e. F-6c-9); record the Row 4 resolution, the same-site transfer precondition and the new v1
+  routes in `docs/specs/spring-domain-modular-monolith.md` and
+  `docs/baseline/api-v1-map.md` (the doc the deprecation `Link` header already points at). Test:
+  `ArchitectureTest` stable across two independent clean rebuilds with a clean `git status` on
+  `archunit_store/`; doc link check.
+- **T-6c-17 — Capture the AC-8 "after" measurement and record the delta.** Changes: rerun T-6c-0's
+  harness against the v1 slim/batched path at equal catalog size. Why: AC-8, and 6e regresses
+  against these numbers rather than re-deriving them. Test: recorded rows/bytes/query counts for
+  full-catalog and known-ID cases, with the explicit note that the browser/realtime half of AC-8
+  remains 6e's.
+
+### Test plan summary
+
+New proof concentrated in five ITs against real Postgres (Testcontainers), following 5c/6b's proven
+pattern: tenant isolation (T-6c-1), concurrency on the same `(location, product)` (T-6c-6),
+atomicity through the v1 controller path (T-6c-12), idempotent replay (T-6c-10) and the migration/
+backfill pair (T-6c-3/T-6c-7). Authorization-matrix ITs extend the existing
+`*ControllerSecurityIT`/`RBACAlignmentIT` family rather than starting a new one. Keep green:
+`StockMovementOutboxAtomicityIT`, `AdjustToKafkaIT`, `InventoryOperationsCallerTransactionIT`,
+`InventoryOperationsSharedCallerPathIT`, `InventoryOperationsSiteIT`, `StockMovementSiteBackfillIT`,
+`StockMovementSiteMigrationIT`, `ArchitectureTest` (8 rules), `OpenApiContractExportTest`.
+Standing reminder (memory + `.specs/phase-5c-site-products/log.md:12-20`): plain `./mvnw test` skips
+every `*IT.java` — run it and `./mvnw test -Dtest='*IT'`.
+
+### Risks and open assumptions carried into 6c
+
+- A-6c-1: P-1's production state is unverified (Q-6c-1). Every 6c claim about scoped movement reads
+  is proven against Testcontainers fixtures only, exactly as 6b's backfill was.
+- A-6c-2: the Kafka topic's partition count was not established this pass (only the topic name, at
+  `infra/docker-compose.yml:150,199`); Q-6c-4's ordering risk assessment depends on it.
+- A-6c-3: `forecasting-service`'s dependence on global `products.quantity`/`is_active` is carried
+  forward from 6b's worksheet reading of `supabase_repo.py:148,180-193,644-645` and was not re-read
+  against the Python source this pass; no Java test covers that consumer, which is precisely why
+  T-6c-15 pins the Java side instead.
+- A-6c-4: F-6c-7's "consumers ignore unknown fields" reasons from Pydantic v2's documented default,
+  not from an executed test, until T-6c-9.
+- A-6c-5: carried forward unresolved — A-1 (`location_inventory.site_id`'s NOT NULL/FK/trigger in
+  Supabase itself), A-2/A-3 (empirical backfill counts and lock time at production volume), the
+  missing `V58` IT, and R-4 through R-8. R-9 is not a 6c blocker under F-6c-9's condition.
+
+## 6c implementation (T-6c-0..T-6c-3) (2026-09-11)
+
+Implements T-6c-0 through T-6c-3 from the task list above, in order (P-4/P-5 respected: baseline
+before the totals query changes, which hasn't happened yet either — T-6c-5 is still open;
+repository/facade work before any controller — no controller exists yet). Stopped at this clean
+boundary per the "stop when the remaining tasks are large" ground rule, with the rest of the task
+list (T-6c-4 through T-6c-17) precisely scoped and unstarted, not partially guessed at.
+
+- **T-6c-0 — AC-8 baseline measurement.** Added
+  `InventoryEgressBaselineIT` (extends `BaseKafkaIntegrationTest`, real Postgres — H2 was tried
+  first and rejected: `InventoryTotalsRepository.findAllInventoryTotals()`'s native query casts
+  `p.id` straight to `UUID`, which H2 returns as `byte[]` for a UUID column and throws
+  `ClassCastException` on, confirmed by an actual failed run before switching). Seeds a fixed,
+  deterministic catalog (25 products across 3 MAIN locations, every third product deliberately
+  zero-stock with no `LocationInventory` row at all, matching F-6c-3's zero-stock hazard) and
+  measures, via Hibernate `Statistics.getPrepareStatementCount()` (every JDBC statement, matching
+  `CatalogQueriesEgressIT`'s established reasoning over `getQueryExecutionCount()`) plus
+  `ObjectMapper.writeValueAsBytes()` for actual serialized response size:
+  - `GET /api/inventory/totals` (`InventoryQueries.findAllInventoryTotals()`): **1 statement, 25
+    rows, 9446 bytes** for the fixed 25-product catalog.
+  - `GET /api/inventory/by-product/{id}` (`InventoryAggregateService.getInventoryByProduct`, one
+    zero-stock product): **2 statements, 0 entry rows, 181 bytes**.
+  - `GET /api/audit-logs` page 0/size 20 (`AuditLogService.getAuditLogs`, no `StockMovement` rows
+    carry an `AuditLog` in this fixture — an honest data point, not a synthetic one): **1
+    statement, 0 rows, 317 bytes**.
+  - These are the numbers T-6c-17 diffs against once the slim/batched v1 path exists. Recorded
+    from an actual run, not assumed — see "Verification" below for the exact command.
+  - **Review-driven fix (P2 x3, 2026-09-11, superseding the three numbers above):** independent
+    review found (1) the fixture committed 25 products per test with no cleanup, so catalog size
+    depended on test order and the `>= PRODUCT_COUNT` assertion would hide accumulation across
+    runs; (2) `firstProductId` — used for the by-product baseline — is always the *first* seeded
+    product, and `i == 0` always hits the `i % 3 == 0` zero-stock branch, so that baseline measured
+    an empty response every run; (3) the audit-log baseline's fixture created no `AuditLog` rows at
+    all, so it also measured an empty page, and none of the three measurements captured AC-8's
+    "database rows"/"projected bytes" dimensions independently of the mapped API response — they
+    only measured response-DTO counts and serialized JSON bytes. Fixed, all in
+    `InventoryEgressBaselineIT`:
+    - Added `@AfterEach cleanup()` that deletes exactly the rows this fixture's own tracked ids
+      created (products, categories, locations, storage locations, location-inventory, stock
+      movements, the one audit log row) — not a blanket `deleteAll()` on any shared table, so this
+      IT never touches state left by other IT classes sharing the same JVM-wide Testcontainers
+      Postgres instance. The full-catalog assertion changed from `isGreaterThanOrEqualTo` to
+      `isEqualTo(PRODUCT_COUNT)`, further hardened by filtering both the API result and the raw SQL
+      (`WHERE p.id = ANY(?)`) to this run's own tracked product ids, so the exact-25 assertion holds
+      even if another class's residue is ever present in the shared container.
+    - Added a separate `stockedProductId` (the first product actually seeded with a
+      `LocationInventory`/`StockMovement` row, distinct from the deliberately-zero-stock
+      `firstProductId`) and renamed the test to `baseline_inventoryByProduct_stockedProduct`.
+    - The fixture now calls `auditLogService.createAuditLog(...)` once during setup to seed one
+      real `audit_logs` row, tracked by id and deleted in cleanup.
+    - Added a `measureDbEgress` helper: a raw `JdbcTemplate` pass over the same query the
+      production code runs (the totals query's SQL duplicated verbatim for an independent
+      measurement; `SELECT * FROM location_inventory WHERE product_id = ?` for by-product;
+      `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 20 OFFSET 0` for the audit page),
+      summing a per-column-value byte-length estimate per row (UUID=16, boolean=1, numeric=8,
+      strings/other=UTF-8 byte length, null=1) — an explicit label estimate per AC-8's own
+      allowance, kept in a separate `dbRowCount`/`projectedDbBytesEstimate` field from
+      `apiRowCount`/`apiBytes` so the two are never conflated again.
+  - **Corrected numbers from the fixed, re-run test** (see "Verification" below):
+    - `GET /api/inventory/totals`, full 25-product catalog: **1 statement, apiRows=25,
+      apiBytes=9447, dbRows=25, projectedDbBytesEstimate=4080**.
+    - `GET /api/inventory/by-product/{id}`, one stocked product: **2 statements, apiRows=1,
+      apiBytes=523, dbRows=1, projectedDbBytesEstimate=124**.
+    - `GET /api/audit-logs` page 0/size 20, one seeded audit row: **1 statement, apiRows=1,
+      apiBytes=825, dbRows=1, projectedDbBytesEstimate=198**.
+    - These superseded numbers, not the original three, are what T-6c-17 must diff against.
+  - **Review-driven fix round 2 (P2 x2 + P3, 2026-09-12, superseding the numbers immediately
+    above):** independent review found (1) the totals measurement's post-fetch application-side
+    filter (`.filter(t -> createdProductIds.contains(...))`) and the JDBC side's in-SQL filter
+    (`WHERE p.id = ANY(?)`) measure two different workloads whenever any other fixture's rows are
+    also present in the shared Testcontainers Postgres instance — the real production query
+    (`InventoryQueries.findAllInventoryTotals()`) has no id filter at all, so its actual executed
+    cost scales with the whole table, not with this fixture's 25 rows; filtering the *response*
+    down to 25 afterward doesn't change what the database actually did; (2) the by-product DB-egress
+    measurement only queried `location_inventory`, undercounting the real read — `
+    InventoryAggregateService.getInventoryByProduct` also fetches the product row (`CatalogQueries
+    .getById` -> a second, distinct SQL statement) and `LocationInventoryRepository
+    .findByProduct_Id`'s own query is a `JOIN FETCH` across `location_inventory`, `locations` and
+    `storage_locations`, not `location_inventory` alone; one P3, the raw `Connection`/`java.sql
+    .Array` acquired to build the `WHERE p.id = ANY(?)` bind parameter was never closed/freed. Fixed,
+    all in `InventoryEgressBaselineIT`:
+    - Replaced the tracked-id filtering approach with `clearCatalogTables()` — `deleteAllInBatch()`
+      on `stock_movements`, `location_inventory`, `products`, `categories` (FK-safe, children
+      before parents) — called in both `@BeforeEach` (before seeding, so every test starts from a
+      genuinely empty catalog regardless of what ran before it in the shared container) and
+      `@AfterEach` (leaving the DB clean for whatever runs after). Locations/storage
+      locations/the seeded audit log stay on the existing targeted, tracked-id cleanup — they
+      aren't part of the totals query's join and don't need blanket clearing. With the catalog
+      genuinely isolated, the totals test now calls `inventoryQueries.findAllInventoryTotals()`
+      unfiltered and runs its SQL counterpart unfiltered too — both sides measure the exact same,
+      real workload, and the `WHERE p.id = ANY(?)`/raw-`Connection`/`Array` code path is gone
+      entirely (removing the P3 leak by removing the code that caused it, not by adding a
+      `finally`).
+    - `measureDbEgress` now takes a `List<DbQuery>` (a new `record DbQuery(String sql, Object...
+      args)`) and sums rows/bytes across every statement a production call actually issues, instead
+      of one hardcoded query. The by-product test now supplies both `SELECT * FROM products WHERE
+      id = ?` and the three-table join `location_inventory JOIN locations JOIN storage_locations`
+      query, matching the real two-statement read and asserting `statementCount() == 2L` (tightened
+      from `isGreaterThan(0L)` now that the exact count is known and stable).
+  - **Corrected numbers from the round-2 fix, re-run test** (superseding the "corrected numbers"
+    block above; see "Review-driven fix round 2" verification below):
+    - `GET /api/inventory/totals`, full 25-product catalog (now genuinely the entire `products`
+      table, not a filtered subset): **1 statement, apiRows=25, apiBytes=9445, dbRows=25,
+      projectedDbBytesEstimate=4078**.
+    - `GET /api/inventory/by-product/{id}`, one stocked product, now covering both the product
+      fetch and the location_inventory/locations/storage_locations join: **2 statements, apiRows=1,
+      apiBytes=523, dbRows=2, projectedDbBytesEstimate=595**.
+    - `GET /api/audit-logs` page 0/size 20, one seeded audit row (unchanged by this round): **1
+      statement, apiRows=1, apiBytes=825, dbRows=1, projectedDbBytesEstimate=198**.
+    - These are the numbers T-6c-17 must diff against; the round-1 "corrected numbers" block above
+      is now superseded in turn.
+- **T-6c-1 — Site-qualified repository methods, no callers yet.** Added to
+  `LocationInventoryRepository`: `findByIdAndSite_Id`, `findByLocation_IdAndProduct_IdAndSite_Id`,
+  `findAllByIdInAndSite_IdWithGraph` (same eager-loaded graph as `findAllByIdWithGraph`, foreign-
+  site ids silently excluded from the batch result — callers must check returned size against
+  requested count), `findByLocation_IdAndSite_Id` (same child/CUSTOM-kuji exclusion filter as the
+  un-scoped `findByLocation_Id`), `sumQuantitiesByProductIdsAndSiteId`. Added to
+  `StockMovementRepository`: `findByItem_IdAndSite_IdOrderByAtDesc` (paginated). Added
+  `StockMovementSpecifications.withSiteFilter(filters, siteId)`, composing the existing
+  `withFilters` with a mandatory site predicate — implemented as an explicit `LEFT JOIN` on `site`
+  (not implicit path navigation via `root.get("site")`, which would silently inner-join and drop
+  null-site rows) so a movement with `site IS NULL` still matches, per the resolved Q-6c-5
+  decision ("include and label", not "filter out", during the pre-backfill compatibility window).
+  Every existing un-scoped method is untouched (F-6c-4's constraint against accidentally scoping
+  the global sum).
+  - Test: `LocationInventorySiteScopedQueriesIT` (H2 `test` profile — none of these queries are
+    native/Postgres-specific, matching the reasoning already recorded for
+    `InventoryOperationsSiteIT` choosing H2 over Testcontainers) — 7 cases, seeding the same
+    `(location, product)` shape at MAIN and SECOND: each new method returns only its own site's
+    rows, `Optional.empty()`/an empty list for a foreign-site id, and `withSiteFilter` matches its
+    own site plus null-site rows while excluding the foreign site's row. 7/7 pass.
+- **T-6c-2 — Site-scoped facade overloads on `InventoryQueries`/`InventoryOperations`.** Added to
+  `InventoryQueries`: `findInventoryBySite(siteId, inventoryId)`,
+  `findInventoryBySite(siteId, locationId, productId)` (both throw
+  `InventoryNotFoundException` on a foreign-site/missing row, matching
+  `LocationService.getLocationById(siteId, id)`'s -> 404 shape per
+  multi-site-data-and-api.md:63-64, not an authorization error — the site boundary itself belongs
+  to the trusted `AuthorizedSiteContext` at the controller, not here), `findByLocationIdAndSite`,
+  `sumQuantityByProductIdAndSite`, `sumQuantitiesByProductIdsAndSite`, `findMovementHistoryBySite`,
+  `findAuditLogPageBySite` (composes `withSiteFilter`). Added to `InventoryOperations`:
+  `findInventory(siteId, locationId, productId)` — read-only; the site-scoped *write* path
+  (adjust/transfer with row locking and the same-site transfer precondition) is deliberately left
+  to T-6c-6/T-6c-12 rather than duplicated here ahead of the locking design F-6c-5 specifies.
+  Existing global methods on both facades are unchanged, so no 6a caller is disturbed.
+  - Test: `InventoryQueriesSiteScopedTest` (new, Mockito unit test, 7 cases) proves the 404 mapping
+    and that the site id reaches the underlying site-qualified repository method unchanged.
+    `InventoryOperationsTest` extended with 2 cases for the new `findInventory` overload. The
+    repository-level tenant-isolation proof (a foreign-site id genuinely returning nothing at the
+    database) stays at T-6c-1's IT, per the task list's own split between unit-level facade proof
+    and IT-level repository proof. 7/7 and 12/12 (whole class) pass respectively.
+- **T-6c-3 — `stock_movements` site index migration (`V62`).** Added
+  `V62__stock_movements_site_indexes.sql` (+ paired `.conf`, `executeInTransaction=false`,
+  matching `V58`'s precedent): `idx_stock_movements_site_at(site_id, at DESC)` and
+  `idx_stock_movements_site_item_at(site_id, item_id, at DESC)`, split out of what the 6b
+  worksheet originally scoped as part of `V61` per P-2 — only the index half is rollback-safe at
+  any point; `V61`'s `SET NOT NULL` + FK stays the separate gated PR/record it already was.
+  - Test: `StockMovementSiteIndexMigrationIT` (new, Testcontainers Postgres, executing the real
+    `V59` then `V62` `.sql` text verbatim — Flyway never runs these files at runtime per F-1).
+    Asserts both indexes exist with the documented column order via `pg_indexes`, and — the "index
+    cosmetically present but unusable" guard the task explicitly calls for — that
+    `EXPLAIN` on the scoped-history query shape (`site_id = ? AND item_id = ? ORDER BY at DESC`)
+    actually plans through `idx_stock_movements_site_item_at`, using `SET enable_seqscan = off`
+    around the `EXPLAIN` since the ~500 seeded rows are not by themselves enough for a real
+    planner to prefer an index scan over a sequential scan at that size — a measurement technique
+    note, not a claim about production planner behavior. 2/2 pass.
+
+### Verification (T-6c-0..T-6c-3, actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java` by design) —
+  exit 0.
+- New/changed classes run individually, all green:
+  - `./mvnw -q test -Dtest='InventoryEgressBaselineIT'` — 3/3 pass (baseline numbers above logged
+    at INFO and copied from this run's actual output).
+  - `./mvnw -q test -Dtest='LocationInventorySiteScopedQueriesIT'` — 7/7 pass.
+  - `./mvnw -q test -Dtest='InventoryQueriesSiteScopedTest,InventoryOperationsTest'` — 7/7 and
+    12/12 pass.
+  - `./mvnw -q test -Dtest='StockMovementSiteIndexMigrationIT'` — 2/2 pass.
+- `./mvnw -q clean test -Dtest='*IT'` — **8 failures**, all in `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT`, proven pre-existing and order-dependent, not a 6c regression —
+  see the "Current handoff" entry above for the full reproduction (a throwaway no-op `*IT` class
+  alone reproduces the identical 8 failures; excluding just those two classes gives a clean sweep):
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` —
+  exit 0.
+- `./mvnw -q -Dtest=ArchitectureTest test` (after an independent clean `test-compile`) — 8/8 pass,
+  `git status --porcelain` on `archunit_store/` shows no diff — **zero frozen-store regeneration
+  needed**, matching P-5's prediction that repository/facade-only changes add no new cross-module
+  edge.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched this pass
+  (no endpoint changed; T-6c-1/T-6c-2/T-6c-3 are repository/facade/migration-only, T-6c-11/T-6c-12
+  are the first tasks that add routes). `OpenApiContractExportTest` not re-run for this reason —
+  nothing for it to prove yet.
+
+### Review-driven fix: T-6c-0 baseline P2 findings (2026-09-11)
+
+Independent review of T-6c-0 returned three P2s (fixture isolation/exact-count assertion, two
+measurements over empty data, database-egress dimensions missing) — see the corrected task entry
+above for the full description and the fixed `InventoryEgressBaselineIT`. No production-code
+finding in the scoped repository/facade methods (T-6c-1/T-6c-2) or the `V62` migration (T-6c-3).
+
+- Verified independently, in order:
+  - `./mvnw -q -Dtest=InventoryEgressBaselineIT test-compile` — clean.
+  - `./mvnw -q -Dtest=InventoryEgressBaselineIT test` — 3/3 pass. Corrected numbers logged at INFO
+    and copied above, superseding the original three.
+  - `./mvnw -q -Dtest=InventoryQueriesSiteScopedTest,InventoryOperationsTest,
+    LocationInventorySiteScopedQueriesIT,StockMovementSiteIndexMigrationIT,
+    InventoryEgressBaselineIT,ArchitectureTest test` — 39/39 pass (matching the reviewer's own
+    re-run count exactly).
+  - `git diff --check` — clean; `git status --porcelain` on `archunit_store/` — no diff.
+  - `./mvnw -q clean test-compile` — clean.
+  - `./mvnw -q clean test` (full unrestricted suite, plain `test`) — all 60 surefire reports show
+    `Failures: 0, Errors: 0` (558 tests summed across every report).
+  - `./mvnw -q test -Dtest='*IT'` — Maven exits 1 (`MojoFailureException`), but every `*IT.txt`
+    surefire report shows `Failures: 0, Errors: 0` across all 558 tests; the only anomaly is
+    `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` reporting `Tests run: 0` each —
+    the exact pre-existing "some `@Nested`-only classes report zero tests under this invocation
+    pattern" quirk already recorded at 6a's T-6 section and re-confirmed (not newly discovered) by
+    this session, unrelated to this fix. Not a regression from the `InventoryEgressBaselineIT`
+    changes: neither class was touched, and the same two classes/same symptom were already flagged
+    before this fix existed.
+- Result: pass. All three P2s fixed same session; no files staged/committed (per this record's
+  "no production apply, implementation/local verification only" rule — the tree is left for
+  review).
+
+### Review-driven fix round 2: T-6c-0 baseline P2/P3 findings (2026-09-12)
+
+Independent review of the round-1 fix returned two more P2s (by-product DB egress undercounted;
+totals filtering measured a different workload than the real production query) and one P3 (leaked
+JDBC connection/unfreed `Array`) — see the corrected task entry above for the full description and
+the fixed `InventoryEgressBaselineIT`. The empty-response P2 from round 1 was confirmed fixed. No
+production-code finding.
+
+- Verified independently, in order:
+  - `./mvnw -q -Dtest=InventoryEgressBaselineIT test-compile` — clean.
+  - `./mvnw -q clean test-compile` — clean (a stale-classpath `NoClassDefFoundError:
+    InventoryQueries` on the first single-class run turned out to be a partial-compile artifact,
+    not a real error — a full `clean test-compile` resolved it and the class runs fine).
+  - `./mvnw -q -Dtest=InventoryEgressBaselineIT test` — 3/3 pass. Corrected numbers logged at INFO
+    and copied above, superseding round 1's numbers.
+  - `./mvnw -q -Dtest=InventoryQueriesSiteScopedTest,InventoryOperationsTest,
+    LocationInventorySiteScopedQueriesIT,StockMovementSiteIndexMigrationIT,
+    InventoryEgressBaselineIT,ArchitectureTest test` — 39/39 pass.
+  - `git diff --check` — clean; `git status --porcelain` on `archunit_store/` — no diff.
+  - `./mvnw -q clean test` (full unrestricted suite, plain `test`) — all 61 surefire reports show
+    `Failures: 0, Errors: 0` (341 tests summed across every report).
+  - `./mvnw -q test -Dtest='*IT'` — exit 0 this run (unlike round 1's `MojoFailureException`); every
+    `*IT.txt` surefire report shows `Failures: 0, Errors: 0` across all 558 tests.
+    `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` still report `Tests run: 0` each
+    — the same pre-existing quirk, evidently order/timing-sensitive as to whether it trips Maven's
+    `MojoFailureException` on a given run, but never a real test failure in either run. Confirms
+    round 1's read: not a regression from this fix, still open debt outside `inventory`'s boundary.
+- Result: pass. Both P2s and the P3 fixed same session; no files staged/committed.
+
+### Open items carried forward from this pass
+
+- The `*IT` suite order-fragility above (`AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` vs. H2-incompatible native SQL in `AnalyticsService`/
+  `ForecastService`) is new-found debt, recorded but not fixed — out of `inventory`'s module
+  boundary and out of 6c's scope. Any future session adding `*IT` classes to this module should
+  expect to see it and know it is not their regression.
+- T-6c-4 through T-6c-17 are unstarted. T-6c-4 (same-site transfer preconditions) and T-6c-5
+  (slim site-scoped totals projection, now unblocked by T-6c-0) are both valid next tasks per the
+  task list's stated ordering; T-6c-6 (row locking) is a prerequisite for the site-scoped
+  *write* overloads on `InventoryOperations` this pass deliberately deferred.
+
+## 6c implementation (T-6c-4..T-6c-5) (2026-09-12)
+
+Implements T-6c-4 and T-6c-5 from the task list above. Stopped at this clean boundary per the
+"stop when the remaining tasks are large" ground rule; T-6c-6 (row locking) is the next task per
+P-5's ordering but was not started this pass, deliberately, since it is a real design task
+(`FOR UPDATE`/outer-join hazard, id-ordered lock query) rather than a small follow-on to either
+task done here.
+
+- **T-6c-4 — Same-site preconditions on existing multi-location writes.**
+  `StockMovementService.executeTransfer` (shared by `transferInventory` and
+  `batchTransferInventory`) now calls a new `requireSameSite(Site, Site)` helper immediately after
+  resolving the destination — for the `destinationInventoryId` branch, right after the
+  `findById`; for the `destinationLocationId` branch, right after resolving `destLocation` and
+  *before* the find-or-create call that would otherwise persist a new, orphaned destination
+  `LocationInventory` row for a transfer that is about to be rejected. Throws the existing
+  `InvalidInventoryOperationException` (already mapped to 400 by `GlobalExceptionHandler`, so no
+  new exception type or handler wiring was needed) with a message naming both site codes. Every
+  line of a batch transfer is checked independently (each call to `executeTransfer` inside
+  `batchTransferInventory`'s loop resolves and checks its own source/destination pair), and the
+  whole method is `@Transactional`, so a rejection on any line rolls back every line already
+  applied earlier in the same batch — no new transactional wiring needed, this was already true of
+  the existing `@Transactional` boundary.
+  - `MachineDisplayService.batchSwapDisplay`'s machine-to-machine mode (Mode 2, `targetMachineId`/
+    `targetLocationType`) gains the same precondition, checked at the very top of the method —
+    before Mode 1's display removals/additions, before any `MachineDisplay`/`AuditLog`/
+    `StockMovement` write, and before any notification is enqueued — via a new
+    `requireSameSite(UUID, UUID)` helper that resolves both machines' sites through the existing
+    `resolveMachineSite` and compares site ids. This was flagged as advisory debt by 6b's review
+    (log.md's 6b "Review-driven fix" section, "a same-site precondition on `MachineDisplayService`'s
+    cross-site swap path") and is now due.
+  - **Existing test needed a compatible fixture change, not just new tests.**
+    `MachineDisplayServiceNotificationTest`'s `setUp()` deliberately wires `loc` (MAIN) and
+    `targetLoc` (SECOND) to distinct sites (6b's review fix, to prove `resolveMachineSite` picks
+    each movement's own destination site rather than always the source's). That fixture was reused
+    by `batchSwapDisplay_machineToMachine_emitsTwoMachineSnapshots` to exercise a *successful*
+    cross-site swap — which T-6c-4 makes impossible. Fixed by adding a third, MAIN-site machine
+    (`sameSiteTargetMachineId`/`sameSiteTargetLoc`) for that test's "successful swap" scenario
+    (updated site assertions from SECOND/MAIN to MAIN/MAIN, with a comment recording that the
+    distinct-site regression this test used to catch can no longer manifest once cross-site swaps
+    are rejected), and adding a new test,
+    `batchSwapDisplay_crossSiteTargetMachine_rejectsBeforeAnyMutation`, that reuses the original
+    MAIN/SECOND `targetLoc` fixture to prove the rejection and assert zero mutation (`saveAll`/
+    `save`/`createAuditLog`/`saveMovements`/`createNotification` all `never()` called).
+  - Tests: new `StockMovementServiceSameSiteTransferTest` (Mockito unit test, 4 cases) —
+    `transferInventory` rejects a cross-site pair for both destination shapes (existing
+    `destinationInventoryId`, and a new `destinationLocationId` with no existing row, asserting no
+    orphan row is created via `verify(locationInventoryRepository, never())
+    .findByLocation_IdAndProduct_Id(...)`), a same-site `transferInventory` still succeeds, and
+    `batchTransferInventory` rejects the whole batch when any one line is cross-site. Extended
+    `MachineDisplayServiceNotificationTest` as described above (7 cases total, was 6).
+- **T-6c-5 — Slim, site-scoped, batched totals projection.** Added to `InventoryTotalsRepository`:
+  `findAllInventoryTotalsBySite(UUID siteId)` (full-catalog mode) and
+  `findInventoryTotalsBySiteAndProductIds(UUID siteId, Collection<UUID> productIds)` (batched
+  mode), both returning the new slim `inventory.api.SiteInventoryTotalDTO`
+  (`productId`/`totalQuantity`/`lastUpdatedAt` — no catalog fields, per F-6c-9). Both are JPQL via
+  `EntityManager.createQuery`, not native SQL — deliberately different from
+  `INVENTORY_TOTALS_SQL`/`STOCK_TOTALS_SQL` above them, which are untouched and stay the AC-8
+  baseline's measured path. JPQL was chosen specifically to reuse Hibernate's own UUID/collection
+  parameter binding (`setParameter("productIds", collection)` for the `IN` clause) rather than
+  hand-rolling native-SQL array binding, and it sidesteps T-6c-0's H2-UUID-cast problem entirely
+  (JPQL, unlike a native query casting a raw column to `UUID`, lets Hibernate map the type) — the
+  new IT below runs on the H2 `test` profile, not Testcontainers.
+  - **Two deliberately different, explicitly documented zero-stock contracts** (F-6c-3's hazard,
+    resolved as two separate, tested choices rather than one blanket rule):
+    - Full-catalog mode: `FROM Product p LEFT JOIN LocationInventory li ON li.product = p AND
+      li.site.id = :siteId GROUP BY p.id` — the site predicate lives in the `ON` clause, not a
+      `WHERE` filter, so every product in the catalog gets exactly one row, `totalQuantity = 0`
+      and `lastUpdatedAt = null` when it has no inventory at that site. Mirrors the legacy
+      `INVENTORY_TOTALS_SQL`'s row-per-product guarantee, scoped by site.
+    - Batched mode: `FROM LocationInventory li WHERE li.product.id IN :productIds AND li.site.id =
+      :siteId GROUP BY li.product.id` — a requested id with no matching row is simply absent from
+      the result. This reuses the contract T-6c-1 already established (undocumented as a
+      deliberate "choice" at the time, but already the de facto behavior) for
+      `LocationInventoryRepository.sumQuantitiesByProductIdsAndSiteId`'s Javadoc ("Missing products
+      … mean total = 0 — callers must treat absence as zero, not as 'not found'"). Chosen over
+      duplicating the full-catalog mode's LEFT JOIN shape because the batched mode's caller already
+      knows every id is a real product (a targeted refresh of known ids, AC-7), not discovering the
+      catalog, so the row-per-id guarantee has no value there and would only add a second `WHERE`
+      variant that returns a different row for zero-stock than one-line-away callers might expect
+      from the other mode — kept them visibly different in both code and doc instead.
+  - **Documented, enforced batch ceiling (AC-7's "real ceiling").**
+    `InventoryTotalsRepository.MAX_PRODUCT_IDS_BATCH_SIZE = 500` (a public constant, referenced by
+    both the repository's own guard and `InventoryQueries`'s Javadoc). A batch over the limit
+    throws `InvalidInventoryOperationException` (→ 400, no new handler wiring, same reasoning as
+    T-6c-4) before the query runs. 500 was chosen as generously above any realistic coalesced-
+    refresh batch (6e's targeted-refresh work is what will actually call this in bulk) while still
+    meaningfully rejecting a full-catalog-sized id list sent through the wrong (batched) mode
+    instead of the full-catalog method. A null or empty `productIds` returns an empty list rather
+    than throwing or falling back to the full-catalog query — callers that want "all products" call
+    the other method explicitly; this method never silently does a full-catalog read.
+  - `InventoryQueries` gained two thin pass-through overloads,
+    `findInventoryTotalsBySite(UUID siteId)` and `findInventoryTotalsBySite(UUID siteId,
+    Collection<UUID> productIds)`, matching T-6c-2's facade-overload convention. No controller
+    calls either yet (T-6c-11 is that task); `INVENTORY_TOTALS_SQL`'s existing
+    `findAllInventoryTotals()` facade method is untouched.
+  - Tests:
+    - New `InventoryTotalsRepositorySiteScopedIT` (`@SpringBootTest`, H2 `test` profile — 6
+      cases), covering exactly the task's four required cases plus two extra boundary cases: (a)
+      a zero-stock product still appears with quantity 0 in the full-catalog mode; (b) the same
+      product at MAIN and SECOND resolves to independent quantities; (c) the batched form returns
+      exactly the requested ids (and separately confirms an id with no site inventory is *absent*,
+      documenting the batched-mode contract explicitly rather than leaving it implicit); (d) a
+      batch of `MAX_PRODUCT_IDS_BATCH_SIZE + 1` random ids is rejected with
+      `InvalidInventoryOperationException` naming the limit in its message; plus a batch of
+      exactly `MAX_PRODUCT_IDS_BATCH_SIZE` ids is accepted (boundary-inclusive), and
+      null/empty `productIds` both return an empty list without throwing.
+    - Extended `InventoryQueriesSiteScopedTest` with 2 cases proving both new facade methods pass
+      the site id (and, for the batched overload, the id collection) through to the repository
+      unchanged.
+
+### Verification (T-6c-4..T-6c-5, actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors.
+- New/changed classes run individually, all green:
+  - `./mvnw -q -Dtest='StockMovementServiceSameSiteTransferTest,MachineDisplayServiceNotificationTest,
+    StockMovementServiceActiveStatusDerivationTest' test` — 4/4, 7/7 (was 6, +1 new rejection
+    test), 8/8 pass respectively.
+  - `./mvnw -q -Dtest='InventoryQueriesSiteScopedTest,InventoryTotalsRepositorySiteScopedIT,
+    StockMovementServiceSameSiteTransferTest,MachineDisplayServiceNotificationTest' test` — 9/9
+    (was 7, +2 new pass-through tests), 6/6, 4/4, 7/7 pass.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java` by design) —
+  exit 0; summed across every surefire report: **348 tests, 0 failures, 0 errors**.
+- `./mvnw -q test -Dtest='*IT'` — Maven exits with `MojoFailureException`, **8 failures**, all in
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` (409 tests total, 8 failures, 0
+  errors) — the exact pre-existing, order-fragile, out-of-`inventory`'s-boundary debt already
+  recorded in this log's "Current handoff" and T-6c-0's verification section, reproduced again
+  here without any new inventory-related failure. Confirmed not a regression from this pass:
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` —
+  exit 0.
+- `./mvnw -q clean test-compile` then `./mvnw -q -Dtest=ArchitectureTest test` — 8/8 pass (still 8
+  rules, unchanged from T-6c-0..T-6c-3), `git status --porcelain` on `archunit_store/` — no diff.
+  Matches the expectation that repository/facade-only changes referencing entities `inventory`
+  already depends on (`catalog.domain.Product`, already imported by `StockMovementService`) add no
+  new cross-module edge.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched this pass
+  (no endpoint changed; T-6c-4 is service-layer-only, T-6c-5 is repository/facade-only).
+  `OpenApiContractExportTest` not re-run for this reason — nothing for it to prove yet. T-6c-11/
+  T-6c-12 are the first tasks that add routes and will trigger regeneration.
+
+### Review-driven fix: T-6c-4 findings (2026-09-12)
+
+Independent review of T-6c-4 returned one P1 and one P2. No finding in T-6c-5.
+
+- **P1 — the swap guard could be bypassed with a foreign display id.**
+  `MachineDisplayService.batchSwapDisplay`'s `requireSameSite` check only compares the two
+  *requested machine ids* — it says nothing about which machine a *display id* the caller supplies
+  in `displayIdsFromTarget`/`displayIdsToTarget` actually belongs to, because
+  `findAllByIdInWithProduct` looks displays up globally by id with no site or machine filter.
+  Naming two same-site (e.g. both MAIN) machines while supplying a foreign-site display's id passed
+  the guard, then ended that foreign display and recreated it at the (wrong) requested machine —
+  the guard checked the right thing about the wrong pair of ids. Fixed: after the existing
+  "already ended" check in both loops (around `fromDisplays`/`toDisplays`), added a check that each
+  display's actual `machineId`/`locationType` matches the machine the caller claims it's moving
+  from — `displayIdsFromTarget` entries must belong to `targetMachineId`/`targetLocationType`,
+  `displayIdsToTarget` entries must belong to `machineId`/`locationType` — throwing
+  `IllegalArgumentException("Display does not belong to target/source machine: " + id)` before any
+  mutation, matching this method's existing validation style ("Display not found"/"Display is
+  already ended"). This is a general ownership-mismatch fix, not a site-specific patch — it closes
+  the bypass regardless of whether the foreign display happens to be same-site or cross-site,
+  which is what actually makes `requireSameSite`'s machine-level check meaningful again (the
+  displays being moved are now guaranteed to really belong to the named machines).
+- **P2 — the required machine-swap IT was missing.** T-6c-4's own task list explicitly calls for
+  "one IT covering the machine swap path" (log.md's 6c planning section), but only
+  `MachineDisplayServiceNotificationTest` (Mockito, no persistence) existed. Added
+  `MachineDisplayServiceCrossSiteSwapIT` (`@SpringBootTest(webEnvironment = NONE)
+  @ActiveProfiles("test")`, real H2-backed beans — no native SQL is involved in this path, matching
+  `InventoryOperationsSiteIT`'s reasoning for not needing Testcontainers Postgres): seeds a real
+  MAIN/MAIN/SECOND three-machine fixture and a display persisted at the SECOND machine, attempts
+  the exact bypass (`machineId`/`targetMachineId` both MAIN, `displayIdsFromTarget` naming the
+  SECOND-site display), asserts the call throws the new `IllegalArgumentException`, and asserts
+  *nothing changed*: the display is reloaded from the repository with `endedAt` still null and its
+  original `machineId`; no display was created at either MAIN machine
+  (`findActiveByLocationTypeAndMachineId`); and `StockMovementRepository`/`AuditLogRepository`/
+  `NotificationRepository` counts are all unchanged before/after — closing the "unchanged displays,
+  movements, audit records, and notifications" proof the finding asked for. 1/1 pass.
+- Verified independently, in order:
+  - `./mvnw -q clean test-compile` — clean.
+  - `./mvnw -q -Dtest=MachineDisplayServiceCrossSiteSwapIT test` — 1/1 pass.
+  - `./mvnw -q -Dtest=StockMovementServiceSameSiteTransferTest,MachineDisplayServiceNotificationTest,
+    MachineDisplayServiceCrossSiteSwapIT,MachineDisplayServiceBatchQueryGuardTest,
+    InventoryTotalsRepositorySiteScopedIT,InventoryQueriesSiteScopedTest,ArchitectureTest test` —
+    39/39 pass (4, 7, 1, 4, 6, 9, 8).
+  - `git diff --check` — clean; `git status --porcelain` on `archunit_store/` — no diff.
+  - `./mvnw -q clean test-compile` then `./mvnw -q clean test` (full unrestricted suite, plain
+    `test`) — all 61 surefire reports show `Failures: 0, Errors: 0` (348 tests summed).
+  - `./mvnw -q test -Dtest='*IT'` — exit 0, all 572 tests across every `*IT.txt` report show
+    `Failures: 0, Errors: 0`. `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` still
+    report `Tests run: 0` each — the same pre-existing, order/timing-sensitive quirk already
+    recorded (sometimes trips `MojoFailureException`, sometimes doesn't; never a real failure in
+    any run so far), unrelated to this fix.
+- Result: pass. Both findings fixed same session; no files staged/committed.
+
+### Review-driven fix round 2: T-6c-4 P1 recurrence (2026-09-12)
+
+Independent review of the round-1 fix reproduced the identical bug class in a path round 1 didn't
+touch: `displayIdsToRemove` (`batchSwapDisplay`'s Mode 1) still loaded removal displays globally
+via `findAllByIdInWithProduct` with no check against `request.getMachineId()`/`locationType` —
+naming only MAIN machines while supplying a foreign-site display id in `displayIdsToRemove` ended
+and attributed the change to MAIN. Unlike the round-1 paths, `displayIdsToRemove` has no
+`requireSameSite` guard to even partially rely on, since removal-only requests never populate
+`targetMachineId` — the per-display ownership check is the *only* guard for this branch. Fixed the
+same way as round 1 (ownership check before mutation, `IllegalArgumentException` before any
+write).
+
+Given the same bug had now appeared in two independent places sharing one root cause (a display id
+looked up globally, then mutated on the strength of a caller-claimed machine, with no check that
+the two agree), swept every other `machineDisplayRepository.findById*`/`findAllByIdIn*` call site
+in the class before it could recur a third time via review. Found and fixed two more instances
+proactively, same session, same fix shape:
+- `renewDisplays` — `existing` (found by id via `findByIdWithProduct`) was ended and a replacement
+  created at `request.getMachineId()` with no check that `existing` actually lived there.
+- `swapDisplay` — `outgoing` (found by id via `findByIdWithProduct`) was ended with no check that
+  it actually lived at `request.getMachineId()`/`locationType` before a new display was created
+  there.
+
+Checked `batchClearDisplays` and confirmed it does NOT have this bug: it derives the expected
+machine from the displays themselves (`first.getMachineId()`/`first.getLocationType()`, checked
+against every other display in the batch) rather than accepting a separately claimed machine id
+from the caller — there is no caller-supplied "expected machine" for a mismatch to slip past, so no
+fix was needed there.
+
+- Extended `MachineDisplayServiceCrossSiteSwapIT` (renamed test methods from the original
+  single-test file to one-per-bypass-path) to 5 cases: the two round-1 paths
+  (`displayIdsFromTarget`/`displayIdsToTarget`, both now asserted explicitly rather than only one),
+  plus new cases for `displayIdsToRemove`, `renewDisplays`, and `swapDisplay` — each seeding a
+  foreign-site display, attempting the exact bypass, and asserting rejection plus zero side effects
+  (display unchanged, no display created at the target machine, stock movement/audit log/
+  notification counts unchanged). Refactored the fixture into a shared `Fixture` record/
+  `newFixture()`/`saveDisplay()` helpers to support five cases without duplication.
+- Verified independently, in order:
+  - `./mvnw -q clean test-compile` — clean.
+  - `./mvnw -q -Dtest=MachineDisplayServiceCrossSiteSwapIT test` — 5/5 pass (was 1).
+  - `./mvnw -q -Dtest=StockMovementServiceSameSiteTransferTest,MachineDisplayServiceNotificationTest,
+    MachineDisplayServiceCrossSiteSwapIT,MachineDisplayServiceBatchQueryGuardTest,
+    InventoryTotalsRepositorySiteScopedIT,InventoryQueriesSiteScopedTest,ArchitectureTest test` —
+    43/43 pass (4, 7, 5, 4, 6, 9, 8).
+  - `git diff --check` — clean; `git status --porcelain` on `archunit_store/` — no diff.
+  - `./mvnw -q clean test-compile` then `./mvnw -q clean test` (full unrestricted suite, plain
+    `test`) — all 61 surefire reports show `Failures: 0, Errors: 0` (348 tests summed; unchanged
+    from round 1 since `MachineDisplayServiceCrossSiteSwapIT` is an `*IT` class, excluded from
+    plain `test` by design).
+  - `./mvnw -q test -Dtest='*IT'` — exit 0, all 576 tests across every `*IT.txt` report show
+    `Failures: 0, Errors: 0` (up from 572, the four new `MachineDisplayServiceCrossSiteSwapIT`
+    cases). `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` still report `Tests run:
+    0` each — the same pre-existing quirk, still unrelated.
+- Result: pass. The reproduced finding and both proactively-found instances fixed same session; no
+  files staged/committed.
+
+## 6c implementation (T-6c-6) (2026-09-12)
+
+Implements T-6c-6 from the task list above: row locking on the read-modify-write paths, per
+F-6c-5's recommendation. No routes changed; repository/service-layer only, so no contract
+regeneration.
+
+- **Repository (`LocationInventoryRepository`).** Added three new methods, all scoped to "row
+  locking" and documented as a group:
+  - `lockAllByIdForUpdate(Collection<UUID> ids)` — `@Lock(LockModeType.PESSIMISTIC_WRITE)` on
+    `SELECT li FROM LocationInventory li WHERE li.id IN :ids ORDER BY li.id`. Deliberately a plain
+    query with no `JOIN FETCH` at all (not even `findByLocation_IdAndProduct_Id`'s inner joins) —
+    the simplest query that cannot ever hit F-6c-5's `FOR UPDATE`-on-outer-join hazard, and the
+    smallest possible SQL surface for a query whose only job is acquiring locks in a specific
+    order. The `ORDER BY li.id` (combined with callers always sorting their input ids ascending
+    first) is what prevents deadlock: two overlapping writers that need the same set of rows will
+    always request their locks in the same relative order, so neither can hold what the other
+    waits for.
+  - `findProductIdById(UUID id)` / `findIdByLocation_IdAndProduct_Id(UUID locationId, UUID
+    productId)` — scalar-only projections (`Optional<UUID>`, not `Optional<LocationInventory>`)
+    used only to plan which ids a transfer needs to lock, before loading anything. Deliberately
+    scalar: an entity-returning query would populate the persistence context, and Hibernate does
+    not overwrite an already-managed entity's scalar state (e.g. `quantity`) from a later query —
+    so if the *planning* step accidentally loaded a full entity here, and the *lock* query later
+    tried to lock the same id, the entity's quantity would still be whatever this early, unlocked
+    read saw, not the fresh value the lock is supposed to guarantee. Reading `product_id` this way
+    without a lock is safe because it is immutable once a `location_inventory` row exists.
+- **`StockMovementService`.** Added two private helpers and wired them into the three
+  read-modify-write entry points:
+  - `lockInventoryRowsForUpdate(Collection<UUID> ids)` — dedupes, sorts ascending, and calls
+    `lockAllByIdForUpdate` (no-op on an empty set). This is the one and only place a lock is
+    acquired; every caller below goes through it.
+  - `resolveTransferLockIds(TransferInventoryRequestDTO)` — resolves the id set a transfer needs
+    locked, using only the scalar lookups above, before any entity is loaded: always the source
+    id; the destination's *existing* row id too, if one already exists (an explicit
+    `destinationInventoryId` is used directly; an implicit `destinationLocationId` is resolved via
+    `findProductIdById` then `findIdByLocation_IdAndProduct_Id`). A destination that does not yet
+    exist has no row to lock — it is created fresh afterward exactly as before, and Javadoc records
+    the one accepted residual gap this leaves (see the "Current handoff" entry above).
+  - `batchAdjustInventory`: locks every line's `inventoryId` before the existing
+    `preloadInventories` (join-fetch) call. Since these ids were not read anywhere earlier in the
+    method, the lock query is genuinely the first touch, so the subsequent join-fetch query
+    populates the same already-locked, already-fresh managed entities with their associations
+    (Hibernate identity-map behavior — no double SELECT of scalar state, no staleness).
+  - `transferInventory`: calls `lockInventoryRowsForUpdate(resolveTransferLockIds(request))`
+    immediately, before its existing (unchanged) `findById(sourceInventoryId)` call — which is now
+    genuinely the first load of that row in the transaction, same reasoning as above.
+  - `batchTransferInventory`: computes `resolveTransferLockIds` for *every* line in the batch
+    first, unions and locks them all in one call, then proceeds with the existing
+    `preloadInventories` call for sources unchanged. Locking the whole batch's id set up front
+    (not per-line, inside the loop) is what keeps a same-process batch internally deadlock-free
+    too, not just deadlock-free against other batches/transfers.
+  - `executeTransfer` itself required no changes beyond what T-6c-4 already added
+    (`requireSameSite`): its existing `findById(destinationInventoryId)` /
+    `findByLocation_IdAndProduct_Id(...).orElseGet(create)` calls now simply hit the persistence
+    context's identity map for ids the caller already locked (a cache hit, not a new unlocked
+    read), or proceed to create a genuinely new row when `resolveTransferLockIds` correctly found
+    none to lock.
+- **No `@Version` column added to `LocationInventory`** — per F-6c-5's explicit recommendation
+  against option (b): a `PESSIMISTIC_WRITE` lock query needs no schema change and no client-facing
+  retry/409 contract on the v1 endpoints (which don't exist yet — T-6c-11/T-6c-12).
+- **Test — `StockMovementServiceConcurrentAdjustIT`** (new,
+  `inventory/application/StockMovementServiceConcurrentAdjustIT.java`, extends
+  `BaseKafkaIntegrationTest` for real Testcontainers Postgres, not H2 — F-6c-5 and the task text
+  both call for real row-locking semantics). Seeds one `LocationInventory` row at quantity 100,
+  then reuses `SiteProductConcurrencyIT`'s proven technique: a third, independently managed
+  transaction takes `SELECT id FROM location_inventory WHERE id = ? FOR UPDATE` and holds it via a
+  `CountDownLatch`, forcing both racing `batchAdjustInventory` calls (deltas -30 and -20 against
+  the same row) to actually block at the same instant — confirmed via
+  `pg_stat_activity`-polling for 2 backends in `wait_event_type = 'Lock'` before releasing. This is
+  what makes the test prove genuine concurrent, overlapping transactions rather than two
+  sequential calls that happen to look concurrent because of JVM thread scheduling. Assertions:
+  final quantity equals the fully serialized result (50, not a lost update); exactly two
+  `StockMovement` rows exist for the product; neither movement's `previousQuantity` nor
+  `currentQuantity` is ever negative; and the two movements form one unbroken chain from 100 down
+  to 50 in whichever order Postgres actually serialized them (the second movement's
+  `previousQuantity` equals the first's `currentQuantity`), proving the second writer really did
+  see the first writer's committed result rather than a stale pre-lock value.
+- **Confirmed the test actually catches the regression it targets (not just "asserted, hoped it
+  works").** Temporarily commented out the new `lockInventoryRowsForUpdate(requestedInventoryIds)`
+  call in `batchAdjustInventory` (nothing else changed) and reran the same test:
+  `./mvnw -q -Dtest=StockMovementServiceConcurrentAdjustIT test` failed with
+  `AssertionFailedError: ... expected: 50 but was: 80` — i.e. only the `-20` delta survived; the
+  `-30` write was silently lost, exactly the classic lost-update F-6c-5 predicted (both threads'
+  unlocked reads saw quantity 100 under MVCC even while the external holder's `FOR UPDATE` lock
+  was held, since plain reads never block on a writer's lock in Postgres; the actual `UPDATE`
+  statements were what blocked on the held lock, and whichever `UPDATE` committed last won,
+  discarding the other transaction's write). Restored the lock call and reran: 1/1 pass again. The
+  `.bak` copy used for this A/B was not left in the tree.
+
+### Verification (T-6c-6, actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors.
+- `./mvnw -q -Dtest=StockMovementServiceConcurrentAdjustIT test` — 1/1 pass (real Testcontainers
+  Postgres; ~9-10s including container reuse).
+- Regression A/B (see above): with the lock call disabled, the same test failed
+  (`expected: 50 but was: 80`); with it restored, 1/1 pass again.
+- `./mvnw -q -Dtest='StockMovementOutboxAtomicityIT,InventoryOperationsCallerTransactionIT,
+  StockMovementServiceSameSiteTransferTest,StockMovementServiceActiveStatusDerivationTest,
+  StockMovementControllerSecurityIT' test` — 2/2, 2/2, 4/4, 8/8 pass; `StockMovementControllerSecurityIT`
+  reports `Tests run: 0` in isolation (uses only `@Nested` classes — Maven Surefire's `-Dtest=`
+  filter does not run nested classes for a bare class-name selector; this is a Surefire selection
+  quirk, not a test failure — confirmed by running the full `*IT` sweep below, where its nested
+  tests execute and pass normally).
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java` by design) —
+  exit 0; 348 tests summed across every surefire report, 0 failures, 0 errors (unchanged from
+  T-6c-4..T-6c-5, since the new test class is itself an `*IT`).
+- `./mvnw -q test -Dtest='*IT'` — `MojoFailureException`, 415 tests (up from 414, the one new
+  `StockMovementServiceConcurrentAdjustIT` case), 8 failures, all still exactly
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` — the same pre-existing,
+  order-fragile, out-of-`inventory`'s-boundary debt already recorded in this log, reproduced again
+  here without any new inventory-related failure. Confirmed not a regression:
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` —
+  exit 0.
+- `./mvnw -q clean test-compile` then `./mvnw -q -Dtest=ArchitectureTest test` — 8/8 pass (still 8
+  rules, unchanged), `git status --porcelain` on `archunit_store/` — no diff. Expected: the new
+  repository methods and service-layer helpers reference only types `inventory` already depends
+  on internally (its own domain/infrastructure classes), adding no new cross-module edge.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched this pass
+  (no endpoint changed; T-6c-6 is repository/service-layer only). `OpenApiContractExportTest` not
+  re-run for this reason.
+
+## Review-driven fix: T-6c-6 P1 findings (2026-09-12)
+
+Independent review of T-6c-6 found one P1, confirmed reproducible: `resolveTransferLockIds` only
+planned a lock for a transfer's destination when a `location_inventory` row already existed at
+that `(location, product)` pair **at planning time** (a scalar `findIdByLocation_IdAndProduct_Id`
+check, no lock). A not-yet-existing destination had nothing planned to lock, and
+`executeTransfer`'s own later, separate `findByLocation_IdAndProduct_Id(...).orElseGet(create)`
+call ran a completely fresh, unlocked query — so if another transaction created a row at that same
+key between planning and this later query, `executeTransfer` could find (or race to create) it and
+mutate its quantity with no lock ever held. The stale doc comment on `resolveTransferLockIds`
+claimed this was "protected by the unique constraint," which only covers the simultaneous-*insert*
+case, not a later *unlocked read-then-update* of a row that already exists.
+
+### Fix
+
+Re-derived `resolveTransferLockIds`'s contract per the reviewer's own framing: every id it returns
+must now already be real and about to be locked — there is no more "nothing to lock yet" case.
+
+- **`LocationInventoryRepository.insertLocationInventoryIfAbsent(id, locationId, siteId,
+  productId)`** (new): a native `INSERT ... ON CONFLICT (location_id, product_id) DO NOTHING`.
+  Chosen over both alternatives weighed in the task: a plain JPA save-if-absent can't be made safe
+  without a savepoint (Postgres aborts the whole transaction on the first unique-constraint error,
+  and this codebase takes no savepoints), and a `REQUIRES_NEW` helper transaction would let a
+  destination-row creation escape rollback if the enclosing transfer later failed — a real,
+  avoidable behavior change. `INSERT ... ON CONFLICT DO NOTHING` sidesteps both problems: it never
+  raises on a duplicate key (Postgres's speculative-insertion protocol makes a second, concurrent
+  inserter of the same key *wait* for the first inserter's transaction to finish, then either see
+  the committed row or, if the first inserter rolled back, insert for real — no error, no
+  deadlock), and because it runs inside the same `@Transactional` as the rest of the transfer, a
+  later failure (e.g. `InsufficientInventoryException`) rolls the insert back too, so the "a
+  transfer that fails leaves no trace" property this module already had is fully preserved — no
+  `Q-6c-N` decision needed on that point.
+  - `id`, `site_id`, `created_at`, `updated_at` are all supplied explicitly by the caller rather
+    than left to production's DB defaults/triggers (`trg_sync_inventory_site_id`,
+    `id`/`created_at`/`updated_at` column defaults — infra/init-db/20-unified-locations.sql).
+    Discovered why this matters the hard way: this module's own Testcontainers-backed integration
+    tests run against a schema Hibernate generates from the entity mapping
+    (`spring.jpa.hibernate.ddl-auto=create-drop`, `src/test/resources/application-integration.
+    properties`), which has none of those triggers or defaults. The first version of this method
+    (relying on the trigger/defaults) failed in-test with `null value in column "id" ... violates
+    not-null constraint` — supplying every value explicitly makes the method correct in both
+    environments instead of silently depending on production-only schema objects this module
+    cannot verify from Java. `LocationRepository.findSiteIdById(locationId)` (new, scalar,
+    unlocked — a location's site is immutable once set) resolves the site id needed for this.
+- **`StockMovementService.resolveTransferLockIds`**: for an implicit destination, now calls a new
+  `ensureDestinationInventoryExists(destLocationId, productId)` helper (guarantees the row exists
+  via the insert above, then re-reads its id with the existing scalar
+  `findIdByLocation_IdAndProduct_Id`) instead of only locking an already-existing row. Unchanged:
+  if the source id doesn't exist, no destination row is created and only the source id is
+  returned — the existing `findById(sourceInventoryId)` call downstream still raises
+  `InventoryNotFoundException` with its established message, exactly as before this fix.
+- **`StockMovementService.executeTransfer`**'s implicit-destination branch: the old
+  `findByLocation_IdAndProduct_Id(...).orElseGet(create)` fallback is now
+  `.orElseThrow(IllegalStateException)`. By the time `executeTransfer` runs, `resolveTransferLockIds`
+  has already guaranteed the row exists and `lockInventoryRowsForUpdate` has already locked it, so
+  this lookup can only ever hit the persistence context's identity map for the already-locked row
+  (a cache hit, not a fresh unlocked read) — a miss here would mean the locking invariant was
+  violated upstream, which is exactly the class of bug this fix exists to make loud instead of
+  silent.
+
+### Requirement 1 (mutated row is always the locked row)
+
+Whatever destination row `executeTransfer` mutates is now structurally guaranteed to be one this
+transaction holds `PESSIMISTIC_WRITE` on: `resolveTransferLockIds` creates-or-finds the row and
+returns its real id *before* `lockInventoryRowsForUpdate` runs, so the id is in the locked set by
+construction, and the unique `(location_id, product_id)` index guarantees at most one row can ever
+exist at that key — the row `executeTransfer`'s natural-key lookup finds is necessarily the one
+just locked.
+
+### Requirement 2 (lock ordering / deadlock safety preserved)
+
+`lockInventoryRowsForUpdate`'s existing sort-then-lock-once discipline is untouched — this fix only
+changes what set of ids gets fed into it, not how that set is locked. The new
+`ensureDestinationInventoryExists` step itself runs strictly *before* any lock is taken in the same
+transaction (same position `resolveTransferLockIds` always occupied), so it cannot itself
+contribute to a lock-ordering cycle. Two scenarios called out in the task, reasoned through:
+
+- **Two concurrent transfers both need to create the same new destination.** Neither has taken any
+  `PESSIMISTIC_WRITE` lock yet at this point in either transaction (the ensure-step precedes
+  `lockInventoryRowsForUpdate`). The later inserter's `INSERT ... ON CONFLICT` blocks on Postgres's
+  speculative-insertion wait for the earlier inserter's transaction outcome — a one-directional
+  wait (the blocked side isn't holding anything the other side needs), so it cannot form a deadlock
+  cycle by itself. Once both sides do reach `lockInventoryRowsForUpdate`, they lock the *same*
+  resolved id in the same ascending-id order as always.
+- **One transfer's source is another transfer's destination.** A transfer's `sourceInventoryId`
+  always names an already-existing row (it's a caller-supplied reference to inventory that exists);
+  a row created fresh by `ensureDestinationInventoryExists` can therefore never simultaneously be
+  in use as some *other* transfer's source before it exists — there is no window where a
+  not-yet-created row is referenced as a source. Once a destination row does exist (created or
+  found), both transfers still resolve their full id sets and call
+  `lockInventoryRowsForUpdate` with everything sorted ascending — identical to the pre-existing
+  same-row-pair deadlock argument for two existing rows, unaffected by this fix.
+- **Within one `batchTransferInventory` batch**, two lines targeting the same new destination:
+  `resolveTransferLockIds` runs per line, sequentially, on the same thread/transaction — the second
+  line's `INSERT ... ON CONFLICT` sees its *own* transaction's uncommitted insert from the first
+  line (Postgres always lets a transaction see its own uncommitted writes) and no-ops immediately;
+  no wait, no risk.
+
+### Delete-and-recreate sub-case (reviewer's second concern)
+
+Reasoned conclusion: **not independently reachable — subsumed by the lock hold, not a separate
+risk.** Once `lockInventoryRowsForUpdate` acquires `PESSIMISTIC_WRITE` on a row, Postgres requires
+any other transaction's `DELETE` of that same row to wait until this transaction commits or rolls
+back (a `DELETE` needs the same row-level lock a `SELECT ... FOR UPDATE` holds). So no *other*
+transaction can delete a row this transaction is holding locked, mid-transaction. The only entity
+that deletes an inventory row inside `executeTransfer` is this same transaction's own drained-to-
+zero *source* deletion (`if (newSourceQuantity == 0) { delete(sourceInventory); }`) — never the
+destination — so within a single transfer's transaction, the destination row it locked is never
+deleted before it's read. There is therefore no window, self-inflicted or external, in which the
+specific locked destination row disappears and gets replaced by a new id before `executeTransfer`
+reads it.
+
+### One recorded, non-material ordering nuance (not a Q-6c-N — no durable behavior/persisted-data
+change, transactionally invisible on rejection)
+
+`ensureDestinationInventoryExists` (inside `resolveTransferLockIds`) now runs, and can write, before
+`executeTransfer`'s `requireSameSite` cross-site check — whereas T-6c-4 originally fail-fast-ed the
+site check *before any write* specifically to avoid creating an orphan destination row for a
+request that's about to be rejected. Because the insert and the later rejection both happen inside
+the same enclosing `@Transactional`, a cross-site transfer that creates a destination row via the
+ensure-step and is then rejected by `requireSameSite` still rolls the insert back with everything
+else — no orphan row is ever observable in the database, and the client-visible outcome (exception
+type, message, final DB state) is unchanged from before this fix. The only externally-observable
+difference is that another transaction racing to insert at that same new key would now briefly wait
+on this doomed-to-rollback transaction's speculative insert before proceeding, once it rolls back —
+a minor, correctness-neutral blocking delay, not a data-loss or security concern, so recorded here
+as an assumption rather than raised as a new open question.
+
+### Test — `StockMovementServiceConcurrentTransferNewDestinationIT` (new,
+`inventory/application/StockMovementServiceConcurrentTransferNewDestinationIT.java`, extends
+`BaseKafkaIntegrationTest`, real Testcontainers Postgres)
+
+Two different source rows (`sourceA`, `sourceB`, quantity 100 each), each transferred concurrently
+to the *same* destination `(location, product)` pair, confirmed absent from `location_inventory`
+before the race starts. Uses the same forced-overlap technique as
+`StockMovementServiceConcurrentAdjustIT`/`SiteProductConcurrencyIT`, adapted for a row that doesn't
+exist yet: a third, independently managed transaction runs the *same-shaped* plain `INSERT` at the
+destination key (no `ON CONFLICT` needed — it's the first attempt) and holds the transaction open
+without committing, forcing both racing `transferInventory` calls' own `INSERT ... ON CONFLICT DO
+NOTHING` destination-creation step to genuinely block on it — confirmed via `pg_stat_activity`
+polling for 2 backends in `wait_event_type = 'Lock'` — before the holder rolls back (never commits,
+so from the database's perspective no row ever really existed at this key before the two real
+transfers raced to create/use it themselves). Assertions: exactly one `location_inventory` row
+exists at the destination key (never two from a lost creation race); its final quantity equals the
+sum of both transfers' quantities (30 + 20 = 50), not a lost update; both sources debited correctly;
+exactly 4 `StockMovement` rows total (one withdrawal + one deposit per transfer); exactly 2 deposit
+movements at the destination, forming one unbroken chain from 0 up to 50 in whichever order Postgres
+actually serialized the two transactions (the second deposit's `previousQuantity` equals the first
+deposit's `currentQuantity`), proving the second writer really did see the first writer's committed
+result rather than a stale pre-lock value of zero.
+
+### Confirmed the test actually catches the regression it targets (pre-fix failure, actual
+transcript, not paraphrased)
+
+Temporarily reverted the fix: `resolveTransferLockIds` back to only locking an already-existing
+destination row (old `flatMap`/scalar-check version, `ensureDestinationInventoryExists` left
+unused), and `executeTransfer`'s implicit branch back to the old unlocked
+`findByLocation_IdAndProduct_Id(...).orElseGet(create)`. Reran the new test:
+`./mvnw -q -Dtest=StockMovementServiceConcurrentTransferNewDestinationIT test` — **failed**, one of
+the two racing `transferInventory` calls threw
+`org.springframework.dao.DataIntegrityViolationException: ... duplicate key value violates unique
+constraint "location_inventory_location_id_product_id_key"` from the old `orElseGet`'s plain JPA
+`save(newInv)`, surfaced through `ExecutionException` in the test. This is precisely the
+"genuine concurrent double-create... fails on the unique constraint" outcome the pre-fix
+`resolveTransferLockIds` javadoc predicted for this exact scenario (both threads' unlocked
+`findByLocation_IdAndProduct_Id` reads missed each other's uncommitted work and both attempted an
+unprotected `INSERT`) — a real, reproducible failure caused specifically by the gap this fix closes,
+not a flaky or unrelated error. Restored the fix (`resolveTransferLockIds`/`executeTransfer` back to
+the versions above) and reran: passed again, 1/1.
+
+### Verification (review-driven fix, actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors (both after the fix and, separately, after
+  the temporary revert used for the pre-fix-failure confirmation above).
+- `./mvnw -q -Dtest=StockMovementServiceConcurrentTransferNewDestinationIT test` — 1/1 pass (real
+  Testcontainers Postgres).
+- Pre-fix regression check (see above): temporarily reverted, same test failed with
+  `DataIntegrityViolationException` / unique constraint violation; restored, 1/1 pass again.
+- `./mvnw -q -Dtest='StockMovementServiceConcurrentTransferNewDestinationIT,
+  StockMovementServiceConcurrentAdjustIT,StockMovementServiceSameSiteTransferTest,
+  StockMovementOutboxAtomicityIT,InventoryOperationsCallerTransactionIT' test` — all pass (1/1, 1/1,
+  4/4, 2/2, 2/2).
+- `./mvnw -q clean test-compile` then `./mvnw -q -Dtest=ArchitectureTest test` — 8/8 pass (still 8
+  rules, unchanged); `git status --porcelain` on `archunit_store/` — no diff. Expected: the new
+  repository methods (`insertLocationInventoryIfAbsent`, `findSiteIdById`) and service-layer helper
+  reference only types `inventory`/`sites` already depend on internally, adding no new cross-module
+  edge.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java` by design) —
+  exit 0; surefire reports sum to 348 tests, 0 failures, 0 errors, 0 skipped — unchanged from
+  T-6c-6 (the new test class is itself an `*IT`, so it doesn't run here).
+- `./mvnw -q test -Dtest='*IT'` — exit 1, 416 tests (up from 415, the one new
+  `StockMovementServiceConcurrentTransferNewDestinationIT` case), 8 failures, all still exactly
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` — the same pre-existing,
+  order-fragile, out-of-`inventory`'s-boundary debt already recorded in this log, reproduced again
+  here with no new inventory-related failure. Confirmed not a regression:
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` —
+  exit 0.
+- `git diff --check` — clean, no whitespace errors. `git status --porcelain` on `archunit_store/` —
+  no diff (repeated from above for completeness of the checklist).
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched (no
+  endpoint changed; this fix is repository/service-layer only). `OpenApiContractExportTest` not
+  re-run for this reason.
+
+## Review-driven fix round 2: T-6c-6 P1 findings (unified locking strategy) (2026-09-12)
+
+Independent review of round 1's fix reproduced two P1s with real Postgres tests, both traced to
+one root cause the reviewer named directly: "destination creation, identity resolution, and
+locking need one consistent concurrency strategy; sorting afterward is insufficient." Round 1
+introduced a second, inconsistent ordering domain (`(location, product)` for destination creation)
+alongside the original one (row id, for locking) instead of unifying them, and that inconsistency
+is exactly what both bugs exploited.
+
+### Bug 1 — existing destination could disappear between "found" and "locked"
+
+`ensureDestinationInventoryExists` read an existing destination's id with a scalar,
+**unlocked** `findIdByLocation_IdAndProduct_Id` after its `INSERT ... ON CONFLICT DO NOTHING`
+no-op'd against the already-existing row. `ON CONFLICT DO NOTHING` never touches or locks the row
+it conflicts against — it is a true no-op for that case — so there was a real, unguarded window
+between "read this id" and "this id is now locked" in which another transaction could delete the
+row (e.g. it was drained to zero as a *different* transfer's source) before the read's id was ever
+locked.
+
+### Bug 2 — batch transfers could deadlock via crossed speculative inserts
+
+`resolveTransferLockIds`/`ensureDestinationInventoryExists` ran in **request order** — whatever
+order a batch's `transfers` list happened to name its lines — and ran *before*
+`lockInventoryRowsForUpdate`'s id-sort ever applied. Postgres's `ON CONFLICT` speculative-insertion
+protocol makes a second, concurrent inserter of the same brand-new key *wait* for the first
+inserter's transaction to resolve (commit or abort) before deciding whether it's really a
+conflict. Two batches naming the same two new destination keys X and Y in opposite request order
+(batch 1: X then Y; batch 2: Y then X) could each successfully insert their first key and then
+both block waiting for the other's speculative insert on the *second* key — a genuine circular
+wait, independently reproduced by the reviewer as a real `PostgreSQL deadlock detected` error.
+Sorting only the later `lockInventoryRowsForUpdate` call did not help, because the deadlock had
+already happened during the earlier, unsorted `ensureDestinationInventoryExists` calls.
+
+### Fix: one (location, product)-keyed routine, one global sort domain
+
+Per the reviewer's own framing, this is a redesign, not two more independent patches. Every row a
+transfer or batch-transfer will touch — source and destination, whether it already exists or must
+be created — is now resolved to a `LocationProductKey(locationId, productId)` and locked through
+exactly one routine, processed strictly in one global, deterministic order
+(`LOCATION_PRODUCT_KEY_ORDER`: by location id, then product id). Row id is not used as a lock-order
+key anywhere in the transfer path any more, because a not-yet-created destination has no id to
+sort by until after it exists — mixing "sort by id" for some rows with "sort by
+`(location, product)`" for others was exactly the two-domain inconsistency that caused bug 2.
+
+- **`LocationInventoryRepository.findIdByLocation_IdAndProduct_IdForUpdate(locationId, productId)`**
+  (new): a scalar, `@Lock(PESSIMISTIC_WRITE)` query — `SELECT li.id FROM LocationInventory li WHERE
+  li.location.id = :locationId AND li.product.id = :productId`. Scalar-only (no joins), for the
+  same F-6c-5 reason `lockAllByIdForUpdate` is scalar/join-free: `FOR UPDATE` must only ever lock
+  the `location_inventory` row itself, never an outer-joined `locations`/`products`/
+  `storage_locations` row. This is the method that closes bug 1: finding a row's id here *is*
+  locking it — there is no separate unlocked read step for a concurrent delete to race through.
+- **`LocationInventoryRepository.findLocationAndProductIdById(id)`** (new, replaces the now-dead
+  `findProductIdById`): a scalar constructor-expression projection
+  (`LocationInventoryRepository.LocationProductIds`) returning a row's `(location, product)` key,
+  unlocked. Used during planning, before any lock is taken, for both a transfer's source (must
+  already exist) and an explicit `destinationInventoryId` (the caller's claim that it exists) — an
+  explicit destination id is resolved through the same scalar lookup as everything else rather
+  than special-cased out of the scheme, and its absence now surfaces the same
+  `InventoryNotFoundException` it always has ("Destination inventory not found: …"), just earlier
+  (during planning) instead of inside the old `executeTransfer` fallback.
+- **Removed** `findProductIdById` and the old unlocked `findIdByLocation_IdAndProduct_Id` scalar
+  method — both dead once the routine above replaced their only caller (`ensureDestinationInventoryExists`,
+  also removed). `findByLocation_IdAndProduct_Id` (the join-fetch, entity-returning method) is kept
+  unchanged — it is still used by `LocationInventoryService`/`InventoryOperations` outside this
+  fix's scope. `insertLocationInventoryIfAbsent` is kept unchanged.
+- **`StockMovementService.ensureAndLockInventoryRow(locationId, productId)`** (new, replaces
+  `ensureDestinationInventoryExists`): the single per-key find-or-create-and-lock routine.
+  ```
+  while (true) {
+      Optional<UUID> lockedId = locationInventoryRepository
+              .findIdByLocation_IdAndProduct_IdForUpdate(locationId, productId);
+      if (lockedId.isPresent()) return lockedId.get();
+      UUID siteId = locationRepository.findSiteIdById(locationId).orElseThrow(...);
+      locationInventoryRepository.insertLocationInventoryIfAbsent(UUID.randomUUID(), locationId, siteId, productId);
+  }
+  ```
+  Terminates in practice within 1-2 iterations: the first pass either finds an existing row (fast
+  path) or finds nothing and issues `INSERT ... ON CONFLICT DO NOTHING`. That insert either commits
+  our own new row (visible to our own transaction immediately, read-your-own-writes, so the next
+  loop iteration's locked find succeeds) or no-ops because a concurrent inserter's row is in
+  flight — in which case Postgres's speculative-insertion wait means our `INSERT` statement itself
+  blocks until that concurrent transaction resolves, so by the time we loop back it has already
+  committed (next find succeeds) or aborted (our own next insert succeeds). It can never return a
+  "found but then vanished" id, because finding IS locking here.
+- **`StockMovementService.planTransfers(transfers)`** (new, replaces `resolveTransferLockIds`):
+  resolves every transfer's source and destination to a `LocationProductKey` up front, failing fast
+  with the established not-found exceptions, and returns a list of `TransferPlan(request,
+  sourceKey, destinationKey)` in the same order as the input.
+- **`StockMovementService.lockPlannedRows(plans)`** (new): collects every plan's source key and
+  destination key into one `TreeSet<LocationProductKey>` (dedup + sort in one step, via
+  `LOCATION_PRODUCT_KEY_ORDER`), then calls `ensureAndLockInventoryRow` for each key **strictly in
+  that sorted order, one key at a time** — never in parallel, never batched into one query — and
+  returns a `Map<LocationProductKey, UUID>` of the resulting locked ids. Processing strictly in
+  sorted order, across the *whole* set of rows a whole batch will touch (not per-line, inside a
+  loop), is what makes the global-ordering property hold across concurrent transactions and
+  batches: two overlapping writers that need overlapping keys always request them in the same
+  relative order, so neither can hold what the other waits for.
+- **`transferInventory`/`batchTransferInventory`**: both now call `planTransfers` then
+  `lockPlannedRows` as one combined planning phase, before loading any entity — replacing the old
+  `resolveTransferLockIds`/`lockInventoryRowsForUpdate` call sites. `batchTransferInventory` builds
+  its plan list from the *whole* batch's transfers before locking anything, same as round 1's
+  design, just re-keyed.
+- **`executeTransfer`**: no longer takes `request.getDestinationInventoryId()` and branches on it.
+  It now takes an already-resolved `UUID destinationInventoryId` (looked up from the locked-id map
+  by the caller, using the plan's `destinationKey`) and does one `findById(destinationInventoryId)`
+  — guaranteed to hit an already-locked, already-existing row — `.orElseThrow(IllegalStateException)`
+  otherwise. All of the old explicit-id-vs-implicit-location branching, and the old
+  `findByLocation_IdAndProduct_Id(...).orElseThrow` "should already exist" check, are gone: there is
+  exactly one code path for resolving the destination now, for both shapes of request.
+- **`lockInventoryRowsForUpdate`/`lockAllByIdForUpdate`** (id-ordered, unchanged): kept, but now
+  used *only* by `batchAdjustInventory`. Confirmed by re-reading the method and grepping for
+  `orElseGet`/`save(new`/`save(LocationInventory` in `StockMovementService.java`: `batchAdjustInventory`
+  has no create-if-absent path anywhere — every id it locks is a caller-supplied reference to a row
+  the earlier `preloadInventories`/ownership-validation loop already requires to exist — so an
+  id-ordered lock remains sufficient and correct for it; it did not need this fix. Doc comments on
+  both were updated to say so explicitly, so a future reader doesn't wonder why two different
+  ordering strategies coexist in the same file.
+
+### Why bug 1 cannot recur
+
+Whatever destination (or source) row this transaction ends up mutating is now structurally
+guaranteed to be one this transaction holds `PESSIMISTIC_WRITE` on, because *finding* the row's id
+via `findIdByLocation_IdAndProduct_IdForUpdate` **is** the act of locking it — there is no
+intermediate unlocked read whose result could go stale before a separate lock call runs. The old
+bug required exactly that intermediate: read an id, then (implicitly) trust it while a completely
+separate, later lock/load happened. That structure no longer exists anywhere in the transfer path.
+
+### Why bug 2 cannot recur
+
+A deadlock over two shared resources requires two transactions to acquire them in *opposite*
+relative order. Every row this module ever locks for a transfer or batch-transfer — source or
+destination, existing or brand-new — now passes through `lockPlannedRows`, which always visits its
+full, deduplicated key set in one ascending `(location, product)` order. Two batches that name the
+same two keys X and Y in opposite *request* order still process them in the same *relative* order
+once each batch's own set is independently sorted (both visit "the smaller key" before "the larger
+key," whichever concrete key that is) — so the crossed-wait shape (A holds X, wants Y; B holds Y,
+wants X) can no longer arise. This is the same argument round 1's `lockInventoryRowsForUpdate`
+already relied on for existing rows (sorted by id); the fix's contribution is putting *every* row,
+including ones that don't exist yet, into that same one sort domain instead of a second, competing
+one.
+
+### Tests
+
+- **`StockMovementServiceConcurrentTransferExistingDestinationRaceIT`** (new, bug 1). An existing
+  destination row is held under an externally managed, uncommitted `SELECT ... FOR UPDATE` (same
+  `pg_stat_activity`-polling forced-overlap technique as `StockMovementServiceConcurrentAdjustIT`)
+  while two concurrent `transferInventory` calls target it via the *implicit* destination path (by
+  location, so they re-derive the row's current id rather than pinning one up front). Once both
+  racing transfers are confirmed genuinely blocked on the external lock, the external holder
+  **deletes the row and inserts a brand-new row at the exact same `(location, product)` key** (a
+  real, committed delete-and-recreate, not a placeholder that rolls back) before releasing.
+  Assertions: exactly one row survives at the destination key; its id is *not* the original row's
+  id (proving the recreated row was genuinely found and locked, not a stale reference to the
+  deleted one); its final quantity equals the recreated row's baseline plus both transfers' deltas
+  (no lost update); both sources debited correctly; exactly 4 movements (2 transfers × withdrawal +
+  deposit).
+  - **Pre-fix-failure evidence (actual transcript):** temporarily removed
+    `@Lock(LockModeType.PESSIMISTIC_WRITE)` from `findIdByLocation_IdAndProduct_IdForUpdate` only
+    (reintroducing bug 1's exact defect — finding the id is no longer the same act as locking it) and
+    reran the same test: **failed** with
+    `jakarta.persistence.OptimisticLockException: Batch update returned unexpected row count from
+    update [1]; actual row count: 0; expected: 1` (wrapping a Hibernate `StaleStateException`) — one
+    of the two racing transfers had read the *original* row's id unlocked, loaded and mutated it in
+    memory, and then tried to `UPDATE ... WHERE id = <original id>` after the external holder had
+    already deleted that exact row — a real, reproducible silent-write-to-a-vanished-row failure,
+    exactly bug 1's mechanism. Restored the `@Lock` annotation and reran: 1/1 pass again.
+- **`StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT`** (new, bug 2), two tests:
+  1. `concurrentBatchTransfersNamingSameTwoNewDestinationsInOppositeOrderDoNotDeadlock` — two
+     concurrent `batchTransferInventory` calls, batch 1 naming brand-new destinations X then Y in
+     its `transfers` list, batch 2 naming the same two Y then X, both started at the same instant
+     via a `CyclicBarrier` to force genuine concurrent contention on the shared keys. Assertions:
+     both calls complete without throwing; exactly one row exists at each of X and Y (never a
+     duplicate from a lost creation race); each destination's final quantity equals the sum of
+     *both* batches' contributions to it (18 at X = 10 + 8, 20 at Y = 15 + 5); exactly 8
+     `StockMovement` rows (4 transfer lines × withdrawal + deposit) — it does not matter which
+     batch's rows are checked, both applied cleanly, per the task's framing.
+  2. `crossedOrderSpeculativeInsertsOnTwoNewKeysGenuinelyDeadlockInPostgres` — a mechanism-level
+     proof independent of `StockMovementService`: two raw JDBC connections, autocommit off, each
+     speculatively inserting the same two brand-new `(location, product)` keys in opposite order
+     (side A: X then Y; side B: Y then X), with `CountDownLatch`es forcing each side to complete its
+     *first* insert before either attempts its *second* — the exact interleaving needed to make each
+     side's second insert block on the other's still-uncommitted first. This is the literal SQL
+     pattern the pre-fix, request-ordered `resolveTransferLockIds`/`ensureDestinationInventoryExists`
+     could produce across two batches with crossed line orders.
+     - **Actual pre-fix mechanism evidence (real Postgres, this session, not paraphrased):** one
+       side's connection returned `ERROR: deadlock detected` (captured verbatim via a temporary
+       diagnostic print, then removed) while the other completed; the test asserts at least one side
+       reports a deadlock. This is the same class of error the independent reviewer reported
+       reproducing against the pre-fix code, confirming the crossed speculative-insert pattern is a
+       genuine Postgres hazard, not a schedule-dependent artifact of a particular JVM thread
+       interleaving.
+- **`StockMovementServiceConcurrentTransferNewDestinationIT`** (prior round's test, unmodified):
+  re-ran unchanged against the new design — still 1/1 pass. Its assertions (two concurrent transfers
+  to the same not-yet-existing destination sum correctly, no lost update, no duplicate row) hold
+  exactly as before; no internal method names it referenced needed updating (it only calls the
+  public `transferInventory` and repository read methods, never the private planning helpers that
+  were renamed).
+- **`StockMovementServiceSameSiteTransferTest`** (existing Mockito unit test, updated — not just
+  confirmed): rewritten to stub the new repository methods
+  (`findLocationAndProductIdById`/`findIdByLocation_IdAndProduct_IdForUpdate`/`findSiteIdById`)
+  instead of the removed ones, since this test never touches a real database and the old stubs
+  (`findByLocation_IdAndProduct_Id`) are no longer called anywhere in the transfer path. Two
+  fixtures that had reused the *same* location and product for both source and destination — valid
+  under round 1's id-based locking but not realistic under the new `(location, product)`-unique-key
+  scheme — were fixed to give the destination a distinct location, matching what the real unique
+  constraint requires. 4/4 pass.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors.
+- `./mvnw -q -Dtest=StockMovementServiceConcurrentTransferExistingDestinationRaceIT test` — 1/1
+  pass (real Testcontainers Postgres).
+- Pre-fix regression check (bug 1, see above): `@Lock` temporarily removed from
+  `findIdByLocation_IdAndProduct_IdForUpdate` only, same test failed with
+  `OptimisticLockException`/`StaleStateException` ("actual row count: 0; expected: 1"); restored,
+  1/1 pass again.
+- `./mvnw -q -Dtest=StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT test` — 2/2
+  pass (the no-deadlock service-level proof and the raw-SQL mechanism proof).
+- Pre-fix mechanism check (bug 2, see above): the mechanism-proof test's crossed-order raw-SQL
+  pattern produced a real `ERROR: deadlock detected` from one of the two sides, captured via a
+  temporary diagnostic print then removed; this is a property of the SQL pattern itself
+  (independent of `StockMovementService`), confirming the hazard the fix's global sort order
+  eliminates.
+- `./mvnw -q -Dtest='StockMovementServiceConcurrentTransferExistingDestinationRaceIT,
+  StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT,
+  StockMovementServiceConcurrentTransferNewDestinationIT,StockMovementServiceConcurrentAdjustIT,
+  StockMovementServiceSameSiteTransferTest,StockMovementOutboxAtomicityIT,
+  InventoryOperationsCallerTransactionIT' test` — all pass: 1/1, 2/2, 1/1, 1/1, 4/4, 2/2, 2/2.
+- `./mvnw -q clean test-compile` then `./mvnw -q -Dtest=ArchitectureTest test` — 8/8 pass (still 8
+  rules, unchanged); `git status --porcelain` on `archunit_store/` — no diff. Expected: the new
+  repository methods and service-layer helpers reference only types `inventory`/`sites` already
+  depend on internally, adding no new cross-module edge.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java` by design) —
+  exit 0; surefire reports sum to 348 tests, 0 failures, 0 errors, 0 skipped — unchanged from
+  before this fix (every new/changed test class here is itself an `*IT` or was already counted).
+- `./mvnw -q test -Dtest='*IT'` — exit 1, 419 tests (up from 416: 3 new `*IT` test methods across
+  the two new classes), 8 failures, all still exactly `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` — the same pre-existing, order-fragile, out-of-`inventory`'s-
+  boundary debt already recorded in this log, reproduced again here with no new inventory-related
+  failure. Confirmed not a regression:
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` —
+  exit 0.
+- `git diff --check` — clean, no whitespace errors. `git status --porcelain` on `archunit_store/` —
+  no diff.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched (no
+  endpoint changed; this fix is repository/service-layer only). `OpenApiContractExportTest` not
+  re-run for this reason.
+
+### No new Q-6c-N
+
+This is a pure concurrency-correctness redesign, as anticipated: no new product, security, or
+data-loss decision was required. The one nuance round 1 already recorded (the destination-ensure
+step can now write, and roll back, before `executeTransfer`'s cross-site `requireSameSite` check —
+transactionally invisible on rejection) still applies, unchanged in kind, just earlier in the
+overall flow now that all rows are planned before any check runs.
+
+## Review-driven fix round 3: T-6c-6 P1 finding, adjustment/transfer lock-order conflict (2026-09-12)
+
+Independent review of round 2's fix found one more P1, reproduced on real Postgres with the
+production repository lock methods: round 2 unified the *transfer* paths onto a single
+`(location, product)`-keyed lock order, but left `batchAdjustInventory` locking by its original,
+still-round-1-shaped ascending **row id** order (`lockInventoryRowsForUpdate` ->
+`lockAllByIdForUpdate`). Both orderings are internally consistent on their own, but they are two
+different domains that can disagree with each other: for two products A and B at one location, row
+id and product id are unrelated random UUIDs, so whichever of A/B's row ids sorts first can easily
+be the opposite of which sorts first by `(location, product)`. A batch-adjust touching both rows
+(locking by id) and a concurrent batch-transfer whose destinations are those same two rows
+(locking by key) could then acquire them in opposite relative order — each holding one row and
+waiting for the other — a real crossed-wait deadlock, exactly the shape every prior round's fix
+was meant to eliminate, just recurring at a boundary between two methods instead of within one.
+
+### Fix: batchAdjustInventory joins the same single ordering domain
+
+`lockInventoryRowsForUpdate` (used only by `batchAdjustInventory`) no longer sorts by id or calls
+`lockAllByIdForUpdate` at all. It now resolves every requested inventory id to its
+`LocationProductKey` (via the same unlocked scalar `findLocationAndProductIdById` the transfer
+paths already use for planning), collects them into the same `TreeSet<LocationProductKey>` /
+`LOCATION_PRODUCT_KEY_ORDER` ordering, and locks each key through the exact same
+`ensureAndLockInventoryRow` routine transfers use. Ids that don't resolve to an existing row are
+silently skipped at this step; the existing "Inventory not found" check immediately after (via
+`preloadInventories`) still catches that case with its established message, unchanged. The now
+fully-unused `lockAllByIdForUpdate` repository method was deleted (dead code), along with the
+comment block that used to describe it as `batchAdjustInventory`'s intentionally-different, "also
+correct" locking strategy — that framing was the bug: there is now exactly **one** lock-ordering
+domain, `(location, product)`, shared by every writer in this class capable of holding more than
+one `LocationInventory` row in a single transaction. No `@Version` column exists on
+`LocationInventory` (F-6c-5, unchanged); this remains `PESSIMISTIC_WRITE`-only.
+
+### Why this cannot recur the way rounds 1-2's bugs did
+
+Both `batchAdjustInventory` and every transfer path now resolve every row they will touch to a
+`LocationProductKey` and lock strictly via `ensureAndLockInventoryRow`, in `LOCATION_PRODUCT_KEY_ORDER`.
+There is no second method left in `StockMovementService` that locks more than one `LocationInventory`
+row through any other query or ordering. Two callers sharing overlapping rows — regardless of
+whether one calls a row "the thing being adjusted" and the other calls the same row "a transfer
+destination" — always attempt to acquire the smallest shared key first; whichever call reaches it
+first proceeds through the rest of its own sorted list, and the other blocks on that one key until
+the first finishes, with no possibility of a "you hold what I need while I hold what you need"
+cycle. A future third method that needs to hold more than one row must reuse
+`ensureAndLockInventoryRow`/the same key ordering rather than inventing a new one, exactly what
+this round's fix itself had to do after round 2 left one method out.
+
+### Test: deterministic mixed adjustment/transfer deadlock reproduction
+
+New `StockMovementServiceMixedAdjustTransferLockOrderIT`
+(`concurrentBatchAdjustAndBatchTransferOnSameTwoRowsDoNotDeadlock`). Relying on two independently-random
+UUIDs (row id vs. product id) to disagree by chance would make the pre-fix reproduction flaky, so
+the test deliberately inserts the two destination `location_inventory` rows with explicitly chosen
+ids (via raw `JdbcTemplate`, bypassing Hibernate's `GenerationType.UUID` generator) such that
+row-id order is the *exact reverse* of `(location, product)` key order, guaranteed regardless of
+the actual random product ids. It then forces the precise interleaving a natural race cannot
+reliably produce (same technique as `StockMovementServiceConcurrentAdjustIT`, extended to a staged
+two-step handoff): an externally held `SELECT ... FOR UPDATE` on the key-order-second /
+id-order-first row, released only after (a) the adjust batch is confirmed blocked on it and then
+(b) the transfer batch is confirmed blocked too (having already acquired the other row first,
+uncontended). Releasing with the adjust batch queued first reproduces the classic crossed-wait
+deterministically.
+- **Pre-fix reproduction (confirmed, not assumed)**: temporarily restored the old
+  `lockAllByIdForUpdate`-based id-ordered body of `lockInventoryRowsForUpdate` and reran — the test
+  failed with a real `org.springframework.dao.CannotAcquireLockException` wrapping
+  `org.postgresql.util.PSQLException: ERROR: deadlock detected` ("Process 64 waits for ShareLock on
+  transaction 835; blocked by process 62. Process 62 waits for ShareLock on transaction 834;
+  blocked by process 64."). Reverted back to the fix; the test passes cleanly.
+- Also confirms the correct combined final state when both do complete: each row's quantity equals
+  100 plus its own adjustment delta plus its own transfer-in quantity (no lost update).
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, both during the temporary pre-fix revert and after
+  restoring the fix.
+- `./mvnw -q -Dtest=StockMovementServiceMixedAdjustTransferLockOrderIT test` — 1/1 pass (post-fix);
+  1/1 **fail** with the deadlock exception above (pre-fix, temporary revert, not committed).
+- `./mvnw -q -Dtest=StockMovementServiceMixedAdjustTransferLockOrderIT,StockMovementServiceConcurrentAdjustIT,
+  StockMovementServiceConcurrentTransferNewDestinationIT,StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT,
+  StockMovementServiceSameSiteTransferTest,StockMovementOutboxAtomicityIT,InventoryOperationsCallerTransactionIT,
+  ArchitectureTest test` — 21/21 pass (1, 1, 1, 2, 4, 2, 2, 8).
+- `git diff --check` — clean. `git status --porcelain` on `archunit_store/` — no diff.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test`) — all 61 surefire reports show
+  `Failures: 0, Errors: 0` (348 tests summed; unchanged from round 2, the new class is an `*IT`).
+- `./mvnw -q test -Dtest='*IT'` — exit 0, all 582 tests (up from 576) across every `*IT.txt` report
+  show `Failures: 0, Errors: 0`.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched (no
+  endpoint changed; repository/service-layer only).
+
+### No new Q-6c-N
+
+Pure concurrency-correctness fix, same as round 2. T-6c-6 is now considered closed pending any
+further review.
+
+## 6c implementation (T-6c-7) (2026-09-12)
+
+Implements T-6c-7 (outbox envelope expand migration + `EventOutbox` entity fields) per F-6c-6 and
+AC-4. Schema/entity only — `EventOutboxService` still writes correlation into the JSON payload as
+before; nothing populates the new columns at creation time yet (T-6c-8's job), and the durable
+idempotency command table (T-6c-10) is a separate, later thing from the `idempotency_key` column
+added here (this column is only where a command's key gets copied *into* the outbox event once
+T-6c-8/T-6c-10 exist).
+
+- **`V63__add_envelope_context_to_event_outbox.sql`**: `event_outbox` predates Flyway (created by
+  Hibernate before Flyway adoption, same as `stock_movements` before `V59`). Adds five nullable
+  columns, no FK, matching 6b's expand-only precedent: `site_id UUID`, `event_version INTEGER
+  DEFAULT 1` (so any row inserted after this migration, including by a writer that omits the
+  column entirely, starts versioned), `correlation_id TEXT` (matches the existing JSON payload
+  value's real type — a caller-supplied or generated string via `CorrelationIdFilter`, not
+  guaranteed UUID-parseable), `causation_id TEXT` (same shape), `idempotency_key TEXT`
+  (client-supplied header value per Q-6c-3, not a generated UUID). No constrain step in this
+  record (P-3).
+- **`V64__backfill_event_outbox_envelope_context.sql`**: scoped to unpublished rows only
+  (`published_at IS NULL`) — a published event already went out over Kafka without this context,
+  so backfilling it here wouldn't change what a consumer already received. Two passes: (1)
+  movement-derived (authoritative) — for a row whose `payload->>'stock_movement_id'` still
+  resolves to a real `stock_movements` row, takes that movement's `site_id` (populated for every
+  existing row by `V60`'s backfill) and sets `event_version`/`correlation_id` from the payload; (2)
+  guard case for a dangling movement reference (id doesn't parse or no matching row) — still sets
+  `event_version`/`correlation_id`, leaves `site_id` NULL (the same "unknown-site" posture Q-6c-5
+  already accepts for `stock_movements` during the compatibility window) rather than blocking or
+  throwing. Both passes are `COALESCE`-guarded (idempotent on rerun), deliberately not guarded on
+  `event_version` alone — `V63`'s `DEFAULT 1` means an old-writer row already reads back
+  `event_version = 1` before this script runs, so an `event_version`-only guard would wrongly skip
+  its still-unresolved `site_id`/`correlation_id`; `site_id IS NULL` is pass 1's real "not yet
+  touched" signal, and pass 2 checks `event_version`/`correlation_id` individually.
+- **`EventOutbox.java`**: added the five matching nullable Java fields (`siteId`, `eventVersion`,
+  `correlationId`, `causationId`, `idempotencyKey`) via `@Column`. No behavior change — existing
+  `@Data`/`@Builder` entity, `UUID` already imported.
+- **`EventOutboxEnvelopeMigrationIT`** (2 cases): runs the real `V63` SQL against Testcontainers
+  Postgres and asserts (a) all five columns exist, nullable, with the expected Postgres types
+  (`uuid`, `integer`, `text` x3); (b) an old-writer-style insert that omits the new columns
+  entirely still succeeds and reads back `event_version = 1` (the `DEFAULT`), the other four NULL.
+- **`EventOutboxEnvelopeBackfillIT`** (6 cases): runs the real `V64` SQL and covers: a resolvable
+  movement backfills site/version/correlation correctly; a payload with no `correlation_id` key
+  backfills a NULL correlation (not an error); a dangling movement reference gets NULL `site_id`
+  but still gets version/correlation backfilled (T-6c-7's explicit guard-case requirement); an
+  old-writer row whose `event_version` is already defaulted to 1 (by `V63`, not yet backfilled)
+  still gets its site/correlation backfilled — the specific case the dual-guard reasoning above
+  exists to get right; already-published rows are left untouched; rerunning the whole backfill
+  changes nothing (idempotent).
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean.
+- `./mvnw -q -Dtest=EventOutboxEnvelopeMigrationIT,EventOutboxEnvelopeBackfillIT test` — 8/8 pass
+  (2 + 6).
+- `git diff --check` — clean. `git status --porcelain` on `archunit_store/` — no diff.
+- `./mvnw -q -Dtest=ArchitectureTest test` — 8/8 pass (unchanged rule count; schema/entity-only
+  change adds no new cross-module edge).
+- `./mvnw -q clean test` (full unrestricted suite, plain `test`) — all 61 surefire reports show
+  `Failures: 0, Errors: 0` (348 tests summed; unchanged from T-6c-6 round 3, both new classes are
+  `*IT`).
+- `./mvnw -q test -Dtest='*IT'` — exit 0, all 590 tests (up from 582 by the 8 new test methods)
+  across every `*IT.txt` report show `Failures: 0, Errors: 0`.
+- `packages/contracts/openapi.json`/`packages/api-client/src/schema.d.ts` — not touched (no
+  endpoint changed; this is a schema/entity-only pass).
+
+### No new Q-6c-N
+
+Schema/entity work only, fully within F-6c-6/AC-4's already-scoped requirements. Note for
+whichever session picks up T-6c-8 next: T-6c-9 already flagged that
+`tests/contracts/schemas/event_outbox.json` sets `additionalProperties: false` and doesn't declare
+`correlation_id` even though the producer already emits it in the JSON payload today (F-6c-6) —
+this drift is unrelated to and unaffected by T-6c-7's new *columns* (which aren't in the Kafka
+payload yet), but T-6c-9 will need to add all five envelope fields to that schema once T-6c-8
+starts publishing them at the envelope level, not just fix the pre-existing `correlation_id` gap.
 
 ## Assumptions and decisions
 

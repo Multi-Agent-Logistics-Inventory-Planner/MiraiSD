@@ -18,6 +18,33 @@ public final class StockMovementSpecifications {
                 .and(isBeforeDate(filters.getToDate()));
     }
 
+    /**
+     * Site-qualified counterpart to {@link #withFilters} (.specs/phase-6-inventory 6c, T-6c-1,
+     * AC-3): composes the same filters with a mandatory site predicate for the v1 scoped
+     * audit-log path. Per the user's resolved Q-6c-5 decision, a movement whose {@code site} is
+     * still {@code null} (pre-backfill compatibility window, .specs/phase-6-inventory 6b
+     * worksheet) is deliberately <b>included</b> here rather than excluded -- callers
+     * (T-6c-11's controller) are responsible for labeling such rows as unknown-site in the
+     * response, not for filtering them out, so the audit trail stays complete during the
+     * compatibility window instead of silently incomplete.
+     */
+    public static Specification<StockMovement> withSiteFilter(AuditLogFilterDTO filters, java.util.UUID siteId) {
+        return withFilters(filters).and(matchesSiteOrUnknown(siteId));
+    }
+
+    private static Specification<StockMovement> matchesSiteOrUnknown(java.util.UUID siteId) {
+        return (root, query, cb) -> {
+            // Explicit LEFT JOIN, not implicit path navigation via root.get("site"): a movement
+            // with a null site must still match (via the isNull branch below), which an implicit
+            // inner join on the association path would silently exclude.
+            jakarta.persistence.criteria.Join<StockMovement, ?> siteJoin =
+                    root.join("site", jakarta.persistence.criteria.JoinType.LEFT);
+            return cb.or(
+                    cb.equal(siteJoin.get("id"), siteId),
+                    cb.isNull(siteJoin.get("id")));
+        };
+    }
+
     private static Specification<StockMovement> matchesSearch(String search) {
         return (root, query, cb) -> {
             if (search == null || search.isBlank()) {

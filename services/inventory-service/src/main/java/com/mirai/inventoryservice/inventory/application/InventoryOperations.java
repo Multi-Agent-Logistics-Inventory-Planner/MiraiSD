@@ -97,6 +97,19 @@ public class InventoryOperations {
         return locationInventoryRepository.findByLocation_IdAndProduct_Id(locationId, productId);
     }
 
+    /**
+     * Site-scoped counterpart to {@link #findInventory(UUID, UUID)} (.specs/phase-6-inventory 6c,
+     * T-6c-2, AC-1/AC-3): {@code (UUID siteId, ...)}-first, mirroring
+     * {@code LocationService.getLocationById(siteId, id)}'s shape. Returns empty, not the
+     * un-scoped row, when the inventory exists but belongs to a different site -- callers map
+     * empty to 404, matching {@link InventoryQueries#findInventoryBySite}. Read-only; the
+     * site-scoped write path (adjust/transfer with row locking and the same-site transfer
+     * precondition) is T-6c-6/T-6c-12's job, not duplicated here ahead of the locking design.
+     */
+    public Optional<LocationInventory> findInventory(UUID siteId, UUID locationId, UUID productId) {
+        return locationInventoryRepository.findByLocation_IdAndProduct_IdAndSite_Id(locationId, productId, siteId);
+    }
+
     @Transactional
     public LocationInventory saveInventory(LocationInventory inventory) {
         return locationInventoryRepository.save(inventory);

@@ -255,4 +255,30 @@ class InventoryOperationsTest {
 
         verify(stockMovementService, times(1)).syncProductTotals(ids);
     }
+
+    // ===================== findInventory (site-scoped, T-6c-2) =====================
+
+    @Test
+    void findInventory_siteScoped_delegatesToSiteQualifiedRepositoryMethod() {
+        UUID siteId = site.getId();
+        LocationInventory row = LocationInventory.builder().id(UUID.randomUUID()).build();
+        when(locationInventoryRepository.findByLocation_IdAndProduct_IdAndSite_Id(locationId, productId, siteId))
+                .thenReturn(Optional.of(row));
+
+        Optional<LocationInventory> result = inventoryOperations.findInventory(siteId, locationId, productId);
+
+        assertTrue(result.isPresent());
+        assertEquals(row.getId(), result.get().getId());
+    }
+
+    @Test
+    void findInventory_siteScoped_emptyForForeignSite() {
+        UUID foreignSiteId = UUID.randomUUID();
+        when(locationInventoryRepository.findByLocation_IdAndProduct_IdAndSite_Id(locationId, productId, foreignSiteId))
+                .thenReturn(Optional.empty());
+
+        Optional<LocationInventory> result = inventoryOperations.findInventory(foreignSiteId, locationId, productId);
+
+        assertTrue(result.isEmpty());
+    }
 }

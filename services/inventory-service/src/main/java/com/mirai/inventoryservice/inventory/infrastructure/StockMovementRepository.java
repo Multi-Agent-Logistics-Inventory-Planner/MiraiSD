@@ -160,5 +160,19 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("fromDate") java.time.LocalDate fromDate,
             @Param("toDate") java.time.LocalDate toDate,
             @Param("tz") String tz);
+
+    // --- Site-qualified methods (.specs/phase-6-inventory 6c, T-6c-1, AC-3) ---
+    // Query-level site predicates: a movement belonging to another site must not appear in a
+    // site-scoped history/audit read at all. Q-6c-5: null-site rows (pre-backfill compatibility
+    // window) are deliberately included by the audit-log variant below, not excluded, per the
+    // user's resolved decision -- see StockMovementSpecifications.withSiteFilter.
+
+    /** Paginated per-product movement history, scoped to one site. Newest first. */
+    Page<StockMovement> findByItem_IdAndSite_IdOrderByAtDesc(UUID productId, UUID siteId, Pageable pageable);
+
+    // Site-scoped audit-log filtering reuses the existing findAll(Specification, Pageable) above
+    // (already carries @EntityGraph("StockMovement.withItem")) -- the site predicate is composed
+    // into the caller-supplied Specification by StockMovementSpecifications.withSiteFilter, not a
+    // second repository method, so the existing AuditLogFilterDTO composition path is unchanged.
 }
 

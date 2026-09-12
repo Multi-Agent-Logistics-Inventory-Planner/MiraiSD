@@ -20,6 +20,7 @@ import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -67,8 +68,10 @@ class MachineDisplayServiceNotificationTest {
     private UUID actorId;
     private UUID machineId;
     private UUID targetMachineId;
+    private UUID sameSiteTargetMachineId;
     private Location loc;
     private Location targetLoc;
+    private Location sameSiteTargetLoc;
 
     @BeforeEach
     void setUp() {
@@ -86,6 +89,7 @@ class MachineDisplayServiceNotificationTest {
         actorId = UUID.randomUUID();
         machineId = UUID.randomUUID();
         targetMachineId = UUID.randomUUID();
+        sameSiteTargetMachineId = UUID.randomUUID();
 
         // Audit log creation always succeeds with a stub
         when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
@@ -110,8 +114,16 @@ class MachineDisplayServiceNotificationTest {
         targetLoc.setId(targetMachineId);
         targetLoc.setLocationCode("S5");
         targetLoc.setStorageLocation(targetStorageLocation);
+        // A second MAIN-site machine (.specs/phase-6-inventory 6c, T-6c-4): batchSwapDisplay now
+        // rejects a cross-site machine-to-machine swap before any mutation, so the "successful
+        // swap" notification test below needs a same-site target instead of targetLoc/SECOND.
+        sameSiteTargetLoc = new Location();
+        sameSiteTargetLoc.setId(sameSiteTargetMachineId);
+        sameSiteTargetLoc.setLocationCode("R7");
+        sameSiteTargetLoc.setStorageLocation(storageLocation);
         when(locationRepository.findById(machineId)).thenReturn(Optional.of(loc));
         when(locationRepository.findById(targetMachineId)).thenReturn(Optional.of(targetLoc));
+        when(locationRepository.findById(sameSiteTargetMachineId)).thenReturn(Optional.of(sameSiteTargetLoc));
 
         // Actor lookup
         User user = new User();
@@ -127,10 +139,18 @@ class MachineDisplayServiceNotificationTest {
     }
 
     private MachineDisplay display(UUID machine, Product p) {
+        Location location;
+        if (machine.equals(machineId)) {
+            location = loc;
+        } else if (machine.equals(sameSiteTargetMachineId)) {
+            location = sameSiteTargetLoc;
+        } else {
+            location = targetLoc;
+        }
         return MachineDisplay.builder()
                 .id(UUID.randomUUID())
                 .machineId(machine)
-                .location(machine.equals(machineId) ? loc : targetLoc)
+                .location(location)
                 .locationType(LocationType.SINGLE_CLAW_MACHINE)
                 .product(p)
                 .startedAt(OffsetDateTime.now())
@@ -204,14 +224,15 @@ class MachineDisplayServiceNotificationTest {
         Product p1 = product("Sonny V1");
         Product p2 = product("Sonny V2");
 
-        // Source machine starts with p1
+        // Source machine starts with p1. Target machine (sameSiteTargetMachineId) shares
+        // machineId's MAIN site (.specs/phase-6-inventory 6c, T-6c-4 requires same-site-only
+        // machine-to-machine swaps) and starts with p2.
         MachineDisplay sourceDisplayP1 = display(machineId, p1);
-        // Target machine starts with p2
-        MachineDisplay targetDisplayP2 = display(targetMachineId, p2);
+        MachineDisplay targetDisplayP2 = display(sameSiteTargetMachineId, p2);
 
         when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
                 .thenReturn(List.of(sourceDisplayP1));
-        when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, targetMachineId))
+        when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, sameSiteTargetMachineId))
                 .thenReturn(List.of(targetDisplayP2));
         when(machineDisplayRepository.findAllByIdInWithProduct(List.of(sourceDisplayP1.getId())))
                 .thenReturn(List.of(sourceDisplayP1));
@@ -223,8 +244,8 @@ class MachineDisplayServiceNotificationTest {
                 .locationType(LocationType.SINGLE_CLAW_MACHINE)
                 .machineId(machineId)
                 .targetLocationType(LocationType.SINGLE_CLAW_MACHINE)
-                .targetMachineId(targetMachineId)
-                .displayIdsToTarget(List.of(sourceDisplayP1.getId()))    // send p1 to S5
+                .targetMachineId(sameSiteTargetMachineId)
+                .displayIdsToTarget(List.of(sourceDisplayP1.getId()))    // send p1 to R7
                 .displayIdsFromTarget(List.of(targetDisplayP2.getId()))  // bring p2 to R2
                 .actorId(actorId)
                 .build();
@@ -241,7 +262,7 @@ class MachineDisplayServiceNotificationTest {
         Map<String, Object> source = machines.stream()
                 .filter(m -> "R2".equals(m.get("code"))).findFirst().orElseThrow();
         Map<String, Object> target = machines.stream()
-                .filter(m -> "S5".equals(m.get("code"))).findFirst().orElseThrow();
+                .filter(m -> "R7".equals(m.get("code"))).findFirst().orElseThrow();
 
         assertEquals(List.of("Sonny V1"), source.get("previously"));
         assertEquals(List.of("Sonny V2"), source.get("currently"));
@@ -249,8 +270,9 @@ class MachineDisplayServiceNotificationTest {
         assertEquals(List.of("Sonny V1"), target.get("currently"));
 
         // .specs/phase-6-inventory 6b: resolveMachineSite must pick each movement's own
-        // destination site, not always the same machine's site - loc and targetLoc are wired to
-        // distinct sites above precisely so a wrong pick here is detectable.
+        // destination site. Both machines now share MAIN (T-6c-4's same-site precondition), so
+        // both movements land on MAIN -- the "picks the wrong machine" failure mode this used to
+        // catch via distinct sites can no longer manifest once cross-site swaps are rejected.
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<StockMovement>> movementsCaptor = ArgumentCaptor.forClass(List.class);
         verify(inventoryOperations).saveMovements(movementsCaptor.capture());
@@ -262,10 +284,36 @@ class MachineDisplayServiceNotificationTest {
         StockMovement p2Movement = movements.stream()
                 .filter(m -> "Sonny V2".equals(m.getItem().getName())).findFirst().orElseThrow();
 
-        // p1 moves from machineId (loc/MAIN) to targetMachineId (targetLoc/SECOND).
-        assertEquals("SECOND", p1Movement.getSite().getCode());
-        // p2 moves from targetMachineId (targetLoc/SECOND) to machineId (loc/MAIN).
+        assertEquals("MAIN", p1Movement.getSite().getCode());
         assertEquals("MAIN", p2Movement.getSite().getCode());
+    }
+
+    @Test
+    void batchSwapDisplay_crossSiteTargetMachine_rejectsBeforeAnyMutation() {
+        // machineId (loc) is MAIN, targetMachineId (targetLoc) is SECOND -- the cross-site pair
+        // .specs/phase-6-inventory 6c, T-6c-4 requires batchSwapDisplay to reject, before any
+        // display is ended/created, any audit log written, or any notification enqueued.
+        BatchDisplaySwapRequestDTO req = BatchDisplaySwapRequestDTO.builder()
+                .locationType(LocationType.SINGLE_CLAW_MACHINE)
+                .machineId(machineId)
+                .targetLocationType(LocationType.SINGLE_CLAW_MACHINE)
+                .targetMachineId(targetMachineId)
+                .displayIdsToTarget(List.of(UUID.randomUUID()))
+                .actorId(actorId)
+                .build();
+
+        InvalidInventoryOperationException ex = assertThrows(
+                InvalidInventoryOperationException.class,
+                () -> service.batchSwapDisplay(req));
+        assertTrue(ex.getMessage().contains("MAIN"));
+        assertTrue(ex.getMessage().contains("SECOND"));
+
+        verify(machineDisplayRepository, never()).saveAll(any());
+        verify(machineDisplayRepository, never()).save(any());
+        verify(auditLogService, never()).createAuditLog(
+                any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any());
+        verify(inventoryOperations, never()).saveMovements(any());
+        verify(notificationService, never()).createNotification(any());
     }
 
     @Test
