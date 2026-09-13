@@ -156,6 +156,15 @@
 # pure leaf in this file (it has zero outgoing edges into any module, confirmed by grep), so this
 # cannot create a new cycle - the same reasoning as the `catalog -> shared`/`inventory -> shared`
 # additions above.
+#
+# Eighth reviewed addition (2026-09-13, .specs/phase-6-inventory/log.md T-6c-11/T-6c-12):
+# `inventory -> shared`, from the new v1 controllers (SiteInventoryController,
+# SiteInventoryMutationController) reading shared.web.AuthorizedSiteContextHolder (the same
+# site-scoped-controller pattern sites.api.SiteLocationController already uses via `sites ->
+# shared`) and, for the mutation controller, calling shared.idempotency.CommandIdempotencyService
+# and reading shared.correlation.IdempotencyKeyContext.HEADER_NAME (Q-6c-3/T-6c-10/T-6c-12).
+# `shared` remains a pure leaf in this file (zero outgoing edges, confirmed by grep), so this
+# cannot create a new cycle - same reasoning as every other `<module> -> shared` addition above.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -201,6 +210,7 @@ inventory -> identity
 inventory -> models
 inventory -> repositories
 inventory -> services
+inventory -> shared
 inventory -> sites
 inventory -> utils
 inventory -> validation

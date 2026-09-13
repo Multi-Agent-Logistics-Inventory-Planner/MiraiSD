@@ -1,5 +1,122 @@
 # Validation
 
+## 6c — Scoped inventory backend (T-6c-11..T-6c-17 checkpoint) — 2026-09-13
+
+Environment: JDK 21, `./mvnw` from `services/inventory-service`, `npm` from `packages/api-client`.
+Full task-by-task detail (what changed, test names, self-review findings and fixes) is in
+`.specs/phase-6-inventory/log.md`'s "6c implementation (T-6c-11..T-6c-17)" section and its
+"Checkpoint self-review findings" subsection; this section records the final, independently-rerun
+verification state after every fix from `review.md` landed.
+
+## Command and scope
+
+```sh
+cd services/inventory-service
+./mvnw -q clean test-compile
+./mvnw -q clean test
+./mvnw test -Dtest='*IT'
+./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'
+./mvnw -q clean test-compile && ./mvnw -q -Dtest=ArchitectureTest test   # run #1
+./mvnw -q clean test-compile && ./mvnw -q -Dtest=ArchitectureTest test   # run #2, independent
+./mvnw -q -Dtest=OpenApiContractExportTest test
+cd ../../packages/api-client && npm run generate
+```
+
+## Result
+
+- `./mvnw -q clean test-compile` — PASS, clean, zero errors.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java`) — PASS, exit 0,
+  every surefire report green.
+- `./mvnw test -Dtest='*IT'` — **474 tests, 8 failures, 0 errors.** All 8 failures are exactly
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` (pre-existing, order-fragile
+  H2-native-SQL debt documented in log.md, confirmed unrelated to this checkpoint's changes — this
+  session never touched `AnalyticsService`/`ForecastService`).
+- `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'` — PASS,
+  exit 0, 466/466, confirming the 8 failures above are the sole, already-known source of red and
+  this checkpoint introduces zero new failures.
+- `./mvnw -q -Dtest=ArchitectureTest test`, run after two independent `./mvnw -q clean
+  test-compile` rebuilds — PASS both times; `git status --porcelain` on
+  `archunit_store/`/`archunit.properties` empty both times (no frozen-store regeneration needed).
+  The one genuinely new module-dependency edge this checkpoint introduces (`inventory -> shared`,
+  from the v1 controllers reading `shared.web`/`shared.idempotency`/`shared.correlation`) is
+  recorded as the file's eighth reviewed addition in
+  `src/test/resources/module-dependency-edges-baseline.txt`.
+- `./mvnw -q -Dtest=OpenApiContractExportTest test`, then `git diff --stat
+  packages/contracts/openapi.json` — 590 insertions, 0 deletions, stable across repeated runs. Six
+  new paths added (`/api/v1/sites/{siteId}/inventory/{totals,products/{productId},
+  locations/{locationId},movements,adjustments,transfers}`); every existing legacy
+  path/operation/schema byte-identical (confirmed by inspecting the diff for any `-` line — none).
+- `npm run generate` in `packages/api-client`, then `git diff --stat
+  packages/api-client/src/schema.d.ts` — 465 insertions, 0 deletions.
+- Individually (all real, this session, re-run after every self-review fix landed):
+  - `SiteInventoryControllerSecurityIT` — 11/11 pass (role/site matrix, foreign-site `siteId` 403,
+    unknown `siteId` 404, foreign-site entity id 404, per-site product isolation).
+  - `SiteInventoryMutationControllerAtomicityIT` — 4/4 pass (rollback-together with no surviving
+    idempotency row on failure; commit-together on success; replay does not re-invoke the command
+    or duplicate effects; foreign-site source inventory rejected before any write).
+  - `SiteInventoryMutationCrossSiteDestinationIT` — 1/1 pass, real Postgres (foreign-site implicit
+    destination location rejected, the speculative destination-row insert rolls back with it).
+  - `SiteInventoryMutationControllerSecurityIT` — 11/11 pass (401/403/400-missing-header/201 role
+    matrix; outbox `idempotencyKey` matches the HTTP header end-to-end; HTTP-level replay does not
+    duplicate the effect; a fingerprint-conflicting replay returns 409; foreign-site
+    location/source-inventory 404s before any write on both adjustments and transfers; same-site
+    transfer succeeds).
+  - `LegacyInventoryDeprecationHeadersIT` — 3/3 pass (RFC 8941/RFC 8288 header shapes present with
+    no `Sunset` on legacy inventory/stock-movement routes, absent on the v1 route).
+  - `ProductStockStateWriterCallerSetTest` — 1/1 pass (caller set pinned to exactly
+    `StockMovementService`/`KujiBoxService`).
+  - `StockStateGlobalAggregationIT` — 2/2 pass, real Postgres, two sites (global sum/derivation
+    across sites for `syncProductTotals`/`calculateTotalInventory`).
+  - `InventoryEgressAfterIT` — 3/3 pass, real Postgres (AC-8 after-measurement numbers below).
+- `git diff --check` — PASS, no whitespace errors introduced.
+
+## Acceptance criteria evidence
+
+- **AC-1** (facade boundary): unaffected by this slice beyond the new v1 controllers themselves
+  depending only on already-approved `inventory.application`/`shared.*` — no new
+  `inventory.infrastructure` leak, confirmed by the stable `ArchitectureTest` runs above.
+- **AC-3** (trusted site context, foreign-site rejection, concurrent/idempotent-retry proof):
+  `SiteInventoryControllerSecurityIT`/`SiteInventoryMutationControllerSecurityIT`/
+  `...AtomicityIT`/`...CrossSiteDestinationIT` above — every v1 route reads the site off
+  `AuthorizedSiteContextHolder`, a foreign-site id 404s before any write (both for an inventory id
+  and an implicit destination location), and idempotent replay is proven both at the direct-call
+  level (`@SpyBean` invocation-count assertion) and over real HTTP (duplicate-effect and
+  fingerprint-conflict-409 assertions).
+- **AC-4** (durable envelope, atomicity, idempotency context): the v1 mutation path's idempotency
+  record commits/rolls back in the same transaction as inventory/movement/outbox
+  (`SiteInventoryMutationControllerAtomicityIT`), and the outbox event's `idempotencyKey` matches
+  the HTTP header end-to-end (`SiteInventoryMutationControllerSecurityIT`). Q-6c-4's Kafka
+  partition-key cutover to production remains **not** part of this evidence — it is a
+  separately-authorized deploy-time action per P-6, unchanged from T-6c-8's own recorded scope.
+- **AC-5** (v1 DTOs, slim/batched totals, zero-stock correctness, contract regen, legacy
+  compatibility): `SiteInventoryControllerSecurityIT`'s per-site isolation and empty-entries cases;
+  `InventoryEgressAfterIT`'s full-catalog (25 rows, row-per-product guarantee preserved) and
+  known-ids-batch (exactly the requested ids) cases; `OpenApiContractExportTest`'s pure-additive
+  diff; `LegacyInventoryDeprecationHeadersIT`'s proof that legacy routes are unmodified in
+  behavior/status and only gain headers.
+- **AC-6**: not this slice's scope (6d, web adoption) — no claim made.
+- **AC-7** (coalesced/bounded refresh): partial backend-side evidence only —
+  `InventoryEgressAfterIT`'s known-ids case proves the batched query returns exactly the requested
+  ids (proportional cost, not full-catalog, not one-request-per-product) and
+  `InventoryTotalsRepository.MAX_PRODUCT_IDS_BATCH_SIZE` (T-6c-5) is the documented ceiling. The
+  browser/realtime coalescing itself is 6e's; not claimed complete here.
+- **AC-8** (before/after measurement): `InventoryEgressAfterIT`'s recorded numbers, diffed against
+  the round-2 baseline in log.md:
+  - Full-catalog totals: apiBytes 9445 → 2715 (−71%), DB-side projected bytes 4078 → 1023 (−75%),
+    same row/statement counts (25 rows, 1 statement) both before and after.
+  - Known-ids batch (3 of 25 products): apiBytes 355, dbRows 3, 1 statement — proportional to the
+    requested ids, not the catalog size, and not one request per product.
+  - Movements page vs. legacy audit-log page: recorded as a non-equivalent, honest data point (the
+    two endpoints operate at different granularities — audit-log entries vs. raw movements — per
+    log.md's explicit note), not forced into a false before/after pair.
+  - The full phase-exit gate (all of AC-1–8, including the browser/realtime half of AC-7/AC-8)
+    remains 6e's; this evidence is what 6e regresses against, not a claim that AC-8 is closed.
+
+Result: **6c (T-6c-0 through T-6c-17) satisfies its checkpoint scope.** All four review findings
+were fixed and re-verified above. Production readiness for Q-6c-1 (backfill/deploy confirmation)
+and Q-6c-4 (Kafka partition-key cutover) remain explicitly outstanding, gated on separate
+authorization, and are not claimed as validated by this entry.
+
 ## 6b re-review — 2026-09-10
 
 From `services/inventory-service`, using JDK 21 and the project wrapper:

@@ -237,13 +237,11 @@
   expression index). `CommandIdempotencyService`'s replay check now compares `commandType` in
   addition to `requestFingerprint` before replaying a stored result. The T-6c-9 consumer-dedup gap
   remains open, reiterated as real/unfinished AC-4 work by the review, not attempted.
-- Next action: T-6c-11 (v1 read routes: `GET /api/v1/sites/{siteId}/inventory/totals`,
-  `/products/{productId}`, `/locations/{locationId}`, `/movements`) per the task list's ordering —
-  see "6c task list" above for exact scope, including the `siteAttribution: "UNKNOWN"` marker
-  Q-6c-5 requires on null-site movement rows and the springdoc operation-id collision trap
-  `SiteLocationController:27-38` already records. T-6c-12 (v1 mutation routes) is the task that
-  actually wires `CommandIdempotencyService` to the `Idempotency-Key` header via
-  `AuthorizedSiteContextHolder`.
+- **Superseded — see the "Current handoff (superseding the 'Next action' note above)" subsection
+  under "6c implementation (T-6c-11..T-6c-17)" further down this file for the current status: 6c is
+  now complete (T-6c-0 through T-6c-17, checkpoint review and validation all done).** This bullet is
+  left in place as history of what was still pending at the point it was written, not as the
+  current state.
 - Last verified (T-6c-8, this session): `./mvnw -q clean test-compile` clean; `./mvnw -q clean
   test` — 355 tests summed across 61 surefire reports, 0 failures/errors (up from 348 by 7 new
   unit tests); `./mvnw -q test -Dtest='*IT'` — 431 tests (up from 419 by 3 new IT methods), 8
@@ -2778,6 +2776,266 @@ fixed same session.
 ### No new Q-6c-N
 
 Both are bug fixes within already-scoped T-6c-8/T-6c-10 behavior, not new design decisions.
+
+## 6c implementation (T-6c-11..T-6c-17) (2026-09-13)
+
+Implements T-6c-11 through T-6c-17 from the task list, plus the 6c checkpoint gate. T-6c-0 through
+T-6c-10 (already committed as `9115384`) are unchanged by this session.
+
+- **T-6c-11 — v1 read routes.** New `inventory.api.SiteInventoryController`
+  (`/api/v1/sites/{siteId}/inventory`): `GET /totals` (optional `productIds`, delegates to
+  `InventoryQueries.findInventoryTotalsBySite`), `GET /products/{productId}` (delegates to a new
+  `InventoryAggregateService.getInventoryByProductAndSite`, backed by a new
+  `LocationInventoryRepository.findByProduct_IdAndSite_Id`; a product with no inventory at this
+  site returns `entries: []`, not 404 — absence-of-stock is not absence-of-product, per F-6c-3),
+  `GET /locations/{locationId}` (validates the location belongs to the site via
+  `LocationService.getLocationById(siteId, id)` before querying, so a foreign-site/unknown
+  location 404s instead of silently returning an empty list indistinguishable from "no inventory
+  here"; new slim `SiteLocationInventoryEntryDTO`, no catalog metadata per F-6c-9), `GET
+  /movements` (`itemId` param selects per-product history, else a filtered audit-log page; new
+  `SiteStockMovementResponseDTO` carries `siteAttribution: "UNKNOWN"` for a null-`site` row per
+  Q-6c-5, omitted otherwise). Distinct handler/DTO names from
+  `InventoryAggregateController`/`StockMovementController` per F-6c-1/the `SiteLocationController`
+  precedent. Role requirement mirrors the legacy endpoints (`ADMIN`/`ASSISTANT_MANAGER`/`EMPLOYEE`).
+  - Test: `SiteInventoryControllerSecurityIT` (11 cases) — role/site matrix, foreign-site `siteId`
+    (403), unknown `siteId` (404), a location belonging to another site (404), a product's
+    per-site isolation (site A's row only, not site B's). 11/11 pass.
+- **T-6c-12 — v1 mutation routes.** New `inventory.api.SiteInventoryMutationController`:
+  `POST /adjustments`, `POST /transfers`, both requiring the `Idempotency-Key` header
+  (`@RequestHeader`, no `required = false`) and running through
+  `shared.idempotency.CommandIdempotencyService.executeIdempotent` with the trusted
+  `AuthorizedSiteContext`'s site/user and a SHA-256 hash of the canonical request JSON as the
+  fingerprint (hashed, not the raw JSON, since the entity column has no explicit length override
+  and a batch body could exceed a default `varchar(255)`). Same-site enforcement per T-6c-4: new
+  site-scoped overloads `StockMovementService.batchAdjustInventory(siteId, request)` (validates
+  `request.getLocationId()` belongs to `siteId` via `LocationService.getLocationById`, which
+  transitively confines every adjustment line since each is already required to belong to that
+  location) and `.transferInventory(siteId, request)`/`.batchTransferInventory(siteId,
+  batchRequest)` (validate each transfer's source inventory belongs to `siteId` via a new
+  `requireInventoryBelongsToSite` — `requireSameSite` already forces the destination to match, so
+  checking the source alone confines the whole transfer). New `shared.correlation
+  .IdempotencyKeyFilter` (mirrors `CorrelationIdFilter` exactly) carries the header into
+  `IdempotencyKeyContext`'s MDC for the whole request so `EventOutboxService` (already reading
+  `IdempotencyKeyContext.current()` since T-6c-8) picks it up automatically; registered in
+  `SecurityConfig` right after `CorrelationIdFilter`. Does not enforce the header's presence
+  itself — only the v1 mutation routes require it, via their own `@RequestHeader`.
+  - Test: `SiteInventoryMutationControllerAtomicityIT` (4 cases, direct bean-method calls +
+    manually driven `AuthorizedSiteContextHolder`, no MockMvc — same reasoning
+    `StockMovementOutboxAtomicityIT` recorded for not extending `BaseIntegrationTest`): a failure
+    inside the guarded command rolls back inventory/movement/outbox **and** leaves no idempotency
+    row (Q-6c-3's "no idempotency row survives a failed attempt"); success commits all four
+    together; a replay with the same key+body does not re-invoke
+    `StockMovementService.batchAdjustInventory` (verified via `@SpyBean`) and produces no
+    duplicate effect; a foreign-site inventory id is rejected before any write. 4/4 pass.
+    `SiteInventoryMutationControllerSecurityIT` (11 cases, real HTTP via `BaseIntegrationTest`):
+    401/403/400(missing header)/201 role matrix, the outbox row's `idempotencyKey` matches the
+    HTTP header value end-to-end, an HTTP-level replay doesn't duplicate the effect, a
+    fingerprint-conflicting replay returns 409, a foreign-site location/source-inventory 404s
+    before any write on both adjustments and transfers, and a same-site transfer succeeds. 11/11
+    pass.
+- **T-6c-13 — legacy compatibility and deprecation.** New `inventory.api
+  .LegacyInventoryDeprecationFilter`/`LegacyInventoryDeprecationConfig`, byte-for-byte mirroring
+  `catalog.api.LegacyCatalogDeprecationFilter`/`Config` (`Deprecation`/`Link` headers, no
+  `Sunset`), registered for `/api/inventory/*` and `/api/stock-movements/*` only.
+  `/api/locations/{id}/inventory` (`LocationInventoryController`) is left alone this pass, per the
+  task's own scope note. Legacy endpoints' behavior/response bodies are otherwise untouched.
+  - Test: `LegacyInventoryDeprecationHeadersIT` (3 cases) — headers present with the correct RFC
+    8941/RFC 8288 shapes and no `Sunset` on `/api/inventory/totals` and
+    `/api/stock-movements/audit-log`, absent on `/api/v1/sites/{siteId}/inventory/totals`. The
+    totals case asserts headers without asserting a 200: `InventoryTotalsRepository
+    .findAllInventoryTotals()`'s native SQL can 500 under the shared H2 `*IT` datasource depending
+    on unrelated data committed by other IT classes (order-dependent, confirmed pre-existing and
+    unrelated to this filter — see the new open risk below), the same accommodation
+    `LegacyCatalogDeprecationHeadersIT` already made for `/api/suppliers`. 3/3 pass.
+- **T-6c-14 — contract and client regeneration.** `packages/contracts/openapi.json` regenerated via
+  `OpenApiContractExportTest` (590 lines added, 0 removed — six new paths:
+  `/api/v1/sites/{siteId}/inventory/{totals,products/{productId},locations/{locationId},
+  movements,adjustments,transfers}`; every existing legacy path/operation/schema byte-identical).
+  `packages/api-client/src/schema.d.ts` regenerated via `npm run generate` in `packages/api-client`
+  (465 lines added, 0 removed). Re-ran `OpenApiContractExportTest` standalone after the fact: the
+  diff is stable (no further change).
+- **T-6c-15 — stock-state compatibility guard (Row 4).** No production code changed, per the task's
+  own "no production code by design." New `architecture.ProductStockStateWriterCallerSetTest`
+  (ArchUnit, mirrors `InventoryOperationsCallerSetTest`'s discipline) pins
+  `ProductStockStateWriter`'s exact caller set to
+  `inventory.application.StockMovementService`/`services.KujiBoxService` — a future caller
+  reinterpreting global activity per-site fails this loudly. New
+  `inventory.application.StockStateGlobalAggregationIT` (real Postgres, two sites: MAIN and
+  SECOND) proves `syncProductTotals`/`calculateTotalInventory` sum quantity **across every site**:
+  a product stocked 5 at MAIN and 7 at SECOND yields `products.quantity = 12`,
+  `products.isActive = true` after `syncProductTotals`; `calculateTotalInventory` alone returns
+  the same cross-site sum (3 + 4 = 7) for a second product. Confirmed by reading
+  `sumQuantitiesByProductIds`/`sumQuantityByProductId` (both plain, unfiltered-by-site queries) and
+  `calculateTotalInventory`/`syncProductTotals`'s call chain that none of the three take a site
+  parameter anywhere — this is pinning already-correct, already-global behavior (F-6c-4's
+  intended resolution), not fixing a bug.
+  - Test: both new tests above. 1/1 (caller-set) + 2/2 (global aggregation) pass.
+- **T-6c-16 — boundary and documentation updates.** `ArchitectureTest` stayed at its expected shape
+  except one genuinely new edge the task list itself flagged as the signal to watch for:
+  `inventory -> shared` (the new v1 controllers reading `shared.web.AuthorizedSiteContextHolder`
+  and, for the mutation controller, `shared.idempotency.CommandIdempotencyService`/`shared
+  .correlation.IdempotencyKeyContext`). Added as the file's documented eighth reviewed addition in
+  `module-dependency-edges-baseline.txt` — `shared` remains a pure leaf (zero outgoing edges), so
+  this cannot introduce a cycle, same reasoning as every prior `<module> -> shared` addition.
+  **No `archunit_store/` frozen-store regeneration was needed** (confirmed across two independent
+  clean rebuilds, `git status --porcelain` empty both times) — exactly what the task predicted,
+  since the v1 controllers depend only on already-approved `inventory.application`,
+  `shared.web`/`shared.idempotency`/`shared.correlation`, and `identity`-adjacent context types,
+  no other module's `api`. Documented the Row 4 resolution (global `products.quantity`/
+  `is_active`, `ProductStockStateWriter`'s pinned caller set), the T-6c-4 same-site transfer
+  precondition, and durable command idempotency's table ownership in
+  `docs/specs/spring-domain-modular-monolith.md` §9. Recorded the six new v1 routes (and their
+  deliberate merge into one `inventory` route family rather than a separate `stock-movements`
+  family the original baseline table predicted) in `docs/baseline/api-v1-map.md`'s new
+  "Implemented so far" section.
+- **T-6c-17 — AC-8 "after" measurement.** New `inventory.application.InventoryEgressAfterIT`,
+  same fixed 25-product/3-location/every-third-zero-stock fixture as `InventoryEgressBaselineIT`
+  (T-6c-0), same `Measurement`/`DbQuery`/`measureDbEgress` technique, measuring the v1 slim/batched
+  totals path and the v1 movements path. Diffed against the **round-2** (final) baseline numbers
+  recorded in the "6c implementation (T-6c-0..T-6c-3)" entry above, not either superseded set:
+  - `GET /api/v1/sites/{siteId}/inventory/totals`, full 25-product catalog: **1 statement,
+    apiRows=25, apiBytes=2715, dbRows=25, projectedDbBytesEstimate=1023** — vs. the legacy baseline's
+    **1 statement, apiRows=25, apiBytes=9445, dbRows=25, projectedDbBytesEstimate=4078**. Same row
+    count and statement count (both are one unfiltered query over the same 25-row catalog); apiBytes
+    drops ~71% (9445 → 2715) and the independent DB-side byte estimate drops ~75% (4078 → 1023) from
+    dropping sku/name/imageUrl/category/parentCategory/unitCost/isActive per row (F-6c-9's slim DTO).
+  - `GET /api/v1/sites/{siteId}/inventory/totals?productIds=...`, 3 known ids: **1 statement,
+    apiRows=3, apiBytes=355, dbRows=3, projectedDbBytesEstimate=150** — proportional to the 3
+    requested ids, not the 25-product catalog (12% of the products, 13% of the full-catalog slim
+    response's bytes) and not 3 separate requests either (1 statement). This is AC-7's real ceiling
+    made concrete: a known-IDs refresh costs proportionally to what changed, not to catalog size.
+  - `GET /api/v1/sites/{siteId}/inventory/movements`, page 0/size 20: **1 statement, apiRows=16,
+    apiBytes=4683, dbRows=16, projectedDbBytesEstimate=2142**. Not directly comparable to the
+    legacy audit-log baseline's numbers (**1 statement, apiRows=1, apiBytes=825, dbRows=1,
+    projectedDbBytesEstimate=198**) — the legacy baseline's fixture seeded exactly one audit-log
+    row (one batch operation), while this measures a full page of the 16 individual stock-movement
+    rows the same fixture's 16 stocked products generate; the two endpoints operate at different
+    granularities (audit-log entries vs. raw movements) and this record does not claim they are
+    interchangeable. Recorded as an honest data point, not forced into a false before/after pair.
+  - The browser/realtime half of AC-8 (coalesced refresh, request/query counts across a live
+    session) remains 6e's, per the task list's own scope note — nothing here claims that half is
+    measured.
+  - Test: the three cases above, 3/3 pass, numbers logged at INFO and copied here per AC-8's
+    "observed, not assumed" requirement.
+
+### Checkpoint self-review findings (2026-09-13, before the independent review pass)
+
+Two findings caught while re-reading the T-6c-12 diff critically, both fixed same session:
+
+- **Standards, test-coverage gap:** T-6c-4's cross-site rejection for an *implicit*
+  `destinationLocationId` (as opposed to an explicit foreign-site `sourceInventoryId`, which
+  T-6c-12's own tests already covered) was untested at the v1 mutation route. Tracing the code
+  confirmed the underlying mechanism (`requireSameSite` inside `executeTransfer`) still catches it,
+  but only *after* `insertLocationInventoryIfAbsent` has already speculatively inserted the
+  destination row — a real write, rolled back by the enclosing `@Transactional`, not "no write at
+  all." Added `SiteInventoryMutationCrossSiteDestinationIT` to prove the rollback actually holds
+  (no permanent `location_inventory` row at the foreign destination, no `StockMovement` for the
+  product, no idempotency record).
+- **Standards, false-positive test:** that new test was first written inside
+  `SiteInventoryMutationControllerAtomicityIT` (H2, `test` profile). It "passed," but for the wrong
+  reason — H2 rejects `insertLocationInventoryIfAbsent`'s native `INSERT ... ON CONFLICT` with a
+  syntax error before `requireSameSite` ever runs, so the test wasn't exercising the intended
+  mechanism at all. Caught by inspecting *why* it passed, not just that it passed. Fixed by moving
+  it to its own class extending `BaseKafkaIntegrationTest` (real Postgres), where it now genuinely
+  exercises `requireSameSite`'s rejection path.
+- A third issue surfaced only when the full `*IT` sweep ran (not in isolation): that same new
+  test's `stockMovementRepository.findAll()).isEmpty()`/`eventOutboxRepository.findAll()
+  ).isEmpty()` assertions are unsafe under the shared, cross-class-persistent Testcontainers
+  Postgres instance the whole `*IT` suite shares — a residual row from a same-JVM-run class
+  running immediately before it made the table non-empty, and AssertJ's own failure-message
+  rendering then threw `LazyInitializationException` trying to `toString()` a movement's
+  already-detached `AuditLog` association, masking the real cause. Fixed by scoping the assertion
+  to this test's own product id (`findByItem_IdOrderByAtDesc`) instead of the whole table,
+  matching the tracked-id isolation discipline `InventoryEgressBaselineIT`'s own review fix
+  already established for exactly this shared-container hazard.
+
+### Verification (T-6c-11..T-6c-17, actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean, zero errors, re-run repeatedly through the slice
+  including after the self-review fixes above.
+- `./mvnw -q clean test` (full unrestricted suite, plain `test` — skips `*IT.java`) — exit 0, all
+  green (no new unit-test failures introduced across the whole slice).
+- `./mvnw -q test -Dtest='*IT'` (final run, after the self-review fixes) — **474 tests, 8
+  failures, 0 errors**, all 8 exactly `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+  (the pre-existing order-fragile H2-native-SQL debt already documented above, e.g. under "New
+  standing risk discovered this session" earlier in this log) — confirmed not a regression by
+  `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`, exit
+  0. An intermediate run (before the assertion-scoping fix above) additionally showed one error in
+  the not-yet-fixed `SiteInventoryMutationCrossSiteDestinationIT` and, in an earlier intermediate
+  run still, one failure in `LegacyInventoryDeprecationHeadersIT.getInventoryTotals_
+  carriesDeprecationHeaders` (a `ClassCastException` in `InventoryTotalsRepository
+  .findAllInventoryTotals()`'s native-SQL row mapper casting a joined UUID column) — confirmed the
+  SAME class of pre-existing, order-dependent H2-native-SQL fragility (not a regression: this
+  session never touched `INVENTORY_TOTALS_SQL` or its mapping code) and fixed the *test*, not
+  production code, by relaxing that one assertion to check headers without asserting a 200
+  (matching `LegacyCatalogDeprecationHeadersIT`'s existing `/api/suppliers` precedent) rather than
+  papering over or "fixing" a native-SQL bug outside this record's scope. Both intermediate issues
+  are fully resolved in the final 474-test/8-failure run above.
+- `./mvnw -q -Dtest=ArchitectureTest test`, run after two independent `./mvnw -q clean
+  test-compile` rebuilds (re-confirmed after the self-review fixes, not just once before them) —
+  both green, `git status --porcelain` on `archunit_store/`/`archunit.properties` empty both times
+  (no frozen-store regeneration needed, as T-6c-16 predicted).
+- `./mvnw -q -Dtest=OpenApiContractExportTest test`, then `git diff --stat
+  packages/contracts/openapi.json` — 590 insertions, 0 deletions, stable across a second run.
+  `npm run generate` in `packages/api-client` then `git diff --stat
+  packages/api-client/src/schema.d.ts` — 465 insertions, 0 deletions.
+- Individually, all re-run after the self-review fixes: `SiteInventoryControllerSecurityIT` 11/11,
+  `SiteInventoryMutationControllerAtomicityIT` 4/4 (one test moved out, see below),
+  `SiteInventoryMutationCrossSiteDestinationIT` 1/1 (new, real Postgres),
+  `SiteInventoryMutationControllerSecurityIT` 11/11, `LegacyInventoryDeprecationHeadersIT` 3/3,
+  `ProductStockStateWriterCallerSetTest` 1/1, `StockStateGlobalAggregationIT` 2/2,
+  `InventoryEgressAfterIT` 3/3.
+
+### New open risk (not fixed, recorded per the ground rules)
+
+- **`InventoryTotalsRepository.findAllInventoryTotals()`'s native SQL is order-fragile under the
+  shared H2 `*IT` datasource**, the same class of pre-existing debt as
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` (documented earlier in this log
+  under "New standing risk discovered this session"): a `ClassCastException` casting a joined
+  `category`/`parent` UUID column to `java.util.UUID` (H2 returns `byte[]` for a UUID column in
+  some join/JDBC-metadata-caching states), depending on what other IT classes committed to the
+  shared instance before it runs. Confirmed pre-existing (this session never touched
+  `INVENTORY_TOTALS_SQL` or its row mapper) and confirmed NOT limited to the two previously-named
+  classes — `LegacyInventoryDeprecationHeadersIT` newly hit it this session purely from order
+  perturbation. `T-6c-0`'s and `T-6c-17`'s own baseline/after measurements never hit this because
+  `InventoryEgressBaselineIT`/`InventoryEgressAfterIT` both extend `BaseKafkaIntegrationTest` (real
+  Postgres), not the shared H2 `test` profile. Not fixed here (same reasoning as the
+  Analytics/Forecast debt: fixing `InventoryTotalsRepository`'s native SQL or giving H2-fragile
+  classes an isolated persistence context is a real, separate task, not a side effect of 6c's
+  scope). A future session should either make `INVENTORY_TOTALS_SQL`'s UUID columns cast safely
+  under H2 or isolate the affected test classes' persistence context.
+
+### No new Q-6c-N
+
+Every choice in T-6c-11..T-6c-17 was already resolved by Q-6c-1 through Q-6c-5 or was a routine
+implementation detail (e.g. hashing the idempotency fingerprint, the exact slim-DTO field sets, the
+`/inventory` vs. `/stock-movements` v1 route family merge) recorded as an assumption above, not
+requiring a new user decision.
+
+### Current handoff (superseding the "Next action" note above)
+
+- Status: **6c complete.** T-6c-0 through T-6c-17 all implemented and independently verified.
+  Checkpoint review (Standards + Spec passes) recorded in `review.md`; full validation recorded in
+  `validation.md`.
+- Next action: 6d (web adoption) is next per the phase spec's checkpoint sequence, NOT started by
+  this record. Before starting 6d: confirm Q-6c-1's production deploy/backfill status if 6d's web
+  layer needs to trust `/api/v1/sites/{siteId}/inventory/movements`'s completeness assumption in
+  production (P-1's gate); Q-6c-4's Kafka partition-key cutover (verify partition count, coordinate
+  a drain, confirm consumer ordering tolerance) is a separately-authorized deploy-time action this
+  record explicitly does NOT close, unchanged from T-6c-8's entry above — AC-4 is not "complete"
+  against production until that gate is actually passed and recorded.
+- Surviving decisions: one branch/PR, five logical commits/checkpoints (6a-6e); no per-task
+  record/commit/review gate within a checkpoint, only at checkpoint boundaries (per the shared SDD
+  review cadence).
+- Last verified: see "Verification (T-6c-11..T-6c-17...)" above — `./mvnw -q clean test` exit 0;
+  `./mvnw -q test -Dtest='*IT'` 474 tests, 8 failures (both documented pre-existing debt classes,
+  0 new); `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
+  exit 0 (466/466); `ArchitectureTest` stable across two independent clean rebuilds;
+  `OpenApiContractExportTest` and the TS client regeneration both stable/pure-additive.
+- Open risks/questions: Q-6c-1 (production deploy/backfill status) and Q-6c-4's cutover remain
+  open exactly as before, unchanged by this session. New: the `InventoryTotalsRepository` H2
+  native-SQL order-fragility above (debt, not a 6c blocker). R-9 (`LocationInventoryController` not
+  moved into `inventory.api`) remains open, unchanged, out of 6c's scope.
 
 ## Assumptions and decisions
 

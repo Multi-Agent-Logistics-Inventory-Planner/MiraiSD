@@ -235,6 +235,21 @@ The following are required:
 - Site-specific uniqueness includes `site_id`.
 - Cache, idempotency, realtime and event keys include site identity where collisions are possible.
 - System-administrator bypasses are explicit, audited and tested.
+- Cross-site joins are prohibited except in explicit, audited transfer workflows. Until `transfers`
+  exists (this table's own module, above), `inventory.application.StockMovementService` rejects a
+  transfer whose source and destination sites differ (.specs/phase-6-inventory 6c, T-6c-4) rather
+  than writing a silent cross-site movement.
+- `products.quantity`/`products.is_active` remain deliberately **global** (summed/derived across
+  every site), not site-scoped, until `inventory` fully owns quantity and per-site assortment
+  (`site_products`) fully owns activity (.specs/phase-6-inventory 6c, T-6c-15, Row 4 of the 6b
+  worksheet). `catalog.application.ProductStockStateWriter` is the sole write surface for these two
+  columns; its caller set is pinned to exactly
+  `inventory.application.StockMovementService`/`services.KujiBoxService`
+  (`ProductStockStateWriterCallerSetTest`) so a future per-site reinterpretation of either column is
+  a loud test failure, not a silent behavior change.
+- Durable command idempotency (`Idempotency-Key` on a v1 mutation route) is `shared.idempotency`'s
+  table, keyed `(site_id, user_id, idempotency_key)` with the trusted `AuthorizedSiteContext`'s
+  site/user, never a client-supplied value (.specs/phase-6-inventory 6c, T-6c-10/T-6c-12).
 
 ## 10. API and DTO rules
 

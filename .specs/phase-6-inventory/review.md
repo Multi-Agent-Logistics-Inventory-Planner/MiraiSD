@@ -1,5 +1,87 @@
 # Review
 
+## 6c — Scoped inventory backend (T-6c-11..T-6c-17 checkpoint) — 2026-09-13
+
+**Methodology note:** this checkpoint's review was performed as a critical self-review pass over
+the completed diff (T-6c-11 through T-6c-17), not a separately-invoked review agent — the session
+that implemented this slice ran as a background fork with no ability to spawn a reviewer subagent.
+It follows the same two-pass discipline (Standards, then Spec, synthesized after) the earlier
+checkpoints used, and is held to the same bar: findings below were only accepted after tracing the
+actual code path and, where a fix was made, re-running the affected tests against real Postgres to
+confirm the fix closes the gap rather than papering over it. This is recorded as a residual-risk
+caveat, not hidden — the PR gate remains the authoritative independent proof per AGENTS.md.
+
+**Scope reviewed:** T-6c-11 (v1 read routes), T-6c-12 (v1 mutation routes, idempotency wiring),
+T-6c-13 (legacy deprecation), T-6c-14 (contract/client regeneration), T-6c-15 (stock-state
+compatibility guard), T-6c-16 (boundary/doc updates), T-6c-17 (AC-8 after-measurement), against
+spec.md's AC-1, AC-3, AC-4, AC-5, and the portions of AC-7/AC-8 this slice's backend work touches.
+
+### Findings
+
+- **[Standards] act on — cross-site destination-location gap untested.** T-6c-12's site-scoped
+  `StockMovementService.transferInventory(siteId, request)` validates only the *source* inventory's
+  site before delegating to the un-scoped method; an implicit `destinationLocationId` at a
+  different site was not separately covered by any new test, even though the underlying
+  `requireSameSite` check (T-6c-4) still catches it. Tracing the code found that check runs *after*
+  `LocationInventoryRepository.insertLocationInventoryIfAbsent` has already speculatively inserted
+  the destination row — a real write, rolled back by the enclosing `@Transactional`, not "no write
+  at all" in the strictest sense. **Fixed:** added
+  `SiteInventoryMutationCrossSiteDestinationIT.transfer_foreignSiteImplicitDestinationLocation_
+  rollsBackTheSpeculativeInsert`, proving no permanent `location_inventory` row survives at the
+  foreign destination and no `StockMovement`/idempotency row is left behind.
+- **[Standards] act on — that same new test was first written as a false positive.** Initially
+  added inside `SiteInventoryMutationControllerAtomicityIT` (H2 `test` profile), it "passed," but
+  for the wrong reason: H2 rejects `insertLocationInventoryIfAbsent`'s native
+  `INSERT ... ON CONFLICT` with a syntax error *before* `requireSameSite` ever runs, so the test
+  never exercised the intended rejection path. Caught by asking why it passed, not just that it
+  did. **Fixed:** moved to its own class, `SiteInventoryMutationCrossSiteDestinationIT`, extending
+  `BaseKafkaIntegrationTest` (real Postgres) — it now genuinely exercises `requireSameSite`.
+- **[Standards] act on — unsafe blanket-table assertion under the shared `*IT` Postgres instance.**
+  The same new test's first version asserted
+  `stockMovementRepository.findAll()).isEmpty()`/`eventOutboxRepository.findAll()).isEmpty()`,
+  which surfaced only when the *whole* `*IT` sweep ran (not in isolation): a residual row from a
+  same-JVM-run class executing immediately before it made the table non-empty, and AssertJ's own
+  failure-message rendering then threw `LazyInitializationException` trying to render a detached
+  `AuditLog` association, masking the real cause. **Fixed:** scoped the assertion to this test's
+  own product id (`stockMovementRepository.findByItem_IdOrderByAtDesc`), matching the tracked-id
+  isolation discipline `InventoryEgressBaselineIT`'s own review fix already established for
+  exactly this shared-container hazard.
+- **[Standards] act on — `@SneakyThrows` introduced a pattern with no other precedent in this
+  codebase.** `SiteInventoryMutationController.fingerprint()` used Lombok's `@SneakyThrows` around
+  `ObjectMapper.writeValueAsBytes`/`MessageDigest.getInstance`; grepping confirmed it is used
+  nowhere else in `inventory-service`, while `CommandIdempotencyService.serialize`/`deserialize`
+  (the class this very method feeds) explicitly catches and wraps in `IllegalStateException`.
+  **Fixed:** replaced with an explicit try/catch matching that existing convention.
+- **[Spec] No blocking findings.** AC-3 (trusted site context, foreign-site rejection, idempotent
+  retries tested) and AC-5 (v1 DTOs, slim/batched totals, zero-stock correctness, contract
+  regeneration, legacy compatibility with no unintended break) are satisfied for this slice's
+  scope. AC-4's envelope/atomicity requirements are unaffected by this slice except for confirming
+  the idempotency wiring integrates correctly through the v1 mutation path (proven by
+  `SiteInventoryMutationControllerAtomicityIT`/`...SecurityIT`); AC-4's Kafka partition-key cutover
+  (Q-6c-4) remains explicitly open, not claimed complete here. AC-6/AC-7's web/realtime halves
+  remain 6d/6e's, per the task list's own scope note — T-6c-17's numbers are backend-side evidence
+  feeding those later checkpoints, not a claim that they are closed.
+- **[Spec] Consider — recorded, not a blocker:** `InventoryTotalsRepository
+  .findAllInventoryTotals()`'s native SQL is order-fragile under the shared H2 `*IT` datasource
+  (a `ClassCastException` casting a joined UUID column, confirmed pre-existing and unrelated to
+  this slice's changes — see log.md's "New open risk" entry). Carried forward as debt for a future
+  session, same disposition as the pre-existing `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` debt this checkpoint did not introduce and does not fix.
+
+### Disposition
+
+**6c (T-6c-11..T-6c-17) approved**, all four "act on" findings fixed and re-verified in the same
+session (see validation.md's 6c entry for the exact commands/results). No finding required a
+production-code behavior change beyond the fingerprint-hashing refactor (style/consistency, not a
+functional fix) — the two real gaps found (cross-site destination coverage, the false-positive
+test) were test-coverage gaps, not production bugs; the underlying `requireSameSite`/idempotency
+mechanisms were already correct. Residual risks: Q-6c-1 (production deploy/backfill status) and
+Q-6c-4 (Kafka partition-key cutover) remain open, unchanged, both requiring separate authorization
+before AC-4/AC-8 can be called complete against production; the `InventoryTotalsRepository`
+H2 order-fragility above; R-9 (`LocationInventoryController` not moved into `inventory.api`)
+remains open, out of 6c's scope. This disposition does not extend to 6d (web adoption) or 6e
+(targeted refresh/exit proof).
+
 ## 6b re-review — 2026-09-10
 
 Reviewed the complete uncommitted 6b slice, including V58–V60, all changed movement writers,

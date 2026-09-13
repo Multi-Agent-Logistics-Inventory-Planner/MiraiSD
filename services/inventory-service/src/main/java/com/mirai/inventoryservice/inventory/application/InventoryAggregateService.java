@@ -62,6 +62,36 @@ public class InventoryAggregateService {
     }
 
     /**
+     * Site-scoped counterpart to {@link #getInventoryByProduct} (.specs/phase-6-inventory 6c,
+     * T-6c-11): only inventory rows at {@code siteId}, for the v1
+     * {@code GET .../inventory/products/{productId}} route. {@code entries} is empty (not a 404)
+     * for a product with no inventory rows at this site -- absence-of-stock is not
+     * absence-of-product (matches the zero-stock contract F-6c-3 established for totals).
+     */
+    public ProductInventoryResponseDTO getInventoryByProductAndSite(UUID siteId, UUID productId) {
+        ProductRef product = catalogQueries.getById(productId);
+
+        List<LocationInventory> inventories = locationInventoryRepository.findByProduct_IdAndSite_Id(productId, siteId);
+
+        List<ProductInventoryEntryDTO> entries = inventories.stream()
+                .map(this::mapToEntryDTO)
+                .sorted(Comparator.comparing(ProductInventoryEntryDTO::getLocationLabel, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        int totalQuantity = entries.stream()
+                .mapToInt(ProductInventoryEntryDTO::getQuantity)
+                .sum();
+
+        return ProductInventoryResponseDTO.builder()
+                .productId(product.id())
+                .productSku(product.sku())
+                .productName(product.name())
+                .totalQuantity(totalQuantity)
+                .entries(entries)
+                .build();
+    }
+
+    /**
      * Delete all inventory records for a product across all locations.
      * Required before deleting a product to avoid FK constraint violations.
      */

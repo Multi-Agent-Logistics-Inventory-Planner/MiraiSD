@@ -147,6 +147,21 @@ public class StockMovementService {
      *
      * Replaces the prior single-line adjustInventory; single adjusts are now a batch of 1.
      */
+    /**
+     * Site-scoped counterpart to {@link #batchAdjustInventory(BatchAdjustStockRequestDTO)}
+     * (.specs/phase-6-inventory 6c, T-6c-12, AC-3): validates the request's {@code locationId}
+     * belongs to {@code siteId} (404 for an unknown/foreign-site location, via
+     * {@code LocationService.getLocationById}) before any write, then delegates to the existing
+     * un-scoped method -- since every adjustment line is already required to belong to the same
+     * {@code locationId} (see the ownership check above), validating the location once transitively
+     * confines the whole batch to one site.
+     */
+    @Transactional
+    public List<StockMovement> batchAdjustInventory(UUID siteId, BatchAdjustStockRequestDTO request) {
+        locationService.getLocationById(siteId, request.getLocationId());
+        return batchAdjustInventory(request);
+    }
+
     @Transactional
     public List<StockMovement> batchAdjustInventory(BatchAdjustStockRequestDTO request) {
         List<BatchAdjustLineDTO> lines = request.getAdjustments();
@@ -549,6 +564,19 @@ public class StockMovementService {
      * Creates TWO stock movement records (withdrawal + deposit) linked to a single audit log.
      * If destination inventory doesn't exist, creates it automatically.
      */
+    /**
+     * Site-scoped counterpart to {@link #transferInventory(TransferInventoryRequestDTO)}
+     * (.specs/phase-6-inventory 6c, T-6c-12, AC-3): confirms the source inventory row belongs to
+     * {@code siteId} (404 via {@link LocationInventoryRepository#findByIdAndSite_Id}) before any
+     * write. {@link #requireSameSite} already forces the destination to match the source's site,
+     * so checking the source alone is sufficient to confine the whole transfer to one site.
+     */
+    @Transactional
+    public void transferInventory(UUID siteId, TransferInventoryRequestDTO request) {
+        requireInventoryBelongsToSite(siteId, request.getSourceInventoryId());
+        transferInventory(request);
+    }
+
     @Transactional
     public void transferInventory(TransferInventoryRequestDTO request) {
         List<TransferPlan> plans = planTransfers(List.of(request));
@@ -596,6 +624,25 @@ public class StockMovementService {
      * Pre-loads all source LocationInventory rows in a single query and defers
      * product active-status updates to a single sweep after the loop.
      */
+    /**
+     * Site-scoped counterpart to {@link #batchTransferInventory(BatchTransferInventoryRequestDTO)}
+     * (.specs/phase-6-inventory 6c, T-6c-12, AC-3): every transfer's source must belong to
+     * {@code siteId} before any write, same reasoning as the single-transfer overload.
+     */
+    @Transactional
+    public void batchTransferInventory(UUID siteId, BatchTransferInventoryRequestDTO batchRequest) {
+        for (TransferInventoryRequestDTO transfer : batchRequest.getTransfers()) {
+            requireInventoryBelongsToSite(siteId, transfer.getSourceInventoryId());
+        }
+        batchTransferInventory(batchRequest);
+    }
+
+    /** Throws {@link InventoryNotFoundException} (-> 404) if {@code inventoryId} isn't at {@code siteId}. */
+    private void requireInventoryBelongsToSite(UUID siteId, UUID inventoryId) {
+        locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+    }
+
     @Transactional
     public void batchTransferInventory(BatchTransferInventoryRequestDTO batchRequest) {
         List<TransferInventoryRequestDTO> transfers = batchRequest.getTransfers();

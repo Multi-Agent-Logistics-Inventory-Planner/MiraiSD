@@ -146,6 +146,14 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
     List<LocationInventory> findByLocation_IdAndSite_Id(@Param("locationId") UUID locationId, @Param("siteId") UUID siteId);
 
     /**
+     * Site-scoped counterpart to {@link #findByProduct_Id} (.specs/phase-6-inventory 6c, T-6c-11):
+     * every location carrying this product at one site, for the v1
+     * {@code GET .../inventory/products/{productId}} route.
+     */
+    @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl WHERE li.product.id = :productId AND li.site.id = :siteId")
+    List<LocationInventory> findByProduct_IdAndSite_Id(@Param("productId") UUID productId, @Param("siteId") UUID siteId);
+
+    /**
      * Site-scoped counterpart to {@link #sumQuantitiesByProductIds}: returns rows of
      * [productId UUID, totalQuantity Long] for the given products at one site only. Missing
      * products (no inventory at this site) mean total = 0 -- callers must treat absence as zero,
