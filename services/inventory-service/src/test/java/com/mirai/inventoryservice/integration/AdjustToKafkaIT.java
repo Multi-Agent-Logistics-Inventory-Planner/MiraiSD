@@ -223,14 +223,25 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         EventOutbox publishedEvent = eventOutboxRepository.findById(outboxEventId).orElseThrow();
         assertThat(publishedEvent.getPublishedAt()).isNotNull();
 
-        // Verify the message arrived in Kafka (retry to handle rebalancing delays)
+        // Verify the message arrived in Kafka. The topic is a static, shared Testcontainer
+        // across every test in this class, so a fresh earliest-offset consumer also sees
+        // earlier tests' messages -- search every record for this test's own event_id rather
+        // than assuming it is the first one delivered (same reasoning as
+        // publishUsesSiteScopedKey_whenCutoverFlagEnabled below).
+        ConsumerRecord<String, Map<String, Object>> record = null;
         try (KafkaConsumer<String, Map<String, Object>> consumer = createKafkaConsumer()) {
             consumer.subscribe(Collections.singletonList("inventory-changes"));
-            ConsumerRecords<String, Map<String, Object>> records = pollWithRetry(consumer, 3);
+            for (int attempt = 0; attempt < 5 && record == null; attempt++) {
+                ConsumerRecords<String, Map<String, Object>> records = consumer.poll(Duration.ofSeconds(5));
+                for (ConsumerRecord<String, Map<String, Object>> candidate : records) {
+                    if (outboxEventId.toString().equals(candidate.value().get("event_id"))) {
+                        record = candidate;
+                        break;
+                    }
+                }
+            }
+            assertThat(record).as("expected a record with event_id %s", outboxEventId).isNotNull();
 
-            assertThat(records.count()).isGreaterThanOrEqualTo(1);
-
-            ConsumerRecord<String, Map<String, Object>> record = records.iterator().next();
             Map<String, Object> message = record.value();
 
             // Verify envelope structure
@@ -510,19 +521,5 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, java.util.HashMap.class.getName());
 
         return new KafkaConsumer<>(props);
-    }
-
-    /**
-     * Poll Kafka with retries to handle consumer group rebalancing delays.
-     */
-    private ConsumerRecords<String, Map<String, Object>> pollWithRetry(
-            KafkaConsumer<String, Map<String, Object>> consumer, int maxAttempts) {
-        for (int i = 0; i < maxAttempts; i++) {
-            ConsumerRecords<String, Map<String, Object>> records = consumer.poll(Duration.ofSeconds(5));
-            if (records.count() > 0) {
-                return records;
-            }
-        }
-        return ConsumerRecords.empty();
     }
 }

@@ -3012,6 +3012,32 @@ implementation detail (e.g. hashing the idempotency fingerprint, the exact slim-
 `/inventory` vs. `/stock-movements` v1 route family merge) recorded as an assumption above, not
 requiring a new user decision.
 
+## Review-driven fix: AdjustToKafkaIT.outboxPublishesToKafka() first-record assumption — 2026-09-13
+
+Independent review flagged a real, unfixed test-quality gap unrelated to the actor-id/null-site
+fixes above: `outboxPublishesToKafka()` grabbed `records.iterator().next()` -- the first Kafka
+record returned by a single bounded poll -- and asserted on it directly, instead of finding the
+record whose `event_id` matches this test's own `outboxEventId`. The topic is a static, shared
+Testcontainer across the whole class (confirmed by reading `createKafkaConsumer()` and the other
+tests in the file), so a fresh earliest-offset consumer also sees every earlier test's messages;
+grabbing the first one is only correct if this test happens to run before every other test that
+publishes to the same topic, which is exam-order-fragile, not a real guarantee.
+
+**Fixed:** the test now polls in a bounded loop (5 attempts x 5s, same shape as the existing
+`publishUsesSiteScopedKey_whenCutoverFlagEnabled` test at the bottom of the same file, reused
+rather than re-invented) searching every returned record for one whose `event_id` equals the
+`outboxEventId` captured earlier in the test, and fails with a clear, descriptive message
+(`assertThat(record).as("expected a record with event_id %s", outboxEventId).isNotNull()`) if no
+matching record ever arrives, rather than silently asserting on the wrong record or an
+`ArrayIndexOutOfBounds`-style failure. The now-unused `pollWithRetry` helper (only ever called
+from this one spot) was deleted rather than left dead. No production code changed.
+
+- Verified: `./mvnw -q clean test-compile` clean; `./mvnw -q -Dtest=AdjustToKafkaIT test` exit 0
+  (all cases in the class, including the fixed one, real Kafka Testcontainer); `./mvnw -q clean
+  test` exit 0; `./mvnw test -Dtest='*IT'` -- 478 tests, 8 failures, identical to the count/set
+  before this fix (the same two pre-existing `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` classes, confirmed unrelated and unchanged).
+
 ### Current handoff (superseding the "Next action" note above)
 
 - Status: **6c complete, including a post-commit independent-review fix round.** T-6c-0 through
