@@ -3014,28 +3014,48 @@ requiring a new user decision.
 
 ### Current handoff (superseding the "Next action" note above)
 
-- Status: **6c complete.** T-6c-0 through T-6c-17 all implemented and independently verified.
-  Checkpoint review (Standards + Spec passes) recorded in `review.md`; full validation recorded in
-  `validation.md`.
+- Status: **6c complete, including a post-commit independent-review fix round.** T-6c-0 through
+  T-6c-17 implemented and verified; checkpoint self-review recorded in `review.md`/`validation.md`
+  (commit `34dcfea`). A separate, genuinely independent review of that commit then found two P1s
+  the self-review missed — see "Review-driven fix: 6c checkpoint P1 findings (independent review)"
+  at the top of `review.md` for full detail. Both confirmed against the actual code and fixed
+  same session: (1) the v1 mutation routes persisted a client-supplied `actorId` instead of the
+  authenticated principal (`docs/specs/authentication-and-authorization.md#4`) — fixed by moving
+  actor-id resolution into the three site-scoped `StockMovementService` overloads
+  (`batchAdjustInventory`/`transferInventory`/`batchTransferInventory`, each now takes an explicit
+  `actorId` parameter sourced from `context.backendUserId()` and overwrites the request's field
+  before delegating), which also surfaced and fixed a self-inflicted idempotency-fingerprint bug
+  (excluding `actorId` from the fingerprint's input, since a field the service always overwrites
+  cannot legitimately be part of request identity); (2) `GET .../movements?itemId=...` hid
+  null-`site` legacy rows contrary to Q-6c-5's "include and label" decision (only the audit-log
+  branch of that same endpoint honored it) — fixed with a new
+  `StockMovementRepository.findByItem_IdAndSiteOrUnknownOrderByAtDesc` query, leaving the original
+  strict method (T-6c-1's general tenant-isolation primitive) untouched. Four new tests added,
+  all passing; no other production-code changes.
 - Next action: 6d (web adoption) is next per the phase spec's checkpoint sequence, NOT started by
   this record. Before starting 6d: confirm Q-6c-1's production deploy/backfill status if 6d's web
   layer needs to trust `/api/v1/sites/{siteId}/inventory/movements`'s completeness assumption in
   production (P-1's gate); Q-6c-4's Kafka partition-key cutover (verify partition count, coordinate
   a drain, confirm consumer ordering tolerance) is a separately-authorized deploy-time action this
   record explicitly does NOT close, unchanged from T-6c-8's entry above — AC-4 is not "complete"
-  against production until that gate is actually passed and recorded.
+  against production until that gate is actually passed and recorded. **This fix round's changes
+  are not yet committed** — working tree has the fix; commit after this handoff entry is written.
 - Surviving decisions: one branch/PR, five logical commits/checkpoints (6a-6e); no per-task
   record/commit/review gate within a checkpoint, only at checkpoint boundaries (per the shared SDD
   review cadence).
-- Last verified: see "Verification (T-6c-11..T-6c-17...)" above — `./mvnw -q clean test` exit 0;
-  `./mvnw -q test -Dtest='*IT'` 474 tests, 8 failures (both documented pre-existing debt classes,
-  0 new); `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
-  exit 0 (466/466); `ArchitectureTest` stable across two independent clean rebuilds;
-  `OpenApiContractExportTest` and the TS client regeneration both stable/pure-additive.
+- Last verified (this fix round): `./mvnw -q clean test-compile` clean; targeted
+  `SiteInventoryMutationControllerAtomicityIT` (8/8), `SiteInventoryControllerSecurityIT`,
+  `SiteInventoryMutationControllerSecurityIT`, `LocationInventorySiteScopedQueriesIT`,
+  `StockMovementServiceSameSiteTransferTest`, `SiteInventoryMutationCrossSiteDestinationIT`
+  (real Postgres) all green; `ArchitectureTest` clean, no `archunit_store` diff; `./mvnw -q clean
+  test` exit 0; `./mvnw test -Dtest='*IT'` — 478 tests (474 + 4 new), 8 failures, all still exactly
+  the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` debt (confirmed
+  via `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
+  exit 0, 470/470); `OpenApiContractExportTest` — no diff (internal signature changes only).
 - Open risks/questions: Q-6c-1 (production deploy/backfill status) and Q-6c-4's cutover remain
-  open exactly as before, unchanged by this session. New: the `InventoryTotalsRepository` H2
-  native-SQL order-fragility above (debt, not a 6c blocker). R-9 (`LocationInventoryController` not
-  moved into `inventory.api`) remains open, unchanged, out of 6c's scope.
+  open exactly as before, unchanged by this session. The `InventoryTotalsRepository` H2
+  native-SQL order-fragility remains open debt (not a 6c blocker). R-9 (`LocationInventoryController`
+  not moved into `inventory.api`) remains open, unchanged, out of 6c's scope.
 
 ## Assumptions and decisions
 

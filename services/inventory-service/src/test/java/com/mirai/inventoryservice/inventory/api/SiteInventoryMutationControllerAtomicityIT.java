@@ -75,6 +75,7 @@ class SiteInventoryMutationControllerAtomicityIT {
     @SpyBean private StockMovementService spiedStockMovementService;
 
     private Site site;
+    private StorageLocation storage;
     private LocationInventory inventory;
     private UUID userId;
 
@@ -92,7 +93,7 @@ class SiteInventoryMutationControllerAtomicityIT {
                 .sku("MUTATOM-" + suffix).name("Mutation Atomicity Product")
                 .category(category).isActive(true).quantity(20).build());
 
-        StorageLocation storage = storageLocationRepository.save(StorageLocation.builder()
+        storage = storageLocationRepository.save(StorageLocation.builder()
                 .site(site).code("BOX_BINS").name("Box Bins")
                 .hasDisplay(false).isDisplayOnly(false).displayOrder(1).build());
         Location location = locationRepository.save(Location.builder()
@@ -173,7 +174,54 @@ class SiteInventoryMutationControllerAtomicityIT {
         assertThat(stockMovementRepository.findAll()).hasSize(1);
         assertThat(eventOutboxRepository.findAll()).hasSize(1);
         assertThat(locationInventoryRepository.findById(inventory.getId()).orElseThrow().getQuantity()).isEqualTo(15);
-        verify(spiedStockMovementService, times(1)).batchAdjustInventory(any(UUID.class), any(BatchAdjustStockRequestDTO.class));
+        verify(spiedStockMovementService, times(1)).batchAdjustInventory(any(UUID.class), any(UUID.class), any(BatchAdjustStockRequestDTO.class));
+    }
+
+    @Test
+    void adjust_clientSuppliedActorIdIsIgnoredInFavorOfTheAuthenticatedPrincipal() {
+        setContext();
+        UUID spoofedActorId = UUID.randomUUID();
+        assertThat(spoofedActorId).isNotEqualTo(userId);
+        BatchAdjustStockRequestDTO request = adjustRequest(-5);
+        request.setActorId(spoofedActorId);
+
+        controller.adjustSiteInventory(site.getId(), "key-actor-spoof-1", request);
+
+        List<com.mirai.inventoryservice.inventory.domain.StockMovement> movements =
+                stockMovementRepository.findByItem_IdOrderByAtDesc(inventory.getProduct().getId());
+        assertThat(movements).hasSize(1);
+        assertThat(movements.get(0).getActorId())
+                .as("persisted actor must be the authenticated principal, never the request body's actorId")
+                .isEqualTo(userId)
+                .isNotEqualTo(spoofedActorId);
+    }
+
+    @Test
+    void transfer_clientSuppliedActorIdIsIgnoredInFavorOfTheAuthenticatedPrincipal() {
+        setContext();
+        Location destinationLocation = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-DEST-" + UUID.randomUUID()).build());
+        LocationInventory destination = locationInventoryRepository.save(LocationInventory.builder()
+                .location(destinationLocation).site(site).product(inventory.getProduct()).quantity(0).build());
+        UUID spoofedActorId = UUID.randomUUID();
+        assertThat(spoofedActorId).isNotEqualTo(userId);
+        TransferInventoryRequestDTO request = TransferInventoryRequestDTO.builder()
+                .sourceLocationType(LocationType.BOX_BIN)
+                .sourceInventoryId(inventory.getId())
+                .destinationLocationType(LocationType.BOX_BIN)
+                .destinationInventoryId(destination.getId())
+                .quantity(3)
+                .actorId(spoofedActorId)
+                .build();
+
+        controller.transferSiteInventory(site.getId(), "key-transfer-actor-spoof-1", request);
+
+        List<com.mirai.inventoryservice.inventory.domain.StockMovement> movements =
+                stockMovementRepository.findByItem_IdOrderByAtDesc(inventory.getProduct().getId());
+        assertThat(movements).isNotEmpty();
+        assertThat(movements)
+                .as("persisted actor must be the authenticated principal, never the request body's actorId")
+                .allSatisfy(m -> assertThat(m.getActorId()).isEqualTo(userId).isNotEqualTo(spoofedActorId));
     }
 
     @Test

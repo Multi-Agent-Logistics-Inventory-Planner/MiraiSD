@@ -29,7 +29,10 @@ import java.util.UUID;
  * overloads, which 404 before any write if the named inventory isn't at this site). Every
  * mutation requires the {@code Idempotency-Key} header (Q-6c-3) and is executed through
  * {@link CommandIdempotencyService#executeIdempotent}, which commits the idempotency record in
- * the same transaction as the underlying write. Distinct handler names from
+ * the same transaction as the underlying write. Actor identity is always
+ * {@code context.backendUserId()} -- the authenticated principal, never a client-supplied
+ * {@code actorId} field on the request body (docs/specs/authentication-and-authorization.md#4).
+ * Distinct handler names from
  * {@link StockMovementController}'s so springdoc doesn't collide operation IDs, matching
  * {@link SiteInventoryController}.
  */
@@ -65,7 +68,7 @@ public class SiteInventoryMutationController {
                 fingerprint(request),
                 Void.class,
                 () -> {
-                    stockMovementService.batchAdjustInventory(context.siteId(), request);
+                    stockMovementService.batchAdjustInventory(context.siteId(), context.backendUserId(), request);
                     return new CommandResult<>(HttpStatus.CREATED.value(), null);
                 });
         return ResponseEntity.status(result.status()).build();
@@ -85,21 +88,31 @@ public class SiteInventoryMutationController {
                 fingerprint(request),
                 Void.class,
                 () -> {
-                    stockMovementService.transferInventory(context.siteId(), request);
+                    stockMovementService.transferInventory(context.siteId(), context.backendUserId(), request);
                     return new CommandResult<>(HttpStatus.CREATED.value(), null);
                 });
         return ResponseEntity.status(result.status()).build();
     }
 
     /**
-     * A stable, size-bounded fingerprint of the request body: the canonical JSON serialization,
-     * SHA-256 hashed to a fixed-length hex string (the entity column carries no explicit length
-     * override, so hashing keeps this well under any default column-size limit regardless of how
-     * large a batch request gets).
+     * A stable, size-bounded fingerprint of the request body: the canonical JSON serialization
+     * with {@code actorId} excluded, SHA-256 hashed to a fixed-length hex string (the entity
+     * column carries no explicit length override, so hashing keeps this well under any default
+     * column-size limit regardless of how large a batch request gets).
+     * <p>
+     * {@code actorId} is excluded deliberately, not incidentally: the service methods always
+     * overwrite it with the authenticated principal (see the class javadoc), so it carries no
+     * request identity of its own -- including it would make the fingerprint depend on a field
+     * the caller cannot actually influence the persisted effect of, and would make a fingerprint
+     * computed before that overwrite mismatch one computed after it if the same request object
+     * were ever fingerprinted twice.
      */
     private String fingerprint(Object request) {
         try {
-            byte[] json = objectMapper.writeValueAsBytes(request);
+            java.util.Map<String, Object> canonical = objectMapper.convertValue(
+                    request, new com.fasterxml.jackson.core.type.TypeReference<java.util.LinkedHashMap<String, Object>>() {});
+            canonical.remove("actorId");
+            byte[] json = objectMapper.writeValueAsBytes(canonical);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(json));
         } catch (JsonProcessingException e) {

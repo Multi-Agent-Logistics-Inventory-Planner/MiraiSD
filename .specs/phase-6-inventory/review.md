@@ -1,5 +1,77 @@
 # Review
 
+## Review-driven fix: 6c checkpoint P1 findings (independent review) — 2026-09-13
+
+An independent review of the committed 6c slice (`34dcfea`) found two P1s the self-review pass
+above missed. Both confirmed against the actual code before fixing, both fixed and re-verified
+same session.
+
+- **[Standards] P1 — v1 mutation routes trusted a client-supplied `actorId`.**
+  `SiteInventoryMutationController` passed the raw request body into
+  `StockMovementService.batchAdjustInventory(siteId, request)`/`transferInventory(siteId,
+  request)`, and the service persisted `request.getActorId()` into `AuditLog`/`StockMovement` rows
+  unchanged. An authenticated caller could name any UUID as the actor, or omit one, directly
+  violating docs/specs/authentication-and-authorization.md#4 ("Mutation actor identity is derived
+  from this principal... compatibility DTO fields are ignored or verified during the transition").
+  **Fixed:** the three site-scoped `StockMovementService` overloads
+  (`batchAdjustInventory(UUID siteId, UUID actorId, ...)`,
+  `transferInventory(UUID siteId, UUID actorId, ...)`,
+  `batchTransferInventory(UUID siteId, UUID actorId, ...)`) now take the actor id as an explicit
+  parameter and overwrite the request's (possibly spoofed) `actorId` with it before delegating to
+  the un-scoped path; the controller passes `context.backendUserId()`. Only these three v1-only
+  overloads changed signature — legacy callers (`StockMovementController`) use the un-scoped
+  overloads and are untouched, so this is scoped to the new v1 surface, not a blanket fix of the
+  legacy `actorId` compatibility field.
+  - Fixing this surfaced a second, self-inflicted bug: the idempotency fingerprint was originally
+    computed by serializing the whole request including `actorId`, and mutating that same field
+    later (inside the guarded command) made a same-object replay's fingerprint diverge from the
+    one recorded at the first call, spuriously returning a fingerprint-conflict 409 — caught by
+    the existing `adjust_replayWithSameKeyAndBody_doesNotRerunTheCommandOrDuplicateEffects` test
+    failing after the actorId fix landed. Fixed by excluding `actorId` from the fingerprint's
+    input entirely: it carries no request identity of its own once the service always overwrites
+    it, so a client-declared (but now-ignored) actor value must not be able to affect idempotency
+    matching either.
+  - New tests: `SiteInventoryMutationControllerAtomicityIT
+    .adjust_clientSuppliedActorIdIsIgnoredInFavorOfTheAuthenticatedPrincipal`/
+    `.transfer_clientSuppliedActorIdIsIgnoredInFavorOfTheAuthenticatedPrincipal` — both submit a
+    request with a spoofed `actorId` different from the authenticated principal's id and assert
+    the persisted `StockMovement.actorId` is the principal's id, not the spoofed one.
+- **[Standards] P1 — `GET .../movements?itemId=...` hid null-site legacy movements, contradicting
+  Q-6c-5.** The per-product branch used `findByItem_IdAndSite_IdOrderByAtDesc` (a strict
+  `site_id = :siteId` predicate, T-6c-1's general tenant-isolation primitive); only the
+  no-`itemId` audit-log branch used `StockMovementSpecifications.withSiteFilter`'s "site or null"
+  contract. Q-6c-5 requires both branches of this one endpoint to include and label unattributed
+  rows, not silently exclude them during the pre-backfill compatibility window. **Fixed:** added
+  `StockMovementRepository.findByItem_IdAndSiteOrUnknownOrderByAtDesc` (a `LEFT JOIN`-based JPQL
+  query matching `site_id = :siteId OR site_id IS NULL`, foreign-site rows still excluded), and
+  `InventoryQueries.findMovementHistoryBySite` now calls it instead of the strict method. The
+  original strict method is kept unchanged and undeleted — it remains the primitive
+  `LocationInventorySiteScopedQueriesIT` pins for general tenant isolation; only the v1 movements
+  endpoint's own query call site changed.
+  - New tests: `LocationInventorySiteScopedQueriesIT
+    .stockMovementHistory_findByItem_IdAndSiteOrUnknownOrderByAtDesc_includesNullSiteExcludesForeignSite`
+    (repository-level: one row per site plus a null-site row; asserts the null-site row is
+    included and the foreign-site row is not) and `SiteInventoryControllerSecurityIT
+    .movements_byItemId_includesNullSiteRowLabeledUnknown` (HTTP-level: asserts the response
+    includes both rows and the null-site one carries `siteAttribution: "UNKNOWN"`).
+
+**Verification:** `./mvnw -q clean test-compile` clean; targeted runs of
+`SiteInventoryMutationControllerAtomicityIT` (8/8, including both new actor-spoofing tests),
+`SiteInventoryControllerSecurityIT`+`SiteInventoryMutationControllerSecurityIT`+
+`LocationInventorySiteScopedQueriesIT`+`StockMovementServiceSameSiteTransferTest` (all green),
+`SiteInventoryMutationCrossSiteDestinationIT` (real Postgres, still green) all pass;
+`ArchitectureTest` clean with no `archunit_store` diff; full `./mvnw clean test` exit 0; full
+`./mvnw test -Dtest='*IT'` — 478 tests (up from 474 by 4 new IT methods), 8 failures, all still
+exactly the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` debt
+(confirmed via `./mvnw test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
+exit 0, 470/470); `OpenApiContractExportTest` — no diff to `packages/contracts/openapi.json` (both
+fixes are internal service-method-signature changes, no route/DTO shape change).
+
+**Disposition:** both P1s fixed and re-verified; no other production-code changes made. The 6c
+checkpoint's disposition (approved, T-6c-11..T-6c-17) stands revised by this entry, not
+superseded — the underlying task-level work was sound, these were review-caught defects in that
+work, now closed.
+
 ## 6c — Scoped inventory backend (T-6c-11..T-6c-17 checkpoint) — 2026-09-13
 
 **Methodology note:** this checkpoint's review was performed as a critical self-review pass over

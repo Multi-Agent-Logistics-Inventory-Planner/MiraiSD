@@ -10,7 +10,11 @@ import com.mirai.inventoryservice.identity.domain.UserSiteMembership;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserSiteMembershipRepository;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,6 +45,7 @@ class SiteInventoryControllerSecurityIT extends BaseIntegrationTest {
     @Autowired private StorageLocationRepository storageLocationRepository;
     @Autowired private LocationRepository locationRepository;
     @Autowired private LocationInventoryRepository locationInventoryRepository;
+    @Autowired private StockMovementRepository stockMovementRepository;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private ProductRepository productRepository;
     @Autowired private UserRepository userRepository;
@@ -204,5 +210,32 @@ class SiteInventoryControllerSecurityIT extends BaseIntegrationTest {
         mockMvc.perform(get("/api/v1/sites/{siteId}/inventory/movements", site.getId())
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("movements?itemId: includes a null-site row labeled UNKNOWN, per Q-6c-5, not hidden")
+    void movements_byItemId_includesNullSiteRowLabeledUnknown() throws Exception {
+        String token = adminToken();
+        Site site = createSiteWithMembership("admin.persona@test.internal", "SIC-11");
+        Product product = newProduct("movements-null-site");
+
+        stockMovementRepository.save(StockMovement.builder()
+                .item(product).locationType(LocationType.BOX_BIN)
+                .previousQuantity(0).currentQuantity(1).quantityChange(1)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT).site(site).at(OffsetDateTime.now())
+                .build());
+        stockMovementRepository.save(StockMovement.builder()
+                .item(product).locationType(LocationType.BOX_BIN)
+                .previousQuantity(1).currentQuantity(4).quantityChange(3)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT).site(null).at(OffsetDateTime.now())
+                .build());
+
+        mockMvc.perform(get("/api/v1/sites/{siteId}/inventory/movements", site.getId())
+                        .queryParam("itemId", product.getId().toString())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].siteAttribution").value("UNKNOWN"))
+                .andExpect(jsonPath("$.content[1].siteAttribution").doesNotExist());
     }
 }

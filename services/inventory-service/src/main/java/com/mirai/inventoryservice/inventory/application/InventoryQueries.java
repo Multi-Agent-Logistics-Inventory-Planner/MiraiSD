@@ -155,9 +155,14 @@ public class InventoryQueries {
         return locationInventoryRepository.sumQuantitiesByProductIdsAndSiteId(productIds, siteId);
     }
 
-    /** Site-scoped, paginated per-product movement history. */
+    /**
+     * Site-scoped, paginated per-product movement history. Per Q-6c-5, rows whose {@code site}
+     * is still null (pre-backfill compatibility window) are included, not hidden -- same
+     * "include and label" contract {@link #findAuditLogPageBySite} already gives the audit-log
+     * branch of the same v1 endpoint.
+     */
     public Page<StockMovement> findMovementHistoryBySite(UUID siteId, UUID productId, Pageable pageable) {
-        return stockMovementRepository.findByItem_IdAndSite_IdOrderByAtDesc(productId, siteId, pageable);
+        return stockMovementRepository.findByItem_IdAndSiteOrUnknownOrderByAtDesc(productId, siteId, pageable);
     }
 
     /**

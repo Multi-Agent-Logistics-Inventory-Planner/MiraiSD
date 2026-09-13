@@ -209,6 +209,37 @@ class LocationInventorySiteScopedQueriesIT {
     }
 
     @Test
+    void stockMovementHistory_findByItem_IdAndSiteOrUnknownOrderByAtDesc_includesNullSiteExcludesForeignSite() {
+        Site main = siteOf("MAIN");
+        Site second = siteOf("SECOND");
+        Product product = newProduct("history-shared-or-unknown");
+
+        stockMovementRepository.save(StockMovement.builder()
+                .item(product).locationType(LocationType.BOX_BIN)
+                .previousQuantity(0).currentQuantity(5).quantityChange(5)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT).site(main).at(OffsetDateTime.now())
+                .build());
+        stockMovementRepository.save(StockMovement.builder()
+                .item(product).locationType(LocationType.BOX_BIN)
+                .previousQuantity(0).currentQuantity(9).quantityChange(9)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT).site(second).at(OffsetDateTime.now())
+                .build());
+        stockMovementRepository.save(StockMovement.builder()
+                .item(product).locationType(LocationType.BOX_BIN)
+                .previousQuantity(0).currentQuantity(12).quantityChange(3)
+                .reason(StockMovementReason.SHIPMENT_RECEIPT).site(null).at(OffsetDateTime.now())
+                .build());
+
+        Page<StockMovement> mainHistory = stockMovementRepository
+                .findByItem_IdAndSiteOrUnknownOrderByAtDesc(product.getId(), main.getId(), PageRequest.of(0, 10));
+
+        assertThat(mainHistory.getContent()).hasSize(2);
+        assertThat(mainHistory.getContent())
+                .extracting(m -> m.getSite() == null ? null : m.getSite().getId())
+                .containsExactlyInAnyOrder(main.getId(), null);
+    }
+
+    @Test
     void withSiteFilter_matchesOwnSiteAndIncludesNullSiteRows_excludesForeignSite() {
         Site main = siteOf("MAIN");
         Site second = siteOf("SECOND");

@@ -155,10 +155,17 @@ public class StockMovementService {
      * un-scoped method -- since every adjustment line is already required to belong to the same
      * {@code locationId} (see the ownership check above), validating the location once transitively
      * confines the whole batch to one site.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id (from
+     * {@code AuthorizedSiteContext.backendUserId()}), never a client-supplied value -- the v1
+     * mutation route is the caller and always passes this. Any {@code actorId} present on
+     * {@code request} is a legacy compatibility field for the un-scoped overload only; it is
+     * overwritten here, not trusted, per docs/specs/authentication-and-authorization.md#4.
      */
     @Transactional
-    public List<StockMovement> batchAdjustInventory(UUID siteId, BatchAdjustStockRequestDTO request) {
+    public List<StockMovement> batchAdjustInventory(UUID siteId, UUID actorId, BatchAdjustStockRequestDTO request) {
         locationService.getLocationById(siteId, request.getLocationId());
+        request.setActorId(actorId);
         return batchAdjustInventory(request);
     }
 
@@ -570,10 +577,14 @@ public class StockMovementService {
      * {@code siteId} (404 via {@link LocationInventoryRepository#findByIdAndSite_Id}) before any
      * write. {@link #requireSameSite} already forces the destination to match the source's site,
      * so checking the source alone is sufficient to confine the whole transfer to one site.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id, never a
+     * client-supplied value -- see {@link #batchAdjustInventory(UUID, UUID, BatchAdjustStockRequestDTO)}.
      */
     @Transactional
-    public void transferInventory(UUID siteId, TransferInventoryRequestDTO request) {
+    public void transferInventory(UUID siteId, UUID actorId, TransferInventoryRequestDTO request) {
         requireInventoryBelongsToSite(siteId, request.getSourceInventoryId());
+        request.setActorId(actorId);
         transferInventory(request);
     }
 
@@ -628,11 +639,15 @@ public class StockMovementService {
      * Site-scoped counterpart to {@link #batchTransferInventory(BatchTransferInventoryRequestDTO)}
      * (.specs/phase-6-inventory 6c, T-6c-12, AC-3): every transfer's source must belong to
      * {@code siteId} before any write, same reasoning as the single-transfer overload.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id, never a
+     * client-supplied value -- see {@link #batchAdjustInventory(UUID, UUID, BatchAdjustStockRequestDTO)}.
      */
     @Transactional
-    public void batchTransferInventory(UUID siteId, BatchTransferInventoryRequestDTO batchRequest) {
+    public void batchTransferInventory(UUID siteId, UUID actorId, BatchTransferInventoryRequestDTO batchRequest) {
         for (TransferInventoryRequestDTO transfer : batchRequest.getTransfers()) {
             requireInventoryBelongsToSite(siteId, transfer.getSourceInventoryId());
+            transfer.setActorId(actorId);
         }
         batchTransferInventory(batchRequest);
     }

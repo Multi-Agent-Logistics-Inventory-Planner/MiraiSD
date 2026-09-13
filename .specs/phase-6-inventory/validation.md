@@ -1,5 +1,67 @@
 # Validation
 
+## Review-driven fix: 6c checkpoint P1 findings (independent review) — 2026-09-13
+
+Commands and results for the fix recorded in `review.md`'s "Review-driven fix: 6c checkpoint P1
+findings (independent review)" entry (actor-id spoofing on v1 mutation routes; null-site rows
+hidden on the per-product movements branch).
+
+```sh
+cd services/inventory-service
+./mvnw -q clean test-compile
+./mvnw -q -Dtest=SiteInventoryMutationControllerAtomicityIT test
+./mvnw -q -Dtest=SiteInventoryControllerSecurityIT,LocationInventorySiteScopedQueriesIT test
+./mvnw -q -Dtest='SiteInventoryMutationController*,SiteInventoryController*,LocationInventorySiteScopedQueriesIT,StockMovementServiceSameSiteTransferTest' test
+./mvnw -q -Dtest=SiteInventoryMutationCrossSiteDestinationIT test
+./mvnw -q clean test-compile && ./mvnw -q -Dtest=ArchitectureTest test
+./mvnw -q clean test
+./mvnw test -Dtest='*IT'
+./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'
+./mvnw -q -Dtest=OpenApiContractExportTest test
+```
+
+## Result
+
+- `./mvnw -q clean test-compile` — PASS, clean.
+- `SiteInventoryMutationControllerAtomicityIT` — PASS, 8/8 (6 pre-existing + 2 new
+  actor-spoofing-rejection tests for adjust and transfer).
+- `SiteInventoryControllerSecurityIT`, `LocationInventorySiteScopedQueriesIT` — PASS, all green
+  (includes the new null-site-inclusion tests at both the repository and HTTP level).
+- `SiteInventoryMutationController*`, `SiteInventoryController*`,
+  `LocationInventorySiteScopedQueriesIT`, `StockMovementServiceSameSiteTransferTest` — PASS,
+  exit 0 (confirms the `StockMovementService` signature changes did not break any other caller of
+  the changed overloads or the unaffected same-site-transfer unit tests).
+- `SiteInventoryMutationCrossSiteDestinationIT` — PASS, real Postgres/Testcontainers, unaffected by
+  the actor-id/fingerprint change (exercises the controller HTTP path, which already derives the
+  actor from context).
+- `ArchitectureTest`, run after an independent clean `test-compile` — PASS, `archunit_store` diff
+  empty (no new module edge — the changed methods only touch types already inside `inventory`
+  and `shared.web`).
+- `./mvnw -q clean test` (full unrestricted suite) — PASS, exit 0.
+- `./mvnw test -Dtest='*IT'` — **478 tests, 8 failures, 0 errors** (up from 474 tests by the 4 new
+  IT methods; failure count unchanged). All 8 failures are exactly
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`, confirmed pre-existing and
+  unrelated by `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
+  — PASS, exit 0, 470/470.
+- `OpenApiContractExportTest`, then `git diff --stat packages/contracts/openapi.json
+  packages/api-client/src/schema.d.ts` — no diff. Both fixes changed only internal
+  `StockMovementService`/`StockMovementRepository`/`InventoryQueries` method signatures and
+  bodies, not any HTTP route or DTO shape.
+
+## Acceptance criteria evidence
+
+- **AC-3** (trusted site context): actor identity for every v1 mutation now derives from
+  `AuthorizedSiteContext.backendUserId()`, never a client-supplied value, closing a real gap in
+  the "trusted site context" requirement — proven by the two new
+  `SiteInventoryMutationControllerAtomicityIT` tests asserting the persisted actor is the
+  principal's id even when the request body names a different one.
+- **AC-5**/Q-6c-5 (v1 route correctness, documented compatibility behavior): the per-product
+  movements branch now honors the same "include and label unknown-site rows" contract the
+  audit-log branch already had, closing the gap between the two branches of one endpoint — proven
+  by `LocationInventorySiteScopedQueriesIT`'s repository-level test and
+  `SiteInventoryControllerSecurityIT`'s HTTP-level test asserting the response body's
+  `siteAttribution: "UNKNOWN"` marker.
+
 ## 6c — Scoped inventory backend (T-6c-11..T-6c-17 checkpoint) — 2026-09-13
 
 Environment: JDK 21, `./mvnw` from `services/inventory-service`, `npm` from `packages/api-client`.
