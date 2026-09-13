@@ -8,6 +8,7 @@ import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
@@ -29,9 +30,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +86,9 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
 
     @Autowired
     private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private LocationInventory testInventory;
     private Product testProduct;
@@ -139,6 +146,8 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         eventDeadLetterRepository.deleteAll();
         stockMovementRepository.deleteAll();
         locationInventoryRepository.deleteAll();
+        // T-6c-8: some tests flip the Q-6c-4 cutover flag directly on the shared bean.
+        ReflectionTestUtils.setField(eventOutboxService, "siteScopedPartitionKeyEnabled", false);
     }
 
     @Test
@@ -375,6 +384,90 @@ class AdjustToKafkaIT extends BaseKafkaIntegrationTest {
         assertThat(payload.get("reason")).isEqualTo("restock");
         assertThat(payload.get("current_location_qty")).isEqualTo(30);
         assertThat(payload.get("previous_location_qty")).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("T-6c-8: outbox record carries the movement's site_id in the AC-4 envelope")
+    void adjustOutboxRecordCarriesSiteId() throws Exception {
+        String requestBody = batchAdjustJson(-1, "SALE", null);
+
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        List<EventOutbox> outboxEvents = eventOutboxRepository.findByPublishedAtIsNullOrderByCreatedAtAsc();
+        assertThat(outboxEvents).hasSize(1);
+        EventOutbox event = outboxEvents.get(0);
+        assertThat(event.getSiteId()).isEqualTo(testInventory.getSite().getId());
+        assertThat(event.getEventVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T-6c-8: re-creating an outbox event for an already-recorded movement does not create a second logical event (V16 dedupe)")
+    void recreatingOutboxEventForSameMovement_isDeduplicated() throws Exception {
+        // This profile uses spring.jpa.hibernate.ddl-auto=create-drop (Hibernate-generated
+        // schema), so Flyway's V16 dedupe index never runs here the way it does in production.
+        // Apply the real index's SQL directly so this test actually exercises the
+        // DataIntegrityViolationException catch in EventOutboxService, not a schema that happens
+        // to allow the duplicate through.
+        jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_event_outbox_stock_movement_dedupe "
+                + "ON event_outbox ((payload->>'stock_movement_id')) "
+                + "WHERE entity_type = 'stock_movement' AND payload->>'stock_movement_id' IS NOT NULL");
+
+        String requestBody = batchAdjustJson(-1, "SALE", null);
+
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        // JOIN FETCH sm.item so the movement is fully detached-safe (no lazy Product proxy) --
+        // this test runs outside a transaction, matching how a real retried caller would load it.
+        List<StockMovement> movements = stockMovementRepository.findByReasonAndAtAfterWithItem(
+                StockMovementReason.SALE, OffsetDateTime.now().minusMinutes(1));
+        assertThat(movements).hasSize(1);
+
+        // Re-run outbox creation for the same, already-recorded movement (e.g. a retried caller).
+        eventOutboxService.createStockMovementEvent(movements.get(0));
+
+        assertThat(eventOutboxRepository.findByPublishedAtIsNullOrderByCreatedAtAsc()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Q-6c-4: Kafka key becomes site_id:product_id once the cutover flag is explicitly enabled")
+    void publishUsesSiteScopedKey_whenCutoverFlagEnabled() throws Exception {
+        ReflectionTestUtils.setField(eventOutboxService, "siteScopedPartitionKeyEnabled", true);
+        String requestBody = batchAdjustJson(-1, "SALE", null);
+
+        mockMvc.perform(post("/api/stock-movements/batch-adjust")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        eventOutboxService.publishPendingEvents();
+
+        // The topic is a static, shared Testcontainer across every test in this class, so a
+        // fresh earliest-offset consumer also sees earlier tests' messages. Search every record
+        // for this test's own product/site rather than assuming it is the first one delivered.
+        String expectedKey = testInventory.getSite().getId() + ":" + testProduct.getId();
+        try (KafkaConsumer<String, Map<String, Object>> consumer = createKafkaConsumer()) {
+            consumer.subscribe(Collections.singletonList("inventory-changes"));
+            boolean found = false;
+            for (int attempt = 0; attempt < 5 && !found; attempt++) {
+                ConsumerRecords<String, Map<String, Object>> records = consumer.poll(Duration.ofSeconds(5));
+                for (ConsumerRecord<String, Map<String, Object>> record : records) {
+                    if (expectedKey.equals(record.key())) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            assertThat(found).as("expected a record keyed %s", expectedKey).isTrue();
+        }
     }
 
     /**

@@ -89,4 +89,95 @@ class EventOutboxServicePublishTest {
         verify(kafkaProducer).sendEvent(any(), any(), messageCaptor.capture());
         assertThat(messageCaptor.getValue()).containsEntry("correlation_id", "req-abc");
     }
+
+    @Test
+    @DisplayName("Q-6c-4: uses the legacy item_id key when the site-scoped flag is off, even if the event carries a site")
+    void publishPendingEvents_usesLegacyItemIdKey_whenFlagDisabled() {
+        UUID productId = UUID.randomUUID();
+        UUID siteId = UUID.randomUUID();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("item_id", productId.toString());
+
+        EventOutbox event = EventOutbox.builder()
+                .id(UUID.randomUUID())
+                .topic("inventory-changes")
+                .eventType("CREATED")
+                .entityType("stock_movement")
+                .entityId(UUID.randomUUID())
+                .payload(payload)
+                .siteId(siteId)
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        when(eventOutboxRepository.findByPublishedAtIsNullAndPublishAttemptsLessThanOrderByCreatedAtAsc(anyInt()))
+                .thenReturn(List.of(event));
+        when(eventOutboxRepository.findById(event.getId())).thenReturn(Optional.of(event));
+
+        eventOutboxService.publishPendingEvents();
+
+        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(kafkaProducer).sendEvent(any(), keyCaptor.capture(), any());
+        assertThat(keyCaptor.getValue()).isEqualTo(productId.toString());
+    }
+
+    @Test
+    @DisplayName("Q-6c-4: uses site_id:product_id when the cutover flag is on and the event carries a site")
+    void publishPendingEvents_usesSiteScopedKey_whenFlagEnabledAndSitePresent() {
+        UUID productId = UUID.randomUUID();
+        UUID siteId = UUID.randomUUID();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("item_id", productId.toString());
+
+        EventOutbox event = EventOutbox.builder()
+                .id(UUID.randomUUID())
+                .topic("inventory-changes")
+                .eventType("CREATED")
+                .entityType("stock_movement")
+                .entityId(UUID.randomUUID())
+                .payload(payload)
+                .siteId(siteId)
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        when(eventOutboxRepository.findByPublishedAtIsNullAndPublishAttemptsLessThanOrderByCreatedAtAsc(anyInt()))
+                .thenReturn(List.of(event));
+        when(eventOutboxRepository.findById(event.getId())).thenReturn(Optional.of(event));
+        ReflectionTestUtils.setField(eventOutboxService, "siteScopedPartitionKeyEnabled", true);
+
+        eventOutboxService.publishPendingEvents();
+
+        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(kafkaProducer).sendEvent(any(), keyCaptor.capture(), any());
+        assertThat(keyCaptor.getValue()).isEqualTo(siteId + ":" + productId);
+    }
+
+    @Test
+    @DisplayName("Q-6c-4: falls back to the legacy item_id key when the flag is on but the event has no site (pre-backfill row)")
+    void publishPendingEvents_fallsBackToLegacyKey_whenFlagEnabledButNoSite() {
+        UUID productId = UUID.randomUUID();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("item_id", productId.toString());
+
+        EventOutbox event = EventOutbox.builder()
+                .id(UUID.randomUUID())
+                .topic("inventory-changes")
+                .eventType("CREATED")
+                .entityType("stock_movement")
+                .entityId(UUID.randomUUID())
+                .payload(payload)
+                .siteId(null)
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        when(eventOutboxRepository.findByPublishedAtIsNullAndPublishAttemptsLessThanOrderByCreatedAtAsc(anyInt()))
+                .thenReturn(List.of(event));
+        when(eventOutboxRepository.findById(event.getId())).thenReturn(Optional.of(event));
+        ReflectionTestUtils.setField(eventOutboxService, "siteScopedPartitionKeyEnabled", true);
+
+        eventOutboxService.publishPendingEvents();
+
+        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(kafkaProducer).sendEvent(any(), keyCaptor.capture(), any());
+        assertThat(keyCaptor.getValue()).isEqualTo(productId.toString());
+    }
 }

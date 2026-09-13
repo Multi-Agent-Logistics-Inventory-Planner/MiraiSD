@@ -126,6 +126,17 @@ class ArchitectureTest {
                 || isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".repositories")) {
             return true;
         }
+        // shared.idempotency (.specs/phase-6-inventory T-6c-10): shared's first entity/
+        // repository-owning subpackage. "shared" is deliberately excluded from BUSINESS_MODULES
+        // above (it must not depend on a business module, and every module may depend on it), so
+        // it never gets the business-module application/infrastructure allowance below; it also
+        // does not follow that two-package convention itself (its existing subpackages -
+        // shared.correlation, shared.web - are flat). This is a narrow, explicit allowance for
+        // this one subpackage, the same shape as the legacy services/repositories exemption
+        // above, not a blanket allowance for all of shared.
+        if (isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".shared.idempotency")) {
+            return true;
+        }
         String module = moduleOf(javaClass);
         for (String candidate : BUSINESS_MODULES) {
             if (candidate.equals(module)) {

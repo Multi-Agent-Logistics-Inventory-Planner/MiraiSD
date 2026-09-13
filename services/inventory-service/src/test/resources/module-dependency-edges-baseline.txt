@@ -148,6 +148,14 @@
 # cross-module cycle, while staying small enough to actually read during review. It does not by
 # itself resolve the pre-existing tangle within this edge set - that is unchanged, already-accepted
 # debt.
+#
+# Seventh reviewed addition (2026-09-12, .specs/phase-6-inventory/log.md T-6c-10): `exceptions ->
+# shared`, from GlobalExceptionHandler mapping the new
+# shared.idempotency.IdempotencyConflictException to 409, the same pattern it already uses for
+# every other domain exception (SiteProductVersionConflictException, etc.). `shared` remains a
+# pure leaf in this file (it has zero outgoing edges into any module, confirmed by grep), so this
+# cannot create a new cycle - the same reasoning as the `catalog -> shared`/`inventory -> shared`
+# additions above.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -182,6 +190,7 @@ dtos -> validation
 exceptions -> catalog
 exceptions -> identity
 exceptions -> inventory
+exceptions -> shared
 exceptions -> sites
 identity -> services
 identity -> shared

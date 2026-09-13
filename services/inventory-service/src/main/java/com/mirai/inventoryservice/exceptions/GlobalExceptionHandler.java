@@ -17,6 +17,7 @@ import com.mirai.inventoryservice.sites.domain.DuplicateLocationCodeException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.domain.SiteNotFoundException;
 import com.mirai.inventoryservice.sites.domain.StorageLocationNotFoundException;
+import com.mirai.inventoryservice.shared.idempotency.IdempotencyConflictException;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -86,7 +87,8 @@ public class GlobalExceptionHandler {
             DuplicateCategoryException.class,
             ProductInUseException.class,
             KujiAllocationViolationException.class,
-            SiteProductVersionConflictException.class
+            SiteProductVersionConflictException.class,
+            IdempotencyConflictException.class
     })
     public ResponseEntity<ErrorResponse> handleConflictException(RuntimeException ex) {
         ErrorResponse error = ErrorResponse.builder()

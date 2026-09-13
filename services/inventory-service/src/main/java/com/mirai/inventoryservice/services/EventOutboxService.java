@@ -9,6 +9,7 @@ import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
 import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
+import com.mirai.inventoryservice.shared.correlation.IdempotencyKeyContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -30,6 +31,11 @@ public class EventOutboxService {
 
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
+    // AC-4's "explicit event version" — the envelope's initial shape (site_id/event_version/
+    // correlation_id/causation_id/idempotency_key columns from V63). Bumped only if the envelope
+    // shape itself changes, not per business event.
+    private static final int ENVELOPE_VERSION = 1;
+
     private final EventOutboxRepository eventOutboxRepository;
     private final KafkaProducer kafkaProducer;
     private final StockMovementService stockMovementService;
@@ -37,6 +43,14 @@ public class EventOutboxService {
 
     @Value("${kafka.topic.inventory-changes:inventory-changes}")
     private String inventoryChangesTopic;
+
+    // Q-6c-4: the partition key changes to site_id:product_id only once this is explicitly
+    // flipped as part of a coordinated cutover (drain old publisher, confirm consumers tolerate
+    // the loss of shared per-product ordering across sites) — never as a side effect of deploying
+    // this code. Defaults to false in every shipped profile; tests that exercise the new key set
+    // it directly via ReflectionTestUtils/@TestPropertySource.
+    @Value("${kafka.partitioning.site-scoped-key.enabled:false}")
+    private boolean siteScopedPartitionKeyEnabled;
 
     public EventOutboxService(
             EventOutboxRepository eventOutboxRepository,
@@ -94,6 +108,22 @@ public class EventOutboxService {
             return;
         }
 
+        // T-6c-8: check-before-insert dedupe guard. entityId is deterministic per movement id
+        // (see below), so this catches the common "already recorded" case (e.g. a retried caller
+        // re-running outbox creation for a movement whose event already exists) without ever
+        // attempting the insert - which matters because a failed flush/insert marks the
+        // enclosing transaction rollback-only even when the resulting exception is caught,
+        // rolling back the whole business mutation this call is part of. The V16 unique index
+        // and the catch below remain as defense-in-depth for the residual concurrent race (two
+        // overlapping transactions both passing this check); if that rare race is lost, rolling
+        // back the whole transaction and requiring the caller's idempotent command to be retried
+        // is the correct, safe behavior for a transactional outbox, not a bug to route around.
+        UUID entityId = UUID.nameUUIDFromBytes(movement.getId().toString().getBytes(StandardCharsets.UTF_8));
+        if (eventOutboxRepository.existsByEntityId(entityId)) {
+            log.info("Outbox event already exists for stock movement {}, skipping duplicate", movement.getId());
+            return;
+        }
+
         // Build payload with resolved location codes for ML analytics
         Map<String, Object> payload = new HashMap<>();
         payload.put("product_id", movement.getItem().getId().toString());
@@ -142,18 +172,51 @@ public class EventOutboxService {
                 .topic(inventoryChangesTopic)
                 .eventType("CREATED") // Expects "CREATED" or "UPDATED"
                 .entityType("stock_movement")
-                .entityId(UUID.nameUUIDFromBytes(movement.getId().toString().getBytes(StandardCharsets.UTF_8)))
+                .entityId(entityId)
                 .payload(payload)
+                // AC-4 envelope (V63 columns, .specs/phase-6-inventory T-6c-8). site_id/
+                // correlation_id/idempotency_key are null when the movement/request carries none
+                // (e.g. a scheduled job, or before T-6c-10 wires IdempotencyKeyContext) — this
+                // mirrors correlation_id's pre-existing nullable posture, not a new gap.
+                .siteId(movement.getSite() != null ? movement.getSite().getId() : null)
+                .eventVersion(ENVELOPE_VERSION)
+                .correlationId(CorrelationIdContext.current())
+                // causationId is reserved for movements caused by consuming another event
+                // (events-and-replica-readiness.md §2); no such consumer exists yet, so every
+                // movement today is directly command-initiated and this stays null.
+                .causationId(null)
+                .idempotencyKey(IdempotencyKeyContext.current())
                 .build();
 
         try {
-            eventOutboxRepository.save(event);
+            // saveAndFlush, not save: Hibernate's JDBC batching (hibernate.jdbc.batch_size)
+            // otherwise defers this INSERT past this try/catch's scope, so the V16 unique-
+            // constraint violation surfaces at the enclosing transaction's commit instead of
+            // here — rolling back the whole caller transaction instead of being swallowed as the
+            // race-condition duplicate this catch exists for (T-6c-8 found this exercising the
+            // index deliberately for the first time).
+            eventOutboxRepository.saveAndFlush(event);
             log.info("Created outbox event for stock movement: {}", movement.getId());
         } catch (DataIntegrityViolationException e) {
             // Duplicate event for this stock movement already exists (unique constraint violation)
             // This is expected in race conditions - log and continue gracefully
             log.warn("Outbox event already exists for stock movement {}, skipping duplicate", movement.getId());
         }
+    }
+
+    /**
+     * Kafka partition key (AC-4). Stays {@code item_id} — the legacy, currently-deployed key —
+     * unless the Q-6c-4 cutover flag is on AND the event actually carries a site (pre-backfill
+     * rows do not). This is a deliberate compatibility fallback, not a bug: flipping the flag in
+     * an environment with unbackfilled rows must not silently drop site-scoped partitioning for
+     * only some events without anyone noticing.
+     */
+    private String partitionKeyFor(EventOutbox event) {
+        String itemId = event.getPayload().get("item_id").toString();
+        if (siteScopedPartitionKeyEnabled && event.getSiteId() != null) {
+            return event.getSiteId() + ":" + itemId;
+        }
+        return itemId;
     }
 
     private String resolveLocationCodeCached(UUID locationId, com.mirai.inventoryservice.models.enums.LocationType locationType, StockEventContext ctx) {
@@ -197,9 +260,12 @@ public class EventOutboxService {
                 message.put("payload", event.getPayload());
                 message.put("created_at", event.getCreatedAt().toString());
                 message.put("correlation_id", event.getPayload().get("correlation_id"));
+                message.put("event_version", event.getEventVersion());
+                message.put("site_id", event.getSiteId() != null ? event.getSiteId().toString() : null);
+                message.put("causation_id", event.getCausationId());
+                message.put("idempotency_key", event.getIdempotencyKey());
 
-                // Key for Kafka partitioning: item_id
-                String key = event.getPayload().get("item_id").toString();
+                String key = partitionKeyFor(event);
 
                 // Send to Kafka (outside of transaction - no DB connection held)
                 kafkaProducer.sendEvent(event.getTopic(), key, message);

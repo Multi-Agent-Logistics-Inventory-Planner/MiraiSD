@@ -191,11 +191,69 @@
   AC-4 envelope columns to `event_outbox` (predates Flyway, same as `stock_movements` before V59)
   and backfill them for unpublished rows; `EventOutbox` gained the matching nullable Java fields.
   `EventOutboxService` is unmodified (T-6c-8's job).
-- Next action: T-6c-8 (`EventOutboxService` populates `site_id`/`event_version`/`correlation_id`/
-  `causation_id`/`idempotency_key` at creation time and changes the Kafka partition key to
-  `site_id:product_id`) per the task list's ordering — see "6c planning" above for exact scope.
-  The partition-key change itself remains gated on Q-6c-4's cutover mechanics, not merely a code
-  change; T-6c-8's code/test work against Testcontainers/local Kafka is not gated.
+- T-6c-8 done and verified this session (new session, continuing 6c) — see "6c implementation
+  (T-6c-8)" below. `EventOutboxService.createStockMovementEvent` now populates `siteId`/
+  `eventVersion`/`correlationId`/`idempotencyKey` on every `EventOutbox` row (`causationId` stays
+  null — no event-consuming producer exists yet); a new `IdempotencyKeyContext` (MDC-based,
+  mirrors `CorrelationIdContext`) is wired but not yet set by anything (T-6c-10's job).
+  `publishPendingEvents` adds the same four fields to the Kafka message and computes the
+  partition key via `partitionKeyFor`, which stays the legacy `item_id` key unless
+  `kafka.partitioning.site-scoped-key.enabled` (new property, default `false` everywhere) is true
+  **and** the event carries a site — the Q-6c-4 cutover itself (verify partition count, drain,
+  confirm consumer ordering tolerance) remains unauthorized and undone; only the gated code path
+  and its tests exist. Building the required "re-run creation does not duplicate" proof surfaced
+  and fixed a real pre-existing bug: catching `DataIntegrityViolationException` around
+  `eventOutboxRepository.save()` did not actually protect the caller's transaction, because
+  Hibernate's batching-deferred flush plus Spring Data's own `@Transactional` on `save` marks the
+  *physical* transaction rollback-only before the exception reaches this method's catch block —
+  confirmed by temporarily removing the fix and reproducing a real
+  `UnexpectedRollbackException`. Fixed with a check-before-insert `existsByEntityId` guard (new
+  repository method) plus switching to `saveAndFlush`; the V16 index and its catch remain as
+  documented, accepted defense-in-depth for the now much narrower concurrent-race window.
+- T-6c-9 done and verified this session — see "6c implementation (T-6c-9)" below.
+  `tests/contracts/schemas/event_envelope.json` now declares `correlation_id`/`event_version`/
+  `site_id`/`causation_id`/`idempotency_key` at the top level (also fixing the pre-existing
+  F-6c-6 `correlation_id` drift). New `test_consumer_compatibility.py` proves both
+  forecasting-service's and messaging-service's real `EventEnvelope` Pydantic models parse an
+  envelope carrying all five new fields (via both `model_validate` and the real
+  `model_validate_json` parse path) and still parse one that omits them. Two gaps explicitly not
+  covered, per the task's own fallback allowance: a producer-payload built by the actual Java path
+  (would need real cross-language plumbing; `AdjustToKafkaIT` already covers this from the Java
+  side), and "duplicate event_id produces one effect" for these two consumers (no existing
+  event-id-dedupe mechanism found in either service to test — pre-existing AC-4/§5 debt, not
+  something this task's change touches).
+- T-6c-10 done and verified this session — see "6c implementation (T-6c-10)" below. New
+  `shared.idempotency` package: `V65` migration + `CommandIdempotency` entity/repository +
+  `CommandIdempotencyService.executeIdempotent(...)` implementing Q-6c-3's full design (durable
+  `(site_id, user_id, idempotency_key)`-unique table, fingerprint-conflict 409, no row survives a
+  failed attempt, documented 7-day retention with a scheduled cleanup). Two reviewed ArchUnit
+  changes: `exceptions -> shared` added to the module-edge baseline, and a narrow new allowance in
+  `isAllowedRepositoryCaller` for `shared.idempotency` (shared has no business-module-style
+  application/infrastructure split, so neither existing exemption covered it). Not yet wired to
+  any HTTP route — that lands with T-6c-12.
+- Review-driven fix (T-6c-8/T-6c-10 P2s) done and verified this session — see "Review-driven fix:
+  T-6c-8/T-6c-10 P2 findings" below. `V66` adds a supporting `CONCURRENTLY` index on
+  `event_outbox.entity_id` (T-6c-8's `existsByEntityId` guard had none, unlike V16's JSONB-
+  expression index). `CommandIdempotencyService`'s replay check now compares `commandType` in
+  addition to `requestFingerprint` before replaying a stored result. The T-6c-9 consumer-dedup gap
+  remains open, reiterated as real/unfinished AC-4 work by the review, not attempted.
+- Next action: T-6c-11 (v1 read routes: `GET /api/v1/sites/{siteId}/inventory/totals`,
+  `/products/{productId}`, `/locations/{locationId}`, `/movements`) per the task list's ordering —
+  see "6c task list" above for exact scope, including the `siteAttribution: "UNKNOWN"` marker
+  Q-6c-5 requires on null-site movement rows and the springdoc operation-id collision trap
+  `SiteLocationController:27-38` already records. T-6c-12 (v1 mutation routes) is the task that
+  actually wires `CommandIdempotencyService` to the `Idempotency-Key` header via
+  `AuthorizedSiteContextHolder`.
+- Last verified (T-6c-8, this session): `./mvnw -q clean test-compile` clean; `./mvnw -q clean
+  test` — 355 tests summed across 61 surefire reports, 0 failures/errors (up from 348 by 7 new
+  unit tests); `./mvnw -q test -Dtest='*IT'` — 431 tests (up from 419 by 3 new IT methods), 8
+  failures, all the same pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+  debt (confirmed not a regression by excluding those two classes, exit 0); `./mvnw -q
+  -Dtest=ArchitectureTest test` after an independent clean `test-compile` — 8/8, no
+  `archunit_store/` diff; `./mvnw -q -Dtest=OpenApiContractExportTest test` then `diff` against a
+  pre-change copy of `packages/contracts/openapi.json` — byte-identical (no routes changed this
+  task). See "6c implementation (T-6c-8)" below for the full list including the pre-fix-failure
+  reproduction.
 - Last verified (review-driven fix round 2, this session): `./mvnw -q clean test-compile` clean;
   new tests `StockMovementServiceConcurrentTransferExistingDestinationRaceIT` 1/1 pass (bug 1) and
   `StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT` 2/2 pass (bug 2, both the
@@ -2358,6 +2416,368 @@ whichever session picks up T-6c-8 next: T-6c-9 already flagged that
 this drift is unrelated to and unaffected by T-6c-7's new *columns* (which aren't in the Kafka
 payload yet), but T-6c-9 will need to add all five envelope fields to that schema once T-6c-8
 starts publishing them at the envelope level, not just fix the pre-existing `correlation_id` gap.
+
+## 6c implementation (T-6c-8) (2026-09-12)
+
+Implements T-6c-8: `EventOutboxService` populates the AC-4 envelope columns at creation time and
+gates the `site_id:product_id` Kafka partition key behind an explicit, currently-off cutover flag
+per Q-6c-4. Causation ID stays null throughout — reserved for movements caused by *consuming*
+another event (events-and-replica-readiness.md §2), and no such consumer exists yet; every
+movement today is directly command-initiated.
+
+- **New `IdempotencyKeyContext`** (`shared.correlation`, mirrors `CorrelationIdContext`'s MDC
+  pattern exactly): `current()` reads MDC key `idempotencyKey`. Nothing sets it yet — T-6c-10's
+  command layer is the intended writer — so it returns null everywhere today, the same pre-filter
+  posture `CorrelationIdContext` had before `CorrelationIdFilter` existed. This is deliberate
+  ordering, not a gap: T-6c-8 wires the outbox *column*, T-6c-10 wires who populates the *context*.
+- **`EventOutboxService.createStockMovementEvent`**: `EventOutbox.builder()` now sets `siteId`
+  (from `movement.getSite()`, null if the movement carries none), `eventVersion` (a fixed
+  `ENVELOPE_VERSION = 1` constant — the envelope *shape* version, bumped only if the envelope
+  itself changes, not per business event), `correlationId` (existing `CorrelationIdContext`,
+  unchanged source), `causationId` (always null, see above), `idempotencyKey`
+  (`IdempotencyKeyContext.current()`).
+- **T-6c-8 found and fixed a pre-existing latent bug while building the "re-run creation does not
+  duplicate" proof the task list requires**: the original code called
+  `eventOutboxRepository.save(event)` inside a `try { } catch (DataIntegrityViolationException)`,
+  relying on the V16 JSONB unique index to reject a second row for the same
+  `stock_movement_id`. With Hibernate JDBC batching (`hibernate.jdbc.batch_size=50`), `save()`
+  defers the actual INSERT past the method's `try/catch` scope, so the violation surfaces at the
+  enclosing `@Transactional` method's flush/commit instead — and because `EventOutboxRepository`'s
+  own `save`/`saveAndFlush` methods are themselves `@Transactional` (`SimpleJpaRepository`
+  joining the same physical transaction), Spring marks that physical transaction rollback-only the
+  moment the exception is thrown, regardless of whether the caller catches it — a well-known
+  Spring/Hibernate trap, not something a `try/catch` at this call site can work around. Left as-is,
+  a "retry outbox creation for an already-recorded movement" call would silently roll back the
+  *entire* enclosing business transaction instead of being swallowed as the graceful duplicate the
+  catch block's comment claims. Fixed with a check-before-insert guard: `entityId` is already a
+  deterministic UUID derived from the movement id, so
+  `eventOutboxRepository.existsByEntityId(entityId)` (new repository method) is checked first and
+  the method returns early on a hit, before any location/total lookups or the insert attempt. The
+  `saveAndFlush` (switched from `save`, so any *other* real DB error still surfaces synchronously
+  inside this method's own try/catch rather than at some later, harder-to-attribute flush point)
+  plus the V16 index and its catch block remain as defense-in-depth for the residual concurrent
+  race (two overlapping transactions both passing the `existsByEntityId` check before either
+  inserts) — recorded as an accepted assumption below, not a further fix: losing that rare race and
+  rolling back the whole transaction is the textbook-correct behavior for a transactional outbox
+  (the caller's whole idempotent command is expected to be retried), not a bug to route around.
+- **`EventOutboxService.publishPendingEvents`**: message now also carries `event_version`,
+  `site_id` (stringified, null-safe), `causation_id`, `idempotency_key` at the envelope level
+  (T-6c-9 is the contract-schema side of this). New `partitionKeyFor(EventOutbox)`: returns the
+  legacy `item_id`-only key unless `kafka.partitioning.site-scoped-key.enabled` is true **and**
+  the event actually carries a `site_id` — falling back to the legacy key even when the flag is on
+  if the event predates the site backfill, so flipping the flag in an environment with any
+  unbackfilled row cannot silently drop site-scoped partitioning for only some events unnoticed.
+- **New property `kafka.partitioning.site-scoped-key.enabled`** (`application.properties`,
+  `application-dev.properties`), default `false` in both. Per Q-6c-4, flipping this is a
+  coordinated production cutover (verify actual topic partition count, drain the old publisher,
+  confirm every consumer tolerates losing shared per-product ordering across sites) that this
+  record does not authorize — the flag exists so the code path and its tests can exist now without
+  that cutover happening as a side effect of deploying this commit.
+
+### Tests
+
+- `EventOutboxServiceCreateEventTest` (+4): envelope population from a movement's site;
+  null `siteId` when the movement has none; `idempotencyKey` carried from MDC when present;
+  null `idempotencyKey` when not set (today's default, until T-6c-10). All existing
+  `save`/`verify` calls in this class switched to `saveAndFlush` to match the production change.
+- `EventOutboxServicePublishTest` (+3): legacy `item_id` key when the flag is off even if the
+  event carries a site; `site_id:product_id` key when the flag is on and a site is present;
+  fallback to the legacy key when the flag is on but the event has no site (pre-backfill row).
+- `AdjustToKafkaIT` (+3, real Postgres/Kafka via Testcontainers): outbox record carries the
+  movement's `site_id`/`event_version=1` through the real batch-adjust endpoint; re-creating an
+  outbox event for an already-recorded movement (fetched via `findByReasonAndAtAfterWithItem` so
+  the retry path is exercised on a detached-safe, non-lazy-proxy movement, matching how a real
+  retried caller would load one) leaves exactly one outbox row — this test required manually
+  creating the V16 index via `JdbcTemplate` first, since this profile's
+  `spring.jpa.hibernate.ddl-auto=create-drop` means Flyway (and therefore V16) never runs against
+  it, only Hibernate's entity-derived schema; a cutover-flag-enabled end-to-end test asserting the
+  real Kafka record's key is `site_id:product_id`, searching every record the shared topic
+  delivers (not just the first) since the topic is a static Testcontainer shared across every test
+  in the class and an earliest-offset consumer also sees earlier tests' messages.
+- Confirmed the dedupe fix actually matters: temporarily removed the `existsByEntityId` guard and
+  reran `recreatingOutboxEventForSameMovement_isDeduplicated` alone — it failed with
+  `UnexpectedRollbackException: Transaction silently rolled back because it has been marked as
+  rollback-only`, the exact failure mode described above, not a generic assertion mismatch;
+  restored the fix and reran to confirm it passes again.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean.
+- `./mvnw -q -Dtest=EventOutboxServiceCreateEventTest,EventOutboxServicePublishTest test` — 11/11
+  and 4/4 pass.
+- `./mvnw -q -Dtest=AdjustToKafkaIT test` — 9/9 pass (6 pre-existing + 3 new), real Testcontainers
+  Postgres/Kafka.
+- Pre-fix-failure reproduction: `./mvnw -q -Dtest=AdjustToKafkaIT#recreatingOutboxEventForSameMovement_isDeduplicated test`
+  with the guard removed — 1 test, 1 error, `UnexpectedRollbackException` as described; restored,
+  reran the same single test — 1/1 pass.
+- `./mvnw -q clean test` (full unrestricted suite) — 355 tests summed across all 61 surefire
+  reports (up from 348 by 7 new unit-test methods), `Failures: 0, Errors: 0`.
+- `./mvnw -q test -Dtest='*IT'` — 431 tests (up from 419 by 3 new IT methods), 8 failures, all the
+  same pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` order-fragility
+  debt (unrelated native-SQL/H2 issue, documented in this log's "Current handoff"); confirmed not a
+  regression: `./mvnw -q test -Dtest='*IT,!AnalyticsControllerSecurityIT,!ForecastControllerSecurityIT'`
+  exits 0.
+- `./mvnw -q -Dtest=ArchitectureTest test` after an independent clean `test-compile` — 8/8 pass;
+  `git status --porcelain` on `archunit_store/`/`archunit.properties` shows no diff (no new
+  cross-module edge — `IdempotencyKeyContext` lives in the already-approved `shared.correlation`
+  package next to `CorrelationIdContext`).
+- `./mvnw -q -Dtest=OpenApiContractExportTest test`, then `diff` against a pre-change copy of
+  `packages/contracts/openapi.json` — byte-identical (no route added/changed this task; expected,
+  T-6c-11/T-6c-12 are the route-adding tasks). `packages/api-client` not regenerated for the same
+  reason.
+- `git diff --check` — clean.
+
+### Assumption carried forward (not a Q-6c-N)
+
+The residual TOCTOU race left after the `existsByEntityId` guard (two transactions both observing
+"not yet recorded" before either inserts) still hits the same rollback-only failure mode for
+whichever transaction loses the race at the database level. This is accepted, not fixed: per the
+transactional-outbox pattern, a transaction that cannot be sure its event was durably recorded
+should roll back its business effect entirely and let the caller's idempotent command (Q-6c-3,
+T-6c-10) be retried, rather than the outbox layer silently absorbing the failure and leaving the
+business mutation committed with an uncertain event state. No durable behavior or persisted-data
+change is implied, so this does not get a `Q-6c-N` — recorded here so a future session does not
+mistake the remaining race window for an oversight.
+
+## 6c implementation (T-6c-9) (2026-09-12)
+
+Implements T-6c-9: contract schema and producer/consumer compatibility for the AC-4 envelope
+fields T-6c-8 started publishing.
+
+- **`tests/contracts/schemas/event_envelope.json`**: added `correlation_id`, `event_version`,
+  `site_id`, `causation_id`, `idempotency_key` at the top-level `properties` (all nullable, typed
+  to match the Java source: `event_version` integer, `site_id` uuid-formatted string, the rest
+  plain nullable strings). Also fixes the pre-existing F-6c-6 drift this task flagged:
+  `correlation_id` had been emitted by the producer since before this record but was never
+  declared in the schema at all (the top-level object's `additionalProperties: false` was
+  silently tolerating it only because no existing fixture/test ever included it).
+- **`tests/contracts/conftest.py`**: `sample_full_payload` gains all five fields (non-null, proving
+  the happy path); `sample_null_optionals_payload` gains all five as explicit `None`.
+  `sample_minimal_payload` deliberately left untouched (still omits them entirely), so it doubles
+  as the "old producer/pre-T-6c-8 row" compatibility case. Also loads messaging-service's
+  `src/events.py` directly as `messaging_events` (no relative imports there, so it needs none of
+  forecasting-service's package-shim machinery above it) so both real consumer models are
+  reachable from the same test session.
+- **`test_producer_contract.py`** (+2): `test_all_envelope_fields_present_in_schema` — the
+  top-level analogue of the existing payload-level drift guard, asserting the exact field set
+  `EventOutboxService.publishPendingEvents`'s `message.put(...)` calls produce (verified by
+  grepping the Java source directly, not by copying the schema back at it) matches the schema's
+  declared top-level properties; `test_envelope_fields_may_be_null_or_absent` pins that
+  `sample_minimal_payload` (no AC-4 fields at all) still validates.
+- **New `test_consumer_compatibility.py`** (+7): both real `EventEnvelope` Pydantic models
+  (forecasting-service's and messaging-service's, imported directly, not re-implemented) parse
+  `sample_full_payload` (all five new fields present) via both `model_validate` and
+  `model_validate_json` — the latter matters because `_parse_line`'s real Kafka-message parse path
+  uses `model_validate_json`, not `model_validate`. Also asserts directly (`"site_id" not in
+  EventEnvelope.model_fields`) that neither service's model declares the fields it doesn't use,
+  so "ignores unknown fields" is proven against the models' actual declared shape, not asserted
+  past it. Forecasting-service's model additionally confirmed to still parse
+  `sample_minimal_payload` (fields absent, not just null) since it is the consumer that actually
+  runs this path today (messaging-service's model requires `topic`/`event_type`/`entity_type`/
+  `entity_id`/`created_at`, so `sample_minimal_payload` was never a valid input for it and no
+  compatibility claim is made there).
+
+### Scope explicitly not covered (recorded per the task's own fallback clause)
+
+- **Producer-payload-built-by-the-real-Java-path test**: not attempted. `EventOutboxService` is a
+  Spring-managed, `@Transactional`, Postgres/Kafka-backed method — reaching it from this Python
+  test session would mean either running the JVM test suite and shelling out to capture its
+  produced JSON (real cross-language plumbing the task text explicitly allows skipping) or
+  duplicating its field-construction logic in Python (which is what the existing hand-written
+  fixtures already are, and wouldn't add independent proof). `AdjustToKafkaIT` (Java side, T-6c-8)
+  already asserts the real producer's message shape against a live Kafka consumer; that is the
+  actual "built by the real producer path" proof for this cycle, just not runnable from here.
+- **"Duplicate delivery of the same event_id produces one effect" for these two consumers**: no
+  existing event-id-dedupe mechanism was found in either `forecasting-service/src` or
+  `messaging-service/src` (grepped for `event_id` usage in both; neither stores/checks processed
+  event ids before generating an effect). This is a consumer-idempotency gap AC-4/§5 of
+  events-and-replica-readiness.md already requires in general, not something T-6c-8/T-6c-9
+  introduced or changed — the new envelope fields don't touch it either way. Recording as carried-
+  forward debt rather than fabricating a test against a mechanism that does not exist.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `services/forecasting-service/.venv/bin/python -m pytest tests/contracts -v` — 31 passed (22
+  pre-existing + 9 new: 2 in `test_producer_contract.py`, 7 in `test_consumer_compatibility.py`).
+  Uses forecasting-service's existing `.venv` (has `pytest`/`pydantic`/`jsonschema`/`pandas`
+  already installed) since the system `python3`/`python3.11` had none of them.
+- `services/messaging-service/.venv/bin/python -m pytest services/messaging-service/tests -q` —
+  71 passed, confirming the `conftest.py` change (loading messaging-service's `events.py`
+  alongside forecasting-service's) didn't disturb messaging-service's own suite.
+- No Java files changed this task; inventory-service's suites not rerun for this task on their own
+  (T-6c-8's verification already covers the Java producer side these Python tests validate
+  against; T-6c-10 is the next Java-touching task).
+
+### No new Q-6c-N
+
+Schema/test-only work within F-6c-6/F-6c-7/AC-4's already-scoped requirements.
+
+## 6c implementation (T-6c-10) (2026-09-12)
+
+Implements T-6c-10: durable, site/user-scoped command idempotency per Q-6c-3's concrete design.
+Scoped as the durable-table/service layer per the "Current handoff" note above this session
+opened with — the v1 mutation routes that actually extract the `Idempotency-Key` header and call
+this service are T-6c-12's job, not this one's; this task makes the mechanism itself real and
+independently tested.
+
+- **`V65__create_command_idempotency.sql`**: new `command_idempotency` table (`site_id`, `user_id`,
+  `idempotency_key`, `command_type`, `request_fingerprint`, `result_status`, `result_body`,
+  `created_at`), no FK (same no-FK precedent as `event_outbox`'s V16/V63 — this is an operational
+  dedup log, not a durable business record), a unique index on `(site_id, user_id,
+  idempotency_key)`, and an index on `created_at` for the retention cleanup's range scan. Explicit
+  7-day retention policy documented in the migration header (T-6c-10's task text requires this be
+  explicit, not left implicit).
+- **New `shared.idempotency` package** (`CommandIdempotency` entity, `CommandIdempotencyRepository`,
+  `IdempotencyConflictException`, `CommandIdempotencyService`). Placed under `shared`, not
+  `inventory`, because Q-6c-3's design is not inventory-specific — any future v1 mutation route in
+  any module can reuse it. `CommandIdempotency` also declares the same unique constraint at the
+  JPA level (`@Table(uniqueConstraints = ...)`), matching the codebase's existing dual-declaration
+  pattern (migration SQL + entity annotation) for every other unique index — the entity Building
+  step below (T-6c-10's own concurrency test) demonstrated this is load-bearing, not decorative:
+  the test profile's `ddl-auto=create-drop` schema is Hibernate-generated, not Flyway-migrated, so
+  without the JPA-level declaration the concurrent-race test's schema had no constraint at all and
+  both racing inserts silently succeeded.
+- **`CommandIdempotencyService.executeIdempotent(siteId, userId, idempotencyKey, commandType,
+  requestFingerprint, resultType, command)`**: reads any existing record for the (site, user, key)
+  triple first. A hit with a matching fingerprint returns the stored `CommandResult` (status +
+  Jackson-deserialized body) without invoking `command`; a hit with a different fingerprint throws
+  `IdempotencyConflictException` (409, wired into `GlobalExceptionHandler` next to
+  `SiteProductVersionConflictException`) without invoking `command` either. A miss invokes
+  `command`, then `saveAndFlush`s the result row — deliberately not caught: per Q-6c-3, "no
+  idempotency row survives a failed attempt," so letting a unique-constraint violation from the
+  residual concurrent-race window (two calls both missing the initial read) propagate rolls back
+  this whole `@Transactional` method, including whatever `command` already did in the same
+  transaction, cleanly failing the race's loser rather than leaving an uncertain half-committed
+  state. Authorization recheck on replay (Q-6c-3) is structural, not code in this class: a v1
+  controller's `@PreAuthorize` runs before its method body regardless of whether the call turns
+  out to be a first attempt or a replay, so a role/membership change between attempts is never
+  bypassed — documented in the class Javadoc rather than re-implemented here.
+- **`cleanupExpiredRecords()`**: `@Scheduled(cron = "0 0 3 * * *")`, deletes rows older than the
+  documented 7-day retention window via a new `deleteByCreatedAtBefore` repository method.
+- **ArchUnit**: two changes, both reviewed. (1) `module-dependency-edges-baseline.txt` gains
+  `exceptions -> shared` (seventh reviewed addition, documented inline) from
+  `GlobalExceptionHandler` importing `IdempotencyConflictException` — verified `shared` still has
+  zero outgoing edges (grepped every import under `shared/**`), so this cannot create a cycle. (2)
+  `ArchitectureTest.isAllowedRepositoryCaller` gains an explicit, narrow allowance for
+  `shared.idempotency` (mirroring the legacy `services`/`repositories` top-level exemption): a
+  business module's repository-owning code is recognized by its `.application`/`.infrastructure`
+  subpackage, but `shared` is deliberately excluded from `BUSINESS_MODULES` (it must not depend on
+  a business module) and its existing subpackages (`correlation`, `web`) are flat, not
+  application/infrastructure-split — so `shared.idempotency`, its first entity/repository-owning
+  subpackage, needed its own explicit line rather than either existing mechanism recognizing it.
+  No frozen-store regeneration needed: the rule change only *removes* violations it previously
+  would have flagged, and confirmed stable (8/8, no `archunit_store`/`archunit.properties` diff)
+  across two independent clean rebuilds.
+
+### Tests
+
+- **`CommandIdempotencyServiceTest`** (Mockito, 6 cases): new key invokes the command and stores
+  status/commandType/fingerprint/serialized body; replay with the same fingerprint returns the
+  stored result without invoking the command; replay with a different fingerprint throws
+  `IdempotencyConflictException` without invoking the command; same key at a different site is not
+  a replay; same key for a different user is not a replay; `cleanupExpiredRecords` deletes with the
+  documented 7-day cutoff.
+- **`CommandIdempotencyServiceIT`** (real Postgres/Kafka via `BaseKafkaIntegrationTest`, 3 cases):
+  concurrent duplicate submissions (two threads, same site/user/key, the command sleeps to widen
+  the race window and writes to a scratch table participating in the same ambient transaction) —
+  both threads race past the initial read (proven: the command is invoked exactly twice), exactly
+  one succeeds, the loser's business effect (the scratch-table insert) rolls back with its failed
+  idempotency insert, and exactly one `CommandIdempotency` row survives; rollback-then-retry — a
+  command that throws leaves no row, and the same key can be retried successfully afterward;
+  restart-then-replay — a second, independent call with the same key/fingerprint replays without
+  re-invoking the command.
+- **`CommandIdempotencyMigrationIT`** (real Postgres via raw Testcontainers, no Spring context,
+  same pattern as `EventOutboxEnvelopeMigrationIT`, 3 cases): the real `V65` SQL produces the
+  expected column shapes; the real unique index rejects a duplicate `(site_id, user_id,
+  idempotency_key)` triple; the same key at a different site is not rejected.
+- Confirmed the entity-level `@UniqueConstraint` actually matters: temporarily removed it and
+  reran the concurrency IT — both racing inserts silently succeeded (2 rows, `commandInvocations`
+  still 2 but the "exactly one succeeds" assertion failed with "expected: 1 but was: 2"); restored
+  it and reran to confirm the test passes again.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean.
+- `./mvnw -q -Dtest=CommandIdempotencyServiceTest,CommandIdempotencyServiceIT test` — 6/6 and 3/3
+  pass (real Testcontainers Postgres/Kafka for the IT).
+- `./mvnw -q -Dtest=CommandIdempotencyMigrationIT test` — 3/3 pass.
+- Pre-fix-failure reproduction: temporarily removed `@UniqueConstraint` from `CommandIdempotency`,
+  reran `CommandIdempotencyServiceIT#concurrentDuplicateSubmissions_produceAtMostOneCommittedEffect`
+  alone — failed exactly as described; restored, reran — passes.
+- `./mvnw -q clean test` (full unrestricted suite) — 361 tests summed across all surefire reports
+  (up from 355 by 6 new unit-test methods), `Failures: 0, Errors: 0`.
+- `./mvnw -q test -Dtest='*IT'` — 437 tests (up from 431 by 6 new IT methods: 3 + 3), 8 failures,
+  all the same pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` debt;
+  confirmed not a regression via the usual exclusion, exit 0.
+- `./mvnw -q -Dtest=ArchitectureTest test` after an independent clean `test-compile`, run twice
+  independently — 8/8 both times; `git status --porcelain` on `archunit_store/`/
+  `archunit.properties` shows no diff both times (only the deliberate
+  `module-dependency-edges-baseline.txt` edit shows in `git status`, which is the reviewed addition
+  itself, not a regenerated store).
+- `./mvnw -q -Dtest=OpenApiContractExportTest test`, then `diff` against a pre-change copy of
+  `packages/contracts/openapi.json` — byte-identical (no routes added this task, as expected).
+- `git diff --check` — clean.
+
+### No new Q-6c-N
+
+Fully within Q-6c-3's already-resolved design. One assumption worth naming for whichever session
+builds T-6c-12: this service's public API (`executeIdempotent`) takes the trusted site/user as
+plain `UUID` parameters, not an `AuthorizedSiteContext` directly — deliberate, since `shared.web`
+and `shared.idempotency` are sibling packages with no dependency between them, and threading the
+whole context type through would be a needless coupling for what only ever reads two fields.
+
+## Review-driven fix: T-6c-8/T-6c-10 P2 findings (2026-09-13)
+
+Independent review of the T-6c-8/T-6c-9/T-6c-10 work found two P2s. No finding in T-6c-9. Both
+fixed same session.
+
+- **P2 — outbox duplicate checks lacked a supporting index.** `EventOutboxRepository
+  .existsByEntityId` (T-6c-8's dedupe guard, run on every stock movement's outbox-event creation)
+  had no index on `entity_id` — V16 indexes a JSONB payload expression
+  (`payload->>'stock_movement_id'`), not this plain column, so every lookup sequentially scanned
+  retained outbox history as the table grows. Fixed with `V66__add_event_outbox_entity_id_index
+  .sql` (`CREATE INDEX CONCURRENTLY`, paired `.conf` disabling the wrapping transaction, same
+  shape as V62 — `event_outbox` is written on every production stock movement and must not be
+  locked). New `EventOutboxEntityIdIndexMigrationIT` (2 cases, same standalone-Testcontainers/
+  `EXPLAIN`-assertion pattern as `StockMovementSiteIndexMigrationIT`): the index exists with the
+  expected definition, and an `entity_id` lookup plans through it under `enable_seqscan=off`.
+- **P2 — replay validation ignored command type.** `CommandIdempotencyService.executeIdempotent`
+  compared only `requestFingerprint` before replaying a stored result; the same site/user/key with
+  a different `commandType` but a coincidentally (or narrowly-computed) matching fingerprint would
+  replay the wrong command's result, risking a deserialization failure or silently wrong response
+  shape. Fixed: the conflict check now requires both `commandType` and `requestFingerprint` to
+  match before replaying; a mismatch on either throws `IdempotencyConflictException` (409), same as
+  before. New unit test
+  `executeIdempotent_replaySameFingerprintDifferentCommandType_throwsConflict` (same fingerprint,
+  different commandType) proves this without invoking the command.
+- The review also reiterated that the T-6c-9 consumer-deduplication gap (no existing event-id-
+  dedupe mechanism found in forecasting-service/messaging-service) is real, unfinished AC-4
+  acceptance work, not closed by recording it. Standing, unchanged from T-6c-9's own entry: carried
+  forward as debt, not attempted this pass either — no dedupe mechanism exists in either Python
+  service to build a test against, and implementing one there is out of this record's Java-focused
+  scope for 6c to date. Recorded again here so it does not read as resolved.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q clean test-compile` — clean.
+- `./mvnw -q -Dtest=CommandIdempotencyServiceTest,CommandIdempotencyServiceIT,
+  CommandIdempotencyMigrationIT,EventOutboxServiceCreateEventTest,EventOutboxServicePublishTest,
+  AdjustToKafkaIT,EventOutboxEntityIdIndexMigrationIT,ArchitectureTest test` — 47/47 pass (up from
+  the reviewer's own 44 by the 3 new tests: 1 commandType-conflict unit test + 2 index-migration
+  IT cases).
+- `./mvnw -q clean test` (full unrestricted suite) — 362 tests summed across all surefire reports
+  (up from 361 by 1 new unit test), `Failures: 0, Errors: 0`.
+- `./mvnw -q test -Dtest='*IT'` — 439 tests (up from 437 by 2 new IT methods), 8 failures, all the
+  same pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` debt; confirmed
+  not a regression via the usual exclusion, exit 0.
+- `git status --porcelain` on `archunit_store/`/`archunit.properties` — no diff (only the
+  pre-existing, already-committed-to-memory `module-dependency-edges-baseline.txt` edit from
+  T-6c-10 shows, unrelated to this fix).
+- No contract regeneration needed (no route/DTO shape changed).
+
+### No new Q-6c-N
+
+Both are bug fixes within already-scoped T-6c-8/T-6c-10 behavior, not new design decisions.
 
 ## Assumptions and decisions
 
