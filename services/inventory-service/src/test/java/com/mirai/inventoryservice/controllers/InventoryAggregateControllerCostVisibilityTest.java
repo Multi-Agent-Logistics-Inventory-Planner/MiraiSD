@@ -1,9 +1,10 @@
 package com.mirai.inventoryservice.controllers;
 
-import com.mirai.inventoryservice.dtos.responses.InventoryTotalDTO;
+import com.mirai.inventoryservice.inventory.api.InventoryAggregateController;
+import com.mirai.inventoryservice.inventory.api.InventoryTotalDTO;
 import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
-import com.mirai.inventoryservice.services.InventoryAggregateService;
+import com.mirai.inventoryservice.inventory.application.InventoryAggregateService;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,7 +33,7 @@ class InventoryAggregateControllerCostVisibilityTest {
     private InventoryAggregateService inventoryAggregateService;
 
     @Mock
-    private InventoryTotalsRepository inventoryTotalsRepository;
+    private InventoryQueries inventoryQueries;
 
     private InventoryTotalDTO totalWithCost() {
         return InventoryTotalDTO.builder()
@@ -55,10 +56,10 @@ class InventoryAggregateControllerCostVisibilityTest {
 
     @Test
     void adminSeesUnitCost() {
-        when(inventoryTotalsRepository.findAllInventoryTotals())
+        when(inventoryQueries.findAllInventoryTotals())
                 .thenReturn(new java.util.ArrayList<>(List.of(totalWithCost())));
         InventoryAggregateController controller =
-                new InventoryAggregateController(inventoryAggregateService, inventoryTotalsRepository);
+                new InventoryAggregateController(inventoryAggregateService, inventoryQueries);
         SecurityContextHolder.getContext().setAuthentication(authWithRole("ADMIN"));
         try {
             ResponseEntity<List<InventoryTotalDTO>> response = controller.getInventoryTotals();
@@ -70,10 +71,10 @@ class InventoryAggregateControllerCostVisibilityTest {
 
     @Test
     void employeeDoesNotSeeUnitCost() {
-        when(inventoryTotalsRepository.findAllInventoryTotals())
+        when(inventoryQueries.findAllInventoryTotals())
                 .thenReturn(new java.util.ArrayList<>(List.of(totalWithCost())));
         InventoryAggregateController controller =
-                new InventoryAggregateController(inventoryAggregateService, inventoryTotalsRepository);
+                new InventoryAggregateController(inventoryAggregateService, inventoryQueries);
         SecurityContextHolder.getContext().setAuthentication(authWithRole("EMPLOYEE"));
         try {
             ResponseEntity<List<InventoryTotalDTO>> response = controller.getInventoryTotals();

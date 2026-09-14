@@ -6,7 +6,7 @@ import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.CarrierStatus;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -15,7 +15,7 @@ import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.identity.domain.UserRole;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
@@ -26,7 +26,7 @@ import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
@@ -35,7 +35,7 @@ import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.repositories.ShipmentRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import com.mirai.inventoryservice.identity.application.MembershipAuthorizer;
@@ -367,6 +367,7 @@ public class DevSeedController {
                     .reason(StockMovementReason.SALE)
                     .at(saleDate)
                     .metadata(Map.of("source", "dev_seed"))
+                    .site(site)
                     .build());
             }
         }
@@ -419,6 +420,7 @@ public class DevSeedController {
 
         int totalSales = 0;
         List<StockMovement> movements = new ArrayList<>();
+        Site site = analyticsSeedService.getDefaultSite();
 
         for (Product product : products) {
             int salesCount = salesPerProduct / 2 + random.nextInt(salesPerProduct);
@@ -433,9 +435,13 @@ public class DevSeedController {
 
                 int quantity = 1 + random.nextInt(5);
 
+                // Synthetic seed row with no real location to derive a site from
+                // (.specs/phase-6-inventory 6b) - MAIN is the correct default here since this
+                // controller is @Profile("dev")-only and always seeds against the default site.
                 StockMovement movement = StockMovement.builder()
                     .locationType(LocationType.BOX_BIN)
                     .item(product)
+                    .site(site)
                     .quantityChange(-quantity)
                     .previousQuantity(quantity)
                     .currentQuantity(0)
@@ -1158,6 +1164,7 @@ public class DevSeedController {
                     .actorId(actorId)
                     .at(timestamp)
                     .metadata(Map.of("source", DEV_SEED_AUDIT_SOURCE))
+                    .site(toLoc.getStorageLocation().getSite())
                     .build();
 
                 movements.add(movement);

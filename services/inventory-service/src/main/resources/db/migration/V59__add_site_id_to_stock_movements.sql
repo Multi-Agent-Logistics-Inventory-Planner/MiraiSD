@@ -1,0 +1,14 @@
+-- Expand step (docs/specs/multi-site-data-and-api.md section 5, .specs/phase-6-inventory AC-2):
+-- stock_movements is the one genuinely site-blind inventory table - it predates Flyway (created
+-- by Hibernate, see infra/init-db/07-audit-logs.sql) and its from_location_id/to_location_id
+-- columns carry no FK. This adds the column nullable, with no FK and no default: existing rows
+-- get a value from V60's backfill, not from a default that would hide which rows are genuinely
+-- unresolved. New rows get site_id from application code (InventoryOperations) starting with the
+-- release that ships alongside this migration - see the .specs/phase-6-inventory log for the
+-- caller-by-caller derivation.
+--
+-- Constraining this column (NOT NULL + FK + supporting indexes) is deliberately deferred to a
+-- later migration (V61) shipped as its own PR/record once the writer release above has been
+-- deployed and verified against production data - see the 6b rollout worksheet's "when
+-- enforcement is safe" analysis. Do not add NOT NULL/FK here.
+ALTER TABLE stock_movements ADD COLUMN site_id UUID;

@@ -58,6 +58,24 @@ explicit split. The route list is complete as of the capture date.
 | `/api/v1/sites/{siteId}/products` | Assortment, local price/cost, reorder and forecasting settings |
 | `/api/v1/sites/{siteId}/transfers` | Draft, dispatch, receive, cancel, discrepancy and correction workflow |
 
+## Implemented so far
+
+- Phase 4 (reference slice): `/api/v1/sites/{siteId}/locations` (`SiteLocationController`).
+- Phase 6c (.specs/phase-6-inventory, T-6c-11/T-6c-12): `/api/v1/sites/{siteId}/inventory/totals`,
+  `/api/v1/sites/{siteId}/inventory/products/{productId}`,
+  `/api/v1/sites/{siteId}/inventory/locations/{locationId}`,
+  `/api/v1/sites/{siteId}/inventory/movements` (`SiteInventoryController`), and
+  `/api/v1/sites/{siteId}/inventory/adjustments`, `/api/v1/sites/{siteId}/inventory/transfers`
+  (`SiteInventoryMutationController`, `Idempotency-Key` required). Movement/mutation routes land
+  under the `inventory` family rather than a separate `stock-movements` family the original
+  `StockMovementController` row above predicted -- inventory quantity, movement history and
+  movement mutation are one cohesive resource from the client's perspective, and a same-site
+  transfer is itself an inventory operation (T-6c-4), not a distinct top-level resource. Legacy
+  `/api/inventory/*` and `/api/stock-movements/*` gained `Deprecation`/`Link` headers (T-6c-13, no
+  `Sunset`) pointing back at this document. `LocationInventoryController`'s row above remains
+  unimplemented v1 (R-9, `.specs/phase-6-inventory/log.md`) pending a catalog-owned
+  application-layer product-summary read contract.
+
 ## Compatibility removal gate
 
 Legacy routes are removed only when web and mobile use v1, access logs show no supported legacy

@@ -26,7 +26,7 @@ public class LocationService {
     private final StorageLocationRepository storageLocationRepository;
     private final SiteRepository siteRepository;
 
-    private static final String DEFAULT_SITE_CODE = "MAIN";
+    public static final String DEFAULT_SITE_CODE = "MAIN";
 
     public LocationService(
             LocationRepository locationRepository,
@@ -314,9 +314,31 @@ public class LocationService {
         return storageLocationRepository.findDisplayLocationsBySite_Id(siteId);
     }
 
+    /**
+     * Get the NOT_ASSIGNED location for the default site -- the catch-all location product
+     * intake lands in before being sorted to a real storage location. No site check - kept only
+     * for the legacy, unscoped default-site callers; do not add new callers.
+     *
+     * <p>Phase 6a T-1 (.specs/phase-6-inventory/log.md): consolidates the lookup chain
+     * StockMovementService.getNotAssignedLocationId() otherwise duplicates directly against
+     * {@link StorageLocationRepository}/{@link LocationRepository}.
+     */
+    public Location getNotAssignedLocation() {
+        return getNotAssignedLocation(getDefaultSiteId());
+    }
+
+    /** Get the NOT_ASSIGNED location for the given site. */
+    public Location getNotAssignedLocation(UUID siteId) {
+        storageLocationRepository.findByCodeAndSite_Id("NOT_ASSIGNED", siteId)
+                .orElseThrow(() -> new StorageLocationNotFoundException("NOT_ASSIGNED storage location not found"));
+        return locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", siteId).stream()
+                .findFirst()
+                .orElseThrow(() -> new LocationNotFoundException("NOT_ASSIGNED location not found"));
+    }
+
     // ========= Helper Methods =========
 
-    private UUID getDefaultSiteId() {
+    public UUID getDefaultSiteId() {
         return siteRepository.findByCode(DEFAULT_SITE_CODE)
                 .orElseThrow(() -> new SiteNotFoundException("Default site not found: " + DEFAULT_SITE_CODE))
                 .getId();

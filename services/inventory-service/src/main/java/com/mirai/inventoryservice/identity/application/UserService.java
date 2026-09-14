@@ -1,19 +1,16 @@
 package com.mirai.inventoryservice.identity.application;
 
 import com.mirai.inventoryservice.identity.domain.UserNotFoundException;
-import com.mirai.inventoryservice.models.audit.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.identity.infrastructure.InvitationRepository;
 import com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,16 +21,16 @@ import java.util.UUID;
 @Slf4j
 public class UserService {
     private final UserRepository userRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final LastActorActivityPort lastActorActivityPort;
     private final InvitationRepository invitationRepository;
     private final SupabaseAdminService supabaseAdminService;
 
     public UserService(UserRepository userRepository,
-                       StockMovementRepository stockMovementRepository,
+                       LastActorActivityPort lastActorActivityPort,
                        InvitationRepository invitationRepository,
                        SupabaseAdminService supabaseAdminService) {
         this.userRepository = userRepository;
-        this.stockMovementRepository = stockMovementRepository;
+        this.lastActorActivityPort = lastActorActivityPort;
         this.invitationRepository = invitationRepository;
         this.supabaseAdminService = supabaseAdminService;
     }
@@ -231,19 +228,11 @@ public class UserService {
     }
 
     public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {
-        return stockMovementRepository.findTopByActorIdOrderByAtDesc(userId)
-                .map(StockMovement::getAt);
+        return lastActorActivityPort.lastActivityFor(userId);
     }
 
     public Map<UUID, OffsetDateTime> getAllLastAuditDates() {
-        List<Object[]> results = stockMovementRepository.findLatestMovementTimestampsByActor();
-        Map<UUID, OffsetDateTime> map = new HashMap<>();
-        for (Object[] row : results) {
-            UUID actorId = (UUID) row[0];
-            OffsetDateTime timestamp = (OffsetDateTime) row[1];
-            map.put(actorId, timestamp);
-        }
-        return map;
+        return lastActorActivityPort.lastActivityByActor();
     }
 }
 

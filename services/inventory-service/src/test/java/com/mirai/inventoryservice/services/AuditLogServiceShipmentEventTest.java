@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.dtos.mappers.AuditLogDTOMapper;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ import static org.mockito.Mockito.*;
 class AuditLogServiceShipmentEventTest {
 
     @Mock private AuditLogRepository auditLogRepository;
-    @Mock private StockMovementRepository stockMovementRepository;
+    @Mock private InventoryQueries inventoryQueries;
     @Mock private AuditLogDTOMapper auditLogMapper;
     @Mock private UserRepository userRepository;
     @Mock private SupabaseBroadcastService broadcastService;
@@ -44,7 +44,7 @@ class AuditLogServiceShipmentEventTest {
     @BeforeEach
     void setUp() {
         service = new AuditLogService(
-                auditLogRepository, stockMovementRepository, auditLogMapper, userRepository, broadcastService);
+                auditLogRepository, inventoryQueries, auditLogMapper, userRepository, broadcastService);
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 

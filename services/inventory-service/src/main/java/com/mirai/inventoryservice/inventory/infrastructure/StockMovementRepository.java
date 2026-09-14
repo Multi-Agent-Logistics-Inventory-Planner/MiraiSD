@@ -1,0 +1,197 @@
+package com.mirai.inventoryservice.inventory.infrastructure;
+
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import org.springframework.data.repository.query.Param;
+
+import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface StockMovementRepository extends JpaRepository<StockMovement, Long>, JpaSpecificationExecutor<StockMovement> {
+    // Find all movements for a specific product, newest first
+    List<StockMovement> findByItem_IdOrderByAtDesc(UUID productId);
+
+    // Paginated version for large histories
+    Page<StockMovement> findByItem_IdOrderByAtDesc(UUID productId, Pageable pageable);
+
+    // Filter by location type
+    List<StockMovement> findByItem_IdAndLocationTypeOrderByAtDesc(UUID productId, LocationType locationType);
+
+    // Find recent movements (last 30 days, etc)
+    List<StockMovement> findByItem_IdAndAtAfterOrderByAtDesc(UUID productId, OffsetDateTime since);
+
+    // Find most recent movement by actor (user)
+    Optional<StockMovement> findTopByActorIdOrderByAtDesc(UUID actorId);
+
+    // Bulk query: find most recent movement timestamp for each actor
+    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm WHERE sm.actorId IS NOT NULL GROUP BY sm.actorId")
+    List<Object[]> findLatestMovementTimestampsByActor();
+
+    // Audit log query with eager fetch of item to avoid N+1
+    @EntityGraph(value = "StockMovement.withItem")
+    Page<StockMovement> findAll(Specification<StockMovement> spec, Pageable pageable);
+
+    // Analytics queries with JOIN FETCH on item to avoid N+1
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since")
+    List<StockMovement> findByReasonAndAtAfterWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since);
+
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since AND sm.at < :until")
+    List<StockMovement> findByReasonAndAtBetweenWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since, @Param("until") OffsetDateTime until);
+
+    // Find all movements for a specific audit log
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId ORDER BY sm.id")
+    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId);
+
+    // Find stock movements by metadata source (used for dev seed cleanup)
+    @Query(value = "SELECT * FROM stock_movements WHERE metadata->>'source' = :source", nativeQuery = true)
+    List<StockMovement> findByMetadataSource(@Param("source") String source);
+
+    void deleteByItem_Id(UUID productId);
+
+    // Batch delete all stock movements for multiple products (optimized for N+1 prevention)
+    @Modifying
+    @Query("DELETE FROM StockMovement sm WHERE sm.item.id IN :itemIds")
+    void deleteAllByItemIdIn(@Param("itemIds") Collection<UUID> itemIds);
+
+    /**
+     * Product Assistant drill-down. Returns a projection so Hibernate never
+     * hydrates the item / auditLog / location graphs. Reasons filter is
+     * optional (null = all reasons). Backed by the V19 (item_id, at DESC) index.
+     */
+    @Query("SELECT sm.id AS id, sm.at AS at, sm.reason AS reason, " +
+            "sm.quantityChange AS quantityChange, sm.previousQuantity AS previousQuantity, " +
+            "sm.currentQuantity AS currentQuantity, sm.fromLocationId AS fromLocationId, " +
+            "sm.toLocationId AS toLocationId " +
+            "FROM StockMovement sm " +
+            "WHERE sm.item.id = :productId " +
+            "AND sm.at >= :from AND sm.at < :to " +
+            "AND (:reasons IS NULL OR sm.reason IN :reasons) " +
+            "ORDER BY sm.at DESC")
+    List<StockMovementHistoryView> findHistoryByItemId(
+            @Param("productId") UUID productId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to,
+            @Param("reasons") List<StockMovementReason> reasons,
+            org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Aggregate sales movements by item and date for rollup computation.
+     * Does the aggregation in SQL to avoid loading all entities into memory.
+     * Returns: item_id, rollup_date, units_sold, revenue, cost, profit, movement_count
+     */
+    @Query(value = """
+        SELECT
+            sm.item_id,
+            DATE(sm.at AT TIME ZONE 'UTC') as rollup_date,
+            SUM(ABS(sm.quantity_change)) as units_sold,
+            SUM(ABS(sm.quantity_change) * COALESCE(p.msrp, 0)) as revenue,
+            SUM(ABS(sm.quantity_change) * COALESCE(p.unit_cost, 0)) as cost,
+            SUM(ABS(sm.quantity_change) * (COALESCE(p.msrp, 0) - COALESCE(p.unit_cost, 0))) as profit,
+            COUNT(*) as movement_count
+        FROM stock_movements sm
+        JOIN products p ON sm.item_id = p.id
+        WHERE sm.reason = 'SALE'
+          AND sm.at >= :startDate
+          AND sm.at < :endDate
+        GROUP BY sm.item_id, DATE(sm.at AT TIME ZONE 'UTC')
+        """, nativeQuery = true)
+    List<Object[]> aggregateSalesByItemAndDate(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate);
+
+    /**
+     * Aggregate KUJI draw payouts for a single box, bucketed per calendar day in the
+     * requested timezone. Slip counts come from metadata.slip_quantity (KUJI movements
+     * carry quantity_change = 0). Value is slip count multiplied by the per-slip price,
+     * preferring the snapshot stamped into metadata at draw time (metadata.unit_value)
+     * and falling back to the live tier.price → linked-product.msrp join for legacy
+     * rows. Reversals subtract on the day the reversal occurred. Returns rows only for
+     * days with activity; the service pads zeros for the dense series.
+     * Columns: bucket_date (date), slip_count (int), value_won (numeric).
+     */
+    @Query(value = """
+        SELECT
+            (sm.at AT TIME ZONE :tz)::date AS bucket_date,
+            SUM(
+                CASE
+                    WHEN sm.reason = 'KUJI_PRIZE_WON'     THEN COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                    WHEN sm.reason = 'KUJI_DRAW_REVERSED' THEN -COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                    ELSE 0
+                END
+            ) AS slip_count,
+            SUM(
+                CASE
+                    WHEN sm.reason = 'KUJI_PRIZE_WON'
+                        THEN COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                            * COALESCE((sm.metadata->>'unit_value')::numeric, t.price, p.msrp, 0)
+                    WHEN sm.reason = 'KUJI_DRAW_REVERSED'
+                        THEN -COALESCE((sm.metadata->>'slip_quantity')::int, 0)
+                            * COALESCE((sm.metadata->>'unit_value')::numeric, t.price, p.msrp, 0)
+                    ELSE 0
+                END
+            ) AS value_won
+        FROM stock_movements sm
+        LEFT JOIN kuji_box_tiers t ON t.id = (sm.metadata->>'kuji_box_tier_id')::uuid
+        LEFT JOIN products p ON p.id = t.linked_product_id
+        WHERE sm.reason IN ('KUJI_PRIZE_WON', 'KUJI_DRAW_REVERSED')
+          AND (sm.metadata->>'kuji_box_id')::uuid = :boxId
+          AND (sm.at AT TIME ZONE :tz)::date >= :fromDate
+          AND (sm.at AT TIME ZONE :tz)::date <= :toDate
+        GROUP BY bucket_date
+        ORDER BY bucket_date
+        """, nativeQuery = true)
+    List<Object[]> aggregateKujiDailyPayouts(
+            @Param("boxId") UUID boxId,
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate,
+            @Param("tz") String tz);
+
+    // --- Site-qualified methods (.specs/phase-6-inventory 6c, T-6c-1, AC-3) ---
+    // Query-level site predicates: a movement belonging to another site must not appear in a
+    // site-scoped history/audit read at all. Q-6c-5: null-site rows (pre-backfill compatibility
+    // window) are deliberately included by the audit-log variant below, not excluded, per the
+    // user's resolved decision -- see StockMovementSpecifications.withSiteFilter.
+
+    /**
+     * Paginated per-product movement history, strictly scoped to one site (foreign-site rows
+     * excluded entirely). This is the general tenant-isolation primitive pinned by
+     * {@code LocationInventorySiteScopedQueriesIT}; the v1 movements endpoint does NOT use this
+     * one directly -- see {@link #findByItem_IdAndSiteOrUnknownOrderByAtDesc} below for Q-6c-5's
+     * "include and label" contract that endpoint actually requires.
+     */
+    Page<StockMovement> findByItem_IdAndSite_IdOrderByAtDesc(UUID productId, UUID siteId, Pageable pageable);
+
+    /**
+     * Q-6c-5 variant for the v1 per-product movement history route: also includes movements whose
+     * {@code site} is still null (pre-backfill compatibility window), matching
+     * {@link StockMovementSpecifications#withSiteFilter}'s "matches site or unknown" contract for
+     * the audit-log branch of the same endpoint. A foreign-site movement (non-null, different
+     * site) is still excluded.
+     */
+    @Query("SELECT sm FROM StockMovement sm LEFT JOIN sm.site s "
+            + "WHERE sm.item.id = :productId AND (s.id = :siteId OR s IS NULL) "
+            + "ORDER BY sm.at DESC")
+    Page<StockMovement> findByItem_IdAndSiteOrUnknownOrderByAtDesc(
+            @Param("productId") UUID productId, @Param("siteId") UUID siteId, Pageable pageable);
+
+    // Site-scoped audit-log filtering reuses the existing findAll(Specification, Pageable) above
+    // (already carries @EntityGraph("StockMovement.withItem")) -- the site predicate is composed
+    // into the caller-supplied Specification by StockMovementSpecifications.withSiteFilter, not a
+    // second repository method, so the existing AuditLogFilterDTO composition path is unchanged.
+}
+

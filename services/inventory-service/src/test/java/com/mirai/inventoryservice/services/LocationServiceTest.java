@@ -486,4 +486,85 @@ class LocationServiceTest {
                     locationService.getStorageLocationById(otherSiteId, storageLocationId));
         }
     }
+
+    // Phase 6a T-1 (.specs/phase-6-inventory/log.md): consolidates the NOT_ASSIGNED lookup chain
+    // StockMovementService.getNotAssignedLocationId() duplicates today
+    // (storageLocationRepository.findByCodeAndSite_Code("NOT_ASSIGNED", DEFAULT_SITE_CODE) ->
+    // locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", site.getId()).
+    // findFirst()) into one sites.application method inventory can call once T-4/T-5 migrate that
+    // caller off sites.infrastructure repositories directly.
+    @Nested
+    @DisplayName("getNotAssignedLocation")
+    class GetNotAssignedLocationTests {
+
+        private StorageLocation notAssignedStorageLocation;
+        private Location notAssignedLocation;
+
+        @BeforeEach
+        void setUpNotAssigned() {
+            notAssignedStorageLocation = StorageLocation.builder()
+                    .id(UUID.randomUUID())
+                    .site(testSite)
+                    .code("NOT_ASSIGNED")
+                    .name("Not Assigned")
+                    .isDisplayOnly(false)
+                    .hasDisplay(false)
+                    .build();
+
+            notAssignedLocation = Location.builder()
+                    .id(UUID.randomUUID())
+                    .storageLocation(notAssignedStorageLocation)
+                    .locationCode("NOT_ASSIGNED")
+                    .build();
+        }
+
+        @Test
+        @DisplayName("no-arg overload resolves the default site's NOT_ASSIGNED location")
+        void shouldReturnNotAssignedLocationForDefaultSite() {
+            when(siteRepository.findByCode("MAIN")).thenReturn(Optional.of(testSite));
+            when(storageLocationRepository.findByCodeAndSite_Id("NOT_ASSIGNED", siteId))
+                    .thenReturn(Optional.of(notAssignedStorageLocation));
+            when(locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", siteId))
+                    .thenReturn(List.of(notAssignedLocation));
+
+            Location result = locationService.getNotAssignedLocation();
+
+            assertEquals(notAssignedLocation, result);
+        }
+
+        @Test
+        @DisplayName("site-scoped overload resolves the given site's NOT_ASSIGNED location")
+        void shouldReturnNotAssignedLocationForGivenSite() {
+            when(storageLocationRepository.findByCodeAndSite_Id("NOT_ASSIGNED", siteId))
+                    .thenReturn(Optional.of(notAssignedStorageLocation));
+            when(locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", siteId))
+                    .thenReturn(List.of(notAssignedLocation));
+
+            Location result = locationService.getNotAssignedLocation(siteId);
+
+            assertEquals(notAssignedLocation, result);
+        }
+
+        @Test
+        @DisplayName("throws StorageLocationNotFoundException when the site has no NOT_ASSIGNED storage location")
+        void shouldThrowWhenNotAssignedStorageLocationMissing() {
+            when(storageLocationRepository.findByCodeAndSite_Id("NOT_ASSIGNED", siteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(StorageLocationNotFoundException.class, () ->
+                    locationService.getNotAssignedLocation(siteId));
+        }
+
+        @Test
+        @DisplayName("throws LocationNotFoundException when the NOT_ASSIGNED storage location has no location row")
+        void shouldThrowWhenNotAssignedLocationMissing() {
+            when(storageLocationRepository.findByCodeAndSite_Id("NOT_ASSIGNED", siteId))
+                    .thenReturn(Optional.of(notAssignedStorageLocation));
+            when(locationRepository.findByStorageLocationCodeAndSiteId("NOT_ASSIGNED", siteId))
+                    .thenReturn(List.of());
+
+            assertThrows(LocationNotFoundException.class, () ->
+                    locationService.getNotAssignedLocation(siteId));
+        }
+    }
 }

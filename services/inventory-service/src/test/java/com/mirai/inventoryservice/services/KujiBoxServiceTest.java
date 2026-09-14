@@ -1,6 +1,8 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
@@ -8,25 +10,23 @@ import com.mirai.inventoryservice.dtos.requests.kuji.AddSlipRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.RecordDrawRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.TransferInMoreRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
-import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.kuji.KujiBox;
 import com.mirai.inventoryservice.models.kuji.KujiBoxTier;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +38,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -66,15 +65,13 @@ class KujiBoxServiceTest {
     @Mock private CatalogEntityAccess catalogEntityAccess;
     @Mock private ProductStockStateWriter productStockStateWriter;
     @Mock private LocationRepository locationRepository;
-    @Mock private LocationInventoryRepository locationInventoryRepository;
+    @Mock private InventoryOperations inventoryOperations;
+    @Mock private InventoryQueries inventoryQueries;
     @Mock private MachineDisplayRepository machineDisplayRepository;
     @Mock private AuditLogRepository auditLogRepository;
-    @Mock private StockMovementRepository stockMovementRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
     @Mock private SupabaseBroadcastService broadcastService;
-    @Mock private EventOutboxService eventOutboxService;
-    @Mock private StockMovementService stockMovementService;
     @Mock private EntityManager entityManager;
     @Mock private ProductService productService;
 
@@ -107,15 +104,13 @@ class KujiBoxServiceTest {
                 catalogEntityAccess,
                 productStockStateWriter,
                 locationRepository,
-                locationInventoryRepository,
+                inventoryOperations,
+                inventoryQueries,
                 machineDisplayRepository,
                 auditLogRepository,
-                stockMovementRepository,
                 userRepository,
                 notificationService,
                 broadcastService,
-                eventOutboxService,
-                stockMovementService,
                 entityManager,
                 productService);
 
@@ -177,9 +172,9 @@ class KujiBoxServiceTest {
                 .product(linkedProduct)
                 .quantity(BOX_INVENTORY)
                 .build();
-        when(locationInventoryRepository.findByLocation_IdAndProduct_Id(sourceLocationId, productId))
+        when(inventoryOperations.findInventory(sourceLocationId, productId))
                 .thenReturn(Optional.of(sourceInv));
-        when(locationInventoryRepository.findByLocation_IdAndProduct_Id(boxLocationId, productId))
+        when(inventoryOperations.findInventory(boxLocationId, productId))
                 .thenReturn(Optional.of(boxInv));
 
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(invocation -> {
@@ -189,7 +184,7 @@ class KujiBoxServiceTest {
             }
             return log;
         });
-        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryOperations.recordMovement(any(StockMovement.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private TransferInMoreRequestDTO request() {
@@ -215,7 +210,7 @@ class KujiBoxServiceTest {
 
         // A single REMOVED stock-movement on the source side (no deposit at the machine).
         ArgumentCaptor<StockMovement> movementCaptor = ArgumentCaptor.forClass(StockMovement.class);
-        verify(stockMovementRepository, times(1)).save(movementCaptor.capture());
+        verify(inventoryOperations, times(1)).recordMovement(movementCaptor.capture());
         StockMovement mv = movementCaptor.getValue();
         Map<String, Object> meta = mv.getMetadata();
         assertNotNull(meta);
@@ -223,7 +218,7 @@ class KujiBoxServiceTest {
         assertEquals(boxId.toString(), meta.get("kuji_box_id"));
 
         // Only the source LocationInventory row is touched.
-        verify(locationInventoryRepository, times(1)).save(any(LocationInventory.class));
+        verify(inventoryOperations, times(1)).saveInventory(any(LocationInventory.class));
     }
 
     @Test
@@ -233,7 +228,7 @@ class KujiBoxServiceTest {
                 IllegalStateException.class,
                 () -> service.transferInInventoryOnly(boxId, tierId, request()));
         assertTrue(ex.getMessage().contains("not OPEN"));
-        verify(stockMovementRepository, never()).save(any());
+        verify(inventoryOperations, never()).recordMovement(any());
     }
 
     @Test
@@ -263,7 +258,7 @@ class KujiBoxServiceTest {
                 InsufficientInventoryException.class,
                 () -> service.transferInInventoryOnly(boxId, tierId, req));
         // No movements written when the transfer is rejected.
-        verify(stockMovementRepository, never()).save(any());
+        verify(inventoryOperations, never()).recordMovement(any());
         assertEquals(INITIAL_SLIP_COUNT, tier.getActiveCount());
     }
 
@@ -277,11 +272,6 @@ class KujiBoxServiceTest {
         req.setActorId(actorId);
         req.setQuantity(2);
 
-        // toResponseDTO will batch-fetch tier inventory; provide an empty result.
-        when(locationInventoryRepository.findByLocation_IdAndProduct_IdIn(
-                any(UUID.class), any(Collection.class)))
-                .thenReturn(Collections.emptyList());
-
         service.addSlip(boxId, tierId, req);
 
         // Tier slip count incremented.
@@ -292,12 +282,11 @@ class KujiBoxServiceTest {
         verify(auditLogRepository, times(1)).save(auditCaptor.capture());
         assertEquals(StockMovementReason.KUJI_SLIP_ADJUSTMENT, auditCaptor.getValue().getReason());
 
-        // No StockMovement row. No outbox event.
-        verify(stockMovementRepository, never()).save(any(StockMovement.class));
-        verify(eventOutboxService, never()).createStockMovementEvent(any());
+        // No StockMovement row (and therefore no outbox event, which recordMovement publishes).
+        verify(inventoryOperations, never()).recordMovement(any(StockMovement.class));
 
         // No costly product-totals SUM either.
-        verify(stockMovementService, never()).syncProductTotals(any());
+        verify(inventoryOperations, never()).syncProductTotals(any());
 
         // Box not reloaded — toResponseDTO should run on the in-memory box.
         verify(kujiBoxRepository, times(1)).findByIdWithTiers(boxId);
@@ -323,7 +312,7 @@ class KujiBoxServiceTest {
         // Product.quantity stays put — the kuji counter is the truth.
         assertEquals(BOX_INVENTORY, linkedProduct.getQuantity());
         // syncProductTotals NOT called — nothing in location_inventory changed.
-        verify(stockMovementService, never()).syncProductTotals(any());
+        verify(inventoryOperations, never()).syncProductTotals(any());
         // Tier active slip count was bumped.
         assertEquals(INITIAL_SLIP_COUNT + TRANSFER_QUANTITY, tier.getActiveCount());
     }
@@ -350,17 +339,15 @@ class KujiBoxServiceTest {
                 .build();
         box.setTiers(new java.util.ArrayList<>(List.of(tier, secondTier)));
 
-        // Reset to ignore findByLocation_IdAndProduct_Id stubs from setUp; we want to
-        // assert that DTO mapping does NOT hit LocationInventory anymore — kuji prize
-        // counts live on the tier, not on location_inventory.
-        clearInvocations(locationInventoryRepository);
+        // Reset to ignore findInventory stubs from setUp; we want to assert that DTO
+        // mapping does NOT hit LocationInventory anymore — kuji prize counts live on
+        // the tier, not on location_inventory.
+        clearInvocations(inventoryOperations);
 
         service.addSlip(boxId, tierId, req);
 
-        verify(locationInventoryRepository, never())
-                .findByLocation_IdAndProduct_IdIn(any(UUID.class), any(Collection.class));
-        verify(locationInventoryRepository, never())
-                .findByLocation_IdAndProduct_Id(any(UUID.class), any(UUID.class));
+        verify(inventoryOperations, never())
+                .findInventory(any(UUID.class), any(UUID.class));
     }
 
     // ===================== drawnCount =====================
@@ -414,7 +401,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(boxId, auditLogId, actorId);
@@ -526,7 +513,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(boxId, auditLogId, actorId);
@@ -568,7 +555,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(stockMovementRepository.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(boxId, auditLogId, actorId);
@@ -585,7 +572,7 @@ class KujiBoxServiceTest {
 
     private StockMovement captureSavedMovementByReason(StockMovementReason reason) {
         ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
-        verify(stockMovementRepository, atLeastOnce()).save(captor.capture());
+        verify(inventoryOperations, atLeastOnce()).recordMovement(captor.capture());
         return captor.getAllValues().stream()
                 .filter(m -> m.getReason() == reason)
                 .findFirst()
@@ -607,7 +594,7 @@ class KujiBoxServiceTest {
         };
         List<Object[]> rows = new java.util.ArrayList<>();
         rows.add(row);
-        when(stockMovementRepository.aggregateKujiDailyPayouts(
+        when(inventoryQueries.aggregateKujiDailyPayouts(
                 eq(boxId), any(), any(), eq("UTC")))
                 .thenReturn(rows);
 

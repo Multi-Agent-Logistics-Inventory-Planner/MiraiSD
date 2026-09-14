@@ -1,19 +1,21 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.exceptions.InventoryNotFoundException;
-import com.mirai.inventoryservice.exceptions.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
+import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
-import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
-import com.mirai.inventoryservice.repositories.*;
+import com.mirai.inventoryservice.inventory.application.LocationInventoryService;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -50,7 +52,7 @@ class LocationInventoryServiceTest {
     private StorageLocationRepository storageLocationRepository;
 
     @Mock
-    private SiteRepository siteRepository;
+    private LocationService locationService;
 
     @Mock
     private CatalogEntityAccess catalogEntityAccess;

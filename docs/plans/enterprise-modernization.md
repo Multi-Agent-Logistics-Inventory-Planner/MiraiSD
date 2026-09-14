@@ -23,7 +23,7 @@ package move.
 | 3 | Architecture and contract foundation | Substantially complete (Track D deferred behind Phase 4, §6) |
 | 4 | Identity and sites | Substantially complete (all deliverables landed, not yet merged, §7) |
 | 5 | Catalog and site assortment | Not started |
-| 6 | Inventory and stock movements | Not started |
+| 6 | Inventory and stock movements | Planned: one PR, five implementation/review checkpoints; code not started (§9) |
 | 7 | Shipments and remaining site operations | Not started |
 | 8 | Audited inter-site transfers | Deferred - no second site actually operating yet, §11 |
 | 9 | Focused Expo mobile client | Deferred - gated behind Phases 5-8, §12 |
@@ -503,6 +503,44 @@ Phase 6 work.
 - Catalog repository ownership and API contracts are enforced by ArchUnit/tests.
 
 ## 9. Phase 6 — Inventory and stock movements
+
+### Delivery structure (agreed 2026-09-09)
+
+Use one working branch and one draft PR for Phase 6. Work through five logical commits in order;
+6a–6e are implementation and review checkpoints, not separately merged releases. Additional fix
+commits are allowed. Keep mechanical movement distinct from behavioral edits within the history.
+Each checkpoint must pass its relevant native checks and review before the next begins; the whole
+phase exit gate must pass before merging the PR. Each checkpoint is one implementation slice:
+complete its T-numbered checklist continuously and request review at the end of the slice, not
+after each task. Use focused checks during implementation and the required gate at completion,
+following the [shared review cadence](../sdd-workflow.md#slice-level-review-cadence). Material
+decisions and migration prerequisites still precede dependent implementation.
+
+One Full-tier execution record, [Phase 6 inventory](../../.specs/phase-6-inventory/spec.md), owns
+the spec, log, review and validation for this mergeable unit. Refine each checkpoint's concrete
+tasks from the caller/schema inventory before implementing it; do not create five sibling records
+unless the delivery actually splits into multiple PRs.
+
+| Checkpoint | Scope |
+| --- | --- |
+| 6a — Inventory module boundary | Move the vertical inventory module, introduce narrow operation/read facades, migrate external callers, and enforce architecture ownership while preserving behavior. |
+| 6b — Site ownership foundation | Expand schema, update writers to supply trusted site ownership, provide deterministic backfill and verification, and preserve legacy compatibility. |
+| 6c — Scoped inventory backend | Enforce site-scoped operations and tenant constraints; add compatible event context and v1 endpoints, including slim and bounded/batched totals contracts. |
+| 6d — Web adoption | Migrate inventory reads and stock workflows; restore Products quantity/status from scoped totals and prove site-switch behavior. |
+| 6e — Targeted refresh and exit proof | Coalesce mutation/realtime refreshes, retain full-refresh recovery, measure egress savings, and complete compatible cleanup and phase validation. |
+
+**Commit order is not deployment order.** Before 6b implementation, record the migration mechanism,
+old/new writer compatibility, backfill verification and constraint-enforcement sequence. Constraints
+in 6c cannot rely on 6b having run in production merely because it is an earlier commit. If safe
+enforcement requires a previously deployed writer/backfill release, split that release into a
+separate PR and execution record before proceeding; do not silently weaken the rollout gate to keep
+one PR. No production migration or deployment is authorized by this plan.
+
+Before changing stock-state semantics, reconcile Phase 5b's planned removal of `products.quantity`
+and `ProductStockStateWriter` with the durable global `is_active` behavior and its Kuji/forecasting
+consumers. Inventory all readers/writers and record compatible replacements or explicit retained
+adapters. This plan does not authorize a column drop or redefine global activity as site assortment.
+Kuji/lootbox site migration stays in Phase 7; audited inter-site transfers stay in Phase 8.
 
 ### Deliverables
 

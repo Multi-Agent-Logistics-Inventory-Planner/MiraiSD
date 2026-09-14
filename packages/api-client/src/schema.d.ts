@@ -2804,6 +2804,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{siteId}/inventory/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["adjustSiteInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteInventoryByLocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/inventory/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/inventory/products/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteInventoryByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/inventory/totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteInventoryTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/inventory/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferSiteInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{siteId}/locations": {
         parameters: {
             query?: never;
@@ -4260,6 +4356,24 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageSiteStockMovementResponseDTO: {
+            content?: components["schemas"]["SiteStockMovementResponseDTO"][];
+            empty?: boolean;
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            number?: number;
+            /** Format: int32 */
+            numberOfElements?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size?: number;
+            sort?: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageStockMovementResponseDTO: {
             content?: components["schemas"]["StockMovementResponseDTO"][];
             empty?: boolean;
@@ -4779,6 +4893,24 @@ export interface components {
         SiteAssortmentRequest: {
             isStocked: boolean;
         };
+        SiteInventoryTotalDTO: {
+            /** Format: date-time */
+            lastUpdatedAt?: string;
+            /** Format: uuid */
+            productId?: string;
+            /** Format: int32 */
+            totalQuantity?: number;
+        };
+        SiteLocationInventoryEntryDTO: {
+            /** Format: uuid */
+            inventoryId?: string;
+            /** Format: uuid */
+            productId?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
         SiteMembershipDTO: {
             siteCode?: string;
             /** Format: uuid */
@@ -4820,6 +4952,31 @@ export interface components {
             /** Format: int32 */
             targetStockLevel?: number | null;
             unitCost?: number | null;
+        };
+        SiteStockMovementResponseDTO: {
+            /** Format: uuid */
+            actorId?: string;
+            /** Format: date-time */
+            at?: string;
+            /** Format: uuid */
+            fromLocationId?: string;
+            /** Format: int64 */
+            id?: number;
+            /** Format: uuid */
+            itemId?: string;
+            /** @enum {string} */
+            locationType?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            /** Format: int32 */
+            quantityChange?: number;
+            /** @enum {string} */
+            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+            /** @description "UNKNOWN" when this row predates the site backfill; omitted otherwise. */
+            siteAttribution?: string;
+            /** Format: uuid */
+            toLocationId?: string;
         };
         SortObject: {
             empty?: boolean;
@@ -15506,6 +15663,314 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["SiteMembershipDTO"][];
                 };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    adjustSiteInventory: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAdjustStockRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteInventoryByLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteLocationInventoryEntryDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteMovements: {
+        parameters: {
+            query: {
+                itemId?: string;
+                search?: string;
+                actorId?: string;
+                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+                fromDate?: string;
+                toDate?: string;
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageSiteStockMovementResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteInventoryByProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductInventoryResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteInventoryTotals: {
+        parameters: {
+            query?: {
+                productIds?: string[];
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SiteInventoryTotalDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    transferSiteInventory: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferInventoryRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Authentication required */
             401: {

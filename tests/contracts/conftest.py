@@ -45,6 +45,18 @@ _events_spec.loader.exec_module(_events_mod)
 sys.modules["events"] = _events_mod
 sys.modules["config"] = _config_mod
 
+# messaging-service's events.py has no relative imports, so it can be loaded directly without
+# the package-shim dance forecasting-service's config-dependent module needs above.
+MESSAGING_SRC = (
+    Path(__file__).parent.parent.parent / "services" / "messaging-service" / "src"
+)
+_messaging_events_spec = importlib.util.spec_from_file_location(
+    "messaging_events", MESSAGING_SRC / "events.py"
+)
+_messaging_events_mod = importlib.util.module_from_spec(_messaging_events_spec)
+sys.modules["messaging_events"] = _messaging_events_mod
+_messaging_events_spec.loader.exec_module(_messaging_events_mod)
+
 
 @pytest.fixture(scope="session")
 def event_envelope_schema() -> dict:
@@ -68,6 +80,12 @@ def sample_full_payload() -> dict:
         "entity_type": "stock_movement",
         "entity_id": str(uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        # AC-4 envelope fields (.specs/phase-6-inventory T-6c-7/T-6c-8/T-6c-9).
+        "correlation_id": str(uuid4()),
+        "event_version": 1,
+        "site_id": str(uuid4()),
+        "causation_id": None,
+        "idempotency_key": None,
         "payload": {
             "product_id": item_id,
             "product_name": "Test Product",
@@ -120,6 +138,11 @@ def sample_null_optionals_payload() -> dict:
         "entity_type": "stock_movement",
         "entity_id": str(uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "correlation_id": None,
+        "event_version": None,
+        "site_id": None,
+        "causation_id": None,
+        "idempotency_key": None,
         "payload": {
             "product_id": item_id,
             "product_name": None,

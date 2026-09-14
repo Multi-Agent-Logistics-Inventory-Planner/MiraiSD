@@ -14,7 +14,7 @@ import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -54,7 +54,7 @@ class AnalyticsServiceTest {
     private ForecastPredictionRepository forecastPredictionRepository;
 
     @Mock
-    private InventoryTotalsRepository inventoryTotalsRepository;
+    private InventoryQueries inventoryQueries;
 
     @Mock
     private DailySalesRollupRepository dailySalesRollupRepository;
@@ -175,7 +175,7 @@ class AnalyticsServiceTest {
                     .thenReturn(List.of(ProductRef.from(product)));
             when(catalogQueries.allCategoryRefs())
                     .thenReturn(List.of(CategoryRef.from(category)));
-            when(inventoryTotalsRepository.findAllStockTotalsMap())
+            when(inventoryQueries.findAllStockTotalsMap())
                     .thenReturn(Map.of(productId, 30));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -192,7 +192,7 @@ class AnalyticsServiceTest {
             when(forecastPredictionRepository.findAllLatest()).thenReturn(Collections.emptyList());
             // When no predictions, catalogQueries.findAllByIds won't be called (empty ID set)
             when(catalogQueries.allCategoryRefs()).thenReturn(Collections.emptyList());
-            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Collections.emptyMap());
+            when(inventoryQueries.findAllStockTotalsMap()).thenReturn(Collections.emptyMap());
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
 
@@ -216,7 +216,7 @@ class AnalyticsServiceTest {
                     .thenReturn(List.of(buildPrediction(productId)));
             when(catalogQueries.findAllByIds(any())).thenReturn(List.of(ProductRef.from(product)));
             when(catalogQueries.allCategoryRefs()).thenReturn(List.of(CategoryRef.from(category)));
-            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(Map.of(productId, 50));
+            when(inventoryQueries.findAllStockTotalsMap()).thenReturn(Map.of(productId, 50));
             when(dailySalesRollupRepository.findByRollupDateBetweenOrderByRollupDateAsc(any(), any()))
                     .thenReturn(Collections.emptyList());
 
@@ -319,7 +319,7 @@ class AnalyticsServiceTest {
             when(forecastPredictionRepository.findAllLatest()).thenReturn(List.of(prediction));
             Map<UUID, Integer> stockMap = new HashMap<>();
             stockMap.put(product.getId(), stock);
-            when(inventoryTotalsRepository.findAllStockTotalsMap()).thenReturn(stockMap);
+            when(inventoryQueries.findAllStockTotalsMap()).thenReturn(stockMap);
             when(catalogQueries.findAllByIds(any())).thenReturn(List.of(ProductRef.from(product)));
             when(catalogQueries.allCategoryRefs()).thenReturn(Collections.emptyList());
             when(catalogPricing.findPricingForIds(any())).thenReturn(List.of(ProductPricing.from(product)));
