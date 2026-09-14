@@ -252,6 +252,95 @@ class LocationInventoryServiceTest {
     }
 
     @Nested
+    @DisplayName("addInventory (site-scoped, T-6d-be-1)")
+    class SiteScopedAddInventoryTests {
+
+        @Test
+        @DisplayName("should validate the location belongs to the site before delegating to the un-scoped method")
+        void shouldValidateSiteOwnershipBeforeDelegating() {
+            when(locationService.getLocationById(siteId, locationId)).thenReturn(testLocation);
+            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
+            when(catalogEntityAccess.requireManagedProduct(productId)).thenReturn(testProduct);
+            when(locationInventoryRepository.findByLocation_IdAndProduct_Id(locationId, productId))
+                    .thenReturn(Optional.empty());
+            when(stockMovementService.createInventoryWithTracking(
+                    any(), eq(locationId), eq(testProduct), eq(10),
+                    any(), any(), any(), any(), any()))
+                    .thenReturn(inventoryId);
+            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.of(testInventory));
+
+            UUID actorId = UUID.randomUUID();
+            LocationInventory result = locationInventoryService.addInventory(
+                    siteId, actorId, locationId, productId, 10, null, null, null);
+
+            assertEquals(testInventory, result);
+            verify(locationService, times(1)).getLocationById(siteId, locationId);
+        }
+
+        @Test
+        @DisplayName("should throw LocationNotFoundException before any write for a foreign-site/unknown location")
+        void shouldThrowNotFoundForForeignSiteLocation_beforeAnyWrite() {
+            when(locationService.getLocationById(siteId, locationId))
+                    .thenThrow(new LocationNotFoundException("Location not found: " + locationId));
+
+            assertThrows(LocationNotFoundException.class, () ->
+                    locationInventoryService.addInventory(
+                            siteId, UUID.randomUUID(), locationId, productId, 10, null, null, null));
+
+            verify(catalogEntityAccess, never()).requireManagedProduct(any());
+            verify(stockMovementService, never()).createInventoryWithTracking(
+                    any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteInventory (site-scoped, T-6d-be-1)")
+    class SiteScopedDeleteInventoryTests {
+
+        @Test
+        @DisplayName("should resolve the inventory row via the site-scoped lookup and delegate to the un-scoped method")
+        void shouldDelegateAfterSiteAndLocationOwnershipChecks() {
+            when(locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId))
+                    .thenReturn(Optional.of(testInventory));
+            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.of(testInventory));
+
+            UUID actorId = UUID.randomUUID();
+            locationInventoryService.deleteInventory(siteId, actorId, locationId, inventoryId, null);
+
+            verify(stockMovementService, times(1)).removeInventoryWithTracking(
+                    any(), eq(inventoryId), any(), eq(actorId), any());
+        }
+
+        @Test
+        @DisplayName("should throw InventoryNotFoundException before any write for a foreign-site/unknown inventory row")
+        void shouldThrowNotFoundForForeignSiteInventory_beforeAnyWrite() {
+            when(locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(InventoryNotFoundException.class, () ->
+                    locationInventoryService.deleteInventory(siteId, UUID.randomUUID(), locationId, inventoryId, null));
+
+            verify(stockMovementService, never()).removeInventoryWithTracking(
+                    any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should throw InvalidInventoryOperationException (400) when the inventory row does not belong to the path locationId")
+        void shouldThrowInvalidOperationForLocationMismatch() {
+            UUID otherLocationId = UUID.randomUUID();
+            when(locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId))
+                    .thenReturn(Optional.of(testInventory));
+
+            assertThrows(InvalidInventoryOperationException.class, () ->
+                    locationInventoryService.deleteInventory(
+                            siteId, UUID.randomUUID(), otherLocationId, inventoryId, null));
+
+            verify(stockMovementService, never()).removeInventoryWithTracking(
+                    any(), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("findByProduct")
     class FindByProductTests {
 

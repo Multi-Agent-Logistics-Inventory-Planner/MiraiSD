@@ -1,5 +1,160 @@
 # Review
 
+## 6d backend slice (T-6d-be-1..T-6d-be-8) — independent review, 2026-09-14
+
+**Scope reviewed:** the full 6d backend slice (T-6d-be-1 through T-6d-be-8) as committed to the
+working tree ahead of PR — site-scoped `LocationInventoryService.addInventory`/`deleteInventory`
+overloads, the new v1 create/delete/batch-transfer routes on `SiteInventoryMutationController`,
+recursive `actorId` idempotency-fingerprint stripping, the `@Size(max = 50)` batch cap, legacy
+deprecation-header coverage for the sites-shaped inventory routes, and the regenerated
+`packages/contracts/openapi.json`/`packages/api-client`. Reviewed against spec.md's AC-3, AC-4,
+AC-5 and the backend-side portion of R-9's resolution.
+
+This is the independent review's disposition list, transcribed verbatim from the review that ran
+ahead of this fix session, with findings 1/2/3's dispositions updated below to reflect the
+review-driven fix that landed in this same session (findings 1/2/3 are marked **fixed**, not just
+"act on" — finding 4, "review.md/validation.md don't exist," is closed by this entry and
+validation.md's matching entry existing).
+
+### Act on
+
+1. **[Standards] Delete route's idempotency fingerprint is non-deterministic across JVM restarts — fixed.**
+   `fingerprint(Map.of("locationId", locationId, "inventoryId", inventoryId))` used
+   `java.util.Map.of`'s randomized-per-JVM iteration order (seeded from `System.nanoTime()`), so
+   the same logical delete command fingerprinted differently across JVM restarts/redeploys — a
+   legitimate retry inside the idempotency table's 7-day retention window got a spurious 409
+   instead of an idempotent 204. Proven by the reviewer hashing the same map six times across JVM
+   runs and getting different SHA-256 values.
+   **Fixed:** replaced the `Map.of(...)` carrier with a package-private
+   `DeleteInventoryFingerprintKey(UUID locationId, UUID inventoryId)` record — a record's component
+   order is fixed by its declaration, so Jackson serializes it identically on every run. Checked
+   the rest of the file for the same `Map.of`-as-fingerprint-carrier pattern: this was the only
+   instance. New test:
+   `SiteInventoryMutationControllerFingerprintTest.deleteFingerprint_forFixedLocationAndInventoryId_matchesPinnedHash`
+   pins the fingerprint of a fixed `(locationId, inventoryId)` pair to a hard-coded SHA-256
+   literal, plus `deleteFingerprint_isStableAcrossRepeatedCalls_forTheSameLogicalCommand` — a test
+   that only re-derived the hash the same way the code does would not have caught this class of
+   bug, since it would drift together with the code on every JVM run; the pinned literal makes an
+   ordering regression structurally visible.
+
+2. **[Standards] Create route's fingerprint omits `locationId` — fixed.**
+   `fingerprint(request)` was body-only; `locationId` is a path variable, not part of the request
+   body. The same `Idempotency-Key` + identical body + a *different* `locationId` therefore matched
+   on `commandType`+`requestFingerprint` in `CommandIdempotencyService.executeIdempotent` and
+   silently returned the first location's stored 201 response without creating anything at the
+   second location — a silent no-op masquerading as success.
+   **Fixed:** added a package-private `CreateInventoryFingerprintKey(UUID locationId,
+   CreateLocationInventoryRequestDTO request)` record and fingerprint that instead of the bare
+   request, using the same deterministic-record approach as finding 1. New tests:
+   `SiteInventoryMutationControllerFingerprintTest.createFingerprint_includesLocationId_soSameBodyDifferentLocationHashesDifferently`/
+   `.createFingerprint_forFixedLocationAndBody_matchesPinnedHash` (unit level), and
+   `SiteInventoryMutationControllerSecurityIT.createItem_sameKeySameBodyDifferentLocation_returns409AndDoesNotReuseFirstLocationResponse`
+   (HTTP level: same `Idempotency-Key`, identical body, two different `locationId` path values —
+   second call asserted 409, and the second location's `location_inventory` row asserted absent).
+   Confirmed this HTTP test actually catches the bug by temporarily reverting the fix and
+   re-running it: it failed with `Status expected:<409> but was:<201>` against the pre-fix code,
+   then passed once the fix was restored.
+
+3. **[Spec] T-6d-be-6's "assumption outcome: confirmed safe" is not supported by the test written — Javadoc corrected; disposition changed to open risk, not blocking.**
+   The design's caveat was "exactly one **location** under NOT_ASSIGNED per site."
+   `secondNotAssignedStorageLocationForSameSite_violatesUniqueConstraint` only proves
+   `storage_locations(site_id, code)` uniqueness, not `locations`-row uniqueness beneath it —
+   `locations` only carries `UNIQUE(storage_location_id, location_code)`
+   (`infra/init-db/20-unified-locations.sql`), so `LocationService.createLocation` could add a
+   second `locations` row under one site's NOT_ASSIGNED storage location without any DB-level
+   rejection, and `LocationService.getNotAssignedLocation` resolves it via an unordered
+   `.stream().findFirst()`.
+   **Fixed to the extent resolvable this session:** corrected `NotAssignedInventoryReadParityIT`'s
+   Javadoc so it no longer claims to prove "the web's single-NA-location assumption is enforced" —
+   it now states plainly what it actually proves (storage-location-level uniqueness only) and what
+   it does not (locations-row uniqueness). Ran a read-only query against the project's real
+   Supabase database (session had live `mcp__supabase` access) —
+   see validation.md's "Finding 3 evidence" for the exact query and result. **Real-data finding:**
+   of the two sites in the live database, one (`MAIN`) has a NOT_ASSIGNED storage location with
+   exactly one `locations` row beneath it; the other (`SECOND`) has no NOT_ASSIGNED storage
+   location at all yet (not yet seeded). No site was found with more than one NA `locations` row —
+   today's real data does not violate the assumption. This is **empirical, not schema-enforced**:
+   nothing in the schema stops a future write from creating a second `locations` row under a site's
+   NOT_ASSIGNED storage location. Recorded as an explicit, named open risk in log.md's Current
+   handoff and validation.md, not silently marked closed — see those files for the
+   escalate-or-proceed disposition on T-6d-9.
+
+4. **[Standards] `review.md`/`validation.md` didn't exist for 6d — fixed.** This entry and
+   validation.md's matching "Review-driven fix: 6d backend slice findings" entry close this gap for
+   the 6d checkpoint, per spec.md's per-checkpoint Full-tier requirement.
+
+### Consider (not acted on this session — recorded as-is from the independent review, unchanged)
+
+5. Audit rows are never asserted in the new atomicity tests — AC-4 names audit explicitly;
+   `createInventoryWithTracking`/`removeInventoryWithTracking` do build an `AuditLog`, add one
+   assertion per success case.
+6. `assertThatThrownBy(...).isInstanceOf(RuntimeException.class)` in new atomicity cases is too
+   loose — tighten to the specific exception types; HTTP ITs already assert real status codes so
+   this is minor.
+7. OpenAPI documents 200/401/403 for all five v1 mutation routes, not actual 201/204/409/404/400 —
+   pre-existing from 6c, but the regenerated TS client now types create as 200-with-body vs actual
+   201, and the web slice is about to consume these types. Add `@ResponseStatus`/`@ApiResponses`.
+8. Fingerprint algorithm's serialization approach changed shape (convertValue→LinkedHashMap→serialize
+   vs valueToTree→serialize) — equivalent bytes for these bodies but not guaranteed for every type;
+   worth a one-line deployment note about idempotency rows spanning a deploy.
+9. No test for a cross-site destination on the new batch route specifically (`requireSameSite` does
+   hold per code read, and NOT_ASSIGNED fallback resolves default site's NA location which fails
+   closed but with a confusing error for non-MAIN sites) — pre-existing from 6c, one IT would pin
+   it.
+
+### Dismissed (checked, no action)
+
+- Recursive `actorId` strip is correct for all fingerprinted shapes in this service, no collateral
+  stripping of legitimate fields.
+- Foreign-site rejection is query-level (JPQL `site.id` predicate), not a post-load filter,
+  IT-confirmed.
+- Actor identity is principal-derived on all three new handlers, never client-supplied.
+- Atomicity holds — `executeIdempotent` is `@Transactional` wrapping the command supplier; rollback
+  proven by test.
+- No new lock-order path — batch route is a pure wrapper over already-proven
+  `batchTransferInventory`.
+- `@Size(max = 50)` reaches both the new v1 route and the legacy route (shared DTO).
+- Deprecation filter coverage confirmed correct for every sites-module route (no false positives)
+  and every legacy inventory route (no false negatives).
+- Site stamping can't diverge — `createInventoryWithTracking` sets site from
+  `location.storageLocation.site`.
+- OpenAPI diff matches claim: 3 paths added (not 4 as originally estimated — a counting
+  correction), 0 removed, 1 schema added, exactly one existing-schema delta
+  (`BatchTransferInventoryRequestDTO.maxItems`).
+- All new/changed test classes independently re-run, 0 failures (SecurityIT 23, AtomicityIT 15,
+  FingerprintTest 4, SiteScopedQueriesIT 12, NotAssignedReadParityIT 2, DeprecationHeadersIT 6,
+  LocationInventoryServiceTest 18).
+
+## Residual risk
+
+- ITs run on H2, not Testcontainers Postgres, contrary to what CLAUDE.md implies for this project
+  generally — real-PG concurrency/constraint semantics for the new routes aren't proven by this
+  slice. (The review-driven fix session separately confirmed finding 3's real-data state via a
+  direct query against the project's actual Supabase database, not through the H2-backed IT suite —
+  see validation.md.)
+- The 50-element batch cap bounds request size, not lock footprint (up to ~100 distinct
+  (location,product) rows could still lock in one transaction on the 512MB single node) — no
+  measurement taken, AC-8 measurement is 6e's job.
+- `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` remain failing under the `*IT`
+  sweep — pre-existing debt, degrades that sweep as a regression signal. Reconfirmed unchanged by
+  this session's full `*IT` rerun (see validation.md).
+- Legacy `PUT /api/locations/{id}/inventory/{inventoryId}` (silent untracked absolute quantity set)
+  is still live, now merely marked deprecated; removal is 6e's job.
+- **New, from finding 3's real-data check:** the one-NA-location-per-site invariant is empirically
+  true today but not schema-enforced — `LocationService.createLocation` could add a second
+  `locations` row under a site's NOT_ASSIGNED storage location with no DB-level rejection, and
+  `LocationService.getNotAssignedLocation`'s unordered `.stream().findFirst()` would then silently
+  pick one of several. Not fixed in this session (out of scope — the finding asked for real-data
+  verification and Javadoc correction, not a schema change); recorded as an explicit open risk for
+  T-6d-9 in log.md's Current handoff.
+
+**Verdict (independent review, as given): Approve after fixes.** Findings 1/2 were real
+idempotency-contract defects, now fixed and re-verified same session (see validation.md). Finding 3
+is settled to the extent real data allows — no violation found today, but the invariant remains
+unenforced; recorded as an open risk rather than closed, per the review's own instruction not to
+mark it "confirmed safe" without evidence. Finding 4 is closed by this entry. No P1 in this
+project's established sense — no tenant leak, no data corruption, no contract break.
+
 ## Review-driven fix: 6c checkpoint P1 findings (independent review) — 2026-09-13
 
 An independent review of the committed 6c slice (`34dcfea`) found two P1s the self-review pass

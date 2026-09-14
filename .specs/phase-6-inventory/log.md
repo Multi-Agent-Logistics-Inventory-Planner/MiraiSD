@@ -3083,6 +3083,35 @@ from this one spot) was deleted rather than left dead. No production code change
   native-SQL order-fragility remains open debt (not a 6c blocker). R-9 (`LocationInventoryController`
   not moved into `inventory.api`) remains open, unchanged, out of 6c's scope.
 
+## Current handoff (6d, superseding the 6c handoff above)
+
+- Status: 6d backend slice (T-6d-be-1..T-6d-be-8) implemented and verified — see "6d
+  implementation (T-6d-be-1..T-6d-be-8) (2026-09-14)" below. Web slice (T-6d-1..T-6d-14) not
+  started.
+- Next action: implement T-6d-1..T-6d-14 (web adoption). T-6d-9 (NOT_ASSIGNED on v1) and T-6d-8's
+  batch-transfer piece are now unblocked — the v1 create/delete/batch-transfer routes exist and
+  are verified.
+- Surviving decisions: batch transfer ships as a new v1 route (not legacy, not fanned into N
+  calls); R-9 resolved via a mechanical move — `LocationInventoryService`/`SiteInventoryMutationController`
+  gained site-scoped create/delete, no module-graph edge change was needed, confirmed by
+  `ArchitectureTest` and an unmodified `module-dependency-edges-baseline.txt`; unknown-site
+  movement rows ship labeled, not gated on Q-6c-1; legacy untracked PUT (`LocationInventoryController
+  .updateInventory`) is left in place but unused by any new route — deletion is 6e's bookkeeping;
+  batch-transfer DTO capped at `@Size(max = 50)` (also tightens the legacy `/api/stock-movements
+  /batch-transfer` route, accepted).
+- Last verified: `./mvnw -q clean test` (367 run/0 failures, non-IT), `./mvnw test -Dtest='*IT'`
+  (508 run/8 failures — all in `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`, the
+  pre-existing unrelated flaky classes recorded below; every inventory-related IT class passed),
+  `./mvnw -q clean -Dtest=ArchitectureTest test` run twice independently (both silent/green),
+  `OpenApiContractExportTest` run twice (stable), `npm run generate` + `npm run typecheck` in
+  `packages/api-client` (clean).
+- Open risks/questions: Q-6c-1/Q-6c-4 unchanged (see 6c handoff above). NOT_ASSIGNED
+  one-location-per-site and the kuji-child/CUSTOM-parent read-filtering discrepancy are now
+  resolved, not open — see T-6d-be-6 below (schema-enforced uniqueness; filtering discrepancy
+  proven real and now the intended behavior of the v1 route, not a gap). Pre-existing
+  `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` flakiness (500s under the shared
+  `*IT` sweep) is unrelated debt, unchanged by this slice.
+
 ## Assumptions and decisions
 
 - 2026-09-10: user agreed to slice-level implementation and review cadence. Checkpoints 6a–6e
@@ -3984,3 +4013,481 @@ Independent review of the completed T-6–T-8 slice found two P3s. No runtime re
 - Verified: `./mvnw -q clean test-compile` clean; `./mvnw -q clean test` (full unrestricted suite)
   exit 0, zero failures across every surefire report; `git diff --check` passed.
 - Result: pass. Both P3s fixed same session; no files committed.
+
+## 6d planning — web adoption worksheet (2026-09-14)
+
+6c is complete and merged to `dev` (PR #326, `c6473a7`). `refactor/inventory-stock` is at the same
+commit. 6d ("Web adoption") scope per spec.md's checkpoint table: migrate inventory reads/mutations
+to v1 site-scoped routes, restore scoped Products inventory, prove rendered behavior and
+site-switch isolation (AC-6). Planning done in two passes — a web-adoption baseline/task list
+(`planner`) and a backend design pass (`mirai-spring-architect`) for two gaps the web baseline
+surfaced that have no v1 route today.
+
+### User decisions (all material, all confirmed 2026-09-14)
+
+- **Batch transfer:** route the already-implemented `StockMovementService.batchTransferInventory`
+  as a new v1 endpoint in 6d, rather than leaving it on the legacy route or fanning it into N
+  single transfers (which would lose atomicity and turn one audit entry into N).
+- **R-9 (`LocationInventoryController`'s `catalog.api` coupling):** resolve now, inside 6d, rather
+  than defer further. Flagging for the record: neither `docs/plans/enterprise-modernization.md`
+  nor the domain-modular-monolith migration plan ever assigned R-9 an owning phase — it had only
+  been carried forward as open debt through 6a/6b/6c's "not a blocker for this checkpoint" notes
+  with no scheduled resolution. 6d closes it.
+- **Unknown-site movement rows:** ship v1 movement history with an explicit "unknown site" marker
+  for `siteAttribution: "UNKNOWN"` rows (Q-6c-5's "include and label," now actually labeled
+  client-side) rather than blocking on confirming Q-6c-1's production backfill/deploy status first.
+- **Dropping the untracked PUT:** confirmed. Legacy `PUT /api/locations/{id}/inventory/{invId}`
+  performs a silent absolute quantity set with no `StockMovement`/audit/outbox — a pre-existing
+  AC-4 violation. R-9's v1 resolution removes it; all location-inventory edits go through the
+  audited adjustment endpoint instead. No dedicated "set exact quantity, but audited" route.
+- **Batch-transfer size cap:** confirmed `@Size(max = 50)` on the shared
+  `BatchTransferInventoryRequestDTO`, matching `BatchAdjustStockRequestDTO`. This also tightens the
+  legacy `/api/stock-movements/batch-transfer` contract; no known caller sends near 50, and it
+  bounds per-transfer pessimistic-lock footprint on the single 512 MB-heap deployment.
+
+### Backend design: R-9 resolution and batch-transfer route
+
+Confirmed by re-reading the actual code (not assumed): the `inventory.api -> catalog.api` coupling
+that blocked R-9 in 6a's T-6 is **read-side only** — `LocationInventoryResponseDTO.item`
+(`catalog.api.ProductSummaryDTO`) and `LocationInventoryMapper`. `InventoryRequestDTO` (the write
+body) imports no catalog type. So R-9 is a mechanical move plus a slim-response-shape change (the
+same discipline T-6c-11/12 already forced on every other v1 inventory route), **not** an R-3-style
+port inversion — no new `catalog.application` read contract, no module-graph edge, no
+`module-dependency-edges-baseline.txt` change.
+
+- The v1 **read** side for a real location is already shipped: `GET
+  /api/v1/sites/{siteId}/inventory/locations/{locationId}` (T-6c-12). Nothing to add there.
+- `GET /api/locations/{id}/inventory/{inventoryId}` has no web caller anywhere — delete the client
+  function in the web slice, no v1 counterpart needed.
+- New v1 write routes on the existing `SiteInventoryMutationController`:
+  - `POST /api/v1/sites/{siteId}/inventory/locations/{locationId}/items` — create, returns the
+    existing `SiteLocationInventoryEntryDTO` (no catalog metadata; web does the client-side join
+    already required by every other v1 read). New `CreateLocationInventoryRequestDTO`
+    (`productId`, `quantity` `@Min(1)`, optional `reason`/`intakeUnit`/`intakeQty`, no `actorId`
+    field — actor comes from `AuthorizedSiteContext`).
+  - `DELETE /api/v1/sites/{siteId}/inventory/locations/{locationId}/items/{inventoryId}` — 204,
+    `ADMIN`/`ASSISTANT_MANAGER` only (method-level override of the class default), matching legacy.
+  - `POST /api/v1/sites/{siteId}/inventory/transfers/batch` — 201/`Void`, same
+    `BatchTransferInventoryRequestDTO` the legacy route uses, `Idempotency-Key` required.
+- New site-scoped `LocationInventoryService` overloads (`addInventory`/`deleteInventory` taking
+  `siteId`/`actorId` first, mirroring `StockMovementService`'s T-6c-4 pattern): resolve the
+  location/row through a site-qualified repository lookup (404 before any write on a foreign-site
+  location or inventory row, 400 on a path/row location mismatch), then delegate to the existing
+  un-scoped methods — which stay untouched so the legacy controller keeps working until 6e deletes
+  it.
+- **NOT_ASSIGNED needs no special route shape.** It is an ordinary per-site `storage_locations` row
+  (code `NOT_ASSIGNED`, `infra/migrations/007-seed-standard-storage-locations.sql`) with an
+  ordinary `locations` row under it. `GET /api/v1/sites/{siteId}/locations?storageLocation=NOT_ASSIGNED`
+  (already shipped) resolves the site's NA location; every read/write after that is an ordinary
+  per-location call. This retires both the virtual-ID indirection and the site-blind
+  `cachedNALocationId` module cache in `apps/web/src/lib/api/inventory.ts` (real multi-site bug:
+  the cache is not keyed by site).
+  - Caveat 1 (to prove, not assume, T-6d-be-6): exactly one location under NOT_ASSIGNED per site.
+    The web already assumes this; it has never been enforced. If false, add a
+    storage-location-scoped v1 read before the web slice depends on it.
+  - Caveat 2 (real, confirmed by reading the repository): `LocationInventoryRepository
+    .findByStorageLocation_Id` (today's NOT_ASSIGNED read path) applies no `parent IS NULL`/
+    non-`CUSTOM`-kuji-parent exclusion, unlike `findByLocation_Id` and its site-scoped twin. Moving
+    NOT_ASSIGNED onto the per-location v1 route changes observable behavior — kuji-child/`CUSTOM`
+    -parent rows at NA stop appearing. This aligns behavior with what the UI's own code comment
+    already (incorrectly) claims is already true; T-6d-be-6 proves it against real data before the
+    web slice ships it as fact.
+- Found and must fix before the batch-transfer route ships: `SiteInventoryMutationController
+  .fingerprint()` strips `actorId` only at the top level of the request body. For
+  `BatchTransferInventoryRequestDTO`, `actorId` is nested inside each `transfers[]` element, so an
+  ignored-but-present client `actorId` would leak into the idempotency fingerprint and a legitimate
+  retry could get a spurious 409. Fix: recursive `actorId` stripping (walk the JSON tree, not just
+  the top level) before hashing.
+
+**Backend task list** (T-6d-be-N, ordered, each independently verifiable; suggested commit split
+T-6d-be-1..3 / T-6d-be-4..5 / T-6d-be-6..8, mirroring how 6c batched T-6c-11..17):
+
+- T-6d-be-1: site-scoped `LocationInventoryService.addInventory`/`deleteInventory` overloads. No
+  route yet. Unit tests (foreign-site 404 before write, path/row mismatch 400) + one real-Postgres
+  case in the `LocationInventorySiteScopedQueriesIT` family.
+- T-6d-be-2: v1 create route (`CreateLocationInventoryRequestDTO` + `POST .../items`). Extend
+  `SiteInventoryMutationControllerSecurityIT`/`...AtomicityIT` — role matrix, missing-header 400,
+  foreign-site 404, replay creates exactly one row, fingerprint conflict 409, atomic
+  inventory+movement+audit+outbox+idempotency commit/rollback.
+- T-6d-be-3: v1 delete route (`DELETE .../items/{inventoryId}`), ADMIN/ASSISTANT_MANAGER only.
+  Same IT family — explicit 403 for EMPLOYEE, 204 for the two allowed roles, foreign-site 404,
+  location/inventory mismatch 400, replay does not double-emit.
+- T-6d-be-4: recursive `actorId` stripping in the idempotency fingerprint (must land before
+  T-6d-be-5). Unit test: nested-`actorId`-only difference hashes identically; a real field
+  difference still hashes differently; existing top-level cases still hold.
+- T-6d-be-5: v1 batch-transfer route + `@Size(max = 50)` on the shared DTO. Role matrix,
+  missing-header 400, foreign-site source 404 before any write, 51-element batch 400, replay is a
+  no-op, atomic multi-transfer rollback on a mid-batch failure, one deadlock-safety concurrency
+  case (two concurrent batches touching the same rows in opposite order).
+- T-6d-be-6: NOT_ASSIGNED read-parity IT (seed a root product, a kuji-child, and a `CUSTOM` kuji
+  parent at one NA location; assert the v1 per-location read returns only the root product) +
+  one-NA-location-per-site assertion recorded in validation.md. If the one-NA-location assumption
+  is false in real data, stop and add a storage-location-scoped v1 read before web depends on it.
+- T-6d-be-7: legacy deprecation headers for `/api/locations/{id}/inventory*` and
+  `/api/storage-locations/{id}/inventory` (extend `LegacyInventoryDeprecationConfig`; url-pattern
+  can't express the mid-path wildcard, so register at `/api/locations/*` / `/api/storage-locations/*`
+  and gate on the trailing `/inventory` segment so `sites`' own `LocationController` routes aren't
+  mismarked). Extend `LegacyInventoryDeprecationHeadersIT`.
+- T-6d-be-8: regenerate `packages/contracts/openapi.json` (`OpenApiContractExportTest`, stable
+  across a second independent run) and `packages/api-client`. Expect four new paths, zero removed
+  paths, and exactly one intentional legacy-schema delta (`BatchTransferInventoryRequestDTO`'s new
+  `maxItems: 50`) — call it out explicitly in validation.md rather than letting it hide in the diff.
+
+`LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+`InventoryRequestDTO` stay in their legacy packages and stay functional through 6d; final deletion
+is 6e's bookkeeping once no web caller remains, not part of closing R-9.
+
+### Web baseline and task list
+
+Full per-call-site baseline (every legacy inventory/stock-movement/location API function, its v1
+disposition, every dependent hook/component, realtime subscription scoping, and the Kuji-gate
+mechanism) and the ordered `T-6d-0..T-6d-14` web task list produced by the planning pass are
+recorded verbatim in this checkpoint's planning transcript; summarized here for traceability and
+expanded into the Task record as each task starts, per the established convention:
+
+- T-6d-0 (superseded by the user decisions above — G-1/G-2/G-3 are now all resolved: batch
+  transfer and R-9 both get v1 routes per the backend design; nothing stays silently on legacy).
+- T-6d-1: typed v1 inventory client functions (`apps/web/src/lib/api/site-inventory.ts`).
+- T-6d-2: idempotency-key strategy for the v1 mutations (generated once per user-initiated attempt).
+- T-6d-3: site-qualified query keys + the late-old-site-result rejection mechanism; audit every
+  `invalidateQueries`/`setQueriesData` call site over the affected prefixes; fix the
+  `setQueriesData<Product[]>({queryKey:["products"]})` prefix collision with the 5d
+  `["products", siteId, "site"]` key.
+- T-6d-4: restore scoped quantity/status on the Products list from `getSiteInventoryTotals`; drop
+  `showQuantity={false}` and the "available after inventory is migrated per site" affordance.
+- T-6d-5: product detail inventory on v1 (`getSiteProductInventory`).
+- T-6d-6: location-detail inventory on v1, with a shared client-side catalog join helper.
+- T-6d-7: stock adjust on v1 (drop client-sent `actorId`).
+- T-6d-8: stock transfer + batch transfer on v1.
+- T-6d-9: NOT_ASSIGNED inventory on v1 (now unblocked by R-9's resolution — the site-keyed
+  `GET .../locations?storageLocation=NOT_ASSIGNED` replaces both the virtual-ID indirection and the
+  site-blind `cachedNALocationId` cache) and the create/delete flows (`product-form.tsx`'s initial
+  stock, the not-assigned/location mutations) onto the new v1 create/delete routes.
+- T-6d-10: movement history on v1, rendering `siteAttribution: "UNKNOWN"` rows with an explicit
+  marker rather than hiding them.
+- T-6d-11: site-scope the realtime inventory refresh (`stock_movements.site_id` filtering, ignore
+  foreign-site events, treat null-site as possibly-relevant, re-subscribe on site change). The
+  org-wide `db-changes` broadcast channel carries no `siteId` and is left as safe-but-over-invalidating
+  for 6d; adding `siteId` to `SupabaseBroadcastService`'s payload is 6e's AC-7 coalescing work.
+- T-6d-12: site-blind residual audit (`getLocationsWithCounts`, `dashboard.ts`'s `getAuditLog`,
+  kuji dialogs' inventory reads — each recorded with its owning phase).
+- T-6d-13: AC-6 rendered-test sweep (detail state, role-dependent controls, stock workflows, site
+  switching asserting whole-page state not just request URLs, unresolved/error states, late-result
+  rejection), following phase-5d's `products/__tests__/page.test.tsx` pattern.
+- T-6d-14: confirm the non-MAIN Kuji-unavailable gate (`kuji-tab-panel.tsx`) is untouched by T-6d-4's
+  hook refactor — existing `kuji-tab-panel.test.tsx` stays green unmodified.
+
+Recorded assumptions (not escalated, per AGENTS.md's "ask only material decisions" rule): no new
+client-side RBAC gates on adjust/transfer (v1 controllers already allow EMPLOYEE, matching today's
+UI); movement-history `actorName` degrades to the existing `formatId(actorId)` fallback rather than
+adding a users join; broadcast-channel over-invalidation stays as-is for 6d (correctness-safe,
+6e's coalescing scope); `getLocationsWithCounts` stays site-blind (`sites` module territory,
+recorded as residual); site switching continues to be exercised only by mocking `useCurrentSite`,
+no switcher UI is built in 6d.
+
+### Next action
+
+Implement T-6d-be-1 through T-6d-be-8 (backend) first — the web task list's T-6d-9 depends on
+R-9's resolution and T-6d-8's batch-transfer depends on T-6d-be-4/5. Then implement T-6d-1 through
+T-6d-14 (web).
+
+## 6d implementation (T-6d-be-1..T-6d-be-8) (2026-09-14)
+
+Implemented the full backend slice per the design above, in order, TDD where a meaningful local
+test existed (Mockito unit tests for the service overloads, real-H2-backed IT for repository/DB
+behavior, MockMvc security IT for the HTTP surface, direct-bean atomicity IT for transactional
+proof — matching 6c's established split). All commands below ran against JDK 21 via `./mvnw`.
+
+### T-6d-be-1 — site-scoped `LocationInventoryService` overloads
+
+- Changed: `inventory/application/LocationInventoryService.java` — added `addInventory(siteId,
+  actorId, locationId, productId, quantity, reason, intakeUnit, intakeQty)` (validates the
+  location via `LocationService.getLocationById(siteId, locationId)`, 404s before any write, then
+  delegates to the existing un-scoped method) and `deleteInventory(siteId, actorId, locationId,
+  inventoryId, reason)` (resolves the row via `LocationInventoryRepository.findByIdAndSite_Id`,
+  404 for a foreign-site/unknown row, then a location/row-ownership check that 400s on a mismatch,
+  then delegates to the existing un-scoped method). Neither overload changes the un-scoped methods
+  the legacy controller still calls.
+- Tests: `services/LocationInventoryServiceTest.java` — new `SiteScopedAddInventoryTests`/
+  `SiteScopedDeleteInventoryTests` nested classes (Mockito): site-ownership delegation,
+  foreign-site 404 before any write, location/row mismatch 400 before any write.
+  `inventory/infrastructure/LocationInventorySiteScopedQueriesIT.java` — 4 new real-H2-backed
+  cases (`addInventory_siteScoped_rejectsForeignSiteLocation_beforeAnyWrite`,
+  `addInventory_siteScoped_createsInventory_whenLocationBelongsToSite`,
+  `deleteInventory_siteScoped_rejectsForeignSiteInventory_beforeAnyWrite`,
+  `deleteInventory_siteScoped_rejectsLocationRowMismatch`) exercising the real service bean
+  against a real database round trip, not mocked repositories.
+- Result: pass. `./mvnw -q -Dtest=LocationInventoryServiceTest,LocationInventorySiteScopedQueriesIT
+  test` — 32 run / 0 failures.
+
+### T-6d-be-2/T-6d-be-3 — v1 create/delete routes on `SiteInventoryMutationController`
+
+- Changed: new `inventory/api/CreateLocationInventoryRequestDTO.java` (`productId`, `quantity
+  @Min(1)`, optional `reason`/`intakeUnit`/`intakeQty`, no `actorId`). `SiteInventoryMutationController`
+  gained `LocationInventoryService` as a dependency and two handlers: `POST
+  .../inventory/locations/{locationId}/items` (201, returns `SiteLocationInventoryEntryDTO`,
+  idempotent via `CommandIdempotencyService`) and `DELETE
+  .../inventory/locations/{locationId}/items/{inventoryId}` (204, `@PreAuthorize("hasAnyRole('ADMIN',
+  'ASSISTANT_MANAGER')")` overriding the controller's class-level EMPLOYEE-inclusive default,
+  matching the legacy `LocationInventoryController.deleteInventory` restriction). Both require the
+  `Idempotency-Key` header and derive actor identity from `AuthorizedSiteContext`, never a
+  client-supplied value.
+- Tests: `controllers/security/SiteInventoryMutationControllerSecurityIT.java` — 8 new cases:
+  missing-key 400, EMPLOYEE 201 + persisted row (create), foreign-site location 404 + no write
+  (create), EMPLOYEE 403 (delete, below ADMIN/ASSISTANT_MANAGER), ADMIN 204 + row removed
+  (delete), foreign-site inventory 404 + no write (delete), location/row mismatch 400 + no write
+  (delete). `inventory/api/SiteInventoryMutationControllerAtomicityIT.java` — 5 new direct-bean
+  cases: create commits inventory+movement+outbox+idempotency together, create replay is a no-op
+  (no second row/movement), create foreign-site rejects before any write, delete commits
+  removal+movement+outbox+idempotency together, delete replay does not double-emit, delete
+  location/row mismatch rejects with no write.
+- Result: pass. `./mvnw -Dtest=SiteInventoryMutationControllerSecurityIT,
+  SiteInventoryMutationControllerAtomicityIT test` — 30 run / 0 failures (at this point in the
+  sequence, before T-6d-be-5's additions).
+
+### T-6d-be-4 — recursive `actorId` stripping in the idempotency fingerprint
+
+- Changed: `SiteInventoryMutationController.fingerprint()` now builds a Jackson `JsonNode` tree
+  (`objectMapper.valueToTree`) and walks it recursively (`stripActorIdRecursively`), removing every
+  `actorId` field at any object depth — objects and array elements alike — instead of the prior
+  top-level-only `Map.remove("actorId")`. `fingerprint()` was widened from `private` to
+  package-private so a focused unit test could call it directly without exercising the whole
+  idempotency/HTTP stack.
+- Tests: new `inventory/api/SiteInventoryMutationControllerFingerprintTest.java` (constructs the
+  controller with mocked collaborators): nested-`actorId`-only difference (inside a
+  `BatchTransferInventoryRequestDTO.transfers[]` element) hashes identically; a real nested field
+  difference still hashes differently; the existing top-level `TransferInventoryRequestDTO` cases
+  (actorId-only same, real-field different) still hold.
+- Result: pass. `./mvnw -Dtest=SiteInventoryMutationControllerFingerprintTest test` — 4 run / 0
+  failures.
+
+### T-6d-be-5 — v1 batch-transfer route + `@Size(max = 50)`
+
+- Changed: `BatchTransferInventoryRequestDTO.transfers` gained `@Size(min = 1, max = 50)`
+  (previously `min = 1` only, effectively unbounded) — a shared DTO, so this also tightens the
+  legacy `/api/stock-movements/batch-transfer` route per the user-confirmed decision.
+  `SiteInventoryMutationController` gained `POST .../inventory/transfers/batch` (201, idempotent,
+  delegates to the already-implemented `StockMovementService.batchTransferInventory(siteId,
+  actorId, request)` — no new service-layer logic). The underlying atomicity/lock-ordering/deadlock
+  proofs for `batchTransferInventory` itself are unchanged and already covered by
+  `StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT` and
+  `StockMovementServiceMixedAdjustTransferLockOrderIT` at the service layer — this route is a thin
+  HTTP/idempotency wrapper around that existing, already-proven method, so this task's tests focus
+  on what's new at this layer (routing, auth, idempotency, size cap, atomicity of the
+  wrapper+service call together) rather than re-running the full concurrency matrix through HTTP.
+- Tests: `SiteInventoryMutationControllerSecurityIT.java` — 5 new cases: missing-key 400, USER
+  role 403, foreign-site source 404 + no write, same-site 201 + replay is a no-op (destination
+  quantity unchanged on the second call), a 51-element batch 400 (bean-validation `@Size` rejects
+  before the controller body runs). `SiteInventoryMutationControllerAtomicityIT.java` — 3 new
+  direct-bean cases: successful batch commits both movements+outbox+idempotency together, a
+  mid-batch failure (second transfer's quantity exceeds source stock) rolls back both lines
+  together (first transfer's effect is not partially applied), foreign-site source rejects before
+  any write.
+- Result: pass. `./mvnw -Dtest=SiteInventoryMutationControllerSecurityIT,
+  SiteInventoryMutationControllerAtomicityIT,SiteInventoryMutationControllerFingerprintTest test`
+  — 42 run / 0 failures.
+
+### T-6d-be-6 — NOT_ASSIGNED read-parity IT + one-NA-location-per-site assumption
+
+- Changed: no production code (proof-only task, as scoped).
+- Tests: new `inventory/application/NotAssignedInventoryReadParityIT.java`:
+  - `v1Read_excludesKujiChildAndCustomKujiParentRows_legacyReadDoesNot` seeds one root product, one
+    kuji-child product (non-null `parent`), and the CUSTOM kuji parent product itself at one real
+    NOT_ASSIGNED location, then asserts the legacy `findByStorageLocation_Id` returns all three
+    rows (today's actual, unfiltered behavior) while the v1 route's
+    `InventoryQueries.findByLocationIdAndSite` (backed by `findByLocation_IdAndSite_Id`'s existing
+    `p.parent IS NULL AND (p.kujiType IS NULL OR p.kujiType <> CUSTOM)` filter) returns only the
+    root product — confirms the design note's flagged discrepancy is real, and that moving the web
+    NOT_ASSIGNED flow onto the v1 route (T-6d-9) is a genuine, intentional behavior change, not a
+    no-op.
+  - `secondNotAssignedStorageLocationForSameSite_violatesUniqueConstraint` proves the
+    one-NOT_ASSIGNED-location-per-site assumption is schema-enforced, not merely conventional:
+    `StorageLocation` carries an entity-level `@UniqueConstraint(columnNames = {"site_id",
+    "code"})`, so a second `NOT_ASSIGNED`-coded storage location for the same site fails with
+    `DataIntegrityViolationException`. **Assumption outcome: confirmed safe** — the design's "very
+    likely fine" held; no design change or escalation needed.
+- Result: pass. `./mvnw -Dtest=NotAssignedInventoryReadParityIT test` — 2 run / 0 failures.
+
+### T-6d-be-7 — legacy deprecation headers for sites-shaped inventory routes
+
+- Changed: new `inventory/api/LegacyLocationInventoryDeprecationFilter.java` — gates on the
+  request path actually ending in an `inventory` segment (`^/api/locations/[^/]+/inventory(?:/.*)?$`
+  or `^/api/storage-locations/[^/]+/inventory$`) before setting the `Deprecation`/`Link` headers,
+  since Spring's `url-pattern` syntax can't express the mid-path `{id}/inventory` segment directly
+  and a naive `/api/locations/*` registration would also catch `sites`' own `LocationController`
+  routes at plain `/api/locations/{id}`. `LegacyInventoryDeprecationConfig` registers this filter
+  at the `/api/locations/*`/`/api/storage-locations/*` wildcard level, alongside the existing
+  `LegacyInventoryDeprecationFilter` registration (unchanged).
+- Tests: `LegacyInventoryDeprecationHeadersIT.java` — 4 new cases: `GET
+  /api/locations/{id}/inventory` carries the headers, `GET /api/storage-locations/{id}/inventory`
+  carries the headers, `GET /api/locations/{id}` (sites' own route, no `/inventory` suffix) does
+  NOT carry the headers.
+- Result: pass. `./mvnw -Dtest=LegacyInventoryDeprecationHeadersIT test` — 6 run / 0 failures.
+
+### T-6d-be-8 — regenerate `packages/contracts/openapi.json` and `packages/api-client`
+
+- Changed: `packages/contracts/openapi.json` (regenerated via `OpenApiContractExportTest`, run
+  twice independently — identical output both times, confirming stability) and
+  `packages/api-client/src/schema.d.ts` (regenerated via `npm run generate` in `packages/api-client`,
+  which shells out to `openapi-typescript`).
+- Diff against the pre-change contract (scripted `json` comparison, not eyeballed):
+  - **Paths added (3):** `POST/DELETE` on `/api/v1/sites/{siteId}/inventory/locations/{locationId}/items`
+    and `/api/v1/sites/{siteId}/inventory/locations/{locationId}/items/{inventoryId}` (create is
+    `POST` on the first path, delete is `DELETE` on the second), and `POST
+    /api/v1/sites/{siteId}/inventory/transfers/batch`. **Deviation from the design note's estimate
+    of "four new paths":** the actual count is 3 distinct path templates (create/delete share one
+    `.../items` vs. `.../items/{inventoryId}` split, plus the batch-transfer path) — verified by a
+    scripted set-diff over `paths.keys()`, not miscounted by hand.
+  - **Paths removed:** none.
+  - **Schemas added:** `CreateLocationInventoryRequestDTO` (new DTO, expected).
+  - **Schemas removed:** none.
+  - **Modified existing schemas:** exactly one — `BatchTransferInventoryRequestDTO.transfers.maxItems`
+    changed from `2147483647` (framework default for a `@Size(min=1)` with no explicit max) to
+    `50`. No other field of any existing schema changed.
+- Result: pass. `npm run typecheck` in `packages/api-client` — clean, no new type errors from the
+  regenerated schema.
+
+### Full-suite verification (checkpoint-slice gate)
+
+- `./mvnw -q clean test` (non-IT unit/component tests): **367 run / 0 failures / 0 errors.**
+- `./mvnw test -Dtest='*IT'` (every integration test, since `mvn test` alone skips `*IT.java` —
+  see the project's recorded `inventory-service-test-commands` note): **508 run / 8 failures.** All
+  8 failures are in `AnalyticsControllerSecurityIT` (6 cases) and `ForecastControllerSecurityIT`
+  (2 cases), pre-existing and recorded as unrelated flaky debt at 6c's close (500s on
+  `/api/analytics/*`/`/api/forecasts` under the shared `*IT` sweep, not touched by this session).
+  Every inventory-related IT class in this run passed, including
+  `SiteInventoryMutationControllerSecurityIT` (23), `SiteInventoryMutationControllerAtomicityIT`
+  (15), `LocationInventorySiteScopedQueriesIT` (12), `NotAssignedInventoryReadParityIT` (2), and
+  `LegacyInventoryDeprecationHeadersIT` (6).
+- `./mvnw -q clean -Dtest=ArchitectureTest test`, run twice as two independent clean rebuilds: both
+  silent/green (no violations). `module-dependency-edges-baseline.txt` was not touched, confirming
+  R-9's resolution needed no new module-graph edge, as the design predicted.
+- `OpenApiContractExportTest` run twice independently: stable, identical `openapi.json` output both
+  times.
+- `npm run generate` + `npm run typecheck` in `packages/api-client`: clean.
+
+### Deviations from the design
+
+- The design's estimate of "four new paths" in the OpenAPI diff was off by one — the actual,
+  verified count is three distinct path templates (see T-6d-be-8 above). This is a
+  counting/estimate correction, not a scope or behavior deviation; every route the design specified
+  (create, delete, batch-transfer) was implemented exactly as designed.
+- No other deviations. `LocationInventoryController`/`LocationInventoryMapper`/
+  `LocationInventoryResponseDTO`/`InventoryRequestDTO` were not touched or deleted, per scope.
+  `module-dependency-edges-baseline.txt` was not touched, per scope.
+
+### Nothing flagged for user input
+
+T-6d-be-6's one-NA-location-per-site assumption came back confirmed safe (schema-enforced), so no
+escalation was needed there. No other material product, security, data-loss, or
+irreversible-deployment decision arose during this slice; all choices already made by the user in
+the 6d planning worksheet were followed as recorded.
+
+## Review-driven fix: 6d backend slice findings (2026-09-14)
+
+An independent review of the committed-but-not-yet-merged 6d backend slice (T-6d-be-1..T-6d-be-8,
+above) found four "Act on" findings. All four addressed this session; full disposition list
+transcribed into `review.md`'s new "6d backend slice (T-6d-be-1..T-6d-be-8) — independent review,
+2026-09-14" entry, commands/results in `validation.md`'s matching entry. Summary:
+
+- **Finding 1 — delete route's idempotency fingerprint non-deterministic across JVM restarts.**
+  `SiteInventoryMutationController`'s delete handler fingerprinted
+  `java.util.Map.of("locationId", locationId, "inventoryId", inventoryId)`; `Map.of`'s iteration
+  order is randomized per JVM (seeded from `System.nanoTime()`), so the same logical delete command
+  hashed differently across JVM restarts/redeploys, risking a spurious 409 on a legitimate retry
+  inside the idempotency table's 7-day window. **Fixed:** a package-private
+  `DeleteInventoryFingerprintKey(UUID locationId, UUID inventoryId)` record replaces the map — a
+  record's component order is fixed by declaration, so the hash is stable across JVM runs. Grepped
+  the file for every other `Map.of`-as-fingerprint-carrier use; this was the only instance.
+- **Finding 2 — create route's fingerprint omitted `locationId`, letting a key-reuse across
+  locations silently "succeed."** `fingerprint(request)` was body-only; the same
+  `Idempotency-Key` + identical body + a different `locationId` path variable matched on
+  `commandType`+`requestFingerprint` and silently returned the first location's stored 201, writing
+  nothing at the second. **Fixed:** a package-private `CreateInventoryFingerprintKey(UUID
+  locationId, CreateLocationInventoryRequestDTO request)` record fingerprints `locationId` together
+  with the body.
+- **Finding 3 — T-6d-be-6's "confirmed safe" claim wasn't supported by the test that was written.**
+  The existing `secondNotAssignedStorageLocationForSameSite_violatesUniqueConstraint` test proves
+  only `storage_locations(site_id, code)` uniqueness, not uniqueness of `locations` rows beneath a
+  site's NOT_ASSIGNED storage location (`locations` only carries `UNIQUE(storage_location_id,
+  location_code)`). **Resolved to the extent real data allows:** ran a read-only query against the
+  project's actual, live Supabase database this session could reach
+  (`mcp__supabase__execute_sql`) — see validation.md's "Finding 3 evidence" for the exact query.
+  Result: of the two real sites, `MAIN` has exactly one `locations` row under its NOT_ASSIGNED
+  storage location; `SECOND` has no NOT_ASSIGNED storage location seeded yet. No violation found in
+  real data, but the invariant is **not schema-enforced** — recorded as an explicit open risk below
+  and in validation.md, not marked "confirmed safe." `NotAssignedInventoryReadParityIT`'s Javadoc
+  corrected to state only what it actually proves.
+- **Finding 4 — `review.md`/`validation.md` had no 6d entries.** Both files now carry a 6d
+  backend-slice entry (review.md: the transcribed independent-review disposition list with
+  findings 1/2/3 marked fixed; validation.md: this session's commands/results/evidence).
+
+New tests (all failing-before/passing-after, verified by temporarily reverting each fix and
+re-running the new test to confirm it actually catches the bug, then restoring the fix):
+`SiteInventoryMutationControllerFingerprintTest.deleteFingerprint_forFixedLocationAndInventoryId_matchesPinnedHash`
+(pins a hard-coded SHA-256 literal — a self-re-deriving test would not catch an ordering
+regression), `.deleteFingerprint_isStableAcrossRepeatedCalls_forTheSameLogicalCommand`,
+`.createFingerprint_includesLocationId_soSameBodyDifferentLocationHashesDifferently`,
+`.createFingerprint_forFixedLocationAndBody_matchesPinnedHash`; and
+`SiteInventoryMutationControllerSecurityIT.createItem_sameKeySameBodyDifferentLocation_returns409AndDoesNotReuseFirstLocationResponse`.
+
+**Result:** `./mvnw -q clean test-compile` clean; `SiteInventoryMutationControllerFingerprintTest`
+8/8; the full touched-class set (`SiteInventoryMutationControllerSecurityIT` 24,
+`...AtomicityIT` 15, `...FingerprintTest` 8, `LocationInventorySiteScopedQueriesIT` 12,
+`NotAssignedInventoryReadParityIT` 2, `LegacyInventoryDeprecationHeadersIT` 6,
+`LocationInventoryServiceTest` 18) all green; `./mvnw -q clean test` — 371+ run (Surefire
+text-summary undercount for `LocationInventoryServiceTest`'s nested-only tests, a pre-existing
+harness quirk unrelated to this fix — its XML report shows `tests="18"`), 0 failures; `./mvnw test
+-Dtest='*IT'` — 509 run (up 1 from 508), 8 failures, all exactly the pre-existing
+`AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` set, confirmed by name-for-name
+comparison against the prior slice's own recorded failures — no new failures, no inventory-related
+IT failed.
+
+**Disposition:** findings 1, 2, and 4 fixed and re-verified. Finding 3 resolved to the extent real
+data allows: no violation found, but recorded as an **open risk, not closed** — the
+one-NA-location-per-site invariant is empirically true in the organization's real data today but is
+not enforced by the schema, so a future write could violate it silently. This does not block T-6d-9
+(the real-data check found no counterexample, so proceeding is reasonable), but T-6d-9 and any
+future session touching `LocationService.createLocation`/`getNotAssignedLocation` should treat this
+as monitored debt, not a proven guarantee — a partial-unique index or application-level guard would
+close it properly. `apps/web` was not touched by this session, per scope; no T-6d-1..T-6d-14 web
+task was started.
+
+## Current handoff (6d review-driven fix, superseding the plain-6d handoff above)
+
+- Status: 6d backend slice (T-6d-be-1..T-6d-be-8) implemented, independently reviewed, and all four
+  review findings addressed this session (see "Review-driven fix: 6d backend slice findings
+  (2026-09-14)" above). Backend slice is done and reviewed. Web slice (T-6d-1..T-6d-14) not started.
+- Next action: implement T-6d-1..T-6d-14 (web adoption). T-6d-9 (NOT_ASSIGNED on v1) and T-6d-8's
+  batch-transfer piece remain unblocked — the v1 create/delete/batch-transfer routes exist, are
+  verified, and their idempotency-fingerprint defects (findings 1/2) are fixed.
+- Surviving decisions: unchanged from the plain-6d handoff above (batch transfer as a new v1 route;
+  R-9 resolved via mechanical move; unknown-site movement rows ship labeled; legacy untracked PUT
+  left in place, unused, deletion deferred to 6e; `@Size(max = 50)` batch cap, also tightening the
+  legacy route).
+- Last verified (this session, review-driven-fix pass): `./mvnw -q clean test-compile` clean;
+  targeted reruns of every touched test class all green (`SiteInventoryMutationControllerSecurityIT`
+  24/24, `...AtomicityIT` 15/15, `...FingerprintTest` 8/8, `LocationInventorySiteScopedQueriesIT`
+  12/12, `NotAssignedInventoryReadParityIT` 2/2, `LegacyInventoryDeprecationHeadersIT` 6/6,
+  `LocationInventoryServiceTest` 18/18); `./mvnw -q clean test` 371+ run/0 failures; `./mvnw test
+  -Dtest='*IT'` 509 run/8 failures (same pre-existing `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` set as every prior checkpoint's run, no new failures). No
+  OpenAPI/contract regeneration was needed — no route/DTO shape changed by this fix session.
+- **Open risks/questions:**
+  - Q-6c-1/Q-6c-4 unchanged (see 6c handoff further above).
+  - **New, from this session's finding 3:** one-NA-location-per-site is empirically true in the
+    live database today (`MAIN` has exactly 1, `SECOND` has 0 — not yet seeded) but is **not
+    schema-enforced** (`locations` only carries `UNIQUE(storage_location_id, location_code)`, not a
+    per-storage-location-NA-count constraint). Not a T-6d-9 blocker given the real-data check found
+    no violation, but flagged as monitored debt: a future `LocationService.createLocation` call
+    could add a second NA `locations` row for a site with no DB-level rejection, and
+    `LocationService.getNotAssignedLocation`'s unordered `.stream().findFirst()` would then
+    silently pick one of several. Consider a partial-unique index or application-level guard in a
+    later checkpoint if this becomes load-bearing for more than T-6d-9's planned scope.
+  - Pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` flakiness (500s
+    under the shared `*IT` sweep) is unrelated debt, unchanged by this session.
+  - The five "Consider" items from the independent review (audit-row assertions in atomicity tests,
+    loose `RuntimeException` exception-type assertions, OpenAPI response-status accuracy for the v1
+    mutation routes, the fingerprint serialization-shape deployment note, no cross-site-destination
+    test on the batch route) were not acted on this session, per the review's own "Consider, not a
+    blocker" disposition — carried forward as recorded debt, not re-litigated.

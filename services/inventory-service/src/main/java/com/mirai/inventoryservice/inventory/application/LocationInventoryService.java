@@ -66,6 +66,24 @@ public class LocationInventoryService {
         return addInventory(locationId, productId, quantity, actorId, reason, null, null);
     }
 
+    /**
+     * Site-scoped counterpart to {@link #addInventory(UUID, UUID, Integer, UUID, StockMovementReason, String, Integer)}
+     * (.specs/phase-6-inventory 6d, T-6d-be-1, R-9/AC-3): validates {@code locationId} belongs to
+     * {@code siteId} via {@link LocationService#getLocationById(UUID, UUID)} (404 for an
+     * unknown/foreign-site location) before any write, then delegates to the existing un-scoped
+     * method -- unchanged, so the legacy controller keeps working until 6e deletes it.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id
+     * ({@code AuthorizedSiteContext.backendUserId()}), never a client-supplied value -- the v1
+     * mutation route is the only caller and always passes this.
+     */
+    public LocationInventory addInventory(UUID siteId, UUID actorId, UUID locationId, UUID productId,
+                                          Integer quantity, StockMovementReason reason,
+                                          String intakeUnit, Integer intakeQty) {
+        locationService.getLocationById(siteId, locationId);
+        return addInventory(locationId, productId, quantity, actorId, reason, intakeUnit, intakeQty);
+    }
+
     public LocationInventory addInventory(UUID locationId, UUID productId, Integer quantity,
                                           UUID actorId, StockMovementReason reason,
                                           String intakeUnit, Integer intakeQty) {
@@ -166,6 +184,27 @@ public class LocationInventoryService {
                 quantity != null ? quantity : 0);
         inventory.setQuantity(quantity);
         return locationInventoryRepository.save(inventory);
+    }
+
+    /**
+     * Site-scoped counterpart to {@link #deleteInventory(UUID, UUID, StockMovementReason)}
+     * (.specs/phase-6-inventory 6d, T-6d-be-1, R-9/AC-3): resolves {@code inventoryId} through
+     * {@link LocationInventoryRepository#findByIdAndSite_Id} (404 for an unknown/foreign-site
+     * inventory row), then confirms it actually belongs to the path's {@code locationId} (400 on a
+     * path/row mismatch) before delegating to the existing un-scoped method.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id -- see
+     * {@link #addInventory(UUID, UUID, UUID, UUID, Integer, StockMovementReason, String, Integer)}.
+     */
+    public void deleteInventory(UUID siteId, UUID actorId, UUID locationId, UUID inventoryId,
+                                 StockMovementReason reason) {
+        LocationInventory inventory = locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+        if (!java.util.Objects.equals(inventory.getLocation().getId(), locationId)) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory " + inventoryId + " does not belong to location " + locationId);
+        }
+        deleteInventory(inventoryId, actorId, reason);
     }
 
     /**

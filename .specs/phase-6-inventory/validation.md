@@ -1,5 +1,137 @@
 # Validation
 
+## Review-driven fix: 6d backend slice findings (2026-09-14)
+
+Commands and results for the fixes recorded in `review.md`'s "6d backend slice (T-6d-be-1..T-6d-be-8)
+— independent review, 2026-09-14" entry (findings 1/2/3/4). Carries forward, rather than re-pastes,
+the prior 6d implementation slice's own verification — see log.md's "6d implementation
+(T-6d-be-1..T-6d-be-8)" section, "Full-suite verification (checkpoint-slice gate)" subsection, for
+that session's numbers (367 unit/component tests, 508 `*IT` tests with the same 8 pre-existing
+failures, two independent clean `ArchitectureTest` reruns, stable `OpenApiContractExportTest`).
+That slice's T-6d-be-8 contract delta, carried forward unchanged by this fix session (no route/DTO
+shape was touched by findings 1/2/3/4): **3 paths added** (`POST`/`DELETE` on
+`/api/v1/sites/{siteId}/inventory/locations/{locationId}/items[/{inventoryId}]`, plus `POST
+/api/v1/sites/{siteId}/inventory/transfers/batch`), **0 paths removed**, **1 schema added**
+(`CreateLocationInventoryRequestDTO`), and exactly **one intentional legacy-schema delta**
+(`BatchTransferInventoryRequestDTO.transfers.maxItems`: `2147483647` to `50`, the shared-DTO
+`@Size(max = 50)` cap applying to the legacy `/api/stock-movements/batch-transfer` route too, per
+the 6d planning worksheet's user-confirmed decision).
+
+### Command and scope
+
+```sh
+cd services/inventory-service
+./mvnw -q clean test-compile
+./mvnw -q -Dtest=SiteInventoryMutationControllerFingerprintTest test
+./mvnw -q -Dtest=SiteInventoryMutationControllerSecurityIT,SiteInventoryMutationControllerAtomicityIT,SiteInventoryMutationControllerFingerprintTest,LocationInventorySiteScopedQueriesIT,NotAssignedInventoryReadParityIT,LegacyInventoryDeprecationHeadersIT,LocationInventoryServiceTest test
+./mvnw -q clean test
+./mvnw test -Dtest='*IT'
+```
+
+Finding-3 evidence (read-only, against the project's real Supabase database, via the session's live
+`mcp__supabase` access — not H2, not Testcontainers):
+
+```sql
+SELECT sl.site_id, count(*) AS na_location_count
+FROM locations l
+JOIN storage_locations sl ON sl.id = l.storage_location_id
+WHERE sl.code = 'NOT_ASSIGNED'
+GROUP BY 1
+ORDER BY 1;
+-- -> [{"site_id":"e898b072-7e51-4399-96fa-173eaa57eded","na_location_count":1}]
+
+SELECT s.id AS site_id, s.code AS site_code, sl.id AS storage_location_id, sl.code AS storage_location_code
+FROM sites s
+LEFT JOIN storage_locations sl ON sl.site_id = s.id AND sl.code = 'NOT_ASSIGNED'
+ORDER BY s.code;
+-- -> MAIN (e898b072-7e51-4399-96fa-173eaa57eded): storage_location_id 32ce6d52-3fe4-47f5-8381-647c33ce930a, code NOT_ASSIGNED
+-- -> SECOND (7e173c98-288a-4261-93c4-9a9ac13c540f): storage_location_id NULL, code NULL
+```
+
+### Result
+
+- `./mvnw -q clean test-compile` — PASS, clean, zero errors (confirms the two new
+  `CreateInventoryFingerprintKey`/`DeleteInventoryFingerprintKey` records and the
+  `NotAssignedInventoryReadParityIT` Javadoc-only change compile cleanly).
+- **Failing-test-first proof, finding 1:** before pinning the delete-fingerprint hash literal, ran
+  the new `deleteFingerprint_forFixedLocationAndInventoryId_matchesPinnedHash` with a placeholder
+  literal — failed with `expected: "bd05f...adde" but was:
+  "8210e6eb400c43f3226db439f1916da14bf6279834a94459f8793822d413cd59"`, i.e. a real, deterministic
+  hash the guessed placeholder didn't match; pinned the actual value, reran green.
+- **Failing-test-first proof, finding 2:** temporarily reverted
+  `fingerprint(new CreateInventoryFingerprintKey(locationId, request))` back to `fingerprint(request)`
+  and reran `SiteInventoryMutationControllerSecurityIT#createItem_sameKeySameBodyDifferentLocation_returns409AndDoesNotReuseFirstLocationResponse`
+  in isolation — failed with `Status expected:<409> but was:<201>`, proving the new HTTP test
+  actually catches the silent-reuse bug, not just re-deriving the (buggy) behavior. Restored the
+  fix, reran — PASS (1/1).
+- `SiteInventoryMutationControllerFingerprintTest` — PASS, **8/8** (4 pre-existing + 4 new: two
+  pinned-hash tests for the delete/create carriers, one stability-across-repeated-calls test, one
+  locationId-changes-the-hash test).
+- `SiteInventoryMutationControllerSecurityIT`, `SiteInventoryMutationControllerAtomicityIT`,
+  `SiteInventoryMutationControllerFingerprintTest`, `LocationInventorySiteScopedQueriesIT`,
+  `NotAssignedInventoryReadParityIT`, `LegacyInventoryDeprecationHeadersIT`,
+  `LocationInventoryServiceTest` (combined run) — PASS, exit 0. Per-class Surefire totals:
+  `SiteInventoryMutationControllerSecurityIT` 24/24 (23 prior + 1 new finding-2 HTTP test),
+  `SiteInventoryMutationControllerAtomicityIT` 15/15 (unchanged), `SiteInventoryMutationControllerFingerprintTest`
+  8/8, `LocationInventorySiteScopedQueriesIT` 12/12 (unchanged), `NotAssignedInventoryReadParityIT`
+  2/2 (unchanged; Javadoc-only change), `LegacyInventoryDeprecationHeadersIT` 6/6 (unchanged),
+  `LocationInventoryServiceTest` 18/18 (unchanged; Surefire's text-summary line reports "Tests run:
+  0" for this class because all its `@Test` methods live in `@Nested` classes — a pre-existing
+  Surefire text-report quirk, not a regression; the XML report (`tests="18"`) and the full-suite
+  totals below confirm the real count).
+- `./mvnw -q clean test` (full unrestricted suite, skips `*IT.java`) — PASS, exit 0. **371 tests
+  counted from Surefire `.txt` summaries, 0 failures, 0 errors** (up from 367 by the 4 new
+  fingerprint unit tests; `LocationInventoryServiceTest`'s 18 nested tests are additionally present
+  per its XML report but undercounted by the same text-summary quirk above — no failures in either
+  count).
+- `./mvnw test -Dtest='*IT'` — **509 tests, 8 failures, 0 errors** (up from 508 by the one new
+  finding-2 HTTP test). All 8 failures are exactly the same pre-existing set as the prior 6d
+  implementation slice's own verification: `AnalyticsControllerSecurityIT` (6 cases) and
+  `ForecastControllerSecurityIT` (2 cases) — confirmed by name-for-name comparison against
+  log.md's "6d implementation" entry, not merely by count. No inventory-related IT failed.
+
+### Finding 3 evidence
+
+Ran the review-specified read-only query against the project's real database (live `mcp__supabase`
+access this session, not a local Testcontainers/H2 stand-in): of the organization's two sites,
+`MAIN` has a `NOT_ASSIGNED`-coded `storage_locations` row with exactly one `locations` row beneath
+it; `SECOND` has no `NOT_ASSIGNED` `storage_locations` row at all yet (unseeded). No site in the
+live data has more than one NA `locations` row — **today's real data does not violate the
+one-NA-location-per-site assumption.** This is empirical evidence from the one organization this
+system actually runs, not a schema guarantee: `locations` only carries `UNIQUE(storage_location_id,
+location_code)`, so nothing prevents a future `LocationService.createLocation` call from adding a
+second row under MAIN's NOT_ASSIGNED storage location. **Disposition: open risk, not blocking
+T-6d-9** — proceeding with T-6d-9 (NOT_ASSIGNED inventory on v1) is reasonable given the confirmed
+real-data state, but the invariant should be treated as monitored, not guaranteed; a future session
+should either add a partial-unique index/application-level guard, or a storage-location-scoped v1
+read that tolerates more than one NA location, before this assumption is load-bearing for anything
+beyond what T-6d-9 already plans. Recorded in log.md's Current handoff as a named open risk, per
+the task's explicit instruction not to silently mark this closed.
+
+### Acceptance criteria evidence
+
+- **AC-3** (trusted site context, idempotent-retry correctness): findings 1/2 were both
+  idempotency-contract defects on the v1 mutation surface AC-3 governs — a spurious-409 risk
+  (finding 1) and a silent-no-op risk (finding 2). Both closed: `SiteInventoryMutationControllerFingerprintTest`'s
+  pinned-hash tests prove the delete fingerprint no longer depends on JVM-randomized map ordering;
+  `SiteInventoryMutationControllerSecurityIT`'s new HTTP test proves the create route now rejects,
+  rather than silently reuses, a same-key-different-location retry.
+- **AC-4** (durable envelope, atomicity, idempotency): unaffected in mechanism — `executeIdempotent`
+  itself was not changed, only the fingerprint inputs it's given; the existing atomicity proofs in
+  `SiteInventoryMutationControllerAtomicityIT` (15/15, unchanged) still hold.
+- **AC-5** (v1 DTO/contract correctness): no DTO/route shape changed by this fix session (the
+  fingerprint carriers are internal, package-private records never serialized to a client) — no
+  `OpenApiContractExportTest`/`packages/contracts/openapi.json` regeneration was needed or run;
+  confirmed by inspecting the diff (`CreateLocationInventoryRequestDTO`,
+  `SiteInventoryMutationController`'s handler signatures, and `NotAssignedInventoryReadParityIT`'s
+  Javadoc are the only non-test-assertion changes, none of them contract-visible).
+
+Result: **findings 1, 2, and 4 fixed and re-verified this session; finding 3 resolved to the extent
+real data allows — no violation found, disposition recorded as an explicit open risk rather than
+"confirmed safe," with the real-database evidence above.** No production-code change beyond the two
+new fingerprint-carrier records and the fingerprint call sites that use them; no test regression
+introduced (509/509 `*IT` minus the 8 pre-existing, unrelated failures; 371+/371+ unit/component).
+
 ## Review-driven fix: 6c checkpoint P1 findings (independent review) — 2026-09-13
 
 Commands and results for the fix recorded in `review.md`'s "Review-driven fix: 6c checkpoint P1

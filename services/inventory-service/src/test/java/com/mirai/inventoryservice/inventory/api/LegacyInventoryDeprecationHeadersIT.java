@@ -1,8 +1,12 @@
 package com.mirai.inventoryservice.inventory.api;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
+import com.mirai.inventoryservice.sites.domain.StorageLocation;
+import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
 
     @Autowired private SiteRepository siteRepository;
+    @Autowired private StorageLocationRepository storageLocationRepository;
+    @Autowired private LocationRepository locationRepository;
 
     private static final Pattern STRUCTURED_FIELD_DATE = Pattern.compile("^@(-?\\d+)$");
     private static final Pattern LINK_HEADER = Pattern.compile("^<([^>]+)>\\s*;\\s*rel=\"deprecation\"$");
@@ -85,6 +91,53 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
 
         mockMvc.perform(get("/api/v1/sites/{siteId}/inventory/totals", site.getId())
                         .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(header().doesNotExist("Deprecation"))
+                .andExpect(header().doesNotExist("Link"));
+    }
+
+    // ========= T-6d-be-7: /api/locations/{id}/inventory* and /api/storage-locations/{id}/inventory =========
+
+    private Location seedLocationWithInventory(String suffix) {
+        Site site = siteRepository.findByCode("MAIN").orElseThrow();
+        StorageLocation storage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", "MAIN")
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(site).code("BOX_BINS").name("Box Bins").isDisplayOnly(false).hasDisplay(false).build()));
+        return locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("DEPHDR-" + suffix).build());
+    }
+
+    @Test
+    @DisplayName("GET /api/locations/{id}/inventory carries Deprecation and Link headers")
+    void getLocationInventory_carriesDeprecationHeaders() throws Exception {
+        Location location = seedLocationWithInventory("1");
+
+        ResultActions result = mockMvc.perform(get("/api/locations/{id}/inventory", location.getId())
+                        .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Sunset"));
+        assertDeprecationHeaders(result);
+    }
+
+    @Test
+    @DisplayName("GET /api/storage-locations/{id}/inventory carries Deprecation and Link headers")
+    void getStorageLocationInventory_carriesDeprecationHeaders() throws Exception {
+        Location location = seedLocationWithInventory("2");
+
+        ResultActions result = mockMvc.perform(
+                        get("/api/storage-locations/{id}/inventory", location.getStorageLocation().getId())
+                                .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Sunset"));
+        assertDeprecationHeaders(result);
+    }
+
+    @Test
+    @DisplayName("GET /api/locations/{id} (sites' own route, no /inventory suffix) does not carry deprecation headers")
+    void getLocationById_sitesOwnRoute_doesNotCarryDeprecationHeaders() throws Exception {
+        Location location = seedLocationWithInventory("3");
+
+        mockMvc.perform(get("/api/locations/{id}", location.getId())
+                        .header("Authorization", "Bearer " + employeeToken()))
                 .andExpect(header().doesNotExist("Deprecation"))
                 .andExpect(header().doesNotExist("Link"));
     }
