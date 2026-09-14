@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useImageUpload } from "@/hooks/use-image-upload";
-import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Permission } from "@/lib/rbac/permissions";
 import { deleteProductImage, isUploadError } from "@/lib/storage/images";
@@ -51,7 +50,9 @@ import {
   useUpdateProductMutation,
 } from "@/hooks/mutations/use-product-mutations";
 import { useProduct } from "@/hooks/queries/use-products";
-import { createInventory } from "@/lib/api/inventory";
+import { createSiteLocationInventory, newIdempotencyKey } from "@/lib/api/site-inventory";
+import { resolveSiteLocationId } from "@/lib/api/locations";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import { DeleteProductDialog } from "./delete-product-dialog";
@@ -128,7 +129,7 @@ export function ProductForm({
   // so the form owns its detail fetch rather than trusting a passed-in object.
   const { data: initialProduct = null } = useProduct(initialProductId ?? null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { siteId } = useCurrentSite();
   const { canViewCosts, canViewMsrp, can } = usePermissions();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
@@ -443,47 +444,62 @@ export function ProductForm({
           initialStockLocation.locationType &&
           initialStockLocation.locationId
         ) {
-          setIsAddingStock(true);
-          try {
-            const actorId = user?.personId || user?.id;
-            const formPpbRaw = form.watch("packsPerBox") as unknown;
-            const formPpb =
-              typeof formPpbRaw === "number"
-                ? formPpbRaw
-                : typeof formPpbRaw === "string" && formPpbRaw.trim() !== ""
-                  ? parseInt(formPpbRaw, 10)
-                  : NaN;
-            const initialIntakeQty =
-              initialStockUnit === "box" &&
-              Number.isFinite(formPpb) &&
-              formPpb > 1 &&
-              typeof initialStockQty === "number"
-                ? Math.floor(initialStockQty / formPpb)
-                : undefined;
-            await createInventory(
-              initialStockLocation.locationType,
-              initialStockLocation.locationId,
-              {
-                itemId: newProduct.id,
-                quantity: initialStockQty,
-                actorId,
-                intakeUnit: initialStockUnit === "box" ? "box" : undefined,
-                intakeQty: initialIntakeQty,
-              },
-            );
-            toast({ title: "Initial stock added", variant: "success" });
-          } catch (stockErr: unknown) {
-            const msg =
-              stockErr instanceof Error
-                ? stockErr.message
-                : "Stock could not be added";
+          if (!siteId) {
+            // siteId can be missing (e.g. site membership not yet resolved) even though the
+            // product itself was created successfully - surface this loudly rather than
+            // silently dropping the user's typed initial stock (review finding 1).
             toast({
               title: "Product created, but stock was not added",
-              description: msg,
+              description: "No active site.",
               variant: "destructive",
             });
-          } finally {
-            setIsAddingStock(false);
+          } else {
+            setIsAddingStock(true);
+            try {
+              const formPpbRaw = form.watch("packsPerBox") as unknown;
+              const formPpb =
+                typeof formPpbRaw === "number"
+                  ? formPpbRaw
+                  : typeof formPpbRaw === "string" && formPpbRaw.trim() !== ""
+                    ? parseInt(formPpbRaw, 10)
+                    : NaN;
+              const initialIntakeQty =
+                initialStockUnit === "box" &&
+                Number.isFinite(formPpb) &&
+                formPpb > 1 &&
+                typeof initialStockQty === "number"
+                  ? Math.floor(initialStockQty / formPpb)
+                  : undefined;
+              const resolvedLocationId = await resolveSiteLocationId(
+                siteId,
+                initialStockLocation.locationType,
+                initialStockLocation.locationId,
+              );
+              await createSiteLocationInventory(
+                siteId,
+                resolvedLocationId,
+                newIdempotencyKey(),
+                {
+                  productId: newProduct.id,
+                  quantity: initialStockQty,
+                  intakeUnit: initialStockUnit === "box" ? "box" : undefined,
+                  intakeQty: initialIntakeQty,
+                },
+              );
+              toast({ title: "Initial stock added", variant: "success" });
+            } catch (stockErr: unknown) {
+              const msg =
+                stockErr instanceof Error
+                  ? stockErr.message
+                  : "Stock could not be added";
+              toast({
+                title: "Product created, but stock was not added",
+                description: msg,
+                variant: "destructive",
+              });
+            } finally {
+              setIsAddingStock(false);
+            }
           }
         }
 

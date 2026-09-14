@@ -1,5 +1,135 @@
 # Review
 
+## 6d web slice (T-6d-1..T-6d-14) — independent review, 2026-09-14
+
+**Scope reviewed:** the full 6d web-adoption slice (T-6d-1 through T-6d-14) as committed to the
+working tree ahead of PR — the typed v1 inventory client (`lib/api/site-inventory.ts`), the
+shared join helper (`lib/api/inventory-join.ts`), site-qualified query keys and realtime
+invalidation across every touched hook, the Products-list/detail quantity restoration (T-6d-4),
+`useLocationInventory`/`useNotAssignedInventory`'s NOT_ASSIGNED resolution (T-6d-9), and
+`product-form.tsx`'s initial-stock creation flow. Reviewed against spec.md's AC-5, AC-6 (rendered
+coverage and site-switch isolation in particular), and the R-9 web-side follow-through.
+
+This is the independent review's disposition list, transcribed verbatim ahead of the fix session
+described in "Review-driven fix: 6d web slice findings" below, with findings 1/2/4/5/6/7/8's
+dispositions updated to reflect that session's fixes (marked **fixed**), finding 3 marked
+**resolved** (documentation-only, per the review's own instruction), and finding 6's numbering
+here (`getLocationsWithCounts`/broadcast-channel egress) explicitly out of scope, per the review
+itself, deferred to 6e.
+
+### Act on
+
+1. **[Spec] `product-form.tsx` silently drops initial stock when `siteId` is unresolved — fixed.**
+   Around line 440-447, `siteId` was a conjunct of the guard deciding whether to create initial
+   stock; when falsy, the whole block (including its error toast) was skipped, so the user saw
+   only "Product created" with their typed stock silently gone. **Fixed:** `siteId` is now
+   checked *inside* the block, with a destructive toast ("Product created, but stock was not
+   added" / "No active site.") on the missing-site path, matching the shape of the existing
+   stock-creation-failure toast. New test:
+   `product-form.test.tsx`'s "surfaces a destructive toast and never calls the create-inventory
+   API when no site is active" (and a companion positive-path test proving the create call still
+   fires normally when a site is active).
+
+2. **[Standards] The `setQueriesData({queryKey:["products"]})` collision fix only excluded the
+   sibling site-scoped key, not per-product `children`/`with-children` keys — fixed.**
+   `legacy-products-query-filter.ts`'s predicate (`query.queryKey[2] !== "site"`) excluded only
+   `["products", siteId, "site"]`; `["products", productId, "children"]` and
+   `["products", productId, "with-children"]` (from `useProductChildren`/`useProductWithChildren`
+   in `hooks/queries/use-products.ts`) still matched by prefix, so
+   `surgicalProductUpdate`'s `index === -1` branch could append an unrelated product into those
+   per-product lists on a realtime event. **Fixed:** narrowed the predicate to
+   `query.queryKey.length === 2`, matching the precedent already established in this codebase at
+   `use-realtime-broadcast.ts`. Verified the `["products", productId]` detail-entry shape (also
+   length 2) stays safe because every write site already guards with
+   `Array.isArray(oldData)` before writing, and a bare product object is never an array. New
+   test: `use-realtime-inventory.test.ts`'s "never appends into a different product's
+   children/with-children cache entry" — seeds both unrelated caches, fires a same-site event,
+   and asserts both are byte-for-byte unchanged.
+
+3. **[Spec] NOT_ASSIGNED row-hiding scale check not yet run against real data — resolved via
+   production-data check, not a code change.** The coordinating session ran the review's
+   specified query directly against the real production database:
+   ```sql
+   SELECT sl.site_id, count(*) AS hidden_rows
+   FROM location_inventory li
+   JOIN locations l ON l.id = li.location_id
+   JOIN storage_locations sl ON sl.id = l.storage_location_id
+   JOIN products p ON p.id = li.product_id
+   WHERE sl.code = 'NOT_ASSIGNED'
+     AND (p.parent_id IS NOT NULL OR p.kuji_type = 'CUSTOM')
+   GROUP BY sl.site_id;
+   ```
+   Result: **zero rows returned** — no production data is hidden by the NOT_ASSIGNED filter
+   change (T-6d-9's kuji-child/CUSTOM-parent exclusion) today. See validation.md's matching entry
+   for the recorded evidence. No code change was needed or made for this finding.
+
+4. **[Spec] AC-6's rendered-test list not fully satisfied — fixed.** No `render()`-level test
+   drove `AdjustStockDialog`'s or `TransferStockDialog`'s actual submit workflow (only
+   hook/client-layer tests), and no test forced an out-of-order ("late old-site result")
+   resolution proving site-qualified keys actually reject a stale response. **Fixed:** added
+   `components/stock/__tests__/adjust-stock-dialog.test.tsx` (2 cases — a subtract-adjustment
+   submit asserting the mutation receives the correct payload and a success toast, and the
+   "update an existing row" delta-computation path asserting a computed `+3` delta, not the raw
+   absolute value 8, reaches the audited batch-adjust mutation) and
+   `components/stock/__tests__/transfer-stock-dialog.test.tsx` (1 case — fills source/destination/
+   quantity and asserts the batch-transfer mutation fires with the correct payload). Added a
+   late-old-site-result test to `hooks/queries/__tests__/use-site-product-inventory.test.ts`
+   ("rejects a late-resolving totals response from the previous site after switching sites") —
+   site A's totals request is left unresolved, the hook is rerendered as if the site switched to
+   B, B's totals resolve and render, and only then is A's request resolved late; the rendered
+   data is asserted to stay B's, proving the site-qualified `["inventoryTotals", siteId]` key (not
+   just structural argument) actually isolates the late response into its own orphaned cache
+   entry.
+
+### Consider (fixed, cheap per the review's own note)
+
+5. **`useSiteProductInventory` fabricated `totalQuantity: 0`/`status: "out-of-stock"` while
+   totals were still loading — fixed.** `hooks/queries/use-product-inventory.ts` computed
+   `qty = total?.totalQuantity ?? 0` before checking whether `totalsQuery` itself had resolved.
+   Masked on the Products page by its own loading skeleton, but not masked in
+   `location-detail-sheet.tsx`'s embedded `ProductModal`, which has no loading gate around this
+   hook. **Fixed:** the memo now returns `null` until `totalsQuery.data !== undefined` (once
+   `siteId` is known), matching the pattern `useLocationInventory` already used. New test:
+   "stays null while totals are still loading, never fabricating totalQuantity: 0".
+6. **`useNotAssignedInventory` lost its `staleTime: 30_000` — fixed.** Rewritten as a thin wrapper
+   over `useLocationInventory` (which defaults to the app-wide `staleTime: 0`), causing a double
+   refetch (location resolution + entries) on every mount/focus. **Fixed:** `staleTime: 30_000`
+   set on both queries inside `hooks/queries/use-location-inventory.ts`.
+7. **`hooks/mutations/use-stock-mutations.ts` had a `void locationType;` statement keeping an
+   unused parameter alive — fixed.** Verified `locationType` was genuinely unused inside
+   `invalidateStockQueries` (the site-wide invalidation below it never referenced it) and dropped
+   both the parameter and the one caller that passed it.
+8. **`lib/api/site-inventory.ts`'s `getSiteProductInventory`/`getSiteMovements` dereferenced
+   `data.productId`/`data.content` with no guard — fixed.** Unlike `getSiteInventoryTotals`/
+   `getSiteLocationInventory` (which use `data ?? []`), an ok-but-empty body (`unwrapGeneratedResponse`
+   can return `undefined`) would throw a raw `TypeError` instead of the project's own
+   `GeneratedApiError`. **Fixed:** both functions now throw `GeneratedApiError` on an empty body,
+   consistent with the other two. New tests: one per function in `site-inventory.test.ts`.
+
+### Dismissed / out of scope (unchanged, not re-litigated this session)
+
+- Idempotency-key generation, no client-supplied `actorId`, the `Pageable` serializer fix, the
+  three dead-code removals (`useUpdateInventoryMutation`, `use-not-assigned-mutations.ts`,
+  `cachedNALocationId`), the Kuji gate, RBAC, and consumer return-shape compatibility — all
+  settled correct by the original 6d web implementation session and the independent review;
+  out of scope for this fix pass per the task's own instruction.
+- `getLocationsWithCounts`/the org-wide broadcast-channel egress (T-6d-12's recorded residual) —
+  explicitly 6e scope per the review itself, not touched this session.
+
+## Residual risk
+
+- The one-NOT_ASSIGNED-location-per-site invariant (carried from the 6d backend slice's finding 3
+  below) is still not schema-enforced; `resolveSiteLocationId`'s `.find() ?? locations[0]`
+  fallback would silently pick an arbitrary location if a site ever had more than one. Unchanged
+  by this session — monitored debt, not blocking.
+- `LocationInventoryRepository.findByStorageLocation_Id`'s missing root-product filter (used only
+  by the still-legacy `getStorageLocationInventory`, with no current caller per T-6d-9's own
+  note) remains a live trap for any future caller that bypasses the already-migrated
+  `useLocationInventory`/`useNotAssignedInventory`. Unchanged by this session.
+- Movement history (T-6d-10) still has no rendered UI consumer to exercise end-to-end; the
+  data-layer/hook is correctly site-scoped and tested, but this is recorded rather than silently
+  treated as full AC-6 coverage for that one piece.
+
 ## 6d backend slice (T-6d-be-1..T-6d-be-8) — independent review, 2026-09-14
 
 **Scope reviewed:** the full 6d backend slice (T-6d-be-1 through T-6d-be-8) as committed to the

@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useSupabaseRealtime, type RealtimePayload } from "./use-supabase-realtime";
 import { getProductById } from "@/lib/api/products";
+import { legacyProductsListFilter } from "./legacy-products-query-filter";
 import type { Product } from "@/types/api";
 
 interface ProductRow {
@@ -35,9 +36,10 @@ export function useRealtimeProducts(enabled = true) {
       }
 
       if (payload.eventType === "DELETE") {
-        // Remove deleted product from all list caches
+        // Remove deleted product from all legacy list caches (never the site-scoped
+        // ["products", siteId, "site"] query - see legacyProductsListFilter's doc comment).
         queryClient.setQueriesData<Product[]>(
-          { queryKey: ["products"] },
+          legacyProductsListFilter,
           (oldData) => {
             if (!oldData || !Array.isArray(oldData)) return oldData;
             return oldData.filter((p) => p.id !== productId);
@@ -55,7 +57,7 @@ export function useRealtimeProducts(enabled = true) {
       getProductById(productId)
         .then((updatedProduct: Product) => {
           queryClient.setQueriesData<Product[]>(
-            { queryKey: ["products"] },
+            legacyProductsListFilter,
             (oldData) => {
               if (!oldData || !Array.isArray(oldData)) return oldData;
               const index = oldData.findIndex((p) => p.id === productId);

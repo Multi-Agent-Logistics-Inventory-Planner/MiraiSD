@@ -4491,3 +4491,569 @@ task was started.
     mutation routes, the fingerprint serialization-shape deployment note, no cross-site-destination
     test on the batch route) were not acted on this session, per the review's own "Consider, not a
     blocker" disposition — carried forward as recorded debt, not re-litigated.
+
+## 6d implementation (T-6d-1..T-6d-14) (2026-09-14)
+
+Implemented the full web-adoption slice per the 6d planning worksheet, in order, in `apps/web`.
+`services/inventory-service`, `packages/contracts`, and `packages/api-client` were not touched
+(the backend slice above already shipped and regenerated them). TDD where a meaningful local test
+existed (new hook/client-layer unit tests written and run red before the implementation, then
+green after); mechanical/scope-driven changes (removing dead affordance copy, wiring existing
+hooks into new client functions) followed the existing rendered-test suite instead of a fresh
+red/green cycle per line.
+
+### T-6d-1 — typed v1 inventory client (`lib/api/site-inventory.ts`)
+
+- New `apps/web/src/lib/api/site-inventory.ts`: `getSiteInventoryTotals`, `getSiteLocationInventory`,
+  `getSiteProductInventory`, `getSiteMovements`, `adjustSiteInventory`, `transferSiteInventory`,
+  `batchTransferSiteInventory`, `createSiteLocationInventory`, `deleteSiteLocationInventory`, and
+  `newIdempotencyKey`. Every function reads the actual `packages/contracts/openapi.json` v1
+  inventory paths/schemas directly (not guessed) - verified with a scripted schema dump before
+  writing any mapper.
+- **Real bug found and fixed while implementing `getSiteMovements`**: `GET
+  /api/v1/sites/{siteId}/inventory/movements` takes a Spring `Pageable pageable` parameter, which
+  Spring binds from flat `page`/`size`/`sort` query params - not the nested `pageable[page]=...`
+  shape `openapi-fetch`'s default `deepObject` serializer would produce for an object-typed query
+  param. Confirmed against `SiteInventoryController.getSiteMovements`'s actual parameter. Fixed
+  with a per-call `querySerializer` override (`sitePageableQuerySerializer`) that flattens
+  `pageable` to top-level `page`/`size`/`sort` keys; every other query param passes through
+  unchanged. Without this fix, every paginated movement-history call would have silently ignored
+  the caller's requested page/size and always returned the endpoint's `@PageableDefault`.
+- New `apps/web/src/lib/api/inventory-join.ts`: `joinSiteLocationEntriesWithCatalog`, the one
+  shared client-side join helper the worksheet asked for (T-6d-6/T-6d-9 both use it - not three
+  separate copies). Joins slim v1 `SiteLocationInventoryEntry` rows against the existing
+  `useProducts()` catalog by product ID, producing the same `LocationInventory[]` shape every
+  existing consumer (`location-detail-sheet.tsx`, the NOT_ASSIGNED view) already expects, so those
+  components needed no shape-level rewrite. Entries with no catalog match are dropped, not
+  rendered with placeholder data.
+- `apps/web/src/lib/api/locations.ts` gained `getSiteLocations(siteId, storageLocationCode?)`
+  (the new v1 `GET /api/v1/sites/{siteId}/locations` route, mapped from the nested
+  `Location.storageLocation` DTO shape to the existing flat `Location` type) and
+  `resolveSiteLocationId(siteId, locationType, locationId)` - the site-scoped replacement for
+  `inventory.ts`'s `resolveLocationId`, used by every new web mutation/query call site that can
+  receive the `LocationSelector`'s NOT_ASSIGNED virtual ID (`"__not_assigned__"`).
+- Tests: `lib/api/site-inventory.test.ts` (15 cases - mapping/defaults, the pageable-serializer
+  fix proven directly by calling the captured `querySerializer` and asserting the produced query
+  string never contains `pageable[page]`, idempotency-key header wiring, no-`actorId`-in-body
+  assertions on every mutation) and `lib/api/inventory-join.test.ts` (3 cases) and new
+  `getSiteLocations`/`resolveSiteLocationId` cases added to the existing `lib/api/locations.test.ts`
+  (5 new cases, 12 total in that file).
+
+### T-6d-2 — idempotency-key strategy
+
+Every v1 mutation hook generates its `Idempotency-Key` in the hook's exposed `mutate`/`mutateAsync`
+wrapper - one call to `newIdempotencyKey()` per invocation, attached to the mutation's `variables`
+- never inside `mutationFn` itself. Since `mutationFn` always receives the same `variables` object
+for a given attempt (including on a hypothetical internal TanStack retry - the app's
+`lib/query-client.ts` already sets `mutations.retry: false` globally, so no retry happens by
+default today, but the wiring is correct independent of that default), one user action always maps
+to exactly one key, and two separate `mutate()` calls always get distinct keys. Proved directly by
+`hooks/mutations/__tests__/use-stock-mutations.test.ts`'s "sends ... a freshly generated idempotency
+key per mutate() call" test (two sequential `mutate()` calls on the same hook instance assert two
+different keys reached the client function). Applied to: `use-stock-mutations.ts` (adjust,
+transfer, batch-transfer) and `use-location-mutations.ts` (create, delete). `product-form.tsx`'s
+one-off initial-stock create call calls `newIdempotencyKey()` directly at the point of the call
+(not inside a retryable wrapper), satisfying the same "once per attempt" rule structurally.
+
+### T-6d-3 — site-qualified query keys and invalidation audit
+
+- Every inventory-related query key gained `siteId` as its second element:
+  `["inventoryTotals", siteId]`, `["locationInventory", siteId, ...]`,
+  `["productInventoryEntries", siteId, productId]`, `["movementHistory", siteId, productId, ...]`.
+  Every one of these queries is gated with `skipToken` until `siteId` resolves, mirroring
+  `use-site-products.ts`'s established pattern (disabled-but-not-falsely-loaded).
+- Audited every `invalidateQueries`/`setQueriesData` call site across the touched prefixes -
+  mutation hooks (`use-stock-mutations.ts`, `use-location-mutations.ts`) and every realtime hook
+  that touches `stock_movements` or `products` (`use-realtime-inventory.ts`,
+  `use-realtime-dashboard.ts`, `use-realtime-products.ts`; the org-wide `db-changes` broadcast
+  channel, `use-realtime-broadcast.ts`, was read but left alone - see T-6d-11 below).
+- **Fixed the exact `setQueriesData<Product[]>({queryKey:["products"]})` prefix-collision bug the
+  worksheet flagged as a live hazard, not hypothetical**, and found it in *three* files, not the
+  one originally suspected: `use-realtime-products.ts` (direct `products` table subscription) and
+  `use-realtime-dashboard.ts` (`stock_movements` subscription) both had the same unguarded
+  `setQueriesData({queryKey:["products"]})` call `use-realtime-inventory.ts` had - a default
+  `exact:false` match that also caught the 5d site-scoped `["products", siteId, "site"]` query
+  (`SiteProduct[]`) by prefix and would silently overwrite it with a differently-shaped legacy
+  `Product[]` fetch on every realtime product/stock-movement event, regardless of which site was
+  active. Fixed all three with one shared filter,
+  `hooks/realtime/legacy-products-query-filter.ts`'s `legacyProductsListFilter`
+  (`{queryKey:["products"], predicate: query => query.queryKey[2] !== "site"}`), applied at every
+  `setQueriesData`/fallback-`invalidateQueries` call site in those three files.
+  `use-realtime-broadcast.ts` (the org-wide broadcast channel) was checked too and turned out to
+  already be safe - its own `findAll({queryKey:["products"]})` loop already filters to
+  `query.queryKey.length === 2` before writing, which already excludes the 3-element site-scoped
+  key - so it needed no change.
+  - Proved directly: `hooks/realtime/__tests__/use-realtime-inventory.test.ts`'s "never overwrites
+    the site-scoped products query..." test seeds both cache shapes, fires a same-site event, and
+    asserts the site-scoped cache is byte-for-byte unchanged while the legacy cache picks up the
+    new fetch - this is the regression test for the exact bug, not just a shape assertion.
+  - `use-shipment-mutations.ts`/`use-supplier-mutations.ts`/`use-product-mutations.ts`'s existing
+    `invalidateQueries({queryKey:["products"]})` calls were checked and left alone: plain
+    `invalidateQueries` (no `setQueriesData` overwrite) is safe across shape differences - it marks
+    matching queries stale and lets each one refetch through its own `queryFn`, it does not write a
+    foreign shape into another query's cache.
+- `use-location-mutations.ts`'s site-scoped invalidation targets `["products", siteId, "site"]`
+  specifically (never the bare `["products"]` prefix), so a stock mutation can never touch the
+  legacy, unscoped product list cache by accident.
+
+### T-6d-4 — restored scoped Products-list quantity/status
+
+`hooks/queries/use-product-inventory.ts`'s `useSiteProductInventory` now also queries
+`getSiteInventoryTotals(siteId)` (site-qualified key, `skipToken`-gated) and derives
+`totalQuantity`/`lastUpdatedAt`/`status` from it, joined by product ID alongside the existing
+`getSiteProducts` join - a third source added to the existing two-source join, each field's source
+still fixed per AC-6a's rule (quantity/status only ever come from totals, never a fallback).
+`apps/web/src/app/(dashboard)/products/page.tsx` no longer passes `showQuantity={false}` to
+`ProductTable` or `showInventory={false}` to `ProductModal` (both default to rendering their real
+content now that quantity exists). `product-table.tsx`'s now-dead "available after inventory is
+migrated per site (Phase 6)" affordance paragraph is removed, and `product-modal.tsx`'s equivalent
+withheld-state branch (and its now-unused `showInventory` prop) is removed entirely - the modal
+always renders its real Current Stock section.
+
+### T-6d-5 — product detail inventory on v1
+
+New `useSiteProductInventoryEntries(productId)` in `hooks/queries/use-product-inventory-entries.ts`
+(site-qualified key `["productInventoryEntries", siteId, productId]`, `skipToken`-gated), backed
+by `getSiteProductInventory`. `product-modal.tsx` now calls this instead of the legacy
+`useProductInventoryEntries`. The legacy hook itself is untouched and still exported - Kuji's own
+dialogs (`transfer-in-dialog.tsx`, `tier-draft-ui.tsx`, `tier-edit-dialog.tsx`) still use it,
+unmodified, per this checkpoint's scope (Kuji stays legacy until Phase 7).
+
+### T-6d-6 — location-detail inventory on v1 with the shared join helper
+
+`hooks/queries/use-location-inventory.ts` rewritten: resolves the caller's location (a real ID
+passed straight through, or the NOT_ASSIGNED virtual ID resolved via the new
+`getSiteLocations(siteId, "NOT_ASSIGNED")` route) into a real, site-scoped location ID, fetches
+`getSiteLocationInventory(siteId, resolvedId)`, and joins the result against `useProducts()` via
+`joinSiteLocationEntriesWithCatalog`. Returns the same `LocationInventory[]` shape as before, plus
+a new `resolvedLocationId` field mutation call sites need (see T-6d-7/8). Query keys:
+`["locationInventory", siteId, "resolved-location", locationType, locationId]` (the resolution
+step) and `["locationInventory", siteId, locationType, resolvedId]` (the entries), both
+site-qualified and `skipToken`-gated. `location-detail-sheet.tsx` and `adjust-stock-dialog.tsx`
+updated to pass `locationCode` (now a required third parameter) - both already had it in scope
+(`LocationSelection.locationCode` / the sheet's own `getLocationCode` helper), so no new state was
+needed. `location-detail-sheet.tsx` also switched its `useProductInventory()` call (used to resolve
+the product shown in its own embedded `ProductModal`) to `useSiteProductInventory()`, for
+consistency with the rest of the site-scoped surface it renders inside.
+
+### T-6d-7 — stock adjust on v1
+
+`hooks/mutations/use-stock-mutations.ts`'s `useBatchAdjustStockMutation` now calls
+`adjustSiteInventory(siteId, idempotencyKey, payload)`; the client no longer sends `actorId` (the
+v1 `AdjustSiteInventoryPayload` type has no such field - actor comes from
+`AuthorizedSiteContext` server-side, matching every other v1 mutation route). Every caller
+(`adjust-stock-dialog.tsx`'s cart-mode and single-mode submit paths, plus its "update an existing
+row" path - see below) updated to stop sending `actorId` and to use `resolvedLocationId`
+(from `useLocationInventory`, see T-6d-6) rather than the raw, possibly-virtual
+`location.locationId`.
+
+### T-6d-8 — stock transfer + batch transfer on v1
+
+`useTransferStockMutation`/`useBatchTransferMutation` now call `transferSiteInventory`/
+`batchTransferSiteInventory`. `transfer-stock-dialog.tsx` (which already always used the batch
+mutation, even for a single item) resolves both source and destination through
+`useLocationInventory`'s new `resolvedLocationId` before building the transfer payload, and no
+longer sends `actorId`.
+
+### T-6d-9 — NOT_ASSIGNED on v1 + create/delete flows
+
+- `useLocationInventory`/`useNotAssignedInventory` (now a thin wrapper over the former) resolve
+  NOT_ASSIGNED through `getSiteLocations(siteId, "NOT_ASSIGNED")`, replacing both the virtual-ID
+  indirection and `lib/api/inventory.ts`'s site-blind `cachedNALocationId` module cache. That
+  cache is retired outright (not just bypassed): `getNALocationId()` still exists (kuji-boxes.ts's
+  own legacy, still-global NA resolution keeps calling it, unmodified, since kuji stays on
+  legacy/global state through this checkpoint), but no longer caches its result across calls - a
+  cross-site-blind cached value could otherwise leak once kuji itself becomes multi-site aware,
+  and there is no reason to carry that latent bug forward once the web's own inventory flows no
+  longer depend on it.
+- `hooks/mutations/use-location-mutations.ts`'s `useCreateInventoryMutation`/
+  `useDeleteInventoryMutation` rewritten onto the new v1 create/delete routes
+  (`createSiteLocationInventory`/`deleteSiteLocationInventory`), each resolving
+  `location`/`locationType` through `resolveSiteLocationId` before calling. **There is no v1
+  "update" route** (R-9's resolution deliberately dropped the legacy untracked
+  `PUT /api/locations/{id}/inventory/{invId}`, a silent absolute-quantity set with no
+  `StockMovement`/audit/outbox - a pre-existing AC-4 violation). `useUpdateInventoryMutation` is
+  removed; `adjust-stock-dialog.tsx`'s "update an existing row's quantity"
+  path (`AddInventoryDialog`'s pre-filled-quantity flow) now computes a signed delta
+  (new quantity - existing quantity) and submits it through the audited
+  `useBatchAdjustStockMutation` instead - the row still gets a proper `StockMovement`/audit/outbox
+  entry, unlike the dropped PUT.
+- `product-form.tsx`'s initial-stock creation (on new-product submit) now resolves the selected
+  location via `resolveSiteLocationId` and calls `createSiteLocationInventory` directly (not
+  through a mutation hook, matching its existing one-off-call style), dropping the client-sent
+  `actorId`. The now-unused `useAuth()`/`user` import was removed from this file (nothing else in
+  it referenced `user` after this change - checked by grep, not assumed).
+- **Dead code found and removed**: `hooks/mutations/use-not-assigned-mutations.ts`
+  (`useUpdateNotAssignedInventoryMutation`/`useDeleteNotAssignedInventoryMutation`) had zero
+  callers anywhere in `apps/web` (confirmed by grep before deleting) and called the same
+  now-retired legacy PUT/DELETE pattern T-6d-9 is replacing. Deleted rather than left as a
+  misleading, unused relic of the pre-R-9 design.
+- **Behavior change this session is explicitly flagging, per the task's own instruction to call it
+  out rather than let it hide**: moving NOT_ASSIGNED reads onto the v1 per-location route means
+  kuji-child and CUSTOM-kuji-parent rows that the legacy, unfiltered
+  `findByStorageLocation_Id`-backed read used to show at NOT_ASSIGNED no longer appear there in the
+  web UI (the not-assigned inventory list on `storage/page.tsx`, and any location-detail view of
+  NOT_ASSIGNED). This was already proven as an intentional, verified behavior difference by the
+  backend slice's `NotAssignedInventoryReadParityIT` (see the 6d backend implementation section
+  above) - this web slice is what actually surfaces that change to a real screen. No kuji dialog
+  reads NOT_ASSIGNED inventory through this path (they use their own, separate legacy read paths,
+  untouched), so this does not affect kuji's own management screens - only the general
+  Storage/NOT_ASSIGNED view a non-kuji user would look at.
+- **Open risk carried forward, not resolved by this session**: the backend slice's finding 3
+  established that "one NOT_ASSIGNED location per site" is empirically true in production today
+  (MAIN has 1, SECOND has 0) but is **not schema-enforced**. This web slice's
+  `resolveSiteLocationId`/`getSiteLocations(..., "NOT_ASSIGNED")` calls
+  `.find(loc => loc.locationCode === "NA") ?? locations[0]` - if a site ever ends up with more than
+  one NOT_ASSIGNED-coded location, this resolves to an arbitrary one (whichever the backend
+  returns first), not a guaranteed-correct one. This did not need to be solved to ship T-6d-9 (the
+  real-data check found no violation), but it is the same open risk the backend handoff already
+  flagged, now with a second, independent consumer (this web code) that would silently pick the
+  wrong location if it were ever violated. Recorded here again rather than treated as newly
+  discovered.
+
+### T-6d-10 — movement history on v1
+
+`hooks/queries/use-movement-history.ts` rewritten onto `getSiteMovements` (site-qualified key,
+`skipToken`-gated). `SiteStockMovement.siteAttribution` carries `"UNKNOWN"` for rows predating the
+site backfill and is never filtered out client-side (proven by `site-inventory.test.ts`'s "labels
+UNKNOWN-site rows, never silently hides them" test). **Honesty note**: grepped for every consumer
+of `useMovementHistory`/the legacy `getStockMovementHistory` before and after this change and found
+none - no component in `apps/web` currently renders movement history through this hook (the visible
+audit-log UI at `/audit-log` uses a separate endpoint, `getAuditLog`/`getAuditLogs` via
+`/api/stock-movements/audit-log` and `/api/audit-logs`, explicitly out of this checkpoint's scope
+per the T-6d-12 residual note below). So T-6d-10 is complete at the data-layer/contract level (the
+hook and its label are real, tested, and ready), but there is currently no rendered UI surface to
+exercise the "visible label" requirement against - the AC-6 rendered-test sweep for this piece is
+necessarily the hook-level/client-level tests, not a component test, because there is no component.
+
+### T-6d-11 — site-scoped realtime inventory refresh
+
+- `hooks/realtime/use-realtime-inventory.ts`'s `StockMovementRow` gained an optional `site_id`
+  field. A new `isRelevantToCurrentSite(row, siteId)` predicate: an event with no resolved current
+  site is never processed; a row with `site_id === null`/`undefined` (pre-backfill/legacy) is
+  always treated as possibly relevant; a row with a different site's `site_id` is dropped before
+  any invalidation runs. Both `useRealtimeInventory` and `useRealtimeProductInventory` apply this
+  filter first in `onReceive`, and both hooks are `enabled` only once a site is resolved.
+  Re-subscription on site change falls out for free: `onReceive`'s closure identity changes with
+  `siteId` (a fresh closure captured on every render, exactly as it already was before this
+  change), and `use-supabase-realtime.ts`'s effect already depends on that closure, so a site
+  change already triggered its existing re-subscribe machinery - no change was needed there.
+- The org-wide `db-changes` broadcast channel (`use-realtime-broadcast.ts`) carries no `site_id` in
+  its payload and is explicitly left over-invalidating-but-safe for this checkpoint, per the
+  worksheet's own scope note - adding site scoping to `SupabaseBroadcastService`'s payload is 6e's
+  AC-7 coalescing work, not 6d's.
+- Tests: `hooks/realtime/__tests__/use-realtime-inventory.test.ts` (5 cases - disabled until site
+  resolves, foreign-site event dropped, same-site event processed, null-site event processed, and
+  the T-6d-3 collision-fix regression test described above).
+
+### T-6d-12 — site-blind residual audit
+
+Recorded here, not fixed (each belongs to a later phase/checkpoint):
+
+- **`getLocationsWithCounts`** (`lib/api/locations.ts`) - legacy, unscoped `/api/locations/with-counts`.
+  Powers `storage/page.tsx`'s location-count badges. Silently resolves to MAIN server-side. Owning
+  phase: not yet scheduled: a `sites`-module route for this shape doesn't exist yet; tracked as the
+  same kind of gap 6a/6b/6c already carried for other `sites`-owned reads.
+- **`dashboard.ts`'s `getAuditLog`/`getAuditLogs`** (`/api/stock-movements/audit-log`,
+  `/api/audit-logs`) - legacy, unscoped. Powers the `/audit-log` page. Not migrated this checkpoint
+  - a v1 site-scoped audit-log route does not exist yet in this checkpoint's backend slice (only
+  `/api/v1/sites/{siteId}/inventory/movements` was added, which is a different, narrower shape than
+  the audit-log page's grouped-by-action view). Owning phase: a future Phase 6 follow-up or Phase 7,
+  whichever adds the route.
+- **Kuji dialogs' inventory reads** (`transfer-in-dialog.tsx`, `tier-draft-ui.tsx`,
+  `tier-edit-dialog.tsx`, all still on `useProductInventoryEntries`/legacy `resolveLocationId` via
+  `kuji-boxes.ts`) - explicitly out of scope per spec.md AC-6e and this checkpoint's own worksheet;
+  Kuji/lootbox site migration is Phase 7's job.
+- **`use-realtime-broadcast.ts`** (the org-wide `db-changes` channel) - site-blind by design for
+  this checkpoint (T-6d-11 above); its AC-7 coalescing/site-scoping is 6e's job.
+- **Movement history has no rendered UI consumer** (T-6d-10 above) - not a site-blind surface (the
+  hook itself is correctly site-scoped), but flagged here since it means this checkpoint's AC-6
+  rendered-test sweep could not exercise it end-to-end through a real component; whichever future
+  work adds a movement-history UI should build directly on the already-scoped
+  `useMovementHistory`/`getSiteMovements`, not reinvent it.
+- **The one-NOT_ASSIGNED-location-per-site invariant is still not schema-enforced** (carried
+  forward from the backend slice's finding 3, restated under T-6d-9 above with a second consumer
+  now depending on it).
+
+### T-6d-13 — AC-6 rendered-test sweep
+
+- Fixed the two pre-existing 5d-era test files that asserted the now-superseded "withheld
+  quantity" behavior (`hooks/queries/__tests__/use-site-product-inventory.test.ts` and
+  `app/(dashboard)/products/__tests__/page.test.tsx`) to assert the T-6d-4 restored-quantity
+  behavior instead - both now mock `getSiteInventoryTotals` with **distinct per-site totals**
+  (MAIN: 42, SECOND: 3) so the site-switch test (`page.test.tsx`'s "rebinds the open detail modal
+  to the new site's own settings on a site change") proves the quantity rebinds to the new site's
+  own total on switch, not merely that the request carried a `siteId` - the exact trap the
+  worksheet called out from 5d's own history. Also added a dedicated "zero-stock product reports
+  totalQuantity: 0, never dropped or undefined" case, matching AC-5's zero-stock correctness
+  requirement.
+- New coverage: `lib/api/site-inventory.test.ts` (15), `lib/api/inventory-join.test.ts` (3), 5 new
+  cases in `lib/api/locations.test.ts`, `hooks/queries/__tests__/use-location-inventory.test.ts` (4
+  - real-location fetch, NOT_ASSIGNED resolution through the v1 locations route, disabled-until-site
+  -resolves, disabled-for-display-only-type), `hooks/mutations/__tests__/use-stock-mutations.test.ts`
+  (2 - the T-6d-2 idempotency-key proof, and a no-site rejection case),
+  `hooks/realtime/__tests__/use-realtime-inventory.test.ts` (5, described under T-6d-11).
+- **Not covered by a rendered (component-level) test in this session, and recorded rather than
+  silently skipped**: the adjust/transfer dialogs' full interactive workflow (staging a cart,
+  submitting a batch adjust/transfer, the delta-computation path for updating an existing row) has
+  no dedicated rendered test added this session - existing coverage for these dialogs was
+  unit/hook-level and at the API-client layer, not a full `render()` + `fireEvent` walkthrough of
+  the dialog components themselves. This is real, scoped debt: the dialogs compile, typecheck, and
+  their underlying hooks/client functions are proven correct in isolation, but no test in this repo
+  currently drives `AdjustStockDialog`/`TransferStockDialog` end-to-end through a simulated user
+  submitting a batch or delta-adjust. Flagging this explicitly rather than claiming full AC-6
+  dialog-workflow coverage.
+- Confirmed via `git status`/`grep` (not assumed) that `storage/page.tsx`, `dashboard.ts`,
+  `kuji-boxes.ts`, and every kuji dialog file are untouched by this session.
+
+### T-6d-14 — Kuji tab panel regression check
+
+`components/products/kuji-tab-panel.tsx` and `components/products/__tests__/kuji-tab-panel.test.tsx`
+are both untouched (`git status` shows no diff for either path). Ran the test file directly:
+3/3 passing (`renders CustomKujiTabs at the MAIN site`, `renders an unavailable state at a
+non-MAIN site...`, `renders the unavailable state while the site is still unresolved...`) -
+T-6d-4's hook refactor (`useSiteProductInventory` gaining totals) did not regress the AC-6e gate.
+
+### Full-suite verification (checkpoint-slice gate)
+
+- `npx tsc --noEmit -p tsconfig.json` (from `apps/web`): clean, exit 0, run twice (once mid-slice
+  after the T-6d-9 idempotency-key refactor, once at the end) - both clean.
+- `npx vitest run` (from `apps/web`), final run: **48 test files passed, 353 tests passed, 0
+  failed.** (Baseline before this session's changes: 43 files / 318 tests, all passing - net +5
+  files / +35 tests, and the 5 pre-existing failures introduced mid-session by the T-6d-4 quantity
+  restoration were fixed before this count, not left red.)
+- `npx eslint .` (from `apps/web`): **0 errors, 51 warnings** - every warning is a pre-existing
+  `react-hooks/exhaustive-deps`/`react-hooks/set-state-in-effect` pattern on lines this session did
+  not touch (verified with `git diff` against each flagged file/line before accepting the count),
+  plus one pre-existing unused-var warning in `use-toast.ts` (also untouched). No new lint errors
+  or warnings were introduced.
+- No live UI verification was performed this session (no browser automation tool was available and
+  no local dev server/backend was started) - rendered-test coverage (React Testing Library,
+  described above) is this session's evidence for UI correctness, not a manual click-through. This
+  is stated explicitly per this task's own instruction, not implied.
+
+### Deviations from the plan
+
+- T-6d-be's design doc did not anticipate the `Pageable` query-serialization bug (T-6d-1) or the
+  two additional `setQueriesData` collision sites beyond the one named in the worksheet (T-6d-3) -
+  both are corrections found by actually reading the generated client/existing realtime code, not
+  scope changes.
+- `useUpdateInventoryMutation` was removed rather than kept-but-unused, since R-9's resolution
+  means it has no backing v1 route and no legitimate future caller (see T-6d-9).
+- `use-not-assigned-mutations.ts` was deleted outright (confirmed zero callers) rather than left in
+  place, since it exercised the same now-retired legacy-PUT pattern and had no test or caller
+  depending on its continued existence.
+- Movement history (T-6d-10) has no rendered UI to test against (see that section and T-6d-13) -
+  this is a pre-existing gap in the app, not something this session was supposed to add UI for, but
+  it does mean this one task's "AC-6 rendered coverage" is necessarily narrower than the others.
+
+### Flagged for the user / reviewer, not resolved by a recorded assumption
+
+- **T-6d-9's NOT_ASSIGNED behavior change** (kuji-child/CUSTOM-kuji-parent rows no longer appear at
+  NOT_ASSIGNED in the general Storage view) is real and now live in the web UI, not just proven in
+  a backend IT. This was pre-confirmed as intentional by the backend slice's own review, but is
+  restated here since it is the first point where an actual screen's behavior changes.
+  - **Backend consideration surfaced by writing this web slice, but not acted on** (Standard tier
+    scope guardrail: no backend edits this session, so this is a recorded observation for the
+    reviewer/next backend session, not a fix): `LocationInventoryRepository
+    .findByStorageLocation_Id` (the legacy read `getStorageLocationInventory`/
+    `getInventoryByLocation` in `lib/api/inventory.ts` still calls, unchanged, for any caller not
+    yet migrated to v1 - today only kuji, via `kuji-boxes.ts`'s own separate paths, does not call
+    this particular function, so no live caller is currently affected) applies no
+    `parent IS NULL`/non-CUSTOM-kuji filter, unlike its `findByLocation_Id` sibling and the v1
+    route. If a future caller reaches `getStorageLocationInventory` directly for NOT_ASSIGNED
+    (rather than going through the v1-backed `useLocationInventory`/`useNotAssignedInventory` this
+    session already migrated), it would silently see the wider, unfiltered legacy result. No such
+    caller exists today (checked by grep), so this is not a live bug, only a trap for whichever
+    future caller adds one without noticing this repository's own precedent has already moved past
+    it.
+- **The one-NOT_ASSIGNED-location-per-site invariant** (open risk carried from the backend slice,
+  restated under T-6d-9 above) now has a second consumer (`resolveSiteLocationId`) that would
+  silently pick an arbitrary location if the invariant were ever violated for a real site. Still
+  not schema-enforced. Not a T-6d-9 blocker (no violation found in real data), but worth the user's
+  attention if a partial-unique index or application-level guard is being considered for a later
+  checkpoint, since the blast radius of leaving it unenforced just grew by one caller.
+- **T-6d-13's incomplete dialog-level rendered coverage** (adjust/transfer dialogs' interactive
+  workflows) - see that section. Recommend a follow-up task (inside 6d's own slice-completion gate,
+  or folded into 6e) to add `render()`-level tests for `AdjustStockDialog`/`TransferStockDialog`
+  covering: staging a cart and submitting a batch adjust, the delta-computation "update an existing
+  row" path, and a batch transfer, all against the site-scoped v1 mutations, before this checkpoint
+  is considered to have full AC-6 rendered coverage rather than "hook/client-layer coverage plus
+  typecheck."
+
+## Current handoff (6d web implementation, superseding the backend-only handoff above)
+
+- Status: 6d is now implemented end-to-end - backend slice (T-6d-be-1..8, reviewed, fixes applied)
+  and web slice (T-6d-1..T-6d-14, this session) are both done. `apps/web` builds clean
+  (`tsc --noEmit`), the full Vitest suite passes (353/353), and `eslint .` reports 0 errors. Not
+  yet independently reviewed (Standards + Spec passes) - that review, plus `review.md`/
+  `validation.md` updates for the whole checkpoint, is the coordinating session's next step, per
+  this record's own process rules (implement, then a separate review pass, then fixes - this
+  session did not touch `review.md`/`validation.md`, as instructed).
+- Next action: independent Standards + Spec review of the full 6d slice (backend + web together),
+  covering in particular: the `Pageable` query-serialization fix, the three-file `setQueriesData`
+  collision fix, T-6d-9's NOT_ASSIGNED-resolution `.find() ?? locations[0]` fallback given the
+  still-unenforced one-NA-location invariant, and T-6d-13's flagged dialog-level rendered-test gap.
+  After review findings are fixed, close checkpoint 6d and move to 6e (targeted refresh
+  coalescing and the full phase exit gate, AC-7/AC-8).
+- Surviving decisions: everything recorded in the plain-6d and backend-review-driven-fix handoffs
+  above, plus this session's own: quantity/status restored on the Products list and detail (AC-6,
+  no longer withheld per 5d's interim AC-6b); no v1 "update inventory" route exists by design (R-9)
+  - an existing row's quantity change always goes through the audited adjust mutation with a
+  computed delta, never a direct set; idempotency keys are generated once per `mutate()`/
+  `mutateAsync()` call in every v1 mutation hook, never inside `mutationFn`.
+- Last verified (this session): `npx tsc --noEmit -p tsconfig.json` clean (exit 0); `npx vitest run`
+  - 48 files / 353 tests, 0 failures; `npx eslint .` - 0 errors, 51 pre-existing warnings (verified
+    none touch this session's changed lines).
+- **Open risks/questions (carried forward or new, see the sections above for full detail):**
+  - One-NOT_ASSIGNED-location-per-site is still not schema-enforced, now with a second consumer
+    (`resolveSiteLocationId`) depending on the same `.find() ?? locations[0]` fallback the backend
+    slice's `getNotAssignedLocation` already used. Monitored, not blocking.
+  - `LocationInventoryRepository.findByStorageLocation_Id`'s missing root-product filter (used by
+    the still-legacy `getStorageLocationInventory`) is a live trap for any future caller that
+    doesn't go through the already-migrated `useLocationInventory`/`useNotAssignedInventory` - no
+    current caller hits it, but nothing prevents a future one from doing so unknowingly.
+  - T-6d-13's dialog-level rendered-test gap (`AdjustStockDialog`/`TransferStockDialog` full
+    interactive workflows) - recommend closing before treating 6d's AC-6 evidence as complete.
+  - No live UI (manual/browser) verification was performed this session - see T-6d-13's full-suite
+    verification note.
+  - Q-6c-1/Q-6c-4 and the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+    flakiness (see the backend handoff above) are unchanged, unrelated to this session.
+
+## Review-driven fix: 6d web slice findings (2026-09-14)
+
+An independent review of the committed-but-not-yet-merged 6d web-adoption slice (T-6d-1..T-6d-14,
+above) found four "Act on" findings and four "Consider" findings marked fixable-cheap. All eight
+addressed this session (finding 3 via a production-data check, no code change; the other seven via
+code + tests). Full disposition list transcribed into `review.md`'s new "6d web slice
+(T-6d-1..T-6d-14) — independent review, 2026-09-14" entry; commands/results in `validation.md`'s
+matching entry. Summary:
+
+- **Finding 1 — `product-form.tsx` silently drops initial stock when `siteId` is unresolved.**
+  `siteId` was a conjunct of the guard deciding whether to create initial stock; when falsy, the
+  whole block (including its error toast) was skipped, so the user saw only "Product created" with
+  their typed stock silently gone. **Fixed:** moved the `siteId` check inside the block with a
+  dedicated destructive toast ("Product created, but stock was not added" / "No active site.") on
+  the missing-site path. New test file `components/products/__tests__/product-form.test.tsx` (2
+  cases). Revert-verified: temporarily reverted the fix (restored the old outer conjunct), reran
+  the new "surfaces a destructive toast..." test in isolation — failed (no destructive toast, and
+  the mutation-not-called assertions held for the wrong reason); restored the fix, reran green.
+- **Finding 2 — the `setQueriesData({queryKey:["products"]})` collision fix only excluded the
+  sibling site-scoped key, not per-product `children`/`with-children` keys.**
+  `legacy-products-query-filter.ts`'s predicate (`query.queryKey[2] !== "site"`) still matched
+  `["products", productId, "children"]`/`["products", productId, "with-children"]`
+  (`useProductChildren`/`useProductWithChildren`), so a realtime event's `surgicalProductUpdate`
+  could append an unrelated product into those lists. **Fixed:** narrowed the predicate to
+  `query.queryKey.length === 2`, matching the precedent already in `use-realtime-broadcast.ts`;
+  verified the `["products", productId]` detail-entry shape (also length 2) stays safe because
+  every write site already guards with `Array.isArray(oldData)`. New test in
+  `use-realtime-inventory.test.ts`. Revert-verified: temporarily restored the old predicate, reran
+  the new test — failed with the seeded `children` cache mutated; restored the fix, reran green.
+- **Finding 3 — NOT_ASSIGNED row-hiding scale check not yet run against real data.** The
+  coordinating session ran the review's specified query directly against the real production
+  database (`mcp__supabase`) — see validation.md's "Finding 3 evidence" for the exact query.
+  **Result: zero rows returned** — no production data is hidden by the NOT_ASSIGNED filter change.
+  No code change needed; this closes T-6d-9's own "flagged, not resolved" open item with real
+  evidence.
+- **Finding 4 — AC-6's rendered-test list not fully satisfied.** No `render()`-level test drove
+  `AdjustStockDialog`'s or `TransferStockDialog`'s submit workflow, and no test forced a late
+  old-site-result resolution to prove site-qualified keys actually reject it (not just structural
+  argument). **Fixed:** added `components/stock/__tests__/adjust-stock-dialog.test.tsx` (2 cases —
+  subtract-adjustment submit with correct payload/success toast, and the "update an existing row"
+  delta-computation path proving a computed `+3` reaches the mutation, not the raw absolute value
+  8) and `components/stock/__tests__/transfer-stock-dialog.test.tsx` (1 case — source/destination/
+  quantity fill and submit with correct transfer payload). Added a late-old-site-result test to
+  `hooks/queries/__tests__/use-site-product-inventory.test.ts`: site A's totals request is left
+  unresolved, the hook rerenders as if the site switched to B, B's totals resolve and render, and
+  only then does A's stale request resolve — the rendered data is asserted to stay B's.
+- **Finding 5 (Consider) — `useSiteProductInventory` fabricated `totalQuantity: 0`/
+  `status: "out-of-stock"` while totals were still loading.** Not masked in
+  `location-detail-sheet.tsx`'s embedded `ProductModal`, which has no loading gate around this
+  hook. **Fixed:** the memo now returns `null` until `totalsQuery.data !== undefined` (once
+  `siteId` is known), matching `useLocationInventory`'s existing pattern. New test: "stays null
+  while totals are still loading, never fabricating totalQuantity: 0". Revert-verified:
+  temporarily restored the old early-return guard, reran the new test — failed with a fabricated
+  zero-quantity/out-of-stock row; restored the fix, reran green. (This fix's `useMemo` gained a
+  `siteId` reference; the dependency array was updated to include it in the same edit, verified by
+  `eslint` staying at the pre-existing 51-warning baseline rather than gaining a new
+  `react-hooks/exhaustive-deps` warning.)
+- **Finding 6 (Consider) — `useNotAssignedInventory` lost its `staleTime: 30_000`.** Rewritten as
+  a thin wrapper over `useLocationInventory` (default `staleTime: 0`), causing a double refetch on
+  every mount/focus. **Fixed:** `staleTime: 30_000` set on both queries inside
+  `hooks/queries/use-location-inventory.ts`.
+- **Finding 7 (Consider) — `use-stock-mutations.ts` had a `void locationType;` statement keeping
+  an unused parameter alive.** Verified genuinely unused (grepped every reference inside
+  `invalidateStockQueries`) and dropped both the parameter and its one caller's argument.
+- **Finding 8 (Consider) — `getSiteProductInventory`/`getSiteMovements` dereferenced
+  `data.productId`/`data.content` with no guard**, unlike `getSiteInventoryTotals`/
+  `getSiteLocationInventory` (`data ?? []`). An ok-but-empty body (`unwrapGeneratedResponse` can
+  return `undefined`) would throw a raw `TypeError` instead of the project's own
+  `GeneratedApiError`. **Fixed:** both functions now throw `GeneratedApiError` on an empty body.
+  New tests: one per function in `lib/api/site-inventory.test.ts`.
+
+New/changed test files this session: `components/products/__tests__/product-form.test.tsx` (2,
+new), `components/stock/__tests__/adjust-stock-dialog.test.tsx` (2, new),
+`components/stock/__tests__/transfer-stock-dialog.test.tsx` (1, new),
+`hooks/queries/__tests__/use-site-product-inventory.test.ts` (+2),
+`hooks/realtime/__tests__/use-realtime-inventory.test.ts` (+1),
+`lib/api/site-inventory.test.ts` (+2). Net +10 tests, +3 files.
+
+**Result:** `npx tsc --noEmit -p tsconfig.json` clean (exit 0); `npx vitest run` — **51 test files
+passed, 363 tests passed, 0 failed** (up from 48 files/353 tests); `npx eslint .` — **0 errors, 51
+warnings** (identical to the prior session's baseline set — one new warning surfaced mid-session
+from finding 5's fix and was closed by adding `siteId` to the `useMemo` deps array before this
+count was taken). Findings 1, 2, and 5 were revert-verified (fix removed, new test confirmed red,
+fix restored, test confirmed green) — see above and validation.md for each. Findings 6, 7, and 8
+are small, mechanical, and covered by the full suite passing plus (for 8) dedicated new tests; not
+separately revert-verified.
+
+**Disposition:** findings 1, 2, 4, 5, 6, 7, and 8 fixed and re-verified. Finding 3 resolved via a
+real production-data check (zero rows hidden) — recorded as closed, not carried forward as an open
+risk, since the check found no counterexample and there is no further action the review asked for
+beyond running and recording it. `services/inventory-service`, `packages/contracts`, and
+`packages/api-client` were not touched this session, per scope. The working tree is left
+uncommitted for the coordinating session, per instruction.
+
+## Current handoff (6d review-driven fix, web slice — supersedes the 6d-web-implementation handoff above)
+
+- Status: 6d is implemented end-to-end (backend + web) and both slices have now been through an
+  independent review with all findings addressed: the backend slice's review-driven fix landed
+  earlier this session-chain (see "Review-driven fix: 6d backend slice findings" above); this
+  session closed the web slice's review (findings 1/2/4/5/6/7/8 fixed, finding 3 resolved via a
+  production-data check with zero rows found). `apps/web` builds clean (`tsc --noEmit`), the full
+  Vitest suite passes (363/363, up from 353/353), and `eslint .` reports 0 errors/51 warnings
+  (same baseline as before this session). `review.md` and `validation.md` now carry both the
+  backend-slice and web-slice review entries with real content, per spec.md's Full-tier
+  requirement.
+- Next action: 6d is ready to close as a checkpoint. Move to 6e (targeted refresh coalescing and
+  the full phase exit gate, AC-7/AC-8) — 6e's own scope already explicitly owns
+  `getLocationsWithCounts`/the org-wide broadcast-channel egress (T-6d-12's recorded residual,
+  reaffirmed out of scope by this session's own review) and the site-scoping of
+  `SupabaseBroadcastService`'s payload.
+- Surviving decisions: everything recorded in the plain-6d, backend-review-driven-fix, and
+  6d-web-implementation handoffs above, unchanged by this session, plus this session's own: a
+  missing site during initial-stock creation now always surfaces a destructive toast rather than
+  silently dropping the write; `legacyProductsListFilter` matches only 2-element
+  `["products", ...]` list keys, never any 3-element per-product or site-scoped key;
+  `useSiteProductInventory` withholds rendering (returns `null`) until totals have actually
+  resolved, never fabricating a zero-quantity row; `useNotAssignedInventory`/
+  `useLocationInventory` both use `staleTime: 30_000`.
+- Last verified (this session): `npx tsc --noEmit -p tsconfig.json` clean (exit 0); `npx vitest
+  run` — 51 files / 363 tests, 0 failures; `npx eslint .` — 0 errors, 51 warnings (identical set to
+  the pre-session baseline, confirmed line-by-line). Findings 1, 2, and 5 individually
+  revert-verified (fix removed → new test fails → fix restored → test passes).
+- **Open risks/questions (carried forward, see the backend and 6d-web-implementation handoffs
+  above for full detail — none newly introduced by this session):**
+  - One-NOT_ASSIGNED-location-per-site is still not schema-enforced (both the backend's
+    `getNotAssignedLocation` and the web's `resolveSiteLocationId` depend on the same
+    `.find() ?? locations[0]` fallback). Monitored, not blocking — unaffected by this session.
+  - `LocationInventoryRepository.findByStorageLocation_Id`'s missing root-product filter (used
+    only by the still-legacy `getStorageLocationInventory`, no current caller) remains a trap for
+    a future, not-yet-existing caller. Unchanged.
+  - Movement history (T-6d-10) still has no rendered UI consumer. Unchanged.
+  - `getLocationsWithCounts`/the org-wide broadcast-channel egress — explicitly 6e scope,
+    reaffirmed by this session's review, not touched.
+  - No live UI (manual/browser) verification was performed this session, consistent with every
+    prior session in this checkpoint.
+  - Q-6c-1/Q-6c-4 and the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+    flakiness are unchanged, unrelated to this session.

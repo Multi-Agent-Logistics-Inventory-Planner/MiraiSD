@@ -72,6 +72,12 @@ vi.mock("@/lib/api/products", () => ({
   deleteProduct: vi.fn(),
 }));
 
+// --- Site-scoped inventory totals (T-6d-4): the only source for quantity/status on this page. ---
+const mockGetSiteInventoryTotals = vi.fn();
+vi.mock("@/lib/api/site-inventory", () => ({
+  getSiteInventoryTotals: (...args: unknown[]) => mockGetSiteInventoryTotals(...args),
+}));
+
 const mockGetCategories = vi.fn();
 vi.mock("@/lib/api/categories", () => ({
   getCatalogCategories: (...args: unknown[]) => mockGetCategories(...args),
@@ -91,10 +97,11 @@ vi.mock("@/hooks/use-permissions", () => ({
   Permission,
 }));
 
-// --- ProductModal's own tangential data (not part of what T-5 changed) - stubbed to keep this
-// test focused on list/detail/role/site behavior, not the modal's unrelated sub-sections. ---
+// --- ProductModal's own tangential data (not part of what T-5/T-6d changed) - stubbed to keep
+// this test focused on list/detail/role/site behavior, not the modal's unrelated sub-sections. ---
 vi.mock("@/hooks/queries/use-product-inventory-entries", () => ({
   useProductInventoryEntries: () => ({ data: { entries: [] }, isLoading: false }),
+  useSiteProductInventoryEntries: () => ({ data: { entries: [] }, isLoading: false }),
 }));
 vi.mock("@/hooks/queries/use-kuji-box", () => ({
   useKujiAllocationsByProduct: () => ({ data: [] }),
@@ -160,6 +167,13 @@ const SITE_PRODUCTS: Record<string, unknown[]> = {
   ],
 };
 
+// Distinct per-site totals (T-6d-4) - proves the Stock column/detail quantity come from the
+// site-scoped totals route, keyed by the resolved siteId, not a shared/global source.
+const SITE_TOTALS: Record<string, unknown[]> = {
+  "site-main": [{ productId: "p-1", totalQuantity: 42, lastUpdatedAt: "2026-01-02T00:00:00Z" }],
+  "site-second": [{ productId: "p-1", totalQuantity: 3, lastUpdatedAt: "2026-01-03T00:00:00Z" }],
+};
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -179,6 +193,9 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     mockGetSiteProducts.mockImplementation((siteId: string) =>
       Promise.resolve(SITE_PRODUCTS[siteId] ?? []),
     );
+    mockGetSiteInventoryTotals.mockImplementation((siteId: string) =>
+      Promise.resolve(SITE_TOTALS[siteId] ?? []),
+    );
     mockUseCurrentSite.mockReturnValue({ ...MAIN_SITE, isLoading: false, error: null });
     mockUsePermissions.mockReturnValue({
       can: (p: string) => p === Permission.PRODUCTS_VIEW,
@@ -194,29 +211,33 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     });
   });
 
-  it("withholds quantity/stock-status in the list and shows MAIN's assortment status", async () => {
+  it("shows scoped quantity/stock-status in the list from the site totals route (T-6d-4)", async () => {
     renderPage();
 
     expect(await screen.findByText("Widget")).toBeInTheDocument();
     expect(screen.getByText("Stocked")).toBeInTheDocument();
-    // AC-6b: no Stock/quantity column, and the legacy, site-blind quantity (999) never renders.
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    // T-6d-4: quantity is restored from the site-scoped totals route (MAIN's 42), and the
+    // legacy, site-blind catalog quantity (999) never renders.
+    expect(await screen.findByText("42")).toBeInTheDocument();
     expect(screen.queryByText("999")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/available after inventory is migrated per site/i),
+    ).not.toBeInTheDocument();
+    expect(mockGetSiteInventoryTotals).toHaveBeenCalledWith("site-main");
   });
 
-  it("opens the detail modal with withheld inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
+  it("opens the detail modal with scoped inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
     renderPage();
 
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/current stock/i)).toBeInTheDocument();
+    // T-6d-4: the modal renders the real, scoped quantity (MAIN's 42), not the withheld-state copy.
+    expect(within(dialog).getByText(/\(42\)/)).toBeInTheDocument();
     expect(
-      within(dialog).getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+      within(dialog).queryByText(/available after inventory is migrated per site/i),
+    ).not.toBeInTheDocument();
     expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
     // canViewMsrp/canViewCosts are false for this EMPLOYEE mock - money fields stay hidden,
     // proving this row's site-scoped msrp isn't leaking around the permission gate.
@@ -290,9 +311,8 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
     expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
     expect(within(dialogAfter).queryByText("$20.00")).not.toBeInTheDocument();
-    // Quantity stays withheld across the switch too.
-    expect(
-      within(dialogAfter).getByText(/available after inventory is migrated per site/i),
-    ).toBeInTheDocument();
+    // Quantity rebinds to SECOND's own totals (3), not MAIN's stale 42.
+    expect(within(dialogAfter).getByText(/\(3\)/)).toBeInTheDocument();
+    expect(within(dialogAfter).queryByText(/\(42\)/)).not.toBeInTheDocument();
   });
 });

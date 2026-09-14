@@ -12,19 +12,20 @@ import { getLocations } from "./locations";
 /** Virtual ID used for NOT_ASSIGNED when no real ID is available */
 export const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
 
-/** Cached NA location ID to avoid repeated lookups */
-let cachedNALocationId: string | null = null;
-
 /**
- * Get the actual NA location ID for NOT_ASSIGNED inventory operations.
- * Caches the result to avoid repeated API calls.
+ * Get the actual NA location ID for NOT_ASSIGNED inventory operations, resolved through the
+ * legacy, unscoped endpoint (silently resolves to MAIN server-side).
+ *
+ * Only used by kuji-boxes.ts (kuji stays on legacy/global state through Phase 6 - see
+ * .specs/phase-6-inventory/log.md's 6d T-6d-12 residual-debt note). Web inventory flows resolve
+ * NOT_ASSIGNED through the site-scoped `resolveSiteLocationId` in lib/api/locations.ts instead
+ * (T-6d-9).
+ *
+ * No longer caches its result: the previous module-level `cachedNALocationId` was never keyed by
+ * site, so a cached MAIN id could leak into another site's resolution the moment kuji itself
+ * becomes multi-site aware. Retired now rather than left as latent debt for that migration.
  */
 export async function getNALocationId(): Promise<string> {
-  if (cachedNALocationId) {
-    return cachedNALocationId;
-  }
-
-  // Get locations within NOT_ASSIGNED storage location
   const locations = await getLocations("NOT_ASSIGNED");
 
   const naLocation = locations.find((loc) => loc.locationCode === "NA");
@@ -32,8 +33,7 @@ export async function getNALocationId(): Promise<string> {
     throw new Error("NA location not found within NOT_ASSIGNED storage location");
   }
 
-  cachedNALocationId = naLocation.id;
-  return cachedNALocationId;
+  return naLocation.id;
 }
 
 /**

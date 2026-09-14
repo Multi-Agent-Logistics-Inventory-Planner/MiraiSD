@@ -26,9 +26,9 @@ interface ProductTableProps {
   readonly sort: ProductSort;
   readonly onSortChange: (sort: ProductSort) => void;
   /**
-   * Whether to render the Stock column. False for the site-scoped Products view, which
-   * withholds quantity/stock-status until Phase 6 provides site-scoped inventory
-   * (.specs/phase-5d-catalog-v1-and-web/spec.md AC-6b) - the column is removed, not zeroed.
+   * Whether to render the Stock column. Defaults to true - quantity/stock-status are restored
+   * from the site-scoped totals route as of Phase 6 checkpoint 6d (previously withheld during
+   * Phase 5, see .specs/phase-5d-catalog-v1-and-web/spec.md AC-6b).
    */
   readonly showQuantity?: boolean;
 }
@@ -248,11 +248,6 @@ export function ProductTable({
           )}
         </TableBody>
       </Table>
-      {!showQuantity && (
-        <p className="mt-2 px-1 text-xs text-muted-foreground">
-          Quantity and stock status are available after inventory is migrated per site (Phase 6).
-        </p>
-      )}
     </div>
   );
 }

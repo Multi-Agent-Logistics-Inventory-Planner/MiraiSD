@@ -9,6 +9,12 @@ import {
   STORAGE_LOCATION_CODES,
 } from "@/types/api";
 
+// Duplicated from lib/api/inventory.ts's NOT_ASSIGNED_VIRTUAL_ID (not imported, to avoid a
+// circular module dependency - inventory.ts already imports getLocations from this file). Both
+// must stay in sync; LocationSelector (components/stock/location-selector.tsx) is the third,
+// UI-side copy of this same placeholder string.
+const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
+
 // Storage location types are fixed and seeded automatically.
 // Use GET endpoints only - no create/update operations available.
 
@@ -62,6 +68,69 @@ export async function getSiteStorageLocations(siteId: string): Promise<StorageLo
   return (data ?? [])
     .map(toStorageLocationSummary)
     .filter((summary): summary is StorageLocationSummary => summary !== null);
+}
+
+// A record's identity (id + locationCode) is required to key/render it safely - see the
+// toStorageLocationSummary comment above for why a missing id/code drops the row rather than
+// defaulting it.
+function toSiteLocation(dto: components["schemas"]["Location"]): Location | null {
+  if (!dto.id || !dto.locationCode || !dto.storageLocation?.id) {
+    return null;
+  }
+  return {
+    id: dto.id,
+    locationCode: dto.locationCode,
+    storageLocationId: dto.storageLocation.id,
+    storageLocationType: dto.storageLocation.code ?? "",
+    createdAt: dto.createdAt ?? "",
+    updatedAt: dto.updatedAt ?? "",
+  };
+}
+
+/**
+ * Get locations for a site, optionally filtered by storage location code (e.g. "NOT_ASSIGNED").
+ * Used (T-6d-9) to resolve the site's NOT_ASSIGNED location directly, replacing both the
+ * virtual-ID indirection and the site-blind `cachedNALocationId` module cache in
+ * lib/api/inventory.ts - a real cross-site bug, since that cache was never keyed by site.
+ */
+export async function getSiteLocations(
+  siteId: string,
+  storageLocationCode?: string
+): Promise<Location[]> {
+  const result = await webApiClient.GET("/api/v1/sites/{siteId}/locations", {
+    params: {
+      path: { siteId },
+      query: storageLocationCode ? { storageLocation: storageLocationCode } : undefined,
+    },
+  });
+  const data = unwrapGeneratedResponse(result);
+  return (data ?? [])
+    .map(toSiteLocation)
+    .filter((loc): loc is Location => loc !== null);
+}
+
+/**
+ * Resolves a `LocationSelection`'s locationId to a real, site-scoped location UUID - passing
+ * through any already-real id, and resolving the NOT_ASSIGNED virtual ID
+ * (`LocationSelector`'s `__not_assigned__` placeholder) to this site's real NOT_ASSIGNED
+ * location row via the v1 locations route. No caching: each call is already site-scoped and
+ * cheap, and caching was the site-blind bug this replaces (`cachedNALocationId` in
+ * lib/api/inventory.ts, never keyed by site).
+ */
+export async function resolveSiteLocationId(
+  siteId: string,
+  locationType: LocationType,
+  locationId: string
+): Promise<string> {
+  if (locationType === LocationType.NOT_ASSIGNED && locationId === NOT_ASSIGNED_VIRTUAL_ID) {
+    const locations = await getSiteLocations(siteId, "NOT_ASSIGNED");
+    const naLocation = locations.find((loc) => loc.locationCode === "NA") ?? locations[0];
+    if (!naLocation) {
+      throw new Error("NOT_ASSIGNED location not found for this site");
+    }
+    return naLocation.id;
+  }
+  return locationId;
 }
 
 // --- Legacy, unscoped reads and all mutations -------------------------------

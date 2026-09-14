@@ -71,13 +71,20 @@ export function TransferStockDialog({
 
   const sourceInventoryQuery = useLocationInventory(
     sourceLocation.locationType ?? undefined,
-    sourceLocation.locationId ?? undefined
+    sourceLocation.locationId ?? undefined,
+    sourceLocation.locationCode
   );
 
   const destinationInventoryQuery = useLocationInventory(
     destinationLocation.locationType ?? undefined,
-    destinationLocation.locationId ?? undefined
+    destinationLocation.locationId ?? undefined,
+    destinationLocation.locationCode
   );
+
+  // Real, resolved location UUIDs - resolve the NOT_ASSIGNED virtual ID. The v1 transfer routes
+  // take a bare locationId with no server-side resolution, unlike the create-inventory mutation.
+  const resolvedSourceLocationId = sourceInventoryQuery.resolvedLocationId;
+  const resolvedDestinationLocationId = destinationInventoryQuery.resolvedLocationId;
 
   useEffect(() => {
     if (!open) {
@@ -245,13 +252,12 @@ export function TransferStockDialog({
   }
 
   async function handleSubmit() {
-    const actorId = user?.personId || user?.id;
-    if (!actorId) {
+    if (!user) {
       toast({ title: "Missing user", description: "Please sign in again." });
       return;
     }
 
-    if (!sourceLocation.locationType || !sourceLocation.locationId) {
+    if (!sourceLocation.locationType || !resolvedSourceLocationId) {
       toast({
         title: "Missing source",
         description: "Select a valid source location.",
@@ -259,7 +265,7 @@ export function TransferStockDialog({
       return;
     }
 
-    if (!destinationLocation.locationType || !destinationLocation.locationId) {
+    if (!destinationLocation.locationType || !resolvedDestinationLocationId) {
       toast({
         title: "Missing destination",
         description: "Select a valid destination location.",
@@ -269,9 +275,9 @@ export function TransferStockDialog({
 
     // Extract validated values for type safety
     const srcLocationType = sourceLocation.locationType;
-    const srcLocationId = sourceLocation.locationId;
+    const srcLocationId = resolvedSourceLocationId;
     const destLocationType = destinationLocation.locationType;
-    const destLocationId = destinationLocation.locationId;
+    const destLocationId = resolvedDestinationLocationId;
 
     const transfers: BatchTransferItem[] = transferItems.map((inv) => {
       const existingDestInventory = destinationInventory.find(
@@ -292,7 +298,6 @@ export function TransferStockDialog({
             typeof transferQuantities[inv.id] === "number"
               ? (transferQuantities[inv.id] as number)
               : 0,
-          actorId,
         },
         productId: inv.item.id,
         productName: inv.item.name,

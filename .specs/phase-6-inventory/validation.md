@@ -1,5 +1,116 @@
 # Validation
 
+## Review-driven fix: 6d web slice findings (2026-09-14)
+
+Commands and results for the fixes recorded in `review.md`'s "6d web slice (T-6d-1..T-6d-14) —
+independent review, 2026-09-14" entry (findings 1/2/4/5/6/7/8 fixed; finding 3 resolved via a
+production-data check, no code change). Carries forward, rather than re-pastes, the prior 6d web
+implementation session's own baseline — see log.md's "6d implementation (T-6d-1..T-6d-14)"
+section, "Full-suite verification" subsection, for that session's starting numbers (48 files/353
+tests, 0 errors/51 warnings, `tsc --noEmit` clean).
+
+### Command and scope
+
+```sh
+cd apps/web
+npx tsc --noEmit -p tsconfig.json
+npx vitest run
+npx eslint .
+```
+
+### Result
+
+- `npx tsc --noEmit -p tsconfig.json` — **clean, exit 0.**
+- `npx vitest run` — **51 test files passed, 363 tests passed, 0 failed** (up from the prior
+  session's 48 files/353 tests: 3 new files —
+  `components/products/__tests__/product-form.test.tsx` (2),
+  `components/stock/__tests__/adjust-stock-dialog.test.tsx` (2),
+  `components/stock/__tests__/transfer-stock-dialog.test.tsx` (1) — plus new cases added to 3
+  existing files —
+  `hooks/queries/__tests__/use-site-product-inventory.test.ts` (+2: finding 5's loading-state
+  test and finding 4's late-old-site-result test),
+  `hooks/realtime/__tests__/use-realtime-inventory.test.ts` (+1: finding 2's
+  children/with-children collision regression test),
+  `lib/api/site-inventory.test.ts` (+2: finding 8's empty-body guard tests) — net +10 tests,
+  matching 353 + 10 = 363).
+- `npx eslint .` — **0 errors, 51 warnings** — same count as the prior session's baseline. One new
+  warning was introduced mid-session by finding 5's fix (`use-product-inventory.ts`'s `useMemo`
+  gained a `siteId` reference without adding it to the dependency array,
+  `react-hooks/exhaustive-deps`); fixed by adding `siteId` to the deps array before this count was
+  taken, verified by rerunning eslint immediately after (52 warnings transiently, then back to 51
+  once fixed). Every one of the 51 final warnings is a pre-existing
+  `react-hooks/exhaustive-deps`/`react-hooks/set-state-in-effect` pattern on lines this session
+  did not touch (checked against `git diff` for each flagged file), plus the one pre-existing
+  unused-var warning in `use-toast.ts` — identical set to the prior session's own recorded
+  baseline.
+- **Failing-test-first proof, finding 1** (`product-form.tsx`): before moving the `siteId` check
+  inside the initial-stock block, the new "surfaces a destructive toast..." test failed because
+  `createSiteLocationInventory`/`resolveSiteLocationId` were still called even without the fix in
+  place being exercised as a guard — reverted the fix locally, reran the test, confirmed it failed
+  (no destructive toast fired, and the call assertions did not hold), then restored the fix and
+  reran green.
+- **Failing-test-first proof, finding 2** (`legacy-products-query-filter.ts`): temporarily reverted
+  the predicate from `query.queryKey.length === 2` back to `query.queryKey[2] !== "site"` and
+  reran `use-realtime-inventory.test.ts`'s new "never appends into a different product's
+  children/with-children cache entry" test in isolation — failed, with the seeded
+  `["products", "other-product", "children"]` cache mutated by the realtime write; restored the
+  fix, reran — passed.
+- **Failing-test-first proof, finding 5** (`use-product-inventory.ts`): temporarily reverted the
+  memo's early-return guard to the pre-fix `if (!products || !siteProducts) return null;` and
+  reran the new "stays null while totals are still loading" test — failed (`result.current.data`
+  was non-null with a fabricated `totalQuantity: 0` row before totals resolved); restored the fix,
+  reran — passed.
+
+### Finding 3 evidence
+
+Ran the review-specified read-only query against the project's real production database (live
+`mcp__supabase` access):
+
+```sql
+SELECT sl.site_id, count(*) AS hidden_rows
+FROM location_inventory li
+JOIN locations l ON l.id = li.location_id
+JOIN storage_locations sl ON sl.id = l.storage_location_id
+JOIN products p ON p.id = li.product_id
+WHERE sl.code = 'NOT_ASSIGNED'
+  AND (p.parent_id IS NOT NULL OR p.kuji_type = 'CUSTOM')
+GROUP BY sl.site_id;
+-- -> zero rows returned
+```
+
+**Result: zero rows returned** — no kuji-child or CUSTOM-kuji-parent row at a NOT_ASSIGNED
+location exists in production today, so T-6d-9's NOT_ASSIGNED read-filter change (moving off the
+legacy, unfiltered `findByStorageLocation_Id`-backed read onto the v1, root-product-filtered
+route) hides nothing that is actually present in the live data. **Disposition: resolved, no code
+change** — this closes the open item recorded in T-6d-9's "Behavior change this session is
+explicitly flagging" note (log.md's 6d web implementation section) with real evidence rather than
+leaving it as an unverified assumption.
+
+### Acceptance criteria evidence
+
+- **AC-5** (v1 DTO/contract correctness, safe handling of the generated client's response shape):
+  finding 8 closed a latent gap where an ok-but-empty response body would throw a raw `TypeError`
+  instead of the project's own `GeneratedApiError` — `site-inventory.test.ts`'s two new tests
+  prove both `getSiteProductInventory` and `getSiteMovements` now fail the same, catchable way as
+  every other function in that module.
+- **AC-6** (rendered coverage and site-switch isolation): finding 4's three new tests are direct
+  evidence for AC-6's previously-unmet rendered-workflow requirement
+  (`AdjustStockDialog`/`TransferStockDialog` submit paths) and its late-result-rejection
+  requirement (the site-switch race test). Finding 5's fix and test additionally close a real
+  rendered-state gap (`location-detail-sheet.tsx`'s embedded `ProductModal` could have flashed a
+  false out-of-stock state) that AC-6's rendered-coverage intent was meant to catch.
+- **AC-4/R-9** (audited stock mutations, no untracked writes): finding 1's fix ensures a missing
+  site never results in a *silently* dropped stock write — the user is now always told, which
+  matters because R-9 already removed the legacy untracked "set exact quantity" path in favor of
+  this audited create-then-adjust flow; silently losing the signal that it didn't run would have
+  reintroduced an equivalent blind spot from the caller's perspective.
+
+Result: **findings 1, 2, 4, 5, 6, 7, and 8 fixed and re-verified this session; finding 3 resolved
+via a real production-data check, no code change needed or made.** No `services/inventory-service`,
+`packages/contracts`, or `packages/api-client` file was touched (out of scope per the task).
+363/363 tests passing (up from 353/353), `tsc` clean, `eslint` 0 errors/51 warnings (same baseline
+as the prior session).
+
 ## Review-driven fix: 6d backend slice findings (2026-09-14)
 
 Commands and results for the fixes recorded in `review.md`'s "6d backend slice (T-6d-be-1..T-6d-be-8)

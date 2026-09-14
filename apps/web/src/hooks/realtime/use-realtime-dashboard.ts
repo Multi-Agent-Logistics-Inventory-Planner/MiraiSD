@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useSupabaseRealtime, type RealtimePayload } from "./use-supabase-realtime";
 import { getProductById } from "@/lib/api/products";
+import { legacyProductsListFilter } from "./legacy-products-query-filter";
 import type { Product } from "@/types/api";
 
 interface StockMovementRow {
@@ -43,7 +44,7 @@ export function useRealtimeDashboard(enabled = true) {
         getProductById(itemId)
           .then((updatedProduct: Product) => {
             queryClient.setQueriesData<Product[]>(
-              { queryKey: ["products"] },
+              legacyProductsListFilter,
               (oldData) => {
                 if (!oldData || !Array.isArray(oldData)) return oldData;
                 const index = oldData.findIndex((p) => p.id === itemId);
