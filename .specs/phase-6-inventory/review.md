@@ -599,3 +599,66 @@ rule; resolving it needs a catalog-owned application-layer product-summary contr
 work for a later checkpoint, not 6a's mechanical-move scope). R-4 through R-8 (see log.md) also
 remain open, each flagged for its owning later phase/checkpoint. This approval does not extend to
 6b's schema/rollout worksheet (AC-2) or any later checkpoint's acceptance criteria.
+
+## 6e — Targeted refresh and exit proof (AC-7/AC-8), self-review pending independent review
+
+**Process note (read before the findings below):** this checkpoint's implementation was carried
+out by an execution session running without access to spawn the `mirai-spring-reviewer`/
+`mirai-next-reviewer` independent-review agents (a tooling constraint of that session, not a
+process decision). Every prior checkpoint in this record (6a-6d) went through implement ->
+independent agent review -> fix; 6e instead went through implement -> a rigorous self-review by
+the same session, applying the same Standards/Spec checklist those agents use -> fix. The
+findings below are real (each is revert-verified with a new failing-then-passing test) but this
+is not a substitute for an independent reviewer with no stake in the implementation choices. The
+coordinating session should decide whether to still run `mirai-spring-reviewer`/
+`mirai-next-reviewer` over this checkpoint's diff before treating it as equivalent in rigor to
+6a-6d, and should treat this section's disposition as provisional until that happens (or a
+documented decision not to).
+
+### Self-review findings and disposition
+
+- **[Spec, backend] Missing test coverage for the productIds-threading fix (P2).** The commit
+  that threaded `siteId`/`productIds` through `StockMovementService`'s five broadcast call sites
+  had no test asserting the actual arguments passed to
+  `SupabaseBroadcastService.broadcastInventoryUpdated` -- specifically no coverage of the exact
+  gap the worksheet flagged (`batchAdjustInventory`/`batchTransferInventory` previously sent
+  `itemId=null` despite already holding every affected product ID). **Fixed:** new
+  `StockMovementServiceBroadcastArgsIT` (real Postgres, not `@Transactional`, so the after-commit
+  dispatch actually fires) asserting both batch paths emit exactly one notification carrying the
+  correct `siteId` and the full affected-product-ID set. Revert-verified: reverting the
+  `productIds` argument to `null` made the batch-adjust case fail for the predicted reason
+  (payload built with `productIds=null`); restored, both pass.
+- **[Spec, web] Missing test coverage for the site-scoped locations-with-counts hooks (P2).**
+  `useLocationsWithCounts`/`useAllLocationsWithCounts` had zero test coverage after their 6e
+  site-scoping, including the worksheet's own required case ("site-switch test asserting counts
+  rebind to the new site's values, distinct per-site fixtures"). **Fixed:** new
+  `use-locations-with-counts.test.ts` (5 cases) covering the disabled states (no site, no real
+  type, NOT_ASSIGNED), the site-switch rebind (a second site's fixture returns a different
+  `totalQuantity`/`id`, confirmed the hook reflects it after switching, not the first site's
+  cached data), and that `useAllLocationsWithCounts` shares the site-scoped key family.
+- **[ArchUnit process near-miss, not a shipped bug]** The first attempt at the after-commit
+  dispatch fix (`AfterCommitRunner`'s deferral logic) was written inline inside
+  `SupabaseBroadcastService` as an anonymous `TransactionSynchronization` class. That failed
+  `ArchitectureTest.legacyTechnicalLayerPackagesDoNotGrow` -- the anonymous class counted as a
+  *new* class in the legacy `services` package, which the freezing rule forbids growing. Caught
+  before commit by running the full suite; fixed by moving the logic into a new
+  `shared.transaction.AfterCommitRunner` (see log.md's "T-6e-be-1..T-6e-be-7" entry for detail).
+  Recorded here because it is exactly the class of mistake an independent reviewer's own
+  `ArchitectureTest` run would have caught if this session's self-review had missed it.
+
+No correctness, tenant-isolation, or security findings were found in the self-review beyond the
+two coverage gaps above -- both were coverage gaps (the underlying implementation was already
+correct in both cases), not behavioral bugs. In particular: the `SiteLocationAggregateController`/
+`LocationAggregateRepository` site-scoping was checked against a real mismatched-`site_id`
+`location_inventory` row (excluded correctly, per `LocationAggregateEgressIT`); the coalescing
+buffer's site-switch behavior was checked against a live mid-flight switch (per
+`use-realtime-broadcast.test.ts`'s dedicated case) and never contaminates the new site's cache;
+and the `@Lazy` self-injection pattern in `SupabaseBroadcastService` was confirmed to work at
+real Spring-context startup, not just in isolated unit tests, by the full IT suite's repeated
+clean passes.
+
+**Disposition: fixed 6e implementation, self-reviewed with two real coverage gaps found and
+closed, both revert-verified. Not yet independently reviewed by an agent with no authorship stake
+-- flagged above as the coordinating session's decision to make before treating 6e as
+equivalent in rigor to 6a-6d.** Full verification commands and counts are in validation.md's "6e"
+section.

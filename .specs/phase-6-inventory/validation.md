@@ -632,3 +632,120 @@ frozen), and facades preserve caller transactions (proven by a real-transaction 
 Mockito). R-9 (see log.md) is recorded as open debt carried forward, not a 6a blocker: no
 acceptance criterion required moving `LocationInventoryController`'s cluster in this checkpoint.
 6b's own worksheet/rollout requirements (AC-2) are unaffected by and not claimed by this checkpoint.
+
+## 6e — Targeted refresh and exit proof (AC-7/AC-8)
+
+Environment: JDK 21 with `./mvnw` from `services/inventory-service` (backend, real Postgres/Kafka
+Testcontainers for the ITs that need them); Node with `npx` from `apps/web` (web). Full detail is
+in log.md's "6e planning" and "6e implementation" entries; this section records final,
+independently-reproducible commands/results per spec.md's requirement.
+
+### Backend
+
+- `./mvnw -q -o compile` / `-o test-compile` — clean throughout every slice.
+- `./mvnw -q clean test` (full unit/component suite) — 379 run, 0 failures, 0 errors (up from
+  the 6d-close baseline of 371 — net effect of +8 new `SupabaseBroadcastServiceTest` cases and -6
+  removed-with-the-legacy-controller `LocationInventoryServiceTest` nested-class cases; the
+  reported top-level count does not track 1:1 with `@Nested` class removal, a pre-existing
+  Surefire text-summary quirk this checkpoint's log entries reference from 6a).
+- `./mvnw -q test -Dtest='*IT'` (full IT suite) — 502 run, 8 failures, name-for-name identical
+  to the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` set, no new
+  failure.
+- `./mvnw -q clean test -Dtest=ArchitectureTest` run twice, independently, as clean rebuilds —
+  both green. The frozen `legacyTechnicalLayerPackagesDoNotGrow` store shrank by exactly the
+  predicted 7 lines (the four deleted `LocationInventory*` classes' entries) when regenerated
+  with `allowStoreCreation=true`/`allowStoreUpdate=true` temporarily set, then reverted; stable
+  across two further independent clean runs with the flags back at `false`/`false`. The other
+  frozen store (`repositoriesAreOnlyAccessedByServicesOrRepositories`) was unaffected.
+- `./mvnw -q test -Dtest=OpenApiContractExportTest` run twice — stable. Scripted set-diff (Python,
+  not by hand) against the pre-6e contract: paths removed:
+  `/api/locations/{locationId}/inventory`, `/api/locations/{locationId}/inventory/{inventoryId}`,
+  `/api/storage-locations/{storageLocationId}/inventory` (3 templates, the first path removals
+  recorded in this phase); paths added: none this run (the `SiteLocationAggregateController`
+  route and `SiteLocationDTO` schema were added in the prior 6e commit's regen); schemas removed:
+  `InventoryRequestDTO`, `LocationInventoryResponseDTO`; schemas added: none.
+- `LocationAggregateEgressIT` (real Postgres) — 3/3 pass. Measured (Hibernate `Statistics` +
+  `ObjectMapper.writeValueAsBytes`, one run): legacy `findAllLocationsWithCounts()` (no site
+  filter) returned both seeded sites' location rows in one call — confirmed as a live cross-site
+  leak, not merely a missing scope, and grew with every prior test method's fixture in the same
+  JVM run (18 rows by the third test method, none ever excluded); the site-scoped
+  `findAllLocationsWithCounts(siteId)` returned exactly the calling site's 3 rows, zero belonging
+  to the other seeded site, and excluded a deliberately mismatched-`site_id`
+  `location_inventory` row from the total (its 999 quantity never appeared).
+- `StockMovementServiceBroadcastArgsIT` (real Postgres, review-driven fix) — 2/2 pass,
+  revert-verified (see review.md's "6e" section): `batchAdjustInventory`/`batchTransferInventory`
+  each emit exactly one `inventory_updated` notification carrying the calling site's ID and the
+  full affected-product-ID set.
+- `SupabaseBroadcastServiceTest` — 8/8 pass: payload assembly (siteId/productIds present vs.
+  omitted), and after-commit dispatch (no active transaction dispatches immediately; an active
+  transaction defers until `afterCommit()`; a transaction cleared without commit never dispatches).
+- `SiteLocationAggregateControllerIT` — 5/5 pass (route precedence over `/{id}`, site isolation,
+  mismatched-row exclusion, foreign-site 403, unauthenticated 401).
+- `LegacyInventoryDeprecationHeadersIT` — 6/6 pass, including the rewritten
+  `/api/locations/with-counts` deprecation-header cases replacing the deleted routes' cases.
+- `NotAssignedInventoryReadParityIT` — 2/2 pass after rewriting its legacy-vs-v1 comparison to a
+  v1-filter-only assertion (the legacy method it compared against was deleted this checkpoint).
+
+### Web
+
+- `npx tsc --noEmit -p tsconfig.json` — clean throughout every slice, including against the final
+  regenerated `packages/api-client/src/schema.d.ts`.
+- `npx vitest run` (full suite) — 57 files, 395 tests, 0 failed (up from the 6d-close baseline
+  of 52 files/366 tests: net +9 test files after deleting the dead-hook test and adding
+  `inventory-refresh.test.ts`, `site-relevance.test.ts`, `use-coalesced-inventory-refresh.test.ts`,
+  `use-realtime-broadcast.test.ts`, `ac8-web-measurement.test.ts`,
+  `use-locations-with-counts.test.ts`).
+- `npx eslint .` — 0 errors, 51 warnings — identical warning set to the 6d-close baseline (no
+  new warnings introduced; two `react-hooks` errors caught and fixed during implementation --
+  see log.md -- before this final count).
+- AC-7 web coverage: site-scoped broadcast handling and coalescing (`use-realtime-broadcast.test.ts`,
+  7 cases: foreign-site drop, missing-siteId possibly-relevant, coalescing two rapid events into
+  one flush, no-recovery-on-first-subscribe, exactly-one-recovery-refresh-after-a-real-error,
+  non-inventory event passthrough, unknown-event-type safety) plus a dedicated site-switch race
+  case (1 case: an event buffered for site-1 still flushes against site-1 even if the site
+  switches to site-2 before the coalescing window elapses — never contaminates site-2's cache).
+  Coalescing buffer mechanics (`use-coalesced-inventory-refresh.test.ts`, 6 cases) and the shared
+  flush executor (`inventory-refresh.test.ts`, 5 cases) are unit-tested directly with fake
+  timers/a real `QueryClient`.
+- AC-8 web measurement (`ac8-web-measurement.test.ts`, T-6e-10): scripted workload through the
+  actual post-6e coalescing path for five scenarios, request counts and byte estimates (labeled
+  estimates, reusing 6c's measured per-row costs) recorded against the reconstructed pre-6e
+  per-event full-refresh behavior:
+
+  | Scenario | Before: requests | Before: est. bytes | After: requests | After: est. bytes |
+  | --- | --- | --- | --- | --- |
+  | single known ID | 1 | 9445 | 1 | 118 |
+  | 5-ID batch | 1 | 9445 | 1 | 590 |
+  | unknown-ID batch | 1 | 9445 | 1 | 2715 |
+  | duplicate ID (2 events) | 2 | 18890 | 1 | 118 |
+  | reordered pair (2 events) | 2 | 18890 | 1 | 236 |
+
+  Result size follows affected IDs, not catalog size, in every known-ID scenario; the unknown-ID
+  case correctly falls back to a full (but still site-scoped, still one-request) refresh with no
+  regression claimed there. Explicitly not measured: a live browser/Supabase-websocket session;
+  this is jsdom + a real `QueryClient` + a counting stub, not an end-to-end browser test.
+- Regression of the 6d rendered suites named in the worksheet, run directly and unmodified:
+  `kuji-tab-panel.test.tsx`, `product-modal.test.tsx`, `adjust-stock-dialog.test.tsx`,
+  `transfer-stock-dialog.test.tsx`, `use-site-product-inventory.test.ts` — 5 files, 16 tests,
+  all pass (subset of the full 395; confirms AC-6 regression specifically, not just aggregate
+  count).
+
+### Cost-impact statement (AC-8)
+
+No new paid infrastructure, service, or third-party dependency was introduced. The
+`SiteLocationAggregateController`/scoped `LocationAggregateRepository` query and the coalesced
+web refresh reduce Supabase Postgres query egress (narrower aggregation input, fewer/smaller HTTP
+responses per realtime burst) and reduce Supabase Realtime broadcast fan-out cost per mutation
+(one coalesced flush instead of one full-catalog invalidation per event) at the existing
+infrastructure tier; no measurable cost increase is expected, and the direction is a reduction
+consistent with the phase's stated egress-reduction goal. Deleting the four obsolete backend
+classes and the corresponding web functions is a maintenance-surface reduction with no runtime
+cost effect.
+
+### Not yet run by this session
+
+The complete phase exit gate (regression of AC-1-6 together with AC-7-8, per spec.md's 6e
+checkpoint row) and the PR-gate authoritative CI run are the coordinating session's to run before
+closing the checkpoint, per this record's own delivery decision that no production apply or
+deployment is authorized here and that checkpoint closure follows an independent review this
+session could not perform (see review.md's "6e" section).
