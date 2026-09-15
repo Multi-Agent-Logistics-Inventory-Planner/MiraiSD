@@ -17,24 +17,169 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     vi.clearAllMocks();
   });
 
-  it("unknown IDs (undefined) fall back to a full site-scoped invalidation, no fetch", async () => {
+  it("unknown IDs (undefined) fetch and apply the full site totals, sequenced like a targeted flush (follow-up review finding, P1)", async () => {
+    // Previously a bare invalidateQueries call, which bypassed sequencing entirely - now
+    // fetches and applies through the same claim/apply mechanism as a targeted flush, so it can
+    // be ordered against one.
     const qc = client();
-    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p1", totalQuantity: 42 }]);
 
     await flushInventorySiteRefresh(qc, "site-1", undefined);
 
-    expect(mockGetSiteInventoryTotals).not.toHaveBeenCalled();
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inventoryTotals", "site-1"] });
+    expect(mockGetSiteInventoryTotals).toHaveBeenCalledWith("site-1");
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 42 },
+    ]);
   });
 
-  it("known IDs with nothing cached yet fall back to a full invalidation rather than caching a partial list", async () => {
+  it("known IDs with nothing cached yet fetch and apply the full site totals rather than caching a partial list", async () => {
     const qc = client();
-    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    mockGetSiteInventoryTotals.mockResolvedValue([
+      { productId: "p1", totalQuantity: 5 },
+      { productId: "p2", totalQuantity: 7 },
+    ]);
 
     await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
 
-    expect(mockGetSiteInventoryTotals).not.toHaveBeenCalled();
+    // The full, unfiltered fetch, not a productIds-scoped one - "nothing cached yet" falls back
+    // to the same full refresh path as an unknown-ID flush.
+    expect(mockGetSiteInventoryTotals).toHaveBeenCalledWith("site-1");
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 5 },
+      { productId: "p2", totalQuantity: 7 },
+    ]);
+  });
+
+  it("an older full refresh does not overwrite a newer targeted write for the same product (follow-up review finding, P1)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+
+    let resolveFullFetch!: (value: unknown) => void;
+    const fullFetch = new Promise((resolve) => {
+      resolveFullFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => fullFetch);
+    // Full refresh starts first (claims every currently-cached id, including p1), but its own
+    // fetch stays pending.
+    const fullFlush = flushInventorySiteRefresh(qc, "site-1", undefined);
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 777 },
+    ]);
+    // Targeted flush for p1 starts second (claims a higher sequence for p1) and resolves first.
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 777 },
+    ]);
+
+    // The full refresh's request finally resolves, with a stale value for p1 - it must not
+    // overwrite what the newer targeted flush already applied.
+    resolveFullFetch([{ productId: "p1", totalQuantity: 5 }]);
+    await fullFlush;
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 777 },
+    ]);
+  });
+
+  it("an older targeted response does not overwrite a newer full refresh for the same product (follow-up review finding, P1)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+
+    let resolveTargetedFetch!: (value: unknown) => void;
+    const targetedFetch = new Promise((resolve) => {
+      resolveTargetedFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => targetedFetch);
+    // Targeted flush for p1 starts first (claims the lower sequence), but its own fetch stays
+    // pending.
+    const targetedFlush = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 50 },
+    ]);
+    // Full refresh starts second (re-claims p1 at a higher sequence, since p1 is still cached
+    // at this point) and resolves first.
+    await flushInventorySiteRefresh(qc, "site-1", undefined);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 50 },
+    ]);
+
+    // The earlier targeted flush's request finally resolves, with a stale value - it must not
+    // overwrite the newer full refresh's value.
+    resolveTargetedFetch([{ productId: "p1", totalQuantity: 3 }]);
+    await targetedFlush;
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 50 },
+    ]);
+  });
+
+  it("recovers with a corrective invalidation when the latest (superseding) flush's request fails, even though an earlier flush would have succeeded (follow-up review finding, P2)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    let resolveEarlierFetch!: (value: unknown) => void;
+    const earlierFetch = new Promise((resolve) => {
+      resolveEarlierFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => earlierFetch);
+    // Flush A starts first (claims p1 at the lower sequence), fetch stays pending.
+    const flushA = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    const networkError = new Error("network blip");
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => Promise.reject(networkError));
+    // Flush B starts second (supersedes A's claim on p1) and fails.
+    const flushB = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    await expect(flushB).rejects.toThrow("network blip");
+    // B still owned the claim on p1 when it failed (nothing even newer superseded it) - its
+    // failure must trigger a corrective invalidation rather than leaving the cache silently
+    // stuck with no path back to authoritative data.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inventoryTotals", "site-1"] });
+
+    // A's response finally arrives with what would have been the correct, current value - but A
+    // no longer owns the claim (B superseded it), so A must not write it either; the recovery
+    // invalidation above is the only path back to correctness now.
+    resolveEarlierFetch([{ productId: "p1", totalQuantity: 2 }]);
+    await flushA;
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 1 },
+    ]);
+  });
+
+  it("does not recover when a failing flush was already superseded by an even newer one before it failed", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    let rejectFailingFetch!: (error: unknown) => void;
+    const failingFetch = new Promise((_resolve, reject) => {
+      rejectFailingFetch = reject;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => failingFetch);
+    // Flush A starts first, fetch stays pending.
+    const flushA = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 9 },
+    ]);
+    // Flush C supersedes A and succeeds before A fails.
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+    invalidateSpy.mockClear();
+
+    // A now fails, but C (not A) is the current claim holder - A's failure must not trigger a
+    // recovery that could race C's already-applied, correct write.
+    rejectFailingFetch(new Error("stale failure"));
+    await expect(flushA).rejects.toThrow("stale failure");
+
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["inventoryTotals", "site-1"] });
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 9 },
+    ]);
   });
 
   it("known IDs with existing cached data issue exactly one bounded fetch and merge, preserving untouched products", async () => {

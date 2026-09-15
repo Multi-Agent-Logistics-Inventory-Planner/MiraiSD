@@ -78,7 +78,6 @@ async function measureAfter(scenario: Scenario): Promise<Measurement> {
     { productId: "p1", totalQuantity: 1 },
     { productId: "p2", totalQuantity: 2 },
   ]);
-  const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
   mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p1", totalQuantity: 99 }]);
 
   vi.useFakeTimers();
@@ -93,11 +92,14 @@ async function measureAfter(scenario: Scenario): Promise<Measurement> {
   vi.useRealTimers();
   unmount();
 
-  const fullRefreshCount = invalidateSpy.mock.calls.filter(
-    (call) => JSON.stringify(call[0]) === JSON.stringify({ queryKey: ["inventoryTotals", "site-1"] })
-  ).length;
-  const requestCount = mockGetSiteInventoryTotals.mock.calls.length + fullRefreshCount;
-  const knownIdCount = fullRefreshCount === 0 ? mockGetSiteInventoryTotals.mock.calls[0]?.[1]?.length ?? 0 : 0;
+  // The unknown-ID path now fetches and applies through the same sequenced executor as a
+  // targeted flush (follow-up review finding, P1), rather than a bare invalidateQueries call -
+  // a full refresh is distinguished by the absence of a productIds argument on the call to
+  // getSiteInventoryTotals, not by a separate invalidation call to count.
+  const calls = mockGetSiteInventoryTotals.mock.calls as Array<[string, string[] | undefined]>;
+  const fullRefreshCount = calls.filter((call) => call[1] === undefined).length;
+  const knownIdCount = calls.reduce((sum, call) => sum + (call[1]?.length ?? 0), 0);
+  const requestCount = calls.length;
 
   return {
     scenario: scenario.name,
