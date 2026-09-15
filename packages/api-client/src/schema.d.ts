@@ -2964,6 +2964,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{siteId}/locations/with-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteLocationsWithCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{siteId}/locations/{id}": {
         parameters: {
             query?: never;
@@ -4959,6 +4975,18 @@ export interface components {
             productId?: string;
             /** Format: int32 */
             totalQuantity?: number;
+        };
+        SiteLocationDTO: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: uuid */
+            id?: string;
+            locationCode?: string;
+            storageLocationCode?: string;
+            /** Format: uuid */
+            storageLocationId?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         SiteLocationInventoryEntryDTO: {
             /** Format: uuid */
@@ -16235,7 +16263,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Location"][];
+                    "*/*": components["schemas"]["SiteLocationDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -16287,7 +16315,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Location"];
+                    "*/*": components["schemas"]["SiteLocationDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteLocationsWithCounts: {
+        parameters: {
+            query?: {
+                type?: "BOX_BIN" | "CABINET" | "DOUBLE_CLAW_MACHINE" | "FOUR_CORNER_MACHINE" | "GACHAPON" | "KEYCHAIN_MACHINE" | "PUSHER_MACHINE" | "RACK" | "SHELF" | "SINGLE_CLAW_MACHINE" | "WINDOW" | "NOT_ASSIGNED";
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LocationWithCountsDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -16336,7 +16414,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Location"];
+                    "*/*": components["schemas"]["SiteLocationDTO"];
                 };
             };
             /** @description Authentication required */
@@ -16389,7 +16467,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["Location"];
+                    "*/*": components["schemas"]["SiteLocationDTO"];
                 };
             };
             /** @description Authentication required */

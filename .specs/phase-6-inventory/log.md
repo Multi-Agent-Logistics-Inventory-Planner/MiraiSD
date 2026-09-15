@@ -5426,3 +5426,141 @@ prohibited" violation that this checkpoint must close.
 Implement backend first (T-6e-be-1 through T-6e-be-11) -- the web task list's T-6e-2/5 depend on
 the broadcast payload change (T-6e-be-4/5) and T-6e-9 depends on the new v1 counts route
 (T-6e-be-3). Then implement web (T-6e-1 through T-6e-11).
+
+## 6e implementation (T-6e-be-1..T-6e-be-7) (2026-09-15)
+
+### T-6e-be-4/T-6e-be-5 -- broadcast payload envelope (`siteId` + `productIds`)
+
+- `services/SupabaseBroadcastService.java`: `broadcastInventoryUpdated`/`broadcastAuditLogCreated`
+  now have `(UUID siteId, ..., List<String> productIds, ...)` overloads; the legacy `(String, String)`
+  two-arg signature still exists and delegates with `siteId=null`. New package-private
+  `buildInventoryUpdatedPayload`/`buildAuditLogCreatedPayload` extracted for unit testing (no HTTP).
+  `broadcastProductUpdated` deliberately untouched/site-less (product identity is global, per the
+  confirmed decision).
+- `inventory/application/StockMovementService.java`: all five call sites
+  (`batchAdjustInventory` :308-309, `transferInventory` :631-632, `batchTransferInventory`
+  :751-752, `addInventoryWithTracking` :1011-1013, `removeInventoryWithTracking` :1082-1084) now
+  pass the site (from the already-in-scope `LocationInventory`/`Location` entity) and the affected
+  product IDs. `batchAdjustInventory`/`batchTransferInventory` (previously `itemId=null` despite
+  holding `affectedProductIds` locally) now carry the full affected-ID set -- this is the fix that
+  makes the targeted-refresh work possible for the dominant (batch) mutation shape, per the
+  confirmed scope-expansion decision.
+
+### T-6e-be-6 -- after-commit dispatch
+
+- New `shared/transaction/AfterCommitRunner.java`: `run(Runnable)` defers to
+  `TransactionSynchronizationManager.registerSynchronization(...).afterCommit(...)` when a
+  transaction is active, else runs immediately. Placed in `shared`, not inline in
+  `SupabaseBroadcastService`, specifically so its anonymous `TransactionSynchronization` class
+  doesn't count as a *new* class introduced into the legacy `services` package under
+  `ArchitectureTest`'s `legacyTechnicalLayerPackagesDoNotGrow` frozen-violation store (confirmed by
+  a failing first attempt: inlining it there broke the freeze with exactly one new
+  `SupabaseBroadcastService$1` line).
+- `SupabaseBroadcastService`'s constructor now takes a `@Lazy` self-reference
+  (`SupabaseBroadcastService self`) so every public `broadcastXxx` method can defer via
+  `AfterCommitRunner.run(() -> self.dispatchXxx(...))` while the actual network dispatch
+  (`dispatchXxx`, package-private, `@Async`) still goes through the Spring AOP proxy rather than a
+  same-instance self-invocation (which would silently skip `@Async`).
+- Tests: `services/SupabaseBroadcastServiceTest.java` (8 cases) -- payload assembly
+  (siteId/productIds present vs. omitted-when-null-or-empty) and after-commit dispatch: no active
+  transaction dispatches immediately; an active transaction defers until `afterCommit()` fires;
+  a transaction cleared without commit (simulated rollback) never dispatches.
+
+### T-6e-be-2/T-6e-be-3 -- site-scoped `locations/with-counts`
+
+Also corrected the record: T-6d-12's residual note calling this "silently resolves to MAIN" was
+verified false this session -- `LocationAggregateRepository`'s native queries have **no site
+predicate at all**, so a MAIN caller's `/api/locations/with-counts` call returns and counts every
+site's locations/quantities together. Confirmed live (not just theoretical) via
+`LocationAggregateEgressIT`'s "before" measurement below.
+
+- `sites/infrastructure/LocationAggregateRepository.java`: added
+  `SITE_SCOPED_INVENTORY_SUBQUERY` (adds `li.site_id = :siteId` inside the aggregation, letting
+  Postgres use the `(site_id, product_id)` index and excluding a mismatched-site row from the
+  count rather than silently counting it into the wrong site's badge) and the two site-scoped SQL
+  constants/methods `findAllLocationsWithCounts(UUID)` /
+  `findLocationsByTypeWithCounts(String, UUID)`. The un-scoped originals are kept, marked
+  `@Deprecated`, unchanged -- both because the legacy route still needs them and because it keeps
+  the "before" behavior measurable after the fact.
+- `sites/application/LocationAggregateService.java`: matching site-scoped overloads
+  (`getAllLocationsWithCounts(UUID)` / `getLocationsByTypeWithCounts(LocationType, UUID)`),
+  preserving the Java-side NOT_ASSIGNED short-circuit identically.
+- New `sites/api/SiteLocationAggregateController.java`: `GET
+  /api/v1/sites/{siteId}/locations/with-counts`, reading site from
+  `AuthorizedSiteContextHolder`, same role set as the legacy route.
+- Tests: `sites/api/SiteLocationAggregateControllerIT.java` (5 cases) -- `/with-counts` routes
+  here and not into `SiteLocationController.getSiteLocationById`'s `/{id}` pattern; returns only
+  the calling site's locations/quantities (a second site's 99-quantity row never appears);
+  excludes a `location_inventory` row whose `site_id` disagrees with its location's site;
+  foreign-site membership 403; unauthenticated 401.
+
+### T-6e-be-1/first half of T-6e-be-11 -- AC-8 before/after measurement
+
+- New `sites/infrastructure/LocationAggregateEgressIT.java` (real Postgres via
+  `BaseKafkaIntegrationTest`), measuring both the legacy and scoped queries in one class rather
+  than 6c's separate Baseline/AfterIT files -- safe because the legacy methods were kept
+  unmodified, so "before" stayed measurable after the scoped methods were added, not only
+  recoverable from history. Two sites seeded, 3 locations/products each.
+- **Actual measured numbers** (statements via Hibernate `Statistics`, `apiBytes` via
+  `ObjectMapper.writeValueAsBytes`, one JVM run, real Postgres Testcontainer):
+  - Before (legacy `findAllLocationsWithCounts()`, no site filter): 1 statement; returned exactly
+    3 of siteA's + 3 of siteB's location rows for **both** sites in one undifferentiated call (the
+    live cross-site leak -- and because prior test methods' fixtures in the same run accumulate,
+    the untouched legacy call actually returned 18 rows by the third test method, growing
+    unboundedly with every site ever created against this endpoint).
+  - After (site-scoped `findAllLocationsWithCounts(siteId)`): 1 statement; returned exactly the 3
+    locations belonging to the calling site, zero belonging to the other site, and zero from a
+    deliberately mismatched-site `location_inventory` row (999-quantity probe never appears).
+  - Full before/after byte and row deltas plus the cost-impact statement will be finalized in
+    validation.md alongside the web-side AC-8 numbers (T-6e-10), per spec.md's requirement to
+    record both API-bytes and request/query counts together.
+
+### T-6e-be-7 -- `SiteLocationDTO` (AC-5 fix, confirmed decision, not originally in the 6e worksheet)
+
+- New `sites/api/SiteLocationDTO.java` (flat `id`/`locationCode`/`storageLocationId`/
+  `storageLocationCode`/`createdAt`/`updatedAt`, matching the shape the web client already
+  extracted by hand from the raw entity) and `SiteLocationController` now returns
+  `SiteLocationDTO`/`List<SiteLocationDTO>` from every handler instead of the raw `Location` JPA
+  entity, closing the standing AC-5 gap ("v1 routes expose DTOs through the application
+  boundary"). `SiteLocationControllerIT`'s existing 7 cases (asserting `$.locationCode`, never a
+  nested `storageLocation.id`) needed no changes and still pass unmodified -- confirming the flat
+  shape was already what every existing assertion expected.
+
+### Verification (actual commands and results, not paraphrased)
+
+- `./mvnw -q -o compile` / `-o test-compile`: clean, both times.
+- `./mvnw -q test -Dtest=SiteLocationControllerIT`: 7/7 pass (unchanged assertions, new DTO shape).
+- `./mvnw -q test -Dtest=SiteLocationAggregateControllerIT`: 5/5 pass.
+- `./mvnw -q test -Dtest=SupabaseBroadcastServiceTest`: 8/8 pass.
+- `./mvnw -q test -Dtest=LocationAggregateEgressIT`: 3/3 pass (real Postgres Testcontainer).
+- `./mvnw -q test -Dtest='StockMovementServiceTest,StockMovementServiceConcurrent*IT,SiteInventoryMutationController*IT,AdjustToKafkaIT'`:
+  all green, no failures introduced by the new broadcast call-site signatures.
+- `./mvnw -q clean test` (full unit/component suite): **379 run (up from 371 baseline -- the 8 new
+  `SupabaseBroadcastServiceTest` cases), 0 failures, 0 errors.**
+- `./mvnw -q test -Dtest='*IT'` (full IT suite): **518 run (up from 510 -- 5 new
+  `SiteLocationAggregateControllerIT` + 3 new `LocationAggregateEgressIT`), 8 failures, name-for-
+  name identical to the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+  set, no new failure.**
+- `./mvnw -q clean test -Dtest=ArchitectureTest` run twice (independent clean rebuilds): both
+  green, zero diff in `archunit_store/` or `module-dependency-edges-baseline.txt` -- confirms the
+  `AfterCommitRunner` relocation fix actually closed the freezing-rule violation (the first attempt,
+  with the anonymous class inline in `SupabaseBroadcastService`, failed this exact check with a
+  new `SupabaseBroadcastService$1` line; recorded here as the review-relevant near-miss).
+
+### Deviations from the plan
+
+- T-6e-be-7 (the `SiteLocationDTO`/AC-5 fix) was not in the original 6e worksheet's backend task
+  list -- it was added as a confirmed user decision (Q-6e-5/"Entity exposure") after the planning
+  pass surfaced it. Implemented as its own task, numbered after the original T-6e-be-6 to avoid
+  renumbering the worksheet's other tasks.
+- `AfterCommitRunner` (a new `shared.transaction` package) was not anticipated by either planning
+  pass; it exists only because of the ArchUnit freezing-rule interaction described above, not
+  because of any design change.
+
+### Remaining backend work (not yet done this session)
+
+T-6e-be-8 (deprecation header for `/api/locations/with-counts`), T-6e-be-9 (delete the four
+obsolete legacy `LocationInventory*` classes -- must land in the same commit as, after, the web
+slice's own legacy deletion per the worksheet's ordering note), and T-6e-be-10 (regenerate
+`packages/contracts/openapi.json`/`packages/api-client`, which should happen once, after both the
+new v1 route and the legacy deletions are final, not twice).

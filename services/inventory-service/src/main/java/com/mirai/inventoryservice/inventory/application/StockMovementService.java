@@ -303,8 +303,10 @@ public class StockMovementService {
 
         List<UUID> changedProductIds = applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, null);
-        broadcastService.broadcastAuditLogCreated(null);
+        UUID batchAdjustSiteId = first.getSite() != null ? first.getSite().getId() : null;
+        List<String> batchAdjustProductIds = affectedProductIds.stream().map(UUID::toString).toList();
+        broadcastService.broadcastInventoryUpdated(batchAdjustSiteId, storageLocationCode, batchAdjustProductIds, null);
+        broadcastService.broadcastAuditLogCreated(batchAdjustSiteId, null);
         if (!changedProductIds.isEmpty()) {
             broadcastService.broadcastProductUpdated(
                     changedProductIds.stream().map(UUID::toString).collect(Collectors.toList()));
@@ -624,8 +626,10 @@ public class StockMovementService {
         }
         executeTransfer(request, sourceInventory, sourceQuantity, lockedIds.get(plan.destinationKey()), auditLog, true, codes);
 
-        broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        UUID transferSiteId = sourceInventory.getSite() != null ? sourceInventory.getSite().getId() : null;
+        String transferProductId = sourceInventory.getProduct().getId().toString();
+        broadcastService.broadcastInventoryUpdated(transferSiteId, sourceLocationCode, List.of(transferProductId), null);
+        broadcastService.broadcastAuditLogCreated(transferSiteId, null);
     }
 
     /**
@@ -742,8 +746,10 @@ public class StockMovementService {
         Map<UUID, Integer> currentTotals = sumCurrentTotalsByProductIds(affectedProductIds);
         applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
-        broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        UUID batchTransferSiteId = firstSource.getSite() != null ? firstSource.getSite().getId() : null;
+        List<String> batchTransferProductIds = affectedProductIds.stream().map(UUID::toString).toList();
+        broadcastService.broadcastInventoryUpdated(batchTransferSiteId, sourceLocationCode, batchTransferProductIds, null);
+        broadcastService.broadcastAuditLogCreated(batchTransferSiteId, null);
     }
 
     /**
@@ -1000,8 +1006,11 @@ public class StockMovementService {
 
         boolean productChanged = updateProductActiveStatus(product);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
-        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        UUID addInventorySiteId = location.getStorageLocation().getSite() != null
+                ? location.getStorageLocation().getSite().getId() : null;
+        broadcastService.broadcastInventoryUpdated(
+                addInventorySiteId, storageLocationCode, List.of(product.getId().toString()), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(addInventorySiteId, product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
         }
@@ -1069,8 +1078,10 @@ public class StockMovementService {
 
         boolean productChanged = updateProductActiveStatus(product);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
-        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        UUID removeInventorySiteId = inventory.getSite() != null ? inventory.getSite().getId() : null;
+        broadcastService.broadcastInventoryUpdated(
+                removeInventorySiteId, storageLocationCode, List.of(product.getId().toString()), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(removeInventorySiteId, product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
         }

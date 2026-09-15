@@ -73,15 +73,17 @@ export async function getSiteStorageLocations(siteId: string): Promise<StorageLo
 // A record's identity (id + locationCode) is required to key/render it safely - see the
 // toStorageLocationSummary comment above for why a missing id/code drops the row rather than
 // defaulting it.
-function toSiteLocation(dto: components["schemas"]["Location"]): Location | null {
-  if (!dto.id || !dto.locationCode || !dto.storageLocation?.id) {
+// SiteLocationController now returns SiteLocationDTO (.specs/phase-6-inventory 6e, T-6e-be-7),
+// a flat DTO replacing the raw Location JPA entity it used to serialize - closes an AC-5 gap.
+function toSiteLocation(dto: components["schemas"]["SiteLocationDTO"]): Location | null {
+  if (!dto.id || !dto.locationCode || !dto.storageLocationId) {
     return null;
   }
   return {
     id: dto.id,
     locationCode: dto.locationCode,
-    storageLocationId: dto.storageLocation.id,
-    storageLocationType: dto.storageLocation.code ?? "",
+    storageLocationId: dto.storageLocationId,
+    storageLocationType: dto.storageLocationCode ?? "",
     createdAt: dto.createdAt ?? "",
     updatedAt: dto.updatedAt ?? "",
   };

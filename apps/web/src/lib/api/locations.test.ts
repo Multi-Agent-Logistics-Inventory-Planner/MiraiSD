@@ -81,13 +81,16 @@ describe("getSiteStorageLocations", () => {
   });
 });
 
+// Flat SiteLocationDTO shape (.specs/phase-6-inventory 6e, T-6e-be-7 - SiteLocationController
+// now returns SiteLocationDTO, not the raw Location entity's nested storageLocation).
 function siteLocationFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: "loc-na-1",
     locationCode: "NA",
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
-    storageLocation: { id: "sl-na", code: "NOT_ASSIGNED", name: "Not Assigned" },
+    storageLocationId: "sl-na",
+    storageLocationCode: "NOT_ASSIGNED",
     ...overrides,
   };
 }
@@ -122,7 +125,7 @@ describe("getSiteLocations", () => {
     ]);
   });
 
-  it("drops rows missing identity (id, locationCode, or storageLocation.id)", async () => {
+  it("drops rows missing identity (id, locationCode, or storageLocationId)", async () => {
     mockGet.mockResolvedValue({
       data: [siteLocationFixture(), siteLocationFixture({ id: undefined })],
       error: undefined,

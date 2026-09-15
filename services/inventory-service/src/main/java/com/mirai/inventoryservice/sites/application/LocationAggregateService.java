@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Service for fetching aggregated location data with inventory counts.
@@ -24,7 +25,10 @@ public class LocationAggregateService {
 
     /**
      * Get all locations across all types with their inventory counts.
+     *
+     * @deprecated site-blind; use {@link #getAllLocationsWithCounts(UUID)}.
      */
+    @Deprecated
     public List<LocationWithCountsDTO> getAllLocationsWithCounts() {
         return locationAggregateRepository.findAllLocationsWithCounts();
     }
@@ -33,13 +37,37 @@ public class LocationAggregateService {
      * Get locations of a specific type with their inventory counts.
      *
      * @param locationType The type of location to filter by (e.g., BOX_BIN, RACK)
+     * @deprecated site-blind; use {@link #getLocationsByTypeWithCounts(LocationType, UUID)}.
      */
+    @Deprecated
     public List<LocationWithCountsDTO> getLocationsByTypeWithCounts(LocationType locationType) {
         if (locationType == LocationType.NOT_ASSIGNED) {
             return List.of();
         }
         String storageLocationCode = mapLocationTypeToStorageCode(locationType);
         return locationAggregateRepository.findLocationsByTypeWithCounts(storageLocationCode);
+    }
+
+    /**
+     * Site-scoped: get all locations across all types with their inventory counts, for
+     * {@code siteId} only (.specs/phase-6-inventory 6e, T-6e-be-2/3).
+     */
+    public List<LocationWithCountsDTO> getAllLocationsWithCounts(UUID siteId) {
+        return locationAggregateRepository.findAllLocationsWithCounts(siteId);
+    }
+
+    /**
+     * Site-scoped: get locations of a specific type with their inventory counts, for
+     * {@code siteId} only (.specs/phase-6-inventory 6e, T-6e-be-2/3).
+     *
+     * @param locationType The type of location to filter by (e.g., BOX_BIN, RACK)
+     */
+    public List<LocationWithCountsDTO> getLocationsByTypeWithCounts(LocationType locationType, UUID siteId) {
+        if (locationType == LocationType.NOT_ASSIGNED) {
+            return List.of();
+        }
+        String storageLocationCode = mapLocationTypeToStorageCode(locationType);
+        return locationAggregateRepository.findLocationsByTypeWithCounts(storageLocationCode, siteId);
     }
 
     /**

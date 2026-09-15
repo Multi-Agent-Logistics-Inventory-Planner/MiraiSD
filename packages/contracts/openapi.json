@@ -13721,7 +13721,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/Location"
+                    "$ref" : "#/components/schemas/SiteLocationDTO"
                   }
                 }
               }
@@ -13788,7 +13788,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13827,6 +13827,75 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "site-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/locations/with-counts" : {
+      "get" : {
+        "operationId" : "getSiteLocationsWithCounts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "BOX_BIN", "CABINET", "DOUBLE_CLAW_MACHINE", "FOUR_CORNER_MACHINE", "GACHAPON", "KEYCHAIN_MACHINE", "PUSHER_MACHINE", "RACK", "SHELF", "SINGLE_CLAW_MACHINE", "WINDOW", "NOT_ASSIGNED" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/LocationWithCountsDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-aggregate-controller" ]
       }
     },
     "/api/v1/sites/{siteId}/locations/{id}" : {
@@ -13911,7 +13980,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13985,7 +14054,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -19143,6 +19212,33 @@
           "totalQuantity" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "SiteLocationDTO" : {
+        "type" : "object",
+        "properties" : {
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "locationCode" : {
+            "type" : "string"
+          },
+          "storageLocationCode" : {
+            "type" : "string"
+          },
+          "storageLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
