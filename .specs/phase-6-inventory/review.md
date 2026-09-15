@@ -1,5 +1,76 @@
 # Review
 
+## 6d P1/P2 findings (external review) — 2026-09-14
+
+**Scope reviewed:** an external review of the already-committed 6d checkpoint (backend `accd2b0`,
+web `232a8ca`, both of which had already been through and closed their own independent-review fix
+rounds — see the "6d backend slice" and "6d web slice" entries below) surfaced two additional,
+real findings: one backend concurrency bug (P1) and one frontend error-swallowing bug (P2).
+Neither was previously flagged by this checkpoint's own independent reviews. Both addressed this
+session.
+
+### Act on
+
+1. **[P1, Correctness] Concurrent site-scoped transfers can lose source debits — fixed.**
+   `StockMovementService.requireInventoryBelongsToSite(UUID siteId, UUID inventoryId)` (called
+   from both site-scoped `transferInventory(UUID siteId, ...)` and `batchTransferInventory(UUID
+   siteId, ...)`) confirmed site membership via
+   `LocationInventoryRepository.findByIdAndSite_Id`, an entity-returning, JOIN-FETCH'd query, run
+   *before* `planTransfers`/`lockPlannedRows` ever locked the row. This populated the transaction's
+   Hibernate persistence context with an unlocked pre-lock snapshot of the row's quantity; the
+   later "locked" read (`findById`/`findAllByIdWithGraph`) does not refresh an already-managed
+   entity's scalar state, so the transfer computed its debit from the stale, pre-lock quantity even
+   though a real Postgres row lock was, by then, correctly held. Two concurrent site-scoped
+   transfers sharing one source row could each read the same unlocked quantity, and whichever
+   committed last silently overwrote the other's debit — a lost update. Traced every call site of
+   `requireInventoryBelongsToSite`, `findByIdAndSite_Id`, and both site-scoped overloads before
+   fixing; confirmed the account exactly as described. **Fixed:** added a scalar-only
+   `LocationInventoryRepository.existsByIdAndSite_Id(UUID id, UUID siteId)` (a `boolean`
+   projection, never populates the persistence context) and switched
+   `requireInventoryBelongsToSite` to use it instead of the entity-returning method. The site check
+   now runs before any entity-level touch of the row, matching this file's own established
+   principle (already followed correctly by `batchAdjustInventory`, which checks site membership
+   via `Location`, a different entity, never `LocationInventory`). New test:
+   `StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT` (real Postgres, two genuinely
+   concurrent site-scoped `transferInventory` calls sharing one source row, forced to interleave
+   around the site-check/lock boundary via an externally held `SELECT ... FOR UPDATE` and
+   `pg_stat_activity`-polled lock-wait confirmation, not timing). Revert-verified: with the fix
+   reverted, the new test failed with the lost update reproduced exactly as predicted (expected
+   `100 - 30 - 47 = 23`, got `53` — only one debit applied); with the fix restored, it passes.
+2. **[P2, Correctness] Failed inventory reads render as "no inventory" instead of an error —
+   fixed.** `ProductModal` (`apps/web/src/components/products/product-modal.tsx`) destructured
+   only `data`/`isLoading` from `useSiteProductInventoryEntries`, discarding the `error` field the
+   hook already returns. On a failed request, `isLoading` becomes `false` and `data` stays
+   `undefined`, so the derived `locations` array becomes empty and the table's empty-state branch
+   ("No inventory at any location") rendered identically to a genuine zero-inventory product, even
+   while the `Current Stock (N)` header (a different, still-successful query) showed a nonzero
+   total directly above it — no indication anything failed, no way to retry. **Fixed:**
+   `ProductModal` now destructures `error`/`refetch` from the hook (added `refetch` to
+   `useSiteProductInventoryEntries`'s return, wrapping `query.refetch`) and the inventory table's
+   conditional render gained an explicit error branch, checked before the empty-state branch:
+   "Couldn't load inventory" plus a Retry button calling `refetch()` — visually and textually
+   distinct from the empty state, following this codebase's existing destructive-state text
+   convention (`location-detail-sheet.tsx`'s `inventoryQuery.isError` message) while adding the
+   retry affordance the finding specifically asked for, since the hook already exposed
+   `query.refetch` cheaply. Also decided and implemented: the Adjust and Transfer buttons (both
+   desktop and mobile) are now `disabled` while the inventory read has failed, with a title tooltip
+   explaining why, so a user can't act on a table that's actually just erroring rather than
+   genuinely empty; Transfer's click handler also gained a distinct destructive toast branch for
+   the (normally unreachable, since the button is disabled) case where it fires anyway. New test
+   file `product-modal.test.tsx` (3 cases): error state renders the retry affordance and not the
+   empty state (with the nonzero header total still visible), Adjust/Transfer are disabled during
+   the error, and the genuine-empty-state case (`data: {entries: []}`, no error) still renders "No
+   inventory at any location" unchanged — a before/after regression guard. Revert-verified: with
+   the fix reverted, the error-state and disabled-buttons tests both failed for the right reason
+   (empty state rendered instead of the error text; buttons not disabled); with the fix restored,
+   all three pass.
+
+**Disposition:** both findings fixed and re-verified, each with a revert-verified new test.
+`packages/contracts`/`packages/api-client` were not touched (no contract/route shape change,
+consistent with the task's explicit scope limit). No other part of either checkpoint slice's
+already-committed scope was touched. The working tree is left uncommitted for the coordinating
+session, per instruction.
+
 ## 6d web slice (T-6d-1..T-6d-14) — independent review, 2026-09-14
 
 **Scope reviewed:** the full 6d web-adoption slice (T-6d-1 through T-6d-14) as committed to the

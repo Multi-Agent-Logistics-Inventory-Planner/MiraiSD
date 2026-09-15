@@ -107,6 +107,19 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
         """)
     Optional<LocationInventory> findByIdAndSite_Id(@Param("id") UUID id, @Param("siteId") UUID siteId);
 
+    /**
+     * Scalar-only site-membership check (.specs/phase-6-inventory 6d, review-driven fix: P1 finding,
+     * concurrent batch transfers losing source debits). {@code boolean} projections never populate
+     * the persistence context, unlike {@link #findByIdAndSite_Id} -- a caller that only needs to
+     * confirm a row belongs to a site before locking it (e.g. {@code
+     * StockMovementService#requireInventoryBelongsToSite}) MUST use this instead: loading the entity
+     * here, then locking it later via {@code ensureAndLockInventoryRow}, then reading it again via
+     * {@code findById}/{@code findAllByIdWithGraph}, would silently return the first, unlocked read's
+     * stale scalar state -- Hibernate does not refresh an already-managed entity's fields from a
+     * later query, locked or not.
+     */
+    boolean existsByIdAndSite_Id(UUID id, UUID siteId);
+
     @Query("""
         SELECT li FROM LocationInventory li
         JOIN FETCH li.location l

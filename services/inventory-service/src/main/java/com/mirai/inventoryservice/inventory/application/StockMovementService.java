@@ -652,10 +652,22 @@ public class StockMovementService {
         batchTransferInventory(batchRequest);
     }
 
-    /** Throws {@link InventoryNotFoundException} (-> 404) if {@code inventoryId} isn't at {@code siteId}. */
+    /**
+     * Throws {@link InventoryNotFoundException} (-> 404) if {@code inventoryId} isn't at
+     * {@code siteId}. Deliberately scalar-only ({@link LocationInventoryRepository#existsByIdAndSite_Id})
+     * rather than the entity-returning {@code findByIdAndSite_Id} (.specs/phase-6-inventory 6d,
+     * review-driven fix: P1 finding, concurrent batch transfers losing source debits). This runs
+     * before {@link #planTransfers}/{@link #lockPlannedRows} ever locks the row it's called for; an
+     * entity-returning query here would populate the persistence context with an unlocked snapshot
+     * of the row, and the later "locked" read (via {@link #preloadInventories}/{@code findById})
+     * would silently return that same stale, unrefreshed entity instead of the row's true
+     * post-lock state -- see {@link #preloadInventories}'s Javadoc for why Hibernate makes that
+     * silent. A boolean projection cannot cause that hazard.
+     */
     private void requireInventoryBelongsToSite(UUID siteId, UUID inventoryId) {
-        locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+        if (!locationInventoryRepository.existsByIdAndSite_Id(inventoryId, siteId)) {
+            throw new InventoryNotFoundException("Inventory not found: " + inventoryId);
+        }
     }
 
     @Transactional

@@ -5057,3 +5057,137 @@ uncommitted for the coordinating session, per instruction.
     prior session in this checkpoint.
   - Q-6c-1/Q-6c-4 and the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
     flakiness are unchanged, unrelated to this session.
+
+## Review-driven fix: 6d P1/P2 findings (external review) (2026-09-14)
+
+An external review of the already-committed 6d checkpoint (backend `accd2b0`, web `232a8ca`, both
+already through their own independent-review fix rounds — see the two "Review-driven fix: 6d ...
+slice findings" sections above) found two additional real bugs neither of this checkpoint's own
+independent reviews had flagged: a backend concurrency bug (P1) and a frontend error-swallowing bug
+(P2). Both fixed this session; full disposition transcribed into `review.md`'s new "6d P1/P2
+findings (external review) — 2026-09-14" entry, commands/results in `validation.md`'s matching
+entry. Summary:
+
+- **P1 — concurrent site-scoped transfers can lose source debits.** Traced every call site of
+  `StockMovementService.requireInventoryBelongsToSite`, `LocationInventoryRepository
+  .findByIdAndSite_Id`, and both site-scoped `transferInventory`/`batchTransferInventory` overloads
+  before touching anything, and confirmed the reviewer's account exactly:
+  `requireInventoryBelongsToSite` confirmed site membership via the entity-returning,
+  JOIN-FETCH'd `findByIdAndSite_Id`, run *before* `planTransfers`/`lockPlannedRows` ever locked the
+  row, populating the transaction's Hibernate persistence context with an unlocked, pre-lock
+  quantity snapshot. The later "locked" read (`findById`/`findAllByIdWithGraph`, run only after the
+  real Postgres row lock is held) does not refresh an already-managed entity's scalar state —
+  Hibernate silently returns the same stale object — so the transfer computed its debit from the
+  pre-lock quantity regardless of the lock. Two concurrent site-scoped transfers sharing one source
+  row could each read the same stale quantity in their own transaction, and whichever committed
+  last silently overwrote the other's already-applied debit. **Fixed:** added a scalar-only
+  `LocationInventoryRepository.existsByIdAndSite_Id(UUID id, UUID siteId)` (a `boolean`
+  projection — cannot populate the persistence context) and switched
+  `requireInventoryBelongsToSite` to use it instead of the entity-returning method, so the site
+  check no longer touches the row at the entity level before it's locked. This mirrors the
+  principle `batchAdjustInventory` already followed correctly (it checks site membership via
+  `Location`, a different, unrelated entity, never `LocationInventory`) — transfers needed a
+  different mechanism (an explicit scalar existence check) since they identify rows by id rather
+  than a shared, caller-known `locationId`. New test:
+  `StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT` — two real, concurrent, site-scoped
+  `transferInventory` calls sharing one source inventory row, forced to interleave around the
+  site-check/lock boundary via an externally held `SELECT ... FOR UPDATE` on the shared row plus
+  `pg_stat_activity`-polled lock-wait confirmation (not timing), following
+  `StockMovementServiceConcurrentTransferExistingDestinationRaceIT`'s exact style/rigor as its
+  direct template. Revert-verified: with the fix reverted, the test failed exactly as the bug
+  predicts — `expected: 23 but was: 53` (baseline 100, deltas 30/47, one debit silently lost);
+  restored the fix, reran green.
+- **P2 — failed inventory reads render as "no inventory" instead of an error.** `ProductModal`
+  destructured only `data`/`isLoading` from `useSiteProductInventoryEntries`, discarding the
+  `error` field the hook already computed (`error: siteError ?? query.error`). On a failed
+  request, the derived `locations` array became empty exactly like a genuine zero-stock product, so
+  the table's "No inventory at any location" empty-state branch rendered identically to a real
+  failure — with no indication anything failed, no retry, even while the `Current Stock (N)` header
+  (a separate, still-successful query) showed a nonzero total directly above it. **Fixed:**
+  `useSiteProductInventoryEntries` now also returns `refetch` (a plain passthrough of
+  `query.refetch` — chosen over inventing a new invalidation helper, since `useQuery` already gives
+  exactly the needed retry semantics); `ProductModal` destructures `error`/`refetch` and the
+  inventory table gained an explicit error branch — checked before the empty-state branch —
+  rendering "Couldn't load inventory" plus a Retry button, following this codebase's existing
+  destructive-state text convention (`location-detail-sheet.tsx`'s `inventoryQuery.isError`
+  message) while adding the retry affordance the finding asked for. Also decided and implemented:
+  Adjust and Transfer (desktop and mobile) are now `disabled` with an explanatory title while the
+  inventory read has failed, since `hasInventory`/`locations` is indistinguishable from a genuine
+  empty state during a failure — letting either button stay live would let a user act on a table
+  that's actually just wrong, not actually empty. Transfer's `onClick` also gained a defense-in-
+  depth destructive-toast branch for the failed-read case, ahead of its existing `hasInventory`
+  check. New test file `product-modal.test.tsx` (3 cases): error state shows the retry affordance
+  and not the empty state (with the nonzero header total still visible); Adjust/Transfer are
+  disabled during the error; and the genuine-empty-state case (`data: {entries: []}`, no error)
+  still renders "No inventory at any location" unchanged — a before/after regression guard.
+  Revert-verified: with the fix reverted, the error-state and disabled-buttons tests both failed
+  for the right reason (empty state rendered instead of the error text; buttons not disabled);
+  restored the fix, reran green (all 3 pass).
+
+**Result:** Backend — `./mvnw -q clean test-compile` clean; the new IT plus
+`StockMovementServiceConcurrent*IT`/`StockMovementServiceMixedAdjustTransferLockOrderIT` all green;
+`SiteInventoryMutationController*IT` (security + atomicity) all green; `./mvnw -q clean test` —
+371 run (Surefire text-summary count, same pre-existing nested-test undercount noted by the prior
+6d backend-slice session), 0 failures; `./mvnw test -Dtest='*IT'` — 510 run (up 1 from 509), 8
+failures, name-for-name identical to the pre-existing `AnalyticsControllerSecurityIT`/
+`ForecastControllerSecurityIT` set, no new failure. Web — `npx tsc --noEmit -p tsconfig.json`
+clean; `npx vitest run` — **52 test files passed, 366 tests passed, 0 failed** (up from 51
+files/363 tests); `npx eslint .` — **0 errors, 51 warnings** (identical set to the prior session's
+baseline).
+
+**Disposition:** both P1 and P2 fixed and re-verified, each with a revert-verified new test that
+reproduces the bug before the fix and passes after. No other part of either checkpoint slice's
+already-committed scope was touched; `packages/contracts`/`packages/api-client` untouched (no
+contract/route shape change). The working tree is left uncommitted for the coordinating session,
+per instruction.
+
+## Current handoff (6d P1/P2 fix, external review — supersedes the 6d review-driven-fix web-slice
+handoff above)
+
+- Status: 6d is implemented end-to-end (backend + web), has been through two full rounds of
+  independent review (backend and web slices, both closed — see the "Review-driven fix: 6d ...
+  slice findings" sections above) plus this session's external-review fix round, which closed two
+  more real bugs: a backend concurrency lost-update (P1) and a frontend error-swallowing bug (P2).
+  Both fixed and re-verified this session, each with a revert-verified new test proving the bug
+  existed before the fix and is gone after. `services/inventory-service` compiles clean and its
+  full test suite is green (371 unit/component tests, 510 total IT run with only the pre-existing
+  8 unrelated security-IT failures); `apps/web` builds clean (`tsc --noEmit`), the full Vitest
+  suite passes (366/366, up from 363/363), and `eslint .` reports 0 errors/51 warnings (same
+  baseline as before this session). `review.md` and `validation.md` now carry this fix round's
+  entries alongside the backend-slice and web-slice review entries, per spec.md's Full-tier
+  requirement.
+- Next action: 6d is ready to close as a checkpoint, now with both of its own independent reviews
+  and this external review's findings addressed. Move to 6e (targeted refresh coalescing and the
+  full phase exit gate, AC-7/AC-8) — 6e's own scope already explicitly owns
+  `getLocationsWithCounts`/the org-wide broadcast-channel egress and the site-scoping of
+  `SupabaseBroadcastService`'s payload, both reaffirmed out of scope by this checkpoint's reviews.
+- Surviving decisions: everything recorded in the plain-6d, backend-review-driven-fix, and
+  6d-web-implementation/review-driven-fix handoffs above, unchanged by this session, plus this
+  session's own: `requireInventoryBelongsToSite` is scalar-only
+  (`LocationInventoryRepository.existsByIdAndSite_Id`), never entity-returning, and must stay that
+  way — any future site-membership check added ahead of a lock-then-mutate sequence in
+  `StockMovementService` must follow the same principle (verify site via a scalar projection or an
+  unrelated entity, never the entity about to be locked); `ProductModal`'s inventory table treats a
+  failed `useSiteProductInventoryEntries` read as a distinct, retryable error state, never folded
+  into the empty-state branch, and gates the Adjust/Transfer actions accordingly.
+- Last verified (this session): backend — `./mvnw -q clean test-compile` clean; new IT
+  (`StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT`) plus the full concurrency/lock-order
+  sibling suite and `SiteInventoryMutationController*IT` all green; `./mvnw -q clean test` 371 run/0
+  failures; `./mvnw test -Dtest='*IT'` 510 run/8 pre-existing failures (unchanged set). Web — `npx
+  tsc --noEmit -p tsconfig.json` clean; `npx vitest run` 52 files/366 tests, 0 failed; `npx eslint .`
+  0 errors/51 warnings. Both new tests individually revert-verified (fix removed, new test
+  confirmed to fail for the predicted reason, fix restored, test confirmed green).
+- **Open risks/questions (carried forward, see the backend and 6d-web-implementation/review-driven-
+  fix handoffs above for full detail — none newly introduced by this session):**
+  - One-NOT_ASSIGNED-location-per-site is still not schema-enforced. Monitored, not blocking —
+    unaffected by this session.
+  - `LocationInventoryRepository.findByStorageLocation_Id`'s missing root-product filter (used
+    only by the still-legacy `getStorageLocationInventory`, no current caller) remains a trap for
+    a future, not-yet-existing caller. Unchanged.
+  - Movement history (T-6d-10) still has no rendered UI consumer. Unchanged.
+  - `getLocationsWithCounts`/the org-wide broadcast-channel egress — explicitly 6e scope, not
+    touched.
+  - No live UI (manual/browser) verification was performed this session, consistent with every
+    prior session in this checkpoint.
+  - Q-6c-1/Q-6c-4 and the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
+    flakiness are unchanged, unrelated to this session.

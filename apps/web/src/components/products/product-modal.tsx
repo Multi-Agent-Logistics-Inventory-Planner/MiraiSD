@@ -79,8 +79,12 @@ export function ProductModal({
   hideDelete = false,
 }: ProductModalProps) {
   const { toast } = useToast();
-  const { data: inventoryData, isLoading: locationsLoading } =
-    useSiteProductInventoryEntries(product?.product.id);
+  const {
+    data: inventoryData,
+    isLoading: locationsLoading,
+    error: inventoryError,
+    refetch: refetchInventory,
+  } = useSiteProductInventoryEntries(product?.product.id);
   const { data: kujiAllocations } = useKujiAllocationsByProduct(
     product?.product.id,
   );
@@ -125,6 +129,7 @@ export function ProductModal({
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const hasInventory = locations && locations.length > 0;
+  const inventoryFailedToLoad = Boolean(inventoryError);
 
   if (!product) {
     return null;
@@ -337,6 +342,12 @@ export function ProductModal({
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
+                  disabled={inventoryFailedToLoad}
+                  title={
+                    inventoryFailedToLoad
+                      ? "Inventory failed to load. Retry before adjusting stock."
+                      : undefined
+                  }
                   onClick={() => {
                     onAdjustClick({
                       product: p,
@@ -352,8 +363,20 @@ export function ProductModal({
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
+                  disabled={inventoryFailedToLoad}
+                  title={
+                    inventoryFailedToLoad
+                      ? "Inventory failed to load. Retry before transferring stock."
+                      : undefined
+                  }
                   onClick={() => {
-                    if (hasInventory) {
+                    if (inventoryFailedToLoad) {
+                      toast({
+                        title: "Inventory failed to load",
+                        description: "Retry loading inventory before transferring stock.",
+                        variant: "destructive",
+                      });
+                    } else if (hasInventory) {
                       onTransferClick({
                         product: p,
                         inventoryEntries: locations,
@@ -399,6 +422,12 @@ export function ProductModal({
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              disabled={inventoryFailedToLoad}
+              title={
+                inventoryFailedToLoad
+                  ? "Inventory failed to load. Retry before adjusting stock."
+                  : undefined
+              }
               onClick={() => {
                 onAdjustClick({
                   product: p,
@@ -414,8 +443,20 @@ export function ProductModal({
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              disabled={inventoryFailedToLoad}
+              title={
+                inventoryFailedToLoad
+                  ? "Inventory failed to load. Retry before transferring stock."
+                  : undefined
+              }
               onClick={() => {
-                if (hasInventory) {
+                if (inventoryFailedToLoad) {
+                  toast({
+                    title: "Inventory failed to load",
+                    description: "Retry loading inventory before transferring stock.",
+                    variant: "destructive",
+                  });
+                } else if (hasInventory) {
                   onTransferClick({
                     product: p,
                     inventoryEntries: locations,
@@ -491,6 +532,25 @@ export function ProductModal({
                           </TableRow>
                         ))}
                       </>
+                    ) : inventoryFailedToLoad ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-destructive py-3"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm">Couldn&apos;t load inventory</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => refetchInventory()}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ) : (!locations || locations.length === 0) &&
                       (!kujiAllocations || kujiAllocations.length === 0) ? (
                       <TableRow>

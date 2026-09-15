@@ -1,5 +1,120 @@
 # Validation
 
+## Review-driven fix: 6d P1/P2 findings (external review) (2026-09-14)
+
+Commands and results for the fixes recorded in `review.md`'s "6d P1/P2 findings (external review)
+— 2026-09-14" entry. Carries forward, rather than re-pastes, the prior sessions' baselines: backend
+371 unit-test run / 509 IT run (8 pre-existing security-IT failures) from the "6d backend slice"
+fix session below; web 51 files/363 tests, 0 errors/51 warnings from the "6d web slice" fix session
+below.
+
+### P1 backend — command and scope
+
+```sh
+cd services/inventory-service
+./mvnw -q clean test-compile
+./mvnw -q test -Dtest=StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT
+./mvnw -q test -Dtest='StockMovementServiceConcurrent*IT,StockMovementServiceMixedAdjustTransferLockOrderIT'
+./mvnw -q test -Dtest='SiteInventoryMutationController*IT'
+./mvnw -q clean test
+./mvnw -q test -Dtest='*IT'
+```
+
+### P1 backend — result
+
+- `./mvnw -q clean test-compile` — **clean, no output (BUILD SUCCESS).**
+- Failing-test-first proof: ran the new
+  `StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT` against the code *before* the
+  `requireInventoryBelongsToSite` fix (repository `existsByIdAndSite_Id` method present but unused
+  by the service — confirmed by running the test against the stashed, pre-fix
+  `StockMovementService.java`/`LocationInventoryRepository.java`). **Failed for the right reason:**
+  `AssertionFailedError: expected: 23 but was: 53` — baseline quantity 100, `deltaA=30`,
+  `deltaB=47`, expected combined debit `100-30-47=23`; actual `53 = 100-47`, meaning transfer A's
+  debit was silently lost, exactly the lost-update failure mode the finding predicted (one debit
+  overwritten by the other transaction's stale-cached-entity write). Restored the fix (switched
+  `requireInventoryBelongsToSite` to the scalar `existsByIdAndSite_Id`) and reran: **passed, no
+  errors.**
+- `StockMovementServiceConcurrent*IT,StockMovementServiceMixedAdjustTransferLockOrderIT` (the
+  existing concurrency/lock-order sibling suite, run alongside the new test) — **all green, no
+  `[ERROR]` output** — confirms the fix does not regress the established lock-ordering discipline
+  (`StockMovementServiceConcurrentTransferExistingDestinationRaceIT`,
+  `StockMovementServiceConcurrentTransferNewDestinationIT`,
+  `StockMovementServiceConcurrentBatchTransferCrossedDestinationsIT`,
+  `StockMovementServiceConcurrentAdjustIT`, `StockMovementServiceMixedAdjustTransferLockOrderIT`,
+  plus the new test).
+- `SiteInventoryMutationController*IT` (security + atomicity family) — **all green, no `[ERROR]`
+  output.**
+- `./mvnw -q clean test` — **clean, no `[ERROR]` output.** Surefire text-summary total (summed
+  across `target/surefire-reports/*.txt`): **371 run, 0 failures, 0 errors, 0 skipped** — same
+  count as the prior (6d backend slice) session's own recorded number, consistent with that
+  session's noted Surefire nested-test undercount quirk (`LocationInventoryServiceTest`'s XML
+  report shows more than its text-summary count), unrelated to this fix.
+- `./mvnw -q test -Dtest='*IT'` — **510 run** (up 1 from the prior session's 509, the new IT),
+  **8 failures**, name-for-name identical to the prior session's recorded pre-existing set
+  (`AnalyticsControllerSecurityIT.getDemandLeaders_adminRole_returns200`,
+  `.getDemandLeaders_assistantManagerRole_returns200`,
+  `.getInventoryByCategory_adminRole_returns200`, `.getInventoryByCategory_employeeRole_returns200`,
+  `.getPerformanceMetrics_adminRole_returns200`, `.getPerformanceMetrics_employeeRole_returns200`,
+  `ForecastControllerSecurityIT.getAllForecasts_adminRole_returns200`,
+  `.getAllForecasts_employeeRole_returns200`, all `Status expected:<200> but was:<500>`) — no new
+  failure, no inventory-related IT failed.
+
+### P2 web — command and scope
+
+```sh
+cd apps/web
+npx tsc --noEmit -p tsconfig.json
+npx vitest run src/components/products/__tests__/product-modal.test.tsx
+npx vitest run
+npx eslint .
+```
+
+### P2 web — result
+
+- Failing-test-first proof: ran the new `product-modal.test.tsx` against the pre-fix
+  `product-modal.tsx`/`use-product-inventory-entries.ts` (temporarily stashed the fix). **2 of 3
+  tests failed for the right reason:** the error-state test failed on
+  `screen.getByText("Couldn't load inventory")` — `TestingLibraryElementError: Unable to find an
+  element with the text` (the component rendered "No inventory at any location" instead, proving
+  the bug: a failed read renders identically to the genuine-empty state); the disabled-buttons test
+  failed with `Received element is not disabled` on the first Transfer button. The third
+  (genuine-empty-state regression guard) test passed even pre-fix, as expected — it only pins
+  existing behavior. Restored the fix (popped the stash) and reran: **all 3 passed.**
+- `npx tsc --noEmit -p tsconfig.json` — **clean, exit 0.**
+- `npx vitest run` — **52 test files passed, 366 tests passed, 0 failed** (up from the prior "6d
+  web slice" session's 51 files/363 tests: +1 new file, `product-modal.test.tsx`, +3 tests).
+- `npx eslint .` — **0 errors, 51 warnings** — identical set to the prior session's recorded
+  baseline (all pre-existing `react-hooks/set-state-in-effect`/`react-hooks/exhaustive-deps`
+  warnings on files this session did not touch, plus the one pre-existing `use-toast.ts` unused-var
+  warning); no new warning introduced by this session's changes.
+
+### Judgment call: gating Adjust/Transfer during an inventory-read error
+
+Both Adjust and Transfer are now `disabled` (with an explanatory `title` tooltip) while
+`useSiteProductInventoryEntries` reports an error, on both the desktop and mobile button rows.
+Reasoning: `hasInventory`/`locations` becomes indistinguishable from a genuine zero-stock product
+during a read failure (both are the empty array), so letting the buttons stay enabled would let a
+user "successfully" open a transfer/adjust flow seeded with a table that is actually just wrong,
+not actually empty — worse than blocking the action outright, since the flow itself offers no
+signal that the underlying data never loaded. Transfer's `onClick` also gained an explicit
+error-branch destructive toast ("Inventory failed to load" / "Retry loading inventory before
+transferring stock.") ahead of its existing `hasInventory` check, for defense in depth (a disabled
+button should not fire `onClick` in a real browser or in jsdom's `fireEvent`, confirmed by this
+session's own test run, but the branch keeps the failure mode honest rather than silently falling
+through to the misleading "No inventory to transfer" message if the disabled state is ever
+bypassed). `useSiteProductInventoryEntries` gained a plain passthrough `refetch: query.refetch` (no
+new wrapper logic) rather than a new invalidation helper, since `useQuery` already provides exactly
+the retry semantics needed and the review's own text named this as the preferred option when
+available.
+
+### Disposition
+
+Both findings fixed and re-verified with revert-verified new tests (P1: real-Postgres concurrency
+IT, reproduced the lost update before the fix, confirmed fixed after; P2: rendered component test,
+reproduced the silent-empty-state bug before the fix, confirmed fixed after). No regression in
+either language's full suite; both failure counts match their respective pre-existing baselines
+exactly. `packages/contracts`/`packages/api-client` untouched.
+
 ## Review-driven fix: 6d web slice findings (2026-09-14)
 
 Commands and results for the fixes recorded in `review.md`'s "6d web slice (T-6d-1..T-6d-14) —

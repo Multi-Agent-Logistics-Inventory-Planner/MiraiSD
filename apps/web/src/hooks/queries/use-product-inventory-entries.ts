@@ -44,5 +44,6 @@ export function useSiteProductInventoryEntries(productId?: string | null) {
     data: query.data,
     isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
     error: siteError ?? query.error,
+    refetch: query.refetch,
   };
 }
