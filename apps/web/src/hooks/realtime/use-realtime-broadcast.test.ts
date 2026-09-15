@@ -151,4 +151,26 @@ describe("useRealtimeBroadcast (.specs/phase-6-inventory 6e, T-6e-2/3/6)", () =>
     mount();
     expect(() => act(() => emit({ type: "unknown_event" }))).not.toThrow();
   });
+
+  it("a site switch mid-flight still flushes the buffered event against the site it was notified for, never the new site", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = renderHook(() => useRealtimeBroadcast(true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1", productIds: ["p1"] });
+    });
+
+    // Site switches before the coalescing window elapses.
+    mockUseCurrentSite.mockReturnValue({ siteId: "site-2" });
+    rerender();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(mockFlushInventorySiteRefresh).toHaveBeenCalledTimes(1);
+    expect(mockFlushInventorySiteRefresh).toHaveBeenCalledWith(expect.anything(), "site-1", ["p1"]);
+  });
 });
