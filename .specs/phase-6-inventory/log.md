@@ -5191,3 +5191,39 @@ handoff above)
     prior session in this checkpoint.
   - Q-6c-1/Q-6c-4 and the pre-existing `AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT`
     flakiness are unchanged, unrelated to this session.
+
+## 6d checkpoint close (2026-09-14)
+
+External independent Standards and Spec review of `e39ad36` confirmed no remaining findings and
+that both P1/P2 fixes address the reported bugs. Re-verified locally: `npm run test:run
+--workspace=apps/web` -- 52 files/366 tests passed; JDK 21 `./mvnw` targeted run of
+`StockMovementServiceSiteScopedConcurrentSourceCheckRaceIT`, `SiteInventoryMutationController
+SecurityIT`, `SiteInventoryMutationControllerAtomicityIT` -- 40 tests passed, including the
+real-Postgres concurrency regression. Worktree clean; nothing further changed or pushed by that
+review pass.
+
+**6d is closed.** Per spec.md's checkpoint table, 6d ("Web adoption") delivered AC-6: inventory
+web workflows migrated to v1 site-qualified queries, Products quantities/status restored from
+scoped totals only, and rendered/hook test coverage across detail state, role-dependent controls,
+stock workflows, site switching, unresolved/error states and late-old-site-result rejection --
+closing the two gaps (dialog workflow tests, late-result race test) the web slice's own review
+required before this checkpoint's gate could be called satisfied. R-9 is resolved. Both backend and
+web slices went through implement -> independent review -> fix, twice each (once per slice, plus
+this final external round), with zero unresolved findings.
+
+Three commits on `refactor/inventory-stock` for this checkpoint: `accd2b0` (backend: R-9 resolution
++ v1 batch-transfer route), `232a8ca` (web: v1 adoption), `e39ad36` (external-review fixes: the
+transfer concurrency lost-update and the inventory-read error-swallowing bug).
+
+**Next: checkpoint 6e -- "Targeted refresh and exit proof."** Per spec.md's table: "Coalesce
+targeted refresh, prove recovery and measured savings, remove only obsolete compatible paths, and
+run the complete phase gate (AC-7-8 and regression of AC-1-6)." 6e explicitly inherits, not
+re-opens: `getLocationsWithCounts`'s site-blind egress, the org-wide `db-changes` broadcast
+channel's lack of site scoping (`SupabaseBroadcastService`'s payload needs `siteId` for real
+per-site coalescing, per T-6d-11's scope note), and the one-NOT_ASSIGNED-location-per-site
+invariant (monitored, still not schema-enforced). 6e also owns removing the now-obsolete legacy
+inventory/stock-movement/location-inventory paths that 6d's v1 routes superseded (the legacy
+`LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+`InventoryRequestDTO`, the untracked PUT route, and whichever `lib/api/inventory.ts`/
+`stock-movements.ts` functions T-6d's web slice left in place only for compatibility) -- per this
+checkpoint's own design note, their deletion was deliberately deferred to 6e, not forgotten.
