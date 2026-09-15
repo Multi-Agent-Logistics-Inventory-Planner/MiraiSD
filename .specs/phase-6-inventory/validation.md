@@ -749,10 +749,47 @@ consistent with the phase's stated egress-reduction goal. Deleting the four obso
 classes and the corresponding web functions is a maintenance-surface reduction with no runtime
 cost effect.
 
-### Not yet run by this session
+### Post-independent-review fix round (final numbers)
 
-The complete phase exit gate (regression of AC-1-6 together with AC-7-8, per spec.md's 6e
-checkpoint row) and the PR-gate authoritative CI run are the coordinating session's to run before
-closing the checkpoint, per this record's own delivery decision that no production apply or
-deployment is authorized here and that checkpoint closure follows an independent review this
-session could not perform (see review.md's "6e" section).
+Two independent reviews (`mirai-spring-reviewer` for backend, `mirai-next-reviewer` for web) ran
+against the implementation recorded above and returned **block** verdicts; all Blocker/Required
+findings and the cheap Advisories were fixed and revert-verified (full disposition in review.md's
+"6e" section). Final counts after the fix round, reproduced independently by the coordinating
+session (not merely re-reported):
+
+- Backend: `./mvnw -q clean test-compile` clean. `./mvnw -q clean test` — 479 run (Surefire
+  top-level count), 0 failures/errors. `./mvnw test -Dtest='*IT'` — 522 run, 8 failures,
+  name-for-name identical to the pre-existing `AnalyticsControllerSecurityIT`/
+  `ForecastControllerSecurityIT` set, no new failure. `./mvnw -Dtest=ArchitectureTest test` clean;
+  frozen store restored to its pre-T-6e-be-9 content exactly (`git diff` on
+  `archunit_store/c1d9f1c8-...` empty).
+- Web: `npx tsc --noEmit -p tsconfig.json` clean. `npx vitest run` — 57 files/404 tests, 0 failed.
+  `npx eslint .` — 0 errors, 51 warnings (baseline-identical).
+
+The fix round's own headline change: the legacy inventory-at-location routes deleted in
+T-6e-be-9 (`c8cfcd8`) were **restored** per a user decision on the reviewer's R-3 finding — the
+documented compatibility-removal gate (`docs/baseline/api-v1-map.md`) requires access-log
+evidence of no legacy traffic plus a stabilization window on a released version, neither of
+which this unmerged branch could satisfy. The routes stay present and deprecated, not deleted;
+`LocationInventoryRepository.findByStorageLocation_Id`'s previously-recorded missing-filter trap
+was closed for real this time (the restored method now carries the same
+parent-IS-NULL/non-CUSTOM-kuji-parent filter its `findByLocation_Id` sibling always had) rather
+than re-shipped. Separately, `GET /api/locations/with-counts` (a different legacy route, `sites`
+module) was found to be a genuine live cross-site data leak — not merely "resolves to MAIN" as
+6d's note assumed — and was fixed to resolve the caller's default site and delegate to the
+already-built scoped query, closing the leak while the route itself, also legacy, stays present
+and deprecated.
+
+### Phase exit gate (run by the coordinating session)
+
+Per spec.md's 6e checkpoint row ("run the complete phase gate (AC-7-8 and regression of AC-1-6)"),
+the coordinating session independently reproduced every command above from a clean state (not
+trusting the implementing/review sessions' reported numbers) and confirmed identical results:
+backend full unit/component suite green (479 run, 0 failures), full IT suite at the same
+pre-existing 8-failure baseline (522 run, 8 failures, unchanged set), `ArchitectureTest` clean
+with the frozen store confirmed unmodified relative to pre-6e, web `tsc`/`vitest`/`eslint` all
+green and warning-baseline-identical (57 files/404 tests/0 failed, 0 errors/51 warnings). No
+production apply or deployment was performed or authorized, consistent with this record's
+delivery decisions. This closes AC-7/AC-8 (this checkpoint's own scope) and confirms no regression
+of AC-1 through AC-6 (the 6a-6d suites remain green, unmodified, within the same full-suite runs).
+The PR-gate authoritative CI run still occurs on the actual PR, not in this local record.

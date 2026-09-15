@@ -5918,7 +5918,7 @@ Web: `npx tsc --noEmit` clean. `npx vitest run` -- **57 files, 404 tests, 0 fail
 395: +9 new cases). `npx eslint .` -- **0 errors, 51 warnings**, identical to every prior
 checkpoint's baseline.
 
-### Current handoff
+### Current handoff (superseded by "6e checkpoint close" below)
 
 6e's implementation is now independently reviewed (both `mirai-spring-reviewer` and
 `mirai-next-reviewer`, both initially blocked, now both addressed) to the same standard as
@@ -5926,3 +5926,56 @@ checkpoint's baseline.
 (AC-1-8 together, regression of every prior checkpoint's own gate) and the PR-gate authoritative
 CI run remain the coordinating session's to run before closing 6e and the phase, per this
 record's Delivery decisions (no production apply/deployment authorized here regardless).
+
+## 6e checkpoint close (2026-09-15)
+
+The coordinating session independently reproduced every verification command from a clean
+state, rather than trusting the implementing/review sessions' reported numbers: backend
+`./mvnw -q clean test-compile` clean; `./mvnw -q clean test` -- 479 run, 0 failures; `./mvnw test
+-Dtest='*IT'` -- 522 run, 8 failures, name-for-name identical to the pre-existing
+`AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` set, no new failure;
+`./mvnw -Dtest=ArchitectureTest test` clean, frozen store confirmed unmodified (`git diff` empty)
+relative to before this checkpoint. Web `npx tsc --noEmit` clean; `npx vitest run` -- 57
+files/404 tests, 0 failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical. Full
+results recorded in validation.md's "Phase exit gate" section.
+
+**6e is closed.** Per spec.md's checkpoint table, 6e ("Targeted refresh and exit proof")
+delivered AC-7 (coalesced, bounded local-mutation/realtime refresh; known IDs cause neither a
+full-catalog refresh nor one request per product; reconnect/missed-event/unknown-ID/site-switch
+cases retain full selected-site recovery; duplicate/reordered notifications converge to
+authoritative state without cross-site contamination) and AC-8 (before/after measurement across
+backend query egress and the web refresh path, a labeled-estimate/measured-count distinction, and
+a cost-impact statement) while regressing none of AC-1-6 (every 6a-6d suite stays green,
+unmodified, inside the same full-suite runs). Both the backend and web slices went through
+implement -> independent review -> fix, with two real Blockers and several Required findings
+caught and fixed in the review round (a stale zero-quantity cache bug, a false-failure/
+double-adjustment risk on mutation refresh, a dead cache-key invalidation that regressed a
+working pre-6e behavior, a live cross-site data leak in a legacy route, and a missing
+after-commit/async-proxy proof) -- zero findings remain open. One deliberate scope correction
+during review: the legacy inventory-at-location routes T-6e-be-9 had deleted were restored
+(present, deprecated, not removed) because their removal could not satisfy the documented
+compatibility-removal gate on this unmerged branch; the missing-filter trap on
+`findByStorageLocation_Id` that a prior checkpoint had flagged and deferred was closed for real
+in the same pass, rather than re-shipped.
+
+Commits on `refactor/inventory-stock` for this checkpoint: `550a229` (planning worksheet),
+`69fc6fe` + `c8cfcd8` (backend implementation, T-6e-be-1..10), `6c79e7c` + `da3f837` + `90231dc`
+(web implementation, T-6e-1..11), `8e99ed0` + `bf1c9b2` + `c130d4a` (self-review fixes and
+implementation record), `01e4fdd` + `7d74505` + `413bf96` (independent-review fixes and
+disposition record).
+
+## Phase 6 close (2026-09-15)
+
+All five checkpoints (6a inventory module boundary, 6b site-ownership foundation, 6c scoped
+inventory backend, 6d web adoption, 6e targeted refresh and exit proof) are closed with every
+acceptance criterion (AC-1 through AC-8) delivered and independently reviewed, per spec.md.
+Phase 6 ("Inventory and stock movements", parent plan Stage E) is complete on
+`refactor/inventory-stock`. Remaining recorded debt, explicitly not blocking this closure per
+each checkpoint's own scope decisions: Kuji/lootbox site migration and its remaining site-blind
+inventory read (`getProductInventoryEntries`), forecasting projection migration, audited
+inter-site transfers, the one-NOT_ASSIGNED-location-per-site invariant (monitored, still not
+schema-enforced), non-inventory broadcast producers still emitting `siteId: null`
+(`KujiBoxService`/`ShipmentService`/`NotificationService`/`AuditLogService`/`ProductService`/
+`ProductDeletionCoordinator`/`EasyPostWebhookService`), and the unbounded `SimpleAsyncTaskExecutor`
+backing every broadcast dispatch — all recorded against their owning later phases, not silently
+dropped. This branch has not been pushed or merged; that remains the user's own action.
