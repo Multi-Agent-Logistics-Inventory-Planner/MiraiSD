@@ -793,3 +793,27 @@ production apply or deployment was performed or authorized, consistent with this
 delivery decisions. This closes AC-7/AC-8 (this checkpoint's own scope) and confirms no regression
 of AC-1 through AC-6 (the 6a-6d suites remain green, unmodified, within the same full-suite runs).
 The PR-gate authoritative CI run still occurs on the actual PR, not in this local record.
+
+### Post-closure follow-up fix round (2026-09-15, amends the numbers above)
+
+A fourth review pass (user-reported) found four more findings after the phase exit gate above
+was recorded: two P1s (a mutually-exclusive invalidation gap in `use-realtime-broadcast.ts`
+leaving `locationInventory` or `productInventoryEntries` stale depending on which branch fired;
+and a totals-merge guard keyed on a non-monotonic server timestamp, replaced with request-
+issuance sequencing) and two P2s (no cap on the coalescing buffer against the backend's 500-ID
+batch limit; and the legacy unscoped `batchTransferInventory` stamping a mixed-site batch's
+combined broadcast with only the first transfer's site). All four fixed and revert-verified;
+full detail in log.md's "Post-closure follow-up review and fix" section and review.md's
+"Follow-up review" section.
+
+Re-verified, superseding the numbers above: backend `./mvnw -q clean test-compile` clean;
+`./mvnw -q clean test` — 479 run, 0 failures; `./mvnw test -Dtest='*IT'` — **523 run** (up 1: the
+new `StockMovementServiceBroadcastArgsIT.batchTransferInventory_mixedSites_
+emitsOneNotificationPerAffectedSite`), 8 failures, the same pre-existing
+`AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` set, no new failure;
+`ArchitectureTest` clean, frozen store unchanged. Web: `npx tsc --noEmit` clean; `npx vitest run`
+— **57 files/406 tests** (up 2: two new `use-realtime-broadcast.test.ts` cases; the two
+`inventory-refresh.test.ts` cases that asserted the now-removed timestamp-based guard were
+replaced with two cases asserting the new sequencing/chunking behavior, net-even in that file),
+0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. This amends the phase exit gate's
+numbers; it does not reopen 6e or Phase 6, and no acceptance criterion's disposition changed.

@@ -820,3 +820,75 @@ noted as skipped with reason, one (Advisory 10) left to judgment for lack of spe
 action. 6e is now reviewed to the same independent-agent standard as 6a-6d.** The coordinating
 session still owns running the complete phase exit gate (AC-1-8 together) and closing the
 checkpoint.
+
+## Follow-up review: four further findings after 6e's independent-review fix round (2026-09-15)
+
+A fourth review pass (user-reported, against `69fc6fe^..HEAD`) found four more findings the two
+independent-agent reviews above had not caught. All fixed by the coordinating session directly,
+each revert-verified (fix removed, new/existing test confirmed to fail for the predicted reason,
+fix restored, confirmed green).
+
+- **P1: known-ID `inventory_updated` events never invalidated `locationInventory`; unknown-ID
+  events never invalidated `productInventoryEntries`.** `use-realtime-broadcast.ts`'s two
+  branches were mutually exclusive when they should not have been: `locationInventory` (read by
+  location sheets and stock dialogs, keyed by location rather than product) was only invalidated
+  in the unknown-ID `else` branch, and `productInventoryEntries` only in the known-ID branch --
+  so a known-ID event left open location views stale, and an unknown-ID event left open
+  product-inventory views stale. **Fixed:** both families are now invalidated unconditionally on
+  every `inventory_updated` event, in addition to whichever ID-specific invalidation already
+  applies. Two new tests in `use-realtime-broadcast.test.ts` (one per direction), both revert-
+  verified against the pre-fix code.
+- **P1: the merge guard in `flushInventorySiteRefresh` compared each fetched row's own
+  `lastUpdatedAt` -- a value that is not monotonic with correctness.** `lastUpdatedAt` is
+  `MAX(location_inventory.updated_at)` across a product's *remaining* rows
+  (`InventoryTotalsRepository.INVENTORY_TOTALS_SQL`): deleting the newest row legitimately
+  *decreases* it, so the guard was rejecting a correct, lower total; and the zero-quantity
+  default seeded for a requested ID absent from the response carries no timestamp at all, so an
+  older, empty response could bypass the guard entirely and overwrite a newer restocked quantity
+  with zero. **Fixed:** replaced the timestamp comparison with request-issuance sequencing -- a
+  module-level monotonic counter claims a sequence number for every requested product ID at the
+  moment a flush *starts* (before its fetch is even issued), and a flush's write is applied only
+  if no later-started flush has since claimed that same product ID, regardless of which resolves
+  first. This depends on nothing in either response, so it is correct however
+  `lastUpdatedAt` (or its absence) behaves. The two prior Advisory-8 tests (which asserted the
+  old timestamp-based behavior) were replaced with one test that drives two overlapping calls
+  through controlled, independently-resolvable promises and proves the later-started one always
+  wins even when its response arrives first.
+- **P2: the coalescing buffer had no cap, and the backend's `MAX_PRODUCT_IDS_BATCH_SIZE` (500)
+  rejects an oversized request outright.** Enough rapid, individually-valid events can
+  accumulate more than 500 buffered IDs; the resulting request would 400, and every caller of
+  `flushInventorySiteRefresh` already wraps it in a bare `.catch()` (by earlier review design),
+  so the failure was silently swallowed with no cache update for any of the batched IDs.
+  **Fixed:** `flushInventorySiteRefresh` now chunks the unique ID list into batches of 500,
+  issuing one request per chunk and merging every chunk's results before writing the cache once.
+  New test asserts a 501-ID flush issues exactly two requests (500 + 1) and every ID ends up
+  correctly refreshed.
+- **P2: the legacy, unscoped `batchTransferInventory(BatchTransferInventoryRequestDTO)` stamps
+  a combined broadcast with only the first transfer's site.** Unlike its site-scoped sibling
+  (which requires every transfer's source to already belong to the caller's `siteId` before this
+  method ever runs), the legacy overload has no such precondition and genuinely accepts
+  independent A-to-A and B-to-B transfers in one request -- confirmed by re-reading
+  `planTransfers`/`lockPlannedRows`, which apply no site check anywhere. The prior code computed
+  one `batchTransferSiteId` from `firstSource` alone and broadcast every affected product under
+  it, so site B's clients would receive a notification stamped for site A and discard it as
+  foreign. **Fixed:** product IDs are now grouped by each transfer's own source site while
+  looping (`productIdsBySite`), and one `broadcastInventoryUpdated`/`broadcastAuditLogCreated`
+  pair is emitted per affected site instead of one combined pair. New IT
+  (`StockMovementServiceBroadcastArgsIT.batchTransferInventory_mixedSites_
+  emitsOneNotificationPerAffectedSite`) seeds two sites' worth of transfers in one legacy batch
+  request and asserts one notification per site, each carrying only that site's product IDs.
+
+### Final verification after this round
+
+Backend: `./mvnw -q clean test-compile` clean. `./mvnw -q clean test` -- 479 run, 0 failures.
+`./mvnw test -Dtest='*IT'` -- 523 run (up 1: the new mixed-site broadcast test), 8 failures,
+name-for-name identical to the pre-existing `AnalyticsControllerSecurityIT`/
+`ForecastControllerSecurityIT` set, no new failure. `ArchitectureTest` clean, frozen store
+unchanged.
+
+Web: `npx tsc --noEmit` clean. `npx vitest run` -- 57 files/406 tests (up 2: the two new
+`use-realtime-broadcast.test.ts` cases; `inventory-refresh.test.ts`'s two replaced tests keep
+the file's count net-even), 0 failed. `npx eslint .` -- 0 errors/51 warnings, baseline-identical.
+
+**Disposition: all four findings fixed and revert-verified by the coordinating session. No
+further findings outstanding.**

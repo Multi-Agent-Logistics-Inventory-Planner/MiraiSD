@@ -5979,3 +5979,38 @@ schema-enforced), non-inventory broadcast producers still emitting `siteId: null
 `ProductDeletionCoordinator`/`EasyPostWebhookService`), and the unbounded `SimpleAsyncTaskExecutor`
 backing every broadcast dispatch — all recorded against their owning later phases, not silently
 dropped. This branch has not been pushed or merged; that remains the user's own action.
+
+## Post-closure follow-up review and fix (2026-09-15)
+
+After the close above, a fourth review pass (user-reported, against `69fc6fe^..HEAD`) surfaced
+four more findings the two independent-agent reviews had missed: two P1s (known-ID
+`inventory_updated` events never invalidated `locationInventory` and unknown-ID events never
+invalidated `productInventoryEntries` -- the two branches in `use-realtime-broadcast.ts` were
+wrongly mutually exclusive; and the totals-merge guard compared each fetched row's own
+`lastUpdatedAt`, a value that is not monotonic with correctness since deleting a product's
+newest row legitimately lowers it and the zero-quantity default for an absent ID carries no
+timestamp at all) and two P2s (the coalescing buffer had no cap against the backend's 500-ID
+batch limit, so an oversized request would 400 and be silently swallowed by the existing
+`.catch()`; and the legacy, unscoped `batchTransferInventory` overload stamps its combined
+broadcast with only the first transfer's site, so a mixed-site legacy batch's other sites never
+see the notification).
+
+All four fixed directly by the coordinating session, each revert-verified (fix removed, new/
+existing test confirmed to fail for the predicted reason, fix restored, confirmed green). The
+`lastUpdatedAt` comparison was replaced with request-issuance sequencing (a monotonic counter
+claims each requested product ID's sequence number at flush start, before any fetch is issued;
+a flush's write only applies if no later-started flush has since claimed that ID) rather than
+patched, since the underlying assumption -- that a fetched row's own timestamp reflects response
+recency -- was wrong, not merely under-guarded. The legacy batch-transfer broadcast now groups
+affected product IDs by each transfer's own source site and emits one notification pair per
+site instead of one combined pair. Full detail, including the new/replaced tests, is in
+review.md's "Follow-up review" section and validation.md's amended final numbers.
+
+Re-verified after this round: backend `./mvnw -q clean test-compile` clean; `./mvnw -q clean
+test` -- 479 run, 0 failures; `./mvnw test -Dtest='*IT'` -- 523 run (up 1: the new mixed-site
+broadcast test), 8 failures, the same pre-existing `AnalyticsControllerSecurityIT`/
+`ForecastControllerSecurityIT` set, no new failure; `ArchitectureTest` clean, frozen store
+unchanged. Web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/406 tests, 0 failed; `npx
+eslint .` -- 0 errors/51 warnings, baseline-identical. 6e and Phase 6 remain closed; this round
+is an amendment to that closure, not a reopening -- no acceptance criterion's disposition
+changed, and no other checkpoint's suites were touched.
