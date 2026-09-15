@@ -108,37 +108,64 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
   });
 
-  it("keeps the newer cached entry when two overlapping flushes for the same product resolve out of order (Advisory 8)", async () => {
+  it("a later-issued flush always wins for the same product, even if it resolves before an earlier, still-pending one (follow-up review finding, P1)", async () => {
+    // Replaces the old lastUpdatedAt-based race test: that guard compared each fetched row's
+    // own server timestamp, which is not monotonic with correctness (a deleted newest row
+    // legitimately lowers it; an absent-id zero-default carries none at all). Sequencing by
+    // request issuance order instead - regardless of what either response contains - is what
+    // the follow-up review asked for.
     const qc = client();
-    qc.setQueryData(["inventoryTotals", "site-1"], [
-      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
-    ]);
-    // A stale, older response resolves second (out of order) - it must not overwrite the
-    // newer cached value.
-    mockGetSiteInventoryTotals.mockResolvedValue([
-      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:05.000Z" },
-    ]);
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
 
+    let resolveEarlierFetch!: (value: unknown) => void;
+    const earlierFetch = new Promise((resolve) => {
+      resolveEarlierFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => earlierFetch);
+    // Starts first (claims the lower sequence number), but its own fetch stays pending.
+    const earlierFlush = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 999 },
+    ]);
+    // Starts second (claims the higher sequence number) and resolves immediately.
     await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
 
     expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
-      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
+      { productId: "p1", totalQuantity: 999 },
+    ]);
+
+    // The earlier flush's request finally resolves, with a different, stale value - it must
+    // not overwrite what the later flush already applied.
+    resolveEarlierFetch([{ productId: "p1", totalQuantity: 42 }]);
+    await earlierFlush;
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 999 },
     ]);
   });
 
-  it("applies a newer fetched entry over an older cached one (Advisory 8, the normal case)", async () => {
+  it("chunks the fetch into bounded batches when more IDs are buffered than the backend's single-request limit (follow-up review finding, P2)", async () => {
     const qc = client();
-    qc.setQueryData(["inventoryTotals", "site-1"], [
-      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:05.000Z" },
-    ]);
-    mockGetSiteInventoryTotals.mockResolvedValue([
-      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
-    ]);
+    const ids = Array.from({ length: 501 }, (_, i) => `p${i}`);
+    qc.setQueryData(
+      ["inventoryTotals", "site-1"],
+      ids.map((id) => ({ productId: id, totalQuantity: 1 }))
+    );
+    mockGetSiteInventoryTotals.mockImplementation(async (_siteId: string, chunkIds: string[]) =>
+      chunkIds.map((id) => ({ productId: id, totalQuantity: 2 }))
+    );
 
-    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+    await flushInventorySiteRefresh(qc, "site-1", ids);
 
-    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
-      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
-    ]);
+    expect(mockGetSiteInventoryTotals).toHaveBeenCalledTimes(2);
+    expect(mockGetSiteInventoryTotals.mock.calls[0][1]).toHaveLength(500);
+    expect(mockGetSiteInventoryTotals.mock.calls[1][1]).toHaveLength(1);
+    const data = qc.getQueryData(["inventoryTotals", "site-1"]) as Array<{
+      productId: string;
+      totalQuantity: number;
+    }>;
+    expect(data.every((t) => t.totalQuantity === 2)).toBe(true);
+    expect(data).toHaveLength(501);
   });
 });

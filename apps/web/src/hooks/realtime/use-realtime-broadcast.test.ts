@@ -177,6 +177,26 @@ describe("useRealtimeBroadcast (.specs/phase-6-inventory 6e, T-6e-2/3/6)", () =>
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
   });
 
+  it("a known-ID event still invalidates locationInventory (follow-up review finding, P1: location sheets/stock dialogs are keyed by location, not product)", () => {
+    const { invalidateSpy } = mount();
+
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1", productIds: ["p1"] });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["locationInventory", "site-1"] });
+  });
+
+  it("an unknown-ID event still invalidates productInventoryEntries (follow-up review finding, P1)", () => {
+    const { invalidateSpy } = mount();
+
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1" });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries"] });
+  });
+
   it("reconnect recovery invalidates locationInventory, locationsWithCounts and productInventoryEntries too, not just totals (Required 5)", () => {
     const { invalidateSpy } = mount();
 

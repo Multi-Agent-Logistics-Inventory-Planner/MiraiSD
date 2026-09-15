@@ -127,6 +127,12 @@ export function useRealtimeBroadcast(enabled = true) {
             notify(currentSiteId, data.productIds);
             // Non-totals inventory reads still use a direct, site-qualified invalidation -
             // they're not part of the totals-merge lever, so coalescing them buys nothing.
+            // Both families are invalidated regardless of known/unknown IDs (follow-up review
+            // finding, P1): locationInventory is read by location sheets/stock dialogs keyed
+            // by location, not product, so a known-ID event still needs it refreshed; an
+            // unknown-ID batch still needs productInventoryEntries refreshed too, since "unknown
+            // IDs" means we can't target specific products, not that no product view is stale.
+            queryClient.invalidateQueries({ queryKey: ["locationInventory", currentSiteId] });
             if (data.productIds && data.productIds.length > 0) {
               data.productIds.forEach((id) => {
                 queryClient.invalidateQueries({
@@ -137,7 +143,7 @@ export function useRealtimeBroadcast(enabled = true) {
                 queryClient.invalidateQueries({ queryKey: ["productInventoryEntries", id] });
               });
             } else {
-              queryClient.invalidateQueries({ queryKey: ["locationInventory", currentSiteId] });
+              queryClient.invalidateQueries({ queryKey: ["productInventoryEntries"] });
             }
             // Unconditionally invalidate the whole locationsWithCounts prefix for this site
             // (6e independent review, R-2/Required-3): data.locationType is the backend's
