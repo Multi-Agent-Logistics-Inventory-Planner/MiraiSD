@@ -5227,3 +5227,202 @@ inventory/stock-movement/location-inventory paths that 6d's v1 routes superseded
 `InventoryRequestDTO`, the untracked PUT route, and whichever `lib/api/inventory.ts`/
 `stock-movements.ts` functions T-6d's web slice left in place only for compatibility) -- per this
 checkpoint's own design note, their deletion was deliberately deferred to 6e, not forgotten.
+
+## 6e planning — targeted refresh and exit proof worksheet (2026-09-15)
+
+6e scope per spec.md's checkpoint table: "Coalesce targeted refresh, prove recovery and measured
+savings, remove only obsolete compatible paths, and run the complete phase gate (AC-7-8 and
+regression of AC-1-6)." Planning done in two parallel passes, mirroring 6d: a web-side
+baseline/task-list pass (`planner`) and a backend design pass (`mirai-spring-architect`), then
+reconciled and four material decisions confirmed with the user before implementation.
+
+### Record correction (backend pass, verified by reading the code)
+
+T-6d-12's residual note (above, "getLocationsWithCounts stays site-blind ... sites module
+territory") understated the defect. `LocationAggregateRepository`'s two native queries
+(`ALL_LOCATIONS_WITH_COUNTS_SQL`, `getLocationsByTypeWithCounts`) have **no site predicate at
+all** -- not "resolves to MAIN," but a genuine cross-site data leak: a MAIN user browsing
+`/storage` today sees SECOND's locations and quantities mixed into the same list with no marker,
+invisible only because SECOND has almost no seeded locations. This raises T-6e-be-2/3 from
+opportunistic cleanup to a live `docs/specs/multi-site-data-and-api.md` §"cross-site joins are
+prohibited" violation that this checkpoint must close.
+
+### User decisions (all material, all confirmed 2026-09-15)
+
+- **Unmounted realtime hooks:** delete them. `useRealtimeInventory`, `useRealtimeProductInventory`,
+  `useRealtimeDashboard`, `useRealtimeProducts`, `useRealtimeNotifications`, `useRealtimeShipments`,
+  `useRealtimeAuditLog`, `use-supabase-realtime.ts`, `legacy-products-query-filter.ts` and their
+  barrel exports/tests have zero mounting callers in production (`RealtimeProvider` mounts only
+  `useRealtimeBroadcast`) -- T-6d-11's site-scoping work inside them never executes in a running
+  browser. The org-wide broadcast channel becomes the single realtime path 6e builds, coalesces
+  and measures; no parallel `postgres_changes` subsystem is revived.
+- **Broadcast payload carries affected product IDs, not just `siteId`:** confirmed scope
+  expansion beyond the 6d handoff's "add siteId" note. Without `ids[]`, batch adjust/transfer
+  (`StockMovementService` at :306/:627/:745, the dominant mutation shape) would keep sending
+  `itemId: null` despite already holding the affected IDs locally, so AC-7's "known IDs cause no
+  full-catalog refresh" and AC-8's "result size follows affected IDs" could not be demonstrated
+  for the workload that matters. Single adjust/transfer already carries one ID (:1003/:1072) and
+  needs no change beyond the new field name.
+- **Broadcast dispatch moves to after-commit, across every producer:** fixed in 6e as a
+  correctness precondition, not deferred. Broadcasts fire inside `@Transactional` methods today,
+  dispatched via an `@Async` bean, so a rolled-back mutation can still emit a notification and (once
+  refresh becomes targeted/coalesced instead of blanket-invalidating) a pre-commit notification
+  would refetch pre-commit data with nothing scheduled to correct it -- breaking AC-7's
+  duplicate/reordered-notification convergence guarantee. Only the broadcast *call* moves
+  (`TransactionSynchronizationManager.registerSynchronization(...).afterCommit(...)`); the
+  business logic of every producer (inventory, kuji, shipments, notifications, audit, products)
+  is untouched.
+- **`SiteLocationController`'s raw-JPA-entity exposure is fixed in 6e, not recorded as a
+  deviation:** pre-existing (Phase 4), unrelated to 6e's original scope, but a standing AC-5
+  violation ("v1 routes expose DTOs through the application boundary") that this checkpoint's exit
+  gate would otherwise have to certify silently. Add a `SiteLocationDTO`, regenerate
+  `packages/contracts/openapi.json`/`packages/api-client`, update the web's hand-rolled
+  `Location`-shape mapping (T-6d-1) to the generated DTO type.
+
+### Recorded assumptions (not escalated, per AGENTS.md's "ask only material decisions" rule)
+
+- Non-inventory broadcast producers (`ShipmentService`, `KujiBoxService`, `NotificationService`,
+  `AuditLogService`, `ProductService`, `ProductDeletionCoordinator`, `EasyPostWebhookService`) are
+  **not** migrated to carry `siteId`/`ids[]` in 6e -- only their broadcast dispatch moves to
+  after-commit (a mechanical, behavior-preserving change to the call site, not their domain).
+  They keep emitting `siteId: null`; the client treats null as "possibly relevant," T-6d-11's
+  established precedent. Recorded as debt against Phase 7 (kuji/shipments). `broadcastProductUpdated`
+  stays site-less by design (product identity is global), not by omission.
+- Legacy `GET /api/locations/with-counts` gets a deprecation header in 6e (matching every other
+  legacy inventory route's treatment) but is **not deleted** -- it is `sites`-module territory,
+  its removal isn't required by AC-7/AC-8, and 6e's mandate is "remove only obsolete compatible
+  paths" for the specific paths already named in the 6d handoff (the four `LocationInventory*`
+  classes). Its deletion is follow-up debt for whichever phase completes the `sites` module's
+  route cleanup.
+- Coalescing window: 300ms. Below ~100ms coalesces almost nothing under a real event burst; above
+  ~1s reads as "my adjustment didn't show up." No existing precedent in this codebase. Local
+  mutations flush immediately through the same shared executor (satisfying AC-7's "share a
+  coalesced, bounded strategy" without adding perceived latency to the user's own action); only
+  realtime notifications actually wait out the window.
+- Convergence rule for duplicate/reordered notifications: a flush always re-fetches authoritative
+  totals for the affected IDs and calls `setQueryData` with the server result, never client-side
+  delta arithmetic -- this makes reordering irrelevant by construction rather than by careful
+  sequencing.
+- `useProductInventoryEntries`/`getProductInventoryEntries` (legacy, unscoped, still used by three
+  Kuji dialogs) stays out of scope -- not obsolete (it has live callers), and 6d already deferred
+  Kuji's site migration to Phase 7 while preserving the non-MAIN Kuji-unavailable gate (AC-6).
+- No live browser/manual verification in 6e, consistent with every prior session in this
+  checkpoint; AC-8's web measurement is a scripted Vitest workload against a real `QueryClient` and
+  a counting client stub, not a live Supabase websocket session -- stated explicitly in
+  validation.md rather than implied as end-to-end proof.
+- Movement history still has no rendered UI consumer (unchanged since 6d); the
+  one-NOT_ASSIGNED-location-per-site invariant stays monitored/unenforced (unchanged since 6d).
+
+### Backend task list (T-6e-be-N, ordered; suggested commit split 1-3 / 4-6 / 7-11)
+
+- T-6e-be-1: AC-8 "before" measurement for `/api/locations/with-counts`
+  (`LocationAggregateEgressBaselineIT`, mirroring `InventoryEgressAfterIT`'s harness), seeded
+  across two sites so the cross-site leak is visible in the numbers. Must land before T-6e-be-2 --
+  this "before" is unrecoverable once the query changes.
+- T-6e-be-2: site-scoped `LocationAggregateRepository`/`LocationAggregateService` overloads
+  (`sl.site_id = :siteId` in the outer query, `li.site_id = :siteId` inside the inventory
+  subquery), no route yet. Un-scoped methods stay untouched for the legacy route.
+- T-6e-be-3: new `sites/api/SiteLocationAggregateController`, `GET
+  /api/v1/sites/{siteId}/locations/with-counts` (+ typed variant), reading site from
+  `AuthorizedSiteContextHolder`. Security IT includes an explicit assertion that `/with-counts`
+  routes here and not into `SiteLocationController`'s `/{id}` pattern.
+- T-6e-be-4: broadcast payload envelope -- `siteId` + `productIds` on
+  `SupabaseBroadcastService.broadcastInventoryUpdated`/`broadcastAuditLogCreated` overloads;
+  existing signatures keep delegating with nulls so non-migrated producers compile unchanged.
+  Unit test on the extracted payload-assembly method, no HTTP.
+- T-6e-be-5: thread `siteId`/`productIds` through the inventory-module producers
+  (`StockMovementService` :306/:627/:745/:1003/:1072, using each site already in local scope).
+  IT with a captured `SupabaseBroadcastService`: one batch adjust of N products emits exactly one
+  notification carrying the right site and exactly those N IDs.
+- T-6e-be-6: move every broadcast producer's dispatch to
+  `TransactionSynchronizationManager...afterCommit`. IT: a forced rollback emits zero broadcasts
+  (fails today); a commit emits exactly one, observably after commit. Revert-verified.
+- T-6e-be-7: `SiteLocationDTO` + mapper for `SiteLocationController`, replacing the raw
+  `Location` entity in every response; regenerate contracts/client; update the web's T-6d-1
+  hand-rolled mapping to the generated type.
+- T-6e-be-8: deprecation header for `/api/locations/with-counts` (new predicate on
+  `LegacyInventoryDeprecationConfig` -- the existing filter gates on a trailing `/inventory`
+  segment and must not fire on this path or on `sites`' own `/api/locations/{id}`).
+- T-6e-be-9: delete the obsolete legacy classes -- `LocationInventoryController`,
+  `LocationInventoryMapper`(+Impl), `LocationInventoryResponseDTO`, `InventoryRequestDTO`, the
+  four now-orphaned `LocationInventoryService` methods, `LocationInventoryRepository
+  .findByStorageLocation_Id` (closes the T-6d-9-recorded trap for good),
+  `LegacyLocationInventoryDeprecationFilter` + registration, `LocationInventoryControllerSecurityIT`
+  (after case-by-case confirmation every behavioral assertion has a v1 equivalent), the three
+  orphaned `LocationInventoryServiceTest` nested classes, the T-6d-be-7 header-test cases; rewrite
+  `NotAssignedInventoryReadParityIT` to assert only v1 filter behavior; update
+  `module-dependency-edges-baseline.txt`'s stale R-9 note. Web-side deletion (T-6e-7) lands in the
+  same commit's diff, before this. ArchUnit run twice (clean rebuilds): frozen store
+  `c1d9f1c8-...` expected to shrink by exactly 7 lines on run 1, stable on run 2; store
+  `0858803e-...` unchanged.
+- T-6e-be-10: regenerate `packages/contracts/openapi.json` + `packages/api-client`, run twice for
+  stability. Enumerate the diff by scripted set-diff over `paths`/`components.schemas` keys, not
+  by hand. Expect additions (`.../locations/with-counts`, `SiteLocationDTO`), and the phase's
+  first path *removals* (4 legacy inventory paths, `InventoryRequestDTO`/
+  `LocationInventoryResponseDTO` schemas) -- record each removal in validation.md with its
+  zero-caller evidence.
+- T-6e-be-11: AC-8 "after" measurement (`LocationAggregateEgressAfterIT` mirroring T-6e-be-1) +
+  broadcast fan-out before/after counts from T-6e-be-5; record deltas against T-6e-be-1, restate
+  the DTO-layer-not-HTTP-layer measurement boundary explicitly, add the required cost-impact
+  statement.
+
+### Web task list (T-6e-N, ordered; suggested commit split 1-4 / 5-7 / 8-11)
+
+- T-6e-1: delete the unmounted `postgres_changes` realtime hooks and their barrel exports/tests
+  per the confirmed decision above.
+- T-6e-2: typed, site-aware broadcast handler -- extend the broadcast payload type with
+  `siteId?`/`ids?`; lift `use-realtime-inventory.ts`'s `isRelevantToCurrentSite` null-is-possibly-
+  relevant rule into a shared module used by `use-realtime-broadcast.ts`; mount `useCurrentSite()`
+  there and re-derive the handler on site change. `[BE-DEP: T-6e-be-4/5]`.
+- T-6e-3: site-qualify every bare inventory prefix in the broadcast handler
+  (`locationInventory`/`productInventoryEntries`/`inventoryTotals`/the `itemId` branch), remove
+  the dead `notAssignedInventory`/`dashboard` keys. Test: two sites' caches seeded, one event
+  fired, only the active site's entries invalidated, the other site's cached data byte-for-byte
+  unchanged.
+- T-6e-4: coalescing buffer (`hooks/realtime/use-coalesced-refresh.ts`) -- per-site buffer, 300ms
+  flush window, ID dedup via `Set`, degrades to "unknown" if any notification in the window lacks
+  IDs. Pure module, fake-timer unit tests.
+- T-6e-5: targeted flush executor -- known-ID flush calls `getSiteInventoryTotals(siteId, ids)`
+  once and merges into the cache (never replaces, never client-side delta arithmetic); unknown/
+  reconnect/site-switch flush does today's full invalidate. Wire into `use-stock-mutations.ts`
+  (already has `productIds`) and `use-location-mutations.ts` (thread the row's `productId`
+  through). `[BE-DEP: T-6e-be-4/5's ids[]]`.
+- T-6e-6: reconnect/missed-event recovery -- track prior error/timeout in
+  `use-realtime-broadcast.ts`'s subscribe-status callback; a `SUBSCRIBED` following an error
+  triggers one full selected-site refresh through T-6e-5's unknown-ID path (not on first mount).
+- T-6e-7: delete obsolete web legacy paths -- every zero-caller function in `lib/api/inventory.ts`
+  (`getLocationInventory`, `getLocationInventoryItem`, `createLocationInventory`,
+  `updateLocationInventory`, `deleteLocationInventory`, `getStorageLocationInventory`,
+  `getInventoryByLocation`, `createInventory`, `updateInventory`, `deleteInventory`,
+  `getInventoryTotals`) and `stock-movements.ts` (`batchAdjustStock`, `transferStock`,
+  `batchTransferStock`, `getStockMovementHistory`), `resolveLocationId`, and
+  `use-product-inventory.ts`'s `useProductInventory`. Keep `getNALocationId`/
+  `NOT_ASSIGNED_VIRTUAL_ID`/`getProductInventoryEntries`/`useProductInventoryEntries` (Kuji, Phase
+  7) and the three audit-log functions. Collapse the three duplicated `"__not_assigned__"` string
+  literals into one shared constant. Lands in the same commit as, before, T-6e-be-9's backend
+  deletion.
+- T-6e-8: dead invalidation-key cleanup -- fix `["auditLogs"]`/`["auditLog"]` to the real
+  `["audit-log"]`/`["audit-logs"]` keys (a real bug: stock mutations have never refreshed the
+  audit-log page), remove `["dashboardStats"]`, resolve the no-op `exact:true`
+  `["locationsWithCounts"]` duplication.
+- T-6e-9: `getLocationsWithCounts` site scoping -- migrate `use-locations-with-counts.ts` to a
+  site-qualified key against the new v1 route, and unify `use-dashboard-metrics.ts`'s separate,
+  never-invalidated `["locations","with-counts"]` cache entry onto the same hook/key. `[BE-DEP:
+  T-6e-be-3]`.
+- T-6e-10: AC-8 web measurement harness -- scripted workload against a real `QueryClient` + a
+  counting client stub, five scenarios (single known ID, 5-ID batch, unknown-ID batch, duplicate
+  ID, reordered pair) at a fixed catalog size, pre-6e vs. post-6e request/byte/row counts recorded
+  in validation.md alongside the backend numbers, explicit statement of what was not measured (no
+  live browser/websocket session).
+- T-6e-11: AC-7 rendered/behavior sweep (site switch during an in-flight coalesced flush;
+  duplicate/reordered convergence; reconnect recovery) + phase exit gate (`tsc --noEmit`, `vitest
+  run`, `eslint .`, regression of the 6d suites unmodified -- `kuji-tab-panel.test.tsx`,
+  `product-modal.test.tsx`, `adjust-stock-dialog.test.tsx`, `transfer-stock-dialog.test.tsx`,
+  `use-site-product-inventory.test.ts`'s late-old-site-result case). Baseline to beat: 52 test
+  files/366 tests/0 failures, 0 eslint errors/51 warnings.
+
+### Next action
+
+Implement backend first (T-6e-be-1 through T-6e-be-11) -- the web task list's T-6e-2/5 depend on
+the broadcast payload change (T-6e-be-4/5) and T-6e-9 depends on the new v1 counts route
+(T-6e-be-3). Then implement web (T-6e-1 through T-6e-11).
