@@ -148,6 +148,54 @@ class StockMovementServiceBroadcastArgsIT extends BaseKafkaIntegrationTest {
     }
 
     @Test
+    void batchTransferInventory_mixedSites_emitsOneNotificationPerAffectedSite() throws Exception {
+        // Follow-up review finding, P2: the legacy, unscoped batchTransferInventory(request)
+        // overload (unlike its site-scoped sibling, which requires every transfer's source to
+        // already belong to the caller's siteId before this method ever runs) accepts
+        // independent transfers whose sources belong to different sites in one request. It must
+        // not stamp a single combined broadcast with only the first transfer's site -- every
+        // other affected site's clients would silently discard it.
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        Site siteA = newSite(suffix + "-A");
+        Site siteB = newSite(suffix + "-B");
+        Location sourceA = newLocation(siteA, "BOX_BINS", suffix + "-srcA");
+        Location destA = newLocation(siteA, "RACKS", suffix + "-dstA");
+        Location sourceB = newLocation(siteB, "BOX_BINS", suffix + "-srcB");
+        Location destB = newLocation(siteB, "RACKS", suffix + "-dstB");
+
+        Product productA = newProduct(suffix + "-A");
+        Product productB = newProduct(suffix + "-B");
+        LocationInventory invA = locationInventoryRepository.save(LocationInventory.builder()
+                .location(sourceA).site(siteA).product(productA).quantity(10).build());
+        LocationInventory invB = locationInventoryRepository.save(LocationInventory.builder()
+                .location(sourceB).site(siteB).product(productB).quantity(8).build());
+
+        TransferInventoryRequestDTO transferA = new TransferInventoryRequestDTO();
+        transferA.setSourceLocationType(LocationType.BOX_BIN);
+        transferA.setSourceInventoryId(invA.getId());
+        transferA.setDestinationLocationType(LocationType.RACK);
+        transferA.setDestinationLocationId(destA.getId());
+        transferA.setQuantity(3);
+
+        TransferInventoryRequestDTO transferB = new TransferInventoryRequestDTO();
+        transferB.setSourceLocationType(LocationType.BOX_BIN);
+        transferB.setSourceInventoryId(invB.getId());
+        transferB.setDestinationLocationType(LocationType.RACK);
+        transferB.setDestinationLocationId(destB.getId());
+        transferB.setQuantity(2);
+
+        BatchTransferInventoryRequestDTO batchRequest = new BatchTransferInventoryRequestDTO();
+        batchRequest.setTransfers(List.of(transferA, transferB));
+
+        stockMovementService.batchTransferInventory(batchRequest);
+
+        verify(spiedBroadcastService, times(1)).broadcastInventoryUpdated(
+                eq(siteA.getId()), any(), argThatContainsExactly(productA.getId()), isNull());
+        verify(spiedBroadcastService, times(1)).broadcastInventoryUpdated(
+                eq(siteB.getId()), any(), argThatContainsExactly(productB.getId()), isNull());
+    }
+
+    @Test
     void forcedRollback_neverReachesTheNetworkDispatchLayer() throws Exception {
         // .specs/phase-6-inventory 6e independent review, R-4: proves AfterCommitRunner's
         // deferral actually depends on a real commit, not just "some transaction was active" --

@@ -717,6 +717,14 @@ public class StockMovementService {
         );
 
         Set<UUID> affectedProductIds = new HashSet<>();
+        // Keyed by each transfer's own source site, not a single site derived from the first
+        // transfer: the legacy, unscoped batch route (this method) accepts transfers whose
+        // sources belong to different sites in one request (unlike the site-scoped overload,
+        // which requires every source to already belong to the caller's siteId before this
+        // method ever runs). A single combined broadcast stamped with only the first transfer's
+        // site would be silently discarded by every other affected site's clients (6e follow-up
+        // review finding).
+        Map<UUID, Set<String>> productIdsBySite = new HashMap<>();
         Map<UUID, String> codes = new HashMap<>();
         codes.put(sourceLocationId, sourceLocationCode);
         if (destLocationId != null && destLocationCode != null) {
@@ -735,6 +743,10 @@ public class StockMovementService {
             executeTransfer(request, sourceInventory, sourceQuantity,
                     lockedIds.get(plan.destinationKey()), auditLog, false, codes);
             affectedProductIds.add(sourceInventory.getProduct().getId());
+            UUID productSiteId = sourceInventory.getSite() != null ? sourceInventory.getSite().getId() : null;
+            productIdsBySite
+                    .computeIfAbsent(productSiteId, key -> new HashSet<>())
+                    .add(sourceInventory.getProduct().getId().toString());
         }
 
         // Compute totals once for all affected products, then publish outbox-friendly
@@ -746,10 +758,15 @@ public class StockMovementService {
         Map<UUID, Integer> currentTotals = sumCurrentTotalsByProductIds(affectedProductIds);
         applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
-        UUID batchTransferSiteId = firstSource.getSite() != null ? firstSource.getSite().getId() : null;
-        List<String> batchTransferProductIds = affectedProductIds.stream().map(UUID::toString).toList();
-        broadcastService.broadcastInventoryUpdated(batchTransferSiteId, sourceLocationCode, batchTransferProductIds, null);
-        broadcastService.broadcastAuditLogCreated(batchTransferSiteId, null);
+        // One broadcast per affected site, not one combined broadcast keyed off only the
+        // first transfer's site (see productIdsBySite's Javadoc above) - a legacy mixed-site
+        // batch must notify every site it actually touched, not just the first one.
+        for (Map.Entry<UUID, Set<String>> entry : productIdsBySite.entrySet()) {
+            UUID siteIdForBroadcast = entry.getKey();
+            List<String> productIdsForSite = List.copyOf(entry.getValue());
+            broadcastService.broadcastInventoryUpdated(siteIdForBroadcast, sourceLocationCode, productIdsForSite, null);
+            broadcastService.broadcastAuditLogCreated(siteIdForBroadcast, null);
+        }
     }
 
     /**
