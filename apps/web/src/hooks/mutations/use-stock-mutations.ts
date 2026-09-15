@@ -10,6 +10,7 @@ import {
   type TransferSiteInventoryPayload,
 } from "@/lib/api/site-inventory";
 import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
 import { LocationType } from "@/types/api";
 
 // --- Site-scoped stock mutations (Phase 6 checkpoint 6d, T-6d-7/T-6d-8) --------------------
@@ -49,14 +50,22 @@ async function invalidateStockQueries(
   siteId: string,
   productIds: string[]
 ) {
+  // Totals go through the shared targeted-refresh executor (6e, T-6e-5/AC-7): a bounded fetch
+  // of just these product IDs, merged into the cache, instead of a full-catalog invalidation -
+  // this hook already has productIds in hand, unlike the realtime broadcast path pre-6e.
+  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds);
+
   const tasks: Promise<unknown>[] = [
+    totalsRefresh,
     // Site-qualified prefix: invalidates every ["locationInventory", siteId, ...] key
     // (including the resolved-location sub-key and the NOT_ASSIGNED case) without needing to
     // know the exact location - deliberately broad within this one site, never cross-site.
     qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
-    qc.invalidateQueries({ queryKey: ["auditLogs"] }),
-    qc.invalidateQueries({ queryKey: ["auditLog"] }),
-    qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] }),
+    // Fixed in 6e (T-6e-8): these were ["auditLogs"]/["auditLog"], which match no real query
+    // key (use-audit-log.ts uses "audit-log"/"audit-logs") - stock mutations had never
+    // actually refreshed the audit-log page.
+    qc.invalidateQueries({ queryKey: ["audit-log"] }),
+    qc.invalidateQueries({ queryKey: ["audit-logs"] }),
     // Site-scoped product list (5d's ["products", siteId, "site"] key) - NOT the bare
     // ["products"] prefix, which would also match the unrelated legacy, unscoped product list
     // query and any future non-inventory "products"-prefixed key (the prefix-collision bug

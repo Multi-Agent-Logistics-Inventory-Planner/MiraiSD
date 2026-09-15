@@ -21,12 +21,17 @@ import {
   type SiteLocationInventoryEntry,
 } from "@/lib/api/site-inventory";
 import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
 
-function invalidateLocations(qc: ReturnType<typeof useQueryClient>, locationType: LocationType) {
+function invalidateLocations(
+  qc: ReturnType<typeof useQueryClient>,
+  siteId: string,
+  locationType: LocationType
+) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["locations", locationType] }),
-    qc.invalidateQueries({ queryKey: ["locationsWithCounts", locationType] }),
-    qc.invalidateQueries({ queryKey: ["locationsWithCounts"] }),
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId, locationType] }),
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId, "ALL"] }),
   ]);
 }
 
@@ -38,14 +43,18 @@ function invalidateLocations(qc: ReturnType<typeof useQueryClient>, locationType
 
 function invalidateSiteLocationInventory(
   qc: ReturnType<typeof useQueryClient>,
-  siteId: string
+  siteId: string,
+  /** The created/deleted row's product ID, when known - enables the targeted-refresh lever
+   * (6e, T-6e-5). Delete only has the inventory row's ID client-side, not its product, so it
+   * falls back to a full totals refresh rather than a doomed lookup. */
+  productId: string | undefined
 ) {
   return Promise.all([
+    flushInventorySiteRefresh(qc, siteId, productId ? [productId] : undefined),
     qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
-    qc.invalidateQueries({ queryKey: ["locationsWithCounts"] }),
+    // Removed in 6e (T-6e-8): ["dashboardStats"] matched no real query.
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId] }),
     qc.invalidateQueries({ queryKey: ["products", siteId, "site"] }),
-    qc.invalidateQueries({ queryKey: ["dashboardStats"] }),
-    qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] }),
   ]);
 }
 
@@ -63,9 +72,9 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
       const resolvedLocationId = await resolveSiteLocationId(siteId, locationType, locationId);
       return createSiteLocationInventory(siteId, resolvedLocationId, idempotencyKey, payload);
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
       if (!siteId) return;
-      await invalidateSiteLocationInventory(qc, siteId);
+      await invalidateSiteLocationInventory(qc, siteId, variables.payload.productId);
     },
   });
 
@@ -98,7 +107,9 @@ export function useDeleteInventoryMutation(locationType: LocationType, locationI
     },
     onSuccess: async () => {
       if (!siteId) return;
-      await invalidateSiteLocationInventory(qc, siteId);
+      // No productId known client-side for a delete (only the inventory row's own ID) - falls
+      // back to a full totals refresh rather than a doomed lookup.
+      await invalidateSiteLocationInventory(qc, siteId, undefined);
     },
   });
 
@@ -115,6 +126,7 @@ export function useDeleteInventoryMutation(locationType: LocationType, locationI
 
 export function useCreateLocationMutation(locationType: LocationType) {
   const qc = useQueryClient();
+  const { siteId } = useCurrentSite();
 
   return useMutation<Location, Error, { locationCode: string }>({
     mutationFn: async ({ locationCode }) => {
@@ -128,33 +140,38 @@ export function useCreateLocationMutation(locationType: LocationType) {
       });
     },
     onSuccess: async () => {
-      await invalidateLocations(qc, locationType);
+      if (!siteId) return;
+      await invalidateLocations(qc, siteId, locationType);
     },
   });
 }
 
 export function useUpdateLocationMutation(locationType: LocationType) {
   const qc = useQueryClient();
+  const { siteId } = useCurrentSite();
 
   return useMutation<Location, Error, { id: string; payload: { locationCode: string } }>({
     mutationFn: async ({ id, payload }) => {
       return updateLocation(id, payload);
     },
     onSuccess: async () => {
-      await invalidateLocations(qc, locationType);
+      if (!siteId) return;
+      await invalidateLocations(qc, siteId, locationType);
     },
   });
 }
 
 export function useDeleteLocationMutation(locationType: LocationType) {
   const qc = useQueryClient();
+  const { siteId } = useCurrentSite();
 
   return useMutation<void, Error, { id: string }>({
     mutationFn: async ({ id }) => {
       return deleteLocation(id);
     },
     onSuccess: async () => {
-      await invalidateLocations(qc, locationType);
+      if (!siteId) return;
+      await invalidateLocations(qc, siteId, locationType);
     },
   });
 }

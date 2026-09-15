@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocations } from "@/hooks/queries/use-locations";
+import { NOT_ASSIGNED_VIRTUAL_ID as NOT_ASSIGNED_ID } from "@/lib/api/not-assigned";
 import { LocationType, type Location } from "@/types/api";
 import { cn, naturalSortCompare } from "@/lib/utils";
 import {
@@ -37,9 +38,6 @@ import {
 const DISPLAY_ONLY_CODES = ["G", "K"];
 
 const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
-
-/** Virtual ID used for "Not Assigned" selection */
-const NOT_ASSIGNED_ID = "__not_assigned__";
 
 /**
  * Custom filter for location code search.

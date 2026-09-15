@@ -6,6 +6,10 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { getProductById, type GetProductsOptions } from "@/lib/api/products";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { KujiType, type Product } from "@/types/api";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { useCoalescedInventoryRefresh } from "./use-coalesced-inventory-refresh";
+import { flushInventorySiteRefresh } from "./inventory-refresh";
+import { isRelevantToCurrentSite } from "./site-relevance";
 
 /**
  * Event types that can be broadcast from the backend
@@ -19,8 +23,12 @@ export type BroadcastEventType =
 
 interface BroadcastPayload {
   type: BroadcastEventType;
-  /** Optional: specific entity IDs that were affected */
+  /** Optional: specific entity IDs that were affected (product_updated/shipment_updated) */
   ids?: string[];
+  /** Optional: site that owns this event - absent means "possibly relevant to any site" */
+  siteId?: string;
+  /** Optional: affected product IDs for inventory_updated (6e, T-6e-be-4/5) */
+  productIds?: string[];
   /** Optional: location type for inventory updates */
   locationType?: string;
   /** Optional: item ID for product-specific updates */
@@ -28,19 +36,12 @@ interface BroadcastPayload {
 }
 
 /**
- * Query key mappings for each event type.
- * When an event is received, all matching query keys will be invalidated.
+ * Query key mappings for non-inventory event types. inventory_updated is handled separately
+ * (site-qualified + coalesced, see below) rather than through this bare-prefix table - the
+ * dead keys `notAssignedInventory` (retired by T-6d-9) and `dashboard` (no such query) were
+ * removed here in 6e, T-6e-3/T-6e-8.
  */
-const EVENT_QUERY_KEYS: Record<BroadcastEventType, string[][]> = {
-  inventory_updated: [
-    ["locationsWithCounts"],
-    ["locationInventory"],
-    ["notAssignedInventory"],
-    ["productInventoryEntries"],
-    ["inventoryTotals"],
-    ["products"],
-    ["dashboard"],
-  ],
+const EVENT_QUERY_KEYS: Record<Exclude<BroadcastEventType, "inventory_updated">, string[][]> = {
   product_updated: [
     ["products"],
     ["dashboard"],
@@ -75,6 +76,16 @@ const EVENT_QUERY_KEYS: Record<BroadcastEventType, string[][]> = {
 export function useRealtimeBroadcast(enabled = true) {
   const queryClient = useQueryClient();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const { siteId } = useCurrentSite();
+  const siteIdRef = useRef(siteId);
+  useEffect(() => {
+    siteIdRef.current = siteId;
+  }, [siteId]);
+  const { notify, flushNow } = useCoalescedInventoryRefresh();
+  // Tracks whether the channel has previously errored/timed out, so a full recovery refresh
+  // fires only on a SUBSCRIBED that follows a real interruption - never on the first, normal
+  // mount subscribe (6e, T-6e-6).
+  const hasErroredRef = useRef(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -108,6 +119,34 @@ export function useRealtimeBroadcast(enabled = true) {
             return;
           }
 
+          if (data.type === "inventory_updated") {
+            const currentSiteId = siteIdRef.current;
+            if (!currentSiteId || !isRelevantToCurrentSite(data.siteId, currentSiteId)) {
+              return;
+            }
+            notify(currentSiteId, data.productIds);
+            // Non-totals inventory reads still use a direct, site-qualified invalidation -
+            // they're not part of the totals-merge lever, so coalescing them buys nothing.
+            if (data.productIds && data.productIds.length > 0) {
+              data.productIds.forEach((id) => {
+                queryClient.invalidateQueries({
+                  queryKey: ["productInventoryEntries", currentSiteId, id],
+                });
+              });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ["locationInventory", currentSiteId] });
+            }
+            if (data.locationType) {
+              queryClient.invalidateQueries({
+                queryKey: ["locationsWithCounts", currentSiteId, data.locationType],
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["locationsWithCounts", currentSiteId, "ALL"],
+              });
+            }
+            return;
+          }
+
           // Get the query keys to invalidate for this event type
           const queryKeys = EVENT_QUERY_KEYS[data.type];
 
@@ -117,22 +156,7 @@ export function useRealtimeBroadcast(enabled = true) {
 
           // Invalidate all matching query keys
           queryKeys.forEach((queryKey) => {
-            // If we have specific IDs, use them for more targeted invalidation
-            if (data.itemId && queryKey[0] === "productInventoryEntries") {
-              queryClient.invalidateQueries({
-                queryKey: ["productInventoryEntries", data.itemId],
-              });
-            } else if (data.locationType && queryKey[0] === "locationsWithCounts") {
-              // Invalidate specific location type
-              queryClient.invalidateQueries({
-                queryKey: ["locationsWithCounts", data.locationType],
-              });
-              // Also invalidate the general query
-              queryClient.invalidateQueries({
-                queryKey: ["locationsWithCounts"],
-                exact: true,
-              });
-            } else if (queryKey[0] === "products") {
+            if (queryKey[0] === "products") {
               // Surgical product update when itemId or single id available
               const itemId = data.itemId ?? (data.ids?.length === 1 ? data.ids[0] : null);
               if (itemId) {
@@ -208,10 +232,23 @@ export function useRealtimeBroadcast(enabled = true) {
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             console.log("[Realtime] Connected to broadcast channel");
+            if (hasErroredRef.current) {
+              // Missed-event recovery (6e, T-6e-6): a reconnect following a real
+              // interruption might have missed notifications, so do one full,
+              // authoritative refresh of the current site rather than trusting whatever
+              // was buffered before the drop.
+              hasErroredRef.current = false;
+              const currentSiteId = siteIdRef.current;
+              if (currentSiteId) {
+                void flushInventorySiteRefresh(queryClient, currentSiteId, undefined);
+              }
+            }
           } else if (status === "CHANNEL_ERROR") {
             console.warn("[Realtime] Broadcast channel error");
+            hasErroredRef.current = true;
           } else if (status === "TIMED_OUT") {
             console.warn("[Realtime] Broadcast channel timed out");
+            hasErroredRef.current = true;
           }
         });
 
@@ -222,6 +259,7 @@ export function useRealtimeBroadcast(enabled = true) {
     }
 
     return () => {
+      flushNow();
       if (channelRef.current) {
         try {
           supabase.removeChannel(channelRef.current);
@@ -231,7 +269,7 @@ export function useRealtimeBroadcast(enabled = true) {
         channelRef.current = null;
       }
     };
-  }, [queryClient, enabled]);
+  }, [queryClient, enabled, notify, flushNow]);
 
   // Expose the channel via a stable accessor instead of reading channelRef.current
   // during render: a ref's live value can change without triggering a re-render, so

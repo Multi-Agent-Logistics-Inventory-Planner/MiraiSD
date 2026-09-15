@@ -6,7 +6,6 @@ import type { ProductListItem } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useSiteProducts } from "@/hooks/queries/use-site-products";
-import { getInventoryTotals } from "@/lib/api/inventory";
 import { getSiteInventoryTotals } from "@/lib/api/site-inventory";
 
 export interface ProductWithInventory {
@@ -38,48 +37,6 @@ function getStatus(totalQuantity: number, reorderPoint?: number): StockStatus {
   if (totalQuantity <= criticalThreshold) return "critical";
   if (totalQuantity <= reorderPoint) return "low";
   return "good";
-}
-
-export function useProductInventory(rootOnly = false) {
-  const productsQuery = useProducts(rootOnly);
-  const totalsQuery = useQuery({
-    queryKey: ["inventoryTotals"],
-    queryFn: getInventoryTotals,
-    // No staleTime override: this fetches an unpaginated, whole-catalog
-    // aggregate (InventoryTotalsRepository.findAllInventoryTotals). At the old
-    // 30s staleTime, every remount of a component that calls this hook
-    // (products page, location-detail-sheet) past 30s re-ran the full-table
-    // query — the dominant contributor to Supabase pooler egress. Falls back
-    // to the app-wide 5-minute default in lib/query-client.ts.
-    // See refs/product-inventory-query-egress.md.
-  });
-
-  const data: ProductWithInventory[] | null = useMemo(() => {
-    const products = productsQuery.data;
-    const totals = totalsQuery.data;
-    if (!products) return null;
-
-    const totalsByItemId = new Map(
-      (totals ?? []).map((t) => [t.itemId, t.totalQuantity])
-    );
-
-    return products.map((p) => {
-      // Use actual inventory across all storage locations (parent's own stock)
-      const qty = totalsByItemId.get(p.id) ?? 0;
-      return {
-        product: p,
-        totalQuantity: qty,
-        lastUpdatedAt: totals?.find((t) => t.itemId === p.id)?.lastUpdatedAt ?? p.updatedAt,
-        status: getStatus(qty, p.reorderPoint),
-      };
-    });
-  }, [productsQuery.data, totalsQuery.data]);
-
-  return {
-    data,
-    isLoading: productsQuery.isLoading || totalsQuery.isLoading,
-    error: productsQuery.error ?? totalsQuery.error,
-  };
 }
 
 // --- Site-scoped view (phase-5d T-5, quantity restored in phase-6 T-6d-4) ------------------

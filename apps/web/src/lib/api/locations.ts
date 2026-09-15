@@ -9,11 +9,7 @@ import {
   STORAGE_LOCATION_CODES,
 } from "@/types/api";
 
-// Duplicated from lib/api/inventory.ts's NOT_ASSIGNED_VIRTUAL_ID (not imported, to avoid a
-// circular module dependency - inventory.ts already imports getLocations from this file). Both
-// must stay in sync; LocationSelector (components/stock/location-selector.tsx) is the third,
-// UI-side copy of this same placeholder string.
-const NOT_ASSIGNED_VIRTUAL_ID = "__not_assigned__";
+import { NOT_ASSIGNED_VIRTUAL_ID } from "./not-assigned";
 
 // Storage location types are fixed and seeded automatically.
 // Use GET endpoints only - no create/update operations available.
@@ -109,6 +105,51 @@ export async function getSiteLocations(
   return (data ?? [])
     .map(toSiteLocation)
     .filter((loc): loc is Location => loc !== null);
+}
+
+// A record's identity (id + locationCode) is required to key/render it safely - see the
+// toStorageLocationSummary comment above for why a missing id/code drops the row rather than
+// defaulting it.
+function toLocationWithCounts(
+  dto: components["schemas"]["LocationWithCountsDTO"]
+): LocationWithCounts | null {
+  if (!dto.id || !dto.locationCode || !dto.locationType) {
+    return null;
+  }
+  return {
+    id: dto.id,
+    locationType: dto.locationType as LocationType,
+    locationCode: dto.locationCode,
+    inventoryRecords: dto.inventoryRecords ?? 0,
+    totalQuantity: dto.totalQuantity ?? 0,
+    activeDisplayCount: dto.activeDisplayCount ?? 0,
+    hasActiveDisplay: dto.hasActiveDisplay ?? false,
+    createdAt: dto.createdAt ?? "",
+    updatedAt: dto.updatedAt ?? "",
+  };
+}
+
+/**
+ * Site-scoped counterpart to `getLocationsWithCounts` (.specs/phase-6-inventory 6e, T-6e-9):
+ * closes the legacy route's cross-site leak (no site predicate at all - every site's locations
+ * and quantities returned and counted together). Used by both the storage-location tab bar and
+ * the dashboard's location-utilization metric, which previously held two separate,
+ * never-reconciled caches of the same site-blind endpoint.
+ */
+export async function getSiteLocationsWithCounts(
+  siteId: string,
+  locationType?: LocationType
+): Promise<LocationWithCounts[]> {
+  const result = await webApiClient.GET("/api/v1/sites/{siteId}/locations/with-counts", {
+    params: {
+      path: { siteId },
+      query: locationType ? { type: locationType } : undefined,
+    },
+  });
+  const data = unwrapGeneratedResponse(result);
+  return (data ?? [])
+    .map(toLocationWithCounts)
+    .filter((loc): loc is LocationWithCounts => loc !== null);
 }
 
 /**
