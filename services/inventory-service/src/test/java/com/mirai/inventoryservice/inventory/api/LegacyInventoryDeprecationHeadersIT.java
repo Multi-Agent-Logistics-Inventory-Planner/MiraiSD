@@ -95,7 +95,8 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
                 .andExpect(header().doesNotExist("Link"));
     }
 
-    // ========= T-6e-be-8: /api/locations/with-counts (legacy, site-blind) =========
+    // ========= T-6d-be-7 (restored by 6e's R-3 revert): /api/locations/{id}/inventory* and
+    // /api/storage-locations/{id}/inventory =========
 
     private Location seedLocation(String suffix) {
         Site site = siteRepository.findByCode("MAIN").orElseThrow();
@@ -105,6 +106,33 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
         return locationRepository.save(Location.builder()
                 .storageLocation(storage).locationCode("DEPHDR-" + suffix).build());
     }
+
+    @Test
+    @DisplayName("GET /api/locations/{id}/inventory carries Deprecation and Link headers")
+    void getLocationInventory_carriesDeprecationHeaders() throws Exception {
+        Location location = seedLocation("1");
+
+        ResultActions result = mockMvc.perform(get("/api/locations/{id}/inventory", location.getId())
+                        .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Sunset"));
+        assertDeprecationHeaders(result);
+    }
+
+    @Test
+    @DisplayName("GET /api/storage-locations/{id}/inventory carries Deprecation and Link headers")
+    void getStorageLocationInventory_carriesDeprecationHeaders() throws Exception {
+        Location location = seedLocation("2");
+
+        ResultActions result = mockMvc.perform(
+                        get("/api/storage-locations/{id}/inventory", location.getStorageLocation().getId())
+                                .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Sunset"));
+        assertDeprecationHeaders(result);
+    }
+
+    // ========= T-6e-be-8: /api/locations/with-counts (legacy, site-blind) =========
 
     @Test
     @DisplayName("GET /api/locations/with-counts carries Deprecation and Link headers")

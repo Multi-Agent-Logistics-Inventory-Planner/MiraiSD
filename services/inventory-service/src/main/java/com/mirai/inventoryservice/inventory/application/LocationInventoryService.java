@@ -123,14 +123,41 @@ public class LocationInventoryService {
     }
 
     /**
-     * Get inventory by ID. Package-private-in-spirit (kept only for {@link #deleteInventory}'s
-     * internal use) -- its only external caller, the legacy {@code LocationInventoryController},
-     * was deleted in .specs/phase-6-inventory 6e, T-6e-be-9.
+     * Get inventory by ID. Public again (.specs/phase-6-inventory 6e, R-3 revert, 2026-09-15):
+     * the legacy {@code LocationInventoryController} that calls this was restored after the
+     * documented compatibility-removal gate (docs/baseline/api-v1-map.md) turned out to be
+     * unsatisfiable this checkpoint -- see log.md's "Review-driven fix: 6e independent review
+     * findings" section.
      */
-    private LocationInventory getInventoryById(UUID inventoryId) {
+    public LocationInventory getInventoryById(UUID inventoryId) {
         return locationInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new InventoryNotFoundException(
                         "Inventory not found with id: " + inventoryId));
+    }
+
+    /**
+     * List all inventory at a specific location. Restored alongside {@link #getInventoryById}
+     * (R-3 revert) -- see that method's Javadoc.
+     */
+    public List<LocationInventory> listInventoryAtLocation(UUID locationId) {
+        locationRepository.findById(locationId)
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
+        return locationInventoryRepository.findByLocation_Id(locationId);
+    }
+
+    /**
+     * List all inventory for a specific storage location type (e.g., all box bins). Restored
+     * alongside {@link #getInventoryById} (R-3 revert) -- see that method's Javadoc. Delegates
+     * to {@link LocationInventoryRepository#findByStorageLocation_Id}, which now applies the
+     * same kuji-child/CUSTOM-kuji-parent exclusion its {@code findByLocation_Id} sibling always
+     * has -- the 6d-recorded "trap" (a caller reaching the unfiltered method) is closed by
+     * fixing the query itself this time, not by leaving the trap for whichever caller reappears.
+     */
+    public List<LocationInventory> listInventoryByStorageLocation(UUID storageLocationId) {
+        storageLocationRepository.findById(storageLocationId)
+                .orElseThrow(() -> new StorageLocationNotFoundException(
+                        "Storage location not found: " + storageLocationId));
+        return locationInventoryRepository.findByStorageLocation_Id(storageLocationId);
     }
 
     /**
@@ -153,20 +180,6 @@ public class LocationInventoryService {
      */
     public Optional<LocationInventory> findByLocationAndProduct(UUID locationId, UUID productId) {
         return locationInventoryRepository.findByLocation_IdAndProduct_Id(locationId, productId);
-    }
-
-    /**
-     * Update inventory quantity directly (without tracking)
-     * Use with caution - prefer adjustInventory for tracked changes
-     */
-    public LocationInventory updateInventoryQuantity(UUID inventoryId, Integer quantity) {
-        LocationInventory inventory = getInventoryById(inventoryId);
-        stockMovementService.validateKujiAllocation(
-                inventory.getLocation().getId(),
-                inventory.getProduct().getId(),
-                quantity != null ? quantity : 0);
-        inventory.setQuantity(quantity);
-        return locationInventoryRepository.save(inventory);
     }
 
     /**

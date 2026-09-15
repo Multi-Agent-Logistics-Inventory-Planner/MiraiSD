@@ -74,6 +74,25 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
     @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE li.site.id = :siteId")
     List<LocationInventory> findBySite_Id(@Param("siteId") UUID siteId);
 
+    /**
+     * Restored (.specs/phase-6-inventory 6e, R-3 revert, 2026-09-15) alongside
+     * {@code LocationInventoryController}. Now applies the same kuji-child/CUSTOM-kuji-parent
+     * exclusion {@link #findByLocation_Id} always has -- 6d recorded the previous, unfiltered
+     * version of this method as "a trap for a future, not-yet-existing caller"; that caller
+     * (the restored {@code LocationInventoryService.listInventoryByStorageLocation}) exists
+     * again now, so the query itself is fixed rather than re-shipping the trap.
+     */
+    @Query("""
+        SELECT li FROM LocationInventory li
+        JOIN FETCH li.location l
+        JOIN FETCH l.storageLocation sl
+        JOIN FETCH li.product p
+        WHERE sl.id = :storageLocationId
+          AND p.parent IS NULL
+          AND (p.kujiType IS NULL OR p.kujiType <> com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM)
+        """)
+    List<LocationInventory> findByStorageLocation_Id(@Param("storageLocationId") UUID storageLocationId);
+
     @Query("SELECT SUM(li.quantity) FROM LocationInventory li WHERE li.product.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
 

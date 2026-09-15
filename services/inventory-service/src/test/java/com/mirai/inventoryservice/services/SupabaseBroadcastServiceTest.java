@@ -27,6 +27,7 @@ class SupabaseBroadcastServiceTest {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.clearSynchronization();
         }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
     }
 
     // --- Payload assembly (T-6e-be-4) --------------------------------------------------------
@@ -99,6 +100,7 @@ class SupabaseBroadcastServiceTest {
         SupabaseBroadcastService service = new SupabaseBroadcastService(self);
 
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         service.broadcastNotificationCreated();
         verify(self, never()).dispatchNotificationCreated();
 
@@ -114,6 +116,7 @@ class SupabaseBroadcastServiceTest {
         SupabaseBroadcastService service = new SupabaseBroadcastService(self);
 
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         service.broadcastNotificationCreated();
         // Simulate rollback: the transaction manager clears synchronizations without ever
         // invoking afterCommit() on them.
@@ -123,12 +126,31 @@ class SupabaseBroadcastServiceTest {
     }
 
     @Test
+    void broadcastNotificationCreated_synchronizationActiveButNoActualTransaction_dispatchesImmediately() {
+        // .specs/phase-6-inventory 6e independent review, A-10: isSynchronizationActive() can be
+        // true without a real, commit-capable transaction underneath it (e.g. a
+        // TransactionTemplate configured for a non-transactional context, or synchronization
+        // initialized directly as here). Guarding on isActualTransactionActive() too means this
+        // case dispatches immediately rather than registering a synchronization that might
+        // never see a real commit/rollback callback fire.
+        SupabaseBroadcastService self = mock(SupabaseBroadcastService.class);
+        SupabaseBroadcastService service = new SupabaseBroadcastService(self);
+
+        TransactionSynchronizationManager.initSynchronization();
+        // Deliberately NOT calling setActualTransactionActive(true) here.
+        service.broadcastNotificationCreated();
+
+        verify(self, times(1)).dispatchNotificationCreated();
+    }
+
+    @Test
     void broadcastInventoryUpdated_siteScoped_activeTransaction_defersAndCarriesArgs() {
         SupabaseBroadcastService self = mock(SupabaseBroadcastService.class);
         SupabaseBroadcastService service = new SupabaseBroadcastService(self);
         UUID siteId = UUID.randomUUID();
 
         TransactionSynchronizationManager.initSynchronization();
+        TransactionSynchronizationManager.setActualTransactionActive(true);
         service.broadcastInventoryUpdated(siteId, "RACKS", List.of("p1"), null);
         verify(self, never()).dispatchInventoryUpdated(siteId, "RACKS", List.of("p1"), null);
 

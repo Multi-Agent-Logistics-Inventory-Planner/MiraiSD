@@ -24,16 +24,21 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * T-6d-be-6 (.specs/phase-6-inventory 6d): originally proved a read-parity delta between the
+ * T-6d-be-6 (.specs/phase-6-inventory 6d): originally proved a read-parity *delta* between the
  * legacy, unfiltered {@code LocationInventoryRepository.findByStorageLocation_Id} (the
  * NOT_ASSIGNED read path before T-6d-9) and the v1 per-location route's {@code
- * InventoryQueries.findByLocationIdAndSite}. That legacy method and its only caller
- * ({@code LocationInventoryService.listInventoryByStorageLocation}, reached only through the
- * since-deleted {@code LocationInventoryController}) were deleted in 6e (T-6e-be-9) -- this test
- * is rewritten, per that checkpoint's own design note, to assert only the v1 filter behavior
- * that remains live: {@code findByLocationIdAndSite} excludes kuji-child rows (non-null
- * {@code product.parent}) and CUSTOM-kuji-parent rows (own {@code kujiType == CUSTOM}), keeping
- * only the root product.
+ * InventoryQueries.findByLocationIdAndSite}.
+ * <p>
+ * 6e (T-6e-be-9) deleted the legacy method as part of removing {@code LocationInventoryController}
+ * entirely; the 6e independent review's R-3 finding required reverting that deletion (the
+ * documented compatibility-removal gate, docs/baseline/api-v1-map.md, needs access-log evidence
+ * plus a stabilization window on a *released* version -- unsatisfiable when the deprecation
+ * headers for these exact routes only just landed on this same unmerged branch). On revert, the
+ * legacy method's missing filter (the "trap" 6d only recorded, never closed) was fixed rather
+ * than re-shipped: {@code findByStorageLocation_Id} now applies the same kuji-child/
+ * CUSTOM-kuji-parent exclusion {@code findByLocation_Id}/{@code findByLocationIdAndSite} always
+ * have. So there is no longer a delta to prove -- this test now proves read *parity*: both the
+ * legacy and v1 reads exclude the same rows and agree on the root-only result.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
@@ -48,7 +53,7 @@ class NotAssignedInventoryReadParityIT {
     @Autowired private SiteRepository siteRepository;
 
     @Test
-    void v1Read_excludesKujiChildAndCustomKujiParentRows_keepsOnlyRoot() {
+    void legacyAndV1Reads_bothExcludeKujiChildAndCustomKujiParentRows_agreeOnRootOnly() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         Site site = siteRepository.save(Site.builder().code("NA-IT-" + suffix).name("NA IT Site").build());
 
@@ -79,14 +84,17 @@ class NotAssignedInventoryReadParityIT {
                 .location(naLocation).site(site).product(rootProduct).quantity(5).build());
 
         List<LocationInventory> v1Rows = inventoryQueries.findByLocationIdAndSite(site.getId(), naLocation.getId());
+        List<LocationInventory> legacyRows = locationInventoryRepository.findByStorageLocation_Id(naStorage.getId());
 
         assertThat(v1Rows).extracting(li -> li.getProduct().getId())
                 .containsExactly(rootProduct.getId());
+        assertThat(legacyRows).extracting(li -> li.getProduct().getId())
+                .containsExactly(rootProduct.getId());
 
         // The three seeded rows (root, kuji-child, CUSTOM-kuji-parent) are all real
-        // location_inventory rows at this NOT_ASSIGNED location - confirms the v1 read's
-        // exclusion is a real filter, not an artifact of an empty fixture. findBySite_Id is
-        // genuinely unfiltered (unlike findByLocation_Id, which already applies the same
+        // location_inventory rows at this NOT_ASSIGNED location - confirms both reads' exclusion
+        // is a real filter, not an artifact of an empty fixture. findBySite_Id is genuinely
+        // unfiltered (unlike findByLocation_Id/findByStorageLocation_Id, which apply the same
         // kuji-child/CUSTOM-parent exclusion findByLocationIdAndSite does).
         List<LocationInventory> allRowsAtLocation = locationInventoryRepository.findBySite_Id(site.getId()).stream()
                 .filter(li -> li.getLocation().getId().equals(naLocation.getId()))

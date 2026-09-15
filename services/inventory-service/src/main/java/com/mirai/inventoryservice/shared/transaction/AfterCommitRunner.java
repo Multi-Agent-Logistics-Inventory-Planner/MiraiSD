@@ -19,7 +19,15 @@ public final class AfterCommitRunner {
     }
 
     public static void run(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        // .specs/phase-6-inventory 6e independent review, A-10: isSynchronizationActive() alone
+        // is true even for a non-transactional TransactionTemplate/read-only synchronization
+        // context (synchronization can be active without an actual, commit-capable transaction
+        // underneath it -- see Spring's TransactionSynchronizationManager javadoc). Guarding on
+        // isActualTransactionActive() too ensures a synchronization is only ever registered when
+        // there is a real transaction to defer to; otherwise dispatch runs immediately, matching
+        // the "no active transaction" behavior this class already had.
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {

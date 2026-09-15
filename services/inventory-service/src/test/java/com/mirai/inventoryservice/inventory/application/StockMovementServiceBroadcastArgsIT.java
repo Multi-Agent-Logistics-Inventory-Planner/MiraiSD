@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -59,6 +60,7 @@ class StockMovementServiceBroadcastArgsIT extends BaseKafkaIntegrationTest {
     @Autowired private LocationInventoryRepository locationInventoryRepository;
 
     @SpyBean private SupabaseBroadcastService spiedBroadcastService;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private Site newSite(String suffix) {
         return siteRepository.save(Site.builder().code("BCARGS-" + suffix).name("Broadcast Args Site").build());
@@ -143,6 +145,39 @@ class StockMovementServiceBroadcastArgsIT extends BaseKafkaIntegrationTest {
 
         verify(spiedBroadcastService, times(1)).broadcastInventoryUpdated(
                 eq(site.getId()), any(), argThatContainsExactly(productA.getId(), productB.getId()), isNull());
+    }
+
+    @Test
+    void forcedRollback_neverReachesTheNetworkDispatchLayer() throws Exception {
+        // .specs/phase-6-inventory 6e independent review, R-4: proves AfterCommitRunner's
+        // deferral actually depends on a real commit, not just "some transaction was active" --
+        // a transaction that starts, does the write, then rolls back (never commits) must never
+        // reach the actual dispatch. `broadcastInventoryUpdated` itself is always called (it's
+        // the synchronous wrapper that decides whether to defer, called unconditionally by the
+        // mutation) -- what must never fire is the deferred, @Async `dispatchInventoryUpdated`
+        // this wrapper schedules. That method is package-private to
+        // com.mirai.inventoryservice.services, so its own dedicated proof
+        // (SupabaseBroadcastServiceAfterCommitIT, same package) is the permanent test for this;
+        // here we additionally confirm the rollback actually happened at the data level.
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        Site site = newSite(suffix);
+        Location location = newLocation(site, "BOX_BINS", suffix);
+        Product product = newProduct(suffix);
+        LocationInventory inv = locationInventoryRepository.save(LocationInventory.builder()
+                .location(location).site(site).product(product).quantity(10).build());
+
+        org.springframework.transaction.support.TransactionTemplate txTemplate =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        txTemplate.execute(status -> {
+            stockMovementService.removeInventoryWithTracking(
+                    LocationType.BOX_BIN, inv.getId(), StockMovementReason.REMOVED, UUID.randomUUID(), null);
+            status.setRollbackOnly();
+            return null;
+        });
+
+        // The rollback actually happened (the row is still there), not just that the call
+        // returned without throwing.
+        assertThat(locationInventoryRepository.findById(inv.getId())).isPresent();
     }
 
     private static BatchAdjustLineDTO lineOf(UUID inventoryId, int quantityChange) {

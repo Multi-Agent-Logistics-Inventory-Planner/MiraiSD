@@ -51,6 +51,7 @@ class LocationAggregateEgressIT extends BaseKafkaIntegrationTest {
     private static final int LOCATIONS_PER_SITE = 3;
 
     @Autowired private LocationAggregateRepository locationAggregateRepository;
+    @Autowired private com.mirai.inventoryservice.sites.application.LocationAggregateService locationAggregateService;
     @Autowired private com.mirai.inventoryservice.sites.infrastructure.SiteRepository siteRepository;
     @Autowired private com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository storageLocationRepository;
     @Autowired private com.mirai.inventoryservice.sites.infrastructure.LocationRepository locationRepository;
@@ -126,22 +127,69 @@ class LocationAggregateEgressIT extends BaseKafkaIntegrationTest {
     }
 
     @Test
-    void before_legacyFindAllLocationsWithCounts_returnsBothSitesRowsTogether() throws Exception {
+    void repositoryPrimitive_findAllLocationsWithCounts_isStillGenuinelySiteBlind() throws Exception {
+        // The raw repository method stays deliberately site-blind (T-6e-be-2's design: the
+        // scoped overload is a sibling query, not a wrapper) -- callers must resolve a site
+        // and call the scoped overload, or (for the one legacy route) go through
+        // LocationAggregateService, which now does that resolution -- see the test below.
         java.util.Set<UUID> siteALocationIds = locationIdsForSite(siteA);
         java.util.Set<UUID> siteBLocationIds = locationIdsForSite(siteB);
 
         statistics.clear();
         @SuppressWarnings("deprecation")
         List<LocationWithCountsDTO> legacy = locationAggregateRepository.findAllLocationsWithCounts();
-        measure("before/legacy findAllLocationsWithCounts", legacy);
+        measure("repository-primitive/legacy findAllLocationsWithCounts", legacy);
 
         long siteACount = legacy.stream().filter(l -> siteALocationIds.contains(l.getId())).count();
         long siteBCount = legacy.stream().filter(l -> siteBLocationIds.contains(l.getId())).count();
 
-        // The defect this checkpoint fixes: the legacy query has no site predicate at all, so
-        // one call returns rows from *every* site mixed together.
         assertThat(siteACount).isEqualTo(LOCATIONS_PER_SITE);
         assertThat(siteBCount).isEqualTo(LOCATIONS_PER_SITE);
+    }
+
+    @Test
+    void legacyRoute_serviceLayerNowResolvesDefaultSite_closingTheCrossSiteLeak() throws Exception {
+        // .specs/phase-6-inventory 6e independent review, B-1: the legacy GET
+        // /api/locations/with-counts route (LocationAggregateController) called the site-blind
+        // repository method directly, genuinely mixing every site's locations/quantities into
+        // one response. Fixed at the service layer: LocationAggregateService.
+        // getAllLocationsWithCounts() (no-arg) now resolves the default (MAIN) site and
+        // delegates to the scoped overload. This test proves the leak is closed at the layer
+        // the controller actually calls, not just at the already-scoped repository method.
+        String suffix = UUID.randomUUID().toString().substring(0, 6);
+        Site main = siteRepository.findByCode("MAIN")
+                .orElseGet(() -> siteRepository.save(Site.builder().code("MAIN").name("Main").build()));
+        Site otherSite = siteRepository.save(Site.builder().code("B1-" + suffix).name("B-1 Other Site").build());
+
+        Category category = categoryRepository.save(Category.builder()
+                .name("B1 Category " + suffix).slug("b1-category-" + suffix).build());
+        StorageLocation mainStorage = storageLocationRepository.save(StorageLocation.builder()
+                .site(main).code("B1M-" + suffix).name("B1 Main Storage")
+                .hasDisplay(false).isDisplayOnly(false).displayOrder(1).build());
+        StorageLocation otherStorage = storageLocationRepository.save(StorageLocation.builder()
+                .site(otherSite).code("B1O-" + suffix).name("B1 Other Storage")
+                .hasDisplay(false).isDisplayOnly(false).displayOrder(1).build());
+        Location mainLocation = locationRepository.save(Location.builder()
+                .storageLocation(mainStorage).locationCode("B1M-" + suffix).build());
+        Location otherLocation = locationRepository.save(Location.builder()
+                .storageLocation(otherStorage).locationCode("B1O-" + suffix).build());
+        Product mainProduct = productRepository.save(Product.builder()
+                .sku("B1M-" + suffix).name("B1 Main Product").category(category).isActive(true).quantity(0).build());
+        Product otherProduct = productRepository.save(Product.builder()
+                .sku("B1O-" + suffix).name("B1 Other Product").category(category).isActive(true).quantity(0).build());
+        locationInventoryRepository.save(LocationInventory.builder()
+                .location(mainLocation).site(main).product(mainProduct).quantity(7).build());
+        locationInventoryRepository.save(LocationInventory.builder()
+                .location(otherLocation).site(otherSite).product(otherProduct).quantity(555).build());
+
+        @SuppressWarnings("deprecation")
+        List<LocationWithCountsDTO> legacyRouteResult = locationAggregateService.getAllLocationsWithCounts();
+
+        boolean anyOtherSiteRow = legacyRouteResult.stream()
+                .anyMatch(l -> l.getId().equals(otherLocation.getId()) || l.getTotalQuantity() == 555);
+        assertThat(anyOtherSiteRow).isFalse();
+        boolean mainRowPresent = legacyRouteResult.stream().anyMatch(l -> l.getId().equals(mainLocation.getId()));
+        assertThat(mainRowPresent).isTrue();
     }
 
     @Test
