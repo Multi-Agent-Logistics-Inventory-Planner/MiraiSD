@@ -964,38 +964,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/locations/{locationId}/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listInventoryAtLocation"];
-        put?: never;
-        post: operations["addInventory"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{locationId}/inventory/{inventoryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getInventoryById"];
-        put: operations["updateInventory"];
-        post?: never;
-        delete: operations["deleteInventory"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/lootbox/admin/activity": {
         parameters: {
             query?: never;
@@ -2300,22 +2268,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getInventoryStorageLocations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/storage-locations/{storageLocationId}/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listInventoryByStorageLocation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3800,19 +3752,6 @@ export interface components {
             quantity?: number;
             storageLocationCode?: string;
         };
-        InventoryRequestDTO: {
-            /** Format: uuid */
-            actorId?: string;
-            /** Format: int32 */
-            intakeQty?: number;
-            intakeUnit?: string;
-            /** Format: uuid */
-            itemId: string;
-            /** Format: int32 */
-            quantity: number;
-            /** @enum {string} */
-            reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
-        };
         InventoryTotalDTO: {
             /** Format: uuid */
             categoryId?: string;
@@ -3997,21 +3936,6 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
             storageLocation: components["schemas"]["StorageLocation"];
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        LocationInventoryResponseDTO: {
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: uuid */
-            id?: string;
-            item?: components["schemas"]["ProductSummaryDTO"];
-            locationCode?: string;
-            /** Format: uuid */
-            locationId?: string;
-            /** Format: int32 */
-            quantity?: number;
-            storageLocationType?: string;
             /** Format: date-time */
             updatedAt?: string;
         };
@@ -8591,257 +8515,6 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listInventoryAtLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    addInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getInventoryById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    updateInventory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InventoryRequestDTO"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteInventory: {
-        parameters: {
-            query?: {
-                actorId?: string;
-            };
-            header?: never;
-            path: {
-                locationId: string;
-                inventoryId: string;
             };
             cookie?: never;
         };
@@ -13528,54 +13201,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["StorageLocation"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listInventoryByStorageLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                storageLocationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["LocationInventoryResponseDTO"][];
                 };
             };
             /** @description Authentication required */

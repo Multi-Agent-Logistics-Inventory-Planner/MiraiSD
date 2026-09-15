@@ -123,31 +123,14 @@ public class LocationInventoryService {
     }
 
     /**
-     * Get inventory by ID
+     * Get inventory by ID. Package-private-in-spirit (kept only for {@link #deleteInventory}'s
+     * internal use) -- its only external caller, the legacy {@code LocationInventoryController},
+     * was deleted in .specs/phase-6-inventory 6e, T-6e-be-9.
      */
-    public LocationInventory getInventoryById(UUID inventoryId) {
+    private LocationInventory getInventoryById(UUID inventoryId) {
         return locationInventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new InventoryNotFoundException(
                         "Inventory not found with id: " + inventoryId));
-    }
-
-    /**
-     * List all inventory at a specific location
-     */
-    public List<LocationInventory> listInventoryAtLocation(UUID locationId) {
-        locationRepository.findById(locationId)
-                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
-        return locationInventoryRepository.findByLocation_Id(locationId);
-    }
-
-    /**
-     * List all inventory for a specific storage location type (e.g., all box bins)
-     */
-    public List<LocationInventory> listInventoryByStorageLocation(UUID storageLocationId) {
-        storageLocationRepository.findById(storageLocationId)
-                .orElseThrow(() -> new StorageLocationNotFoundException(
-                        "Storage location not found: " + storageLocationId));
-        return locationInventoryRepository.findByStorageLocation_Id(storageLocationId);
     }
 
     /**

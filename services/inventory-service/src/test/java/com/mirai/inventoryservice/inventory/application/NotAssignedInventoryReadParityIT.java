@@ -24,20 +24,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * T-6d-be-6 (.specs/phase-6-inventory 6d): proves the real read-parity delta the backend design
- * flagged (R-9's NOT_ASSIGNED resolution) between the legacy, unfiltered
- * {@code LocationInventoryRepository.findByStorageLocation_Id} (today's NOT_ASSIGNED read path)
- * and the v1 per-location route's {@code InventoryQueries.findByLocationIdAndSite} (backed by
- * {@code findByLocation_IdAndSite_Id}), which excludes kuji-child rows (non-null {@code
- * product.parent}) and CUSTOM-kuji-parent rows (own {@code kujiType == CUSTOM}).
- * <p>
- * Seeds one root product, one kuji-child product (parented to a CUSTOM kuji parent), and the
- * CUSTOM kuji parent product itself -- each with a real {@code location_inventory} row at one
- * NOT_ASSIGNED location -- and asserts: the legacy read returns all three (today's actual,
- * unfiltered behavior), while the v1 read returns only the root product. Moving the web's
- * NOT_ASSIGNED flow onto the v1 route (T-6d-9) is therefore a genuine behavior change, not a
- * no-op -- exactly what the design note requires this test to prove before the web slice ships it
- * as fact.
+ * T-6d-be-6 (.specs/phase-6-inventory 6d): originally proved a read-parity delta between the
+ * legacy, unfiltered {@code LocationInventoryRepository.findByStorageLocation_Id} (the
+ * NOT_ASSIGNED read path before T-6d-9) and the v1 per-location route's {@code
+ * InventoryQueries.findByLocationIdAndSite}. That legacy method and its only caller
+ * ({@code LocationInventoryService.listInventoryByStorageLocation}, reached only through the
+ * since-deleted {@code LocationInventoryController}) were deleted in 6e (T-6e-be-9) -- this test
+ * is rewritten, per that checkpoint's own design note, to assert only the v1 filter behavior
+ * that remains live: {@code findByLocationIdAndSite} excludes kuji-child rows (non-null
+ * {@code product.parent}) and CUSTOM-kuji-parent rows (own {@code kujiType == CUSTOM}), keeping
+ * only the root product.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
@@ -52,7 +48,7 @@ class NotAssignedInventoryReadParityIT {
     @Autowired private SiteRepository siteRepository;
 
     @Test
-    void v1Read_excludesKujiChildAndCustomKujiParentRows_legacyReadDoesNot() {
+    void v1Read_excludesKujiChildAndCustomKujiParentRows_keepsOnlyRoot() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         Site site = siteRepository.save(Site.builder().code("NA-IT-" + suffix).name("NA IT Site").build());
 
@@ -82,13 +78,21 @@ class NotAssignedInventoryReadParityIT {
         locationInventoryRepository.save(LocationInventory.builder()
                 .location(naLocation).site(site).product(rootProduct).quantity(5).build());
 
-        List<LocationInventory> legacyRows = locationInventoryRepository.findByStorageLocation_Id(naStorage.getId());
         List<LocationInventory> v1Rows = inventoryQueries.findByLocationIdAndSite(site.getId(), naLocation.getId());
 
-        assertThat(legacyRows).extracting(li -> li.getProduct().getId())
-                .containsExactlyInAnyOrder(customParent.getId(), kujiChild.getId(), rootProduct.getId());
         assertThat(v1Rows).extracting(li -> li.getProduct().getId())
                 .containsExactly(rootProduct.getId());
+
+        // The three seeded rows (root, kuji-child, CUSTOM-kuji-parent) are all real
+        // location_inventory rows at this NOT_ASSIGNED location - confirms the v1 read's
+        // exclusion is a real filter, not an artifact of an empty fixture. findBySite_Id is
+        // genuinely unfiltered (unlike findByLocation_Id, which already applies the same
+        // kuji-child/CUSTOM-parent exclusion findByLocationIdAndSite does).
+        List<LocationInventory> allRowsAtLocation = locationInventoryRepository.findBySite_Id(site.getId()).stream()
+                .filter(li -> li.getLocation().getId().equals(naLocation.getId()))
+                .toList();
+        assertThat(allRowsAtLocation).extracting(li -> li.getProduct().getId())
+                .containsExactlyInAnyOrder(customParent.getId(), kujiChild.getId(), rootProduct.getId());
     }
 
     /**

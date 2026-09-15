@@ -184,7 +184,9 @@ class RBACAlignmentIT extends BaseIntegrationTest {
     /**
      * Inventory Operations: EMPLOYEE + ADMIN
      * Frontend: inventory:adjust, inventory:add (EMPLOYEE + ADMIN)
-     * Backend: LocationInventoryController POST/PUT (EMPLOYEE+), StockMovementController adjust (EMPLOYEE+)
+     * Backend: SiteInventoryMutationController create/delete (EMPLOYEE+/ADMIN+ASSISTANT_MANAGER),
+     * StockMovementController adjust (EMPLOYEE+) -- LocationInventoryController (POST/PUT) was
+     * deleted in .specs/phase-6-inventory 6e, T-6e-be-9.
      */
     @Nested
     @DisplayName("Inventory Operations (EMPLOYEE + ADMIN)")

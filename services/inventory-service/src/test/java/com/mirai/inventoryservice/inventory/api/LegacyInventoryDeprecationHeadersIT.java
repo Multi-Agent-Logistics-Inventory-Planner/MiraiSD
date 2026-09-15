@@ -95,9 +95,9 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
                 .andExpect(header().doesNotExist("Link"));
     }
 
-    // ========= T-6d-be-7: /api/locations/{id}/inventory* and /api/storage-locations/{id}/inventory =========
+    // ========= T-6e-be-8: /api/locations/with-counts (legacy, site-blind) =========
 
-    private Location seedLocationWithInventory(String suffix) {
+    private Location seedLocation(String suffix) {
         Site site = siteRepository.findByCode("MAIN").orElseThrow();
         StorageLocation storage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", "MAIN")
                 .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
@@ -107,11 +107,9 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/locations/{id}/inventory carries Deprecation and Link headers")
-    void getLocationInventory_carriesDeprecationHeaders() throws Exception {
-        Location location = seedLocationWithInventory("1");
-
-        ResultActions result = mockMvc.perform(get("/api/locations/{id}/inventory", location.getId())
+    @DisplayName("GET /api/locations/with-counts carries Deprecation and Link headers")
+    void getLocationsWithCounts_carriesDeprecationHeaders() throws Exception {
+        ResultActions result = mockMvc.perform(get("/api/locations/with-counts")
                         .header("Authorization", "Bearer " + employeeToken()))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Sunset"));
@@ -119,22 +117,20 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /api/storage-locations/{id}/inventory carries Deprecation and Link headers")
-    void getStorageLocationInventory_carriesDeprecationHeaders() throws Exception {
-        Location location = seedLocationWithInventory("2");
+    @DisplayName("GET /api/v1/sites/{siteId}/locations/with-counts does not carry legacy deprecation headers")
+    void getV1SiteLocationsWithCounts_doesNotCarryDeprecationHeaders() throws Exception {
+        Site site = siteRepository.save(Site.builder().name("Deprecation V1 Locations Site").code("DEPV1-LOC-1").build());
 
-        ResultActions result = mockMvc.perform(
-                        get("/api/storage-locations/{id}/inventory", location.getStorageLocation().getId())
-                                .header("Authorization", "Bearer " + employeeToken()))
-                .andExpect(status().isOk())
-                .andExpect(header().doesNotExist("Sunset"));
-        assertDeprecationHeaders(result);
+        mockMvc.perform(get("/api/v1/sites/{siteId}/locations/with-counts", site.getId())
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(header().doesNotExist("Deprecation"))
+                .andExpect(header().doesNotExist("Link"));
     }
 
     @Test
-    @DisplayName("GET /api/locations/{id} (sites' own route, no /inventory suffix) does not carry deprecation headers")
+    @DisplayName("GET /api/locations/{id} (sites' own route, no with-counts suffix) does not carry deprecation headers")
     void getLocationById_sitesOwnRoute_doesNotCarryDeprecationHeaders() throws Exception {
-        Location location = seedLocationWithInventory("3");
+        Location location = seedLocation("3");
 
         mockMvc.perform(get("/api/locations/{id}", location.getId())
                         .header("Authorization", "Bearer " + employeeToken()))

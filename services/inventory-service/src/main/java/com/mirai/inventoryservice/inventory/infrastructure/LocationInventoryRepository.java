@@ -74,9 +74,6 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
     @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE li.site.id = :siteId")
     List<LocationInventory> findBySite_Id(@Param("siteId") UUID siteId);
 
-    @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE sl.id = :storageLocationId")
-    List<LocationInventory> findByStorageLocation_Id(@Param("storageLocationId") UUID storageLocationId);
-
     @Query("SELECT SUM(li.quantity) FROM LocationInventory li WHERE li.product.id = :productId")
     Integer sumQuantityByProductId(@Param("productId") UUID productId);
 

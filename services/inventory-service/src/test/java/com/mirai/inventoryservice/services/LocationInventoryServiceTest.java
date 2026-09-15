@@ -127,75 +127,6 @@ class LocationInventoryServiceTest {
     }
 
     @Nested
-    @DisplayName("getInventoryById")
-    class GetInventoryByIdTests {
-
-        @Test
-        @DisplayName("should return inventory when found")
-        void shouldReturnInventoryWhenFound() {
-            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.of(testInventory));
-
-            LocationInventory result = locationInventoryService.getInventoryById(inventoryId);
-
-            assertEquals(testInventory, result);
-        }
-
-        @Test
-        @DisplayName("should throw InventoryNotFoundException when not found")
-        void shouldThrowExceptionWhenNotFound() {
-            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.empty());
-
-            assertThrows(InventoryNotFoundException.class, () ->
-                    locationInventoryService.getInventoryById(inventoryId));
-        }
-    }
-
-    @Nested
-    @DisplayName("listInventoryAtLocation")
-    class ListInventoryAtLocationTests {
-
-        @Test
-        @DisplayName("should return all inventory at location")
-        void shouldReturnAllInventoryAtLocation() {
-            LocationInventory inventory2 = LocationInventory.builder()
-                    .id(UUID.randomUUID())
-                    .location(testLocation)
-                    .site(testSite)
-                    .product(Product.builder().id(UUID.randomUUID()).sku("SKU-002").name("Product 2").category(testCategory).build())
-                    .quantity(5)
-                    .build();
-
-            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
-            when(locationInventoryRepository.findByLocation_Id(locationId))
-                    .thenReturn(List.of(testInventory, inventory2));
-
-            List<LocationInventory> result = locationInventoryService.listInventoryAtLocation(locationId);
-
-            assertEquals(2, result.size());
-        }
-
-        @Test
-        @DisplayName("should return empty list when no inventory exists")
-        void shouldReturnEmptyListWhenNoInventory() {
-            when(locationRepository.findById(locationId)).thenReturn(Optional.of(testLocation));
-            when(locationInventoryRepository.findByLocation_Id(locationId)).thenReturn(List.of());
-
-            List<LocationInventory> result = locationInventoryService.listInventoryAtLocation(locationId);
-
-            assertTrue(result.isEmpty());
-        }
-
-        @Test
-        @DisplayName("should throw LocationNotFoundException when location not found")
-        void shouldThrowExceptionWhenLocationNotFound() {
-            when(locationRepository.findById(locationId)).thenReturn(Optional.empty());
-
-            assertThrows(LocationNotFoundException.class, () ->
-                    locationInventoryService.listInventoryAtLocation(locationId));
-        }
-    }
-
-    @Nested
     @DisplayName("addInventory")
     class AddInventoryTests {
 
@@ -364,31 +295,6 @@ class LocationInventoryServiceTest {
             List<LocationInventory> result = locationInventoryService.findByProduct(productId);
 
             assertTrue(result.isEmpty());
-        }
-    }
-
-    @Nested
-    @DisplayName("updateInventoryQuantity")
-    class UpdateInventoryQuantityTests {
-
-        @Test
-        @DisplayName("should update inventory quantity")
-        void shouldUpdateInventoryQuantity() {
-            LocationInventory updatedInventory = LocationInventory.builder()
-                    .id(inventoryId)
-                    .location(testLocation)
-                    .site(testSite)
-                    .product(testProduct)
-                    .quantity(20)
-                    .build();
-
-            when(locationInventoryRepository.findById(inventoryId)).thenReturn(Optional.of(testInventory));
-            when(locationInventoryRepository.save(any(LocationInventory.class))).thenReturn(updatedInventory);
-
-            LocationInventory result = locationInventoryService.updateInventoryQuantity(inventoryId, 20);
-
-            assertEquals(20, result.getQuantity());
-            verify(locationInventoryRepository).save(any(LocationInventory.class));
         }
     }
 
