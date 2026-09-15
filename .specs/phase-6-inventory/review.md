@@ -657,8 +657,166 @@ and the `@Lazy` self-injection pattern in `SupabaseBroadcastService` was confirm
 real Spring-context startup, not just in isolated unit tests, by the full IT suite's repeated
 clean passes.
 
-**Disposition: fixed 6e implementation, self-reviewed with two real coverage gaps found and
-closed, both revert-verified. Not yet independently reviewed by an agent with no authorship stake
--- flagged above as the coordinating session's decision to make before treating 6e as
-equivalent in rigor to 6a-6d.** Full verification commands and counts are in validation.md's "6e"
-section.
+**Disposition (superseded by the independent review below): fixed 6e implementation,
+self-reviewed with two real coverage gaps found and closed, both revert-verified.** Full
+verification commands and counts from this pass are in validation.md's "6e" section.
+
+## 6e -- independent review (mirai-spring-reviewer, mirai-next-reviewer): BLOCK, then fixed
+
+The coordinating session ran both independent reviewers this checkpoint's earlier self-review
+flagged as still owed. Both returned a **block** verdict. Every Blocker and Required finding was
+fixed, each with a revert-verified test (the fix removed, the new test confirmed to fail for the
+predicted reason, the fix restored, the test confirmed green). Advisories were fixed where cheap
+and clear; the rest are noted with disposition below.
+
+### Backend findings (mirai-spring-reviewer)
+
+- **R-3 (material scope decision, user-directed, not a code fix): revert the legacy
+  inventory-at-location route deletion; ship deprecation-only.** T-6e-be-9's deletion of
+  `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+  `InventoryRequestDTO` violated the project's own documented compatibility-removal gate
+  (`docs/baseline/api-v1-map.md`): removal requires access-log evidence of no legacy traffic plus
+  a stabilization window on a *released* version, which is unsatisfiable when the routes'
+  deprecation headers only just landed on this same unmerged branch. **Fixed:** restored all four
+  classes, the four `LocationInventoryService` methods (except `updateInventoryQuantity`/the PUT
+  route -- see A-5), `LocationInventoryRepository.findByStorageLocation_Id`, their tests
+  (`LocationInventoryControllerSecurityIT` minus the by-product `ProductTests` nested class,
+  which now permanently lives in `InventoryAggregateControllerSecurityIT` to avoid duplicate
+  coverage across two files; the three `LocationInventoryServiceTest` nested classes; the
+  T-6d-be-7 deprecation-header cases), and the restored-classes' `module-dependency-edges-baseline.txt`
+  note -- from git history at `c8cfcd8^`. Unlike the original T-6d-be-6 version, the restored
+  `findByStorageLocation_Id` now applies the same kuji-child/CUSTOM-kuji-parent filter its
+  `findByLocation_Id` sibling always had, closing the trap for real rather than re-shipping it;
+  `NotAssignedInventoryReadParityIT` rewritten again to prove read *parity* between the legacy
+  and v1 reads (there is no longer a delta, since both filter identically). Regenerated
+  contracts/client (3 paths, 2 schemas restored, confirmed by scripted set-diff). ArchUnit's
+  frozen store regenerated back to its pre-deletion 7-line-larger content directly from git
+  history (`git show c8cfcd8^:...`) rather than via the `allowStoreUpdate` flag, since that flag
+  only prunes obsolete entries -- it cannot re-add violations that were previously frozen out;
+  verified stable across two independent clean rebuilds with the flag back at `false`/`false`.
+- **B-1 (Blocker): the legacy `GET /api/locations/with-counts` route
+  (`LocationAggregateController`, a *different* legacy route from R-3's, in the `sites` module)
+  still called the site-blind `findAllLocationsWithCounts()`/`findLocationsByTypeWithCounts(String)`
+  directly, genuinely mixing every site's data.** **Fixed:** `LocationAggregateService`'s two
+  deprecated no-arg methods now resolve the caller's default site (via `LocationService
+  .getDefaultSiteId()`, the same pattern `LocationInventoryService.listInventoryByStorageLocationCode`
+  already uses) and delegate to the already-built site-scoped overload -- the route's response
+  shape is unchanged. New test in `LocationAggregateEgressIT`
+  (`legacyRoute_serviceLayerNowResolvesDefaultSite_closingTheCrossSiteLeak`) calls the service
+  method the controller actually calls (not just the already-scoped repository method) and
+  confirms a 555-quantity row seeded under a different site never appears. Revert-verified.
+- **R-4 (Required): a permanent real-Postgres IT proving a forced-rollback transaction emits zero
+  broadcasts, plus proof `@Async` still applies through the `@Lazy` self-proxy.** The reviewer
+  verified this by hand with a throwaway test context; no permanent test existed. **Fixed:** new
+  `SupabaseBroadcastServiceAfterCommitIT` (package `com.mirai.inventoryservice.services`, same
+  package as `SupabaseBroadcastService` so it can observe its package-private
+  `dispatchInventoryUpdated` -- a Mockito spy on that method proved too fragile to stub reliably
+  through the class's existing Spring AOP `@Async` CGLIB proxy, so both proofs instead observe
+  the dispatch's own "Failed to send broadcast" WARN log line via a Logback `ListAppender`: a
+  forced-rollback transaction (via `TransactionTemplate` + `setRollbackOnly()`) produces zero log
+  lines within a real wait window; a committed transaction produces exactly one, on a thread
+  different from the calling test thread.
+- **A-5 (Advisory, fixed): `LocationInventoryService.updateInventoryQuantity` is an untracked,
+  unaudited absolute-quantity setter with zero callers -- delete it.** Confirmed by re-reading
+  the commit history: T-6e-be-9's own commit message claimed to delete this method, but the
+  actual diff never touched it -- a real oversight, caught by this finding. **Fixed:** deleted
+  the method (and, per the same rationale, did not restore its PUT route/test cases during the
+  R-3 revert above -- the controller's PUT endpoint and its Javadoc now explicitly record that
+  this stays removed even though the rest of the controller came back).
+- **A-7 (Advisory, fixed): delete `apps/web/src/lib/api/locations.ts`'s dead `getLocationsWithCounts`
+  function.** Zero callers post-T-6e-9; its own comment's "silently resolves to MAIN" claim was
+  the exact claim B-1 found to be false. Deleted; the backend route stays present (deprecated) per
+  R-3.
+- **A-10 (Advisory, fixed): `AfterCommitRunner` should guard on `isSynchronizationActive() &&
+  isActualTransactionActive()`, not synchronization-active alone.** Synchronization can be active
+  without a real, commit-capable transaction underneath it. Fixed; updated
+  `SupabaseBroadcastServiceTest`'s three "active transaction" cases to also call
+  `TransactionSynchronizationManager.setActualTransactionActive(true)` (they were manually
+  initializing synchronization without a real transaction manager, which would otherwise now
+  dispatch immediately instead of deferring), and added a new case proving the guard itself:
+  synchronization active but no actual transaction still dispatches immediately. Revert-verified.
+- **A-6 (Advisory): re-check `docs/baseline/api-v1-map.md` for accuracy after the R-3 revert.**
+  Checked -- the document was never edited during T-6e-be-9's deletion (confirmed via `git log`),
+  so it already correctly described `LocationInventoryController` as present. No change needed.
+- A-8, A-9, A-11, A-12: informational, no action needed (A-8 moot once R-2/B-1 were fixed; A-9/
+  A-11/A-12 pre-existing or Phase-7 debt).
+
+### Web findings (mirai-next-reviewer)
+
+- **Blocker 1: `flushInventorySiteRefresh`'s merge never zeroed a requested product ID absent
+  from the response, contradicting `InventoryQueries.java`'s documented batched-mode contract
+  (absence means quantity 0).** A product that just went out of stock would show its old
+  non-zero quantity forever. **Fixed:** every requested ID is now seeded to
+  `{productId, totalQuantity: 0}` before applying whatever the response actually returned.
+  Revert-verified with a new test (`inventory-refresh.test.ts`).
+- **Blocker 2: the totals refresh added inside `onSuccess` in `use-stock-mutations.ts`/
+  `use-location-mutations.ts` could reject, and an `onSuccess` rejection makes `mutateAsync`
+  report the whole, already-committed mutation as failed** -- `adjust-stock-dialog.tsx` would
+  show a false "Adjustment failed" toast, and a user retry would mint a fresh idempotency key,
+  risking a real double-adjustment. **Fixed:** both call sites now `.catch()` a refresh failure
+  into a plain `invalidateQueries` fallback instead of letting it propagate. Revert-verified
+  (`use-stock-mutations.test.ts`); the identical fix in `use-location-mutations.ts` was applied
+  by the same pattern but not independently test-covered -- that hook has no existing test file
+  at all (a pre-existing gap, not introduced by this fix), and adding one from scratch was out of
+  this fix round's scope. Noted, not silently skipped.
+- **Required 4: the Kuji dialogs' legacy `useProductInventoryEntries` two-element key
+  (`["productInventoryEntries", productId]`) was never invalidated by either the coalescing
+  executor or the broadcast handler after 6e's site-scoping.** **Fixed:** both
+  `flushInventorySiteRefresh` and the broadcast handler's direct per-product branch now also
+  invalidate the legacy two-element key alongside the site-qualified one, kept until Kuji's own
+  Phase 7 site migration. Revert-verified in both files.
+- **Required 5: reconnect recovery only refreshed `inventoryTotals`, not AC-7's "full
+  selected-site recovery."** **Fixed:** broadened to also invalidate `locationInventory`,
+  `locationsWithCounts` (site-qualified) and `productInventoryEntries` (the bare prefix, since a
+  recovery-path refresh is rare enough that the minor cross-site over-invalidation cost is
+  acceptable there, unlike the regular coalesced path). Revert-verified.
+- **Advisory 6 (fixed): attach `.catch()` to the fire-and-forget `flushInventorySiteRefresh`
+  calls** in `use-coalesced-inventory-refresh.ts` and the reconnect-recovery call, so a failed
+  refresh never becomes an unhandled promise rejection.
+- **Advisory 7 (fixed): the broadcast effect's cleanup called `flushNow()` on unmount, contradicting
+  `useCoalescedInventoryRefresh`'s own documented/tested "cancels without flushing" behavior.**
+  Picked the coalescing hook's existing behavior (no flush on unmount) and removed the
+  contradictory call; added a composed-hook unmount test in `use-realtime-broadcast.test.ts`
+  (not just the isolated coalescing hook's existing test). Revert-verified.
+- **Advisory 8 (fixed): guard the merge with a `lastUpdatedAt` comparison** so two overlapping
+  flushes for the same product can't have an older response win just by resolving second. Keeps
+  whichever of the cached vs. fetched row is newer; prefers the fetched candidate when either
+  side lacks a timestamp. Revert-verified with two new tests (the race case, and the normal
+  newer-wins case).
+- **Advisory 9 (fixed): relabeled the AC-8 web measurement's byte figures in `validation.md`**
+  as derived estimates carried over from 6c's backend-measured per-row costs, explicitly not an
+  independent web-side measurement -- the request-count columns are the real web-side evidence.
+- **R-2/Required-3 (same finding from both reviewers, fixed): `use-realtime-broadcast.ts`'s
+  `locationsWithCounts` type-qualified invalidation was dead code** -- `data.locationType` is the
+  backend's `storage_locations.code` vocabulary (`"RACKS"`), not the frontend `LocationType` enum
+  the cache key uses, so it could never match, and Kuji/Shipment producers send no `locationType`
+  at all so even the "ALL" branch never fired for those. **Fixed:** dropped the type-qualified
+  keys entirely; every `inventory_updated` event now unconditionally invalidates the whole
+  `["locationsWithCounts", siteId]` prefix, matching the pattern `use-location-mutations.ts`
+  already used. Revert-verified.
+- Advisory 10: left to judgment -- not independently actioned this round; no specific finding
+  text was carried in the reviewer's report to act on beyond what's covered above.
+
+### Final verification after all fixes (this round)
+
+Backend: `./mvnw -q clean test-compile` clean. `./mvnw -q clean test` -- 380 run (up from 379:
++1, `SupabaseBroadcastServiceTest`'s new A-10 case), 0 failures/errors. `./mvnw test -Dtest='*IT'`
+-- 522 run (up from 502: the R-3-restored `LocationInventoryControllerSecurityIT` minus its moved
+`ProductTests`, plus `SupabaseBroadcastServiceAfterCommitIT` and the new `LocationAggregateEgressIT`
+case), 8 failures, name-for-name identical to the pre-existing
+`AnalyticsControllerSecurityIT`/`ForecastControllerSecurityIT` set, no new failure. `ArchitectureTest`
+stable across two independent clean rebuilds; frozen store restored to its pre-T6e-be-9 content
+exactly, confirmed by `git diff`. Contracts regenerated and confirmed stable (scripted set-diff:
+the R-3 revert's 3 paths + 2 schemas restored, nothing else changed).
+
+Web: `npx tsc --noEmit` clean. `npx vitest run` -- 57 files/404 tests (up from 395: +9 new cases
+across `inventory-refresh.test.ts`, `use-realtime-broadcast.test.ts`,
+`use-stock-mutations.test.ts`), 0 failed. `npx eslint .` -- 0 errors/51 warnings, identical to
+every prior checkpoint's baseline.
+
+**Disposition: both independent reviews' Blocker and Required findings fixed and revert-verified;
+Advisories fixed where cheap, one (use-location-mutations.ts's Blocker-2 test coverage) explicitly
+noted as skipped with reason, one (Advisory 10) left to judgment for lack of specific text to
+action. 6e is now reviewed to the same independent-agent standard as 6a-6d.** The coordinating
+session still owns running the complete phase exit gate (AC-1-8 together) and closing the
+checkpoint.

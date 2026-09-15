@@ -708,11 +708,16 @@ independently-reproducible commands/results per spec.md's requirement.
   flush executor (`inventory-refresh.test.ts`, 5 cases) are unit-tested directly with fake
   timers/a real `QueryClient`.
 - AC-8 web measurement (`ac8-web-measurement.test.ts`, T-6e-10): scripted workload through the
-  actual post-6e coalescing path for five scenarios, request counts and byte estimates (labeled
-  estimates, reusing 6c's measured per-row costs) recorded against the reconstructed pre-6e
-  per-event full-refresh behavior:
+  actual post-6e coalescing path for five scenarios. **The request-count columns are the real
+  web-side measurement evidence** (directly counted from the actual code path under test). **The
+  byte columns are NOT an independent web-side measurement** -- they are derived by multiplying
+  each scenario's request/row count by 6c's backend-measured per-row byte costs (legacy full
+  totals 9445 bytes/25 rows, v1 full totals 2715 bytes/25 rows, v1 batch-of-3 355 bytes/3 rows),
+  carried over as a proxy for "what this request would cost" rather than measured on this
+  checkpoint's own web-side traffic (6e independent review, Advisory 9). "Before" throughout is
+  the reconstructed pre-6e per-event full-refresh behavior (read from git history, not re-run):
 
-  | Scenario | Before: requests | Before: est. bytes | After: requests | After: est. bytes |
+  | Scenario | Before: requests (measured) | Before: bytes (derived, 6c-proxy) | After: requests (measured) | After: bytes (derived, 6c-proxy) |
   | --- | --- | --- | --- | --- |
   | single known ID | 1 | 9445 | 1 | 118 |
   | 5-ID batch | 1 | 9445 | 1 | 590 |
@@ -720,10 +725,12 @@ independently-reproducible commands/results per spec.md's requirement.
   | duplicate ID (2 events) | 2 | 18890 | 1 | 118 |
   | reordered pair (2 events) | 2 | 18890 | 1 | 236 |
 
-  Result size follows affected IDs, not catalog size, in every known-ID scenario; the unknown-ID
-  case correctly falls back to a full (but still site-scoped, still one-request) refresh with no
-  regression claimed there. Explicitly not measured: a live browser/Supabase-websocket session;
-  this is jsdom + a real `QueryClient` + a counting stub, not an end-to-end browser test.
+  Result size follows affected IDs, not catalog size, in every known-ID scenario, per the
+  measured request counts; the unknown-ID case correctly falls back to a full (but still
+  site-scoped, still one-request) refresh with no regression claimed there. Explicitly not
+  measured: a live browser/Supabase-websocket session, and no independent web-side byte
+  measurement was taken -- this is jsdom + a real `QueryClient` + a counting stub, not an
+  end-to-end browser test or a network-level byte capture.
 - Regression of the 6d rendered suites named in the worksheet, run directly and unmodified:
   `kuji-tab-panel.test.tsx`, `product-modal.test.tsx`, `adjust-stock-dialog.test.tsx`,
   `transfer-stock-dialog.test.tsx`, `use-site-product-inventory.test.ts` — 5 files, 16 tests,
