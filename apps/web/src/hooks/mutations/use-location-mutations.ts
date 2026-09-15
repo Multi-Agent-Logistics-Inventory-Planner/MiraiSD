@@ -50,7 +50,12 @@ function invalidateSiteLocationInventory(
   productId: string | undefined
 ) {
   return Promise.all([
-    flushInventorySiteRefresh(qc, siteId, productId ? [productId] : undefined),
+    // Non-fatal (6e independent review, Blocker 2): see use-stock-mutations.ts's identical
+    // comment - a refresh failure must degrade to invalidate-only, never fail the mutation
+    // whose write already committed.
+    flushInventorySiteRefresh(qc, siteId, productId ? [productId] : undefined).catch(() =>
+      qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] })
+    ),
     qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
     // Removed in 6e (T-6e-8): ["dashboardStats"] matched no real query.
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId] }),

@@ -39,11 +39,17 @@ export function useCoalescedInventoryRefresh(windowMs = DEFAULT_WINDOW_MS) {
     if (!buffer) {
       return;
     }
-    void flushInventorySiteRefresh(
+    // Fire-and-forget from the caller's perspective, but never an unhandled rejection (6e
+    // independent review, Advisory 6) - a failed refresh here has no mutation to fail; it just
+    // means this flush's cache update didn't happen, which the next real event/mutation will
+    // correct anyway.
+    flushInventorySiteRefresh(
       queryClient,
       buffer.siteId,
       buffer.ids ? Array.from(buffer.ids) : undefined
-    );
+    ).catch(() => {
+      // Swallow: best-effort refresh, no fallback needed here beyond not crashing.
+    });
   }, [queryClient]);
 
   const notify = useCallback(

@@ -152,6 +152,63 @@ describe("useRealtimeBroadcast (.specs/phase-6-inventory 6e, T-6e-2/3/6)", () =>
     expect(() => act(() => emit({ type: "unknown_event" }))).not.toThrow();
   });
 
+  it("unconditionally invalidates the locationsWithCounts site prefix on inventory_updated, regardless of locationType shape (R-2/Required-3)", () => {
+    const { invalidateSpy } = mount();
+
+    // data.locationType is the backend's storage_locations.code vocabulary ("RACKS"), not the
+    // frontend LocationType enum the cache key uses - a type-qualified invalidation could never
+    // match this. The fix must invalidate unconditionally, and even fire when locationType is
+    // entirely absent (Kuji/Shipment producers send none).
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1", productIds: ["p1"], locationType: "RACKS" });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["locationsWithCounts", "site-1"] });
+  });
+
+  it("invalidates the legacy two-element productInventoryEntries key alongside the site-qualified one (Required 4)", () => {
+    const { invalidateSpy } = mount();
+
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1", productIds: ["p1"] });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "site-1", "p1"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
+  });
+
+  it("reconnect recovery invalidates locationInventory, locationsWithCounts and productInventoryEntries too, not just totals (Required 5)", () => {
+    const { invalidateSpy } = mount();
+
+    act(() => {
+      capturedOnStatus?.("SUBSCRIBED");
+      capturedOnStatus?.("CHANNEL_ERROR");
+      capturedOnStatus?.("SUBSCRIBED");
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["locationInventory", "site-1"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["locationsWithCounts", "site-1"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries"] });
+  });
+
+  it("does not flush a pending coalesced buffer on unmount (Advisory 7 - matches the coalescing hook's own tested behavior)", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { unmount } = renderHook(() => useRealtimeBroadcast(true), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      emit({ type: "inventory_updated", siteId: "site-1", productIds: ["p1"] });
+    });
+    unmount();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(mockFlushInventorySiteRefresh).not.toHaveBeenCalled();
+  });
+
   it("a site switch mid-flight still flushes the buffered event against the site it was notified for, never the new site", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { rerender } = renderHook(() => useRealtimeBroadcast(true), {

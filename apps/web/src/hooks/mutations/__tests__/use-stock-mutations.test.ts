@@ -18,6 +18,11 @@ vi.mock("@/lib/api/site-inventory", () => ({
   newIdempotencyKey: () => crypto.randomUUID(),
 }));
 
+const mockFlushInventorySiteRefresh = vi.fn();
+vi.mock("@/hooks/realtime/inventory-refresh", () => ({
+  flushInventorySiteRefresh: (...args: unknown[]) => mockFlushInventorySiteRefresh(...args),
+}));
+
 import { useBatchAdjustStockMutation } from "../use-stock-mutations";
 
 function createWrapper() {
@@ -39,6 +44,7 @@ describe("useBatchAdjustStockMutation (T-6d-2 idempotency)", () => {
     vi.clearAllMocks();
     mockUseCurrentSite.mockReturnValue({ siteId: "site-1", isLoading: false, error: null });
     mockAdjustSiteInventory.mockResolvedValue(undefined);
+    mockFlushInventorySiteRefresh.mockResolvedValue(undefined);
   });
 
   it("sends no client-supplied actorId and a freshly generated idempotency key per mutate() call", async () => {
@@ -71,5 +77,17 @@ describe("useBatchAdjustStockMutation (T-6d-2 idempotency)", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockAdjustSiteInventory).not.toHaveBeenCalled();
+  });
+
+  it("a failed totals refresh does not fail the mutation (Blocker 2) - the write already committed", async () => {
+    mockFlushInventorySiteRefresh.mockRejectedValue(new Error("network down"));
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useBatchAdjustStockMutation(), { wrapper });
+
+    result.current.mutate({ payload: PAYLOAD, productIds: ["p-1"] });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.isError).toBe(false);
   });
 });

@@ -81,7 +81,7 @@ export function useRealtimeBroadcast(enabled = true) {
   useEffect(() => {
     siteIdRef.current = siteId;
   }, [siteId]);
-  const { notify, flushNow } = useCoalescedInventoryRefresh();
+  const { notify } = useCoalescedInventoryRefresh();
   // Tracks whether the channel has previously errored/timed out, so a full recovery refresh
   // fires only on a SUBSCRIBED that follows a real interruption - never on the first, normal
   // mount subscribe (6e, T-6e-6).
@@ -132,18 +132,22 @@ export function useRealtimeBroadcast(enabled = true) {
                 queryClient.invalidateQueries({
                   queryKey: ["productInventoryEntries", currentSiteId, id],
                 });
+                // Legacy, unscoped two-element key (6e independent review, Required 4) - see
+                // inventory-refresh.ts's identical comment; the Kuji dialogs still read this.
+                queryClient.invalidateQueries({ queryKey: ["productInventoryEntries", id] });
               });
             } else {
               queryClient.invalidateQueries({ queryKey: ["locationInventory", currentSiteId] });
             }
-            if (data.locationType) {
-              queryClient.invalidateQueries({
-                queryKey: ["locationsWithCounts", currentSiteId, data.locationType],
-              });
-              queryClient.invalidateQueries({
-                queryKey: ["locationsWithCounts", currentSiteId, "ALL"],
-              });
-            }
+            // Unconditionally invalidate the whole locationsWithCounts prefix for this site
+            // (6e independent review, R-2/Required-3): data.locationType is the backend's
+            // storage_locations.code vocabulary ("RACKS", "BOX_BINS"), not the frontend
+            // LocationType enum this cache key uses, so a type-qualified invalidation could
+            // never match; Kuji/Shipment producers also send no locationType at all, so even
+            // the "ALL" branch never fired for those. A prefix invalidation matches every
+            // locationsWithCounts entry for this site regardless of shape, same pattern
+            // use-location-mutations.ts already uses.
+            queryClient.invalidateQueries({ queryKey: ["locationsWithCounts", currentSiteId] });
             return;
           }
 
@@ -236,11 +240,20 @@ export function useRealtimeBroadcast(enabled = true) {
               // Missed-event recovery (6e, T-6e-6): a reconnect following a real
               // interruption might have missed notifications, so do one full,
               // authoritative refresh of the current site rather than trusting whatever
-              // was buffered before the drop.
+              // was buffered before the drop. Broadened (6e independent review, Required 5)
+              // to cover every inventory-shaped cache this handler ever writes to, not just
+              // totals - a missed-event window can affect location-level reads and
+              // locations-with-counts too, and AC-7 asks for "full selected-site recovery",
+              // not "full totals-only recovery".
               hasErroredRef.current = false;
               const currentSiteId = siteIdRef.current;
               if (currentSiteId) {
-                void flushInventorySiteRefresh(queryClient, currentSiteId, undefined);
+                flushInventorySiteRefresh(queryClient, currentSiteId, undefined).catch(() => {
+                  // Best-effort recovery; nothing else to fall back to here.
+                });
+                queryClient.invalidateQueries({ queryKey: ["locationInventory", currentSiteId] });
+                queryClient.invalidateQueries({ queryKey: ["locationsWithCounts", currentSiteId] });
+                queryClient.invalidateQueries({ queryKey: ["productInventoryEntries"] });
               }
             }
           } else if (status === "CHANNEL_ERROR") {
@@ -259,7 +272,10 @@ export function useRealtimeBroadcast(enabled = true) {
     }
 
     return () => {
-      flushNow();
+      // Deliberately does NOT flush a pending coalesced buffer on unmount (6e independent
+      // review, Advisory 7) - matches useCoalescedInventoryRefresh's own documented/tested
+      // behavior (cancels without flushing); there is no mounted component left to observe the
+      // result, and the buffer's own timer cleanup (inside that hook) already cancels it.
       if (channelRef.current) {
         try {
           supabase.removeChannel(channelRef.current);
@@ -269,7 +285,7 @@ export function useRealtimeBroadcast(enabled = true) {
         channelRef.current = null;
       }
     };
-  }, [queryClient, enabled, notify, flushNow]);
+  }, [queryClient, enabled, notify]);
 
   // Expose the channel via a stable accessor instead of reading channelRef.current
   // during render: a ref's live value can change without triggering a re-render, so

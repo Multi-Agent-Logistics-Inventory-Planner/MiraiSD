@@ -53,7 +53,15 @@ async function invalidateStockQueries(
   // Totals go through the shared targeted-refresh executor (6e, T-6e-5/AC-7): a bounded fetch
   // of just these product IDs, merged into the cache, instead of a full-catalog invalidation -
   // this hook already has productIds in hand, unlike the realtime broadcast path pre-6e.
-  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds);
+  //
+  // Non-fatal (6e independent review, Blocker 2): this is a network call the mutation's own
+  // write already succeeded before we get here. If it rejects, mutateAsync would otherwise
+  // report the whole (already-committed) mutation as failed - adjust-stock-dialog.tsx would
+  // show a false "Adjustment failed" toast, and a user retry would mint a fresh idempotency key
+  // and risk a real double-adjustment. Degrade to the old invalidate-only behavior instead.
+  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds).catch(() =>
+    qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] })
+  );
 
   const tasks: Promise<unknown>[] = [
     totalsRefresh,

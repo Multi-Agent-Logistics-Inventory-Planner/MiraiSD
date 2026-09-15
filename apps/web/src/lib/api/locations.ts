@@ -178,20 +178,14 @@ export async function resolveSiteLocationId(
 
 // --- Legacy, unscoped reads and all mutations -------------------------------
 // Silently resolve to MAIN server-side (DEFAULT_SITE_CODE). Untouched by Track D.
-
-/**
- * Fetch all locations with their inventory counts in a single request.
- * Replaces the N+1 pattern of fetching locations then counts individually.
- *
- * @param locationType Optional filter by location type
- * @returns List of locations with inventory record counts and total quantities
- */
-export async function getLocationsWithCounts(
-  locationType?: LocationType
-): Promise<LocationWithCounts[]> {
-  const params = locationType ? `?type=${locationType}` : "";
-  return apiGet<LocationWithCounts[]>(`/api/locations/with-counts${params}`);
-}
+//
+// getLocationsWithCounts (GET /api/locations/with-counts) was deleted here in
+// .specs/phase-6-inventory 6e independent review, A-7 - zero remaining web callers after
+// T-6e-9's site-scoped getSiteLocationsWithCounts migration, and its own comment's claim that
+// the legacy route "silently resolves to MAIN server-side" was the exact claim this checkpoint's
+// backend review (B-1) found to be false: the route had no site predicate at all and mixed every
+// site's data together until that finding's fix. The route itself stays deprecated-but-present
+// on the backend (6e's R-3 revert) for compatibility; only this unused client function is gone.
 
 /**
  * Get a storage location by code.

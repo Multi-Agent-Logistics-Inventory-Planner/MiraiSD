@@ -77,4 +77,68 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
 
     expect(mockGetSiteInventoryTotals).toHaveBeenCalledWith("site-1", ["p1"]);
   });
+
+  it("zeroes a requested ID absent from the response, rather than keeping its stale non-zero quantity (Blocker 1)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [
+      { productId: "p1", totalQuantity: 10 },
+      { productId: "p2", totalQuantity: 20 },
+    ]);
+    // p1 went out of stock: per InventoryQueries.java's batched-mode contract, an absent id
+    // means quantity 0, not "unchanged".
+    mockGetSiteInventoryTotals.mockResolvedValue([]);
+
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 0 },
+      { productId: "p2", totalQuantity: 20 },
+    ]);
+  });
+
+  it("invalidates both the site-qualified and the legacy two-element productInventoryEntries key (Required 4)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+    mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p1", totalQuantity: 2 }]);
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "site-1", "p1"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
+  });
+
+  it("keeps the newer cached entry when two overlapping flushes for the same product resolve out of order (Advisory 8)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [
+      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
+    ]);
+    // A stale, older response resolves second (out of order) - it must not overwrite the
+    // newer cached value.
+    mockGetSiteInventoryTotals.mockResolvedValue([
+      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:05.000Z" },
+    ]);
+
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
+    ]);
+  });
+
+  it("applies a newer fetched entry over an older cached one (Advisory 8, the normal case)", async () => {
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [
+      { productId: "p1", totalQuantity: 1, lastUpdatedAt: "2026-01-01T00:00:05.000Z" },
+    ]);
+    mockGetSiteInventoryTotals.mockResolvedValue([
+      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
+    ]);
+
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 999, lastUpdatedAt: "2026-01-01T00:00:10.000Z" },
+    ]);
+  });
 });
