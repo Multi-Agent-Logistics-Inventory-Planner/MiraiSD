@@ -890,5 +890,66 @@ Web: `npx tsc --noEmit` clean. `npx vitest run` -- 57 files/406 tests (up 2: the
 `use-realtime-broadcast.test.ts` cases; `inventory-refresh.test.ts`'s two replaced tests keep
 the file's count net-even), 0 failed. `npx eslint .` -- 0 errors/51 warnings, baseline-identical.
 
-**Disposition: all four findings fixed and revert-verified by the coordinating session. No
-further findings outstanding.**
+**Disposition: all four findings fixed and revert-verified by the coordinating session.**
+
+## Second follow-up review: two sequencing gaps in the P1/P2 fix itself (2026-09-15)
+
+A fifth review pass (user-reported, against the round above) found that the request-issuance
+sequencing mechanism the prior round introduced did not itself cover every path that writes the
+`inventoryTotals` cache. Both fixed by the coordinating session, each revert-verified.
+
+- **P1: full refreshes (reconnect recovery, unknown-ID batches, and the "nothing cached yet"
+  fallback) bypassed sequencing entirely.** They called a bare `invalidateQueries` instead of
+  going through the claim/apply mechanism the prior round built for targeted flushes, so they
+  raced with targeted flushes in both directions: an older full read arriving late (React
+  Query's own refetch, unsequenced) could overwrite a newer targeted write for the same product,
+  and -- because the full path never claimed anything -- an older targeted flush that resolved
+  late could just as easily overwrite a newer full read. **Fixed:** replaced both bare-invalidate
+  call sites with a new `refreshAllInventoryTotals` helper that participates in the same
+  sequencing scheme: it claims every currently-cached product ID up front (mirroring how a
+  targeted flush claims its own ids), fetches the full site totals, and per-id, only applies a
+  fetched row if no strictly newer flush has since claimed that id -- falling back to whatever is
+  currently cached for it otherwise, so a superseded full read doesn't regress an id a newer
+  flush already corrected. New tests cover both directions: an older full refresh cannot
+  overwrite a newer targeted write, and an older targeted response cannot overwrite a newer full
+  refresh, each driven through controlled, independently-resolvable promises the same way the
+  first round's P1 sequencing test was.
+- **P2: a failing flush that had superseded an earlier, successful one left the cache
+  permanently stale with nothing scheduled to correct it.** Claiming happens before the fetch is
+  issued (by design, so ordering is determined by issuance time, not resolution time) -- but the
+  prior round's fix let a flush's own failure just propagate with no consequence for the claim it
+  had already taken. If flush B superseded flush A's claim on product X and then B's fetch
+  failed, A's result (even a correct one, already in flight) was discarded on arrival because A
+  no longer owned the claim, and nothing else was scheduled to reconcile X - the cache stayed
+  wrong indefinitely. **Fixed:** added `recoverOnFailure`, invoked from both the targeted and
+  full-refresh paths' catch blocks: if the failing flush is still the *current* claim holder for
+  at least one of its ids when it fails (i.e. no even-newer flush has since superseded it too),
+  a best-effort `invalidateQueries` on the site's totals key triggers a corrective refetch.
+  Deliberately scoped to only fire when the failing flush is still the latest claimant -- if an
+  even-newer flush already superseded the failing one before it failed, that newer flush already
+  owns reconciling the id, and a redundant recovery would just race it. Two new tests: recovery
+  fires and reproduces the reported scenario (cache would otherwise stay stuck at the old value
+  even though an earlier, superseded fetch had already returned the correct one), and recovery
+  does *not* fire when a still-later flush had already taken over before the failure.
+
+Two existing tests (`ac8-web-measurement.test.ts`'s scenario harness) detected a "full refresh"
+by counting `invalidateQueries` calls against the totals key -- no longer valid once the
+unknown-ID path fetches directly instead of bare-invalidating. Updated to detect a full refresh
+by the absence of a `productIds` argument on the `getSiteInventoryTotals` mock call instead;
+the scenario assertions themselves (request counts, byte estimates) are unchanged.
+
+### Final verification after this round
+
+Backend: unaffected by this round (web-only fix); re-ran `StockMovementServiceBroadcastArgsIT`
+directly to confirm continued green (4/4) after the prior round's backend fix, since the user's
+own attempt was blocked locally by Docker permissions.
+
+Web: `npx tsc --noEmit` clean. `npx vitest run` -- **57 files/410 tests** (up 4 net: two existing
+full-refresh tests rewritten for the new fetch-based behavior, four new tests added -- two P1
+ordering-direction tests and two P2 recovery tests), 0 failed. `npx eslint .` -- 0 errors/51
+warnings, baseline-identical. All new/changed tests individually revert-verified: with the fix
+reverted, 7 of the file's 13 tests failed for the predicted reasons (wrong value applied, no
+ordering guard, recovery not triggered, or a timeout from the old code's non-deterministic mock
+consumption under the new test's controlled-promise setup); fix restored, all 13 green.
+
+**Disposition: both sequencing gaps fixed and revert-verified. No further findings outstanding.**

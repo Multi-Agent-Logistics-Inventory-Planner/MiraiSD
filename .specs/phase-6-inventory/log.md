@@ -6014,3 +6014,27 @@ unchanged. Web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/406 tests,
 eslint .` -- 0 errors/51 warnings, baseline-identical. 6e and Phase 6 remain closed; this round
 is an amendment to that closure, not a reopening -- no acceptance criterion's disposition
 changed, and no other checkpoint's suites were touched.
+
+## Second post-closure follow-up (2026-09-15): sequencing gaps in the P1/P2 fix itself
+
+A fifth review pass found the request-issuance sequencing mechanism from the round above did
+not cover every writer of the `inventoryTotals` cache: the full-refresh paths (reconnect
+recovery, unknown-ID batches, "nothing cached yet") still called a bare `invalidateQueries`,
+bypassing the claim/apply scheme entirely and racing with targeted flushes in both directions
+(an older full read could overwrite a newer targeted write, and vice versa, since the full path
+never claimed anything). Separately, a flush that superseded an earlier successful one and then
+itself failed left the cache permanently stale, since nothing recovered on that failure.
+
+Both fixed: a new `refreshAllInventoryTotals` helper brings the full-refresh path into the same
+sequencing scheme (claims every currently-cached id up front, applies per-id only if not
+superseded, preserving a newer flush's already-applied value otherwise), and a new
+`recoverOnFailure` helper triggers a corrective invalidation when a failing flush was still the
+current claim holder for at least one of its ids (not when an even-newer flush already
+superseded it too, to avoid a redundant race). Full detail, including the new/rewritten tests
+and the `ac8-web-measurement.test.ts` detection-logic update this required, is in review.md's
+"Second follow-up review" section and validation.md's amended final numbers.
+
+Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/410 tests, 0 failed;
+`npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend unaffected (web-only fix);
+`StockMovementServiceBroadcastArgsIT` re-confirmed green (4/4). Both fixes individually
+revert-verified. 6e and Phase 6 remain closed; this is a further amendment, not a reopening.

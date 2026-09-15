@@ -817,3 +817,22 @@ emitsOneNotificationPerAffectedSite`), 8 failures, the same pre-existing
 replaced with two cases asserting the new sequencing/chunking behavior, net-even in that file),
 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. This amends the phase exit gate's
 numbers; it does not reopen 6e or Phase 6, and no acceptance criterion's disposition changed.
+
+### Second post-closure follow-up fix round (2026-09-15, amends the numbers above again)
+
+A fifth review pass found the sequencing mechanism from the round above did not cover the
+full-refresh paths (reconnect recovery, unknown-ID batches, "nothing cached yet"), which still
+bare-invalidated and so raced with targeted flushes in both directions; and that a flush which
+superseded an earlier successful one and then itself failed left the cache permanently stale
+with no recovery. Both fixed (`refreshAllInventoryTotals` brings full refreshes into the same
+claim/apply scheme; `recoverOnFailure` triggers a corrective invalidation when the failing flush
+was still the current claim holder). Full detail in log.md's "Second post-closure follow-up"
+section and review.md's "Second follow-up review" section.
+
+Re-verified, superseding the web numbers above: `npx tsc --noEmit` clean; `npx vitest run` —
+**57 files/410 tests** (up 4 net: two existing full-refresh tests rewritten for the new
+fetch-based behavior, plus four new tests — two P1 ordering-direction cases and two P2 recovery
+cases), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend numbers are
+unaffected by this round (web-only fix); `StockMovementServiceBroadcastArgsIT` re-confirmed
+green (4/4) since the user's own local attempt was blocked by Docker permissions. This amends
+the phase exit gate's web numbers again; it does not reopen 6e or Phase 6.
