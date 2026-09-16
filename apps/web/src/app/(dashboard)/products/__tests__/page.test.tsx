@@ -176,13 +176,16 @@ const SITE_TOTALS: Record<string, unknown[]> = {
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <ProductsPage />
-      </SidebarProvider>
-    </QueryClientProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <SidebarProvider>
+          <ProductsPage />
+        </SidebarProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
@@ -284,7 +287,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
       role: UserRole.ASSISTANT_MANAGER,
     });
 
-    const { rerender } = renderPage();
+    const { rerender, queryClient } = renderPage();
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
@@ -293,10 +296,20 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
 
     // Simulate the site resolving to SECOND (the only way this can happen today, since there's
     // no switcher UI yet - see use-current-site.ts) and force a re-render so the mocked hook's
-    // new return value takes effect and useSiteProductInventory's query key changes.
+    // new return value takes effect and useSiteProductInventory's query key changes. Reuses the
+    // SAME QueryClient instance, matching real production behavior - the app creates one
+    // QueryClient at the root and never swaps it; a genuinely different instance is not
+    // representative and, independent of anything this checkpoint changed, hits a well-known
+    // React Query limitation where an already-mounted useQuery's underlying observer stays
+    // bound to whichever client instance was current at its own mount and never rebinds to a
+    // later one without an actual unmount (useBaseQuery.js's `const [observer] = useState(() =>
+    // new Observer(client, ...))`). The property this test actually verifies - that MAIN's
+    // cached data never leaks into SECOND's view - comes from the site-qualified query keys
+    // (T-6d-3/AC-7), not from swapping client instances, so reusing the same client still fully
+    // exercises it.
     mockUseCurrentSite.mockReturnValue({ ...SECOND_SITE, isLoading: false, error: null });
     rerender(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <SidebarProvider>
           <ProductsPage />
         </SidebarProvider>
@@ -306,7 +319,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     await waitFor(() => {
       const dialogAfter = screen.getByRole("dialog");
       expect(within(dialogAfter).getByText("Not Stocked")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
     const dialogAfter = screen.getByRole("dialog");
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
     expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();

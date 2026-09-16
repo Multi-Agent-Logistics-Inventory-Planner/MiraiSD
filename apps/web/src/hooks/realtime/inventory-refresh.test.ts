@@ -208,10 +208,14 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     expect(result).toEqual([{ productId: "p1", totalQuantity: 10 }]);
   });
 
-  it("fetchSequencedInventoryTotals commits its own result atomically even when its fetch and a targeted flush's fetch resolve back-to-back (follow-up fourth-round review, P1)", async () => {
-    // Same class of gap as the explicit full-refresh test above, but for the real query's own
-    // path: resolving both fetches in the same microtask window (rather than fully awaiting the
-    // targeted flush first) is what actually exercises "decide now, write several hops later."
+  it("fetchSequencedInventoryTotals's own commit is atomic even when its fetch and a targeted flush's fetch resolve back-to-back (follow-up fifth-round review, P1)", async () => {
+    // Fifth-round review found the fourth round's "yield one more tick before returning"
+    // mitigation was just a narrower version of the same race - a longer competing delay always
+    // defeats a shorter one, so it could never be a real fix. This function no longer feeds
+    // React Query's own write to the display key at all (see use-product-inventory.ts's
+    // trigger/mirror split) - its return value is inert, so what matters now is only that its
+    // OWN commit (via commitFullTotals, already asserted structurally above) is correct, not
+    // what it happens to return.
     const qc = client();
     qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
 
@@ -231,20 +235,11 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
 
     resolveQueryFetch([{ productId: "p1", totalQuantity: 5 }]);
     resolveTargetedFetch([{ productId: "p1", totalQuantity: 10 }]);
-    const [result] = await Promise.all([queryRefetch, targetedFlush]);
+    await Promise.all([queryRefetch, targetedFlush]);
 
-    // Both the cache itself and the value fetchSequencedInventoryTotals returns (what React
-    // Query's own subsequent write would apply) must reflect the targeted flush's win.
-    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
-      { productId: "p1", totalQuantity: 10 },
-    ]);
-    expect(result).toEqual([{ productId: "p1", totalQuantity: 10 }]);
-
-    // Simulate React Query's own subsequent, unconditional `data = result` assignment (the
-    // real write this queryFn's return value feeds, which this function itself cannot prevent
-    // or make conditional) - since `result` already matches the current cache, that write is a
-    // harmless no-op rather than a regression back to a stale value.
-    qc.setQueryData(["inventoryTotals", "site-1"], result);
+    // The cache itself must reflect the targeted flush's win - this is the only thing anything
+    // reads for display now, since nothing applies fetchSequencedInventoryTotals's return value
+    // to this key.
     expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
       { productId: "p1", totalQuantity: 10 },
     ]);

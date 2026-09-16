@@ -7,6 +7,7 @@ import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useSiteProducts } from "@/hooks/queries/use-site-products";
 import { fetchSequencedInventoryTotals } from "@/hooks/realtime/inventory-refresh";
+import type { SiteInventoryTotal } from "@/lib/api/site-inventory";
 
 export interface ProductWithInventory {
   product: ProductListItem;
@@ -57,13 +58,35 @@ export function useSiteProductInventory(rootOnly = false) {
   const siteId = siteProductsQuery.siteId;
   const queryClient = useQueryClient();
 
-  const totalsQuery = useQuery({
-    queryKey: ["inventoryTotals", siteId],
-    // Routes through the same request-issuance sequencing as the realtime/mutation flush paths
-    // (follow-up review finding, P1) - this query's own lifecycle refetches (mount, window
-    // focus, staleTime, a manual refetch) used to write via a bare fetch with no sequencing at
-    // all, so they could silently overwrite a newer targeted flush's already-applied value.
+  // Split into a fetch-trigger query and a read-only cache mirror (follow-up review, fifth
+  // round) - a single useQuery whose own queryFn write into ["inventoryTotals", siteId] could
+  // never be fully protected from React Query's own unconditional, un-interceptable application
+  // of that queryFn's return value, which happens some microtask hops after the function
+  // returns on React Query's own schedule. No amount of internal delay/yielding closes that gap
+  // (verified: a longer competing delay always defeats a shorter mitigating one). The only real
+  // fix is to make sure nothing ever registers a queryFn for the real key at all, so every write
+  // to it goes exclusively through the one atomic path (`commitFullTotals`, via
+  // `fetchSequencedInventoryTotals` here or a targeted flush elsewhere) with nothing left to
+  // race against.
+  //
+  // The trigger query drives the actual network fetch and lifecycle (mount, window focus,
+  // staleTime, manual refetch) on a private key nothing reads for display; its own queryFn
+  // return value gets written only into that throwaway key by React Query, which is harmless
+  // since nothing consumes it. The real work - claiming sequence and atomically committing the
+  // merged result - already happened synchronously inside fetchSequencedInventoryTotals before
+  // it returned.
+  const totalsFetchTrigger = useQuery({
+    queryKey: ["inventoryTotalsFetchTrigger", siteId],
     queryFn: siteId ? () => fetchSequencedInventoryTotals(queryClient, siteId) : skipToken,
+  });
+
+  // The mirror: never fetches on its own (queryFn: skipToken), so React Query never
+  // independently applies anything to this key - it only ever observes whatever `setQueryData`
+  // writes here (from the trigger above, from a targeted flush, or from recovery), and re-renders
+  // reactively when any of those commit. This is the only reader of the real, shared cache key.
+  const totalsQuery = useQuery<SiteInventoryTotal[]>({
+    queryKey: ["inventoryTotals", siteId],
+    queryFn: skipToken,
   });
 
   const data: ProductWithInventory[] | null = useMemo(() => {
@@ -107,8 +130,11 @@ export function useSiteProductInventory(rootOnly = false) {
     data,
     siteId,
     siteCode: siteProductsQuery.siteCode,
-    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || totalsQuery.isLoading,
-    error: productsQuery.error ?? siteProductsQuery.error ?? totalsQuery.error,
+    // The mirror query never fetches (queryFn: skipToken), so its own isLoading/error are
+    // always false/undefined regardless of whether data has arrived - loading/error state must
+    // come from the trigger query, which is the one that actually fetches.
+    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || totalsFetchTrigger.isLoading,
+    error: productsQuery.error ?? siteProductsQuery.error ?? totalsFetchTrigger.error,
   };
 }
 

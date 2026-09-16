@@ -134,35 +134,29 @@ async function fetchAndCommitFullTotals(
 }
 
 /**
- * Claims sequence for every currently-cached id, fetches the full site totals, commits the
- * merged result atomically, and returns it as this `queryFn`'s own resolution value. This is
- * the function the real `useQuery` backing this cache key (`use-product-inventory.ts`) uses as
- * its `queryFn`, so a query's own lifecycle refetches (mount, window focus, staleTime, manual
- * refetch) are ordered against explicit flushes the same way an explicit full refresh is
- * (follow-up review finding, P1) - previously the query's own refetches never claimed or
- * checked sequence at all, so they could overwrite a newer targeted write unconditionally.
- * React Query's own retry policy covers a failure here; no separate recovery hook is needed.
+ * Claims sequence for every currently-cached id, fetches the full site totals, and commits the
+ * merged result atomically into `["inventoryTotals", siteId]` (see `commitFullTotals`).
  * <p>
- * Committing ourselves (via `commitFullTotals`) *before* returning, rather than only returning a
- * value and letting React Query's own internal `onSuccess` assignment be the sole write, closes
- * most of the gap: our own write is already correct and atomic against whatever else has
- * committed by the time our fetch resolves. But React Query still performs its own, separate
- * `data = <our return value>` assignment some microtask hops after we return - that assignment
- * is not something a `queryFn` can intercept or make conditional, so whatever we return here
- * will *also* get written, unconditionally, moments later. A value snapshotted at our own commit
- * time can already be stale by the time that second write happens if a sibling flush (e.g. one
- * that resolved in the very same batch of microtasks) commits in between.
+ * This is the function driving the real fetch behind that cache key, but - critically, after
+ * the fifth-round review found the previous approach unfixable from inside a `queryFn` - it is
+ * no longer registered as that key's OWN `queryFn`. A `queryFn`'s return value is applied by
+ * React Query with an unconditional, un-interceptable write some microtask hops after the
+ * function returns; no amount of "yield one/two/N more ticks before returning" can close that
+ * gap, since the reviewer can always inject a longer competing delay than whatever we wait for
+ * (verified: a two-to-three-microtask delay defeated the prior round's single-tick mitigation).
+ * The only way to stop that unconditional write from ever landing on the *real*, shared cache
+ * key is to make sure nothing ever registers a `queryFn` for that key at all - see
+ * `use-product-inventory.ts`'s split into a private fetch-trigger query (whose `queryFn` is
+ * this function, writing only into its own throwaway key - see below) and a pure mirror query
+ * on `["inventoryTotals", siteId]` itself (`queryFn: skipToken`, so it only ever *observes* the
+ * cache, never independently fetches or writes it). Every actual write to the real key -
+ * targeted flushes, the explicit full-refresh path, recovery, and this function - goes through
+ * `commitFullTotals`'s atomic updater-callback form, and nothing else can write it, so there is
+ * no longer a second, uncoordinated writer for anything to race against.
  * <p>
- * To keep that second, unavoidable write from regressing anything, we don't return the value we
- * just committed - we yield one more microtask tick and then take a fresh snapshot of whatever
- * the cache actually holds at that later point, so any sibling write already scheduled alongside
- * ours gets a chance to land first. React Query's own subsequent assignment then just re-applies
- * that same, already-current snapshot - a no-op rather than a regression. This is a real
- * narrowing of the window (verified against a same-batch sibling commit), not a provable
- * guarantee for every possible timing - a queryFn fundamentally cannot make React Query's own
- * write conditional, so an adversarial enough delay could still in principle land in the
- * remaining gap. Closing it completely would mean not using a `queryFn`-driven write for this
- * key at all, which is a larger redesign than this fix round.
+ * The return value here is inert (not applied to any key anything reads for display); it exists
+ * only so tests can inspect what was committed. React Query's own retry policy still covers a
+ * fetch failure on the trigger query; no separate recovery hook is needed for this path.
  */
 export async function fetchSequencedInventoryTotals(
   queryClient: QueryClient,
@@ -172,9 +166,7 @@ export async function fetchSequencedInventoryTotals(
     (t) => t.productId
   );
   const seq = claimSequence(siteId, cachedIds);
-  await fetchAndCommitFullTotals(queryClient, siteId, seq);
-  await Promise.resolve();
-  return queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? [];
+  return fetchAndCommitFullTotals(queryClient, siteId, seq);
 }
 
 /**

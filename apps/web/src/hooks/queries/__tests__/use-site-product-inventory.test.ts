@@ -21,11 +21,15 @@ vi.mock("@/lib/api/site-inventory", () => ({
 }));
 
 import { useSiteProductInventory } from "../use-product-inventory";
+import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children);
+  return {
+    queryClient,
+    Wrapper: function Wrapper({ children }: { children: ReactNode }) {
+      return createElement(QueryClientProvider, { client: queryClient }, children);
+    },
   };
 }
 
@@ -62,7 +66,7 @@ describe("useSiteProductInventory", () => {
       error: null,
     });
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     expect(result.current.data).toBeNull();
@@ -95,7 +99,7 @@ describe("useSiteProductInventory", () => {
       { productId: "p-1", totalQuantity: 12, lastUpdatedAt: "2026-02-01T00:00:00Z" },
     ]);
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     await waitFor(() => {
@@ -135,7 +139,7 @@ describe("useSiteProductInventory", () => {
     });
     mockGetSiteInventoryTotals.mockResolvedValue([]);
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     await waitFor(() => {
@@ -159,7 +163,7 @@ describe("useSiteProductInventory", () => {
     });
     mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p-1", totalQuantity: 40 }]);
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result, rerender } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     await waitFor(() => {
@@ -215,7 +219,7 @@ describe("useSiteProductInventory", () => {
       })
     );
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     // Give the totals query a tick to start (and NOT resolve) before asserting.
@@ -246,7 +250,7 @@ describe("useSiteProductInventory", () => {
       siteId === "site-a" ? siteAPromise : Promise.resolve([{ productId: "p-1", totalQuantity: 7 }])
     );
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result, rerender } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     // Site A's request is still in flight (never resolved yet) when the user switches to site B.
@@ -284,9 +288,81 @@ describe("useSiteProductInventory", () => {
       error: siteError,
     });
 
-    const wrapper = createWrapper();
+    const { Wrapper: wrapper } = createWrapper();
     const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
 
     expect(result.current.error).toBe(siteError);
+  });
+
+  it("an external writer's update to the shared key sticks - the mirror never re-derives its own value", async () => {
+    // Companion to the structural test below: this one documents the functional behavior
+    // (external write wins and is displayed), while the structural test proves *why* it always
+    // will, independent of timing.
+    mockUseProducts.mockReturnValue({ data: [catalogProduct()], isLoading: false, error: null });
+    mockUseSiteProducts.mockReturnValue({
+      data: [{ productId: "p-1", name: "Widget", isStocked: true, version: 1 }],
+      siteId: "site-main",
+      siteCode: "MAIN",
+      isLoading: false,
+      error: null,
+    });
+    mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p-1", totalQuantity: 1 }]);
+
+    const { queryClient, Wrapper: wrapper } = createWrapper();
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
+
+    await waitFor(() => expect(result.current.data?.[0]?.totalQuantity).toBe(1));
+
+    // The mirror received its initial data (from the trigger's atomic commit), but never by
+    // fetching it itself.
+    expect(queryClient.getQueryState(["inventoryTotals", "site-main"])?.fetchStatus).toBe("idle");
+
+    // An independent writer (a targeted flush, in production) overwrites the shared key
+    // directly. Nothing about the trigger query's own, now-stale return value can ever be
+    // "reapplied" over this, because nothing ever wrote it there in the first place except this
+    // one atomic commit path.
+    mockGetSiteInventoryTotals.mockResolvedValueOnce([{ productId: "p-1", totalQuantity: 99 }]);
+    await flushInventorySiteRefresh(queryClient, "site-main", ["p-1"]);
+    await waitFor(() => expect(result.current.data?.[0]?.totalQuantity).toBe(99));
+    expect(queryClient.getQueryState(["inventoryTotals", "site-main"])?.fetchStatus).toBe("idle");
+  });
+
+  it("invalidating the shared display key never triggers a network fetch - it has no queryFn of its own to run (fifth-round review, P1, structural)", async () => {
+    // Fourth round's fix made the query's own fetch commit atomically, but React Query still
+    // applied that same queryFn's (possibly stale) return value as a second, separate write on
+    // its own schedule, sometime after the function returned. That round's mitigation - yielding
+    // one extra microtask tick before returning - was just a narrower version of the same race:
+    // the reviewer defeated it by delaying the competing write two or three ticks instead of
+    // one, and any fixed number of ticks can always be defeated by one more. No timing-based
+    // mitigation can close this from inside a queryFn, because React Query's own reapplication
+    // schedule isn't something a queryFn can observe or control.
+    //
+    // Fifth round removes the mechanism this exploited entirely: use-product-inventory.ts splits
+    // the single query into a fetch-trigger (queryFn does the real work, on its own private key
+    // nothing reads for display) and a pure mirror on the real key (queryFn: skipToken). Proving
+    // this structurally, rather than by racing a specific timing, is what makes the guarantee
+    // hold regardless of delay length: skipToken means React Query can never call a fetcher for
+    // this key at all, under any circumstance, including an explicit invalidation - verified by
+    // running this exact assertion against the pre-fifth-round code, where it fails (the single
+    // query's queryFn does re-run on invalidation, exactly the second write path this removes).
+    mockUseProducts.mockReturnValue({ data: [catalogProduct()], isLoading: false, error: null });
+    mockUseSiteProducts.mockReturnValue({
+      data: [{ productId: "p-1", name: "Widget", isStocked: true, version: 1 }],
+      siteId: "site-main",
+      siteCode: "MAIN",
+      isLoading: false,
+      error: null,
+    });
+    mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p-1", totalQuantity: 1 }]);
+
+    const { queryClient, Wrapper: wrapper } = createWrapper();
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
+    await waitFor(() => expect(result.current.data?.[0]?.totalQuantity).toBe(1));
+
+    mockGetSiteInventoryTotals.mockClear();
+    await queryClient.invalidateQueries({ queryKey: ["inventoryTotals", "site-main"] });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockGetSiteInventoryTotals).not.toHaveBeenCalled();
   });
 });
