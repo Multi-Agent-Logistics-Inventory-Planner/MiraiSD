@@ -6141,3 +6141,23 @@ review" section and validation.md's amended final numbers.
 Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/417 tests, 0 failed; `npx
 eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. 6e and Phase 6 remain
 closed; this is a further amendment, not a reopening.
+
+## Sixth post-closure follow-up (2026-09-16): recovery left the Products page stuck on an error
+
+A ninth review pass confirmed the fifth round's write-race fix holds, and found one new P2 that
+follows directly from the trigger/mirror split: `useSiteProductInventory`'s exposed `error` came
+only from the trigger query, but successful recovery (a targeted flush, a realtime notification,
+or `recoverOnFailure`) writes straight into the mirror, never through the trigger -- so once the
+trigger's own fetch failed once, its error stayed set even after the mirror received fresh,
+correct data through a different path. The Products page unconditionally replaces its whole
+table with an error card whenever `error` is truthy, regardless of `data`, so it would stay
+stuck on the error screen indefinitely despite having successfully recovered.
+
+Fixed without touching the write separation: the hook now only surfaces the trigger's error
+while the mirror still has no data at all; once the mirror has any data, from any source, the
+stale error is suppressed. This changes only what the hook reports, not how either query
+fetches or writes. New test proves the fix and is revert-verified against the pre-fix code.
+
+Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/418 tests, 0 failed;
+`npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. 6e and Phase 6
+remain closed; this is a further amendment, not a reopening.

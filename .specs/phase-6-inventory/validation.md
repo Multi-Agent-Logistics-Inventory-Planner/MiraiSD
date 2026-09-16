@@ -897,3 +897,18 @@ the fourth round, verified to fail against it; one functional companion test; th
 now-obsolete "yield one tick" test rewritten), 0 failed; `npx eslint .` — 0 errors/51 warnings,
 unchanged. Backend numbers unaffected. This amends the phase exit gate's web numbers again; it
 does not reopen 6e or Phase 6.
+
+### Sixth post-closure follow-up fix round (2026-09-16, amends the numbers above again)
+
+A ninth review pass found successful recovery (a targeted flush writing straight into the
+mirror) never cleared the trigger query's own stale error from a prior failed fetch, so the
+Products page (which replaces its whole table with an error card whenever `error` is truthy,
+regardless of `data`) stayed stuck on the error screen after a successful recovery. Fixed by
+only surfacing the trigger's error while the mirror still has no data at all, without changing
+how either query fetches or writes. Full detail in log.md's "Sixth post-closure follow-up"
+section and review.md's "Sixth follow-up review" section.
+
+Re-verified, superseding the web numbers above: `npx tsc --noEmit` clean; `npx vitest run` —
+**57 files/418 tests** (up 1: the new error-reconciliation regression test), 0 failed; `npx
+eslint .` — 0 errors/51 warnings, unchanged. Backend numbers unaffected. This amends the phase
+exit gate's web numbers again; it does not reopen 6e or Phase 6.

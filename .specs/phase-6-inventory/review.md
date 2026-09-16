@@ -1134,5 +1134,37 @@ tests**, 0 failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical. T
 "invalidating never fetches" test independently confirmed to fail against the pre-fifth-round
 code (exactly reproducing the class of bug) and pass against the fix.
 
-**Disposition: the real query's gap is now closed structurally, not narrowed. No further
-findings outstanding.**
+**Disposition: the real query's gap is now closed structurally, not narrowed.**
+
+## Sixth follow-up review: successful recovery left the Products page stuck on its error screen (2026-09-16)
+
+A ninth review pass confirmed the fifth round's write-race fix holds (its own report: "all 13
+timing probes pass with the split-query design") and found one new P2, a direct consequence of
+that same split: `useSiteProductInventory`'s exposed `error` came from `totalsFetchTrigger.error`
+only, but successful recovery (a targeted flush, a realtime notification, or `recoverOnFailure`)
+writes straight into the *mirror*, never through the trigger. Once the trigger's own fetch
+failed once, its `error` stayed set even after the mirror received fresh, correct data through
+one of those other paths - the Products page (`page.tsx`, which unconditionally replaces its
+whole table with "Could not load products" whenever `error` is truthy, regardless of `data`)
+would stay stuck on the error screen indefinitely despite having successfully recovered.
+
+**Fixed without touching the write separation:** the hook now only surfaces the trigger's error
+while the mirror still has no data at all (`totalsQuery.data === undefined`). Once the mirror
+has *any* data - from the trigger's own success, a targeted flush, or recovery - the trigger's
+error is suppressed, since showing a blocking error over a page that plainly just loaded
+successfully through a different path is actively misleading. This changes only what the hook
+*reports*; the trigger still fetches, still commits atomically, and the mirror still never
+fetches on its own - the fifth round's structural fix is unchanged.
+
+New test in `use-site-product-inventory.test.ts`: initial fetch fails (error surfaces, data
+stays null), then a targeted flush commits fresh data straight into the mirror (simulating
+recovery), and the error must clear once real data is showing. Revert-verified: fails against
+the pre-fix code with the stale error still reported even though the recovered quantity is
+already in `data`.
+
+### Final verification after this round
+
+Web only (backend untouched): `npx tsc --noEmit` clean; `npx vitest run` -- **57 files/418
+tests**, 0 failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical.
+
+**Disposition: fixed and revert-verified. No further findings outstanding.**
