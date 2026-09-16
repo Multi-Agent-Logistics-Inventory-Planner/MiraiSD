@@ -6066,3 +6066,40 @@ Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/412 test
 eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched by this round. Both
 fixes revert-verified (5 of 15 tests in `inventory-refresh.test.ts` failed against the reverted
 code for the predicted reasons). 6e and Phase 6 remain closed; this is a further amendment.
+
+## Fourth post-closure follow-up (2026-09-16): merge decisions computed ahead of the commit
+
+A seventh review pass found the third round's fix still separated "decide" from "write": the
+full-refresh path and the real query each computed their merge result right after their fetch
+resolved, then returned it up through further `await` hops before actually writing (or, for the
+query, before React Query itself applied the return value) - a concurrent targeted write
+landing in that gap got clobbered by the stale, already-decided value once it finally landed.
+Reproduced exactly as described: full read decides to preserve quantity 1 (correctly
+recognizing a newer flush owns the product, but reading that flush's not-yet-written value);
+the targeted write lands, writing 10; the full read's delayed write restores 1.
+
+**Fixed provably for the explicit path:** `commitFullTotals` performs the merge *inside*
+`setQueryData`'s updater-callback form, the one primitive that's genuinely atomic with the live
+cache (invoked synchronously with the true current `old`, no `await` between reading it and
+writing). There is no execution ordering under which a concurrent write can land inside one
+synchronous callback invocation, so this closes the gap completely for `refreshAllInventoryTotals`
+and `recoverOnFailure`.
+
+**Narrowed as far as `useQuery`'s API allows for the real query:** a `queryFn` cannot make React
+Query's own subsequent, unconditional `data = <return value>` assignment conditional - that's a
+structural fact of the contract. `fetchSequencedInventoryTotals` now commits atomically on its
+own immediately upon fetching (an improvement on its own), then yields one more microtask tick
+before taking its final snapshot to return, giving an already-in-flight sibling write a chance
+to land first so the returned value already reflects it. Verified against the reported
+reproduction shape; explicitly documented as a narrowing, not a provable guarantee for every
+timing - fully closing it would mean not using a `queryFn`-driven write for this key at all, a
+larger redesign left as residual risk rather than silently claimed solved.
+
+Full detail, including the four new tests (two structural/interleaving reproductions per path,
+one extended with an explicit simulation of React Query's own later reapplication), is in
+review.md's "Fourth follow-up review" section and validation.md's amended final numbers.
+
+Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/415 tests, 0 failed;
+`npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. All 3 new tests
+revert-verified (failed against the reverted code for the predicted reasons). 6e and Phase 6
+remain closed; this is a further amendment.

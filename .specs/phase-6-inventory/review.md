@@ -1006,4 +1006,65 @@ reverted, 5 of `inventory-refresh.test.ts`'s 15 tests failed for the predicted r
 export, timeouts from the old recovery path never issuing its corrective fetch, and the wrong
 error propagating from stale mock-queue ordering); fix restored, all 15 green, full suite green.
 
-**Disposition: both sequencing gaps fixed and revert-verified. No further findings outstanding.**
+**Disposition: both sequencing gaps fixed and revert-verified.**
+
+## Fourth follow-up review: merge decisions computed ahead of the actual commit (2026-09-16)
+
+A seventh review pass (user-reported, with independent reproduction tests) found that the
+third round's fix still separated "decide" from "write": both the explicit full-refresh path
+and the real query computed their merge result right after their fetch resolved, then returned
+that value up through one or two more `await`/`.then()` hops before actually calling
+`setQueryData` (or, for the query, before React Query itself applied the returned value). A
+concurrent targeted write landing in that gap got silently clobbered once the stale,
+already-decided value was finally written. Reproduced as: full read decides to preserve
+quantity 1 (correctly recognizing a newer flush owns the product, but reading that newer
+flush's *not-yet-written* value); the targeted write then lands, writing 10; the full read's
+delayed write finally lands, restoring 1.
+
+**Fixed for the explicit path (provably, not just narrowed):** introduced `commitFullTotals`,
+which performs the merge computation *inside* `queryClient.setQueryData`'s updater-callback
+form - the one primitive React Query provides that is genuinely atomic with the live cache
+(invoked synchronously with whatever `old` truly is at that instant, no `await` between reading
+it and writing the result). `refreshAllInventoryTotals` and `recoverOnFailure` no longer compute
+a value and assign it afterward; they call `fetchAndCommitFullTotals` (fetch, then synchronously
+`commitFullTotals`), and the write is done. This closes the gap completely for this path: there
+is no execution ordering under which a concurrent write can land between "read old" and "write
+new" inside one synchronous callback invocation.
+
+**Narrowed as far as `useQuery`'s API allows for the real query path:** a `queryFn` cannot make
+React Query's own subsequent `data = <return value>` assignment conditional or interceptable -
+that assignment happens some further microtask hops after the function returns, on React
+Query's own schedule, and will unconditionally apply whatever was returned regardless of what
+else has committed by then. `fetchSequencedInventoryTotals` now performs its own atomic commit
+(via `fetchAndCommitFullTotals`) immediately upon its fetch resolving - already a correctness
+improvement - but then yields one more microtask tick (`await Promise.resolve()`) before taking
+a fresh snapshot of the cache to return, rather than returning the value from its own earlier
+commit. This gives an already-in-flight sibling write (one resolving in the same microtask
+batch, which is exactly the shape of the reported reproduction and every prior round's test
+harness) a chance to land first, so the *returned* value already reflects it - React Query's own
+later assignment then re-applies an already-correct snapshot, a no-op rather than a regression.
+This is a real, verified narrowing against the reported reproduction, not a provable guarantee
+for every conceivable timing: a `queryFn` fundamentally cannot make an external system's own
+write conditional, so a sufficiently adversarial additional delay could in principle still land
+in the remaining (now much smaller) gap. Fully eliminating it would mean this cache key stops
+using a `queryFn`-driven write entirely - a larger redesign out of scope for this fix round,
+recorded as residual risk rather than silently claimed as solved.
+
+Four tests added: a same-batch interleaving reproduction and a structural assertion (the
+`setQueryData` call is the updater-callback form, not a plain value) for the explicit path; a
+same-batch interleaving reproduction for the query path, extended with an explicit simulation of
+React Query's own subsequent reapplication of the returned value, proving that reapplication is
+now a no-op rather than a regression.
+
+### Final verification after this round
+
+Web only (backend untouched): `npx tsc --noEmit` clean; `npx vitest run` -- **57 files/415
+tests** (up 3), 0 failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical.
+Revert-verified: with the fix reverted, all 3 new tests failed for the predicted reasons (the
+same stale-overwrite regression reproduced directly, and the structural assertion showing a
+plain object instead of the updater-callback form); fix restored, all 18 tests in the file pass,
+full suite green.
+
+**Disposition: the explicit full-refresh path's staleness gap is fully closed; the real query's
+gap is substantially narrowed to a structurally-inherent residual, explicitly documented rather
+than silently claimed as eliminated. No further findings outstanding.**

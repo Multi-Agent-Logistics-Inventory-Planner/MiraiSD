@@ -855,3 +855,23 @@ absent-entry-preservation fixes; the existing P2 recovery tests rewritten to ass
 mechanism, same count), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend
 numbers unaffected (web-only fix). This amends the phase exit gate's web numbers again; it does
 not reopen 6e or Phase 6.
+
+### Fourth post-closure follow-up fix round (2026-09-16, amends the numbers above again)
+
+A seventh review pass found both full-refresh writers still computed their merge decision right
+after fetching, then wrote it several `await` hops later - reproduced as a stale, already-
+decided value overwriting a concurrent targeted write. Fixed provably for the explicit path via
+`commitFullTotals` (merge performed inside `setQueryData`'s atomic updater-callback form, no
+gap possible); narrowed as far as `useQuery`'s API allows for the real query
+(`fetchSequencedInventoryTotals` now yields once more before its final snapshot, verified
+against the reported reproduction, explicitly documented as a narrowing rather than a provable
+guarantee - closing it fully would require not using a `queryFn`-driven write for this key at
+all). Full detail in log.md's "Fourth post-closure follow-up" section and review.md's "Fourth
+follow-up review" section.
+
+Re-verified, superseding the web numbers above: `npx tsc --noEmit` clean; `npx vitest run` —
+**57 files/415 tests** (up 3: two structural/interleaving reproductions for the explicit path,
+one for the query path extended with an explicit simulation of React Query's own later
+reapplication), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend numbers
+unaffected. This amends the phase exit gate's web numbers again; it does not reopen 6e or
+Phase 6.
