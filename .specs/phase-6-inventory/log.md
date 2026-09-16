@@ -6038,3 +6038,31 @@ Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/410 test
 `npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend unaffected (web-only fix);
 `StockMovementServiceBroadcastArgsIT` re-confirmed green (4/4). Both fixes individually
 revert-verified. 6e and Phase 6 remain closed; this is a further amendment, not a reopening.
+
+## Third post-closure follow-up (2026-09-16): sequencing gaps in the second round's own fix
+
+A sixth review pass found two more gaps in the second round's sequencing mechanism: recovery
+and the real `useQuery` behind `["inventoryTotals", siteId]` (in `use-product-inventory.ts`)
+still bypassed sequencing entirely - recovery via a bare `invalidateQueries`, the query via its
+own unsequenced `queryFn` - so either path's own refetch (mount, window focus, staleTime, manual
+refetch, or recovery's own corrective invalidate) could land after a newer targeted flush and
+overwrite it unconditionally (reproduced as a quantity regressing from 10 to 2). Separately, the
+full-refresh merge deleted any old-cache id absent from a full response unconditionally, which
+incorrectly caught a brand-new product that a newer targeted flush had already cached but that
+an older, in-flight full read's snapshot simply predated.
+
+Both fixed: introduced `fetchSequencedInventoryTotals` (now the actual `queryFn` for that query,
+so its own lifecycle refetches are finally ordered against explicit flushes) and
+`fetchAndMergeFullTotals` (a claim-once, shared fetch+merge helper used by the query, by
+recovery, and by the explicit full-refresh path, so no caller double-claims and mints a spurious
+sequence number that could wrongly supersede a real concurrent flush); `mergeFullTotals` now
+preserves an absent id's newer-owned entry rather than deleting it, only dropping ids nothing
+newer has claimed since. Also removed two bare-`invalidateQueries` fallbacks in the mutation
+hooks (`use-stock-mutations.ts`/`use-location-mutations.ts`) that were now doubly risky, since
+`flushInventorySiteRefresh` already attempts its own sequenced recovery internally. Full detail
+in review.md's "Third follow-up review" section and validation.md's amended final numbers.
+
+Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/412 tests, 0 failed; `npx
+eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched by this round. Both
+fixes revert-verified (5 of 15 tests in `inventory-refresh.test.ts` failed against the reverted
+code for the predicted reasons). 6e and Phase 6 remain closed; this is a further amendment.

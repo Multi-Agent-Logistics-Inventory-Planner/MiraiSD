@@ -952,4 +952,58 @@ reverted, 7 of the file's 13 tests failed for the predicted reasons (wrong value
 ordering guard, recovery not triggered, or a timeout from the old code's non-deterministic mock
 consumption under the new test's controlled-promise setup); fix restored, all 13 green.
 
+**Disposition: both sequencing gaps fixed and revert-verified.**
+
+## Third follow-up review: sequencing gaps in the second round's own fix (2026-09-16)
+
+A sixth review pass (user-reported, with independent reproduction tests) found two more gaps in
+the sequencing mechanism the second round built. Both fixed by the coordinating session,
+revert-verified against 5 tests that failed for the predicted reasons on the pre-fix code.
+
+- **P1: recovery and the real `useQuery` behind this cache key still bypassed sequencing.**
+  The second round's `recoverOnFailure` called a bare `invalidateQueries`, and the actual
+  `useQuery` in `use-product-inventory.ts` (`queryFn: () => getSiteInventoryTotals(siteId)`)
+  never claimed or checked sequence at all - so *either* path's own refetch (recovery's
+  corrective invalidate, or the query's own mount/window-focus/staleTime/manual refetch) could
+  land after a newer targeted flush and overwrite it unconditionally, reproduced as a quantity
+  regressing from 10 back to 2. **Fixed:** split the merge logic into a pure `mergeFullTotals`
+  function and a claim-then-fetch `fetchAndMergeFullTotals` helper that takes an
+  already-claimed sequence number (never claims twice for the same attempt, which would mint a
+  spurious higher number that could wrongly supersede a genuinely concurrent flush). Three
+  callers now share it, each claiming exactly once: `fetchSequencedInventoryTotals` (a new
+  exported function, now the actual `queryFn` for `["inventoryTotals", siteId]` in
+  `use-product-inventory.ts` - the query's own lifecycle refetches are ordered against explicit
+  flushes for the first time), `recoverOnFailure` (issues its own freshly-claimed recovery fetch
+  instead of a bare invalidate), and `refreshAllInventoryTotals` (the unknown-ID/no-cache path,
+  unchanged in spirit but rewired onto the shared helper). Also removed two now-doubly-risky
+  bare-`invalidateQueries` fallbacks in `use-stock-mutations.ts`/`use-location-mutations.ts`
+  (added in the *first* follow-up round for Blocker 2) - `flushInventorySiteRefresh` already
+  attempts its own sequenced recovery internally on failure; an unsequenced fallback stacked on
+  top of that could undo it.
+- **P2: an older full response deleted a newer product entirely absent from it.** The second
+  round's full-refresh merge built its result exclusively from `fetched` rows; any id in the old
+  cache but absent from that response was silently dropped, on the assumption absence always
+  means deletion. But a product created after an older full read's server-side snapshot - and
+  already cached by a newer targeted flush that started after that read began - is *also* absent
+  from the older response, for an entirely different reason (it didn't exist yet when that
+  read's query ran), and was being deleted right along with genuine deletions. **Fixed:**
+  `mergeFullTotals` now walks the old cache's ids that are absent from `fetched` first: an id is
+  only dropped if nothing newer than this flush's own sequence has claimed it since; otherwise
+  the newer-owned entry is preserved into the result before the fetched rows are applied.
+
+Two new tests target these directly: `fetchSequencedInventoryTotals` (the real queryFn's
+replacement) losing a race to a targeted flush that started after it but resolved first, and a
+brand-new product surviving an older, in-flight full read that never saw it exist. The existing
+P2 recovery tests were rewritten to assert the new mechanism (a fresh sequenced fetch + direct
+`setQueryData`, not `invalidateQueries`) rather than the old one.
+
+### Final verification after this round
+
+Web only (backend untouched): `npx tsc --noEmit` clean; `npx vitest run` -- **57 files/412
+tests** (up 2 net: two new tests, two rewritten P2 recovery tests kept at the same count), 0
+failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical. Revert-verified: with the fix
+reverted, 5 of `inventory-refresh.test.ts`'s 15 tests failed for the predicted reasons (missing
+export, timeouts from the old recovery path never issuing its corrective fetch, and the wrong
+error propagating from stale mock-queue ordering); fix restored, all 15 green, full suite green.
+
 **Disposition: both sequencing gaps fixed and revert-verified. No further findings outstanding.**

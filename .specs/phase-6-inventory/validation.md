@@ -836,3 +836,22 @@ cases), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend nu
 unaffected by this round (web-only fix); `StockMovementServiceBroadcastArgsIT` re-confirmed
 green (4/4) since the user's own local attempt was blocked by Docker permissions. This amends
 the phase exit gate's web numbers again; it does not reopen 6e or Phase 6.
+
+### Third post-closure follow-up fix round (2026-09-16, amends the numbers above again)
+
+A sixth review pass found recovery and the real `useQuery` behind `["inventoryTotals", siteId]`
+still bypassed sequencing entirely (reproduced as a quantity regressing from 10 to 2), and that
+the full-refresh merge deleted a newer product's entry when it was absent from an older,
+in-flight full response for a legitimate reason (it simply didn't exist yet when that read's
+snapshot was taken). Both fixed: `fetchSequencedInventoryTotals` is now the real query's
+`queryFn`; a shared, claim-once `fetchAndMergeFullTotals` helper is used by the query, recovery,
+and the explicit full-refresh path so no caller double-claims; `mergeFullTotals` preserves a
+newer-owned absent entry instead of deleting it. Full detail in log.md's "Third post-closure
+follow-up" section and review.md's "Third follow-up review" section.
+
+Re-verified, superseding the web numbers above: `npx tsc --noEmit` clean; `npx vitest run` —
+**57 files/412 tests** (up 2 net: two new tests targeting the query-sequencing and
+absent-entry-preservation fixes; the existing P2 recovery tests rewritten to assert the new
+mechanism, same count), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend
+numbers unaffected (web-only fix). This amends the phase exit gate's web numbers again; it does
+not reopen 6e or Phase 6.
