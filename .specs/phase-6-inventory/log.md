@@ -6161,3 +6161,14 @@ fetches or writes. New test proves the fix and is revert-verified against the pr
 Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/418 tests, 0 failed;
 `npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. 6e and Phase 6
 remain closed; this is a further amendment, not a reopening.
+
+## PR #327 conflict resolution into dev (2026-09-16)
+
+### Current handoff
+
+- Status: merged origin/dev locally into refactor/inventory-stock; conflicts resolved and web checks passed.
+- Next action: commit and push the resolution; independent PR checks remain authoritative.
+- Decision: user explicitly requested all incoming inventory-stock behavior. Kept the complete inventory-stock versions of all six conflicted web files. Also retained its product-sort-utils implementation and tests so status sorting matches Stocked/Not Stocked. The temporary MAIN legacy inventory and Active/Inactive overrides are superseded for this branch. Retained dev's historical specification records.
+- Scope: mechanical integration of the existing Full-tier Phase 6 feature; no new API, backend, migration, or deployment behavior introduced relative to inventory-stock.
+- Last verified: `npm run test:run --workspace apps/web` — 57 files / 418 tests passed; `npx tsc --noEmit` from apps/web — passed; `npm run lint --workspace apps/web` — 0 errors, 51 warnings.
+- Open risks: GitHub PR checks pending; backend checks were not rerun because the merge adds no backend changes relative to inventory-stock.
