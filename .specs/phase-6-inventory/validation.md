@@ -875,3 +875,25 @@ one for the query path extended with an explicit simulation of React Query's own
 reapplication), 0 failed; `npx eslint .` — 0 errors/51 warnings, unchanged. Backend numbers
 unaffected. This amends the phase exit gate's web numbers again; it does not reopen 6e or
 Phase 6.
+
+### Fifth post-closure follow-up fix round (2026-09-16, amends the numbers above again)
+
+An eighth review pass confirmed the fourth round's "yield one more tick" mitigation for the real
+query's own fetch was still exploitable by a longer competing delay, and directed that the
+underlying mechanism be removed rather than further narrowed. Fixed structurally:
+`useSiteProductInventory` now splits into a private fetch-trigger query (drives the real fetch,
+commits atomically into the shared key, returns an inert value) and a pure mirror query on the
+shared key (`queryFn: skipToken`, so React Query can never register a fetcher for it at all).
+Verification also fixed a genuine test regression traced to an orthogonal, pre-existing React
+Query limitation (an already-mounted `useQuery`'s observer never rebinds to a different
+`QueryClient` instance without an unmount) surfaced by `page.test.tsx`'s unrealistic
+brand-new-`QueryClient` site-switch simulation -- fixed the test (reuse the same client), not
+the production code. Full detail in log.md's "Fifth post-closure follow-up" section and
+review.md's "Fifth follow-up review" section.
+
+Re-verified, superseding the web numbers above: `npx tsc --noEmit` clean; `npx vitest run` —
+**57 files/417 tests** (up 2 net: one structural test that genuinely differentiates the fix from
+the fourth round, verified to fail against it; one functional companion test; the fourth round's
+now-obsolete "yield one tick" test rewritten), 0 failed; `npx eslint .` — 0 errors/51 warnings,
+unchanged. Backend numbers unaffected. This amends the phase exit gate's web numbers again; it
+does not reopen 6e or Phase 6.

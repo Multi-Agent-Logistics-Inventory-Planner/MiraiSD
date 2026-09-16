@@ -1066,5 +1066,73 @@ plain object instead of the updater-callback form); fix restored, all 18 tests i
 full suite green.
 
 **Disposition: the explicit full-refresh path's staleness gap is fully closed; the real query's
-gap is substantially narrowed to a structurally-inherent residual, explicitly documented rather
-than silently claimed as eliminated. No further findings outstanding.**
+gap is substantially narrowed and explicitly documented as a residual.**
+
+## Fifth follow-up review: the real query's residual gap was still exploitable (2026-09-16)
+
+An eighth review pass (user-reported, with an independent reproduction test) confirmed the
+explicit full-refresh fix holds, but found the fourth round's "yield one more tick" mitigation
+for the real query was exactly what its own documentation admitted: a narrower version of the
+same race, not a fix. Delaying the competing (targeted) write by two to three microtasks instead
+of one defeated it, reproducing the regression (10 -> 1) again. The review's explicit direction:
+"Keep this finding open until the query's actual cache write is coordinated with targeted
+writes. Documenting the limitation does not satisfy AC-7's convergence requirement" - i.e., no
+further tick-counting mitigation would be accepted; the underlying mechanism had to go.
+
+**Root cause, confirmed:** a `queryFn`'s return value is applied by React Query via its own
+internal `onSuccess` dispatch, an unconditional write that happens some number of microtask hops
+after the function returns, entirely outside the function's control. No amount of "wait N more
+ticks before deciding what to return" can close this, since the reviewer (or reality) can always
+inject a longer competing delay than whatever is waited for. The only way to stop that
+unconditional write from landing on the *real*, shared cache key is to ensure nothing ever
+registers a `queryFn` for that key in the first place.
+
+**Fix:** split `useSiteProductInventory`'s single query into two. A private `useQuery` on
+`["inventoryTotalsFetchTrigger", siteId]` drives the actual network fetch and its normal
+lifecycle (mount, window focus, staleTime, manual refetch); its `queryFn` is
+`fetchSequencedInventoryTotals`, which still claims sequence and commits atomically into the
+*real* key via `commitFullTotals` as a side effect - but its own return value is now inert,
+feeding only the throwaway trigger key that nothing reads for display. The real key,
+`["inventoryTotals", siteId]`, is observed by a second `useQuery` with `queryFn: skipToken` - a
+pure mirror that never independently fetches or writes; it only ever reflects whatever
+`setQueryData` writes to that key, from the trigger's commit, a targeted flush, or recovery.
+With nothing else able to register a fetcher for the real key, there is no second writer left
+for anything to race against, regardless of delay length - closing the gap structurally rather
+than by tuning a timing window.
+
+**A genuine regression surfaced during verification, traced to an orthogonal, pre-existing React
+Query limitation, not this fix:** `page.test.tsx`'s AC-6c site-switch test broke. Diagnosed by
+direct inspection (temporary debug logging, then an isolated three-probe reproduction outside
+this file) to `useBaseQuery.js`'s `const [observer] = useState(() => new Observer(client,
+...))` - a `useQuery` hook's underlying observer is bound to whichever `QueryClient` instance
+was current at its own mount and never rebinds to a different instance without an actual
+unmount. The test simulates a site switch by swapping in a brand-new `QueryClient` via
+`rerender` without unmounting - unrealistic (a real app creates one `QueryClient` at its root
+and never swaps the instance) and, confirmed by an isolated repro, breaks under *any*
+multi-query hook design due to this limitation, independent of anything this round changed. The
+original single-query design merely happened to be self-consistent under the same bug (its one
+query's fetch and its one query's display read from the same stale-but-consistent observer).
+Fixed the test, not the production code: `renderPage()` now returns the `QueryClient` it
+created, and the site-switch step reuses that same instance (only `mockUseCurrentSite`'s siteId
+changes) - a more realistic simulation that still fully exercises what the test actually
+verifies (no stale MAIN data leaking into SECOND's view), since that guarantee comes from
+site-qualified query keys (T-6d-3/AC-7), not from swapping `QueryClient` instances.
+
+Five tests added/rewritten: two direct reproductions in `inventory-refresh.test.ts` proving the
+explicit path's fix and rewriting the now-obsolete fourth-round test whose premise (a return
+value React Query would reapply) no longer applies; two in
+`use-site-product-inventory.test.ts` - a functional one (an external writer's update to the
+shared key sticks) and a structural one (invalidating the display key never triggers a network
+fetch, since it has no `queryFn` of its own) that is the one genuinely differentiating test,
+verified to fail against the fourth-round code and pass against the fix; and the `page.test.tsx`
+fix restoring its own 4/4 pass rate.
+
+### Final verification after this round
+
+Web only (backend untouched): `npx tsc --noEmit` clean; `npx vitest run` -- **57 files/417
+tests**, 0 failed; `npx eslint .` -- 0 errors/51 warnings, baseline-identical. The structural
+"invalidating never fetches" test independently confirmed to fail against the pre-fifth-round
+code (exactly reproducing the class of bug) and pass against the fix.
+
+**Disposition: the real query's gap is now closed structurally, not narrowed. No further
+findings outstanding.**

@@ -6103,3 +6103,41 @@ Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/415 test
 `npx eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. All 3 new tests
 revert-verified (failed against the reverted code for the predicted reasons). 6e and Phase 6
 remain closed; this is a further amendment.
+
+## Fifth post-closure follow-up (2026-09-16): the real query's residual gap closed structurally
+
+An eighth review pass confirmed the fourth round's "yield one more tick" mitigation for the real
+query was still exploitable -- a longer competing delay (two to three microtasks) defeated it,
+reproducing the same regression again -- and explicitly directed that documenting the limitation
+was not acceptable; the mechanism had to be removed. Root cause: a `queryFn`'s return value is
+applied by React Query via its own internal dispatch, some microtask hops after the function
+returns, entirely outside the function's control -- no fixed wait can close a gap whose other
+side isn't bounded.
+
+Fix: split `useSiteProductInventory`'s single query into a private fetch-trigger query (whose
+`queryFn`, `fetchSequencedInventoryTotals`, still claims sequence and commits atomically into
+the real key via `commitFullTotals`, but returns an inert value nothing reads for display) and a
+pure mirror query on the real key (`queryFn: skipToken`, so React Query can never register a
+fetcher for it at all -- it only ever reflects `setQueryData` writes from elsewhere). With no
+second writer able to exist for the real key, there is nothing left to race against, regardless
+of delay length -- closing the gap structurally rather than by tuning a timing window.
+
+Verification surfaced a genuine test regression, traced to an orthogonal, pre-existing React
+Query limitation (`useBaseQuery.js`'s observer binds to whichever `QueryClient` instance was
+current at mount and never rebinds without an unmount), not to this fix: `page.test.tsx`'s AC-6c
+site-switch test swaps in a brand-new `QueryClient` instance mid-test, which is unrealistic
+(production has exactly one, created once) and breaks under any multi-query hook design,
+confirmed by an isolated three-probe reproduction outside this file. The original single-query
+design merely happened to be self-consistent under the same underlying bug. Fixed the test
+(reuse the same `QueryClient` across the site switch, changing only `siteId` -- the property it
+actually verifies, cross-site cache isolation, comes from site-qualified keys per T-6d-3/AC-7,
+not from swapping client instances), not the production code.
+
+Full detail, including the one test that genuinely differentiates the fix from its predecessor
+(invalidating the display key must never trigger a network fetch, since it has no `queryFn` of
+its own -- verified to fail against the fourth-round code), is in review.md's "Fifth follow-up
+review" section and validation.md's amended final numbers.
+
+Re-verified: web `npx tsc --noEmit` clean; `npx vitest run` -- 57 files/417 tests, 0 failed; `npx
+eslint .` -- 0 errors/51 warnings, baseline-identical. Backend untouched. 6e and Phase 6 remain
+closed; this is a further amendment, not a reopening.
