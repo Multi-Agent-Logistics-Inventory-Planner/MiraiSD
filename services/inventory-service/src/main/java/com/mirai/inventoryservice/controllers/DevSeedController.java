@@ -87,6 +87,7 @@ public class DevSeedController {
     private static final String DEV_SEED_AUDIT_SOURCE = "dev_seed_audit";
     private static final String DEFAULT_SITE_CODE = "MAIN";
     private static final String DEV_EMPLOYEE_EMAIL = "mjpark019@gmail.com";
+    private static final String ADMIN_EMPLOYEE_EMAIL = "jjmatu16@yahoo.com";
 
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
@@ -387,18 +388,27 @@ public class DevSeedController {
         ));
     }
 
+    // Provision both dev accounts; return the employee to preserve the seed response.
     private User ensureDevEmployee() {
-        User user = userRepository.findByEmail(DEV_EMPLOYEE_EMAIL).orElseGet(() ->
-            userRepository.save(User.builder()
-                .email(DEV_EMPLOYEE_EMAIL)
-                .fullName("Matthew Park")
-                .role(UserRole.EMPLOYEE)
-                .build())
+        List<User> accounts = List.of(
+            User.builder().email(DEV_EMPLOYEE_EMAIL).fullName("Matthew Park")
+                .role(UserRole.EMPLOYEE).build(),
+            User.builder().email(ADMIN_EMPLOYEE_EMAIL).fullName("Development Admin")
+                .role(UserRole.ADMIN).build()
         );
-        user.setRole(UserRole.EMPLOYEE);
-        User saved = userRepository.save(user);
-        membershipAuthorizer.grantMainSiteMembershipIfAbsent(saved.getId());
-        return saved;
+        User employee = null;
+        for (User account : accounts) {
+            User user = userRepository.findByEmail(account.getEmail()).orElseGet(() ->
+                userRepository.save(account)
+            );
+            user.setRole(account.getRole());
+            User saved = userRepository.save(user);
+            membershipAuthorizer.grantMainSiteMembershipIfAbsent(saved.getId());
+            if (DEV_EMPLOYEE_EMAIL.equals(saved.getEmail())) {
+                employee = saved;
+            }
+        }
+        return employee;
     }
 
     @PostMapping("/seed/sales")
