@@ -83,6 +83,61 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     ]);
   });
 
+  it("a full refresh's merge decision happens atomically with its own write, not computed earlier and applied several microtask hops later (follow-up fourth-round review, P1)", async () => {
+    // The test above fully awaits the targeted flush to completion BEFORE resolving the full
+    // refresh's fetch, so the full refresh's merge always reads an already-correct cache and
+    // never exercises the actual bug: computing the merge decision right after the fetch
+    // resolves, then writing that precomputed value several `await`/`.then()` hops later,
+    // during which a concurrent write can land and get silently clobbered by the stale,
+    // already-decided value. This test resolves both fetches back-to-back, in the same
+    // microtask window, so any extra hop between "decide" and "write" in the full-refresh path
+    // would let the targeted write land in that gap and then get overwritten.
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+
+    let resolveFullFetch!: (value: unknown) => void;
+    const fullFetch = new Promise((resolve) => {
+      resolveFullFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => fullFetch);
+    const fullFlush = flushInventorySiteRefresh(qc, "site-1", undefined);
+
+    let resolveTargetedFetch!: (value: unknown) => void;
+    const targetedFetch = new Promise((resolve) => {
+      resolveTargetedFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => targetedFetch);
+    const targetedFlush = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    resolveFullFetch([{ productId: "p1", totalQuantity: 5 }]);
+    resolveTargetedFetch([{ productId: "p1", totalQuantity: 10 }]);
+    await Promise.all([fullFlush, targetedFlush]);
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 10 },
+    ]);
+  });
+
+  it("commits the full-refresh result through setQueryData's updater-callback form, never a separately-computed static value (follow-up fourth-round review, P1)", async () => {
+    // Structural guarantee behind the fix above: the updater form is the one primitive React
+    // Query gives us that's atomic with the live cache (invoked synchronously with whatever
+    // `old` truly is, no `await` between reading it and writing the result). Asserting the call
+    // shape - not just one timing-dependent outcome - pins that the merge genuinely happens
+    // inside the commit, not merely "happens to look right for this particular interleaving."
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+    mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p1", totalQuantity: 5 }]);
+    const setDataSpy = vi.spyOn(qc, "setQueryData");
+
+    await flushInventorySiteRefresh(qc, "site-1", undefined);
+
+    const totalsCalls = setDataSpy.mock.calls.filter(
+      (call) => JSON.stringify(call[0]) === JSON.stringify(["inventoryTotals", "site-1"])
+    );
+    expect(totalsCalls).toHaveLength(1);
+    expect(typeof totalsCalls[0][1]).toBe("function");
+  });
+
   it("an older targeted response does not overwrite a newer full refresh for the same product (follow-up review finding, P1)", async () => {
     const qc = client();
     qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
@@ -151,6 +206,48 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     resolveQueryFetch([{ productId: "p1", totalQuantity: 2 }]);
     const result = await queryRefetch;
     expect(result).toEqual([{ productId: "p1", totalQuantity: 10 }]);
+  });
+
+  it("fetchSequencedInventoryTotals commits its own result atomically even when its fetch and a targeted flush's fetch resolve back-to-back (follow-up fourth-round review, P1)", async () => {
+    // Same class of gap as the explicit full-refresh test above, but for the real query's own
+    // path: resolving both fetches in the same microtask window (rather than fully awaiting the
+    // targeted flush first) is what actually exercises "decide now, write several hops later."
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+
+    let resolveQueryFetch!: (value: unknown) => void;
+    const queryFetch = new Promise((resolve) => {
+      resolveQueryFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => queryFetch);
+    const queryRefetch = fetchSequencedInventoryTotals(qc, "site-1");
+
+    let resolveTargetedFetch!: (value: unknown) => void;
+    const targetedFetch = new Promise((resolve) => {
+      resolveTargetedFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => targetedFetch);
+    const targetedFlush = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+
+    resolveQueryFetch([{ productId: "p1", totalQuantity: 5 }]);
+    resolveTargetedFetch([{ productId: "p1", totalQuantity: 10 }]);
+    const [result] = await Promise.all([queryRefetch, targetedFlush]);
+
+    // Both the cache itself and the value fetchSequencedInventoryTotals returns (what React
+    // Query's own subsequent write would apply) must reflect the targeted flush's win.
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 10 },
+    ]);
+    expect(result).toEqual([{ productId: "p1", totalQuantity: 10 }]);
+
+    // Simulate React Query's own subsequent, unconditional `data = result` assignment (the
+    // real write this queryFn's return value feeds, which this function itself cannot prevent
+    // or make conditional) - since `result` already matches the current cache, that write is a
+    // harmless no-op rather than a regression back to a stale value.
+    qc.setQueryData(["inventoryTotals", "site-1"], result);
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 10 },
+    ]);
   });
 
   it("an older full refresh preserves a newer product entry that's absent from its response, rather than deleting it (follow-up third-round review, P1)", async () => {

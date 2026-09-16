@@ -90,35 +90,79 @@ function mergeFullTotals(
 }
 
 /**
- * Fetches the full site totals and returns the correctly-merged result for an *already-claimed*
- * `seq` - never claims, never writes the cache itself. Kept separate from claiming so every
- * caller claims exactly once per attempt; claiming twice for the same ids (once by a caller,
- * again inside a shared helper) would mint a second, higher sequence number that could wrongly
- * supersede a genuinely concurrent flush that claimed in between the two claims.
- * <p>
- * Re-reads the cache after the fetch resolves (not the pre-fetch snapshot the caller claimed
- * against) so a concurrent write that landed while this fetch was in flight is the merge base,
- * not a stale snapshot from before this function's own await.
+ * Commits a full-refresh result at the actual cache write, not via a value computed earlier and
+ * assigned afterward through further microtask hops (follow-up review, fourth round): a value
+ * computed ahead of time and then written later - even "later" by only a couple of `await`s -
+ * can be stale by the time it's actually applied, if a concurrent targeted write lands in
+ * between the computation and the write. `queryClient.setQueryData`'s updater-callback form is
+ * the one primitive React Query gives us that's genuinely atomic with the live cache: React
+ * Query invokes it synchronously with whatever `old` truly is at that exact instant, with no
+ * `await` between reading `old` and writing the new value - so performing the merge *inside*
+ * that callback (reading `old` from the callback's own parameter, never from an earlier
+ * `getQueryData` call) is what actually closes the gap, not merely re-reading current state one
+ * more time before a plain, separately-scheduled `setQueryData(key, someArray)` call.
  */
-async function fetchAndMergeFullTotals(
+function commitFullTotals(
+  queryClient: QueryClient,
+  siteId: string,
+  seq: number,
+  fetched: SiteInventoryTotal[]
+): SiteInventoryTotal[] {
+  let committed: SiteInventoryTotal[] = [];
+  queryClient.setQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId], (old) => {
+    committed = mergeFullTotals(siteId, seq, old ?? [], fetched);
+    return committed;
+  });
+  return committed;
+}
+
+/**
+ * Fetches the full site totals and commits the merged result atomically (see
+ * `commitFullTotals`) for an *already-claimed* `seq` - never claims itself. Kept separate from
+ * claiming so every caller claims exactly once per attempt; claiming twice for the same ids
+ * (once by a caller, again inside a shared helper) would mint a second, higher sequence number
+ * that could wrongly supersede a genuinely concurrent flush that claimed in between the two
+ * claims.
+ */
+async function fetchAndCommitFullTotals(
   queryClient: QueryClient,
   siteId: string,
   seq: number
 ): Promise<SiteInventoryTotal[]> {
   const fetched = await getSiteInventoryTotals(siteId);
-  const current = queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? [];
-  return mergeFullTotals(siteId, seq, current, fetched);
+  return commitFullTotals(queryClient, siteId, seq, fetched);
 }
 
 /**
- * Claims sequence for every currently-cached id, fetches the full site totals, and returns the
- * correctly-merged result - never writing the cache itself. This is the function the real
- * `useQuery` backing this cache key (`use-product-inventory.ts`) uses as its `queryFn`, so a
- * query's own lifecycle refetches (mount, window focus, staleTime, manual refetch) are ordered
- * against explicit flushes exactly the same way an explicit full refresh is (follow-up review
- * finding, P1) - previously the query's own refetches never claimed or checked sequence at all,
- * so they could overwrite a newer targeted write unconditionally. React Query's own retry policy
- * covers a failure here; no separate recovery hook is needed for this path.
+ * Claims sequence for every currently-cached id, fetches the full site totals, commits the
+ * merged result atomically, and returns it as this `queryFn`'s own resolution value. This is
+ * the function the real `useQuery` backing this cache key (`use-product-inventory.ts`) uses as
+ * its `queryFn`, so a query's own lifecycle refetches (mount, window focus, staleTime, manual
+ * refetch) are ordered against explicit flushes the same way an explicit full refresh is
+ * (follow-up review finding, P1) - previously the query's own refetches never claimed or
+ * checked sequence at all, so they could overwrite a newer targeted write unconditionally.
+ * React Query's own retry policy covers a failure here; no separate recovery hook is needed.
+ * <p>
+ * Committing ourselves (via `commitFullTotals`) *before* returning, rather than only returning a
+ * value and letting React Query's own internal `onSuccess` assignment be the sole write, closes
+ * most of the gap: our own write is already correct and atomic against whatever else has
+ * committed by the time our fetch resolves. But React Query still performs its own, separate
+ * `data = <our return value>` assignment some microtask hops after we return - that assignment
+ * is not something a `queryFn` can intercept or make conditional, so whatever we return here
+ * will *also* get written, unconditionally, moments later. A value snapshotted at our own commit
+ * time can already be stale by the time that second write happens if a sibling flush (e.g. one
+ * that resolved in the very same batch of microtasks) commits in between.
+ * <p>
+ * To keep that second, unavoidable write from regressing anything, we don't return the value we
+ * just committed - we yield one more microtask tick and then take a fresh snapshot of whatever
+ * the cache actually holds at that later point, so any sibling write already scheduled alongside
+ * ours gets a chance to land first. React Query's own subsequent assignment then just re-applies
+ * that same, already-current snapshot - a no-op rather than a regression. This is a real
+ * narrowing of the window (verified against a same-batch sibling commit), not a provable
+ * guarantee for every possible timing - a queryFn fundamentally cannot make React Query's own
+ * write conditional, so an adversarial enough delay could still in principle land in the
+ * remaining gap. Closing it completely would mean not using a `queryFn`-driven write for this
+ * key at all, which is a larger redesign than this fix round.
  */
 export async function fetchSequencedInventoryTotals(
   queryClient: QueryClient,
@@ -128,7 +172,9 @@ export async function fetchSequencedInventoryTotals(
     (t) => t.productId
   );
   const seq = claimSequence(siteId, cachedIds);
-  return fetchAndMergeFullTotals(queryClient, siteId, seq);
+  await fetchAndCommitFullTotals(queryClient, siteId, seq);
+  await Promise.resolve();
+  return queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? [];
 }
 
 /**
@@ -139,9 +185,9 @@ export async function fetchSequencedInventoryTotals(
  * cache. Recovery only fires when the failing flush is still the *current* claim holder for at
  * least one of its ids (i.e. no even-newer flush has since superseded it too) - otherwise that
  * newer flush is already responsible for reconciling the id and a redundant recovery would just
- * race it. Recovers with a fresh, separately-claimed attempt through the same sequenced merge
- * path (follow-up review, second round) rather than a bare `invalidateQueries`, which bypassed
- * sequencing entirely.
+ * race it. Recovers with a fresh, separately-claimed attempt through the same atomically-
+ * committing path (follow-up review, second/fourth rounds) rather than a bare `invalidateQueries`
+ * or a separately-computed-then-assigned value, either of which bypassed sequencing/atomicity.
  */
 async function recoverOnFailure(queryClient: QueryClient, siteId: string, seq: number, ids: string[]): Promise<void> {
   const stillOwnsAnId = ids.some((id) => latestSequenceByProductKey.get(productKey(siteId, id)) === seq);
@@ -153,8 +199,7 @@ async function recoverOnFailure(queryClient: QueryClient, siteId: string, seq: n
       siteId,
       (queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? []).map((t) => t.productId)
     );
-    const result = await fetchAndMergeFullTotals(queryClient, siteId, recoverySeq);
-    queryClient.setQueryData(["inventoryTotals", siteId], result);
+    await fetchAndCommitFullTotals(queryClient, siteId, recoverySeq);
   } catch {
     // Best-effort recovery; nothing else to fall back to here.
   }
@@ -166,8 +211,8 @@ async function recoverOnFailure(queryClient: QueryClient, siteId: string, seq: n
  * call, so it raced with targeted flushes in both directions (follow-up review finding, P1):
  * an older full read could overwrite a newer targeted write, and - because this path never
  * claimed anything - a targeted flush that started earlier but resolved later could overwrite a
- * newer full read too. Claims once, then routes through the same merge helper the real query and
- * failure recovery use.
+ * newer full read too. Claims once, then commits atomically through the same helper the real
+ * query and failure recovery use.
  */
 async function refreshAllInventoryTotals(queryClient: QueryClient, siteId: string): Promise<void> {
   const cachedIds = (queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? []).map(
@@ -175,14 +220,12 @@ async function refreshAllInventoryTotals(queryClient: QueryClient, siteId: strin
   );
   const seq = claimSequence(siteId, cachedIds);
 
-  let result: SiteInventoryTotal[];
   try {
-    result = await fetchAndMergeFullTotals(queryClient, siteId, seq);
+    await fetchAndCommitFullTotals(queryClient, siteId, seq);
   } catch (error) {
     await recoverOnFailure(queryClient, siteId, seq, cachedIds);
     throw error;
   }
-  queryClient.setQueryData(["inventoryTotals", siteId], result);
 }
 
 /**
