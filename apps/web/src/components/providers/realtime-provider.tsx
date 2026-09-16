@@ -1,6 +1,7 @@
 "use client";
 
 import { useRealtimeBroadcast } from "@/hooks/realtime/use-realtime-broadcast";
+import { useAuthContext } from "./auth-provider";
 
 interface RealtimeProviderProps {
   children: React.ReactNode;
@@ -9,22 +10,22 @@ interface RealtimeProviderProps {
 }
 
 /**
- * Provider component that sets up global Supabase Realtime subscriptions.
- * Add this inside your QueryClientProvider to enable real-time updates across the app.
- *
- * @example
- * ```tsx
- * <QueryClientProvider client={queryClient}>
- *   <RealtimeProvider>
- *     <App />
- *   </RealtimeProvider>
- * </QueryClientProvider>
- * ```
+ * Dashboard realtime lives inside both QueryProvider and AuthProvider. Mount the
+ * subscriber only after authentication: the hook also fetches protected site
+ * membership data, even when its subscription's enabled flag is false.
  */
 export function RealtimeProvider({ children, enabled = true }: RealtimeProviderProps) {
-  // Subscribe to broadcast channel for real-time updates from backend
-  // This single subscription handles all entity types (inventory, products, shipments, etc.)
-  useRealtimeBroadcast(enabled);
+  const { user, isLoading } = useAuthContext();
 
-  return <>{children}</>;
+  return (
+    <>
+      {enabled && !isLoading && user ? <RealtimeSubscriber /> : null}
+      {children}
+    </>
+  );
+}
+
+function RealtimeSubscriber() {
+  useRealtimeBroadcast();
+  return null;
 }

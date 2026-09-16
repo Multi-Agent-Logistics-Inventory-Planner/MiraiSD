@@ -116,6 +116,8 @@ describe("compareProducts", () => {
   it("sorts active before inactive when status ascending", () => {
     const active = makeRow({ isActive: true });
     const inactive = makeRow({ isActive: false });
+    active.isStocked = false;
+    inactive.isStocked = true;
     const sort: ProductSort = { column: "status", direction: "asc" };
 
     expect(compareProducts(active, inactive, sort, parentNameMap)).toBeLessThan(0);
@@ -124,6 +126,8 @@ describe("compareProducts", () => {
   it("sorts inactive before active when status descending", () => {
     const active = makeRow({ isActive: true });
     const inactive = makeRow({ isActive: false });
+    active.isStocked = false;
+    inactive.isStocked = true;
     const sort: ProductSort = { column: "status", direction: "desc" };
 
     expect(compareProducts(active, inactive, sort, parentNameMap)).toBeGreaterThan(0);

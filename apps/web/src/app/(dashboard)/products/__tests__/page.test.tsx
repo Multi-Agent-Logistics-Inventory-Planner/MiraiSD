@@ -218,7 +218,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     renderPage();
 
     expect(await screen.findByText("Widget")).toBeInTheDocument();
-    expect(screen.getByText("Stocked")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
     // T-6d-4: quantity is restored from the site-scoped totals route (MAIN's 42), and the
     // legacy, site-blind catalog quantity (999) never renders.
     expect(await screen.findByText("42")).toBeInTheDocument();
@@ -241,7 +241,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     expect(
       within(dialog).queryByText(/available after inventory is migrated per site/i),
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
+    expect(within(dialog).getByText("Active")).toBeInTheDocument();
     // canViewMsrp/canViewCosts are false for this EMPLOYEE mock - money fields stay hidden,
     // proving this row's site-scoped msrp isn't leaking around the permission gate.
     expect(within(dialog).queryByText(/MSRP:/i)).not.toBeInTheDocument();
@@ -291,7 +291,7 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
+    expect(within(dialog).getByText("Active")).toBeInTheDocument();
     expect(within(dialog).getByText("$20.00")).toBeInTheDocument();
 
     // Simulate the site resolving to SECOND (the only way this can happen today, since there's
@@ -318,7 +318,8 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
 
     await waitFor(() => {
       const dialogAfter = screen.getByRole("dialog");
-      expect(within(dialogAfter).getByText("Not Stocked")).toBeInTheDocument();
+      expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
+      expect(within(dialogAfter).getByText("Active")).toBeInTheDocument();
     }, { timeout: 5000 });
     const dialogAfter = screen.getByRole("dialog");
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
