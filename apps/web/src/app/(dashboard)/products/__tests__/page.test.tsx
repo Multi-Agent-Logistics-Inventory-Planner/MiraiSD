@@ -72,9 +72,10 @@ vi.mock("@/lib/api/products", () => ({
   deleteProduct: vi.fn(),
 }));
 
-const mockGetInventoryTotals = vi.fn();
-vi.mock("@/lib/api/inventory", () => ({
-  getInventoryTotals: () => mockGetInventoryTotals(),
+// --- Site-scoped inventory totals (T-6d-4): the only source for quantity/status on this page. ---
+const mockGetSiteInventoryTotals = vi.fn();
+vi.mock("@/lib/api/site-inventory", () => ({
+  getSiteInventoryTotals: (...args: unknown[]) => mockGetSiteInventoryTotals(...args),
 }));
 
 const mockGetCategories = vi.fn();
@@ -96,10 +97,11 @@ vi.mock("@/hooks/use-permissions", () => ({
   Permission,
 }));
 
-// --- ProductModal's own tangential data (not part of what T-5 changed) - stubbed to keep this
-// test focused on list/detail/role/site behavior, not the modal's unrelated sub-sections. ---
+// --- ProductModal's own tangential data (not part of what T-5/T-6d changed) - stubbed to keep
+// this test focused on list/detail/role/site behavior, not the modal's unrelated sub-sections. ---
 vi.mock("@/hooks/queries/use-product-inventory-entries", () => ({
-  useProductInventoryEntries: () => ({ data: { entries: [{ inventoryId: "inv-1", locationId: "rack-16", locationCode: "R16", locationType: "RACK", quantity: 15 }] }, isLoading: false }),
+  useProductInventoryEntries: () => ({ data: { entries: [] }, isLoading: false }),
+  useSiteProductInventoryEntries: () => ({ data: { entries: [] }, isLoading: false }),
 }));
 vi.mock("@/hooks/queries/use-kuji-box", () => ({
   useKujiAllocationsByProduct: () => ({ data: [] }),
@@ -165,25 +167,37 @@ const SITE_PRODUCTS: Record<string, unknown[]> = {
   ],
 };
 
+// Distinct per-site totals (T-6d-4) - proves the Stock column/detail quantity come from the
+// site-scoped totals route, keyed by the resolved siteId, not a shared/global source.
+const SITE_TOTALS: Record<string, unknown[]> = {
+  "site-main": [{ productId: "p-1", totalQuantity: 42, lastUpdatedAt: "2026-01-02T00:00:00Z" }],
+  "site-second": [{ productId: "p-1", totalQuantity: 3, lastUpdatedAt: "2026-01-03T00:00:00Z" }],
+};
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <ProductsPage />
-      </SidebarProvider>
-    </QueryClientProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <SidebarProvider>
+          <ProductsPage />
+        </SidebarProvider>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetInventoryTotals.mockResolvedValue([{ itemId: "p-1", totalQuantity: 15 }]);
     mockGetProducts.mockResolvedValue([CATALOG_PRODUCT]);
     mockGetCategories.mockResolvedValue([CATEGORY]);
     mockGetSiteProducts.mockImplementation((siteId: string) =>
       Promise.resolve(SITE_PRODUCTS[siteId] ?? []),
+    );
+    mockGetSiteInventoryTotals.mockImplementation((siteId: string) =>
+      Promise.resolve(SITE_TOTALS[siteId] ?? []),
     );
     mockUseCurrentSite.mockReturnValue({ ...MAIN_SITE, isLoading: false, error: null });
     mockUsePermissions.mockReturnValue({
@@ -200,45 +214,34 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
     });
   });
 
-  it.each([true, false])("uses legacy isActive=%s despite conflicting assortment in table and modal", async (isActive) => {
-    mockGetProducts.mockResolvedValue([{ ...CATALOG_PRODUCT, isActive }]);
-    mockGetSiteProducts.mockResolvedValue([{ productId: "p-1", name: "Widget", isStocked: !isActive }]);
-    renderPage();
-    const label = isActive ? "Active" : "Inactive";
-    expect(await screen.findByText(label)).toBeInTheDocument();
-    fireEvent.click(await screen.findByText("Widget"));
-    expect(within(screen.getByRole("dialog")).getByText(label)).toBeInTheDocument();
-    expect(screen.queryByText("Stocked")).not.toBeInTheDocument();
-    expect(screen.queryByText("Not Stocked")).not.toBeInTheDocument();
-  });
-
-  it("shows legacy totals and active status", async () => {
+  it("shows scoped quantity/stock-status in the list from the site totals route (T-6d-4)", async () => {
     renderPage();
 
     expect(await screen.findByText("Widget")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
-    // Counts come from inventory totals, never the catalog quantity field.
-    expect(screen.getByText("Stock")).toBeInTheDocument();
-    expect(screen.getByText("15")).toBeInTheDocument();
+    expect(screen.getByText("Stocked")).toBeInTheDocument();
+    // T-6d-4: quantity is restored from the site-scoped totals route (MAIN's 42), and the
+    // legacy, site-blind catalog quantity (999) never renders.
+    expect(await screen.findByText("42")).toBeInTheDocument();
     expect(screen.queryByText("999")).not.toBeInTheDocument();
     expect(
       screen.queryByText(/available after inventory is migrated per site/i),
     ).not.toBeInTheDocument();
+    expect(mockGetSiteInventoryTotals).toHaveBeenCalledWith("site-main");
   });
 
-  it("opens the detail modal with inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
+  it("opens the detail modal with scoped inventory and role-appropriate actions (EMPLOYEE: no Edit)", async () => {
     renderPage();
 
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/current stock/i)).toHaveTextContent("15");
-    expect(within(dialog).getByText("R16")).toBeInTheDocument();
-    expect(within(dialog).getByText("15")).toBeInTheDocument();
+    expect(within(dialog).getByText(/current stock/i)).toBeInTheDocument();
+    // T-6d-4: the modal renders the real, scoped quantity (MAIN's 42), not the withheld-state copy.
+    expect(within(dialog).getByText(/\(42\)/)).toBeInTheDocument();
     expect(
       within(dialog).queryByText(/available after inventory is migrated per site/i),
     ).not.toBeInTheDocument();
-    expect(within(dialog).getByText("Active")).toBeInTheDocument();
+    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
     // canViewMsrp/canViewCosts are false for this EMPLOYEE mock - money fields stay hidden,
     // proving this row's site-scoped msrp isn't leaking around the permission gate.
     expect(within(dialog).queryByText(/MSRP:/i)).not.toBeInTheDocument();
@@ -284,19 +287,29 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
       role: UserRole.ASSISTANT_MANAGER,
     });
 
-    const { rerender } = renderPage();
+    const { rerender, queryClient } = renderPage();
     fireEvent.click(await screen.findByText("Widget"));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Active")).toBeInTheDocument();
+    expect(within(dialog).getByText("Stocked")).toBeInTheDocument();
     expect(within(dialog).getByText("$20.00")).toBeInTheDocument();
 
     // Simulate the site resolving to SECOND (the only way this can happen today, since there's
     // no switcher UI yet - see use-current-site.ts) and force a re-render so the mocked hook's
-    // new return value takes effect and useSiteProductInventory's query key changes.
+    // new return value takes effect and useSiteProductInventory's query key changes. Reuses the
+    // SAME QueryClient instance, matching real production behavior - the app creates one
+    // QueryClient at the root and never swaps it; a genuinely different instance is not
+    // representative and, independent of anything this checkpoint changed, hits a well-known
+    // React Query limitation where an already-mounted useQuery's underlying observer stays
+    // bound to whichever client instance was current at its own mount and never rebinds to a
+    // later one without an actual unmount (useBaseQuery.js's `const [observer] = useState(() =>
+    // new Observer(client, ...))`). The property this test actually verifies - that MAIN's
+    // cached data never leaks into SECOND's view - comes from the site-qualified query keys
+    // (T-6d-3/AC-7), not from swapping client instances, so reusing the same client still fully
+    // exercises it.
     mockUseCurrentSite.mockReturnValue({ ...SECOND_SITE, isLoading: false, error: null });
     rerender(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <SidebarProvider>
           <ProductsPage />
         </SidebarProvider>
@@ -305,18 +318,14 @@ describe("ProductsPage (site-scoped, phase-5d T-5)", () => {
 
     await waitFor(() => {
       const dialogAfter = screen.getByRole("dialog");
-      expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
-      expect(within(dialogAfter).getByText("Active")).toBeInTheDocument();
-    });
+      expect(within(dialogAfter).getByText("Not Stocked")).toBeInTheDocument();
+    }, { timeout: 5000 });
     const dialogAfter = screen.getByRole("dialog");
     // SECOND's own realistic settings, not MAIN's stale $20/$10, and not an empty placeholder.
     expect(within(dialogAfter).getByText("$99.00")).toBeInTheDocument();
     expect(within(dialogAfter).queryByText("$20.00")).not.toBeInTheDocument();
-    // Quantity disappears across the switch too.
-    expect(within(dialogAfter).queryByText(/current stock/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Stock" })).not.toBeInTheDocument();
-    expect(
-      within(dialogAfter).queryByText(/available after inventory is migrated per site/i),
-    ).not.toBeInTheDocument();
+    // Quantity rebinds to SECOND's own totals (3), not MAIN's stale 42.
+    expect(within(dialogAfter).getByText(/\(3\)/)).toBeInTheDocument();
+    expect(within(dialogAfter).queryByText(/\(42\)/)).not.toBeInTheDocument();
   });
 });

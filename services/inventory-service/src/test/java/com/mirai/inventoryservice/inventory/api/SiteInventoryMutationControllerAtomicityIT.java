@@ -225,6 +225,191 @@ class SiteInventoryMutationControllerAtomicityIT {
     }
 
     @Test
+    void createItem_onSuccess_persistsInventoryMovementOutboxAndIdempotencyRecordTogether() {
+        setContext();
+        Location location = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-CREATE-" + UUID.randomUUID().toString().substring(0, 8)).build());
+        Product product = productRepository.save(Product.builder()
+                .sku("MUTCREATE-" + UUID.randomUUID()).name("Mutation Create Product")
+                .category(inventory.getProduct().getCategory()).isActive(true).quantity(0).build());
+        CreateLocationInventoryRequestDTO request = CreateLocationInventoryRequestDTO.builder()
+                .productId(product.getId()).quantity(7).build();
+
+        var response = controller.createSiteLocationInventoryItem(site.getId(), location.getId(), "key-create-1", request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getBody().getQuantity()).isEqualTo(7);
+        assertThat(locationInventoryRepository.findByLocation_IdAndProduct_Id(location.getId(), product.getId()))
+                .isPresent();
+        assertThat(stockMovementRepository.findByItem_IdOrderByAtDesc(product.getId())).hasSize(1);
+        assertThat(eventOutboxRepository.findAll()).hasSize(1);
+        assertThat(commandIdempotencyRepository.findBySiteIdAndUserIdAndIdempotencyKey(
+                site.getId(), userId, "key-create-1")).isPresent();
+    }
+
+    @Test
+    void createItem_replayWithSameKey_doesNotCreateASecondRow() {
+        setContext();
+        Location location = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-CREATE-REPLAY-" + UUID.randomUUID().toString().substring(0, 8)).build());
+        Product product = productRepository.save(Product.builder()
+                .sku("MUTCREATEREPLAY-" + UUID.randomUUID()).name("Mutation Create Replay Product")
+                .category(inventory.getProduct().getCategory()).isActive(true).quantity(0).build());
+        CreateLocationInventoryRequestDTO request = CreateLocationInventoryRequestDTO.builder()
+                .productId(product.getId()).quantity(4).build();
+
+        controller.createSiteLocationInventoryItem(site.getId(), location.getId(), "key-create-replay-1", request);
+        controller.createSiteLocationInventoryItem(site.getId(), location.getId(), "key-create-replay-1", request);
+
+        assertThat(locationInventoryRepository.findByLocation_IdAndProduct_Id(location.getId(), product.getId()))
+                .isPresent();
+        assertThat(stockMovementRepository.findByItem_IdOrderByAtDesc(product.getId())).hasSize(1);
+    }
+
+    @Test
+    void createItem_foreignSiteLocation_rejectsBeforeAnyWrite() {
+        Site otherSite = siteRepository.save(Site.builder().code("SITE-MUT-CR-O-" + UUID.randomUUID().toString().substring(0, 4)).name("Other Site").build());
+        AuthorizedSiteContextHolder.set(new AuthorizedSiteContext(
+                userId, otherSite.getId(), "ADMIN", Set.of(), false, "test-correlation"));
+        CreateLocationInventoryRequestDTO request = CreateLocationInventoryRequestDTO.builder()
+                .productId(inventory.getProduct().getId()).quantity(3).build();
+
+        assertThatThrownBy(() -> controller.createSiteLocationInventoryItem(
+                otherSite.getId(), inventory.getLocation().getId(), "key-create-foreign-1", request))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(eventOutboxRepository.findAll()).isEmpty();
+        assertThat(commandIdempotencyRepository.findBySiteIdAndUserIdAndIdempotencyKey(
+                otherSite.getId(), userId, "key-create-foreign-1")).isEmpty();
+    }
+
+    @Test
+    void deleteItem_onSuccess_removesInventoryAndCommitsMovementOutboxAndIdempotencyRecord() {
+        setContext();
+
+        var response = controller.deleteSiteLocationInventoryItem(
+                site.getId(), inventory.getLocation().getId(), inventory.getId(), "key-delete-1");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(locationInventoryRepository.findById(inventory.getId())).isEmpty();
+        assertThat(stockMovementRepository.findByItem_IdOrderByAtDesc(inventory.getProduct().getId())).hasSize(1);
+        assertThat(eventOutboxRepository.findAll()).hasSize(1);
+        assertThat(commandIdempotencyRepository.findBySiteIdAndUserIdAndIdempotencyKey(
+                site.getId(), userId, "key-delete-1")).isPresent();
+    }
+
+    @Test
+    void deleteItem_replayWithSameKey_doesNotDoubleEmit() {
+        setContext();
+
+        controller.deleteSiteLocationInventoryItem(
+                site.getId(), inventory.getLocation().getId(), inventory.getId(), "key-delete-replay-1");
+        controller.deleteSiteLocationInventoryItem(
+                site.getId(), inventory.getLocation().getId(), inventory.getId(), "key-delete-replay-1");
+
+        assertThat(stockMovementRepository.findByItem_IdOrderByAtDesc(inventory.getProduct().getId())).hasSize(1);
+        assertThat(eventOutboxRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    void deleteItem_locationRowMismatch_rejectsWithNoWrite() {
+        setContext();
+        Location otherLocation = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-DEL-MISMATCH-" + UUID.randomUUID().toString().substring(0, 8)).build());
+
+        assertThatThrownBy(() -> controller.deleteSiteLocationInventoryItem(
+                site.getId(), otherLocation.getId(), inventory.getId(), "key-delete-mismatch-1"))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(locationInventoryRepository.findById(inventory.getId())).isPresent();
+        assertThat(eventOutboxRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void batchTransfer_onSuccess_commitsBothMovementsOutboxAndIdempotencyRecordTogether() {
+        setContext();
+        Location destLocation = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-BT-DST-" + UUID.randomUUID().toString().substring(0, 8)).build());
+        LocationInventory destination = locationInventoryRepository.save(LocationInventory.builder()
+                .location(destLocation).site(site).product(inventory.getProduct()).quantity(0).build());
+        BatchTransferInventoryRequestDTO request = BatchTransferInventoryRequestDTO.builder()
+                .transfers(List.of(TransferInventoryRequestDTO.builder()
+                        .sourceLocationType(LocationType.BOX_BIN)
+                        .sourceInventoryId(inventory.getId())
+                        .destinationLocationType(LocationType.BOX_BIN)
+                        .destinationInventoryId(destination.getId())
+                        .quantity(5)
+                        .build()))
+                .build();
+
+        var response = controller.batchTransferSiteInventory(site.getId(), "key-batch-transfer-1", request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(locationInventoryRepository.findById(inventory.getId()).orElseThrow().getQuantity()).isEqualTo(15);
+        assertThat(locationInventoryRepository.findById(destination.getId()).orElseThrow().getQuantity()).isEqualTo(5);
+        assertThat(stockMovementRepository.findByItem_IdOrderByAtDesc(inventory.getProduct().getId())).hasSize(2);
+        assertThat(eventOutboxRepository.findAll()).hasSize(2);
+        assertThat(commandIdempotencyRepository.findBySiteIdAndUserIdAndIdempotencyKey(
+                site.getId(), userId, "key-batch-transfer-1")).isPresent();
+    }
+
+    @Test
+    void batchTransfer_whenMidBatchWriteFails_rollsBackBothLinesTogether() {
+        setContext();
+        Location destLocation1 = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-BT-D1-" + UUID.randomUUID().toString().substring(0, 8)).build());
+        Location destLocation2 = locationRepository.save(Location.builder()
+                .storageLocation(storage).locationCode("MUT-BT-D2-" + UUID.randomUUID().toString().substring(0, 8)).build());
+        LocationInventory destination1 = locationInventoryRepository.save(LocationInventory.builder()
+                .location(destLocation1).site(site).product(inventory.getProduct()).quantity(0).build());
+        LocationInventory destination2 = locationInventoryRepository.save(LocationInventory.builder()
+                .location(destLocation2).site(site).product(inventory.getProduct()).quantity(0).build());
+        BatchTransferInventoryRequestDTO request = BatchTransferInventoryRequestDTO.builder()
+                .transfers(List.of(
+                        TransferInventoryRequestDTO.builder()
+                                .sourceLocationType(LocationType.BOX_BIN).sourceInventoryId(inventory.getId())
+                                .destinationLocationType(LocationType.BOX_BIN).destinationInventoryId(destination1.getId())
+                                .quantity(3).build(),
+                        TransferInventoryRequestDTO.builder()
+                                .sourceLocationType(LocationType.BOX_BIN).sourceInventoryId(inventory.getId())
+                                .destinationLocationType(LocationType.BOX_BIN).destinationInventoryId(destination2.getId())
+                                .quantity(999).build()))
+                .build();
+
+        assertThatThrownBy(() -> controller.batchTransferSiteInventory(site.getId(), "key-batch-transfer-fail-1", request))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(locationInventoryRepository.findById(inventory.getId()).orElseThrow().getQuantity()).isEqualTo(20);
+        assertThat(locationInventoryRepository.findById(destination1.getId()).orElseThrow().getQuantity()).isEqualTo(0);
+        assertThat(stockMovementRepository.findAll()).isEmpty();
+        assertThat(eventOutboxRepository.findAll()).isEmpty();
+        assertThat(commandIdempotencyRepository.findBySiteIdAndUserIdAndIdempotencyKey(
+                site.getId(), userId, "key-batch-transfer-fail-1")).isEmpty();
+    }
+
+    @Test
+    void batchTransfer_foreignSiteSource_rejectsBeforeAnyWrite() {
+        Site otherSite = siteRepository.save(Site.builder().code("SITE-MUT-BT-O-" + UUID.randomUUID().toString().substring(0, 4)).name("Other Site").build());
+        AuthorizedSiteContextHolder.set(new AuthorizedSiteContext(
+                userId, otherSite.getId(), "ADMIN", Set.of(), false, "test-correlation"));
+        BatchTransferInventoryRequestDTO request = BatchTransferInventoryRequestDTO.builder()
+                .transfers(List.of(TransferInventoryRequestDTO.builder()
+                        .sourceLocationType(LocationType.BOX_BIN)
+                        .sourceInventoryId(inventory.getId())
+                        .destinationLocationType(LocationType.BOX_BIN)
+                        .destinationLocationId(UUID.randomUUID())
+                        .quantity(1)
+                        .build()))
+                .build();
+
+        assertThatThrownBy(() -> controller.batchTransferSiteInventory(otherSite.getId(), "key-batch-transfer-foreign-1", request))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(locationInventoryRepository.findById(inventory.getId()).orElseThrow().getQuantity()).isEqualTo(20);
+        assertThat(eventOutboxRepository.findAll()).isEmpty();
+    }
+
+    @Test
     void adjust_foreignSiteInventoryId_rejectsBeforeAnyWrite() {
         Site otherSite = siteRepository.save(Site.builder().code("SITE-MUT-OTHER").name("Other Site").build());
         AuthorizedSiteContextHolder.set(new AuthorizedSiteContext(

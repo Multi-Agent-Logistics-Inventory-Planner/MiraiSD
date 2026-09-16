@@ -5,6 +5,9 @@ import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
+import com.mirai.inventoryservice.inventory.application.LocationInventoryService;
+import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -12,6 +15,7 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
+import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
@@ -29,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * T-6c-1 (.specs/phase-6-inventory/log.md, AC-3): proves every new site-qualified repository
@@ -49,6 +54,7 @@ class LocationInventorySiteScopedQueriesIT {
     @Autowired private LocationRepository locationRepository;
     @Autowired private StorageLocationRepository storageLocationRepository;
     @Autowired private SiteRepository siteRepository;
+    @Autowired private LocationInventoryService locationInventoryService;
 
     private Site siteOf(String code) {
         return siteRepository.findByCode(code)
@@ -65,6 +71,28 @@ class LocationInventorySiteScopedQueriesIT {
                 .isDisplayOnly(false)
                 .displayOrder(1)
                 .build());
+        return locationRepository.save(Location.builder()
+                .storageLocation(storage)
+                .locationCode("SCOPEDIT-" + suffix)
+                .build());
+    }
+
+    /**
+     * Like {@link #newLocation} but with a real ({@code BOX_BINS}) storage location code, for
+     * flows that call {@code LocationInventoryService.mapStorageLocationCodeToLocationType}
+     * (e.g. {@code addInventory}), which only recognizes the fixed set of real codes.
+     */
+    private Location newBoxBinLocation(Site site, String label) {
+        String suffix = label + "-" + UUID.randomUUID().toString().substring(0, 8);
+        StorageLocation storage = storageLocationRepository.findByCodeAndSite_Code("BOX_BINS", site.getCode())
+                .orElseGet(() -> storageLocationRepository.save(StorageLocation.builder()
+                        .site(site)
+                        .code("BOX_BINS")
+                        .name("Box Bins")
+                        .hasDisplay(false)
+                        .isDisplayOnly(false)
+                        .displayOrder(1)
+                        .build()));
         return locationRepository.save(Location.builder()
                 .storageLocation(storage)
                 .locationCode("SCOPEDIT-" + suffix)
@@ -271,5 +299,71 @@ class LocationInventorySiteScopedQueriesIT {
         List<Long> ids = mainScoped.getContent().stream().map(StockMovement::getId).toList();
         assertThat(ids).contains(mainMovement.getId(), nullSiteMovement.getId());
         assertThat(ids).doesNotContain(secondMovement.getId());
+    }
+
+    /**
+     * T-6d-be-1: {@link LocationInventoryService}'s site-scoped {@code addInventory}/
+     * {@code deleteInventory} overloads, against a real database round trip (not mocked
+     * repositories) -- a foreign-site {@code locationId} 404s before any row is written, and a
+     * same-site create/delete round trip actually persists and removes the row.
+     */
+    @Test
+    void addInventory_siteScoped_rejectsForeignSiteLocation_beforeAnyWrite() {
+        Site main = siteOf("MAIN");
+        Site second = siteOf("SECOND");
+        Location secondLocation = newLocation(second, "add-foreign-site");
+        Product product = newProduct("add-foreign-site");
+
+        assertThatThrownBy(() -> locationInventoryService.addInventory(
+                main.getId(), UUID.randomUUID(), secondLocation.getId(), product.getId(), 5, null, null, null))
+                .isInstanceOf(LocationNotFoundException.class);
+
+        assertThat(locationInventoryRepository.findByLocation_IdAndProduct_Id(secondLocation.getId(), product.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    void addInventory_siteScoped_createsInventory_whenLocationBelongsToSite() {
+        Site main = siteOf("MAIN");
+        Location mainLocation = newBoxBinLocation(main, "add-own-site");
+        Product product = newProduct("add-own-site");
+
+        LocationInventory created = locationInventoryService.addInventory(
+                main.getId(), UUID.randomUUID(), mainLocation.getId(), product.getId(), 5, null, null, null);
+
+        assertThat(created.getQuantity()).isEqualTo(5);
+        assertThat(locationInventoryRepository.findByIdAndSite_Id(created.getId(), main.getId())).isPresent();
+    }
+
+    @Test
+    void deleteInventory_siteScoped_rejectsForeignSiteInventory_beforeAnyWrite() {
+        Site main = siteOf("MAIN");
+        Site second = siteOf("SECOND");
+        Location secondLocation = newLocation(second, "delete-foreign-site");
+        Product product = newProduct("delete-foreign-site");
+        LocationInventory secondInv = locationInventoryRepository.save(LocationInventory.builder()
+                .location(secondLocation).site(second).product(product).quantity(3).build());
+
+        assertThatThrownBy(() -> locationInventoryService.deleteInventory(
+                main.getId(), UUID.randomUUID(), secondLocation.getId(), secondInv.getId(), null))
+                .isInstanceOf(InventoryNotFoundException.class);
+
+        assertThat(locationInventoryRepository.findById(secondInv.getId())).isPresent();
+    }
+
+    @Test
+    void deleteInventory_siteScoped_rejectsLocationRowMismatch() {
+        Site main = siteOf("MAIN");
+        Location locationA = newLocation(main, "delete-mismatch-a");
+        Location locationB = newLocation(main, "delete-mismatch-b");
+        Product product = newProduct("delete-mismatch");
+        LocationInventory inv = locationInventoryRepository.save(LocationInventory.builder()
+                .location(locationA).site(main).product(product).quantity(2).build());
+
+        assertThatThrownBy(() -> locationInventoryService.deleteInventory(
+                main.getId(), UUID.randomUUID(), locationB.getId(), inv.getId(), null))
+                .isInstanceOf(InvalidInventoryOperationException.class);
+
+        assertThat(locationInventoryRepository.findById(inv.getId())).isPresent();
     }
 }

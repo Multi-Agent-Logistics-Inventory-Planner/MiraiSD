@@ -12,9 +12,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useAllForecasts, useAtRiskForecasts } from "./use-forecasts";
 import { useNotifications, useNotificationCounts } from "./use-notifications";
 import { useProducts } from "./use-products";
+import { useAllLocationsWithCounts } from "./use-locations-with-counts";
 import { getPerformanceMetrics } from "@/lib/api/analytics";
 import { getShipmentsPaged } from "@/lib/api/shipments";
-import { getLocationsWithCounts } from "@/lib/api/locations";
 import { ShipmentStatus, NotificationSeverity } from "@/types/api";
 import type { ProductListItem } from "@/types/api";
 import type {
@@ -81,11 +81,7 @@ export function useDashboardMetrics() {
     [activeShipmentsQuery.data]
   );
 
-  const locationsQuery = useQuery({
-    queryKey: ["locations", "with-counts"],
-    queryFn: () => getLocationsWithCounts(),
-    staleTime: 60 * 1000,
-  });
+  const locationsQuery = useAllLocationsWithCounts();
 
   // Store metrics for future trend calculations
   useEffect(() => {

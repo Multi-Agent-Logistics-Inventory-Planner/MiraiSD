@@ -74,7 +74,23 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
     @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE li.site.id = :siteId")
     List<LocationInventory> findBySite_Id(@Param("siteId") UUID siteId);
 
-    @Query("SELECT li FROM LocationInventory li JOIN FETCH li.location l JOIN FETCH l.storageLocation sl JOIN FETCH li.product WHERE sl.id = :storageLocationId")
+    /**
+     * Restored (.specs/phase-6-inventory 6e, R-3 revert, 2026-09-15) alongside
+     * {@code LocationInventoryController}. Now applies the same kuji-child/CUSTOM-kuji-parent
+     * exclusion {@link #findByLocation_Id} always has -- 6d recorded the previous, unfiltered
+     * version of this method as "a trap for a future, not-yet-existing caller"; that caller
+     * (the restored {@code LocationInventoryService.listInventoryByStorageLocation}) exists
+     * again now, so the query itself is fixed rather than re-shipping the trap.
+     */
+    @Query("""
+        SELECT li FROM LocationInventory li
+        JOIN FETCH li.location l
+        JOIN FETCH l.storageLocation sl
+        JOIN FETCH li.product p
+        WHERE sl.id = :storageLocationId
+          AND p.parent IS NULL
+          AND (p.kujiType IS NULL OR p.kujiType <> com.mirai.inventoryservice.catalog.domain.KujiType.CUSTOM)
+        """)
     List<LocationInventory> findByStorageLocation_Id(@Param("storageLocationId") UUID storageLocationId);
 
     @Query("SELECT SUM(li.quantity) FROM LocationInventory li WHERE li.product.id = :productId")
@@ -106,6 +122,19 @@ public interface LocationInventoryRepository extends JpaRepository<LocationInven
         WHERE li.id = :id AND li.site.id = :siteId
         """)
     Optional<LocationInventory> findByIdAndSite_Id(@Param("id") UUID id, @Param("siteId") UUID siteId);
+
+    /**
+     * Scalar-only site-membership check (.specs/phase-6-inventory 6d, review-driven fix: P1 finding,
+     * concurrent batch transfers losing source debits). {@code boolean} projections never populate
+     * the persistence context, unlike {@link #findByIdAndSite_Id} -- a caller that only needs to
+     * confirm a row belongs to a site before locking it (e.g. {@code
+     * StockMovementService#requireInventoryBelongsToSite}) MUST use this instead: loading the entity
+     * here, then locking it later via {@code ensureAndLockInventoryRow}, then reading it again via
+     * {@code findById}/{@code findAllByIdWithGraph}, would silently return the first, unlocked read's
+     * stale scalar state -- Hibernate does not refresh an already-managed entity's fields from a
+     * later query, locked or not.
+     */
+    boolean existsByIdAndSite_Id(UUID id, UUID siteId);
 
     @Query("""
         SELECT li FROM LocationInventory li

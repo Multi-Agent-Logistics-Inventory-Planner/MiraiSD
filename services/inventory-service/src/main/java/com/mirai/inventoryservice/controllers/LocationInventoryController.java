@@ -64,17 +64,11 @@ public class LocationInventoryController {
                 .body(locationInventoryMapper.toResponseDTO(inventory));
     }
 
-    @PutMapping("/api/locations/{locationId}/inventory/{inventoryId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
-    public ResponseEntity<LocationInventoryResponseDTO> updateInventory(
-            @PathVariable UUID locationId,
-            @PathVariable UUID inventoryId,
-            @Valid @RequestBody InventoryRequestDTO requestDTO) {
-        LocationInventory inventory = locationInventoryService.updateInventoryQuantity(
-                inventoryId,
-                requestDTO.getQuantity());
-        return ResponseEntity.ok(locationInventoryMapper.toResponseDTO(inventory));
-    }
+    // The untracked PUT (silent absolute-quantity set, no StockMovement/audit/outbox) stays
+    // removed even through the 6e R-3 revert of this controller's other routes -- it was always
+    // a standing AC-4 violation (6d's R-9 resolution note), not compatibility debt requiring the
+    // release/stabilization gate the GET/POST/DELETE routes below do. All quantity edits go
+    // through the audited adjustment endpoint (v1 or the legacy /api/stock-movements/batch-adjust).
 
     @DeleteMapping("/api/locations/{locationId}/inventory/{inventoryId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")

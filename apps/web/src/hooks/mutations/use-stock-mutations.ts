@@ -1,29 +1,38 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { batchAdjustStock, batchTransferStock, transferStock } from "@/lib/api/stock-movements";
-import { getProductById } from "@/lib/api/products";
 import {
-  LocationType,
-  type BatchAdjustStockRequest,
-  type Product,
-  type StockMovement,
-  type TransferStockRequest,
-} from "@/types/api";
+  adjustSiteInventory,
+  transferSiteInventory,
+  batchTransferSiteInventory,
+  newIdempotencyKey,
+  type AdjustSiteInventoryPayload,
+  type TransferSiteInventoryPayload,
+} from "@/lib/api/site-inventory";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
+import { LocationType } from "@/types/api";
+
+// --- Site-scoped stock mutations (Phase 6 checkpoint 6d, T-6d-7/T-6d-8) --------------------
+// Replaces the legacy, unscoped batchAdjustStock/transferStock/batchTransferStock. Actor
+// identity is derived server-side from AuthorizedSiteContext - the client no longer sends
+// actorId (T-6d-7). Idempotency keys are generated once per user-initiated mutate() call (T-6d-2,
+// see site-inventory.ts's newIdempotencyKey doc comment for why this must not happen inside
+// mutationFn). Query-key invalidation is site-qualified throughout (T-6d-3).
 
 export interface BatchAdjustVariables {
-  payload: BatchAdjustStockRequest;
-  /** Product ids touched by this batch — used to invalidate per-product query keys. */
+  payload: AdjustSiteInventoryPayload;
+  /** Product ids touched by this batch - used to invalidate per-product query keys. */
   productIds: string[];
 }
 
 interface TransferStockVariables {
-  payload: TransferStockRequest;
+  payload: TransferSiteInventoryPayload;
   productId?: string;
 }
 
 export interface BatchTransferItem {
-  payload: TransferStockRequest;
+  payload: TransferSiteInventoryPayload;
   productId: string;
   productName: string;
 }
@@ -38,150 +47,146 @@ interface BatchTransferVariables {
 
 async function invalidateStockQueries(
   qc: QueryClient,
-  productId?: string,
-  locationType?: LocationType
+  siteId: string,
+  productIds: string[]
 ) {
-  // Surgical product update: fetch single product and update cache (avoid full list refetch)
-  if (productId) {
-    // Invalidate specific product queries
-    await qc.invalidateQueries({ queryKey: ["products", productId] });
-    await qc.invalidateQueries({ queryKey: ["products", productId, "with-children"] });
-    await qc.invalidateQueries({ queryKey: ["products", productId, "children"] });
+  // Totals go through the shared targeted-refresh executor (6e, T-6e-5/AC-7): a bounded fetch
+  // of just these product IDs, merged into the cache, instead of a full-catalog invalidation -
+  // this hook already has productIds in hand, unlike the realtime broadcast path pre-6e.
+  //
+  // Non-fatal (6e independent review, Blocker 2): this is a network call the mutation's own
+  // write already succeeded before we get here. If it rejects, mutateAsync would otherwise
+  // report the whole (already-committed) mutation as failed - adjust-stock-dialog.tsx would
+  // show a false "Adjustment failed" toast, and a user retry would mint a fresh idempotency key
+  // and risk a real double-adjustment. Swallow the error rather than fail the mutation.
+  //
+  // Does NOT fall back to a bare `invalidateQueries` here (follow-up review, second round): a
+  // bare invalidate bypasses the sequencing `flushInventorySiteRefresh` itself already uses, so
+  // it could arrive after - and unconditionally overwrite - a newer flush's already-applied,
+  // correct value. `flushInventorySiteRefresh` already attempts its own sequenced recovery
+  // internally on failure (only when this attempt is still the current claim holder); a second,
+  // unsequenced fallback here would just risk undoing that.
+  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds).catch(() => {
+    // Best-effort; recovery (if warranted) already happened inside flushInventorySiteRefresh.
+  });
 
-    // Fetch single product and update all list caches
-    try {
-      const updatedProduct = await getProductById(productId);
-      qc.setQueriesData<Product[]>(
-        { queryKey: ["products"] },
-        (oldData) => {
-          if (!oldData || !Array.isArray(oldData)) return oldData;
-          const index = oldData.findIndex((p) => p.id === productId);
-          if (index === -1) return oldData;
-          return [
-            ...oldData.slice(0, index),
-            updatedProduct,
-            ...oldData.slice(index + 1),
-          ];
-        }
-      );
-    } catch {
-      // Fallback: if single fetch fails, invalidate all
-      await qc.invalidateQueries({ queryKey: ["products"] });
-    }
+  const tasks: Promise<unknown>[] = [
+    totalsRefresh,
+    // Site-qualified prefix: invalidates every ["locationInventory", siteId, ...] key
+    // (including the resolved-location sub-key and the NOT_ASSIGNED case) without needing to
+    // know the exact location - deliberately broad within this one site, never cross-site.
+    qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
+    // Fixed in 6e (T-6e-8): these were ["auditLogs"]/["auditLog"], which match no real query
+    // key (use-audit-log.ts uses "audit-log"/"audit-logs") - stock mutations had never
+    // actually refreshed the audit-log page.
+    qc.invalidateQueries({ queryKey: ["audit-log"] }),
+    qc.invalidateQueries({ queryKey: ["audit-logs"] }),
+    // Site-scoped product list (5d's ["products", siteId, "site"] key) - NOT the bare
+    // ["products"] prefix, which would also match the unrelated legacy, unscoped product list
+    // query and any future non-inventory "products"-prefixed key (the prefix-collision bug
+    // T-6d-3 was scoped to fix).
+    qc.invalidateQueries({ queryKey: ["products", siteId, "site"] }),
+  ];
 
-    await qc.invalidateQueries({ queryKey: ["inventoryByItem", productId] });
-    await qc.invalidateQueries({ queryKey: ["movementHistory", productId] });
-  } else {
-    // No specific productId, fall back to full invalidation
-    await qc.invalidateQueries({ queryKey: ["products"] });
+  for (const id of new Set(productIds)) {
+    tasks.push(qc.invalidateQueries({ queryKey: ["productInventoryEntries", siteId, id] }));
+    tasks.push(qc.invalidateQueries({ queryKey: ["movementHistory", siteId, id] }));
   }
 
-  // Invalidate not-assigned inventory if dealing with NOT_ASSIGNED location
-  if (locationType === LocationType.NOT_ASSIGNED) {
-    await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
-  }
+  await Promise.all(tasks);
 }
 
 export function useBatchAdjustStockMutation() {
   const qc = useQueryClient();
-  return useMutation<void, Error, BatchAdjustVariables>({
-    mutationFn: ({ payload }) => batchAdjustStock(payload),
+  const { siteId } = useCurrentSite();
+
+  const mutation = useMutation<
+    void,
+    Error,
+    BatchAdjustVariables & { idempotencyKey: string }
+  >({
+    mutationFn: ({ idempotencyKey, payload }) => {
+      if (!siteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return adjustSiteInventory(siteId, idempotencyKey, payload);
+    },
     onSuccess: async (_data, variables) => {
-      const { payload, productIds } = variables;
-      const uniqueProductIds = [...new Set(productIds)];
-
-      const tasks: Promise<unknown>[] = [
-        qc.invalidateQueries({
-          queryKey: ["locationInventory", payload.locationType, payload.locationId],
-        }),
-        qc.invalidateQueries({ queryKey: ["auditLogs"] }),
-        qc.invalidateQueries({ queryKey: ["auditLog"] }),
-      ];
-
-      for (const id of uniqueProductIds) {
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "with-children"] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "children"] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["productInventoryEntries", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["inventoryByItem", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["movementHistory", id] }));
-      }
-
-      if (payload.locationType === LocationType.NOT_ASSIGNED) {
-        tasks.push(qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }));
-      }
-
-      await Promise.all(tasks);
+      if (!siteId) return;
+      await invalidateStockQueries(qc, siteId, variables.productIds);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: BatchAdjustVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: (variables: BatchAdjustVariables) =>
+      mutation.mutateAsync({ ...variables, idempotencyKey: newIdempotencyKey() }),
+  };
 }
 
 export function useTransferStockMutation() {
   const qc = useQueryClient();
-  return useMutation<StockMovement, Error, TransferStockVariables>({
-    mutationFn: ({ payload }) => transferStock(payload),
+  const { siteId } = useCurrentSite();
+
+  const mutation = useMutation<
+    void,
+    Error,
+    TransferStockVariables & { idempotencyKey: string }
+  >({
+    mutationFn: ({ idempotencyKey, payload }) => {
+      if (!siteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return transferSiteInventory(siteId, idempotencyKey, payload);
+    },
     onSuccess: async (_data, variables) => {
-      await invalidateStockQueries(qc, variables.productId);
+      if (!siteId) return;
+      await invalidateStockQueries(qc, siteId, variables.productId ? [variables.productId] : []);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: TransferStockVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: (variables: TransferStockVariables) =>
+      mutation.mutateAsync({ ...variables, idempotencyKey: newIdempotencyKey() }),
+  };
 }
 
 export function useBatchTransferMutation() {
   const qc = useQueryClient();
+  const { siteId } = useCurrentSite();
 
-  return useMutation<void, Error, BatchTransferVariables>({
-    mutationFn: ({ transfers }) =>
-      batchTransferStock({ transfers: transfers.map((t) => t.payload) }),
+  const mutation = useMutation<
+    void,
+    Error,
+    BatchTransferVariables & { idempotencyKey: string }
+  >({
+    mutationFn: ({ idempotencyKey, transfers }) => {
+      if (!siteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return batchTransferSiteInventory(
+        siteId,
+        idempotencyKey,
+        transfers.map((t) => t.payload)
+      );
+    },
     onSuccess: async (_data, variables) => {
-      // Batch transfers affect multiple products - fetch each and update cache
+      if (!siteId) return;
       const productIds = [...new Set(variables.transfers.map((t) => t.productId))];
-
-      try {
-        // Fetch all affected products in parallel
-        const updatedProducts = await Promise.all(
-          productIds.map((id) => getProductById(id))
-        );
-
-        // Update all products list caches with the new data
-        qc.setQueriesData<Product[]>(
-          { queryKey: ["products"] },
-          (oldData) => {
-            if (!oldData || !Array.isArray(oldData)) return oldData;
-            const updatedMap = new Map(updatedProducts.map((p) => [p.id, p]));
-            return oldData.map((p) => updatedMap.get(p.id) ?? p);
-          }
-        );
-
-        // Invalidate specific product queries
-        for (const id of productIds) {
-          await qc.invalidateQueries({ queryKey: ["products", id] });
-          await qc.invalidateQueries({ queryKey: ["products", id, "with-children"] });
-          await qc.invalidateQueries({ queryKey: ["products", id, "children"] });
-        }
-      } catch {
-        // Fallback: if fetching fails, invalidate all
-        await qc.invalidateQueries({ queryKey: ["products"] });
-      }
-
-      if (
-        variables.sourceLocationType === LocationType.NOT_ASSIGNED ||
-        variables.destinationLocationType === LocationType.NOT_ASSIGNED
-      ) {
-        await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
-      }
-
-      await qc.invalidateQueries({
-        queryKey: ["locationInventory", variables.sourceLocationId],
-      });
-      await qc.invalidateQueries({
-        queryKey: ["locationInventory", variables.destinationLocationId],
-      });
-
-      for (const transfer of variables.transfers) {
-        await qc.invalidateQueries({
-          queryKey: ["inventoryByItem", transfer.productId],
-        });
-      }
+      await invalidateStockQueries(qc, siteId, productIds);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: BatchTransferVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: (variables: BatchTransferVariables) =>
+      mutation.mutateAsync({ ...variables, idempotencyKey: newIdempotencyKey() }),
+  };
 }

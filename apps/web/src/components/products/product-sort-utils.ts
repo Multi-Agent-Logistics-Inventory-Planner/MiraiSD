@@ -104,9 +104,12 @@ export function compareProducts(
       return dir * a.product.name.localeCompare(b.product.name);
 
     case "status": {
-      // Match the temporary legacy Active/Inactive status shown in the table and modal.
-      const aVal = a.product.isActive ? 0 : 1;
-      const bVal = b.product.isActive ? 0 : 1;
+      // Stocked/Active (true) = 0, Not-stocked/Inactive (false) = 1 => stocked first when
+      // ascending. Site-scoped rows (phase-5d T-5) carry isStocked and sort by assortment
+      // eligibility (spec.md AC-6d); rows without it (the legacy, unscoped view) fall back to
+      // product.isActive, preserving prior behavior there.
+      const aVal = (a.isStocked ?? a.product.isActive) ? 0 : 1;
+      const bVal = (b.isStocked ?? b.product.isActive) ? 0 : 1;
       return dir * (aVal - bVal);
     }
 

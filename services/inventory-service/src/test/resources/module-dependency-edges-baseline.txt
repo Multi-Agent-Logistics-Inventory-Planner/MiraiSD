@@ -124,13 +124,23 @@
 # repositoriesAreOnlyAccessedByServicesOrRepositories violations; regenerating that store shrank
 # it by exactly one entry for this reason).
 # `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
-# `InventoryRequestDTO` were deliberately NOT moved in T-6 (R-9, new): LocationInventoryResponseDTO
+# `InventoryRequestDTO` are deliberately NOT moved into `inventory.api` (R-9): LocationInventoryResponseDTO
 # .item is catalog.api.ProductSummaryDTO, and LocationInventoryMapper `uses` catalog.api.ProductMapper
 # -- moving them into inventory.api would create an inventory.api -> catalog.api edge, which
 # modulesDoNotDependOnAnotherModulesApi forbids unconditionally (no baseline/exemption mechanism,
 # unlike the frozen-store or module-edge rules). Resolving it properly needs a catalog-owned
 # application-layer product-summary read contract inventory.api can consume instead of catalog's
-# own transport DTO -- real design work, not a mechanical move. Deferred; see log.md T-6 entry.
+# own transport DTO -- real design work, not a mechanical move.
+#
+# 6e (T-6e-be-9) deleted these four classes outright, on the theory that their only remaining
+# caller (the legacy LocationInventoryController's own GET/POST/DELETE routes) had no production
+# traffic. The 6e independent review's R-3 finding reverted that deletion: the documented
+# compatibility-removal gate (docs/baseline/api-v1-map.md) needs access-log evidence of no legacy
+# traffic plus a stabilization window on a *released* version -- unsatisfiable when the
+# deprecation headers for these exact routes only just landed on this same unmerged branch. All
+# four classes, and the `inventory.api -> catalog.api` avoidance rationale above, are current
+# again as of that revert (2026-09-15). See log.md's "Review-driven fix: 6e independent review
+# findings" section.
 #
 # This replaces the previous FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` check, which
 # froze the full, multi-line cycle-path text (including specific example call-site edges, capped

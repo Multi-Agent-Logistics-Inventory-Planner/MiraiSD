@@ -303,8 +303,10 @@ public class StockMovementService {
 
         List<UUID> changedProductIds = applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, null);
-        broadcastService.broadcastAuditLogCreated(null);
+        UUID batchAdjustSiteId = first.getSite() != null ? first.getSite().getId() : null;
+        List<String> batchAdjustProductIds = affectedProductIds.stream().map(UUID::toString).toList();
+        broadcastService.broadcastInventoryUpdated(batchAdjustSiteId, storageLocationCode, batchAdjustProductIds, null);
+        broadcastService.broadcastAuditLogCreated(batchAdjustSiteId, null);
         if (!changedProductIds.isEmpty()) {
             broadcastService.broadcastProductUpdated(
                     changedProductIds.stream().map(UUID::toString).collect(Collectors.toList()));
@@ -624,8 +626,10 @@ public class StockMovementService {
         }
         executeTransfer(request, sourceInventory, sourceQuantity, lockedIds.get(plan.destinationKey()), auditLog, true, codes);
 
-        broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        UUID transferSiteId = sourceInventory.getSite() != null ? sourceInventory.getSite().getId() : null;
+        String transferProductId = sourceInventory.getProduct().getId().toString();
+        broadcastService.broadcastInventoryUpdated(transferSiteId, sourceLocationCode, List.of(transferProductId), null);
+        broadcastService.broadcastAuditLogCreated(transferSiteId, null);
     }
 
     /**
@@ -652,10 +656,22 @@ public class StockMovementService {
         batchTransferInventory(batchRequest);
     }
 
-    /** Throws {@link InventoryNotFoundException} (-> 404) if {@code inventoryId} isn't at {@code siteId}. */
+    /**
+     * Throws {@link InventoryNotFoundException} (-> 404) if {@code inventoryId} isn't at
+     * {@code siteId}. Deliberately scalar-only ({@link LocationInventoryRepository#existsByIdAndSite_Id})
+     * rather than the entity-returning {@code findByIdAndSite_Id} (.specs/phase-6-inventory 6d,
+     * review-driven fix: P1 finding, concurrent batch transfers losing source debits). This runs
+     * before {@link #planTransfers}/{@link #lockPlannedRows} ever locks the row it's called for; an
+     * entity-returning query here would populate the persistence context with an unlocked snapshot
+     * of the row, and the later "locked" read (via {@link #preloadInventories}/{@code findById})
+     * would silently return that same stale, unrefreshed entity instead of the row's true
+     * post-lock state -- see {@link #preloadInventories}'s Javadoc for why Hibernate makes that
+     * silent. A boolean projection cannot cause that hazard.
+     */
     private void requireInventoryBelongsToSite(UUID siteId, UUID inventoryId) {
-        locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+        if (!locationInventoryRepository.existsByIdAndSite_Id(inventoryId, siteId)) {
+            throw new InventoryNotFoundException("Inventory not found: " + inventoryId);
+        }
     }
 
     @Transactional
@@ -701,6 +717,14 @@ public class StockMovementService {
         );
 
         Set<UUID> affectedProductIds = new HashSet<>();
+        // Keyed by each transfer's own source site, not a single site derived from the first
+        // transfer: the legacy, unscoped batch route (this method) accepts transfers whose
+        // sources belong to different sites in one request (unlike the site-scoped overload,
+        // which requires every source to already belong to the caller's siteId before this
+        // method ever runs). A single combined broadcast stamped with only the first transfer's
+        // site would be silently discarded by every other affected site's clients (6e follow-up
+        // review finding).
+        Map<UUID, Set<String>> productIdsBySite = new HashMap<>();
         Map<UUID, String> codes = new HashMap<>();
         codes.put(sourceLocationId, sourceLocationCode);
         if (destLocationId != null && destLocationCode != null) {
@@ -719,6 +743,10 @@ public class StockMovementService {
             executeTransfer(request, sourceInventory, sourceQuantity,
                     lockedIds.get(plan.destinationKey()), auditLog, false, codes);
             affectedProductIds.add(sourceInventory.getProduct().getId());
+            UUID productSiteId = sourceInventory.getSite() != null ? sourceInventory.getSite().getId() : null;
+            productIdsBySite
+                    .computeIfAbsent(productSiteId, key -> new HashSet<>())
+                    .add(sourceInventory.getProduct().getId().toString());
         }
 
         // Compute totals once for all affected products, then publish outbox-friendly
@@ -730,8 +758,15 @@ public class StockMovementService {
         Map<UUID, Integer> currentTotals = sumCurrentTotalsByProductIds(affectedProductIds);
         applyProductActiveStatusFromTotals(affectedProductIds, currentTotals);
 
-        broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        // One broadcast per affected site, not one combined broadcast keyed off only the
+        // first transfer's site (see productIdsBySite's Javadoc above) - a legacy mixed-site
+        // batch must notify every site it actually touched, not just the first one.
+        for (Map.Entry<UUID, Set<String>> entry : productIdsBySite.entrySet()) {
+            UUID siteIdForBroadcast = entry.getKey();
+            List<String> productIdsForSite = List.copyOf(entry.getValue());
+            broadcastService.broadcastInventoryUpdated(siteIdForBroadcast, sourceLocationCode, productIdsForSite, null);
+            broadcastService.broadcastAuditLogCreated(siteIdForBroadcast, null);
+        }
     }
 
     /**
@@ -988,8 +1023,11 @@ public class StockMovementService {
 
         boolean productChanged = updateProductActiveStatus(product);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
-        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        UUID addInventorySiteId = location.getStorageLocation().getSite() != null
+                ? location.getStorageLocation().getSite().getId() : null;
+        broadcastService.broadcastInventoryUpdated(
+                addInventorySiteId, storageLocationCode, List.of(product.getId().toString()), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(addInventorySiteId, product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
         }
@@ -1057,8 +1095,10 @@ public class StockMovementService {
 
         boolean productChanged = updateProductActiveStatus(product);
 
-        broadcastService.broadcastInventoryUpdated(storageLocationCode, product.getId().toString());
-        broadcastService.broadcastAuditLogCreated(product.getId().toString());
+        UUID removeInventorySiteId = inventory.getSite() != null ? inventory.getSite().getId() : null;
+        broadcastService.broadcastInventoryUpdated(
+                removeInventorySiteId, storageLocationCode, List.of(product.getId().toString()), product.getId().toString());
+        broadcastService.broadcastAuditLogCreated(removeInventorySiteId, product.getId().toString());
         if (productChanged) {
             broadcastService.broadcastProductUpdated(List.of(product.getId().toString()));
         }

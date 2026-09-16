@@ -75,7 +75,7 @@ import { RenewDisplayDialog } from "@/components/machine-displays/renew-display-
 import { AdjustStockDialog } from "@/components/stock/adjust-stock-dialog";
 import { TransferStockDialog } from "@/components/stock/transfer-stock-dialog";
 import { useProducts } from "@/hooks/queries/use-products";
-import { useProductInventory } from "@/hooks/queries/use-product-inventory";
+import { useSiteProductInventory } from "@/hooks/queries/use-product-inventory";
 import { ProductModal } from "@/components/products/product-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -127,9 +127,13 @@ export function LocationDetailSheet({
   const isMachine = MACHINE_LOCATION_TYPES.includes(locationType);
   const isDisplayOnly = DISPLAY_ONLY_LOCATION_TYPES.includes(locationType);
 
-  const inventoryQuery = useLocationInventory(locationType, locationId);
+  const inventoryQuery = useLocationInventory(
+    locationType,
+    locationId,
+    location ? getLocationCode(locationType, location) : undefined
+  );
   const deleteLocation = useDeleteLocationMutation(locationType);
-  const { data: productInventory } = useProductInventory();
+  const { data: productInventory } = useSiteProductInventory();
 
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);

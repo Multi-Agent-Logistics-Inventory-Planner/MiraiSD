@@ -184,7 +184,12 @@ class RBACAlignmentIT extends BaseIntegrationTest {
     /**
      * Inventory Operations: EMPLOYEE + ADMIN
      * Frontend: inventory:adjust, inventory:add (EMPLOYEE + ADMIN)
-     * Backend: LocationInventoryController POST/PUT (EMPLOYEE+), StockMovementController adjust (EMPLOYEE+)
+     * Backend: SiteInventoryMutationController create/delete (EMPLOYEE+/ADMIN+ASSISTANT_MANAGER),
+     * StockMovementController adjust (EMPLOYEE+), LocationInventoryController POST (EMPLOYEE+) --
+     * its PUT stays removed (R-9's audited-adjustment-only resolution); the rest of the
+     * controller was restored by 6e's R-3 revert (.specs/phase-6-inventory 6e independent
+     * review) after T-6e-be-9's deletion turned out to violate the documented
+     * compatibility-removal gate.
      */
     @Nested
     @DisplayName("Inventory Operations (EMPLOYEE + ADMIN)")

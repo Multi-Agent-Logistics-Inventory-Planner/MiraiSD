@@ -66,6 +66,24 @@ public class LocationInventoryService {
         return addInventory(locationId, productId, quantity, actorId, reason, null, null);
     }
 
+    /**
+     * Site-scoped counterpart to {@link #addInventory(UUID, UUID, Integer, UUID, StockMovementReason, String, Integer)}
+     * (.specs/phase-6-inventory 6d, T-6d-be-1, R-9/AC-3): validates {@code locationId} belongs to
+     * {@code siteId} via {@link LocationService#getLocationById(UUID, UUID)} (404 for an
+     * unknown/foreign-site location) before any write, then delegates to the existing un-scoped
+     * method -- unchanged, so the legacy controller keeps working until 6e deletes it.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id
+     * ({@code AuthorizedSiteContext.backendUserId()}), never a client-supplied value -- the v1
+     * mutation route is the only caller and always passes this.
+     */
+    public LocationInventory addInventory(UUID siteId, UUID actorId, UUID locationId, UUID productId,
+                                          Integer quantity, StockMovementReason reason,
+                                          String intakeUnit, Integer intakeQty) {
+        locationService.getLocationById(siteId, locationId);
+        return addInventory(locationId, productId, quantity, actorId, reason, intakeUnit, intakeQty);
+    }
+
     public LocationInventory addInventory(UUID locationId, UUID productId, Integer quantity,
                                           UUID actorId, StockMovementReason reason,
                                           String intakeUnit, Integer intakeQty) {
@@ -105,7 +123,11 @@ public class LocationInventoryService {
     }
 
     /**
-     * Get inventory by ID
+     * Get inventory by ID. Public again (.specs/phase-6-inventory 6e, R-3 revert, 2026-09-15):
+     * the legacy {@code LocationInventoryController} that calls this was restored after the
+     * documented compatibility-removal gate (docs/baseline/api-v1-map.md) turned out to be
+     * unsatisfiable this checkpoint -- see log.md's "Review-driven fix: 6e independent review
+     * findings" section.
      */
     public LocationInventory getInventoryById(UUID inventoryId) {
         return locationInventoryRepository.findById(inventoryId)
@@ -114,7 +136,8 @@ public class LocationInventoryService {
     }
 
     /**
-     * List all inventory at a specific location
+     * List all inventory at a specific location. Restored alongside {@link #getInventoryById}
+     * (R-3 revert) -- see that method's Javadoc.
      */
     public List<LocationInventory> listInventoryAtLocation(UUID locationId) {
         locationRepository.findById(locationId)
@@ -123,7 +146,12 @@ public class LocationInventoryService {
     }
 
     /**
-     * List all inventory for a specific storage location type (e.g., all box bins)
+     * List all inventory for a specific storage location type (e.g., all box bins). Restored
+     * alongside {@link #getInventoryById} (R-3 revert) -- see that method's Javadoc. Delegates
+     * to {@link LocationInventoryRepository#findByStorageLocation_Id}, which now applies the
+     * same kuji-child/CUSTOM-kuji-parent exclusion its {@code findByLocation_Id} sibling always
+     * has -- the 6d-recorded "trap" (a caller reaching the unfiltered method) is closed by
+     * fixing the query itself this time, not by leaving the trap for whichever caller reappears.
      */
     public List<LocationInventory> listInventoryByStorageLocation(UUID storageLocationId) {
         storageLocationRepository.findById(storageLocationId)
@@ -155,17 +183,24 @@ public class LocationInventoryService {
     }
 
     /**
-     * Update inventory quantity directly (without tracking)
-     * Use with caution - prefer adjustInventory for tracked changes
+     * Site-scoped counterpart to {@link #deleteInventory(UUID, UUID, StockMovementReason)}
+     * (.specs/phase-6-inventory 6d, T-6d-be-1, R-9/AC-3): resolves {@code inventoryId} through
+     * {@link LocationInventoryRepository#findByIdAndSite_Id} (404 for an unknown/foreign-site
+     * inventory row), then confirms it actually belongs to the path's {@code locationId} (400 on a
+     * path/row mismatch) before delegating to the existing un-scoped method.
+     * <p>
+     * {@code actorId} MUST be the authenticated principal's backend user id -- see
+     * {@link #addInventory(UUID, UUID, UUID, UUID, Integer, StockMovementReason, String, Integer)}.
      */
-    public LocationInventory updateInventoryQuantity(UUID inventoryId, Integer quantity) {
-        LocationInventory inventory = getInventoryById(inventoryId);
-        stockMovementService.validateKujiAllocation(
-                inventory.getLocation().getId(),
-                inventory.getProduct().getId(),
-                quantity != null ? quantity : 0);
-        inventory.setQuantity(quantity);
-        return locationInventoryRepository.save(inventory);
+    public void deleteInventory(UUID siteId, UUID actorId, UUID locationId, UUID inventoryId,
+                                 StockMovementReason reason) {
+        LocationInventory inventory = locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found: " + inventoryId));
+        if (!java.util.Objects.equals(inventory.getLocation().getId(), locationId)) {
+            throw new InvalidInventoryOperationException(
+                    "Inventory " + inventoryId + " does not belong to location " + locationId);
+        }
+        deleteInventory(inventoryId, actorId, reason);
     }
 
     /**

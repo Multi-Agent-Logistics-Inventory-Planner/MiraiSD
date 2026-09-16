@@ -25,12 +25,16 @@ interface ProductTableProps {
   readonly kujiCategoryIds: ReadonlySet<string>;
   readonly sort: ProductSort;
   readonly onSortChange: (sort: ProductSort) => void;
-  /** Whether inventory counts are available for this view. */
+  /**
+   * Whether to render the Stock column. Defaults to true - quantity/stock-status are restored
+   * from the site-scoped totals route as of Phase 6 checkpoint 6d (previously withheld during
+   * Phase 5, see .specs/phase-5d-catalog-v1-and-web/spec.md AC-6b).
+   */
   readonly showQuantity?: boolean;
 }
 
-function getProductStatusColor(isActive: boolean) {
-  return isActive
+function getProductStatusColor(isStocked: boolean) {
+  return isStocked
     ? "bg-[#20d760] text-black"
     : "bg-[#e50815] text-white";
 }
@@ -172,7 +176,7 @@ export function ProductTable({
           ) : (
             items.map((row) => {
               const showKujiIcon = row.product.hasChildren || kujiCategoryIds.has(row.product.category.id);
-              const isActive = row.product.isActive;
+              const isStocked = row.isStocked ?? row.product.isActive;
               return (
                 <TableRow
                   key={row.product.id}
@@ -199,9 +203,9 @@ export function ProductTable({
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-center">
                     <Badge
-                      className={cn("text-xs", getProductStatusColor(isActive))}
+                      className={cn("text-xs", getProductStatusColor(isStocked))}
                     >
-                      {isActive ? "Active" : "Inactive"}
+                      {isStocked ? "Stocked" : "Not Stocked"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell pl-4 max-w-0 overflow-hidden">
@@ -244,7 +248,6 @@ export function ProductTable({
           )}
         </TableBody>
       </Table>
-
     </div>
   );
 }

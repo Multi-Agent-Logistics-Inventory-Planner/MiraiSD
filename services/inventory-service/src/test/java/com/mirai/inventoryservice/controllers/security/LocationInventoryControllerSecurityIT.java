@@ -114,53 +114,8 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
         }
     }
 
-    @Nested
-    @DisplayName("PUT endpoints")
-    class PutTests {
-
-        private static final String INVENTORY_URL = BASE_URL + "/550e8400-e29b-41d4-a716-446655440002";
-
-        @Test
-        @DisplayName("Should return 401 when no token provided")
-        void updateInventory_noAuth_returns401() throws Exception {
-            mockMvc.perform(put(INVENTORY_URL)
-                            .contentType("application/json")
-                            .content(INVENTORY_JSON))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @DisplayName("Should return 403 when USER role attempts to update")
-        void updateInventory_userRole_returns403() throws Exception {
-            mockMvc.perform(put(INVENTORY_URL)
-                            .header("Authorization", "Bearer " + userToken())
-                            .contentType("application/json")
-                            .content(INVENTORY_JSON))
-                    .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("Should allow EMPLOYEE role to update inventory")
-        void updateInventory_employeeRole_notForbidden() throws Exception {
-            mockMvc.perform(put(INVENTORY_URL)
-                            .header("Authorization", "Bearer " + employeeToken())
-                            .contentType("application/json")
-                            .content(INVENTORY_JSON))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
-        }
-
-        @Test
-        @DisplayName("Should allow ADMIN role to update inventory")
-        void updateInventory_adminRole_notForbidden() throws Exception {
-            mockMvc.perform(put(INVENTORY_URL)
-                            .header("Authorization", "Bearer " + adminToken())
-                            .contentType("application/json")
-                            .content(INVENTORY_JSON))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
-        }
-    }
+    // PUT (updateInventory) stays removed even through the 6e R-3 revert -- see the controller's
+    // own comment for why.
 
     @Nested
     @DisplayName("DELETE endpoints")
@@ -224,25 +179,8 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
         }
     }
 
-    @Nested
-    @DisplayName("Product level endpoints")
-    class ProductTests {
-
-        private static final String PRODUCT_URL = "/api/inventory/by-product/550e8400-e29b-41d4-a716-446655440004";
-
-        @Test
-        @DisplayName("Should return 401 when no token provided")
-        void listByProduct_noAuth_returns401() throws Exception {
-            mockMvc.perform(get(PRODUCT_URL))
-                    .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @DisplayName("Should deny USER role from listing by product (EMPLOYEE+ required)")
-        void listByProduct_userRole_returns403() throws Exception {
-            mockMvc.perform(get(PRODUCT_URL)
-                            .header("Authorization", "Bearer " + userToken()))
-                    .andExpect(status().isForbidden());
-        }
-    }
+    // Product-level (/api/inventory/by-product/{id}) coverage lives in
+    // InventoryAggregateControllerSecurityIT -- that route belongs to a different controller
+    // (InventoryAggregateController) and was moved out during the 6e R-3 revert cycle to avoid
+    // duplicate test methods across two files covering the same route.
 }

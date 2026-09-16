@@ -4427,80 +4427,6 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "location-inventory-controller" ]
-      },
-      "put" : {
-        "operationId" : "updateInventory",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "locationId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "in" : "path",
-          "name" : "inventoryId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/InventoryRequestDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/LocationInventoryResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "location-inventory-controller" ]
       }
     },
     "/api/lootbox/admin/activity" : {
@@ -13152,6 +13078,163 @@
         "tags" : [ "site-inventory-controller" ]
       }
     },
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}/items" : {
+      "post" : {
+        "operationId" : "createSiteLocationInventoryItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "locationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateLocationInventoryRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SiteLocationInventoryEntryDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}/items/{inventoryId}" : {
+      "delete" : {
+        "operationId" : "deleteSiteLocationInventoryItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "locationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "inventoryId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
     "/api/v1/sites/{siteId}/inventory/movements" : {
       "get" : {
         "operationId" : "getSiteMovements",
@@ -13470,6 +13553,74 @@
         "tags" : [ "site-inventory-mutation-controller" ]
       }
     },
+    "/api/v1/sites/{siteId}/inventory/transfers/batch" : {
+      "post" : {
+        "operationId" : "batchTransferSiteInventory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchTransferInventoryRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
     "/api/v1/sites/{siteId}/locations" : {
       "get" : {
         "operationId" : "getSiteLocations",
@@ -13496,7 +13647,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/Location"
+                    "$ref" : "#/components/schemas/SiteLocationDTO"
                   }
                 }
               }
@@ -13563,7 +13714,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13602,6 +13753,75 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "site-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/locations/with-counts" : {
+      "get" : {
+        "operationId" : "getSiteLocationsWithCounts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "BOX_BIN", "CABINET", "DOUBLE_CLAW_MACHINE", "FOUR_CORNER_MACHINE", "GACHAPON", "KEYCHAIN_MACHINE", "PUSHER_MACHINE", "RACK", "SHELF", "SINGLE_CLAW_MACHINE", "WINDOW", "NOT_ASSIGNED" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/LocationWithCountsDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-aggregate-controller" ]
       }
     },
     "/api/v1/sites/{siteId}/locations/{id}" : {
@@ -13686,7 +13906,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13760,7 +13980,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -15053,7 +15273,7 @@
             "items" : {
               "$ref" : "#/components/schemas/TransferInventoryRequestDTO"
             },
-            "maxItems" : 2147483647,
+            "maxItems" : 50,
             "minItems" : 1
           }
         },
@@ -15496,6 +15716,32 @@
             "format" : "int32"
           }
         }
+      },
+      "CreateLocationInventoryRequestDTO" : {
+        "type" : "object",
+        "properties" : {
+          "intakeQty" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "intakeUnit" : {
+            "type" : "string"
+          },
+          "productId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+          }
+        },
+        "required" : [ "productId", "quantity" ]
       },
       "CreateLocationRequest" : {
         "type" : "object",
@@ -18892,6 +19138,33 @@
           "totalQuantity" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "SiteLocationDTO" : {
+        "type" : "object",
+        "properties" : {
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "locationCode" : {
+            "type" : "string"
+          },
+          "storageLocationCode" : {
+            "type" : "string"
+          },
+          "storageLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
