@@ -294,6 +294,46 @@ describe("useSiteProductInventory", () => {
     expect(result.current.error).toBe(siteError);
   });
 
+  it("clears the trigger's stale error once the mirror receives fresh data from a successful recovery elsewhere (follow-up review, sixth round)", async () => {
+    // The trigger's error is only ever about its own attempt; it stays set even after some
+    // other writer (a targeted flush, a realtime notification, or recovery) has already
+    // committed fresh, authoritative data straight into the mirror - since recovery writes the
+    // mirror directly, not the trigger, nothing about a successful recovery ever clears the
+    // trigger's own stale error. Before this fix, the hook kept reporting that stale error even
+    // once `data` had real, recovered rows in it - the Products page (which replaces its whole
+    // table with "Could not load products" whenever `error` is truthy, regardless of `data`)
+    // would stay stuck on the error screen forever despite having successfully recovered.
+    mockUseProducts.mockReturnValue({ data: [catalogProduct()], isLoading: false, error: null });
+    mockUseSiteProducts.mockReturnValue({
+      data: [{ productId: "p-1", name: "Widget", isStocked: true, version: 1 }],
+      siteId: "site-main",
+      siteCode: "MAIN",
+      isLoading: false,
+      error: null,
+    });
+
+    const fetchError = new Error("network down");
+    // First call (the trigger's own fetch) fails; the second (recovery's full-refresh fallback,
+    // since nothing was ever cached to merge a targeted response into) succeeds.
+    mockGetSiteInventoryTotals.mockRejectedValueOnce(fetchError);
+    mockGetSiteInventoryTotals.mockResolvedValueOnce([{ productId: "p-1", totalQuantity: 1 }]);
+
+    const { queryClient, Wrapper: wrapper } = createWrapper();
+    const { result } = renderHook(() => useSiteProductInventory(true), { wrapper });
+
+    // The trigger's initial fetch fails: no data yet, so the error must surface.
+    await waitFor(() => expect(result.current.error).toBe(fetchError));
+    expect(result.current.data).toBeNull();
+
+    // Recovery (or a targeted flush, or a realtime notification) commits fresh data straight
+    // into the mirror - not through the trigger, which is still sitting in its own error state.
+    await flushInventorySiteRefresh(queryClient, "site-main", ["p-1"]);
+
+    await waitFor(() => expect(result.current.data?.[0]?.totalQuantity).toBe(1));
+    // The stale error must no longer be reported now that real data is showing.
+    expect(result.current.error).toBeNull();
+  });
+
   it("an external writer's update to the shared key sticks - the mirror never re-derives its own value", async () => {
     // Companion to the structural test below: this one documents the functional behavior
     // (external write wins and is displayed), while the structural test proves *why* it always

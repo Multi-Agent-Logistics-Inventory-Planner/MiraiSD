@@ -126,15 +126,26 @@ export function useSiteProductInventory(rootOnly = false) {
     });
   }, [productsQuery.data, siteProductsQuery.data, totalsQuery.data, siteId]);
 
+  // The mirror query never fetches on its own, so its own isLoading/error are always
+  // false/undefined regardless of whether data has arrived - that state has to come from the
+  // trigger query, which is the one that actually fetches. But the trigger's error is *only*
+  // ever about its own attempt: it stays set even after some other writer (a targeted flush, a
+  // realtime notification, or the trigger's own next successful retry landing via recovery
+  // elsewhere) has already committed fresh, authoritative data into the mirror directly - since
+  // recovery writes the mirror, not the trigger, nothing ever clears the trigger's stale error
+  // on its own (follow-up review, sixth round). Surfacing that stale error once the mirror
+  // plainly has usable data would show "Could not load products" over a page that, in fact,
+  // just loaded successfully through a different path - so the trigger's error is suppressed
+  // once the mirror has any data, without touching how either query writes (the split/write
+  // separation from the fifth round is unchanged; this only changes what the hook reports).
+  const totalsError = totalsQuery.data === undefined ? totalsFetchTrigger.error : null;
+
   return {
     data,
     siteId,
     siteCode: siteProductsQuery.siteCode,
-    // The mirror query never fetches (queryFn: skipToken), so its own isLoading/error are
-    // always false/undefined regardless of whether data has arrived - loading/error state must
-    // come from the trigger query, which is the one that actually fetches.
     isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || totalsFetchTrigger.isLoading,
-    error: productsQuery.error ?? siteProductsQuery.error ?? totalsFetchTrigger.error,
+    error: productsQuery.error ?? siteProductsQuery.error ?? totalsError,
   };
 }
 
