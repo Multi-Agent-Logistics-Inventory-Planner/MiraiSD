@@ -51,11 +51,13 @@ function invalidateSiteLocationInventory(
 ) {
   return Promise.all([
     // Non-fatal (6e independent review, Blocker 2): see use-stock-mutations.ts's identical
-    // comment - a refresh failure must degrade to invalidate-only, never fail the mutation
-    // whose write already committed.
-    flushInventorySiteRefresh(qc, siteId, productId ? [productId] : undefined).catch(() =>
-      qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] })
-    ),
+    // comment - a refresh failure must never fail the mutation whose write already committed.
+    // No bare-invalidate fallback (follow-up review, second round, same reasoning as
+    // use-stock-mutations.ts): flushInventorySiteRefresh already attempts its own sequenced
+    // recovery internally; an unsequenced fallback here could overwrite a newer flush's value.
+    flushInventorySiteRefresh(qc, siteId, productId ? [productId] : undefined).catch(() => {
+      // Best-effort; recovery (if warranted) already happened inside flushInventorySiteRefresh.
+    }),
     qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
     // Removed in 6e (T-6e-8): ["dashboardStats"] matched no real query.
     qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId] }),

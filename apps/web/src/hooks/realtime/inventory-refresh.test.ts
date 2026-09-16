@@ -6,7 +6,7 @@ vi.mock("@/lib/api/site-inventory", () => ({
   getSiteInventoryTotals: (...args: unknown[]) => mockGetSiteInventoryTotals(...args),
 }));
 
-import { flushInventorySiteRefresh } from "./inventory-refresh";
+import { flushInventorySiteRefresh, fetchSequencedInventoryTotals } from "./inventory-refresh";
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -117,10 +117,88 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     ]);
   });
 
-  it("recovers with a corrective invalidation when the latest (superseding) flush's request fails, even though an earlier flush would have succeeded (follow-up review finding, P2)", async () => {
+  it("fetchSequencedInventoryTotals (the real query's own queryFn) does not overwrite a newer targeted write, even though its own fetch resolves later (follow-up third-round review, P1)", async () => {
+    // The actual useQuery backing this cache key (use-product-inventory.ts) used to call
+    // getSiteInventoryTotals directly with no sequencing at all, so ANY of its own lifecycle
+    // refetches (mount, window focus, staleTime, a manual refetch) could overwrite a newer
+    // targeted write unconditionally - not just the explicit full-refresh path this file already
+    // covers. fetchSequencedInventoryTotals is what the queryFn now calls; this proves it
+    // participates in the same ordering as an explicit flush.
     const qc = client();
     qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
-    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    let resolveQueryFetch!: (value: unknown) => void;
+    const queryFetch = new Promise((resolve) => {
+      resolveQueryFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => queryFetch);
+    // The query's own refetch starts first (claims the lower sequence), fetch stays pending.
+    const queryRefetch = fetchSequencedInventoryTotals(qc, "site-1");
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 10 },
+    ]);
+    // A targeted flush starts second (claims a higher sequence for p1) and resolves first.
+    await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 10 },
+    ]);
+
+    // The query's own refetch finally resolves, with a stale value for p1 - since its result
+    // is applied by whatever *called* fetchSequencedInventoryTotals (React Query's own
+    // queryFn-success handler in production; here, the test itself), the merge it returns must
+    // already reflect that it lost the race, not just "the caller happens not to apply it."
+    resolveQueryFetch([{ productId: "p1", totalQuantity: 2 }]);
+    const result = await queryRefetch;
+    expect(result).toEqual([{ productId: "p1", totalQuantity: 10 }]);
+  });
+
+  it("an older full refresh preserves a newer product entry that's absent from its response, rather than deleting it (follow-up third-round review, P1)", async () => {
+    // The previous round's merge built its result exclusively from the fetched rows, so a
+    // product created after an older full read's server-side snapshot but before that read
+    // resolves - and already cached by a newer targeted flush in the meantime - would be
+    // silently dropped: absent from the older response, and never carried forward from `old`.
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
+
+    let resolveFullFetch!: (value: unknown) => void;
+    const fullFetch = new Promise((resolve) => {
+      resolveFullFetch = resolve;
+    });
+    mockGetSiteInventoryTotals.mockImplementationOnce(() => fullFetch);
+    // Full refresh starts first (claims p1 only - "p2" doesn't exist in the cache yet), fetch
+    // stays pending.
+    const fullFlush = flushInventorySiteRefresh(qc, "site-1", undefined);
+
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p2", totalQuantity: 20 },
+    ]);
+    // A targeted flush for the brand-new product p2 starts second and resolves first.
+    await flushInventorySiteRefresh(qc, "site-1", ["p2"]);
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 1 },
+      { productId: "p2", totalQuantity: 20 },
+    ]);
+
+    // The full refresh's response finally arrives - a snapshot taken before p2 existed, so it
+    // contains only p1. It must not delete p2, which a newer flush already correctly cached.
+    resolveFullFetch([{ productId: "p1", totalQuantity: 1 }]);
+    await fullFlush;
+
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual(
+      expect.arrayContaining([
+        { productId: "p1", totalQuantity: 1 },
+        { productId: "p2", totalQuantity: 20 },
+      ])
+    );
+  });
+
+  it("recovers with a fresh, sequenced full fetch when the latest (superseding) flush's request fails, even though an earlier flush would have succeeded (follow-up review finding, P2)", async () => {
+    // Recovery no longer uses a bare invalidateQueries (follow-up review, second round) - that
+    // bypassed sequencing just like the bug it was meant to fix. It now issues its own freshly
+    // claimed, sequenced full fetch through the same merge path as everything else.
+    const qc = client();
+    qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
 
     let resolveEarlierFetch!: (value: unknown) => void;
     const earlierFetch = new Promise((resolve) => {
@@ -132,29 +210,32 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
 
     const networkError = new Error("network blip");
     mockGetSiteInventoryTotals.mockImplementationOnce(() => Promise.reject(networkError));
-    // Flush B starts second (supersedes A's claim on p1) and fails.
+    // Flush B starts second (supersedes A's claim on p1) and its own targeted fetch fails.
+    mockGetSiteInventoryTotals.mockImplementationOnce(async () => [
+      { productId: "p1", totalQuantity: 2 },
+    ]);
+    // B's recovery attempt (a full, unfiltered fetch) succeeds with the correct current value.
     const flushB = flushInventorySiteRefresh(qc, "site-1", ["p1"]);
 
     await expect(flushB).rejects.toThrow("network blip");
-    // B still owned the claim on p1 when it failed (nothing even newer superseded it) - its
-    // failure must trigger a corrective invalidation rather than leaving the cache silently
-    // stuck with no path back to authoritative data.
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["inventoryTotals", "site-1"] });
+    // B still owned the claim on p1 when its own fetch failed (nothing even newer superseded
+    // it), so its failure triggered a corrective recovery fetch that corrected the cache.
+    expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
+      { productId: "p1", totalQuantity: 2 },
+    ]);
 
-    // A's response finally arrives with what would have been the correct, current value - but A
-    // no longer owns the claim (B superseded it), so A must not write it either; the recovery
-    // invalidation above is the only path back to correctness now.
-    resolveEarlierFetch([{ productId: "p1", totalQuantity: 2 }]);
+    // A's response finally arrives with a now-stale value - A no longer owns the claim (B's
+    // recovery superseded it too), so A must not overwrite what recovery already applied.
+    resolveEarlierFetch([{ productId: "p1", totalQuantity: 42 }]);
     await flushA;
     expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
-      { productId: "p1", totalQuantity: 1 },
+      { productId: "p1", totalQuantity: 2 },
     ]);
   });
 
   it("does not recover when a failing flush was already superseded by an even newer one before it failed", async () => {
     const qc = client();
     qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
-    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
 
     let rejectFailingFetch!: (error: unknown) => void;
     const failingFetch = new Promise((_resolve, reject) => {
@@ -169,14 +250,14 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     ]);
     // Flush C supersedes A and succeeds before A fails.
     await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
-    invalidateSpy.mockClear();
+    mockGetSiteInventoryTotals.mockClear();
 
     // A now fails, but C (not A) is the current claim holder - A's failure must not trigger a
-    // recovery that could race C's already-applied, correct write.
+    // redundant recovery fetch that could race C's already-applied, correct write.
     rejectFailingFetch(new Error("stale failure"));
     await expect(flushA).rejects.toThrow("stale failure");
 
-    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["inventoryTotals", "site-1"] });
+    expect(mockGetSiteInventoryTotals).not.toHaveBeenCalled();
     expect(qc.getQueryData(["inventoryTotals", "site-1"])).toEqual([
       { productId: "p1", totalQuantity: 9 },
     ]);

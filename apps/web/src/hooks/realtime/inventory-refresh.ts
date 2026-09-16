@@ -40,6 +40,98 @@ function claimSequence(siteId: string, ids: string[]): number {
 }
 
 /**
+ * Pure merge step shared by every full-refresh writer (follow-up review, second round): given
+ * the current cache (`old`), this flush's own sequence number, and `fetched` (the full site
+ * totals response), returns the array to write. Two directions matter:
+ * <p>
+ * - An id present in `fetched` but claimed by a strictly newer flush since this one started:
+ *   keep whatever is currently cached for it (that newer flush already wrote the authoritative
+ *   value) instead of regressing to this older response.
+ * - An id present in `old` but ABSENT from `fetched`: the previous round treated this
+ *   unconditionally as "the product was deleted, drop it" - but a product that's newer than
+ *   this flush (e.g. just created, cached by a targeted flush that started after this full read
+ *   did) is *also* absent from this read's response, since the read is a snapshot that predates
+ *   it. Only drop an absent id when nothing newer than this flush owns it; otherwise preserve
+ *   the newer-owned entry rather than silently deleting it.
+ */
+function mergeFullTotals(
+  siteId: string,
+  seq: number,
+  old: SiteInventoryTotal[],
+  fetched: SiteInventoryTotal[]
+): SiteInventoryTotal[] {
+  const oldById = new Map(old.map((t) => [t.productId, t]));
+  const fetchedIds = new Set(fetched.map((t) => t.productId));
+  const result = new Map<string, SiteInventoryTotal>();
+
+  for (const [id, current] of oldById) {
+    if (fetchedIds.has(id)) continue;
+    const recorded = latestSequenceByProductKey.get(productKey(siteId, id));
+    if (recorded !== undefined && recorded > seq) {
+      result.set(id, current);
+    }
+    // else: genuinely absent from a read at least as current as this flush - a real deletion.
+  }
+
+  for (const total of fetched) {
+    const key = productKey(siteId, total.productId);
+    const recorded = latestSequenceByProductKey.get(key);
+    if (recorded !== undefined && recorded > seq) {
+      const current = oldById.get(total.productId);
+      if (current) {
+        result.set(total.productId, current);
+      }
+      continue;
+    }
+    latestSequenceByProductKey.set(key, seq);
+    result.set(total.productId, total);
+  }
+  return Array.from(result.values());
+}
+
+/**
+ * Fetches the full site totals and returns the correctly-merged result for an *already-claimed*
+ * `seq` - never claims, never writes the cache itself. Kept separate from claiming so every
+ * caller claims exactly once per attempt; claiming twice for the same ids (once by a caller,
+ * again inside a shared helper) would mint a second, higher sequence number that could wrongly
+ * supersede a genuinely concurrent flush that claimed in between the two claims.
+ * <p>
+ * Re-reads the cache after the fetch resolves (not the pre-fetch snapshot the caller claimed
+ * against) so a concurrent write that landed while this fetch was in flight is the merge base,
+ * not a stale snapshot from before this function's own await.
+ */
+async function fetchAndMergeFullTotals(
+  queryClient: QueryClient,
+  siteId: string,
+  seq: number
+): Promise<SiteInventoryTotal[]> {
+  const fetched = await getSiteInventoryTotals(siteId);
+  const current = queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? [];
+  return mergeFullTotals(siteId, seq, current, fetched);
+}
+
+/**
+ * Claims sequence for every currently-cached id, fetches the full site totals, and returns the
+ * correctly-merged result - never writing the cache itself. This is the function the real
+ * `useQuery` backing this cache key (`use-product-inventory.ts`) uses as its `queryFn`, so a
+ * query's own lifecycle refetches (mount, window focus, staleTime, manual refetch) are ordered
+ * against explicit flushes exactly the same way an explicit full refresh is (follow-up review
+ * finding, P1) - previously the query's own refetches never claimed or checked sequence at all,
+ * so they could overwrite a newer targeted write unconditionally. React Query's own retry policy
+ * covers a failure here; no separate recovery hook is needed for this path.
+ */
+export async function fetchSequencedInventoryTotals(
+  queryClient: QueryClient,
+  siteId: string
+): Promise<SiteInventoryTotal[]> {
+  const cachedIds = (queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? []).map(
+    (t) => t.productId
+  );
+  const seq = claimSequence(siteId, cachedIds);
+  return fetchAndMergeFullTotals(queryClient, siteId, seq);
+}
+
+/**
  * A flush whose fetch failed must not just silently leave the cache stale with nothing to
  * correct it (follow-up review finding, P2): if flush B supersedes flush A's claim on some id
  * before A resolves, and B then fails, A's result - even if it had succeeded - is discarded by
@@ -47,16 +139,25 @@ function claimSequence(siteId: string, ids: string[]): number {
  * cache. Recovery only fires when the failing flush is still the *current* claim holder for at
  * least one of its ids (i.e. no even-newer flush has since superseded it too) - otherwise that
  * newer flush is already responsible for reconciling the id and a redundant recovery would just
- * race it.
+ * race it. Recovers with a fresh, separately-claimed attempt through the same sequenced merge
+ * path (follow-up review, second round) rather than a bare `invalidateQueries`, which bypassed
+ * sequencing entirely.
  */
 async function recoverOnFailure(queryClient: QueryClient, siteId: string, seq: number, ids: string[]): Promise<void> {
   const stillOwnsAnId = ids.some((id) => latestSequenceByProductKey.get(productKey(siteId, id)) === seq);
   if (!stillOwnsAnId) {
     return;
   }
-  await queryClient.invalidateQueries({ queryKey: ["inventoryTotals", siteId] }).catch(() => {
+  try {
+    const recoverySeq = claimSequence(
+      siteId,
+      (queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? []).map((t) => t.productId)
+    );
+    const result = await fetchAndMergeFullTotals(queryClient, siteId, recoverySeq);
+    queryClient.setQueryData(["inventoryTotals", siteId], result);
+  } catch {
     // Best-effort recovery; nothing else to fall back to here.
-  });
+  }
 }
 
 /**
@@ -65,8 +166,8 @@ async function recoverOnFailure(queryClient: QueryClient, siteId: string, seq: n
  * call, so it raced with targeted flushes in both directions (follow-up review finding, P1):
  * an older full read could overwrite a newer targeted write, and - because this path never
  * claimed anything - a targeted flush that started earlier but resolved later could overwrite a
- * newer full read too. This claims every currently-cached id up front, just like a targeted
- * flush claims its own ids, so both paths are ordered against each other the same way.
+ * newer full read too. Claims once, then routes through the same merge helper the real query and
+ * failure recovery use.
  */
 async function refreshAllInventoryTotals(queryClient: QueryClient, siteId: string): Promise<void> {
   const cachedIds = (queryClient.getQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId]) ?? []).map(
@@ -74,35 +175,14 @@ async function refreshAllInventoryTotals(queryClient: QueryClient, siteId: strin
   );
   const seq = claimSequence(siteId, cachedIds);
 
-  let fetched: SiteInventoryTotal[];
+  let result: SiteInventoryTotal[];
   try {
-    fetched = await getSiteInventoryTotals(siteId);
+    result = await fetchAndMergeFullTotals(queryClient, siteId, seq);
   } catch (error) {
     await recoverOnFailure(queryClient, siteId, seq, cachedIds);
     throw error;
   }
-
-  queryClient.setQueryData<SiteInventoryTotal[]>(["inventoryTotals", siteId], (old) => {
-    const oldById = new Map((old ?? []).map((t) => [t.productId, t]));
-    const result = new Map<string, SiteInventoryTotal>();
-    for (const total of fetched) {
-      const key = productKey(siteId, total.productId);
-      const recorded = latestSequenceByProductKey.get(key);
-      if (recorded !== undefined && recorded > seq) {
-        // A strictly newer flush already produced this id's authoritative value (claimed
-        // after this full read started) - keep whatever is currently cached for it rather
-        // than regressing to this older full read's value.
-        const current = oldById.get(total.productId);
-        if (current) {
-          result.set(total.productId, current);
-        }
-        continue;
-      }
-      latestSequenceByProductKey.set(key, seq);
-      result.set(total.productId, total);
-    }
-    return Array.from(result.values());
-  });
+  queryClient.setQueryData(["inventoryTotals", siteId], result);
 }
 
 /**

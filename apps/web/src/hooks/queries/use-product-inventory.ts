@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery, skipToken } from "@tanstack/react-query";
+import { useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import type { ProductListItem } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useSiteProducts } from "@/hooks/queries/use-site-products";
-import { getSiteInventoryTotals } from "@/lib/api/site-inventory";
+import { fetchSequencedInventoryTotals } from "@/hooks/realtime/inventory-refresh";
 
 export interface ProductWithInventory {
   product: ProductListItem;
@@ -55,10 +55,15 @@ export function useSiteProductInventory(rootOnly = false) {
   const productsQuery = useProducts(rootOnly);
   const siteProductsQuery = useSiteProducts();
   const siteId = siteProductsQuery.siteId;
+  const queryClient = useQueryClient();
 
   const totalsQuery = useQuery({
     queryKey: ["inventoryTotals", siteId],
-    queryFn: siteId ? () => getSiteInventoryTotals(siteId) : skipToken,
+    // Routes through the same request-issuance sequencing as the realtime/mutation flush paths
+    // (follow-up review finding, P1) - this query's own lifecycle refetches (mount, window
+    // focus, staleTime, a manual refetch) used to write via a bare fetch with no sequencing at
+    // all, so they could silently overwrite a newer targeted flush's already-applied value.
+    queryFn: siteId ? () => fetchSequencedInventoryTotals(queryClient, siteId) : skipToken,
   });
 
   const data: ProductWithInventory[] | null = useMemo(() => {

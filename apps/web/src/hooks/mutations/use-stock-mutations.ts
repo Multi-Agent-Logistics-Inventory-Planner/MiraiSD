@@ -58,10 +58,17 @@ async function invalidateStockQueries(
   // write already succeeded before we get here. If it rejects, mutateAsync would otherwise
   // report the whole (already-committed) mutation as failed - adjust-stock-dialog.tsx would
   // show a false "Adjustment failed" toast, and a user retry would mint a fresh idempotency key
-  // and risk a real double-adjustment. Degrade to the old invalidate-only behavior instead.
-  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds).catch(() =>
-    qc.invalidateQueries({ queryKey: ["inventoryTotals", siteId] })
-  );
+  // and risk a real double-adjustment. Swallow the error rather than fail the mutation.
+  //
+  // Does NOT fall back to a bare `invalidateQueries` here (follow-up review, second round): a
+  // bare invalidate bypasses the sequencing `flushInventorySiteRefresh` itself already uses, so
+  // it could arrive after - and unconditionally overwrite - a newer flush's already-applied,
+  // correct value. `flushInventorySiteRefresh` already attempts its own sequenced recovery
+  // internally on failure (only when this attempt is still the current claim holder); a second,
+  // unsequenced fallback here would just risk undoing that.
+  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds).catch(() => {
+    // Best-effort; recovery (if warranted) already happened inside flushInventorySiteRefresh.
+  });
 
   const tasks: Promise<unknown>[] = [
     totalsRefresh,
