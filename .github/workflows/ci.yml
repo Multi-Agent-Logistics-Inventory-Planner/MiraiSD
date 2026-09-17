@@ -156,6 +156,9 @@ jobs:
           base: .tmp/base-openapi.json
           revision: packages/contracts/openapi.json
           fail-on: ERR
+          # Reviewed, approved breaking-change exceptions only - see the file's header before
+          # adding an entry.
+          err-ignore: .github/oasdiff/err-ignore.txt
           # Uploading the spec to oasdiff.com for a shareable review link is opt-in
           # elsewhere; disabled here so the contract never leaves CI.
           review: false

@@ -1,0 +1,17 @@
+# Approved breaking-change exceptions
+
+Lines below are matched by `oasdiff breaking --err-ignore` against error-level findings (see
+`docs/CONFIG-FILES.md` / `docs/BREAKING-CHANGES.md` in oasdiff/oasdiff for the format: each
+pattern line names the method+path and enough of the finding text to identify it). Every entry
+here must be reviewed and approved before merge - this file is not a place to silence CI, it is
+a record of contract changes the team decided are acceptable and why.
+
+Approved 2026-09-16 (PR #328): this route let any caller silently overwrite an inventory row's
+quantity with no audit trail and no site scoping. `.specs/phase-6-inventory/review.md` (finding
+A-5) and `log.md`'s "Dropping the untracked PUT" entry record the team's confirmed decision to
+delete it rather than resurrect it behind auth/audit, since the project's design now has exactly
+one way to mutate quantity - the audited `POST /api/v1/sites/{siteId}/inventory/adjustments`
+endpoint - and deliberately does not offer an audited "set absolute quantity" equivalent. No web
+caller has used the legacy route since that endpoint shipped (`apps/web/src/lib/api/site-inventory.ts`).
+
+PUT /api/locations/{locationId}/inventory/{inventoryId} api removed without deprecation

@@ -4979,9 +4979,14 @@ export interface components {
         SiteLocationDTO: {
             /** Format: date-time */
             createdAt?: string;
+            fullLocationCode?: string;
             /** Format: uuid */
             id?: string;
             locationCode?: string;
+            metadata?: {
+                [key: string]: Record<string, never>;
+            };
+            storageLocation: components["schemas"]["StorageLocationSummary"];
             storageLocationCode?: string;
             /** Format: uuid */
             storageLocationId?: string;
@@ -5065,6 +5070,12 @@ export interface components {
             /** Format: uuid */
             toLocationId?: string;
         };
+        SiteSummary: {
+            code?: string;
+            /** Format: uuid */
+            id: string;
+            name?: string;
+        };
         SortObject: {
             empty?: boolean;
             sorted?: boolean;
@@ -5115,6 +5126,13 @@ export interface components {
             site: components["schemas"]["Site"];
             /** Format: date-time */
             updatedAt?: string;
+        };
+        StorageLocationSummary: {
+            code?: string;
+            /** Format: uuid */
+            id: string;
+            name?: string;
+            site: components["schemas"]["SiteSummary"];
         };
         SupplierRequestDTO: {
             contactEmail?: string;

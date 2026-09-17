@@ -19148,12 +19148,25 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "fullLocationCode" : {
+            "type" : "string"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
           },
           "locationCode" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "storageLocation" : {
+            "$ref" : "#/components/schemas/StorageLocationSummary"
           },
           "storageLocationCode" : {
             "type" : "string"
@@ -19166,7 +19179,8 @@
             "type" : "string",
             "format" : "date-time"
           }
-        }
+        },
+        "required" : [ "storageLocation" ]
       },
       "SiteLocationInventoryEntryDTO" : {
         "type" : "object",
@@ -19346,6 +19360,24 @@
           }
         }
       },
+      "SiteSummary" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "id" ]
+      },
       "SortObject" : {
         "type" : "object",
         "properties" : {
@@ -19466,6 +19498,27 @@
           }
         },
         "required" : [ "site" ]
+      },
+      "StorageLocationSummary" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "site" : {
+            "$ref" : "#/components/schemas/SiteSummary"
+          }
+        },
+        "required" : [ "id", "site" ]
       },
       "SupplierRequestDTO" : {
         "type" : "object",
