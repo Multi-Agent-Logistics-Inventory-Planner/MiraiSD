@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockGet = vi.fn();
+const mockPost = vi.fn();
+const mockPut = vi.fn();
+const mockDelete = vi.fn();
 
 vi.mock("@/lib/api/generated-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./generated-client")>();
   return {
     ...actual,
-    webApiClient: { GET: (...args: unknown[]) => mockGet(...args) },
+    webApiClient: { GET: (...args: unknown[]) => mockGet(...args), POST: (...args: unknown[]) => mockPost(...args), PUT: (...args: unknown[]) => mockPut(...args), DELETE: (...args: unknown[]) => mockDelete(...args) },
   };
 });
 
-import { getSiteStorageLocations, getSiteLocations, resolveSiteLocationId } from "./locations";
+import { getSiteStorageLocations, getSiteLocations, resolveSiteLocationId, createSiteLocation, updateSiteLocation, deleteSiteLocation } from "./locations";
 import { GeneratedApiError } from "./generated-client";
 import { LocationType } from "@/types/api";
 
@@ -178,5 +181,36 @@ describe("resolveSiteLocationId", () => {
     await expect(
       resolveSiteLocationId(SITE_ID, LocationType.NOT_ASSIGNED, "__not_assigned__")
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+
+describe("site location CRUD", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("creates through the generated v1 route and maps its flat DTO", async () => {
+    mockPost.mockResolvedValue({ data: siteLocationFixture(), response: new Response(null, { status: 201 }) });
+    const body = { storageLocationId: "storage-second", locationCode: "B2" };
+    const result = await createSiteLocation("second", body);
+    expect(mockPost).toHaveBeenCalledWith("/api/v1/sites/{siteId}/locations", { params: { path: { siteId: "second" } }, body });
+    expect(result.id).toBe(siteLocationFixture().id);
+    expect(result.storageLocationType).toBe("NOT_ASSIGNED");
+  });
+  it("renames through the generated v1 route", async () => {
+    mockPut.mockResolvedValue({ data: siteLocationFixture(), response: new Response(null, { status: 200 }) });
+    await updateSiteLocation("second", "location-second", { locationCode: "B2" });
+    expect(mockPut).toHaveBeenCalledWith("/api/v1/sites/{siteId}/locations/{id}", { params: { path: { siteId: "second", id: "location-second" } }, body: { locationCode: "B2" } });
+  });
+  it("accepts a successful empty DELETE, but rejects empty error responses", async () => {
+    mockDelete.mockResolvedValueOnce({ response: new Response(null, { status: 204 }) });
+    await expect(deleteSiteLocation("second", "loc")).resolves.toBeUndefined();
+    expect(mockDelete).toHaveBeenCalledWith("/api/v1/sites/{siteId}/locations/{id}", { params: { path: { siteId: "second", id: "loc" } } });
+    mockDelete.mockResolvedValueOnce({ response: new Response(null, { status: 403 }) });
+    await expect(deleteSiteLocation("second", "loc")).rejects.toMatchObject({ status: 403 });
+  });
+  it("rejects malformed write responses instead of reporting success", async () => {
+    mockPost.mockResolvedValue({ data: {}, response: new Response(null, { status: 201 }) });
+    await expect(createSiteLocation("second", { storageLocationId: "storage", locationCode: "B2" })).rejects.toThrow();
+    mockPut.mockResolvedValue({ response: new Response(null, { status: 403 }) });
+    await expect(updateSiteLocation("second", "loc", { locationCode: "B2" })).rejects.toMatchObject({ status: 403 });
   });
 });

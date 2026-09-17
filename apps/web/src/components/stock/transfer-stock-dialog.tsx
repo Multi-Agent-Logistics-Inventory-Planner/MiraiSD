@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import {
   useBatchTransferMutation,
   type BatchTransferItem,
 } from "@/hooks/mutations/use-stock-mutations";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import { LocationSelector } from "./location-selector";
 import { ProductTransferCard } from "./product-transfer-card";
 import { InventoryPreviewTooltip } from "./inventory-preview-tooltip";
@@ -52,6 +53,8 @@ export function TransferStockDialog({
 }: TransferStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { siteId } = useCurrentSite();
+  const previousSiteId = useRef(siteId);
 
   // Product-filtered mode: when a product is preselected, we show only its locations in "From"
   const isProductFilteredMode = Boolean(preselectedProduct);
@@ -104,6 +107,17 @@ export function TransferStockDialog({
   }, [open, initialSourceLocationProp]);
 
   useEffect(() => {
+    if (previousSiteId.current === siteId) return;
+    previousSiteId.current = siteId;
+    setSourceLocation(EMPTY_LOCATION);
+    setDestinationLocation(EMPTY_LOCATION);
+    setTransferQuantities({});
+    setSearchQuery("");
+    setCategoryFilters([]);
+    setChildCategoryFilters([]);
+  }, [siteId]);
+
+  useEffect(() => {
     if (sourceLocation.locationId) {
       setTransferQuantities({});
     }
@@ -134,6 +148,10 @@ export function TransferStockDialog({
 
   const sourceInventory = sourceInventoryQuery.data ?? [];
   const destinationInventory = destinationInventoryQuery.data ?? [];
+  const sourceUnavailable = Boolean(sourceInventoryQuery.isError || sourceInventoryQuery.isUnresolved);
+  const destinationUnavailable = Boolean(destinationInventoryQuery.isError || destinationInventoryQuery.isUnresolved);
+  const sourceReady = Boolean(sourceInventoryQuery.data) && !sourceUnavailable && !sourceInventoryQuery.isLoading;
+  const destinationReady = Boolean(destinationInventoryQuery.data) && !destinationUnavailable && !destinationInventoryQuery.isLoading;
 
   const filteredInventory = useMemo(() => {
     let result = sourceInventory;
@@ -216,6 +234,8 @@ export function TransferStockDialog({
   const isSameLocation =
     hasValidSource &&
     hasValidDestination &&
+    sourceReady &&
+    destinationReady &&
     sourceLocation.locationType === destinationLocation.locationType &&
     sourceLocation.locationId === destinationLocation.locationId;
   const hasItemsToTransfer = totalItemsToTransfer > 0;
@@ -257,7 +277,7 @@ export function TransferStockDialog({
       return;
     }
 
-    if (!sourceLocation.locationType || !resolvedSourceLocationId) {
+    if (!sourceReady || !sourceLocation.locationType || !resolvedSourceLocationId) {
       toast({
         title: "Missing source",
         description: "Select a valid source location.",
@@ -265,7 +285,7 @@ export function TransferStockDialog({
       return;
     }
 
-    if (!destinationLocation.locationType || !resolvedDestinationLocationId) {
+    if (!destinationReady || !destinationLocation.locationType || !resolvedDestinationLocationId) {
       toast({
         title: "Missing destination",
         description: "Select a valid destination location.",
@@ -322,6 +342,16 @@ export function TransferStockDialog({
     } catch (err) {
       const message = err instanceof Error ? err.message : "Transfer failed";
       toast({ title: "Transfer failed", description: message });
+    }
+  }
+
+  async function handleRetryUncertain() {
+    try {
+      await batchTransferMutation.retryUncertain?.();
+      toast({ title: "Transfer confirmed", description: "The original submission was safely retried." });
+      setTransferQuantities({});
+    } catch (err) {
+      toast({ title: "Transfer outcome still uncertain", description: err instanceof Error ? err.message : "Retry later.", variant: "destructive" });
     }
   }
 
@@ -398,7 +428,12 @@ export function TransferStockDialog({
           ) : null}
 
           {/* Products section */}
-          {hasValidSource ? (
+          {hasValidSource && sourceUnavailable ? (
+            <div className="flex-1 flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-sm text-center mt-4 gap-3">
+              <p className="text-destructive">Couldn&apos;t load source inventory.</p>
+              <Button type="button" variant="outline" onClick={() => void sourceInventoryQuery.retry?.()}>Retry</Button>
+            </div>
+          ) : hasValidSource ? (
             <div className="flex-1 min-h-0 flex flex-col mt-4">
               <ProductFilterHeader
                 title={`Products at ${locationLabel}`}
@@ -455,6 +490,12 @@ export function TransferStockDialog({
               Select a source location to see available products
             </div>
           )}
+          {hasValidDestination && destinationUnavailable ? (
+            <div className="shrink-0 mt-2 flex items-center justify-between rounded-md border border-destructive/40 p-2 text-sm">
+              <span className="text-destructive">Couldn&apos;t load destination inventory.</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => void destinationInventoryQuery.retry?.()}>Retry</Button>
+            </div>
+          ) : null}
         </div>
 
         {/* Fixed bottom section */}
@@ -482,6 +523,11 @@ export function TransferStockDialog({
 
           {/* Footer buttons */}
           <DialogFooter className="px-6 py-3">
+            {batchTransferMutation.uncertainSubmission ? (
+              <Button type="button" variant="outline" onClick={handleRetryUncertain} disabled={isTransferring}>
+                Retry uncertain transfer
+              </Button>
+            ) : null}
             <Button
               type="button"
               onClick={handleSubmit}

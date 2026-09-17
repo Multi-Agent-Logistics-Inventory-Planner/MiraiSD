@@ -6,6 +6,7 @@ import type { LocationSelection } from "@/types/transfer";
 
 const mockUseAuth = vi.fn();
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => mockUseAuth() }));
+vi.mock("@/hooks/queries/use-current-site", () => ({ useCurrentSite: () => ({ siteId: "site-1" }) }));
 
 const mockToast = vi.fn();
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mockToast }) }));

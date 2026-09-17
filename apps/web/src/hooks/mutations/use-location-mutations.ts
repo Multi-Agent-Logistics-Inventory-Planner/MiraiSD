@@ -7,10 +7,10 @@ import type {
 } from "@/types/api";
 import { STORAGE_LOCATION_CODES } from "@/types/api";
 import {
-  createLocation,
-  updateLocation,
-  deleteLocation,
-  getStorageLocationByCode,
+  createSiteLocation,
+  updateSiteLocation,
+  deleteSiteLocation,
+  getSiteStorageLocations,
   resolveSiteLocationId,
 } from "@/lib/api/locations";
 import {
@@ -26,12 +26,19 @@ import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
 function invalidateLocations(
   qc: ReturnType<typeof useQueryClient>,
   siteId: string,
-  locationType: LocationType
+  siteCode: string | undefined,
+  locationType: LocationType,
 ) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ["locations", locationType] }),
-    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId, locationType] }),
-    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId, "ALL"] }),
+    qc.invalidateQueries({ queryKey: ["locations", siteId] }),
+    // Phase 7 pickers still read MAIN through this legacy key. A SECOND-site
+    // mutation must not invalidate that MAIN compatibility cache.
+    ...(siteCode === "MAIN"
+      ? [qc.invalidateQueries({ queryKey: ["locations", locationType] })]
+      : []),
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId] }),
+    qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
+    qc.invalidateQueries({ queryKey: ["productInventoryEntries", siteId] }),
   ]);
 }
 
@@ -72,16 +79,16 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
   const mutation = useMutation<
     SiteLocationInventoryEntry,
     Error,
-    { idempotencyKey: string; payload: CreateSiteLocationInventoryPayload }
+    { idempotencyKey: string; siteId: string | undefined; payload: CreateSiteLocationInventoryPayload }
   >({
-    mutationFn: async ({ idempotencyKey, payload }) => {
-      if (!siteId) throw new Error("No active site");
-      const resolvedLocationId = await resolveSiteLocationId(siteId, locationType, locationId);
-      return createSiteLocationInventory(siteId, resolvedLocationId, idempotencyKey, payload);
+    mutationFn: async ({ idempotencyKey, siteId: originSiteId, payload }) => {
+      if (!originSiteId) throw new Error("No active site");
+      const resolvedLocationId = await resolveSiteLocationId(originSiteId, locationType, locationId);
+      return createSiteLocationInventory(originSiteId, resolvedLocationId, idempotencyKey, payload);
     },
     onSuccess: async (_data, variables) => {
-      if (!siteId) return;
-      await invalidateSiteLocationInventory(qc, siteId, variables.payload.productId);
+      if (!variables.siteId) return;
+      await invalidateSiteLocationInventory(qc, variables.siteId, variables.payload.productId);
     },
   });
 
@@ -92,9 +99,9 @@ export function useCreateInventoryMutation(locationType: LocationType, locationI
     mutate: (
       payload: CreateSiteLocationInventoryPayload,
       options?: Parameters<typeof mutation.mutate>[1]
-    ) => mutation.mutate({ idempotencyKey: newIdempotencyKey(), payload }, options),
+    ) => mutation.mutate({ idempotencyKey: newIdempotencyKey(), siteId, payload }, options),
     mutateAsync: (payload: CreateSiteLocationInventoryPayload) =>
-      mutation.mutateAsync({ idempotencyKey: newIdempotencyKey(), payload }),
+      mutation.mutateAsync({ idempotencyKey: newIdempotencyKey(), siteId, payload }),
   };
 }
 
@@ -105,18 +112,18 @@ export function useDeleteInventoryMutation(locationType: LocationType, locationI
   const mutation = useMutation<
     void,
     Error,
-    { idempotencyKey: string; inventoryId: string }
+    { idempotencyKey: string; siteId: string | undefined; inventoryId: string }
   >({
-    mutationFn: async ({ idempotencyKey, inventoryId }) => {
-      if (!siteId) throw new Error("No active site");
-      const resolvedLocationId = await resolveSiteLocationId(siteId, locationType, locationId);
-      return deleteSiteLocationInventory(siteId, resolvedLocationId, inventoryId, idempotencyKey);
+    mutationFn: async ({ idempotencyKey, siteId: originSiteId, inventoryId }) => {
+      if (!originSiteId) throw new Error("No active site");
+      const resolvedLocationId = await resolveSiteLocationId(originSiteId, locationType, locationId);
+      return deleteSiteLocationInventory(originSiteId, resolvedLocationId, inventoryId, idempotencyKey);
     },
-    onSuccess: async () => {
-      if (!siteId) return;
+    onSuccess: async (_data, variables) => {
+      if (!variables.siteId) return;
       // No productId known client-side for a delete (only the inventory row's own ID) - falls
       // back to a full totals refresh rather than a doomed lookup.
-      await invalidateSiteLocationInventory(qc, siteId, undefined);
+      await invalidateSiteLocationInventory(qc, variables.siteId, undefined);
     },
   });
 
@@ -125,61 +132,55 @@ export function useDeleteInventoryMutation(locationType: LocationType, locationI
     mutate: (
       variables: { inventoryId: string },
       options?: Parameters<typeof mutation.mutate>[1]
-    ) => mutation.mutate({ idempotencyKey: newIdempotencyKey(), ...variables }, options),
+    ) => mutation.mutate({ idempotencyKey: newIdempotencyKey(), siteId, ...variables }, options),
     mutateAsync: (variables: { inventoryId: string }) =>
-      mutation.mutateAsync({ idempotencyKey: newIdempotencyKey(), ...variables }),
+      mutation.mutateAsync({ idempotencyKey: newIdempotencyKey(), siteId, ...variables }),
+  };
+}
+
+/** Capture the initiating site in variables, including callbacks after a site change. */
+function useLocationCommand<TInput, TResult>(
+  locationType: LocationType,
+  command: (siteId: string, input: TInput, locationType: LocationType) => Promise<TResult>,
+) {
+  const qc = useQueryClient();
+  const { siteId, siteCode } = useCurrentSite();
+  const mutation = useMutation<TResult, Error, { siteId: string | undefined; siteCode: string | undefined; locationType: LocationType; input: TInput }>({
+    mutationFn: ({ siteId: originSiteId, input, locationType: originType }) => {
+      if (!originSiteId) throw new Error("No active site");
+      return command(originSiteId, input, originType);
+    },
+    onSuccess: async (_result, variables) => {
+      if (variables.siteId) await invalidateLocations(qc, variables.siteId, variables.siteCode, variables.locationType);
+    },
+  });
+  return {
+    ...mutation,
+    mutate: (input: TInput, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ siteId, siteCode, locationType, input }, options),
+    mutateAsync: (input: TInput) => mutation.mutateAsync({ siteId, siteCode, locationType, input }),
   };
 }
 
 export function useCreateLocationMutation(locationType: LocationType) {
-  const qc = useQueryClient();
-  const { siteId } = useCurrentSite();
-
-  return useMutation<Location, Error, { locationCode: string }>({
-    mutationFn: async ({ locationCode }) => {
-      // Look up the storage location ID for this location type
-      const storageLocationCode = STORAGE_LOCATION_CODES[locationType];
-      const storageLocation = await getStorageLocationByCode(storageLocationCode);
-
-      return createLocation({
-        locationCode,
-        storageLocationId: storageLocation.id,
-      });
-    },
-    onSuccess: async () => {
-      if (!siteId) return;
-      await invalidateLocations(qc, siteId, locationType);
-    },
+  return useLocationCommand<{ locationCode: string; }, Location>(locationType, async (siteId, { locationCode }, originType) => {
+    const categories = await getSiteStorageLocations(siteId);
+    const storageLocation = categories.find(category => category.code === STORAGE_LOCATION_CODES[originType]);
+    if (!storageLocation) throw new Error("Storage category not found for this site");
+    return createSiteLocation(siteId, { locationCode, storageLocationId: storageLocation.id });
   });
 }
 
 export function useUpdateLocationMutation(locationType: LocationType) {
-  const qc = useQueryClient();
-  const { siteId } = useCurrentSite();
-
-  return useMutation<Location, Error, { id: string; payload: { locationCode: string } }>({
-    mutationFn: async ({ id, payload }) => {
-      return updateLocation(id, payload);
-    },
-    onSuccess: async () => {
-      if (!siteId) return;
-      await invalidateLocations(qc, siteId, locationType);
-    },
-  });
+  return useLocationCommand<{ id: string; payload: { locationCode: string } }, Location>(
+    locationType,
+    (siteId, { id, payload }) => updateSiteLocation(siteId, id, payload),
+  );
 }
 
 export function useDeleteLocationMutation(locationType: LocationType) {
-  const qc = useQueryClient();
-  const { siteId } = useCurrentSite();
-
-  return useMutation<void, Error, { id: string }>({
-    mutationFn: async ({ id }) => {
-      return deleteLocation(id);
-    },
-    onSuccess: async () => {
-      if (!siteId) return;
-      await invalidateLocations(qc, siteId, locationType);
-    },
-  });
+  return useLocationCommand<{ id: string }, void>(
+    locationType,
+    (siteId, { id }) => deleteSiteLocation(siteId, id),
+  );
 }
-

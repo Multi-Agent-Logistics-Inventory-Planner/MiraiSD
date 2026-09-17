@@ -1,10 +1,9 @@
-import { apiGet, apiPost, apiPut, apiDelete } from "./client";
+import { apiGet } from "./client";
 import { webApiClient, unwrapGeneratedResponse } from "./generated-client";
 import type { components } from "@mirai/api-client";
 import {
   LocationType,
   Location,
-  LocationRequest,
   LocationWithCounts,
   STORAGE_LOCATION_CODES,
 } from "@/types/api";
@@ -46,12 +45,7 @@ function toStorageLocationSummary(
   };
 }
 
-// --- Site-scoped reads (Phase 3 Track D) -----------------------------------
-// Used only by useStorageLocations (the storage-location category tab bar on the
-// Locations page - the one workflow this feature migrated all the way to real UI).
-// getLocations/getLocationsByType power unrelated workflows (shipment receiving, stock
-// location selection, machine-display transfer) and stay on the legacy, unscoped
-// endpoints - see .specs/track-d-web-client-adoption/log.md for why.
+// Site-scoped reads and writes use the existing generated v1 contract.
 
 /**
  * Get all storage locations (categories like BOX_BINS, RACKS, etc.) for a site.
@@ -176,36 +170,43 @@ export async function resolveSiteLocationId(
   return locationId;
 }
 
-// --- Legacy, unscoped reads and all mutations -------------------------------
-// Silently resolve to MAIN server-side (DEFAULT_SITE_CODE). Untouched by Track D.
-//
-// getLocationsWithCounts (GET /api/locations/with-counts) was deleted here in
-// .specs/phase-6-inventory 6e independent review, A-7 - zero remaining web callers after
-// T-6e-9's site-scoped getSiteLocationsWithCounts migration, and its own comment's claim that
-// the legacy route "silently resolves to MAIN server-side" was the exact claim this checkpoint's
-// backend review (B-1) found to be false: the route had no site predicate at all and mixed every
-// site's data together until that finding's fix. The route itself stays deprecated-but-present
-// on the backend (6e's R-3 revert) for compatibility; only this unused client function is gone.
-
-/**
- * Get a storage location by code.
- */
-export async function getStorageLocationByCode(code: string): Promise<{
-  id: string;
-  code: string;
-  name: string;
-  hasDisplay: boolean;
-  isDisplayOnly: boolean;
-}> {
-  return apiGet(`/api/storage-locations/by-code/${code}`);
+/** Create a location within an explicitly selected site's storage category. */
+export async function createSiteLocation(
+  siteId: string,
+  body: components["schemas"]["CreateSiteLocationRequest"],
+): Promise<Location> {
+  const result = await webApiClient.POST("/api/v1/sites/{siteId}/locations", {
+    params: { path: { siteId } }, body,
+  });
+  return requireSiteLocation(unwrapGeneratedResponse(result));
 }
 
-// Location CRUD operations
-// These use the unified /api/locations endpoints
+export async function updateSiteLocation(
+  siteId: string,
+  id: string,
+  body: components["schemas"]["UpdateSiteLocationRequest"],
+): Promise<Location> {
+  const result = await webApiClient.PUT("/api/v1/sites/{siteId}/locations/{id}", {
+    params: { path: { siteId, id } }, body,
+  });
+  return requireSiteLocation(unwrapGeneratedResponse(result));
+}
 
-/**
- * Get all locations (optionally filtered by storage location code).
- */
+export async function deleteSiteLocation(siteId: string, id: string): Promise<void> {
+  const result = await webApiClient.DELETE("/api/v1/sites/{siteId}/locations/{id}", {
+    params: { path: { siteId, id } },
+  });
+  unwrapGeneratedResponse(result);
+}
+
+function requireSiteLocation(dto: components["schemas"]["SiteLocationDTO"] | undefined): Location {
+  const location = dto && toSiteLocation(dto);
+  if (!location) throw new Error("Invalid location response");
+  return location;
+}
+
+// Legacy reads remain for Phase 7 shipment/display/Kuji workflows only.
+// ID-based legacy routes do not guarantee site ownership; do not add new callers.
 export async function getLocations(storageLocationCode?: string): Promise<Location[]> {
   const params = storageLocationCode ? `?storageLocation=${storageLocationCode}` : "";
   return apiGet<Location[]>(`/api/locations${params}`);
@@ -216,30 +217,6 @@ export async function getLocations(storageLocationCode?: string): Promise<Locati
  */
 export async function getLocationById(id: string): Promise<Location> {
   return apiGet<Location>(`/api/locations/${id}`);
-}
-
-/**
- * Create a new location.
- */
-export async function createLocation(data: LocationRequest): Promise<Location> {
-  return apiPost<Location, LocationRequest>("/api/locations", data);
-}
-
-/**
- * Update a location.
- */
-export async function updateLocation(
-  id: string,
-  data: Partial<LocationRequest>
-): Promise<Location> {
-  return apiPut<Location, Partial<LocationRequest>>(`/api/locations/${id}`, data);
-}
-
-/**
- * Delete a location.
- */
-export async function deleteLocation(id: string): Promise<void> {
-  return apiDelete<void>(`/api/locations/${id}`);
 }
 
 // Helper to get locations by type (uses storage location code mapping)

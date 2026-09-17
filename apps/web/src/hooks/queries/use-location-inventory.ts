@@ -92,5 +92,15 @@ export function useLocationInventory(
       productsQuery.isLoading,
     isError: resolvedLocationQuery.isError || entriesQuery.isError || productsQuery.isError,
     error: siteError ?? resolvedLocationQuery.error ?? entriesQuery.error ?? productsQuery.error,
+    // A selected location without a trusted current site or a resolved backing location (the
+    // virtual NOT_ASSIGNED case) is not an empty inventory.  Callers must keep mutations
+    // disabled until a successful snapshot exists.
+    isUnresolved: !canResolve || (!resolvedLocationQuery.isLoading && resolved === null),
+    isReady: Boolean(data) && !resolvedLocationQuery.isError && !entriesQuery.isError && !productsQuery.isError,
+    retry: () => Promise.all([
+      resolvedLocationQuery.refetch(),
+      entriesQuery.refetch(),
+      productsQuery.refetch(),
+    ]),
   };
 }

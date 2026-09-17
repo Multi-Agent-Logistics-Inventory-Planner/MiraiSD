@@ -9,6 +9,8 @@ const mockUseCurrentSite = vi.fn();
 vi.mock("@/hooks/queries/use-current-site", () => ({
   useCurrentSite: () => mockUseCurrentSite(),
 }));
+const mockUseAuth = vi.fn();
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => mockUseAuth() }));
 
 const mockAdjustSiteInventory = vi.fn();
 vi.mock("@/lib/api/site-inventory", () => ({
@@ -24,6 +26,7 @@ vi.mock("@/hooks/realtime/inventory-refresh", () => ({
 }));
 
 import { useBatchAdjustStockMutation } from "../use-stock-mutations";
+import { clearUncertainStockSubmission, readUncertainStockSubmission } from "@/lib/stock-submission-recovery";
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -42,7 +45,9 @@ const PAYLOAD = {
 describe("useBatchAdjustStockMutation (T-6d-2 idempotency)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockUseCurrentSite.mockReturnValue({ siteId: "site-1", isLoading: false, error: null });
+    mockUseAuth.mockReturnValue({ user: { id: "user-1" } });
     mockAdjustSiteInventory.mockResolvedValue(undefined);
     mockFlushInventorySiteRefresh.mockResolvedValue(undefined);
   });
@@ -89,5 +94,45 @@ describe("useBatchAdjustStockMutation (T-6d-2 idempotency)", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.isError).toBe(false);
+  });
+
+  it("retains a response-lost command for explicit retry and never mints a second key", async () => {
+    mockAdjustSiteInventory.mockRejectedValueOnce(new Error("response lost")).mockResolvedValueOnce(undefined);
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useBatchAdjustStockMutation(), { wrapper });
+
+    await expect(result.current.mutateAsync({ payload: PAYLOAD, productIds: ["p-1"] })).rejects.toThrow("response lost");
+    const recovery = readUncertainStockSubmission("user-1", "site-1", "adjust");
+    expect(recovery).toMatchObject({ kind: "adjust", siteId: "site-1" });
+    const originalKey = recovery?.idempotencyKey;
+
+    await expect(result.current.mutateAsync({ payload: PAYLOAD, productIds: ["p-1"] })).rejects.toThrow("awaiting explicit recovery");
+    await result.current.retryUncertain();
+    expect(mockAdjustSiteInventory.mock.calls.map((call) => call[1])).toEqual([originalKey, originalKey]);
+    expect(readUncertainStockSubmission("user-1", "site-1", "adjust")).toBeNull();
+    if (recovery) clearUncertainStockSubmission(recovery);
+  });
+
+  it("clears a definitive client rejection so a corrected adjustment can be submitted", async () => {
+    const rejection = Object.assign(new Error("insufficient stock"), { status: 400 });
+    mockAdjustSiteInventory.mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
+    const { result } = renderHook(() => useBatchAdjustStockMutation(), { wrapper: createWrapper() });
+    await expect(result.current.mutateAsync({ payload: PAYLOAD, productIds: ["p-1"] })).rejects.toThrow("insufficient stock");
+    expect(readUncertainStockSubmission("user-1", "site-1", "adjust")).toBeNull();
+    await expect(result.current.mutateAsync({ payload: PAYLOAD, productIds: ["p-1"] })).resolves.toBeUndefined();
+    expect(mockAdjustSiteInventory).toHaveBeenCalledTimes(2);
+  });
+
+  it("unblocks a corrected submission when an explicit recovery retry receives a 400", async () => {
+    const rejection = Object.assign(new Error("insufficient stock"), { status: 400 });
+    mockAdjustSiteInventory.mockRejectedValueOnce(new Error("response lost")).mockRejectedValueOnce(rejection).mockResolvedValueOnce(undefined);
+    const { result } = renderHook(() => useBatchAdjustStockMutation(), { wrapper: createWrapper() });
+
+    await expect(result.current.mutateAsync({ payload: PAYLOAD, productIds: ["p-1"] })).rejects.toThrow("response lost");
+    await expect(result.current.retryUncertain()).rejects.toThrow("insufficient stock");
+    expect(readUncertainStockSubmission("user-1", "site-1", "adjust")).toBeNull();
+
+    await expect(result.current.mutateAsync({ payload: { ...PAYLOAD, adjustments: [{ inventoryId: "inv-1", quantityChange: -1 }] }, productIds: ["p-1"] })).resolves.toBeUndefined();
+    expect(mockAdjustSiteInventory).toHaveBeenCalledTimes(3);
   });
 });
