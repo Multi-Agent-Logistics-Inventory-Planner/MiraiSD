@@ -175,6 +175,13 @@
 # and reading shared.correlation.IdempotencyKeyContext.HEADER_NAME (Q-6c-3/T-6c-10/T-6c-12).
 # `shared` remains a pure leaf in this file (zero outgoing edges, confirmed by grep), so this
 # cannot create a new cycle - same reasoning as every other `<module> -> shared` addition above.
+# Ninth reviewed addition (2026-09-16, Phase 6 gap closure): `controllers -> shared` and
+# `sites -> identity` are intentionally limited to retained unversioned HTTP compatibility
+# adapters. LocationInventoryController consumes AuthorizedSiteContext after resolving MAIN, and
+# LocationController/StorageLocationController/LocationAggregateController delegate MAIN-context
+# construction to identity.application.LegacyMainSiteContextResolver. This keeps trusted actor and
+# membership derivation at the HTTP boundary. Remove both edges with these deprecated adapters
+# after the documented legacy removal gate is met.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -197,6 +204,7 @@ controllers -> models
 controllers -> repositories
 controllers -> services
 controllers -> sites
+controllers -> shared
 displays -> catalog
 displays -> repositories
 dtos -> catalog
@@ -251,6 +259,7 @@ shipments -> catalog
 shipments -> repositories
 sites -> models
 sites -> shared
+sites -> identity
 sites -> utils
 validation -> dtos
 validation -> inventory

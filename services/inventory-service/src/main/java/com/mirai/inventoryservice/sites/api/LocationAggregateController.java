@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.sites.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.application.LocationAggregateService;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,9 +27,12 @@ import java.util.List;
 public class LocationAggregateController {
 
     private final LocationAggregateService locationAggregateService;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
-    public LocationAggregateController(LocationAggregateService locationAggregateService) {
+    public LocationAggregateController(LocationAggregateService locationAggregateService,
+                                       LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.locationAggregateService = locationAggregateService;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
     }
 
     /**
@@ -44,10 +48,11 @@ public class LocationAggregateController {
             @RequestParam(required = false) LocationType type) {
 
         List<LocationWithCountsDTO> locations;
+        var main = legacyMainSiteContextResolver.requireMain();
         if (type != null) {
-            locations = locationAggregateService.getLocationsByTypeWithCounts(type);
+            locations = locationAggregateService.getLocationsByTypeWithCounts(type, main.siteId());
         } else {
-            locations = locationAggregateService.getAllLocationsWithCounts();
+            locations = locationAggregateService.getAllLocationsWithCounts(main.siteId());
         }
 
         return ResponseEntity.ok(locations);

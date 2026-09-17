@@ -1,6 +1,12 @@
 package com.mirai.inventoryservice.controllers.security;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserSiteMembership;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserSiteMembershipRepository;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,6 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("LocationInventoryController Security Tests")
 class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
 
+    @org.springframework.beans.factory.annotation.Autowired private UserRepository userRepository;
+    @org.springframework.beans.factory.annotation.Autowired private UserSiteMembershipRepository membershipRepository;
+    @org.springframework.beans.factory.annotation.Autowired private SiteRepository siteRepository;
+
     private static final String BASE_URL = "/api/locations/550e8400-e29b-41d4-a716-446655440000/inventory";
     private static final String INVENTORY_JSON = """
             {
@@ -28,6 +38,22 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
                 "quantity": 10
             }
             """;
+
+    @BeforeEach
+    void grantPrivilegedPersonasMainMembership() {
+        employeeToken();
+        adminToken();
+        var main = siteRepository.findByCode("MAIN").orElseThrow();
+        grant("employee.persona@test.internal", main.getId());
+        grant("admin.persona@test.internal", main.getId());
+    }
+
+    private void grant(String email, java.util.UUID siteId) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        if (membershipRepository.findByUserIdAndSiteId(user.getId(), siteId).isEmpty()) {
+            membershipRepository.save(UserSiteMembership.builder().userId(user.getId()).siteId(siteId).isActive(true).build());
+        }
+    }
 
     @Nested
     @DisplayName("GET endpoints")
@@ -41,12 +67,11 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should allow USER role to list inventory")
-        void listInventory_userRole_notForbidden() throws Exception {
+        @DisplayName("Should deny an authenticated user without MAIN membership")
+        void listInventory_userRole_returns403() throws Exception {
             mockMvc.perform(get(BASE_URL)
                             .header("Authorization", "Bearer " + userToken()))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
+                    .andExpect(status().isForbidden());
         }
 
         @Test
@@ -170,12 +195,11 @@ class LocationInventoryControllerSecurityIT extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should allow USER role to list by storage location")
-        void listByStorageLocation_userRole_notForbidden() throws Exception {
+        @DisplayName("Should deny an authenticated user without MAIN membership")
+        void listByStorageLocation_userRole_returns403() throws Exception {
             mockMvc.perform(get(STORAGE_URL)
                             .header("Authorization", "Bearer " + userToken()))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
+                    .andExpect(status().isForbidden());
         }
     }
 

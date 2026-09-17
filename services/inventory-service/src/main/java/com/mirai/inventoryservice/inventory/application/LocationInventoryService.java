@@ -135,6 +135,13 @@ public class LocationInventoryService {
                         "Inventory not found with id: " + inventoryId));
     }
 
+    /** Compatibility-read counterpart which never resolves an inventory row outside MAIN. */
+    public LocationInventory getInventoryById(UUID siteId, UUID inventoryId) {
+        return locationInventoryRepository.findByIdAndSite_Id(inventoryId, siteId)
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Inventory not found with id: " + inventoryId));
+    }
+
     /**
      * List all inventory at a specific location. Restored alongside {@link #getInventoryById}
      * (R-3 revert) -- see that method's Javadoc.
@@ -143,6 +150,12 @@ public class LocationInventoryService {
         locationRepository.findById(locationId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
         return locationInventoryRepository.findByLocation_Id(locationId);
+    }
+
+    /** Site-qualified compatibility read for a location's rows. */
+    public List<LocationInventory> listInventoryAtLocation(UUID siteId, UUID locationId) {
+        locationService.getLocationById(siteId, locationId);
+        return locationInventoryRepository.findByLocation_IdAndSite_Id(locationId, siteId);
     }
 
     /**
@@ -155,6 +168,14 @@ public class LocationInventoryService {
      */
     public List<LocationInventory> listInventoryByStorageLocation(UUID storageLocationId) {
         storageLocationRepository.findById(storageLocationId)
+                .orElseThrow(() -> new StorageLocationNotFoundException(
+                        "Storage location not found: " + storageLocationId));
+        return locationInventoryRepository.findByStorageLocation_Id(storageLocationId);
+    }
+
+    /** Site-qualified compatibility read for a storage category's rows. */
+    public List<LocationInventory> listInventoryByStorageLocation(UUID siteId, UUID storageLocationId) {
+        storageLocationRepository.findByIdAndSite_Id(storageLocationId, siteId)
                 .orElseThrow(() -> new StorageLocationNotFoundException(
                         "Storage location not found: " + storageLocationId));
         return locationInventoryRepository.findByStorageLocation_Id(storageLocationId);

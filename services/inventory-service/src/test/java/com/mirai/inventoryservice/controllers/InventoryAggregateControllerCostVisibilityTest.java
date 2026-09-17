@@ -5,6 +5,8 @@ import com.mirai.inventoryservice.inventory.api.InventoryTotalDTO;
 import com.mirai.inventoryservice.identity.domain.AuthenticatedPrincipal;
 import com.mirai.inventoryservice.inventory.application.InventoryAggregateService;
 import com.mirai.inventoryservice.inventory.application.InventoryQueries;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -35,6 +37,9 @@ class InventoryAggregateControllerCostVisibilityTest {
     @Mock
     private InventoryQueries inventoryQueries;
 
+    @Mock
+    private LegacyMainSiteContextResolver legacyMainSiteContextResolver;
+
     private InventoryTotalDTO totalWithCost() {
         return InventoryTotalDTO.builder()
                 .itemId(UUID.randomUUID())
@@ -58,8 +63,12 @@ class InventoryAggregateControllerCostVisibilityTest {
     void adminSeesUnitCost() {
         when(inventoryQueries.findAllInventoryTotals())
                 .thenReturn(new java.util.ArrayList<>(List.of(totalWithCost())));
+        UUID siteId = UUID.randomUUID();
+        when(legacyMainSiteContextResolver.requireMain()).thenReturn(
+                new AuthorizedSiteContext(UUID.randomUUID(), siteId, "ADMIN", java.util.Set.of(), false, "test"));
+        when(inventoryQueries.findInventoryTotalsBySite(siteId)).thenReturn(List.of());
         InventoryAggregateController controller =
-                new InventoryAggregateController(inventoryAggregateService, inventoryQueries);
+                new InventoryAggregateController(inventoryAggregateService, inventoryQueries, legacyMainSiteContextResolver);
         SecurityContextHolder.getContext().setAuthentication(authWithRole("ADMIN"));
         try {
             ResponseEntity<List<InventoryTotalDTO>> response = controller.getInventoryTotals();
@@ -73,8 +82,12 @@ class InventoryAggregateControllerCostVisibilityTest {
     void employeeDoesNotSeeUnitCost() {
         when(inventoryQueries.findAllInventoryTotals())
                 .thenReturn(new java.util.ArrayList<>(List.of(totalWithCost())));
+        UUID siteId = UUID.randomUUID();
+        when(legacyMainSiteContextResolver.requireMain()).thenReturn(
+                new AuthorizedSiteContext(UUID.randomUUID(), siteId, "EMPLOYEE", java.util.Set.of(), false, "test"));
+        when(inventoryQueries.findInventoryTotalsBySite(siteId)).thenReturn(List.of());
         InventoryAggregateController controller =
-                new InventoryAggregateController(inventoryAggregateService, inventoryQueries);
+                new InventoryAggregateController(inventoryAggregateService, inventoryQueries, legacyMainSiteContextResolver);
         SecurityContextHolder.getContext().setAuthentication(authWithRole("EMPLOYEE"));
         try {
             ResponseEntity<List<InventoryTotalDTO>> response = controller.getInventoryTotals();

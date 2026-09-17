@@ -1,5 +1,32 @@
 # Implementation log
 
+## Gap-closure continuation — 2026-09-16
+
+### Follow-up evidence — 2026-09-16
+
+- Recovery hardening follow-up: records are now v2 and separately stored by originating `userId + siteId + operation kind`. Replay reads require that same authenticated user, preventing shared-tab sign-out/sign-in replay and preventing unrelated stock operations from overwriting an unresolved key/payload. Explicitly received 4xx failures (except timeout 408) clear recovery so corrected commands can proceed; transport/unknown failures remain explicit-retry recoverable.
+- Recovery retry follow-up: the same definitive-failure cleanup now applies to all explicit adjust/transfer/batch-transfer retries and initial-stock retry. The regression sequence is network failure, recovery retry receives 400, then a corrected new adjustment succeeds.
+
+- Completed uncertainty hardening for initial stock: a 24-hour, session-scoped recovery record now captures the resolved location, product, payload and original idempotency key before dispatch. It is site-bound, only replays on an explicit user action, expires through the shared recovery reader, and is cleared only after a successful response. A normal same-site adjust/transfer/batch-transfer resubmission is rejected while its own unresolved record exists.
+- Stock dialogs and the product initial-stock draft clear selections, carts, quantities and confirmation state when the resolved site changes. Pending command callbacks remain bound to their original site via mutation variables.
+- Added hook and rendered regressions for response-lost recovery. The rendered initial-stock test verifies the retry uses the exact original key.
+- Reproduced the historical eight controller-security failures with a clean JDK 21 run and a direct Surefire Byte Buddy agent. They were stale fixtures: role personas had no active MAIN membership after the legacy routes began enforcing it. Focused tests now seed memberships for allowed employee/admin personas and assert 403 for authenticated no-membership users. This is H2 MockMvc evidence; PostgreSQL-backed legacy-route proof remains unavailable in this local slice.
+- Last verified: web focused regressions and TypeScript passed; inventory `./mvnw clean test -Dtest=LocationInventoryControllerSecurityIT,InventoryAggregateControllerSecurityIT,StockMovementControllerSecurityIT ...` passed 29 tests under JDK 21 with an explicit Surefire Byte Buddy agent.
+
+### Current handoff
+
+- Status: implemented the first stock-correctness and retained legacy HTTP-security slice; uncertain-submission recovery, rendered site-switch reset proof, measurements, and independent reviews remain open.
+- Next action: add explicit persisted uncertain-operation recovery UX before representing Phase 6 as closed; then run PostgreSQL-backed authorization regressions and the full native gate.
+- Decisions: a committed write keeps a successful UI result even when reconciliation fails; completion refresh uses the operation's captured site and refreshes targeted totals, inventory readers, movement history, and location counts without a whole-site product refresh. Retained unversioned location/inventory routes resolve authenticated MAIN membership and derive actors from the principal.
+- Last verified: web `npm run test:run` — 66 files / 449 tests passed; `npx tsc --noEmit -p tsconfig.json` passed; ESLint 0 errors / 51 existing warnings; inventory `./mvnw -q test-compile` passed under JDK 21.
+- Open risks/questions: local Java controller test execution is blocked by the Homebrew JDK 21 Mockito/Byte Buddy self-attachment error, before tests run. Historical analytics/forecasting IT failures are not yet investigated.
+
+### Task record
+
+- Stock refresh: mutation variables capture origin site; post-commit refresh no longer invalidates the whole site-product list and now includes `locationsWithCounts`. Initial-stock creation uses the same best-effort refresh. Dialogs expose failed/unresolved inventory and disable actions until a successful snapshot exists.
+- Uncertain submissions: adjustment and transfer commands persist one session-scoped, 24-hour recovery record before dispatch. An explicit dialog action replays the original site, payload, and idempotency key; a different site cannot see or erase it. A fresh submit still receives a new key.
+- Legacy HTTP adapters: added a trusted MAIN compatibility resolver and applied it to retained location, storage-location, location-count, inventory-row, aggregate inventory product, and legacy stock mutation paths. Nested inventory rows must match their URL parent; request actor values are ignored for mutations.
+
 ## Current handoff
 
 - Status: 6a baseline inventory complete and reviewed. T-0 done (ArchUnit `isRepositoryClass()`

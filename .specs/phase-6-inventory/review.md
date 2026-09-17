@@ -1,5 +1,21 @@
 # Review
 
+## Gap-closure follow-up — 2026-09-16
+
+### Standards pass
+
+- **act on (completed):** recovery must cover initial stock and must reject accidental fresh-key resubmission while a matching uncertain command exists. The recovery record is explicit, session-bound, site-bound and 24-hour bounded; no automatic replay was introduced.
+- **act on (completed):** legacy controller tests must seed the active MAIN membership now required by the compatibility resolver rather than treating a role alone as authorization. No-membership assertions now expect 403.
+
+### Spec pass
+
+- **act on (completed):** AC-3/AC-4 client recovery has a rendered initial-stock response-lost regression and preserves the server's original idempotency key.
+- **consider:** full AC-3 legacy authorization proof still lacks wrong-site/wrong-parent/revoked/system-admin/actor-spoofing PostgreSQL HTTP coverage; existing implementation and H2 focused tests are insufficient to close that remaining evidence item.
+
+## Residual risk
+
+- Full controlled AC-8 measurement, PostgreSQL HTTP authorization proof, the complete native/PR gate, and remaining site-switch deferred-response coverage are not represented as complete by this follow-up.
+
 ## 6d P1/P2 findings (external review) — 2026-09-14
 
 **Scope reviewed:** an external review of the already-committed 6d checkpoint (backend `accd2b0`,

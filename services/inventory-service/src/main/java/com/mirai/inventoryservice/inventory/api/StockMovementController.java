@@ -6,6 +6,8 @@ import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.inventory.application.StockMovementService;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,32 +30,38 @@ public class StockMovementController {
     private final StockMovementService stockMovementService;
     private final StockMovementMapper stockMovementMapper;
     private final AuditLogMapper auditLogMapper;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
     public StockMovementController(
             StockMovementService stockMovementService,
             StockMovementMapper stockMovementMapper,
-            AuditLogMapper auditLogMapper) {
+            AuditLogMapper auditLogMapper,
+            LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.stockMovementService = stockMovementService;
         this.stockMovementMapper = stockMovementMapper;
         this.auditLogMapper = auditLogMapper;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
     }
 
     @PostMapping("/batch-adjust")
     public ResponseEntity<Void> batchAdjustInventory(
             @Valid @RequestBody BatchAdjustStockRequestDTO requestDTO) {
-        stockMovementService.batchAdjustInventory(requestDTO);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        stockMovementService.batchAdjustInventory(context.siteId(), context.backendUserId(), requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/transfer")
     public ResponseEntity<Void> transferInventory(@Valid @RequestBody TransferInventoryRequestDTO requestDTO) {
-        stockMovementService.transferInventory(requestDTO);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        stockMovementService.transferInventory(context.siteId(), context.backendUserId(), requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/batch-transfer")
     public ResponseEntity<Void> batchTransferInventory(@Valid @RequestBody BatchTransferInventoryRequestDTO requestDTO) {
-        stockMovementService.batchTransferInventory(requestDTO);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        stockMovementService.batchTransferInventory(context.siteId(), context.backendUserId(), requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -90,4 +98,3 @@ public class StockMovementController {
         return ResponseEntity.ok(auditLogMapper.toAuditLogEntryDTOPage(movements));
     }
 }
-

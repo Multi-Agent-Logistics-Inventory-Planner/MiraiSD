@@ -1,5 +1,23 @@
 # Validation
 
+## Gap-closure follow-up — 2026-09-16
+
+`apps/web: npm run test:run -- src/components/products/__tests__/product-form.test.tsx src/components/stock/__tests__/adjust-stock-dialog.test.tsx src/components/stock/__tests__/transfer-stock-dialog.test.tsx src/hooks/mutations/__tests__/use-stock-mutations.test.ts`
+
+Pass: 4 files / 11 tests. The initial-stock rendered regression covers a committed-but-response-lost recovery action and verifies reuse of the original key. The mutation regression prevents ordinary same-site resubmission while recovery is unresolved.
+
+Follow-up focused web check: `npm run test:run -- src/lib/stock-submission-recovery.test.ts src/hooks/mutations/__tests__/use-stock-mutations.test.ts src/components/products/__tests__/product-form.test.tsx` — pass, 3 files / 12 tests; `npx tsc --noEmit -p tsconfig.json` and `git diff --check` — pass. Coverage includes cross-user rejection, separate operation slots, and clearing a 400 rejection before a corrected submission.
+
+Recovery-retry follow-up: the same focused command — pass, 3 files / 13 tests. It covers network failure → explicit retry returns 400 → corrected new adjustment succeeds.
+
+`services/inventory-service: ./mvnw clean test -Dtest=LocationInventoryControllerSecurityIT,InventoryAggregateControllerSecurityIT,StockMovementControllerSecurityIT -DfailIfNoTests=false '-DargLine=-javaagent:/Users/mjpark019/.m2/repository/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar'`
+
+Pass: 29 tests. A normal JDK 21 invocation and `MAVEN_OPTS=-Djdk.attach.allowAttachSelf=true` both remain blocked by Homebrew JDK Byte Buddy external attachment; passing the agent to Surefire's fork is required locally. This is H2 MockMvc evidence, not PostgreSQL-backed HTTP proof.
+
+`services/inventory-service: ./mvnw test -Dtest=ArchitectureTest '-DargLine=-javaagent:.../byte-buddy-agent-1.17.8.jar'`
+
+Pass: 8 tests. The approved dependency baseline now records the compatibility-only `controllers -> shared` and `sites -> identity` edges introduced by the retained MAIN resolver. `OpenApiContractExportTest` could not run in this sandbox because embedded Tomcat's ephemeral port bind is denied (`SocketException: Operation not permitted`); no endpoint shape changed, so contracts were not regenerated.
+
 ## Review-driven fix: 6d P1/P2 findings (external review) (2026-09-14)
 
 Commands and results for the fixes recorded in `review.md`'s "6d P1/P2 findings (external review)

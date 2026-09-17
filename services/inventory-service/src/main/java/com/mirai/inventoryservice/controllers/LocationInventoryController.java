@@ -5,6 +5,8 @@ import com.mirai.inventoryservice.dtos.requests.InventoryRequestDTO;
 import com.mirai.inventoryservice.dtos.responses.LocationInventoryResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.inventory.application.LocationInventoryService;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,12 +24,15 @@ import java.util.UUID;
 public class LocationInventoryController {
     private final LocationInventoryService locationInventoryService;
     private final LocationInventoryMapper locationInventoryMapper;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
     public LocationInventoryController(
             LocationInventoryService locationInventoryService,
-            LocationInventoryMapper locationInventoryMapper) {
+            LocationInventoryMapper locationInventoryMapper,
+            LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.locationInventoryService = locationInventoryService;
         this.locationInventoryMapper = locationInventoryMapper;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
     }
 
     // ========= Location-level endpoints =========
@@ -35,7 +40,8 @@ public class LocationInventoryController {
     @GetMapping("/api/locations/{locationId}/inventory")
     public ResponseEntity<List<LocationInventoryResponseDTO>> listInventoryAtLocation(
             @PathVariable UUID locationId) {
-        List<LocationInventory> inventories = locationInventoryService.listInventoryAtLocation(locationId);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        List<LocationInventory> inventories = locationInventoryService.listInventoryAtLocation(context.siteId(), locationId);
         return ResponseEntity.ok(locationInventoryMapper.toResponseDTOList(inventories));
     }
 
@@ -43,7 +49,12 @@ public class LocationInventoryController {
     public ResponseEntity<LocationInventoryResponseDTO> getInventoryById(
             @PathVariable UUID locationId,
             @PathVariable UUID inventoryId) {
-        LocationInventory inventory = locationInventoryService.getInventoryById(inventoryId);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        LocationInventory inventory = locationInventoryService.getInventoryById(context.siteId(), inventoryId);
+        if (!inventory.getLocation().getId().equals(locationId)) {
+            throw new com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException(
+                    "Inventory not found with id: " + inventoryId);
+        }
         return ResponseEntity.ok(locationInventoryMapper.toResponseDTO(inventory));
     }
 
@@ -52,11 +63,13 @@ public class LocationInventoryController {
     public ResponseEntity<LocationInventoryResponseDTO> addInventory(
             @PathVariable UUID locationId,
             @Valid @RequestBody InventoryRequestDTO requestDTO) {
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
         LocationInventory inventory = locationInventoryService.addInventory(
+                context.siteId(),
+                context.backendUserId(),
                 locationId,
                 requestDTO.getItemId(),
                 requestDTO.getQuantity(),
-                requestDTO.getActorId(),
                 requestDTO.getReason(),
                 requestDTO.getIntakeUnit(),
                 requestDTO.getIntakeQty());
@@ -76,7 +89,10 @@ public class LocationInventoryController {
             @PathVariable UUID locationId,
             @PathVariable UUID inventoryId,
             @RequestParam(required = false) UUID actorId) {
-        locationInventoryService.deleteInventory(inventoryId, actorId, null);
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        // actorId remains accepted for URL compatibility but is never trusted for audit identity.
+        locationInventoryService.deleteInventory(
+                context.siteId(), context.backendUserId(), locationId, inventoryId, null);
         return ResponseEntity.noContent().build();
     }
 
@@ -85,8 +101,9 @@ public class LocationInventoryController {
     @GetMapping("/api/storage-locations/{storageLocationId}/inventory")
     public ResponseEntity<List<LocationInventoryResponseDTO>> listInventoryByStorageLocation(
             @PathVariable UUID storageLocationId) {
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
         List<LocationInventory> inventories = locationInventoryService
-                .listInventoryByStorageLocation(storageLocationId);
+                .listInventoryByStorageLocation(context.siteId(), storageLocationId);
         return ResponseEntity.ok(locationInventoryMapper.toResponseDTOList(inventories));
     }
 
