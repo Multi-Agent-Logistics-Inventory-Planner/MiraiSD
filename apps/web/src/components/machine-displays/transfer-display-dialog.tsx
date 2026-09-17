@@ -33,7 +33,7 @@ import {
   ProductListItem,
 } from "@/types/api";
 import { useQuery } from "@tanstack/react-query";
-import { useLocationsOnly } from "@/hooks/queries/use-locations";
+import { useSiteLocations } from "@/hooks/queries/use-locations";
 import {
   useActiveDisplaysForMachine,
   useActiveDisplaysByType,
@@ -297,20 +297,21 @@ export function TransferDisplayDialog({
   const { data: products = [] } = useQuery({
     queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
     queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
+    enabled: open,
   });
 
   // Fetch all machines of the same type
-  const { data: machines = [], isLoading: isMachinesLoading } = useLocationsOnly(locationType);
+  const { data: machines = [], isLoading: isMachinesLoading } = useSiteLocations(open ? locationType : undefined);
 
   // Fetch displays for the selected target machine
   const { data: targetDisplays = [], isLoading: isTargetDisplaysLoading } =
     useActiveDisplaysForMachine(
-      selectedMachineId ? locationType : undefined,
+      open && selectedMachineId ? locationType : undefined,
       selectedMachineId ?? undefined
     );
 
   // Get display counts for each machine
-  const { data: allDisplaysByType = [] } = useActiveDisplaysByType(locationType);
+  const { data: allDisplaysByType = [] } = useActiveDisplaysByType(open ? locationType : undefined);
 
   // Create a map of machine ID to display count
   const displayCountByMachine = useMemo(() => {
