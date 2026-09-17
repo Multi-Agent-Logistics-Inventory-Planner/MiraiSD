@@ -62,15 +62,9 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
     @Test
     @DisplayName("GET /api/inventory/totals carries Deprecation and Link headers")
     void getInventoryTotals_carriesDeprecationHeaders() throws Exception {
-        // InventoryTotalsRepository.findAllInventoryTotals()'s native SQL can 500 under the
-        // shared H2 test datasource depending on unrelated data committed by other IT classes
-        // (a ClassCastException casting a joined UUID column, order-dependent, pre-existing --
-        // confirmed unrelated to this filter by grepping that this session never touched
-        // INVENTORY_TOTALS_SQL or its mapping code). Same class of debt as
-        // LegacyCatalogDeprecationHeadersIT's /api/suppliers test: assert header presence/format
-        // without asserting a 200, and separately confirm Sunset is absent.
         ResultActions result = mockMvc.perform(get("/api/inventory/totals")
-                        .header("Authorization", "Bearer " + employeeToken()))
+                        .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
+                .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Sunset"));
         assertDeprecationHeaders(result);
     }
@@ -79,7 +73,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
     @DisplayName("GET /api/stock-movements/audit-log carries Deprecation and Link headers")
     void getAuditLog_carriesDeprecationHeaders() throws Exception {
         ResultActions result = mockMvc.perform(get("/api/stock-movements/audit-log")
-                        .header("Authorization", "Bearer " + employeeToken()))
+                        .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                 .andExpect(status().isOk());
         assertDeprecationHeaders(result);
     }
@@ -90,7 +84,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
         Site site = siteRepository.save(Site.builder().name("Deprecation V1 Site").code("DEPV1-1").build());
 
         mockMvc.perform(get("/api/v1/sites/{siteId}/inventory/totals", site.getId())
-                        .header("Authorization", "Bearer " + adminToken()))
+                        .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                 .andExpect(header().doesNotExist("Deprecation"))
                 .andExpect(header().doesNotExist("Link"));
     }
@@ -113,7 +107,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
         Location location = seedLocation("1");
 
         ResultActions result = mockMvc.perform(get("/api/locations/{id}/inventory", location.getId())
-                        .header("Authorization", "Bearer " + employeeToken()))
+                        .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Sunset"));
         assertDeprecationHeaders(result);
@@ -126,7 +120,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
 
         ResultActions result = mockMvc.perform(
                         get("/api/storage-locations/{id}/inventory", location.getStorageLocation().getId())
-                                .header("Authorization", "Bearer " + employeeToken()))
+                                .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Sunset"));
         assertDeprecationHeaders(result);
@@ -138,7 +132,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
     @DisplayName("GET /api/locations/with-counts carries Deprecation and Link headers")
     void getLocationsWithCounts_carriesDeprecationHeaders() throws Exception {
         ResultActions result = mockMvc.perform(get("/api/locations/with-counts")
-                        .header("Authorization", "Bearer " + employeeToken()))
+                        .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("Sunset"));
         assertDeprecationHeaders(result);
@@ -150,7 +144,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
         Site site = siteRepository.save(Site.builder().name("Deprecation V1 Locations Site").code("DEPV1-LOC-1").build());
 
         mockMvc.perform(get("/api/v1/sites/{siteId}/locations/with-counts", site.getId())
-                        .header("Authorization", "Bearer " + adminToken()))
+                        .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                 .andExpect(header().doesNotExist("Deprecation"))
                 .andExpect(header().doesNotExist("Link"));
     }
@@ -161,7 +155,7 @@ class LegacyInventoryDeprecationHeadersIT extends BaseIntegrationTest {
         Location location = seedLocation("3");
 
         mockMvc.perform(get("/api/locations/{id}", location.getId())
-                        .header("Authorization", "Bearer " + employeeToken()))
+                        .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                 .andExpect(header().doesNotExist("Deprecation"))
                 .andExpect(header().doesNotExist("Link"));
     }

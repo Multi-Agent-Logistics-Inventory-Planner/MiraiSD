@@ -21,7 +21,6 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/locations")
-@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class LocationController {
     private final LocationService locationService;
     private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;

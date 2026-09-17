@@ -124,7 +124,7 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
         @DisplayName("Should return all locations with inventory counts")
         void getAllLocationsWithCounts_returnsAllTypes() throws Exception {
             mockMvc.perform(get("/api/locations/with-counts")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", isA(java.util.List.class)))
                     .andExpect(jsonPath("$[*].locationType", hasItem("BOX_BINS")))
@@ -136,7 +136,7 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
         void getLocationsWithCounts_filterByType_returnsOnlyMatchingType() throws Exception {
             mockMvc.perform(get("/api/locations/with-counts")
                             .param("type", "BOX_BIN")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[*].locationType", everyItem(equalTo("BOX_BINS"))));
         }
@@ -153,7 +153,7 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
 
             mockMvc.perform(get("/api/locations/with-counts")
                             .param("type", "BOX_BIN")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[?(@.locationCode=='B99')].inventoryRecords", hasItem(1)))
                     .andExpect(jsonPath("$[?(@.locationCode=='B99')].totalQuantity", hasItem(10)));
@@ -164,7 +164,7 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
         void getLocationsWithCounts_emptyLocation_returnsZeroCounts() throws Exception {
             mockMvc.perform(get("/api/locations/with-counts")
                             .param("type", "RACK")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[?(@.locationCode=='R99')].inventoryRecords", hasItem(0)))
                     .andExpect(jsonPath("$[?(@.locationCode=='R99')].totalQuantity", hasItem(0)));
@@ -175,7 +175,7 @@ class LocationAggregateControllerIT extends BaseIntegrationTest {
         void getLocationsWithCounts_notAssignedType_returnsEmptyList() throws Exception {
             mockMvc.perform(get("/api/locations/with-counts")
                             .param("type", "NOT_ASSIGNED")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(0)));
         }

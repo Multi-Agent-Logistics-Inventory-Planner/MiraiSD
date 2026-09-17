@@ -8,6 +8,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,33 @@ public class InventoryTotalsRepository {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    /**
+     * Native, unmapped queries hand back whatever the JDBC driver's {@code getObject} returns for
+     * a UUID column, with no Hibernate type conversion applied (unlike a JPQL/entity query). Real
+     * Postgres returns {@link UUID} directly; H2's own UUID column type does not, and hands back
+     * the raw 16-byte big-endian value instead (verified against a JPA-assigned id: reading it
+     * back through this exact reconstruction round-trips correctly). Both native queries below
+     * (products.id, categories.id, location_inventory.product_id) go through this so they work
+     * against either database rather than only the one Postgres uses in production.
+     */
+    private static UUID toUuid(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof UUID uuid) {
+            return uuid;
+        }
+        if (raw instanceof byte[] bytes) {
+            if (bytes.length != 16) {
+                throw new IllegalArgumentException(
+                        "Expected a 16-byte UUID representation, got " + bytes.length + " bytes");
+            }
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            return new UUID(buffer.getLong(), buffer.getLong());
+        }
+        throw new IllegalArgumentException("Unsupported UUID column representation: " + raw.getClass());
+    }
 
     private static final String INVENTORY_TOTALS_SQL = """
         SELECT
@@ -57,13 +85,13 @@ public class InventoryTotalsRepository {
 
         return results.stream()
                 .map(row -> InventoryTotalDTO.builder()
-                        .itemId((UUID) row[0])
+                        .itemId(toUuid(row[0]))
                         .sku((String) row[1])
                         .name((String) row[2])
                         .imageUrl((String) row[3])
-                        .categoryId((UUID) row[4])
+                        .categoryId(toUuid(row[4]))
                         .categoryName((String) row[5])
-                        .parentCategoryId((UUID) row[6])
+                        .parentCategoryId(toUuid(row[6]))
                         .parentCategoryName((String) row[7])
                         .unitCost(row[8] != null ? ((Number) row[8]).doubleValue() : null)
                         .isActive((Boolean) row[9])
@@ -91,7 +119,7 @@ public class InventoryTotalsRepository {
 
         Map<UUID, Integer> stockMap = new HashMap<>();
         for (Object[] row : results) {
-            UUID itemId = (UUID) row[0];
+            UUID itemId = toUuid(row[0]);
             Integer quantity = ((Number) row[1]).intValue();
             stockMap.put(itemId, quantity);
         }

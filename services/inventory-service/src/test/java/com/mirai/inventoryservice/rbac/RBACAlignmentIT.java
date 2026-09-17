@@ -39,7 +39,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can access analytics")
         void employee_canAccessAnalytics() throws Exception {
             mockMvc.perform(get("/api/analytics/inventory-by-category")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -50,7 +50,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can access analytics")
         void admin_canAccessAnalytics() throws Exception {
             mockMvc.perform(get("/api/analytics/inventory-by-category")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -71,7 +71,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view products")
         void employee_canViewProducts() throws Exception {
             mockMvc.perform(get("/api/products")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk());
         }
 
@@ -90,7 +90,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/products")
-                            .header("Authorization", "Bearer " + employeeToken())
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(status().isForbidden());
@@ -111,7 +111,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/products")
-                            .header("Authorization", "Bearer " + adminToken())
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(result -> {
@@ -135,7 +135,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view locations")
         void employee_canViewLocations() throws Exception {
             mockMvc.perform(get("/api/locations")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -152,7 +152,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/locations")
-                            .header("Authorization", "Bearer " + employeeToken())
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(result -> {
@@ -165,7 +165,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee denied location deletion")
         void employee_cannotDeleteLocation() throws Exception {
             mockMvc.perform(delete("/api/locations/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isForbidden());
         }
 
@@ -173,7 +173,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can delete locations")
         void admin_canDeleteLocation() throws Exception {
             mockMvc.perform(delete("/api/locations/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -205,7 +205,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/locations/550e8400-e29b-41d4-a716-446655440000/inventory")
-                            .header("Authorization", "Bearer " + employeeToken())
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(result -> {
@@ -224,7 +224,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/locations/550e8400-e29b-41d4-a716-446655440000/inventory")
-                            .header("Authorization", "Bearer " + adminToken())
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(result -> {
@@ -247,7 +247,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view shipments")
         void employee_canViewShipments() throws Exception {
             mockMvc.perform(get("/api/shipments")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk());
         }
 
@@ -262,7 +262,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
                     }
                     """;
             mockMvc.perform(post("/api/shipments")
-                            .header("Authorization", "Bearer " + employeeToken())
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json))
                     .andExpect(result -> {
@@ -275,7 +275,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee denied shipment deletion")
         void employee_cannotDeleteShipment() throws Exception {
             mockMvc.perform(delete("/api/shipments/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isForbidden());
         }
 
@@ -283,7 +283,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can delete shipments")
         void admin_canDeleteShipment() throws Exception {
             mockMvc.perform(delete("/api/shipments/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -303,7 +303,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view forecasts")
         void employee_canViewForecasts() throws Exception {
             mockMvc.perform(get("/api/forecasts")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -314,7 +314,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can view forecasts")
         void admin_canViewForecasts() throws Exception {
             mockMvc.perform(get("/api/forecasts")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -334,7 +334,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view notifications")
         void employee_canViewNotifications() throws Exception {
             mockMvc.perform(get("/api/notifications")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -345,7 +345,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can view notifications")
         void admin_canViewNotifications() throws Exception {
             mockMvc.perform(get("/api/notifications")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(status().isOk());
         }
     }
@@ -362,7 +362,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view audit log")
         void employee_canViewAuditLog() throws Exception {
             mockMvc.perform(get("/api/stock-movements/audit-log")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -373,7 +373,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can view audit log")
         void admin_canViewAuditLog() throws Exception {
             mockMvc.perform(get("/api/stock-movements/audit-log")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -394,7 +394,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view user list (read-only, see 62a52df)")
         void employee_canViewUsers() throws Exception {
             mockMvc.perform(get("/api/users")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk());
         }
 
@@ -402,7 +402,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can view users")
         void admin_canViewUsers() throws Exception {
             mockMvc.perform(get("/api/users")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(status().isOk());
         }
     }
@@ -419,7 +419,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Employee can view own settings")
         void employee_canViewOwnSettings() throws Exception {
             mockMvc.perform(get("/api/auth/me")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
@@ -430,7 +430,7 @@ class RBACAlignmentIT extends BaseIntegrationTest {
         @DisplayName("Admin can view own settings")
         void admin_canViewOwnSettings() throws Exception {
             mockMvc.perform(get("/api/auth/me")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);

@@ -154,7 +154,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
                     .build());
 
             mockMvc.perform(get("/api/inventory/by-product/{productId}", testProduct.getId())
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.productId", is(testProduct.getId().toString())))
                     .andExpect(jsonPath("$.productSku", is("TEST-AGG-001")))
@@ -175,7 +175,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
                     .build());
 
             mockMvc.perform(get("/api/inventory/by-product/{productId}", testProduct.getId())
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.totalQuantity", is(7)))
                     .andExpect(jsonPath("$.entries", hasSize(1)))
@@ -187,7 +187,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         @DisplayName("Should return empty entries for product with no inventory")
         void getInventoryByProduct_noInventory_returnsEmptyEntries() throws Exception {
             mockMvc.perform(get("/api/inventory/by-product/{productId}", testProduct.getId())
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.productId", is(testProduct.getId().toString())))
                     .andExpect(jsonPath("$.totalQuantity", is(0)))
@@ -199,7 +199,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         void getInventoryByProduct_nonExistentProduct_returns404() throws Exception {
             UUID randomId = UUID.randomUUID();
             mockMvc.perform(get("/api/inventory/by-product/{productId}", randomId)
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isNotFound());
         }
 
@@ -207,7 +207,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
         @DisplayName("Should return 400 for invalid UUID format")
         void getInventoryByProduct_invalidUuid_returns400() throws Exception {
             mockMvc.perform(get("/api/inventory/by-product/{productId}", "invalid-uuid")
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isBadRequest());
         }
 
@@ -236,7 +236,7 @@ class InventoryAggregateControllerIT extends BaseIntegrationTest {
                     .build());
 
             mockMvc.perform(get("/api/inventory/by-product/{productId}", testProduct.getId())
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.totalQuantity", is(15)));
         }

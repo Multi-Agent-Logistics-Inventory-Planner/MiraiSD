@@ -5,7 +5,6 @@ import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
 import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,7 +16,6 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/storage-locations")
-@PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
 public class StorageLocationController {
     private final LocationService locationService;
     private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
