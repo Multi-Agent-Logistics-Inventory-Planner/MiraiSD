@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Radix Checkbox (via @radix-ui/react-use-size) calls ResizeObserver, which jsdom doesn't
 // implement - this project's jsdom setup has no global polyfill for it (no other test in this
@@ -19,6 +20,7 @@ const mockUseCurrentSite = vi.fn();
 vi.mock("@/hooks/queries/use-current-site", () => ({
   useCurrentSite: () => mockUseCurrentSite(),
 }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 
 const mockCreateMutateAsync = vi.fn();
 vi.mock("@/hooks/mutations/use-product-mutations", () => ({
@@ -27,8 +29,9 @@ vi.mock("@/hooks/mutations/use-product-mutations", () => ({
   useDeleteProductMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+const mockUseProduct = vi.hoisted(() => vi.fn(() => ({ data: null })));
 vi.mock("@/hooks/queries/use-products", () => ({
-  useProduct: () => ({ data: null }),
+  useProduct: mockUseProduct,
 }));
 
 const CATEGORY = { id: "cat-1", name: "Toys", slug: "toys", parentId: null, displayOrder: 0, isActive: true, usesPacks: false, children: [], createdAt: "", updatedAt: "" };
@@ -90,6 +93,10 @@ const mockCreateSiteLocationInventory = vi.fn();
 vi.mock("@/lib/api/site-inventory", () => ({
   createSiteLocationInventory: (...args: unknown[]) => mockCreateSiteLocationInventory(...args),
   newIdempotencyKey: () => "idem-key-1",
+}));
+
+vi.mock("@/hooks/mutations/use-stock-mutations", () => ({
+  refreshCommittedStock: vi.fn().mockResolvedValue(undefined),
 }));
 
 // --- Deep subcomponents not under test here: stubbed so the test stays focused on onSubmit's
@@ -159,14 +166,18 @@ import { ProductForm } from "../product-form";
 const NEW_PRODUCT = { id: "p-new", name: "Widget", sku: "WID-1" };
 
 function renderForm() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <ProductForm open={true} onOpenChange={vi.fn()} initialProductId={null} />
+    <QueryClientProvider client={client}>
+      <ProductForm open={true} onOpenChange={vi.fn()} initialProductId={null} />
+    </QueryClientProvider>
   );
 }
 
 describe("ProductForm - initial stock creation (review finding 1)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockCreateMutateAsync.mockResolvedValue(NEW_PRODUCT);
     mockResolveSiteLocationId.mockResolvedValue("loc-resolved-1");
     mockCreateSiteLocationInventory.mockResolvedValue({
@@ -226,4 +237,28 @@ describe("ProductForm - initial stock creation (review finding 1)", () => {
       expect.objectContaining({ title: "Initial stock added", variant: "success" })
     );
   });
+
+  it("renders an explicit response-lost recovery that reuses the original initial-stock key", async () => {
+    mockUseCurrentSite.mockReturnValue({ siteId: "site-1" });
+    mockCreateSiteLocationInventory.mockRejectedValueOnce(new Error("response lost")).mockResolvedValueOnce(undefined);
+    renderForm();
+
+    await fillNameCategoryAndStock();
+    fireEvent.click(screen.getByRole("button", { name: /add product/i }));
+    await screen.findByRole("button", { name: /retry uncertain initial stock/i });
+    const originalKey = mockCreateSiteLocationInventory.mock.calls[0][2];
+
+    fireEvent.click(screen.getByRole("button", { name: /retry uncertain initial stock/i }));
+    await waitFor(() => expect(mockCreateSiteLocationInventory).toHaveBeenCalledTimes(2));
+    expect(mockCreateSiteLocationInventory.mock.calls[1][2]).toBe(originalKey);
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Initial stock confirmed" }));
+  });
+});
+
+it("disables the edit-detail lookup while closed and restores it on open", () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { rerender } = render(<QueryClientProvider client={client}><ProductForm open={false} onOpenChange={vi.fn()} initialProductId="p1" /></QueryClientProvider>);
+  expect(mockUseProduct).toHaveBeenLastCalledWith(null);
+  rerender(<QueryClientProvider client={client}><ProductForm open={true} onOpenChange={vi.fn()} initialProductId="p1" /></QueryClientProvider>);
+  expect(mockUseProduct).toHaveBeenLastCalledWith("p1");
 });

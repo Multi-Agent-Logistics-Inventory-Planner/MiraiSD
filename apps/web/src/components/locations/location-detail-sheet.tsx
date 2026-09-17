@@ -111,7 +111,12 @@ interface LocationDetailSheetProps {
   defaultTab?: LocationDetailTab;
 }
 
-export function LocationDetailSheet({
+export function LocationDetailSheet(props: LocationDetailSheetProps) {
+  // Unmount query-owning content and nested dialogs while hidden; cached data survives.
+  return props.open ? <LocationDetailSheetContent {...props} /> : null;
+}
+
+function LocationDetailSheetContent({
   open,
   onOpenChange,
   locationType,

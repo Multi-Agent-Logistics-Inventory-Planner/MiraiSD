@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { createElement } from "react";
 import type { ReactNode } from "react";
+
+const mockGetProductById = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/api/products", () => ({ getProductById: mockGetProductById }));
 
 const mockUseCurrentSite = vi.fn();
 vi.mock("@/hooks/queries/use-current-site", () => ({
@@ -251,3 +254,49 @@ describe("useRealtimeBroadcast (.specs/phase-6-inventory 6e, T-6e-2/3/6)", () =>
     expect(mockFlushInventorySiteRefresh).toHaveBeenCalledWith(expect.anything(), "site-1", ["p1"]);
   });
 });
+
+  it("shares one broadcast detail fetch with active observers and list caches", async () => {
+    mockGetProductById.mockReset();
+    mockUseCurrentSite.mockReturnValue({ siteId: "site-1" });
+    mockGetSupabaseClient.mockReturnValue({ channel: () => fakeChannel(), removeChannel: vi.fn() });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const oldProduct = { id: "p1", name: "Old" };
+    const updatedProduct = { id: "p1", name: "New" };
+    client.setQueryData(["products", "p1"], oldProduct);
+    client.setQueryData(["products", { rootOnly: true }], [oldProduct]);
+    mockGetProductById.mockResolvedValue(updatedProduct);
+    const observer = new QueryObserver(client, { queryKey: ["products", "p1"], queryFn: () => mockGetProductById("p1") });
+    const unsubscribe = observer.subscribe(() => {});
+    renderHook(() => useRealtimeBroadcast(true), { wrapper: createWrapper(client) });
+    await act(async () => {
+      emit({ type: "product_updated", itemId: "p1" });
+      await Promise.resolve();
+    });
+    expect(mockGetProductById).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(["products", "p1"])).toEqual(updatedProduct);
+    expect(client.getQueryData(["products", { rootOnly: true }])).toEqual([updatedProduct]);
+    unsubscribe();
+    client.clear();
+  });
+
+  it("supersedes a pre-event product read and ignores its late old response", async () => {
+    mockGetProductById.mockReset();
+    mockUseCurrentSite.mockReturnValue({ siteId: "site-1" });
+    mockGetSupabaseClient.mockReturnValue({ channel: () => fakeChannel(), removeChannel: vi.fn() });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const oldProduct = { id: "p1", name: "Old" };
+    const latest = { id: "p1", name: "Latest" };
+    let resolveOld!: (value: unknown) => void;
+    mockGetProductById.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; })).mockResolvedValue(latest);
+    client.setQueryData(["products", { rootOnly: true }], [oldProduct]);
+    const observer = new QueryObserver(client, { queryKey: ["products", "p1"], queryFn: () => mockGetProductById("p1") });
+    const unsubscribe = observer.subscribe(() => {});
+    renderHook(() => useRealtimeBroadcast(true), { wrapper: createWrapper(client) });
+    await act(async () => { emit({ type: "product_updated", itemId: "p1" }); });
+    expect(mockGetProductById).toHaveBeenCalledTimes(2);
+    await act(async () => { resolveOld(oldProduct); });
+    expect(client.getQueryData(["products", "p1"])).toEqual(latest);
+    expect(client.getQueryData(["products", { rootOnly: true }])).toEqual([latest]);
+    unsubscribe();
+    client.clear();
+  });

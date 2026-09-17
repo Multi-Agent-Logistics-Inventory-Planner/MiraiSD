@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { useImageUpload } from "@/hooks/use-image-upload";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Permission } from "@/lib/rbac/permissions";
@@ -53,6 +54,8 @@ import { useProduct } from "@/hooks/queries/use-products";
 import { createSiteLocationInventory, newIdempotencyKey } from "@/lib/api/site-inventory";
 import { resolveSiteLocationId } from "@/lib/api/locations";
 import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { useQueryClient } from "@tanstack/react-query";
+import { refreshCommittedStock } from "@/hooks/mutations/use-stock-mutations";
 import { LocationSelector } from "@/components/stock/location-selector";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import { DeleteProductDialog } from "./delete-product-dialog";
@@ -62,6 +65,12 @@ import type { Product, ProductRequest } from "@/types/api";
 import { KujiType, LocationType } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 import { buildKujiCategoryIds, buildPackCategoryIds } from "./product-sort-utils";
+import {
+  clearUncertainStockSubmission,
+  isDefinitiveStockSubmissionFailure,
+  readUncertainStockSubmission,
+  storeUncertainStockSubmission,
+} from "@/lib/stock-submission-recovery";
 
 const SLACK_WEBHOOK_REGEX = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/_-]+$/;
 
@@ -127,9 +136,12 @@ export function ProductForm({
 }: ProductFormProps) {
   // Fetch full product detail when editing. List endpoints return slim DTOs,
   // so the form owns its detail fetch rather than trusting a passed-in object.
-  const { data: initialProduct = null } = useProduct(initialProductId ?? null);
+  const { data: initialProduct = null } = useProduct(open ? initialProductId ?? null : null);
   const { toast } = useToast();
+  const { user } = useAuth();
   const { siteId } = useCurrentSite();
+  const previousSiteId = useRef(siteId);
+  const queryClient = useQueryClient();
   const { canViewCosts, canViewMsrp, can } = usePermissions();
   const createMutation = useCreateProductMutation();
   const updateMutation = useUpdateProductMutation();
@@ -166,6 +178,17 @@ export function ProductForm({
   /** "pack" = stored value is the typed value; "box" = stored value is typed * packsPerBox. */
   const [initialStockUnit, setInitialStockUnit] = useState<"pack" | "box">("pack");
   const [isAddingStock, setIsAddingStock] = useState(false);
+
+  useEffect(() => {
+    if (previousSiteId.current !== siteId) {
+      previousSiteId.current = siteId;
+      setInitialStockEnabled(false);
+      setInitialStockLocation(NOT_ASSIGNED_LOCATION);
+      setInitialStockQty("");
+      setInitialStockQtyError("");
+      setLocationError("");
+    }
+  }, [siteId]);
 
   const childCategories = useChildCategories(rootCategoryId);
   const hasChildCategories = childCategories.length > 0;
@@ -331,6 +354,10 @@ export function ProductForm({
     isAddingStock;
 
   async function onSubmit(values: FormValues) {
+    // The product create and optional inventory write can span several awaits.  Bind the
+    // optional stock command to the site the user submitted from so a later site change cannot
+    // redirect either its request or its cache reconciliation.
+    const initialStockSiteId = siteId;
     // Validate initial stock BEFORE creating product to avoid partial state
     if (!initialProduct && initialStockEnabled) {
       if (initialStockQty === "") {
@@ -444,7 +471,7 @@ export function ProductForm({
           initialStockLocation.locationType &&
           initialStockLocation.locationId
         ) {
-          if (!siteId) {
+          if (!initialStockSiteId) {
             // siteId can be missing (e.g. site membership not yet resolved) even though the
             // product itself was created successfully - surface this loudly rather than
             // silently dropping the user's typed initial stock (review finding 1).
@@ -471,21 +498,51 @@ export function ProductForm({
                   ? Math.floor(initialStockQty / formPpb)
                   : undefined;
               const resolvedLocationId = await resolveSiteLocationId(
-                siteId,
+                initialStockSiteId,
                 initialStockLocation.locationType,
                 initialStockLocation.locationId,
               );
-              await createSiteLocationInventory(
-                siteId,
-                resolvedLocationId,
-                newIdempotencyKey(),
-                {
-                  productId: newProduct.id,
-                  quantity: initialStockQty,
-                  intakeUnit: initialStockUnit === "box" ? "box" : undefined,
-                  intakeQty: initialIntakeQty,
-                },
-              );
+              const idempotencyKey = newIdempotencyKey();
+              if (!user?.id) throw new Error("No authenticated user.");
+              const existingRecovery = readUncertainStockSubmission(user.id, initialStockSiteId, "initial-stock");
+              if (existingRecovery) {
+                throw new Error("An earlier initial-stock submission is awaiting explicit recovery.");
+              }
+              storeUncertainStockSubmission({
+                version: 2,
+                createdAt: Date.now(),
+                userId: user.id,
+                siteId: initialStockSiteId,
+                idempotencyKey,
+                kind: "initial-stock",
+                productId: newProduct.id,
+                locationId: resolvedLocationId,
+                quantity: initialStockQty,
+                intakeUnit: initialStockUnit === "box" ? "box" : undefined,
+                intakeQty: initialIntakeQty,
+              });
+              try {
+                await createSiteLocationInventory(
+                  initialStockSiteId,
+                  resolvedLocationId,
+                  idempotencyKey,
+                  {
+                    productId: newProduct.id,
+                    quantity: initialStockQty,
+                    intakeUnit: initialStockUnit === "box" ? "box" : undefined,
+                    intakeQty: initialIntakeQty,
+                  },
+                );
+              } catch (error) {
+                if (isDefinitiveStockSubmissionFailure(error)) {
+                  clearUncertainStockSubmission({ userId: user.id, siteId: initialStockSiteId, kind: "initial-stock", idempotencyKey });
+                }
+                throw error;
+              }
+              clearUncertainStockSubmission({ userId: user.id, siteId: initialStockSiteId, kind: "initial-stock", idempotencyKey });
+              // The write is committed at this point.  Refreshing is deliberately not part of
+              // its success path: a read failure must not ask the user to repeat stock creation.
+              await refreshCommittedStock(queryClient, initialStockSiteId, [newProduct.id]);
               toast({ title: "Initial stock added", variant: "success" });
             } catch (stockErr: unknown) {
               const msg =
@@ -595,6 +652,30 @@ export function ProductForm({
 
   const canDeleteCustomKuji =
     isEditingCustomKuji && can(Permission.PRODUCTS_DELETE);
+  const uncertainInitialStock = siteId && user?.id
+    ? readUncertainStockSubmission(user.id, siteId, "initial-stock")
+    : null;
+
+  const retryUncertainInitialStock = async () => {
+    if (!siteId || !user?.id || !uncertainInitialStock || uncertainInitialStock.kind !== "initial-stock") return;
+    setIsAddingStock(true);
+    try {
+      await createSiteLocationInventory(siteId, uncertainInitialStock.locationId, uncertainInitialStock.idempotencyKey, {
+        productId: uncertainInitialStock.productId,
+        quantity: uncertainInitialStock.quantity,
+        intakeUnit: uncertainInitialStock.intakeUnit,
+        intakeQty: uncertainInitialStock.intakeQty,
+      });
+      clearUncertainStockSubmission(uncertainInitialStock);
+      await refreshCommittedStock(queryClient, siteId, [uncertainInitialStock.productId]);
+      toast({ title: "Initial stock confirmed", description: "The original submission was safely retried.", variant: "success" });
+    } catch (error) {
+      if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(uncertainInitialStock);
+      toast({ title: "Initial stock outcome still uncertain", description: error instanceof Error ? error.message : "Retry later.", variant: "destructive" });
+    } finally {
+      setIsAddingStock(false);
+    }
+  };
 
   return (
     <>
@@ -1139,6 +1220,11 @@ export function ProductForm({
                 <span />
               )}
               <div className="flex flex-col-reverse sm:flex-row gap-2">
+                {uncertainInitialStock ? (
+                  <Button type="button" variant="outline" onClick={retryUncertainInitialStock} disabled={isSaving}>
+                    Retry uncertain initial stock
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"

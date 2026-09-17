@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { isCancelledError, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getProductById, type GetProductsOptions } from "@/lib/api/products";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -170,10 +170,7 @@ export function useRealtimeBroadcast(enabled = true) {
               // Surgical product update when itemId or single id available
               const itemId = data.itemId ?? (data.ids?.length === 1 ? data.ids[0] : null);
               if (itemId) {
-                // Invalidate specific product queries (single product, not lists)
-                queryClient.invalidateQueries({
-                  queryKey: ["products", itemId],
-                });
+                // Child views have separate payloads and still require their own refresh.
                 queryClient.invalidateQueries({
                   queryKey: ["products", itemId, "with-children"],
                 });
@@ -186,7 +183,19 @@ export function useRealtimeBroadcast(enabled = true) {
                 // those filters — e.g. a kuji prize child would briefly appear on the
                 // root-only Products page until the next refetch removed it. So iterate
                 // the cache and respect each query's filter when deciding INSERT/keep.
-                getProductById(itemId)
+                // A pre-event read may contain an old snapshot. Supersede it before
+                // sharing one authoritative refresh between detail and list consumers.
+                queryClient.cancelQueries({ queryKey: ["products", itemId], exact: true })
+                  .then(async () => {
+                    await queryClient.invalidateQueries({
+                      queryKey: ["products", itemId], exact: true, refetchType: "none",
+                    });
+                    return queryClient.fetchQuery({
+                      queryKey: ["products", itemId],
+                      queryFn: () => getProductById(itemId),
+                      retry: false,
+                    });
+                  })
                   .then((updatedProduct: Product) => {
                     const matchesFilter = (opts: GetProductsOptions): boolean => {
                       if (opts.rootOnly && updatedProduct.parentId != null) return false;
@@ -226,7 +235,9 @@ export function useRealtimeBroadcast(enabled = true) {
                       }
                     }
                   })
-                  .catch(() => {
+                  .catch((error: unknown) => {
+                    // A newer broadcast owns the replacement read; don't restart its work.
+                    if (isCancelledError(error)) return;
                     // Fallback for DELETE (404) or network error
                     queryClient.invalidateQueries({ queryKey: ["products"] });
                   });
