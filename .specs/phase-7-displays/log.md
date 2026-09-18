@@ -4,7 +4,7 @@
 
 - Status: Specification kickoff complete; implementation has not started.
 - Next action: T-1 — verify the production table name and inventory display routes, web consumers and location/product dependencies.
-- Decisions that must survive compaction: Never assume `machine_display` versus `machine_displays`; site constraints follow verified production evidence; constrain is a separate release.
+- Decisions that must survive compaction: `machine_display` is the verified production table; site constraints follow verified production evidence; constrain is a separate release.
 - Last verified: Phase 7 architecture-edge and source inventory recorded in `docs/baseline/phase-7-inventory.md`.
 - Open risks/questions: The physical table name is explicitly unresolved.
 

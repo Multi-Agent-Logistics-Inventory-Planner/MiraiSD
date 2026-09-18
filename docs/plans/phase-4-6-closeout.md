@@ -85,6 +85,65 @@ Everything below was re-checked at `53ca9e2` and is genuinely open.
 
 ---
 
+## 1a. Progress as of 2026-09-18
+
+Slice A, Slice B, the Slice C design record, Phase 7 kickoff artifacts, and the
+associated planning documents were committed together as `cf96eda` on top of
+`53ca9e2`. This section records their verified completion; the remaining Slice C
+implementation, Slice D reconciliation, Phase 7 artifact corrections, and F1
+preparation remain uncommitted.
+
+### Slice A — DONE
+
+- `maven-surefire-plugin` block added. `-XX:+EnableDynamicAgentLoading` alone is **not**
+  sufficient on Homebrew JDK 21.0.12.1 (both external and self-attach fail); the already-managed
+  `mockito-core` jar is also preloaded as a premain agent. `@{argLine}` preserved, JaCoCo intact.
+- `tests/contracts/requirements.txt` + `tests/e2e/requirements.txt` created. Neither suite had a
+  dependency manifest; `tests/e2e` had been silently unrunnable.
+- New `event-envelope-contracts` job in `ci.yml` runs `pytest tests/contracts` (31 tests green).
+  It gates merges via `pr-gate.yml`'s aggregate `Gate`.
+- `tests/e2e` Compose will not come healthy locally. Recorded as pre-multi-site (zero `site`
+  references, drives legacy `/api/stock-movements/.../adjust`) and owned by Slice E. Not debugged.
+- The eight analytics/forecasting IT failures **did not recur** — both classes ran inside a passing
+  526-test IT suite with no exclusion. Standing risk retired.
+
+### Slice B — DONE, and it found a live G3 defect
+
+The expanded route matrix exposed three unguarded, globally-unscoped read endpoints on
+`StockMovementController`: `GET /history/{itemId}`, `GET /history/{itemId}/all`, `GET /audit-log`.
+Only the three mutations had `requireMain()`. `getMovementHistory` and `getAuditLog` in
+`StockMovementService` had no site predicate.
+
+Fixed: `requireMain()` on all three; scoping via `site_id = :mainId OR site_id IS NULL`, reusing
+the existing Q-6c-5 query `findByItem_IdAndSiteOrUnknownOrderByAtDesc` rather than duplicating the
+predicate. Composed into the `Specification` for audit-log so pagination stays correct. The three
+now-unreferenced unscoped service overloads were deleted. URLs and DTOs unchanged; `openapi.json`
+and `schema.d.ts` untouched.
+
+Evidence: 17 focused authorization tests, 481 unit, 526 IT — all green on a clean build.
+
+### NEW TRAP — always use `clean` for the full suites
+
+`./mvnw -B test` without `clean` produced two **false** failures after Slice B deleted methods:
+`CatalogEntityAccessCallerSetTest` reported a phantom `KujiBoxService.7 -> getReference` caller,
+and `ArchitectureTest` threw `StoreUpdateFailedException` from
+`FreezingArchRule.removeObsoleteViolationsFromStore`.
+
+Cause: Maven's incremental compile leaves orphaned `.class` files when source methods are deleted.
+ArchUnit scans `target/classes` and sees remnants of code that no longer exists. `./mvnw -B clean
+test` passes 481/481. CI never hits this because every run is a fresh checkout.
+
+**Do not "fix" these by editing the pinned caller inventory or setting
+`freeze.store.default.allowStoreUpdate=true`.** Both guardrails are working correctly. Every slice
+that deletes, renames or moves code will hit this.
+
+### Slice C — design only
+
+Record exists. Trigger chosen (the predicate spans two tables, so a unique index cannot express
+it). **V67 reserved** for the constrain migration; V61 is not used. No migration written yet.
+
+---
+
 ## 2. Dependency order
 
 ```
@@ -391,8 +450,8 @@ Per slice, before commit:
 ```bash
 # inventory-service — JDK 21 required; the enforcer plugin fails on anything else
 cd services/inventory-service
-./mvnw -B test                     # unit + ArchUnit (skips every *IT — no failsafe plugin)
-./mvnw -B test -Dtest='*IT'        # integration; needs Docker for Testcontainers
+./mvnw -B clean test               # unit + ArchUnit; `clean` is REQUIRED (see 1a) (skips every *IT — no failsafe plugin)
+./mvnw -B clean test -Dtest='*IT'  # integration; needs Docker for Testcontainers
 
 # contract freshness
 ./mvnw -B -Dtest=OpenApiContractExportTest test
@@ -442,103 +501,100 @@ of runtime, authorization, contract, migration or event behavior.
 ## 5. Task prompt for the executing agent
 
 ```
-You are finishing the Phase 4–6 closeout in /Users/mjpark019/code/MiraiSD.
+Finish the Phase 4-6 closeout in /Users/mjpark019/code/MiraiSD, then continue Phase 7.
 
-Read these first, in order:
-  1. AGENTS.md — sources of truth and the SDD lifecycle. Follow it.
-  2. docs/sdd-workflow.md — tier definitions.
-  3. docs/plans/phase-6-gap-closure.md — the audit these slices come from
-     (G1–G8, P1–P7, D1–D7). Slices map onto its IDs.
-  4. docs/plans/phase-4-6-closeout.md — this file. It is the work order.
+Read first: AGENTS.md, docs/sdd-workflow.md, docs/plans/phase-6-gap-closure.md, and
+docs/plans/phase-4-6-closeout.md (the work order). Section 1a of the work order records
+what is already done - read it before touching anything.
 
-CURRENT STATE — verify before trusting, all checked at commit 53ca9e2:
-  - refactor/remaining-endpoints == dev == origin/dev == 53ca9e2.
-  - origin/main is 53 commits behind. PR #328 (dev -> main) is OPEN and fully
-    green on this exact commit, including the Testcontainers IT job.
-  - Production schema is at V57. V58–V66 are NOT applied. Flyway does not run
-    at all (no flyway_schema_history, no dependency, no config).
-  - Site SECOND is an empty shell: 0 storage locations, 0 locations,
-    0 site_products, 0 memberships, no NOT_ASSIGNED row.
+STATE: HEAD is 53ca9e2. Slices A and B are complete but UNCOMMITTED, along with the
+Phase 7 kickoff artifacts and two plan docs. Production is at V57; dev needs V58-V66.
+PR #328 (dev -> main) is open and must stay unmerged until F1.
 
-SCOPE: Slices A, B, C, D, then F. Slice E is separately gated — do not start it.
-Phase 7 spec artifacts already exist; apply the five fixes listed below to them,
-but do not begin Phase 7 implementation.
+STEP 0 - COMMIT FIRST. Three slices of uncommitted work is too much to carry.
+  1. Slice A infrastructure: pom.xml surefire block, tests/{contracts,e2e}/requirements.txt,
+     ci.yml event-envelope-contracts job, .specs/phase-4-6-exit-gate/.
+  2. Slice B: StockMovementController/Service/Repository, the two new test classes,
+     .specs/phase-4-6-legacy-authz-postgres/.
+  3. Docs: .gitignore, docs/plans/phase-4-6-closeout.md, docs/plans/phase-6-gap-closure.md,
+     docs/baseline/phase-7-inventory.md, the five .specs/phase-7-* records,
+     .specs/phase-4-6-site-integrity/.
+  Conventional commits, short messages, no Claude/session attribution footer.
+  Do NOT push. Ask before any push, every time.
 
-ORDER:
-  A, B, C and D are independent. Start with A — it unblocks local Java testing
-  for the others. F is LAST and has a hard stop (below). C writes its constrain
-  migration but does not apply it until after F1.
+THEN, in this order:
 
-HARD STOPS — do not do any of these without explicit per-action approval:
-  - Applying any migration to production.
-  - Merging PR #328 or pushing to main. Merging before F1 deploys code whose
-    entities map columns production does not have; stock writes, the outbox
-    drain and every idempotent v1 mutation would fail.
-  - git push of any kind. Ask first, every time.
-  - Deleting data, force-pushing, or changing production configuration.
+SLICE C - implement (Full, record exists).
+  - Seed SECOND's NOT_ASSIGNED storage location and its single location row. SECOND currently
+    has 0 storage locations, 0 locations, 0 site_products, 0 memberships.
+  - Add the trigger enforcing one canonical NOT_ASSIGNED location per site. A unique index
+    cannot express it - the predicate spans locations -> storage_locations.code. Test the
+    concurrent-insert case. Production has no duplicates today, so this is a guard not a repair.
+  - Write the constrain migration (NOT NULL + FK on stock_movements.site_id) as V67. NOT V61 -
+    that slot is below V66 and would never run after the F2 Flyway baseline. Say so in its header.
+  - Write and test it. DO NOT APPLY IT. It depends on F1 applying V59/V60 first.
 
-DO NOT REDO — closed by commits 66dadc9..53ca9e2, verify before touching:
-  - G1/G2 site-scoped location CRUD and stock selectors (f99a95b)
-  - G3/G4/G5 legacy route authorization, forged actor, wrong parent
-    (87e06b8, 738ed72, 53ca9e2; see sites/application/LegacyMainSiteContextResolver.java)
-  - G6/G7/G8 local refresh and dialog error states (1797fc1, 2cf2e13)
-  - P5 persisted uncertain-submission retry (apps/web/src/lib/stock-submission-recovery.ts)
+SLICE D - documentation reconciliation (Standard). Every row in the work order's Slice D table,
+  plus these three, which list a table that does not exist anywhere:
+    docs/baseline/tenant-migration-worksheet.md:49
+    docs/baseline/system-inventory.md:36
+    docs/baseline/phase-7-inventory.md:17
+  analytics_monthly_rollup is created by no migration, no init-db script, and is absent from
+  production. Its only consumers are @Profile("dev") beans (jobs/AnalyticsRollupScheduler.java:24,
+  controllers/DevSeedController.java:73), so nothing in production can reach it. It is dead code,
+  NOT a production defect. Correct the docs here; the code deletion belongs to Phase 7's analytics
+  slice, which owns that module.
+  Also resolve is_active: it is defined three incompatible ways across
+  .specs/phase-5b-catalog-facade/spec.md:32-40, .specs/phase-5c-site-products/spec.md:51-60 and
+  .specs/temp-restore-legacy-inventory-counts/spec.md:39-45, and docs/baseline/phase-7-inventory.md
+  gate 6 asserts a fourth. Land ONE definition in docs/specs/multi-site-data-and-api.md and point
+  all four at it. Do this BEFORE the Phase 7 artifact fixes below.
+  Add .specs/phase-5c-site-products/validation.md recording the T-5 apply that already happened
+  (1772 site_products rows = 1772 products, MAIN only, SECOND zero).
+  Add review.md + validation.md to phase-5b and phase-5c; both self-declare Full tier without them.
+  Add docs/plans/phase-4-6-closeout.md and phase-6-gap-closure.md to the docs/README.md index.
 
-FIVE TRAPS — each of these has already caused a real defect in this repo:
-  1. `mvn test` alone silently skips EVERY *IT.java. There is no failsafe plugin.
-     Always run both `./mvnw -B test` and `./mvnw -B test -Dtest='*IT'`.
-     Use ./mvnw, never a global mvn. JDK 21 only; the enforcer fails otherwise.
-  2. When adding the maven-surefire-plugin block in Slice A, the argLine MUST be
-     `@{argLine} -XX:+EnableDynamicAgentLoading`. Omitting @{argLine} silently
-     disables JaCoCo coverage.
-  3. Slice C's constrain migration must NOT be numbered V61, despite V59's header
-     saying so. V61 sits below V66; once Flyway is baselined in F2 an out-of-order
-     version never runs. Use the next free number and say so in the header.
-  4. Do NOT add a -Dtest exclude for AnalyticsControllerSecurityIT or
-     ForecastControllerSecurityIT. docs/plans/phase-6-gap-closure.md:53 forbids it.
-     They are order-fragile H2 failures, not deterministic ones, and they passed in
-     CI on this commit. Reproduce first; fix fixture isolation if they fail.
-  5. Compilation is not proof. Not of runtime, authorization, contract, migration
-     or event behavior.
+PHASE 7 ARTIFACT FIXES - after Slice D.
+  a. Replace the analytics spec AC "add site_id to analytics_monthly_rollup" with "delete the dead
+     MonthlyPerformanceRollup entity, repository and AnalyticsSeedService path". Deletion happens
+     in Phase 7, not now.
+  b. The displays table is machine_display, singular - verified. Remove the "must be verified"
+     placeholder from the inventory and from .specs/phase-7-displays/spec.md AC-1.
+  c. Add the three missing controllers: ActivityFeedController (/api/activity-feed, analytics),
+     EasyPostWebhookController (/api/webhooks, shipments), LootboxAdminController
+     (/api/lootbox/admin, kuji-lootbox).
+  d. Actually inventory the two deferred dimensions instead of restating the task: apps/web
+     consumers per route family, and realtime/event producers - KujiBoxService 9 no-arg
+     broadcastInventoryUpdated calls (:359,487,656,804,994,1211,1257,1446,1663),
+     ShipmentService:711,860, EasyPostWebhookService:180, AuditLogService:128,174,
+     NotificationService:113. Distinguish "emits without site_id" from "emits nothing at all" -
+     displays, lootbox, reviews, analytics and transfers are the latter.
+  e. Align gate 6 with Slice D's is_active resolution.
 
-PHASE 7 ARTIFACT FIXES (docs/baseline/phase-7-inventory.md and .specs/phase-7-*):
-  a. `analytics_monthly_rollup` does not exist in production, yet
-     models/analytics/MonthlyPerformanceRollup.java:23 maps it, a repository
-     exists, and no migration creates it. Resolve: dead code to delete, or a
-     missing migration. Correct the inventory, the tenant-migration-worksheet and
-     system-inventory.
-  b. The displays table is `machine_display`, singular. Replace the
-     "must be verified" placeholder in the inventory and in
-     .specs/phase-7-displays/spec.md AC-1.
-  c. Three controllers are missing from the inventory entirely:
-     ActivityFeedController (/api/activity-feed, analytics),
-     EasyPostWebhookController (/api/webhooks, shipments),
-     LootboxAdminController (/api/lootbox/admin, kuji-lootbox).
-  d. Inventory the deferred dimensions rather than restating the task: the
-     apps/web consumers per route family, and the realtime/event producers
-     (KujiBoxService 9 no-arg broadcastInventoryUpdated calls; ShipmentService
-     :711,860; EasyPostWebhookService:180; AuditLogService:128,174;
-     NotificationService:113). Distinguish "emits without site_id" from
-     "emits nothing at all" — displays, lootbox, reviews, analytics and transfers
-     are the latter.
-  e. phase-7-inventory.md gate 6 asserts an `is_active` definition that
-     contradicts .specs/phase-5c-site-products/spec.md:51-60. Do not leave it as
-     a fourth competing voice. Slice D owns the resolution; land it in
-     docs/specs/multi-site-data-and-api.md and point 5b, 5c, the temp record and
-     the Phase 7 inventory at it.
+SLICE F - LAST, and STOP before F1.
+  F1 applies V58,V59,V60,V62,V63,V64,V65,V66 to production and then merges PR #328. It needs a
+  fresh Supabase backup and explicit per-action approval from the user. Prepare the runbook, the
+  drift queries and the V60 backfill verification counts, then STOP AND ASK. Do not apply, do not
+  merge, do not push.
+  F2 (Flyway canonical) follows F1. Do not start it before F1 lands.
 
-PER SLICE:
-  - Classify the tier and create the .specs/<id>/ record before editing.
-    A and D are Standard (spec.md + log.md). B, C and F are Full (add review.md
-    and validation.md).
-  - Write the failing test first where a meaningful local test exists.
-  - Keep a Current handoff section in log.md updated at task boundaries: status,
-    next action, surviving decisions, last verified command, open risks.
-  - Record material assumptions rather than stopping to ask. Ask only for
-    product, security, data-loss or irreversible-deployment decisions.
-  - Run the native gates in §4 of the plan before claiming a slice is done.
-  - Report honestly. If tests fail, say so with the output. If a step was
-    skipped, say that.
+SLICE E - do not start. Gated on second-site enablement. Add to its record that all five
+  @Scheduled methods in jobs/AnalyticsRollupScheduler.java swallow every exception into
+  log.error, so background failures are invisible - this belongs with D6's failure-observability item.
 
-Start with Slice A. Report what you find before changing the pom.
+TRAPS - each has already caused a real defect here:
+  1. Full suites REQUIRE clean: ./mvnw -B clean test and ./mvnw -B clean test -Dtest='*IT'.
+     Without it, deleted methods leave orphaned .class files and ArchUnit reports phantom
+     violations. Never respond by editing pinned caller inventories or setting allowStoreUpdate=true.
+     Leave archunit.properties.bak alone; Slice D decides its fate.
+  2. mvn test alone skips every *IT.java - no failsafe plugin. Always run both. ./mvnw, never mvn.
+     JDK 21 only.
+  3. Never number a migration into a historical gap. V67 next.
+  4. Never exclude AnalyticsControllerSecurityIT or ForecastControllerSecurityIT.
+  5. Compilation is not proof of runtime, authorization, contract, migration or event behavior.
+
+PER SLICE: classify tier, create/update the .specs record before editing, failing test first,
+keep Current handoff in log.md current, run the section 4 verification gates, report failures with output.
+Record assumptions rather than stopping; ask only for product, security, data-loss or
+irreversible-deployment decisions.
 ```

@@ -16,7 +16,7 @@ Machine display workflows use legacy persistence and location/product relationsh
 
 ## Acceptance criteria
 
-- AC-1: Production naming (`machine_display` versus `machine_displays`), ownership, row counts, and site source are verified before a migration is written.
+- AC-1: `machine_display` is the verified production table name; ownership, row counts, and site source are verified before a migration is written.
 - AC-2: Display rows have an expand/backfill/verify/constrain site migration with same-site location/product consistency where feasible.
 - AC-3: All display reads, mutations, transfers and location-detail reads are authorized against the requested site before entity lookup; foreign-site IDs are inaccessible.
 - AC-4: The `displays` module owns repositories and uses declared catalog/inventory contracts rather than foreign repositories; baseline edges are shrunk with review.

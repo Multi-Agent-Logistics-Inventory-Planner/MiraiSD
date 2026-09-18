@@ -8,7 +8,7 @@
 
 1. Every site, including SECOND, has exactly one canonical NOT_ASSIGNED storage location and location.
 2. A database guard rejects a second location beneath a site's NOT_ASSIGNED storage location, including concurrent insertion.
-3. A new post-V66 migration makes `stock_movements.site_id` non-null and references `sites`; it is tested only and not applied to production.
+3. V67 safely seeds/guards canonical NOT_ASSIGNED rows; separately releasable V68 makes `stock_movements.site_id` non-null and references `sites` only after writer deployment and a fresh NULL check.
 
 ## Decision
 

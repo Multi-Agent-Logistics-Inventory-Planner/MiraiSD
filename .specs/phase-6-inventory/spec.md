@@ -3,8 +3,9 @@
 ## Tier and status
 
 Full — module ownership, tenant migrations, authorization, public contracts, events and web behavior.
-Planning record; implementation has not started. Checkpoint scopes below are agreed; concrete
-caller/table/endpoint inventories and rollout decisions must be completed before dependent changes.
+Implementation is complete through the documented checkpoints; remaining closeout integrity,
+documentation, production-schema, and gated realtime work is tracked by
+`docs/plans/phase-4-6-closeout.md`.
 
 ## Problem and outcome
 

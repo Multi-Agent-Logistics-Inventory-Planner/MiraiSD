@@ -21,9 +21,9 @@ package move.
 | 1 | Security, CI and database safety | Substantially complete (Flyway not yet canonical) |
 | 2 | Reliable events and GHCR artifacts | Substantially complete (4 gaps reviewed and deferred, §5) |
 | 3 | Architecture and contract foundation | Substantially complete (Track D deferred behind Phase 4, §6) |
-| 4 | Identity and sites | Substantially complete (all deliverables landed, not yet merged, §7) |
-| 5 | Catalog and site assortment | Not started |
-| 6 | Inventory and stock movements | Planned: one PR, five implementation/review checkpoints; code not started (§9) |
+| 4 | Identity and sites | Shipped (PR #320) |
+| 5 | Catalog and site assortment | Shipped (PR #322) |
+| 6 | Inventory and stock movements | Shipped closeout in progress (PR #327; remaining integrity/docs/production gates) |
 | 7 | Shipments and remaining site operations | Not started |
 | 8 | Audited inter-site transfers | Deferred - no second site actually operating yet, §11 |
 | 9 | Focused Expo mobile client | Deferred - gated behind Phases 5-8, §12 |
@@ -105,7 +105,7 @@ This phase addresses present-day risks before structural or tenant changes.
       Trivy `fs` mode scans for both vulnerabilities and secrets by default).
 - [ ] **Flyway is not canonical.** `pom.xml` has no Flyway dependency despite `V1`-`V49` migration
       files existing under `db/migration`. Deliberately deferred: production schema was confirmed at
-      parity through V28 via direct query, but with no `flyway_schema_history` tracking, so wiring
+      at V57 via direct query, but with no `flyway_schema_history` tracking, so wiring
       Flyway in now would need a one-time baseline reconciliation first. This is the one open item
       blocking a full Phase 1 close.
 

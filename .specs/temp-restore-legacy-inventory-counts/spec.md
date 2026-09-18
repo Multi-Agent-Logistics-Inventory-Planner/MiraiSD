@@ -37,7 +37,8 @@ adding labels or redesigning the UI, as requested by the user on 2026-09-10.
 
 User authorized restoring legacy status on this branch before further refactor testing.
 - AC-5: Products table and detail modal display Active/Inactive from global
-  `product.isActive`, even when `isStocked` disagrees. Preserve green/red colors.
+  `product.isActive` (the durable data/API §2 global stock-derived state), even when `isStocked`
+  disagrees. Preserve green/red colors.
 - AC-6: Status sorting uses the same legacy flag in both directions.
 - AC-7: Preserve MAIN quantity restoration, site settings, stored assortment,
   permissions and database schema. This temporary global status is not site availability.

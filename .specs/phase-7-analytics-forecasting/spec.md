@@ -16,7 +16,7 @@ Analytics and forecasting projections are organization-oriented legacy code with
 
 ## Acceptance criteria
 
-- AC-1: `forecast_predictions`, all three analytics rollups, and `mv_lead_time_stats` have recorded site dimensions, source/backfill strategy, uniqueness/index changes and expand/backfill/verify/constrain releases.
+- AC-1: `forecast_predictions`, `analytics_daily_rollup`, `analytics_category_demand_rollup`, and `mv_lead_time_stats` have recorded site dimensions, source/backfill strategy, uniqueness/index changes and expand/backfill/verify/constrain releases; Phase 7 deletes the dead dev-only `MonthlyPerformanceRollup` entity, repository, and `AnalyticsSeedService` path rather than adding a nonexistent `analytics_monthly_rollup` table.
 - AC-2: Analytics and forecast APIs resolve authorized site before querying a projection; foreign-site IDs and cache keys cannot cross tenant boundaries.
 - AC-3: Stable owned views or event-derived projections define forecasting output ownership. Java module imports and cross-service writes to another service's tables are removed.
 - AC-4: `analytics` owns its repositories/projections and uses declared catalog/inventory contracts; the four approved `analytics` baseline edges are shrunk with review.

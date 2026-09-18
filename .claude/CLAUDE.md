@@ -133,7 +133,7 @@ MiraiSD/
 
 - TDD: write the failing test first, then implement
 - 90% minimum coverage
-- Unit tests for utilities, integration tests for APIs (Testcontainers), Playwright E2E for critical flows (`tests/e2e`), and `tests/contracts` verifies the API against `packages/contracts/openapi.json`
+- Unit tests for utilities, integration tests for APIs (Testcontainers), pytest/Docker Compose E2E coverage in `tests/e2e`, and Kafka event-envelope contract checks in `tests/contracts`
 
 ## Spec-Driven Development workflow
 
