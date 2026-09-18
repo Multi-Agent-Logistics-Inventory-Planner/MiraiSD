@@ -29,12 +29,12 @@ which cannot actually migrate these callers. The real surface, from the code:
 | bulk entity writes (dev only) | `AnalyticsSeedService`, `DevSeedController` | exempted, see decisions |
 | `preferredSupplier` from delivery | `ShipmentService:1175` (`saveAll`) | covered by `CatalogCommands` |
 
-**Hazard to record, not fix here (Phase 6):** `StockMovementService:360` computes
+**Historical behavior, resolved by the durable data/API specification §2:** `StockMovementService:360` computes
 `shouldBeActive = total > 0` and writes it to `products.is_active`. So today `is_active` in practice
 means "has stock somewhere", not "not retired from the master catalog" — which is the meaning
 [5c](../phase-5c-site-products/spec.md) assigns it when it introduces `site_products.is_stocked`.
-Under multi-site this becomes a live correctness bug: one site's stock reaching zero would flip a
-**global** flag and hide the product at the other site. Phase 5 must not silently change this
+This is the legacy global stock-derived state, not catalog retirement or a site assortment flag.
+Phase 5 must not silently change this
 behavior (it would alter kuji Active/Closed tabs and forecasting's `WHERE p.is_active = true`), but
 5c records the intended semantics and Phase 6 owns the actual split when `quantity` moves to
 `inventory`.

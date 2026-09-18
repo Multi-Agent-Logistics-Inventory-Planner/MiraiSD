@@ -72,7 +72,7 @@ class StockMovementControllerSecurityIT extends BaseIntegrationTest {
         @DisplayName("Should allow ADMIN role to get movement history")
         void getMovementHistory_adminRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL + "/history/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }

@@ -30,10 +30,10 @@ The service contains 37 repository interfaces and 33 mapped entities. Proposed l
 | Identity | `users`, `invitations` |
 | Inventory | `location_inventory`, `stock_movements` |
 | Shipments | `shipments`, `shipment_items`, `shipment_item_allocations`, `webhook_events` |
-| Displays | `machine_display` (production name must be verified against messaging's `machine_displays`) |
+| Displays | `machine_display` |
 | Kuji | `kuji_boxes`, `kuji_box_tiers` |
 | Lootbox | `lootboxes`, `lootbox_tiers`, `lootbox_prizes`, `lootbox_plays`, `coin_adjustments`, `coin_economy_config` |
-| Analytics/forecasting | `analytics_daily_rollup`, `analytics_monthly_rollup`, `analytics_category_demand_rollup`, `forecast_predictions` |
+| Analytics/forecasting | `analytics_daily_rollup`, `analytics_category_demand_rollup`, `forecast_predictions`; Phase 7 deletes dead dev-only `MonthlyPerformanceRollup` code (no `analytics_monthly_rollup` table exists) |
 | Notifications/reviews | `notifications`, `reviews`, `review_daily_counts` |
 | Audit/event infrastructure | `audit_logs`, `event_outbox`, `event_dead_letter` |
 

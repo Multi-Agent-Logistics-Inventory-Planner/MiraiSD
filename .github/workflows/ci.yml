@@ -164,6 +164,19 @@ jobs:
           review: false
           github-token: ''
 
+  event-envelope-contracts:
+    name: Kafka event-envelope contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: tests/contracts/requirements.txt
+      - run: pip install -r tests/contracts/requirements.txt
+      - run: pytest tests/contracts
+
   unit-test-forecasting-service:
     name: "unit-test / forecasting-service"
     needs: changes
