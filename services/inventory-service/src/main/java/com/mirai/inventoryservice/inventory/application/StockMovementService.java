@@ -29,7 +29,7 @@ import com.mirai.inventoryservice.inventory.infrastructure.StockMovementReposito
 import com.mirai.inventoryservice.repositories.*;
 import com.mirai.inventoryservice.services.EventOutboxService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
-import static com.mirai.inventoryservice.inventory.infrastructure.StockMovementSpecifications.withFilters;
+import static com.mirai.inventoryservice.inventory.infrastructure.StockMovementSpecifications.withSiteFilter;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -1107,19 +1107,20 @@ public class StockMovementService {
     /**
      * Get movement history for a product
      */
-    public Page<StockMovement> getMovementHistory(UUID productId, Pageable pageable) {
-        return stockMovementRepository.findByItem_IdOrderByAtDesc(productId, pageable);
+    public Page<StockMovement> getMovementHistory(UUID siteId, UUID productId, Pageable pageable) {
+        return stockMovementRepository.findByItem_IdAndSiteOrUnknownOrderByAtDesc(productId, siteId, pageable);
     }
 
-    public List<StockMovement> getMovementHistory(UUID productId) {
-        return stockMovementRepository.findByItem_IdOrderByAtDesc(productId);
+    public List<StockMovement> getMovementHistory(UUID siteId, UUID productId) {
+        return stockMovementRepository.findByItem_IdAndSiteOrUnknownOrderByAtDesc(productId, siteId);
     }
 
     /**
      * Get audit log with optional filters
      */
-    public Page<StockMovement> getAuditLog(AuditLogFilterDTO filters, Pageable pageable) {
-        return stockMovementRepository.findAll(withFilters(filters), pageable);
+    public Page<StockMovement> getAuditLog(UUID siteId, AuditLogFilterDTO filters, Pageable pageable) {
+        return stockMovementRepository.findAll(
+                withSiteFilter(filters, siteId), pageable);
     }
 
     // ========= Helper Methods =========

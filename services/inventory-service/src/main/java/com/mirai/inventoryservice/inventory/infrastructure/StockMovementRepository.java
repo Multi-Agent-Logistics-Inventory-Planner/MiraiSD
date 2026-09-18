@@ -189,9 +189,13 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     Page<StockMovement> findByItem_IdAndSiteOrUnknownOrderByAtDesc(
             @Param("productId") UUID productId, @Param("siteId") UUID siteId, Pageable pageable);
 
+    @Query("SELECT sm FROM StockMovement sm LEFT JOIN sm.site s "
+            + "WHERE sm.item.id = :productId AND (s.id = :siteId OR s IS NULL) ORDER BY sm.at DESC")
+    List<StockMovement> findByItem_IdAndSiteOrUnknownOrderByAtDesc(
+            @Param("productId") UUID productId, @Param("siteId") UUID siteId);
+
     // Site-scoped audit-log filtering reuses the existing findAll(Specification, Pageable) above
     // (already carries @EntityGraph("StockMovement.withItem")) -- the site predicate is composed
     // into the caller-supplied Specification by StockMovementSpecifications.withSiteFilter, not a
     // second repository method, so the existing AuditLogFilterDTO composition path is unchanged.
 }
-

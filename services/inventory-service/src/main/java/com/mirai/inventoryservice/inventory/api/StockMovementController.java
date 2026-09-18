@@ -69,13 +69,15 @@ public class StockMovementController {
     public ResponseEntity<Page<StockMovementResponseDTO>> getMovementHistory(
             @PathVariable UUID itemId,
             @PageableDefault(size = 20, sort = "at", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<StockMovement> movements = stockMovementService.getMovementHistory(itemId, pageable);
+        Page<StockMovement> movements = stockMovementService.getMovementHistory(
+                legacyMainSiteContextResolver.requireMain().siteId(), itemId, pageable);
         return ResponseEntity.ok(movements.map(stockMovementMapper::toResponseDTO));
     }
 
     @GetMapping("/history/{itemId}/all")
     public ResponseEntity<List<StockMovementResponseDTO>> getAllMovementHistory(@PathVariable UUID itemId) {
-        List<StockMovement> movements = stockMovementService.getMovementHistory(itemId);
+        List<StockMovement> movements = stockMovementService.getMovementHistory(
+                legacyMainSiteContextResolver.requireMain().siteId(), itemId);
         return ResponseEntity.ok(stockMovementMapper.toResponseDTOList(movements));
     }
 
@@ -94,7 +96,8 @@ public class StockMovementController {
                 .fromDate(fromDate)
                 .toDate(toDate)
                 .build();
-        Page<StockMovement> movements = stockMovementService.getAuditLog(filters, pageable);
+        Page<StockMovement> movements = stockMovementService.getAuditLog(
+                legacyMainSiteContextResolver.requireMain().siteId(), filters, pageable);
         return ResponseEntity.ok(auditLogMapper.toAuditLogEntryDTOPage(movements));
     }
 }
