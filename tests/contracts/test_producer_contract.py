@@ -102,3 +102,41 @@ class TestProducerPayloadMatchesContract:
             f"  In producer but not schema: {expected_payload_fields - schema_payload_fields}\n"
             f"  In schema but not producer: {schema_payload_fields - expected_payload_fields}"
         )
+
+    def test_all_envelope_fields_present_in_schema(self, event_envelope_schema):
+        """Verify every top-level field EventOutboxService.publishPendingEvents produces is in
+        the schema (.specs/phase-6-inventory T-6c-9). Includes correlation_id, which the producer
+        has emitted since before this record (F-6c-6) but the schema never declared -- confirmed
+        by grep against EventOutboxService.java's message.put(...) calls, not just this repo's own
+        prior assumption.
+        """
+        expected_envelope_fields = {
+            "event_id",
+            "topic",
+            "event_type",
+            "entity_type",
+            "entity_id",
+            "payload",
+            "created_at",
+            "correlation_id",
+            "event_version",
+            "site_id",
+            "causation_id",
+            "idempotency_key",
+        }
+        schema_envelope_fields = set(event_envelope_schema["properties"].keys())
+        assert expected_envelope_fields == schema_envelope_fields, (
+            f"Schema drift detected.\n"
+            f"  In producer but not schema: {expected_envelope_fields - schema_envelope_fields}\n"
+            f"  In schema but not producer: {schema_envelope_fields - expected_envelope_fields}"
+        )
+
+    def test_envelope_fields_may_be_null_or_absent(
+        self, event_envelope_schema, sample_minimal_payload
+    ):
+        """AC-4 envelope fields are nullable/optional -- a minimal payload that omits all five
+        (an old, not-yet-upgraded producer, or a pre-T-6c-8 outbox row) still validates.
+        """
+        jsonschema.validate(instance=sample_minimal_payload, schema=event_envelope_schema)
+        assert "correlation_id" not in sample_minimal_payload
+        assert "site_id" not in sample_minimal_payload

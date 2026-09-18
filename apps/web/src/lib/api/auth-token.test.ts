@@ -44,7 +44,7 @@ describe("redirectToLogin", () => {
     // @ts-expect-error - reassigning window.location for the test
     delete window.location;
     // @ts-expect-error - minimal stub sufficient for asserting the redirect
-    window.location = { href: "" };
+    window.location = { href: "", pathname: "/products" };
   });
 
   afterEach(() => {
@@ -56,5 +56,13 @@ describe("redirectToLogin", () => {
     redirectToLogin();
 
     expect(window.location.href).toBe("/login");
+  });
+
+  it.each(["/login", "/login/", "/login?redirect=%2Fproducts"])("does not reload %s after a 401", (url) => {
+    const setHref = vi.fn();
+    Object.defineProperty(window.location, "pathname", { value: new URL(url, "http://localhost").pathname });
+    Object.defineProperty(window.location, "href", { set: setHref });
+    redirectToLogin();
+    expect(setHref).not.toHaveBeenCalled();
   });
 });

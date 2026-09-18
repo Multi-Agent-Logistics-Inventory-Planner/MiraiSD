@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
+import com.mirai.inventoryservice.identity.application.MembershipAuthorizer;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
@@ -81,6 +82,9 @@ public abstract class BaseKafkaIntegrationTest {
     @Autowired
     private SiteRepository siteRepository;
 
+    @Autowired
+    private MembershipAuthorizer membershipAuthorizer;
+
     @Value("${supabase.jwt.secret}")
     private String jwtSecret;
 
@@ -137,12 +141,21 @@ public abstract class BaseKafkaIntegrationTest {
         return generateTestToken("employee-id", "EMPLOYEE");
     }
 
+    /**
+     * Also grants MAIN site membership: legacy routes now resolve their site context through
+     * {@code LegacyMainSiteContextResolver.requireMain()}, which requires an active MAIN
+     * membership (see docs/specs/authentication-and-authorization.md section 5). Unlike
+     * {@code BaseIntegrationTest}, this class runs against real Postgres (Testcontainers), so
+     * the native {@code ON CONFLICT} upsert behind {@code grantMainSiteMembershipIfAbsent} works
+     * here.
+     */
     private void seedUser(String email, UserRole role) {
         User user = userRepository.findByEmail(email).orElseGet(() -> User.builder()
                 .email(email)
                 .fullName("Integration Test User")
                 .build());
         user.setRole(role);
-        userRepository.save(user);
+        user = userRepository.save(user);
+        membershipAuthorizer.grantMainSiteMembershipIfAbsent(user.getId());
     }
 }

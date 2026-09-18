@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.validation;
 
-import com.mirai.inventoryservice.dtos.requests.TransferInventoryRequestDTO;
+import com.mirai.inventoryservice.inventory.api.TransferInventoryRequestDTO;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;

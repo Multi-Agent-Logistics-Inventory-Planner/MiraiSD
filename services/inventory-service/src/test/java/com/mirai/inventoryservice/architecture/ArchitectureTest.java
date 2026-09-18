@@ -126,6 +126,17 @@ class ArchitectureTest {
                 || isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".repositories")) {
             return true;
         }
+        // shared.idempotency (.specs/phase-6-inventory T-6c-10): shared's first entity/
+        // repository-owning subpackage. "shared" is deliberately excluded from BUSINESS_MODULES
+        // above (it must not depend on a business module, and every module may depend on it), so
+        // it never gets the business-module application/infrastructure allowance below; it also
+        // does not follow that two-package convention itself (its existing subpackages -
+        // shared.correlation, shared.web - are flat). This is a narrow, explicit allowance for
+        // this one subpackage, the same shape as the legacy services/repositories exemption
+        // above, not a blanket allowance for all of shared.
+        if (isPackageOrSubpackageOf(packageName, BASE_PACKAGE + ".shared.idempotency")) {
+            return true;
+        }
         String module = moduleOf(javaClass);
         for (String candidate : BUSINESS_MODULES) {
             if (candidate.equals(module)) {
@@ -136,9 +147,23 @@ class ArchitectureTest {
         return false;
     }
 
+    // Amended for Phase 6a (docs: .specs/phase-6-inventory/log.md, T-0) to add a third arm: a
+    // plain class annotated @Repository that does not implement Spring Data's Repository marker
+    // interface -- e.g. LocationAggregateRepository/InventoryTotalsRepository, which are
+    // EntityManager-backed native-SQL classes, not Spring Data interfaces. The legacy-package arm
+    // (first) currently catches both of those, but only because they still live in
+    // `repositories..`; once Phase 6a relocates them out of that package -- InventoryTotalsRepository
+    // into inventory.infrastructure (T-3), LocationAggregateRepository into sites.infrastructure
+    // per R-1's cross-module-read-projection assignment -- they would be neither in the legacy
+    // package nor assignable to Repository, silently dropping out of this rule's coverage while
+    // the build stays green -- the same failure mode the class-level comment above already
+    // documents for the first two arms. Checked against every current @Repository-annotated class
+    // in the codebase (all in repositories.., catalog/identity/sites.infrastructure) to confirm
+    // none is a non-repository class that this new arm would misclassify.
     private static boolean isRepositoryClass(JavaClass target) {
         return isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".repositories")
-                || target.isAssignableTo(Repository.class);
+                || target.isAssignableTo(Repository.class)
+                || target.isAnnotatedWith(org.springframework.stereotype.Repository.class);
     }
 
     /** Exact package match or a strict dot-delimited descendant -- never a substring match. */
@@ -212,6 +237,63 @@ class ArchitectureTest {
     private static boolean isExemptFromCatalogInfrastructureRule(JavaClass javaClass) {
         String name = javaClass.getName();
         for (String exempt : CATALOG_INFRASTRUCTURE_ACCESS_EXEMPTIONS) {
+            if (exempt.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Phase 6a T-7 (docs: .specs/phase-6-inventory/spec.md, log.md): the inventory-module mirror
+    // of noProductionClassOutsideCatalogDependsOnCatalogInfrastructure above. Runs live, never
+    // frozen: T-5 already migrated every named production caller off direct
+    // LocationInventoryRepository/StockMovementRepository/InventoryTotalsRepository access onto
+    // InventoryOperations/InventoryQueries, so there is no pre-existing debt to grandfather in --
+    // unlike the still-frozen repositoriesAreOnlyAccessedByServicesOrRepositories rule above, which
+    // predates this migration and carries genuine legacy debt this rule does not need to repeat.
+    @Test
+    void noProductionClassOutsideInventoryDependsOnInventoryInfrastructure() {
+        outsideInventoryToInventoryInfrastructureRule().check(importedClasses);
+    }
+
+    // Same two dev-profile-only seeding classes exempted from the catalog version of this rule,
+    // for the same reason: no production equivalent (docs/baseline/api-v1-map.md), so a seeding
+    // port for two throwaway consumers is not worth the indirection. Verified by grep (2026-09-10)
+    // that these are the only two production classes outside `inventory` reaching
+    // inventory.infrastructure directly.
+    private static final String[] INVENTORY_INFRASTRUCTURE_ACCESS_EXEMPTIONS = {
+        BASE_PACKAGE + ".controllers.DevSeedController", BASE_PACKAGE + ".services.AnalyticsSeedService"
+    };
+
+    static ArchRule outsideInventoryToInventoryInfrastructureRule() {
+        return classes()
+                .that(new DescribedPredicate<JavaClass>("reside outside inventory and are not exempted") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !"inventory".equals(moduleOf(javaClass)) && !isExemptFromInventoryInfrastructureRule(javaClass);
+                    }
+                })
+                .should(new ArchCondition<JavaClass>("not depend on inventory.infrastructure") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                            JavaClass target = dependency.getTargetClass();
+                            if (isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".inventory.infrastructure")) {
+                                events.add(SimpleConditionEvent.violated(
+                                        javaClass,
+                                        dependency.getDescription()
+                                                + " -- inventory.infrastructure must only be accessed from within"
+                                                + " inventory, via InventoryOperations/InventoryQueries"));
+                            }
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
+
+    private static boolean isExemptFromInventoryInfrastructureRule(JavaClass javaClass) {
+        String name = javaClass.getName();
+        for (String exempt : INVENTORY_INFRASTRUCTURE_ACCESS_EXEMPTIONS) {
             if (exempt.equals(name)) {
                 return true;
             }

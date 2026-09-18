@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLocations } from "@/hooks/queries/use-locations";
+import { useLocations, useSiteLocations } from "@/hooks/queries/use-locations";
+import { NOT_ASSIGNED_VIRTUAL_ID as NOT_ASSIGNED_ID } from "@/lib/api/not-assigned";
 import { LocationType, type Location } from "@/types/api";
 import { cn, naturalSortCompare } from "@/lib/utils";
 import {
@@ -37,9 +38,6 @@ import {
 const DISPLAY_ONLY_CODES = ["G", "K"];
 
 const DEFAULT_LOCATION_TYPE = LocationType.BOX_BIN;
-
-/** Virtual ID used for "Not Assigned" selection */
-const NOT_ASSIGNED_ID = "__not_assigned__";
 
 /**
  * Custom filter for location code search.
@@ -78,7 +76,28 @@ function getLocationCode(
   return location.locationCode ?? "";
 }
 
-export function LocationSelector({
+/** Scoped default for stock workflows and ProductForm initial stock. */
+export function LocationSelector(props: LocationSelectorProps) {
+  const query = useSiteLocations(props.value.locationType ?? undefined);
+  const previousSite = useRef(query.siteId);
+  const { onChange } = props;
+  useEffect(() => {
+    if (previousSite.current && previousSite.current !== query.siteId) {
+      onChange({ locationType: null, locationId: null, locationCode: "" });
+    }
+    previousSite.current = query.siteId;
+  }, [query.siteId, onChange]);
+  return <LocationSelectorView key={query.siteId ?? "unresolved"} {...props} disabled={props.disabled || !query.siteId} locationsQuery={query} />;
+}
+
+/** Explicit compatibility adapter for Kuji until its Phase 7 migration. */
+export function LegacyLocationSelector(props: LocationSelectorProps) {
+  const query = useLocations(props.value.locationType === LocationType.NOT_ASSIGNED
+    ? DEFAULT_LOCATION_TYPE : (props.value.locationType ?? DEFAULT_LOCATION_TYPE));
+  return <LocationSelectorView {...props} locationsQuery={query} />;
+}
+
+function LocationSelectorView({
   label,
   labelSuffix,
   value,
@@ -87,7 +106,8 @@ export function LocationSelector({
   excludeLocation,
   endContent,
   excludeDisplayOnly = false,
-}: LocationSelectorProps) {
+  locationsQuery,
+}: LocationSelectorProps & { locationsQuery: { data?: Location[]; isLoading: boolean; error: Error | null; refetch: () => unknown } }) {
   const [codePopoverOpen, setCodePopoverOpen] = useState(false);
   const isNotAssigned = value.locationType === LocationType.NOT_ASSIGNED;
 
@@ -105,11 +125,6 @@ export function LocationSelector({
           (opt) => CODE_TO_LOCATION_TYPE[opt.code] === value.locationType
         )?.code ?? ""
       : "";
-
-  // Only fetch locations if a non-NOT_ASSIGNED type is selected
-  const locationsQuery = useLocations(
-    isNotAssigned ? DEFAULT_LOCATION_TYPE : (value.locationType ?? DEFAULT_LOCATION_TYPE)
-  );
 
   // Build list of available locations for the dropdown
   const availableLocations = useMemo(() => {
@@ -229,7 +244,7 @@ export function LocationSelector({
                 role="combobox"
                 aria-expanded={codePopoverOpen}
                 aria-label={`${label || "Location"} code`}
-                disabled={disabled || !value.locationType || locationsQuery.isLoading}
+                disabled={disabled || !value.locationType || locationsQuery.isLoading || Boolean(locationsQuery.error)}
                 className="flex-1 min-w-0 sm:flex-none sm:w-24 sm:shrink-0 justify-between font-normal overflow-hidden dark:bg-input dark:border-[#41413d]"
               >
                 <span className="truncate">
@@ -274,6 +289,14 @@ export function LocationSelector({
         )}
         {endContent}
       </div>
+      {locationsQuery.error && (
+        <div role="alert" className="text-sm text-destructive">
+          Unable to load locations.
+          <Button type="button" variant="ghost" size="sm" onClick={() => { void locationsQuery.refetch(); }} disabled={disabled}>
+            Retry locations
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

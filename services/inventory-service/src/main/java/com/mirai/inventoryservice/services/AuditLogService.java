@@ -5,12 +5,12 @@ import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogDTO;
 import com.mirai.inventoryservice.dtos.responses.AuditLogDetailDTO;
 import com.mirai.inventoryservice.models.audit.AuditLog;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.AuditLogSpecifications;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ import java.util.UUID;
 public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final InventoryQueries inventoryQueries;
     private final AuditLogDTOMapper auditLogMapper;
     private final UserRepository userRepository;
     private final SupabaseBroadcastService broadcastService;
@@ -221,7 +221,7 @@ public class AuditLogService {
                 .orElseThrow(() -> new EntityNotFoundException("Audit log not found: " + auditLogId));
 
         // Fetch movements for this audit log with eager loading of items
-        List<StockMovement> movements = stockMovementRepository.findByAuditLogIdWithItem(auditLogId);
+        List<StockMovement> movements = inventoryQueries.findByAuditLogIdWithItem(auditLogId);
 
         return auditLogMapper.toDetailDTO(auditLog, movements);
     }

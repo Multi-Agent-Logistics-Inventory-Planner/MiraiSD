@@ -1,14 +1,17 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import com.mirai.inventoryservice.kafka.KafkaProducer;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.EventOutbox;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.catalog.domain.KujiType;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.EventDeadLetterRepository;
 import com.mirai.inventoryservice.repositories.EventOutboxRepository;
+import com.mirai.inventoryservice.shared.correlation.IdempotencyKeyContext;
+import com.mirai.inventoryservice.sites.domain.Site;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,13 +74,13 @@ class EventOutboxServiceCreateEventTest {
         StockMovement movement = buildMovement(movementId);
         when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
         when(stockMovementService.calculateTotalInventory(any())).thenReturn(100);
-        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
         eventOutboxService.createStockMovementEvent(movement);
 
         // Then
-        verify(eventOutboxRepository).save(outboxCaptor.capture());
+        verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
         EventOutbox saved = outboxCaptor.getValue();
 
         UUID expectedEntityId = UUID.nameUUIDFromBytes(movementId.toString().getBytes());
@@ -93,14 +96,14 @@ class EventOutboxServiceCreateEventTest {
         StockMovement movement2 = buildMovement(movementId);
         when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("R1");
         when(stockMovementService.calculateTotalInventory(any())).thenReturn(50);
-        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
         eventOutboxService.createStockMovementEvent(movement1);
         eventOutboxService.createStockMovementEvent(movement2);
 
         // Then
-        verify(eventOutboxRepository, org.mockito.Mockito.times(2)).save(outboxCaptor.capture());
+        verify(eventOutboxRepository, org.mockito.Mockito.times(2)).saveAndFlush(outboxCaptor.capture());
         EventOutbox first = outboxCaptor.getAllValues().get(0);
         EventOutbox second = outboxCaptor.getAllValues().get(1);
 
@@ -115,14 +118,14 @@ class EventOutboxServiceCreateEventTest {
         StockMovement movement2 = buildMovement(2L);
         when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("C1");
         when(stockMovementService.calculateTotalInventory(any())).thenReturn(10);
-        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
         eventOutboxService.createStockMovementEvent(movement1);
         eventOutboxService.createStockMovementEvent(movement2);
 
         // Then
-        verify(eventOutboxRepository, org.mockito.Mockito.times(2)).save(outboxCaptor.capture());
+        verify(eventOutboxRepository, org.mockito.Mockito.times(2)).saveAndFlush(outboxCaptor.capture());
         EventOutbox first = outboxCaptor.getAllValues().get(0);
         EventOutbox second = outboxCaptor.getAllValues().get(1);
 
@@ -161,7 +164,7 @@ class EventOutboxServiceCreateEventTest {
         eventOutboxService.createStockMovementEvent(movement);
 
         // Then — outbox is never written, and we never query totals/locations for the child
-        verify(eventOutboxRepository, never()).save(any());
+        verify(eventOutboxRepository, never()).saveAndFlush(any());
         verify(stockMovementService, never()).calculateTotalInventory(any());
         verify(stockMovementService, never()).resolveLocationCode(any(), any());
     }
@@ -196,13 +199,13 @@ class EventOutboxServiceCreateEventTest {
                 .build();
         when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
         when(stockMovementService.calculateTotalInventory(any())).thenReturn(2);
-        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
         eventOutboxService.createStockMovementEvent(movement);
 
         // Then — outbox was written exactly once
-        verify(eventOutboxRepository).save(any());
+        verify(eventOutboxRepository).saveAndFlush(any());
     }
 
     @Test
@@ -214,13 +217,13 @@ class EventOutboxServiceCreateEventTest {
             StockMovement movement = buildMovement(11L);
             when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
             when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
-            when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
             eventOutboxService.createStockMovementEvent(movement);
 
             // Then
-            verify(eventOutboxRepository).save(outboxCaptor.capture());
+            verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
             assertThat(outboxCaptor.getValue().getPayload()).containsEntry("correlation_id", "req-123");
         } finally {
             MDC.remove(CorrelationIdContext.MDC_KEY);
@@ -234,14 +237,87 @@ class EventOutboxServiceCreateEventTest {
         StockMovement movement = buildMovement(12L);
         when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
         when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
-        when(eventOutboxRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
         eventOutboxService.createStockMovementEvent(movement);
 
         // Then
-        verify(eventOutboxRepository).save(outboxCaptor.capture());
+        verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
         assertThat(outboxCaptor.getValue().getPayload()).containsEntry("correlation_id", null);
+    }
+
+    @Test
+    @DisplayName("populates the AC-4 envelope: site_id from the movement, a fixed event_version, null causation_id")
+    void createStockMovementEvent_populatesEnvelope_siteAndVersionAndCausation() {
+        // Given
+        Site site = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();
+        StockMovement movement = buildMovement(20L);
+        movement.setSite(site);
+        when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+        when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        eventOutboxService.createStockMovementEvent(movement);
+
+        // Then
+        verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
+        EventOutbox saved = outboxCaptor.getValue();
+        assertThat(saved.getSiteId()).isEqualTo(site.getId());
+        assertThat(saved.getEventVersion()).isEqualTo(1);
+        assertThat(saved.getCausationId()).isNull();
+    }
+
+    @Test
+    @DisplayName("stores a null site_id when the movement carries no site")
+    void createStockMovementEvent_storesNullSiteId_whenMovementHasNoSite() {
+        // Given
+        StockMovement movement = buildMovement(21L);
+        movement.setSite(null);
+        when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+        when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        eventOutboxService.createStockMovementEvent(movement);
+
+        // Then
+        verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getSiteId()).isNull();
+    }
+
+    @Test
+    @DisplayName("carries the request's idempotency key from MDC into the envelope when present")
+    void createStockMovementEvent_carriesIdempotencyKey_whenPresentInMdc() {
+        MDC.put(IdempotencyKeyContext.MDC_KEY, "idem-abc");
+        try {
+            StockMovement movement = buildMovement(22L);
+            when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+            when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+            when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            eventOutboxService.createStockMovementEvent(movement);
+
+            verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
+            assertThat(outboxCaptor.getValue().getIdempotencyKey()).isEqualTo("idem-abc");
+        } finally {
+            MDC.remove(IdempotencyKeyContext.MDC_KEY);
+        }
+    }
+
+    @Test
+    @DisplayName("stores a null idempotency key when none was set (e.g. before T-6c-10 wires the v1 command layer)")
+    void createStockMovementEvent_storesNullIdempotencyKey_whenNotSet() {
+        StockMovement movement = buildMovement(23L);
+        when(stockMovementService.resolveLocationCode(any(), any())).thenReturn("B1");
+        when(stockMovementService.calculateTotalInventory(any())).thenReturn(5);
+        when(eventOutboxRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        eventOutboxService.createStockMovementEvent(movement);
+
+        verify(eventOutboxRepository).saveAndFlush(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getIdempotencyKey()).isNull();
     }
 
     private StockMovement buildMovement(Long id) {

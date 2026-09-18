@@ -27,7 +27,7 @@ import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +64,7 @@ public class AnalyticsService {
     private final CatalogQueries catalogQueries;
     private final CatalogPricing catalogPricing;
     private final ForecastPredictionRepository forecastPredictionRepository;
-    private final InventoryTotalsRepository inventoryTotalsRepository;
+    private final InventoryQueries inventoryQueries;
     private final DailySalesRollupRepository dailySalesRollupRepository;
     private final MachineDisplayRepository machineDisplayRepository;
 
@@ -280,7 +280,7 @@ public class AnalyticsService {
         List<ProductRef> products = catalogQueries.allProductRefs().stream()
                 .filter(p -> p.parentId() == null)
                 .toList();
-        Map<UUID, Integer> stockTotals = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockTotals = inventoryQueries.findAllStockTotalsMap();
         Map<UUID, CategoryRef> categoriesById = loadCategoriesById();
 
         Map<UUID, List<ProductRef>> productsByCategoryId = products.stream()
@@ -339,7 +339,7 @@ public class AnalyticsService {
         List<ProductRef> allProducts = catalogQueries.allProductRefs().stream()
                 .filter(p -> p.parentId() == null)
                 .toList();
-        Map<UUID, Integer> stockByProduct = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockByProduct = inventoryQueries.findAllStockTotalsMap();
 
         long outOfStockCount = allProducts.stream()
                 .filter(p -> stockByProduct.getOrDefault(p.id(), 0) == 0)
@@ -471,7 +471,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public ActionCenterDTO getActionCenter() {
         List<ForecastPrediction> latestPredictions = forecastPredictionRepository.findAllLatest();
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
 
         // Fetch only products with forecast predictions instead of all products
         Set<UUID> itemIds = latestPredictions.stream()
@@ -952,7 +952,7 @@ public class AnalyticsService {
         List<CategoryRef> categories = catalogQueries.allCategoryRefs();
         Map<UUID, CategoryRef> categoriesById = categories.stream()
             .collect(Collectors.toMap(CategoryRef::id, c -> c));
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
 
         // Fetch rollups for both current and previous periods in a single query
         List<DailySalesRollup> allRollups = dailySalesRollupRepository

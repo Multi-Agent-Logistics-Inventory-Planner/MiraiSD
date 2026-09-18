@@ -46,7 +46,7 @@ public class SiteLocationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Location>> getSiteLocations(
+    public ResponseEntity<List<SiteLocationDTO>> getSiteLocations(
             @PathVariable UUID siteId,
             @RequestParam(required = false) String storageLocation) {
         UUID contextSiteId = AuthorizedSiteContextHolder.require().siteId();
@@ -56,36 +56,36 @@ public class SiteLocationController {
         } else {
             locations = locationService.getAllLocations(contextSiteId);
         }
-        return ResponseEntity.ok(locations);
+        return ResponseEntity.ok(locations.stream().map(SiteLocationDTO::from).toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Location> getSiteLocationById(@PathVariable UUID siteId, @PathVariable UUID id) {
+    public ResponseEntity<SiteLocationDTO> getSiteLocationById(@PathVariable UUID siteId, @PathVariable UUID id) {
         UUID contextSiteId = AuthorizedSiteContextHolder.require().siteId();
-        return ResponseEntity.ok(locationService.getLocationById(contextSiteId, id));
+        return ResponseEntity.ok(SiteLocationDTO.from(locationService.getLocationById(contextSiteId, id)));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ResponseEntity<Location> createSiteLocation(
+    public ResponseEntity<SiteLocationDTO> createSiteLocation(
             @PathVariable UUID siteId,
             @Valid @RequestBody CreateSiteLocationRequest request) {
         UUID contextSiteId = AuthorizedSiteContextHolder.require().siteId();
         Location location = locationService.createLocation(
                 contextSiteId, request.getStorageLocationId(), request.getLocationCode());
-        return ResponseEntity.status(HttpStatus.CREATED).body(location);
+        return ResponseEntity.status(HttpStatus.CREATED).body(SiteLocationDTO.from(location));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
-    public ResponseEntity<Location> updateSiteLocation(
+    public ResponseEntity<SiteLocationDTO> updateSiteLocation(
             @PathVariable UUID siteId,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateSiteLocationRequest request) {
         UUID contextSiteId = AuthorizedSiteContextHolder.require().siteId();
         Location location = locationService.updateLocation(contextSiteId, id, request.getLocationCode());
-        return ResponseEntity.ok(location);
+        return ResponseEntity.ok(SiteLocationDTO.from(location));
     }
 
     @DeleteMapping("/{id}")

@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { LocationSelector } from "@/components/stock/location-selector";
+import { LegacyLocationSelector as LocationSelector } from "@/components/stock/location-selector";
 import { ProductLocationSelector } from "@/components/stock/product-location-selector";
 import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import {

@@ -12,7 +12,7 @@ import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
@@ -23,7 +23,7 @@ import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +44,7 @@ public class MachineDisplayService {
     private final CatalogQueries catalogQueries;
     private final CatalogEntityAccess catalogEntityAccess;
     private final UserRepository userRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final InventoryOperations inventoryOperations;
     private final LocationRepository locationRepository;
     private final EntityManager entityManager;
     private final AuditLogService auditLogService;
@@ -58,7 +58,7 @@ public class MachineDisplayService {
             CatalogQueries catalogQueries,
             CatalogEntityAccess catalogEntityAccess,
             UserRepository userRepository,
-            StockMovementRepository stockMovementRepository,
+            InventoryOperations inventoryOperations,
             LocationRepository locationRepository,
             EntityManager entityManager,
             AuditLogService auditLogService,
@@ -67,7 +67,7 @@ public class MachineDisplayService {
         this.catalogQueries = catalogQueries;
         this.catalogEntityAccess = catalogEntityAccess;
         this.userRepository = userRepository;
-        this.stockMovementRepository = stockMovementRepository;
+        this.inventoryOperations = inventoryOperations;
         this.locationRepository = locationRepository;
         this.entityManager = entityManager;
         this.auditLogService = auditLogService;
@@ -133,8 +133,9 @@ public class MachineDisplayService {
                 .reason(StockMovementReason.DISPLAY_SET)
                 .actorId(request.getActorId())
                 .at(now)
+                .site(location.getStorageLocation().getSite())
                 .build();
-        stockMovementRepository.save(movement);
+        inventoryOperations.saveMovement(movement);
 
         List<String> previousNames = existingDisplays.stream()
                 .map(d -> d.getProduct().getName())
@@ -238,9 +239,10 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_SET)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(location.getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         List<String> previousNames = existingDisplays.stream()
                 .map(d -> d.getProduct().getName())
@@ -301,9 +303,10 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_REMOVED)
                         .actorId(actorId)
                         .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_REMOVED,
@@ -396,9 +399,10 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_REMOVED)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         Set<UUID> removedIds = displays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
         List<String> previousNames = activeBefore.stream()
@@ -429,6 +433,14 @@ public class MachineDisplayService {
 
         if (outgoing.getEndedAt() != null) {
             throw new IllegalArgumentException("Display is already ended");
+        }
+        // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: the outgoing
+        // display id is looked up globally, so without this check a request naming
+        // request.getMachineId() could end a display that actually lives on a different machine.
+        if (!Objects.equals(outgoing.getMachineId(), request.getMachineId())
+                || outgoing.getLocationType() != request.getLocationType()) {
+            throw new IllegalArgumentException(
+                    "Display does not belong to machine: " + request.getOutgoingDisplayId());
         }
 
         String outgoingProductName = outgoing.getProduct().getName();
@@ -505,6 +517,31 @@ public class MachineDisplayService {
     ) {}
 
     /**
+     * Resolve the site for a machine (location) id, for the swap StockMovement's site
+     * (.specs/phase-6-inventory 6b) — destination-first, matching V60's backfill convention.
+     */
+    private com.mirai.inventoryservice.sites.domain.Site resolveMachineSite(UUID machineId) {
+        return locationRepository.findById(machineId)
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + machineId))
+                .getStorageLocation().getSite();
+    }
+
+    /**
+     * Same-site-only swap precondition (.specs/phase-6-inventory 6c, T-6c-4). Audited
+     * inter-site transfers are Phase 7's; until then a machine-to-machine swap whose two
+     * machines belong to different sites must be rejected explicitly, before any mutation.
+     */
+    private void requireSameSite(UUID sourceMachineId, UUID targetMachineId) {
+        com.mirai.inventoryservice.sites.domain.Site sourceSite = resolveMachineSite(sourceMachineId);
+        com.mirai.inventoryservice.sites.domain.Site targetSite = resolveMachineSite(targetMachineId);
+        if (!Objects.equals(sourceSite.getId(), targetSite.getId())) {
+            throw new com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException(
+                    "Cannot swap displays across sites: source site " + sourceSite.getCode()
+                            + " does not match target site " + targetSite.getCode());
+        }
+    }
+
+    /**
      * Batch display swap operation that handles both swap modes in a single transaction:
      * 1. Swap with products - remove displays and add new products
      * 2. Swap with another machine - trade displays between two machines
@@ -512,6 +549,13 @@ public class MachineDisplayService {
      */
     @Transactional
     public List<MachineDisplayDTO> batchSwapDisplay(BatchDisplaySwapRequestDTO request) {
+        // Fail fast, before any write: reject a cross-site machine-to-machine swap
+        // (.specs/phase-6-inventory 6c, T-6c-4 -- flagged as advisory debt by 6b's review).
+        // Same-site-only in 6c; audited inter-site transfers are Phase 7's.
+        if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
+            requireSameSite(request.getMachineId(), request.getTargetMachineId());
+        }
+
         OffsetDateTime now = OffsetDateTime.now();
         List<DisplayChange> displayChanges = new ArrayList<>();
         List<String> allProductNames = new ArrayList<>();
@@ -544,6 +588,16 @@ public class MachineDisplayService {
             for (MachineDisplay display : toRemove) {
                 if (display.getEndedAt() != null) {
                     throw new IllegalArgumentException("Display is already ended: " + display.getId());
+                }
+                // T-6c-4 P1 fix (round 2): same ownership-mismatch bug as
+                // displayIdsFromTarget/displayIdsToTarget below -- findAllByIdInWithProduct looks
+                // displays up globally by id, so without this check a request naming machineId
+                // could end and attribute a display that actually lives on a different (e.g.
+                // foreign-site) machine.
+                if (!Objects.equals(display.getMachineId(), request.getMachineId())
+                        || display.getLocationType() != request.getLocationType()) {
+                    throw new IllegalArgumentException(
+                            "Display does not belong to source machine: " + display.getId());
                 }
                 Product product = display.getProduct();
                 displayChanges.add(new DisplayChange(
@@ -632,6 +686,16 @@ public class MachineDisplayService {
                     if (d.getEndedAt() != null) {
                         throw new IllegalArgumentException("Display is already ended: " + d.getId());
                     }
+                    // T-6c-4 P1 fix: the machine/site guard above only checks the requested
+                    // machine ids -- it says nothing about which machine a *display id* actually
+                    // belongs to. Without this check, naming two same-site machines while
+                    // supplying a foreign (e.g. cross-site) display id in displayIdsFromTarget
+                    // would pass the site guard and then end/recreate that foreign display here.
+                    if (!Objects.equals(d.getMachineId(), request.getTargetMachineId())
+                            || d.getLocationType() != request.getTargetLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to target machine: " + d.getId());
+                    }
                 }
 
                 List<MachineDisplay> endedOnTarget = new ArrayList<>(fromDisplays.size());
@@ -687,6 +751,14 @@ public class MachineDisplayService {
                 for (MachineDisplay d : toDisplays) {
                     if (d.getEndedAt() != null) {
                         throw new IllegalArgumentException("Display is already ended: " + d.getId());
+                    }
+                    // T-6c-4 P1 fix: same reasoning as displayIdsFromTarget above, mirrored for
+                    // the opposite direction -- a display id here must actually belong to the
+                    // requested source machine, not just any machine the caller can reach by id.
+                    if (!Objects.equals(d.getMachineId(), request.getMachineId())
+                            || d.getLocationType() != request.getLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to source machine: " + d.getId());
                     }
                 }
 
@@ -758,9 +830,11 @@ public class MachineDisplayService {
                             .reason(StockMovementReason.DISPLAY_SWAP)
                             .actorId(request.getActorId())
                             .at(now)
+                            .site(resolveMachineSite(
+                                    change.toMachineId() != null ? change.toMachineId() : change.fromMachineId()))
                             .build())
                     .collect(Collectors.toList());
-            stockMovementRepository.saveAll(movements);
+            inventoryOperations.saveMovements(movements);
 
             List<MachineSnapshot> snapshots = new ArrayList<>();
             snapshots.add(new MachineSnapshot(
@@ -811,6 +885,14 @@ public class MachineDisplayService {
             if (existing.getEndedAt() != null) {
                 throw new IllegalArgumentException("Display is already ended: " + displayId);
             }
+            // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: a display id
+            // is looked up globally, so without this check a request naming request.getMachineId()
+            // could end and recreate (at that machine) a display that actually lives elsewhere.
+            if (!Objects.equals(existing.getMachineId(), request.getMachineId())
+                    || existing.getLocationType() != request.getLocationType()) {
+                throw new IllegalArgumentException(
+                        "Display does not belong to machine: " + displayId);
+            }
 
             Product product = existing.getProduct();
             productNames.add(product.getName());
@@ -857,9 +939,10 @@ public class MachineDisplayService {
                         .reason(StockMovementReason.DISPLAY_SWAP)
                         .actorId(request.getActorId())
                         .at(now)
+                        .site(location.getStorageLocation().getSite())
                         .build())
                 .collect(Collectors.toList());
-        stockMovementRepository.saveAll(movements);
+        inventoryOperations.saveMovements(movements);
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_RENEWED,

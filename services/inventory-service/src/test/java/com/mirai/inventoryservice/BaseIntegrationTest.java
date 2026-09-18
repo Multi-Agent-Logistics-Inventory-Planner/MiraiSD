@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirai.inventoryservice.auth.RateLimitingFilter;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
+import com.mirai.inventoryservice.identity.domain.UserSiteMembership;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserSiteMembershipRepository;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import io.jsonwebtoken.Jwts;
@@ -23,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Base class for integration tests providing common test infrastructure.
@@ -48,6 +51,9 @@ public abstract class BaseIntegrationTest {
 
     @Autowired
     private SiteRepository siteRepository;
+
+    @Autowired
+    private UserSiteMembershipRepository userSiteMembershipRepository;
 
     @Value("${supabase.jwt.secret}")
     private String jwtSecret;
@@ -125,8 +131,13 @@ public abstract class BaseIntegrationTest {
      * Ensures a User record exists with the given email and role, so the DB-backed role
      * lookup in JwtAuthenticationFilter resolves to that role for tokens carrying this
      * email. Creates the record if missing, otherwise updates the role on the existing one.
+     * <p>
+     * Deliberately does NOT grant any site membership: docs/specs/authentication-and-
+     * authorization.md section 8's "empty list, not implicit MAIN" rule means a seeded persona
+     * must start with zero memberships (see MeAndSitePermissionsIT), so tests that exercise a
+     * membership-gated route grant it explicitly via {@link #grantMainSiteMembership(String)}.
      */
-    private void seedUser(String email, String fullName, UserRole role) {
+    private User seedUser(String email, String fullName, UserRole role) {
         User user = userRepository.findByEmail(email).orElseGet(() ->
                 User.builder()
                         .email(email)
@@ -134,7 +145,29 @@ public abstract class BaseIntegrationTest {
                         .build());
         user.setFullName(fullName);
         user.setRole(role);
-        userRepository.save(user);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Grants the given persona an active MAIN site membership. Legacy routes resolve their site
+     * context through {@code LegacyMainSiteContextResolver.requireMain()}, which requires one
+     * (see docs/specs/authentication-and-authorization.md section 5); callers that exercise a
+     * legacy route with a seeded persona must call this explicitly first, since persona helpers
+     * themselves seed no membership by default.
+     */
+    protected void grantMainSiteMembership(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("No seeded User for " + email));
+        Site mainSite = siteRepository.findByCode("MAIN")
+                .orElseThrow(() -> new IllegalStateException("MAIN site not seeded"));
+        UUID userId = user.getId();
+        if (userSiteMembershipRepository.findByUserIdAndSiteId(userId, mainSite.getId()).isEmpty()) {
+            userSiteMembershipRepository.save(UserSiteMembership.builder()
+                    .userId(userId)
+                    .siteId(mainSite.getId())
+                    .isActive(true)
+                    .build());
+        }
     }
 
     /**
@@ -169,6 +202,37 @@ public abstract class BaseIntegrationTest {
         String email = "assistant-manager.persona@test.internal";
         seedUser(email, "Assistant Manager Persona", UserRole.ASSISTANT_MANAGER);
         return generateTestToken("assistant-manager-id", email, "ASSISTANT_MANAGER");
+    }
+
+    /**
+     * Like {@link #adminToken()}, but also grants the persona an active MAIN site membership -
+     * for tests that exercise a legacy, MAIN-gated route (see {@link #grantMainSiteMembership}).
+     */
+    protected String adminTokenWithMainMembership() {
+        String token = adminToken();
+        grantMainSiteMembership("admin.persona@test.internal");
+        return token;
+    }
+
+    /**
+     * Like {@link #employeeToken()}, but also grants the persona an active MAIN site membership -
+     * for tests that exercise a legacy, MAIN-gated route (see {@link #grantMainSiteMembership}).
+     */
+    protected String employeeTokenWithMainMembership() {
+        String token = employeeToken();
+        grantMainSiteMembership("employee.persona@test.internal");
+        return token;
+    }
+
+    /**
+     * Like {@link #assistantManagerToken()}, but also grants the persona an active MAIN site
+     * membership - for tests that exercise a legacy, MAIN-gated route (see
+     * {@link #grantMainSiteMembership}).
+     */
+    protected String assistantManagerTokenWithMainMembership() {
+        String token = assistantManagerToken();
+        grantMainSiteMembership("assistant-manager.persona@test.internal");
+        return token;
     }
 
     /**

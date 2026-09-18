@@ -9,7 +9,8 @@ import com.mirai.inventoryservice.catalog.application.SupplierService;
 import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentItemRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
-import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
@@ -21,7 +22,7 @@ import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.catalog.domain.Supplier;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.UserService;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
@@ -34,7 +35,7 @@ import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.shipment.Shipment;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;
@@ -68,16 +69,13 @@ public class ShipmentService {
     private final ProductService productService;
     private final UserService userService;
     private final UserRepository userRepository;
-    private final StockMovementRepository stockMovementRepository;
-    private final LocationInventoryRepository locationInventoryRepository;
+    private final InventoryOperations inventoryOperations;
     private final LocationRepository locationRepository;
     private final StorageLocationRepository storageLocationRepository;
     private final SiteRepository siteRepository;
     private final NotificationService notificationService;
-    private final StockMovementService stockMovementService;
     private final AuditLogService auditLogService;
     private final SupabaseBroadcastService broadcastService;
-    private final EventOutboxService eventOutboxService;
     private final SupplierService supplierService;
 
     private static final String DEFAULT_SITE_CODE = "MAIN";
@@ -91,16 +89,13 @@ public class ShipmentService {
             ProductService productService,
             UserService userService,
             UserRepository userRepository,
-            StockMovementRepository stockMovementRepository,
-            LocationInventoryRepository locationInventoryRepository,
+            InventoryOperations inventoryOperations,
             LocationRepository locationRepository,
             StorageLocationRepository storageLocationRepository,
             SiteRepository siteRepository,
             NotificationService notificationService,
-            StockMovementService stockMovementService,
             AuditLogService auditLogService,
             SupabaseBroadcastService broadcastService,
-            EventOutboxService eventOutboxService,
             SupplierService supplierService) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
@@ -110,16 +105,13 @@ public class ShipmentService {
         this.productService = productService;
         this.userService = userService;
         this.userRepository = userRepository;
-        this.stockMovementRepository = stockMovementRepository;
-        this.locationInventoryRepository = locationInventoryRepository;
+        this.inventoryOperations = inventoryOperations;
         this.locationRepository = locationRepository;
         this.storageLocationRepository = storageLocationRepository;
         this.siteRepository = siteRepository;
         this.notificationService = notificationService;
-        this.stockMovementService = stockMovementService;
         this.auditLogService = auditLogService;
         this.broadcastService = broadcastService;
-        this.eventOutboxService = eventOutboxService;
         this.supplierService = supplierService;
     }
 
@@ -712,7 +704,7 @@ public class ShipmentService {
         }
 
         // Ensure product quantity/isActive denormalized fields stay in sync for UI reads
-        stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+        inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
 
         // Broadcast real-time updates to connected clients
         broadcastService.broadcastShipmentUpdated();
@@ -861,7 +853,7 @@ public class ShipmentService {
         Shipment savedShipment = shipmentRepository.save(shipment);
 
         // Sync product totals
-        stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+        inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
 
         // Broadcast updates
         broadcastService.broadcastShipmentUpdated();
@@ -938,47 +930,22 @@ public class ShipmentService {
         Location location = locationRepository.findById(locationId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found: " + locationId));
 
-        Site site = location.getStorageLocation().getSite();
-
-        // Find or create inventory at this location
-        LocationInventory inventory = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(locationId, product.getId())
-                .orElseGet(() -> LocationInventory.builder()
-                        .location(location)
-                        .site(site)
-                        .product(product)
-                        .quantity(0)
-                        .build());
-
-        int previousQuantity = inventory.getQuantity();
-        inventory.setQuantity(previousQuantity + quantity);
-        LocationInventory saved = locationInventoryRepository.save(inventory);
-        int currentQuantity = saved.getQuantity();
+        InventoryOperations.InventoryQuantityChange change =
+                inventoryOperations.adjustQuantity(location, product, quantity);
 
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("inventory_id", saved.getId().toString());
+        metadata.put("inventory_id", change.inventoryId().toString());
         metadata.put("shipment_receipt", true);
         if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
             metadata.put("intake_unit", "box");
             metadata.put("intake_qty", intakeQty);
         }
 
-        StockMovement movement = StockMovement.builder()
-                .auditLog(parentAuditLog)
-                .item(product)
-                .locationType(locationType)
-                .toLocationId(locationId)
-                .previousQuantity(previousQuantity)
-                .currentQuantity(currentQuantity)
-                .quantityChange(quantity)
-                .reason(StockMovementReason.SHIPMENT_RECEIPT)
-                .actorId(validatedActorId)
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
-
-        stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(movement);
+        inventoryOperations.recordMovement(
+                parentAuditLog, product, locationType, null, locationId,
+                change.previousQuantity(), change.currentQuantity(), quantity,
+                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata,
+                location.getStorageLocation().getSite());
     }
 
     /**
@@ -993,44 +960,22 @@ public class ShipmentService {
         // Get NOT_ASSIGNED location
         Location notAssignedLocation = getNotAssignedLocation();
 
-        LocationInventory inventory = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(notAssignedLocation.getId(), product.getId())
-                .orElseGet(() -> LocationInventory.builder()
-                        .location(notAssignedLocation)
-                        .site(notAssignedLocation.getStorageLocation().getSite())
-                        .product(product)
-                        .quantity(0)
-                        .build());
-
-        int previousQuantity = inventory.getQuantity();
-        inventory.setQuantity(previousQuantity + quantity);
-        LocationInventory saved = locationInventoryRepository.save(inventory);
-        int currentQuantity = saved.getQuantity();
+        InventoryOperations.InventoryQuantityChange change =
+                inventoryOperations.adjustQuantity(notAssignedLocation, product, quantity);
 
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("inventory_id", saved.getId().toString());
+        metadata.put("inventory_id", change.inventoryId().toString());
         metadata.put("shipment_receipt", true);
         if ("box".equalsIgnoreCase(intakeUnit) && intakeQty != null && intakeQty > 0) {
             metadata.put("intake_unit", "box");
             metadata.put("intake_qty", intakeQty);
         }
 
-        StockMovement movement = StockMovement.builder()
-                .auditLog(parentAuditLog)
-                .item(product)
-                .locationType(LocationType.NOT_ASSIGNED)
-                .toLocationId(notAssignedLocation.getId())
-                .previousQuantity(previousQuantity)
-                .currentQuantity(currentQuantity)
-                .quantityChange(quantity)
-                .reason(StockMovementReason.SHIPMENT_RECEIPT)
-                .actorId(validatedActorId)
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
-
-        stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(movement);
+        inventoryOperations.recordMovement(
+                parentAuditLog, product, LocationType.NOT_ASSIGNED, null, notAssignedLocation.getId(),
+                change.previousQuantity(), change.currentQuantity(), quantity,
+                StockMovementReason.SHIPMENT_RECEIPT, validatedActorId, metadata,
+                notAssignedLocation.getStorageLocation().getSite());
     }
 
     /**
@@ -1051,8 +996,7 @@ public class ShipmentService {
      */
     private void removeFromInventory(LocationType locationType, UUID locationId, Product product, int quantity,
                                      UUID actorId, AuditLog parentAuditLog) {
-        LocationInventory inventory = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(locationId, product.getId())
+        LocationInventory inventory = inventoryOperations.findInventory(locationId, product.getId())
                 .orElseThrow(() -> new InsufficientInventoryException(
                         String.format("Cannot undo receipt: no inventory found for '%s' at location. " +
                                 "The inventory record may have been deleted.", product.getName())
@@ -1073,29 +1017,18 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("shipment_receipt_reversal", true);
 
-        StockMovement movement = StockMovement.builder()
-                .auditLog(parentAuditLog)
-                .item(product)
-                .locationType(locationType)
-                .fromLocationId(locationId)
-                .previousQuantity(currentQuantity)
-                .currentQuantity(newQuantity)
-                .quantityChange(-quantity)
-                .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
-                .actorId(actorId)
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
-
-        stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(movement);
+        inventoryOperations.recordMovement(
+                parentAuditLog, product, locationType, locationId, null,
+                currentQuantity, newQuantity, -quantity,
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata,
+                inventory.getSite());
 
         // Update or delete inventory
         if (newQuantity == 0) {
-            locationInventoryRepository.delete(inventory);
+            inventoryOperations.deleteInventory(inventory);
         } else {
             inventory.setQuantity(newQuantity);
-            locationInventoryRepository.save(inventory);
+            inventoryOperations.saveInventory(inventory);
         }
     }
 
@@ -1108,8 +1041,8 @@ public class ShipmentService {
                                                 UUID actorId, AuditLog parentAuditLog) {
         Location notAssignedLocation = getNotAssignedLocation();
 
-        LocationInventory inventory = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(notAssignedLocation.getId(), product.getId())
+        LocationInventory inventory = inventoryOperations
+                .findInventory(notAssignedLocation.getId(), product.getId())
                 .orElseThrow(() -> new InsufficientInventoryException(
                         String.format("Cannot undo receipt: no unassigned inventory for '%s'. " +
                                 "Items may have been assigned to locations.", product.getName())
@@ -1130,28 +1063,17 @@ public class ShipmentService {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("shipment_receipt_reversal", true);
 
-        StockMovement movement = StockMovement.builder()
-                .auditLog(parentAuditLog)
-                .item(product)
-                .locationType(LocationType.NOT_ASSIGNED)
-                .fromLocationId(notAssignedLocation.getId())
-                .previousQuantity(currentQuantity)
-                .currentQuantity(newQuantity)
-                .quantityChange(-quantity)
-                .reason(StockMovementReason.SHIPMENT_RECEIPT_REVERSED)
-                .actorId(actorId)
-                .at(OffsetDateTime.now())
-                .metadata(metadata)
-                .build();
-
-        stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(movement);
+        inventoryOperations.recordMovement(
+                parentAuditLog, product, LocationType.NOT_ASSIGNED, notAssignedLocation.getId(), null,
+                currentQuantity, newQuantity, -quantity,
+                StockMovementReason.SHIPMENT_RECEIPT_REVERSED, actorId, metadata,
+                inventory.getSite());
 
         if (newQuantity == 0) {
-            locationInventoryRepository.delete(inventory);
+            inventoryOperations.deleteInventory(inventory);
         } else {
             inventory.setQuantity(newQuantity);
-            locationInventoryRepository.save(inventory);
+            inventoryOperations.saveInventory(inventory);
         }
     }
 

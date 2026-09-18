@@ -1,29 +1,45 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { batchAdjustStock, batchTransferStock, transferStock } from "@/lib/api/stock-movements";
-import { getProductById } from "@/lib/api/products";
 import {
-  LocationType,
-  type BatchAdjustStockRequest,
-  type Product,
-  type StockMovement,
-  type TransferStockRequest,
-} from "@/types/api";
+  adjustSiteInventory,
+  transferSiteInventory,
+  batchTransferSiteInventory,
+  newIdempotencyKey,
+  type AdjustSiteInventoryPayload,
+  type TransferSiteInventoryPayload,
+} from "@/lib/api/site-inventory";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { useAuth } from "@/hooks/use-auth";
+import { flushInventorySiteRefresh } from "@/hooks/realtime/inventory-refresh";
+import { LocationType } from "@/types/api";
+import {
+  clearUncertainStockSubmission,
+  isDefinitiveStockSubmissionFailure,
+  readUncertainStockSubmission,
+  storeUncertainStockSubmission,
+} from "@/lib/stock-submission-recovery";
+
+// --- Site-scoped stock mutations (Phase 6 checkpoint 6d, T-6d-7/T-6d-8) --------------------
+// Replaces the legacy, unscoped batchAdjustStock/transferStock/batchTransferStock. Actor
+// identity is derived server-side from AuthorizedSiteContext - the client no longer sends
+// actorId (T-6d-7). Idempotency keys are generated once per user-initiated mutate() call (T-6d-2,
+// see site-inventory.ts's newIdempotencyKey doc comment for why this must not happen inside
+// mutationFn). Query-key invalidation is site-qualified throughout (T-6d-3).
 
 export interface BatchAdjustVariables {
-  payload: BatchAdjustStockRequest;
-  /** Product ids touched by this batch — used to invalidate per-product query keys. */
+  payload: AdjustSiteInventoryPayload;
+  /** Product ids touched by this batch - used to invalidate per-product query keys. */
   productIds: string[];
 }
 
 interface TransferStockVariables {
-  payload: TransferStockRequest;
+  payload: TransferSiteInventoryPayload;
   productId?: string;
 }
 
 export interface BatchTransferItem {
-  payload: TransferStockRequest;
+  payload: TransferSiteInventoryPayload;
   productId: string;
   productName: string;
 }
@@ -36,152 +52,223 @@ interface BatchTransferVariables {
   destinationLocationType?: LocationType;
 }
 
-async function invalidateStockQueries(
+/**
+ * Reconcile the views affected by a stock command which has already committed.  This is
+ * deliberately best-effort: a failed read must never turn a successful, idempotent write into
+ * a failed mutation in the UI.
+ */
+export async function refreshCommittedStock(
   qc: QueryClient,
-  productId?: string,
-  locationType?: LocationType
+  siteId: string,
+  productIds: string[]
 ) {
-  // Surgical product update: fetch single product and update cache (avoid full list refetch)
-  if (productId) {
-    // Invalidate specific product queries
-    await qc.invalidateQueries({ queryKey: ["products", productId] });
-    await qc.invalidateQueries({ queryKey: ["products", productId, "with-children"] });
-    await qc.invalidateQueries({ queryKey: ["products", productId, "children"] });
+  // Totals go through the shared targeted-refresh executor (6e, T-6e-5/AC-7): a bounded fetch
+  // of just these product IDs, merged into the cache, instead of a full-catalog invalidation -
+  // this hook already has productIds in hand, unlike the realtime broadcast path pre-6e.
+  //
+  // Non-fatal (6e independent review, Blocker 2): this is a network call the mutation's own
+  // write already succeeded before we get here. If it rejects, mutateAsync would otherwise
+  // report the whole (already-committed) mutation as failed - adjust-stock-dialog.tsx would
+  // show a false "Adjustment failed" toast, and a user retry would mint a fresh idempotency key
+  // and risk a real double-adjustment. Swallow the error rather than fail the mutation.
+  //
+  // Does NOT fall back to a bare `invalidateQueries` here (follow-up review, second round): a
+  // bare invalidate bypasses the sequencing `flushInventorySiteRefresh` itself already uses, so
+  // it could arrive after - and unconditionally overwrite - a newer flush's already-applied,
+  // correct value. `flushInventorySiteRefresh` already attempts its own sequenced recovery
+  // internally on failure (only when this attempt is still the current claim holder); a second,
+  // unsequenced fallback here would just risk undoing that.
+  const totalsRefresh = flushInventorySiteRefresh(qc, siteId, productIds).catch(() => {
+    // Best-effort; recovery (if warranted) already happened inside flushInventorySiteRefresh.
+  });
 
-    // Fetch single product and update all list caches
-    try {
-      const updatedProduct = await getProductById(productId);
-      qc.setQueriesData<Product[]>(
-        { queryKey: ["products"] },
-        (oldData) => {
-          if (!oldData || !Array.isArray(oldData)) return oldData;
-          const index = oldData.findIndex((p) => p.id === productId);
-          if (index === -1) return oldData;
-          return [
-            ...oldData.slice(0, index),
-            updatedProduct,
-            ...oldData.slice(index + 1),
-          ];
-        }
-      );
-    } catch {
-      // Fallback: if single fetch fails, invalidate all
-      await qc.invalidateQueries({ queryKey: ["products"] });
-    }
+  const tasks: Promise<unknown>[] = [
+    totalsRefresh,
+    // Site-qualified prefix: invalidates every ["locationInventory", siteId, ...] key
+    // (including the resolved-location sub-key and the NOT_ASSIGNED case) without needing to
+    // know the exact location - deliberately broad within this one site, never cross-site.
+    qc.invalidateQueries({ queryKey: ["locationInventory", siteId] }),
+    // Fixed in 6e (T-6e-8): these were ["auditLogs"]/["auditLog"], which match no real query
+    // key (use-audit-log.ts uses "audit-log"/"audit-logs") - stock mutations had never
+    // actually refreshed the audit-log page.
+    qc.invalidateQueries({ queryKey: ["audit-log"] }),
+    qc.invalidateQueries({ queryKey: ["audit-logs"] }),
+    // Location cards and Storage utilization use this projection.  Realtime eventually did
+    // this too, but command completion must converge without a broadcast.
+    qc.invalidateQueries({ queryKey: ["locationsWithCounts", siteId] }),
+  ];
 
-    await qc.invalidateQueries({ queryKey: ["inventoryByItem", productId] });
-    await qc.invalidateQueries({ queryKey: ["movementHistory", productId] });
-  } else {
-    // No specific productId, fall back to full invalidation
-    await qc.invalidateQueries({ queryKey: ["products"] });
+  for (const id of new Set(productIds)) {
+    tasks.push(qc.invalidateQueries({ queryKey: ["productInventoryEntries", siteId, id] }));
+    tasks.push(qc.invalidateQueries({ queryKey: ["movementHistory", siteId, id] }));
   }
 
-  // Invalidate not-assigned inventory if dealing with NOT_ASSIGNED location
-  if (locationType === LocationType.NOT_ASSIGNED) {
-    await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
-  }
+  await Promise.all(tasks).catch(() => {
+    // Query invalidation itself is also best-effort after a committed command.  The totals
+    // refresh has its own sequenced recovery; callers retain a successful mutation result.
+  });
 }
 
 export function useBatchAdjustStockMutation() {
   const qc = useQueryClient();
-  return useMutation<void, Error, BatchAdjustVariables>({
-    mutationFn: ({ payload }) => batchAdjustStock(payload),
+  const { siteId } = useCurrentSite();
+  const { user } = useAuth();
+
+  const mutation = useMutation<
+    void,
+    Error,
+    BatchAdjustVariables & { idempotencyKey: string; siteId: string | undefined }
+  >({
+    mutationFn: ({ idempotencyKey, payload, siteId: originSiteId }) => {
+      if (!originSiteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return adjustSiteInventory(originSiteId, idempotencyKey, payload);
+    },
     onSuccess: async (_data, variables) => {
-      const { payload, productIds } = variables;
-      const uniqueProductIds = [...new Set(productIds)];
-
-      const tasks: Promise<unknown>[] = [
-        qc.invalidateQueries({
-          queryKey: ["locationInventory", payload.locationType, payload.locationId],
-        }),
-        qc.invalidateQueries({ queryKey: ["auditLogs"] }),
-        qc.invalidateQueries({ queryKey: ["auditLog"] }),
-      ];
-
-      for (const id of uniqueProductIds) {
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "with-children"] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["products", id, "children"] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["productInventoryEntries", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["inventoryByItem", id] }));
-        tasks.push(qc.invalidateQueries({ queryKey: ["movementHistory", id] }));
-      }
-
-      if (payload.locationType === LocationType.NOT_ASSIGNED) {
-        tasks.push(qc.invalidateQueries({ queryKey: ["notAssignedInventory"] }));
-      }
-
-      await Promise.all(tasks);
+      if (!variables.siteId) return;
+      await refreshCommittedStock(qc, variables.siteId, variables.productIds);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: BatchAdjustVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, siteId, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: async (variables: BatchAdjustVariables) => {
+      if (!siteId || !user?.id) return mutation.mutateAsync({ ...variables, siteId, idempotencyKey: newIdempotencyKey() });
+      if (readUncertainStockSubmission(user.id, siteId, "adjust")) {
+        throw new Error("An earlier adjustment is awaiting explicit recovery. Retry that submission before creating a new one.");
+      }
+      const submitted = { ...variables, siteId, idempotencyKey: newIdempotencyKey() };
+      const record = { version: 2 as const, createdAt: Date.now(), userId: user.id, siteId, idempotencyKey: submitted.idempotencyKey, kind: "adjust" as const, payload: variables.payload, productIds: variables.productIds };
+      storeUncertainStockSubmission(record);
+      try { const result = await mutation.mutateAsync(submitted); clearUncertainStockSubmission(record); return result; } catch (error) { if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record); throw error; }
+    },
+    uncertainSubmission: siteId && user?.id ? readUncertainStockSubmission(user.id, siteId, "adjust") : null,
+    retryUncertain: async () => {
+      if (!siteId || !user?.id) throw new Error("No active site or user");
+      const record = readUncertainStockSubmission(user.id, siteId, "adjust");
+      if (!record || record.kind !== "adjust") throw new Error("No uncertain adjustment to retry");
+      try {
+        const result = await mutation.mutateAsync({ siteId: record.siteId, idempotencyKey: record.idempotencyKey, payload: record.payload, productIds: record.productIds });
+        clearUncertainStockSubmission(record);
+        return result;
+      } catch (error) {
+        if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record);
+        throw error;
+      }
+    },
+  };
 }
 
 export function useTransferStockMutation() {
   const qc = useQueryClient();
-  return useMutation<StockMovement, Error, TransferStockVariables>({
-    mutationFn: ({ payload }) => transferStock(payload),
+  const { siteId } = useCurrentSite();
+  const { user } = useAuth();
+
+  const mutation = useMutation<
+    void,
+    Error,
+    TransferStockVariables & { idempotencyKey: string; siteId: string | undefined }
+  >({
+    mutationFn: ({ idempotencyKey, payload, siteId: originSiteId }) => {
+      if (!originSiteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return transferSiteInventory(originSiteId, idempotencyKey, payload);
+    },
     onSuccess: async (_data, variables) => {
-      await invalidateStockQueries(qc, variables.productId);
+      if (!variables.siteId) return;
+      await refreshCommittedStock(qc, variables.siteId, variables.productId ? [variables.productId] : []);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: TransferStockVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, siteId, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: async (variables: TransferStockVariables) => {
+      if (!siteId || !user?.id) return mutation.mutateAsync({ ...variables, siteId, idempotencyKey: newIdempotencyKey() });
+      if (readUncertainStockSubmission(user.id, siteId, "transfer")) {
+        throw new Error("An earlier transfer is awaiting explicit recovery. Retry that submission before creating a new one.");
+      }
+      const submitted = { ...variables, siteId, idempotencyKey: newIdempotencyKey() };
+      const record = { version: 2 as const, createdAt: Date.now(), userId: user.id, siteId, idempotencyKey: submitted.idempotencyKey, kind: "transfer" as const, payload: variables.payload, productId: variables.productId };
+      storeUncertainStockSubmission(record);
+      try { const result = await mutation.mutateAsync(submitted); clearUncertainStockSubmission(record); return result; } catch (error) { if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record); throw error; }
+    },
+    uncertainSubmission: siteId && user?.id ? readUncertainStockSubmission(user.id, siteId, "transfer") : null,
+    retryUncertain: async () => {
+      if (!siteId || !user?.id) throw new Error("No active site or user");
+      const record = readUncertainStockSubmission(user.id, siteId, "transfer");
+      if (!record || record.kind !== "transfer") throw new Error("No uncertain transfer to retry");
+      try {
+        const result = await mutation.mutateAsync({ siteId: record.siteId, idempotencyKey: record.idempotencyKey, payload: record.payload, productId: record.productId });
+        clearUncertainStockSubmission(record);
+        return result;
+      } catch (error) {
+        if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record);
+        throw error;
+      }
+    },
+  };
 }
 
 export function useBatchTransferMutation() {
   const qc = useQueryClient();
+  const { siteId } = useCurrentSite();
+  const { user } = useAuth();
 
-  return useMutation<void, Error, BatchTransferVariables>({
-    mutationFn: ({ transfers }) =>
-      batchTransferStock({ transfers: transfers.map((t) => t.payload) }),
+  const mutation = useMutation<
+    void,
+    Error,
+    BatchTransferVariables & { idempotencyKey: string; siteId: string | undefined }
+  >({
+    mutationFn: ({ idempotencyKey, transfers, siteId: originSiteId }) => {
+      if (!originSiteId) {
+        return Promise.reject(new Error("No active site"));
+      }
+      return batchTransferSiteInventory(
+        originSiteId,
+        idempotencyKey,
+        transfers.map((t) => t.payload)
+      );
+    },
     onSuccess: async (_data, variables) => {
-      // Batch transfers affect multiple products - fetch each and update cache
+      if (!variables.siteId) return;
       const productIds = [...new Set(variables.transfers.map((t) => t.productId))];
-
-      try {
-        // Fetch all affected products in parallel
-        const updatedProducts = await Promise.all(
-          productIds.map((id) => getProductById(id))
-        );
-
-        // Update all products list caches with the new data
-        qc.setQueriesData<Product[]>(
-          { queryKey: ["products"] },
-          (oldData) => {
-            if (!oldData || !Array.isArray(oldData)) return oldData;
-            const updatedMap = new Map(updatedProducts.map((p) => [p.id, p]));
-            return oldData.map((p) => updatedMap.get(p.id) ?? p);
-          }
-        );
-
-        // Invalidate specific product queries
-        for (const id of productIds) {
-          await qc.invalidateQueries({ queryKey: ["products", id] });
-          await qc.invalidateQueries({ queryKey: ["products", id, "with-children"] });
-          await qc.invalidateQueries({ queryKey: ["products", id, "children"] });
-        }
-      } catch {
-        // Fallback: if fetching fails, invalidate all
-        await qc.invalidateQueries({ queryKey: ["products"] });
-      }
-
-      if (
-        variables.sourceLocationType === LocationType.NOT_ASSIGNED ||
-        variables.destinationLocationType === LocationType.NOT_ASSIGNED
-      ) {
-        await qc.invalidateQueries({ queryKey: ["notAssignedInventory"] });
-      }
-
-      await qc.invalidateQueries({
-        queryKey: ["locationInventory", variables.sourceLocationId],
-      });
-      await qc.invalidateQueries({
-        queryKey: ["locationInventory", variables.destinationLocationId],
-      });
-
-      for (const transfer of variables.transfers) {
-        await qc.invalidateQueries({
-          queryKey: ["inventoryByItem", transfer.productId],
-        });
-      }
+      await refreshCommittedStock(qc, variables.siteId, productIds);
     },
   });
+
+  return {
+    ...mutation,
+    mutate: (variables: BatchTransferVariables, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ ...variables, siteId, idempotencyKey: newIdempotencyKey() }, options),
+    mutateAsync: async (variables: BatchTransferVariables) => {
+      if (!siteId || !user?.id) return mutation.mutateAsync({ ...variables, siteId, idempotencyKey: newIdempotencyKey() });
+      if (readUncertainStockSubmission(user.id, siteId, "batch-transfer")) {
+        throw new Error("An earlier transfer is awaiting explicit recovery. Retry that submission before creating a new one.");
+      }
+      const submitted = { ...variables, siteId, idempotencyKey: newIdempotencyKey() };
+      const record = { version: 2 as const, createdAt: Date.now(), userId: user.id, siteId, idempotencyKey: submitted.idempotencyKey, kind: "batch-transfer" as const, transfers: variables.transfers, sourceLocationId: variables.sourceLocationId, destinationLocationId: variables.destinationLocationId };
+      storeUncertainStockSubmission(record);
+      try { const result = await mutation.mutateAsync(submitted); clearUncertainStockSubmission(record); return result; } catch (error) { if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record); throw error; }
+    },
+    uncertainSubmission: siteId && user?.id ? readUncertainStockSubmission(user.id, siteId, "batch-transfer") : null,
+    retryUncertain: async () => {
+      if (!siteId || !user?.id) throw new Error("No active site or user");
+      const record = readUncertainStockSubmission(user.id, siteId, "batch-transfer");
+      if (!record || record.kind !== "batch-transfer") throw new Error("No uncertain transfer to retry");
+      try {
+        const result = await mutation.mutateAsync({ siteId: record.siteId, idempotencyKey: record.idempotencyKey, transfers: record.transfers, sourceLocationId: record.sourceLocationId, destinationLocationId: record.destinationLocationId });
+        clearUncertainStockSubmission(record);
+        return result;
+      } catch (error) {
+        if (isDefinitiveStockSubmissionFailure(error)) clearUncertainStockSubmission(record);
+        throw error;
+      }
+    },
+  };
 }

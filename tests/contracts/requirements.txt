@@ -1,0 +1,9 @@
+# Contract test runner and schema validation (Python 3.10+; imported consumer
+# models use PEP 604 union annotations)
+pytest>=7.0.0
+jsonschema>=4.0.0
+
+# Pydantic consumer-envelope models imported from both Python services. pandas is
+# imported by the forecasting consumer module under test, not by jsonschema itself.
+pydantic>=2.0.0
+pandas>=2.0.0

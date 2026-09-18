@@ -250,7 +250,6 @@ function ProductsContent() {
                   kujiCategoryIds={kujiCategoryIds}
                   sort={sort}
                   onSortChange={handleSortChange}
-                  showQuantity={list.showInventory}
                 />
               </CardContent>
             </Card>
@@ -274,7 +273,6 @@ function ProductsContent() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         product={selected}
-        showInventory={list.showInventory}
         onAdjustClick={(preselectedProduct) => {
           setAdjustPreselectedProduct(preselectedProduct);
           setAdjustOpen(true);

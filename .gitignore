@@ -232,12 +232,15 @@ docs/specs/*
 docs/plans/*
 !docs/plans/spring-domain-modular-monolith-migration.md
 !docs/plans/enterprise-modernization.md
+!docs/plans/phase-6-gap-closure.md
+!docs/plans/phase-4-6-closeout.md
 !docs/baseline/
 docs/baseline/*
 !docs/baseline/phase-0-baseline.md
 !docs/baseline/system-inventory.md
 !docs/baseline/tenant-migration-worksheet.md
 !docs/baseline/api-v1-map.md
+!docs/baseline/phase-7-inventory.md
 !docs/templates/
 docs/templates/*
 !docs/templates/phase-cost-impact.md

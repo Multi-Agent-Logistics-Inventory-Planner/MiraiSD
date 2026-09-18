@@ -2,6 +2,8 @@ package com.mirai.inventoryservice.sites.api;
 
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.application.LocationService;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -21,9 +23,12 @@ import java.util.UUID;
 @RequestMapping("/api/locations")
 public class LocationController {
     private final LocationService locationService;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
-    public LocationController(LocationService locationService) {
+    public LocationController(LocationService locationService,
+                              LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.locationService = locationService;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
     }
 
     /**
@@ -32,11 +37,12 @@ public class LocationController {
     @GetMapping
     public ResponseEntity<List<Location>> getAllLocations(
             @RequestParam(required = false) String storageLocation) {
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
         List<Location> locations;
         if (storageLocation != null && !storageLocation.isBlank()) {
-            locations = locationService.getLocationsByStorageLocationCode(storageLocation);
+            locations = locationService.getLocationsByStorageLocationCode(context.siteId(), storageLocation);
         } else {
-            locations = locationService.getAllLocations();
+            locations = locationService.getAllLocations(context.siteId());
         }
         return ResponseEntity.ok(locations);
     }
@@ -46,7 +52,7 @@ public class LocationController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Location> getLocationById(@PathVariable UUID id) {
-        Location location = locationService.getLocationById(id);
+        Location location = locationService.getLocationById(legacyMainSiteContextResolver.requireMain().siteId(), id);
         return ResponseEntity.ok(location);
     }
 
@@ -56,8 +62,9 @@ public class LocationController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Location> createLocation(@Valid @RequestBody CreateLocationRequest request) {
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
         Location location = locationService.createLocation(
-                request.getStorageLocationId(),
+                context.siteId(), request.getStorageLocationId(),
                 request.getLocationCode());
         return ResponseEntity.status(HttpStatus.CREATED).body(location);
     }
@@ -70,7 +77,8 @@ public class LocationController {
     public ResponseEntity<Location> updateLocation(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateLocationRequest request) {
-        Location location = locationService.updateLocation(id, request.getLocationCode());
+        Location location = locationService.updateLocation(
+                legacyMainSiteContextResolver.requireMain().siteId(), id, request.getLocationCode());
         return ResponseEntity.ok(location);
     }
 
@@ -80,7 +88,7 @@ public class LocationController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER')")
     public ResponseEntity<Void> deleteLocation(@PathVariable UUID id) {
-        locationService.deleteLocation(id);
+        locationService.deleteLocation(legacyMainSiteContextResolver.requireMain().siteId(), id);
         return ResponseEntity.noContent().build();
     }
 

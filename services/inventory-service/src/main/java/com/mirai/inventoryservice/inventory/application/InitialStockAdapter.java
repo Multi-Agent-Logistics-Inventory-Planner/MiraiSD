@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.catalog.application.InitialStockPort;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.services.StockMovementService;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

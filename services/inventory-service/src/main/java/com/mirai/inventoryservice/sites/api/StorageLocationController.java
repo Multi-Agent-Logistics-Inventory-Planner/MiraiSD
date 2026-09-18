@@ -2,6 +2,8 @@ package com.mirai.inventoryservice.sites.api;
 
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.sites.application.LocationService;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,9 +18,12 @@ import java.util.List;
 @RequestMapping("/api/storage-locations")
 public class StorageLocationController {
     private final LocationService locationService;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
-    public StorageLocationController(LocationService locationService) {
+    public StorageLocationController(LocationService locationService,
+                                     LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.locationService = locationService;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
     }
 
     /**
@@ -26,7 +31,8 @@ public class StorageLocationController {
      */
     @GetMapping
     public ResponseEntity<List<StorageLocation>> getAllStorageLocations() {
-        List<StorageLocation> storageLocations = locationService.getAllStorageLocations();
+        List<StorageLocation> storageLocations = locationService.getAllStorageLocations(
+                legacyMainSiteContextResolver.requireMain().siteId());
         return ResponseEntity.ok(storageLocations);
     }
 
@@ -35,7 +41,8 @@ public class StorageLocationController {
      */
     @GetMapping("/by-code/{code}")
     public ResponseEntity<StorageLocation> getStorageLocationByCode(@PathVariable String code) {
-        StorageLocation storageLocation = locationService.getStorageLocationByCode(code);
+        StorageLocation storageLocation = locationService.getStorageLocationByCode(
+                legacyMainSiteContextResolver.requireMain().siteId(), code);
         return ResponseEntity.ok(storageLocation);
     }
 
@@ -44,7 +51,8 @@ public class StorageLocationController {
      */
     @GetMapping("/inventory-locations")
     public ResponseEntity<List<StorageLocation>> getInventoryStorageLocations() {
-        List<StorageLocation> storageLocations = locationService.getInventoryStorageLocations();
+        List<StorageLocation> storageLocations = locationService.getInventoryStorageLocations(
+                legacyMainSiteContextResolver.requireMain().siteId());
         return ResponseEntity.ok(storageLocations);
     }
 
@@ -53,7 +61,8 @@ public class StorageLocationController {
      */
     @GetMapping("/display-locations")
     public ResponseEntity<List<StorageLocation>> getDisplayStorageLocations() {
-        List<StorageLocation> storageLocations = locationService.getDisplayStorageLocations();
+        List<StorageLocation> storageLocations = locationService.getDisplayStorageLocations(
+                legacyMainSiteContextResolver.requireMain().siteId());
         return ResponseEntity.ok(storageLocations);
     }
 }

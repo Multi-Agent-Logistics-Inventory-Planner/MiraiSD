@@ -9,7 +9,7 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.InventoryTotalsRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
