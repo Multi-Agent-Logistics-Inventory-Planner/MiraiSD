@@ -6,7 +6,8 @@ Full
 
 ## Problem and outcome
 
-Production remains at V57 while application code depends on V58-V66. F1 prepares an approved, auditable manual apply and PR #328 merge; F2 is deliberately blocked until F1 completes.
+Status: complete 2026-09-22 — production is at V68. Original problem: production remained at V57
+while application code depended on V58-V66. F1 prepares an approved, auditable manual apply and PR #328 merge; F2 is deliberately blocked until F1 completes.
 
 ## Durable context
 
