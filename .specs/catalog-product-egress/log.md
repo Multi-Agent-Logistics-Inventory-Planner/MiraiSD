@@ -2,10 +2,29 @@
 
 ## Current handoff
 
-- Status: **Backend track (B1-B8) complete.** All acceptance criteria met. Full native gates
-  green: 482 unit tests, 560 integration tests, contract regeneration clean (additive only).
-- Next action: none for this record. `.specs/web-product-list-cache/` (W1-W3) is a separate,
-  independent web-side follow-up that can proceed once this lands.
+- Status: **Complete, including a post-implementation review round.** An external review of the
+  working tree (before push) found four real issues -- see `review.md` for full detail. All four
+  fixed, verified with new regression tests, and re-validated. `review.md`/`validation.md` added
+  (this record is Full tier and was initially missing both).
+- Next action: none for this record.
+- Review-round summary (full detail in `review.md`):
+  1. **Regression, high severity:** consolidating every `useProducts` caller onto
+     `getAllProductsAsListItems()` (web-product-list-cache W1) silently dropped `hasActiveBox`
+     for every rootOnly/kujiOnly web caller, including `CustomKujiTabs` -- every product would
+     have rendered as Closed. Fixed by adding the missing `withHasActiveBox` call; this was a gap
+     in the original plan's analysis (it tracked `hasChildren`'s fold but not `hasActiveBox`'s
+     separate, selectively-applied enrichment).
+  2. **Bug:** `CatalogProductMapper` never mapped `preferredSupplierName` -- v1 catalog detail
+     always returned `null` even for a product with an assigned supplier.
+  3. **Bug:** `CatalogProductResponse.category` had no explicit mapping, so MapStruct
+     auto-generated a recursive `Category` sub-mapper that would walk the lazy `children`
+     association at request time -- extra DB reads and a response shape inconsistent with the
+     list endpoint's flat category.
+  4. **Test-design gap:** the original `ProductListEgressIT` tested repository methods directly,
+     which cannot catch a caller adding an extra query around an already-slim repository call (as
+     in finding 1) and mischaracterized the site-products endpoint's real 2-statement shape as
+     "1". Added three HTTP-level tests through `mockMvc` that inspect the actual SQL a real
+     request emits.
 - Decisions that must survive compaction: see "Assumptions and decisions" below, organized by
   task. Most consequential: `CatalogProductResponse` gained a hand-written flat-args constructor
   (mirroring `ProductListItemDTO`'s precedent) alongside its Lombok `@AllArgsConstructor` for the

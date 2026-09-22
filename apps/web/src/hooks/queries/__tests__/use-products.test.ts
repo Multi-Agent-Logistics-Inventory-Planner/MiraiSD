@@ -117,6 +117,21 @@ describe("useProducts", () => {
     expect(result.current.data?.map((p) => p.id)).toEqual(["p1"]);
   });
 
+  it("preserves hasActiveBox through rootOnly filtering (regression: CustomKujiTabs partitions purely on this field)", async () => {
+    mockGetProducts.mockResolvedValue([
+      makeProduct({ id: "p1", name: "Open Box Product", hasActiveBox: true }),
+      makeProduct({ id: "p2", name: "Closed Box Product", hasActiveBox: false }),
+    ]);
+    const { Wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useProducts(true), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.find((p) => p.id === "p1")?.hasActiveBox).toBe(true);
+    expect(result.current.data?.find((p) => p.id === "p2")?.hasActiveBox).toBe(false);
+  });
+
   it("respects the enabled option, matching the closed-dialog gating each direct caller previously implemented itself", async () => {
     mockGetProducts.mockResolvedValue([]);
     const { Wrapper } = createWrapper();

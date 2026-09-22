@@ -468,7 +468,13 @@ public class ProductService {
     }
 
     public List<ProductListItemDTO> getAllProductsAsListItems() {
-        return productRepository.findAllAsListItems();
+        // withHasActiveBox is required here, not just on the root-only methods below: every
+        // rootOnly/kujiOnly web caller now routes through this one method too (web-product-
+        // list-cache W1 consolidated useProducts onto a single unfiltered fetch, applying
+        // rootOnly/kujiOnly client-side afterward). CustomKujiTabs partitions purely on
+        // hasActiveBox, so leaving it unpopulated here silently mispartitioned every kuji product
+        // as Closed regardless of its real box status.
+        return withHasActiveBox(productRepository.findAllAsListItems());
     }
 
     public List<ProductListItemDTO> getActiveProductsAsListItems() {

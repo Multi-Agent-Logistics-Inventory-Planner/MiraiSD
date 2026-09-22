@@ -2,7 +2,12 @@
 
 ## Current handoff
 
-- Status: **Complete.** All acceptance criteria met.
+- Status: **Complete, with a post-implementation review fix.** An external review of the working
+  tree found that W1's consolidation onto `getAllProductsAsListItems()` silently dropped
+  `hasActiveBox` for every rootOnly/kujiOnly caller (see `.specs/catalog-product-egress/review.md`
+  finding 1 for full detail; the actual fix was backend-only, in `ProductService`). Added a web
+  test here (`use-products.test.ts`) proving `hasActiveBox` survives the client-side `rootOnly`
+  filter unchanged, to close the gap on this side of the fix too.
 - Next action: none for this record.
 - Decisions that must survive compaction:
   - Consolidated key is `["products", {}]` (always empty options object), not a boolean or a
