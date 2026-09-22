@@ -105,6 +105,28 @@ class RedactedFieldsAreOmittedFromJsonIT extends BaseIntegrationTest {
     }
 
     @Test
+    void productResponseOmitsKujiSlackWebhookUrlWhenRedacted() throws Exception {
+        ProductResponseDTO dto = ProductResponseDTO.builder()
+                .id(UUID.randomUUID()).sku("SKU-WEBHOOK").kujiSlackWebhookUrl(null).build();
+
+        JsonNode json = serialize(dto);
+
+        assertThat(json.has("kujiSlackWebhookUrl")).isFalse();
+    }
+
+    @Test
+    void productListItemOmitsKujiSlackWebhookUrlWhenRedacted() throws Exception {
+        ProductListItemDTO dto = new ProductListItemDTO();
+        dto.setId(UUID.randomUUID());
+        dto.setSku("SKU-WEBHOOK-2");
+        dto.setKujiSlackWebhookUrl(null);
+
+        JsonNode json = serialize(dto);
+
+        assertThat(json.has("kujiSlackWebhookUrl")).isFalse();
+    }
+
+    @Test
     void shipmentResponseOmitsTotalCostAndItemUnitCost() throws Exception {
         ShipmentItemResponseDTO item = ShipmentItemResponseDTO.builder()
                 .id(UUID.randomUUID()).unitCost(null).build();

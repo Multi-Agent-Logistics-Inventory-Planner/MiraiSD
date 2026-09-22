@@ -28,6 +28,8 @@ public class ProductResponseDTO {
     private String letter;
     private Integer templateQuantity;
     private KujiType kujiType;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential).")
     private String kujiSlackWebhookUrl;
     private Integer packsPerBox;
     private String parentSku;

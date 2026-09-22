@@ -18,6 +18,10 @@ import java.util.UUID;
  *       {@code NOT NULL} columns, never coalesced); each nullable override column falls back to
  *       the global value only when that column itself is NULL on the row.</li>
  * </ul>
+ * <p>Both methods also accept {@link ProductSettingsDefaults}, the slim projection a list read
+ * uses instead of a full {@link Product} entity. The {@link Product} overloads delegate to the
+ * {@link ProductSettingsDefaults} ones via {@link ProductSettingsDefaults#from(Product)} so there
+ * is exactly one implementation of each branch's resolution logic.
  */
 public record EffectiveProductSettings(
         UUID siteId,
@@ -32,28 +36,36 @@ public record EffectiveProductSettings(
 ) {
 
     public static EffectiveProductSettings absent(UUID siteId, Product product) {
+        return absent(siteId, ProductSettingsDefaults.from(product));
+    }
+
+    public static EffectiveProductSettings absent(UUID siteId, ProductSettingsDefaults product) {
         return new EffectiveProductSettings(
                 siteId,
-                product.getId(),
+                product.id(),
                 false,
-                Boolean.TRUE.equals(product.getForecastingEnabled()),
-                product.getUnitCost(),
-                product.getMsrp(),
-                product.getReorderPoint(),
-                product.getTargetStockLevel(),
-                product.getLeadTimeDays());
+                Boolean.TRUE.equals(product.forecastingEnabled()),
+                product.unitCost(),
+                product.msrp(),
+                product.reorderPoint(),
+                product.targetStockLevel(),
+                product.leadTimeDays());
     }
 
     public static EffectiveProductSettings from(SiteProduct siteProduct, Product product) {
+        return from(siteProduct, ProductSettingsDefaults.from(product));
+    }
+
+    public static EffectiveProductSettings from(SiteProduct siteProduct, ProductSettingsDefaults product) {
         return new EffectiveProductSettings(
                 siteProduct.getSiteId(),
-                product.getId(),
+                product.id(),
                 Boolean.TRUE.equals(siteProduct.getIsStocked()),
                 Boolean.TRUE.equals(siteProduct.getForecastingEnabled()),
-                siteProduct.getUnitCost() != null ? siteProduct.getUnitCost() : product.getUnitCost(),
-                siteProduct.getMsrp() != null ? siteProduct.getMsrp() : product.getMsrp(),
-                siteProduct.getReorderPoint() != null ? siteProduct.getReorderPoint() : product.getReorderPoint(),
-                siteProduct.getTargetStockLevel() != null ? siteProduct.getTargetStockLevel() : product.getTargetStockLevel(),
-                siteProduct.getLeadTimeDays() != null ? siteProduct.getLeadTimeDays() : product.getLeadTimeDays());
+                siteProduct.getUnitCost() != null ? siteProduct.getUnitCost() : product.unitCost(),
+                siteProduct.getMsrp() != null ? siteProduct.getMsrp() : product.msrp(),
+                siteProduct.getReorderPoint() != null ? siteProduct.getReorderPoint() : product.reorderPoint(),
+                siteProduct.getTargetStockLevel() != null ? siteProduct.getTargetStockLevel() : product.targetStockLevel(),
+                siteProduct.getLeadTimeDays() != null ? siteProduct.getLeadTimeDays() : product.leadTimeDays());
     }
 }

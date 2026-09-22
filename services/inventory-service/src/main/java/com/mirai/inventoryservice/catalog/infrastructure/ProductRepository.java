@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.catalog.infrastructure;
 
 import com.mirai.inventoryservice.catalog.application.ProductListItemDTO;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
+import com.mirai.inventoryservice.catalog.application.ProductSettingsDefaults;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -107,9 +108,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT COALESCE(SUM(p.quantity), 0) FROM Product p WHERE p.parent.id = :parentId")
     Integer sumChildrenQuantities(@Param("parentId") UUID parentId);
 
-    // Batch query: get all product IDs that have at least one child (for hasChildren computation)
-    @Query("SELECT DISTINCT p.parent.id FROM Product p WHERE p.parent IS NOT NULL")
-    List<UUID> findAllParentIds();
 
     // Find products by preferred supplier
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH c.parent LEFT JOIN FETCH p.preferredSupplier WHERE p.preferredSupplier.id = :supplierId ORDER BY p.name")
@@ -124,6 +122,10 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     // not hydrate Product/Category/Supplier entities, just the named columns.
     // Drops description, notes, parent entity, children, createdAt to cut pooler egress.
 
+    // hasChildren is a correlated EXISTS against the same Product table the outer query already
+    // scans, computed in this one statement instead of a second, uncached full-table
+    // `SELECT DISTINCT parent_id` per list call (the single most-called query in the database
+    // before this fix -- see .specs/catalog-product-egress/spec.md AC-2).
     String LIST_ITEM_SELECT = "SELECT new com.mirai.inventoryservice.catalog.application.ProductListItemDTO("
             + "p.id, p.sku, p.name, p.imageUrl, p.isActive, "
             + "p.quantity, p.letter, p.templateQuantity, p.packsPerBox, "
@@ -132,7 +134,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             + "p.unitCost, p.msrp, "
             + "p.preferredSupplierId, s.displayName, p.preferredSupplierAuto, "
             + "p.updatedAt, "
-            + "c.id, c.name, c.parentId, c.slug, c.displayOrder, c.isActive, c.usesPacks"
+            + "c.id, c.name, c.parentId, c.slug, c.displayOrder, c.isActive, c.usesPacks, "
+            + "CASE WHEN EXISTS (SELECT 1 FROM Product ch WHERE ch.parentId = p.id) THEN true ELSE false END"
             + ") "
             + "FROM Product p "
             + "LEFT JOIN p.category c "
@@ -189,4 +192,17 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             + "p.category.id, p.preferredSupplierId, p.preferredSupplierAuto) "
             + "FROM Product p")
     List<ProductRef> findAllProductRefs();
+
+    // ==================== Slim Projection Query (SiteProductController.getSiteProducts) ====================
+    // Every site-scoped product-settings list read (hit on every Products page load) needs only
+    // these 9 scalar columns to compute EffectiveProductSettings -- no category, no parent, no
+    // preferredSupplier join. Replaces ProductService.getAllProducts() -> findAllWithCategories(),
+    // a JOIN FETCH across category/parent-category/parent-product for an endpoint that used none
+    // of them (.specs/catalog-product-egress/spec.md AC-3).
+
+    @Query("SELECT new com.mirai.inventoryservice.catalog.application.ProductSettingsDefaults("
+            + "p.id, p.sku, p.name, p.unitCost, p.msrp, "
+            + "p.reorderPoint, p.targetStockLevel, p.leadTimeDays, p.forecastingEnabled) "
+            + "FROM Product p")
+    List<ProductSettingsDefaults> findAllSettingsDefaults();
 }

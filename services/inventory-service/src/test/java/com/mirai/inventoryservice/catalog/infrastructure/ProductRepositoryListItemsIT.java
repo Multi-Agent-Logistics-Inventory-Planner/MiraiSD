@@ -79,4 +79,46 @@ class ProductRepositoryListItemsIT extends BaseKafkaIntegrationTest {
                 .contains(active.getId())
                 .doesNotContain(inactive.getId());
     }
+
+    /**
+     * Regression for the egress-audit fix: hasChildren used to require a separate uncached
+     * SELECT DISTINCT parent_id FROM products scan per list call (ProductService.withHasChildren)
+     * -- the single most-called query in the database. Folding it into LIST_ITEM_SELECT's
+     * projection removes that second query entirely; this proves the folded EXISTS subquery
+     * computes the same true/false result the old two-query approach did.
+     */
+    @Test
+    void findAllAsListItems_computesHasChildrenInTheSameQuery() {
+        Category category = categoryRepository.save(Category.builder()
+                .name("List Items HasChildren IT Category " + System.nanoTime())
+                .slug("list-items-haschildren-it-category-" + System.nanoTime())
+                .build());
+        Product parent = productRepository.save(Product.builder()
+                .sku("LIST-ITEMS-PARENT-" + System.nanoTime())
+                .name("Parent Product")
+                .category(category)
+                .isActive(true)
+                .build());
+        Product child = productRepository.save(Product.builder()
+                .sku("LIST-ITEMS-CHILD-" + System.nanoTime())
+                .name("Child Product")
+                .category(category)
+                .parent(parent)
+                .isActive(true)
+                .build());
+        Product leaf = productRepository.save(Product.builder()
+                .sku("LIST-ITEMS-LEAF-" + System.nanoTime())
+                .name("Leaf Product")
+                .category(category)
+                .isActive(true)
+                .build());
+
+        var listItems = productRepository.findAllAsListItems();
+        var byId = listItems.stream()
+                .collect(java.util.stream.Collectors.toMap(ProductListItemDTO::getId, i -> i));
+
+        assertThat(byId.get(parent.getId()).getHasChildren()).isTrue();
+        assertThat(byId.get(child.getId()).getHasChildren()).isFalse();
+        assertThat(byId.get(leaf.getId()).getHasChildren()).isFalse();
+    }
 }
