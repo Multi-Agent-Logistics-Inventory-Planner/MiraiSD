@@ -32,13 +32,12 @@ import {
   Location,
   ProductListItem,
 } from "@/types/api";
-import { useQuery } from "@tanstack/react-query";
 import { useSiteLocations } from "@/hooks/queries/use-locations";
 import {
   useActiveDisplaysForMachine,
   useActiveDisplaysByType,
 } from "@/hooks/queries/use-machine-displays";
-import { getProducts } from "@/lib/api/products";
+import { useProducts } from "@/hooks/queries/use-products";
 
 type SwapMode = "machine" | "products";
 type Step = "select-mode" | "select-machine" | "select-items" | "select-products";
@@ -294,11 +293,10 @@ export function TransferDisplayDialog({
   const [productsToAdd, setProductsToAdd] = useState<Set<string>>(new Set());
 
   // Fetch products (rootOnly to exclude child products/prizes; excludeCustomKuji to hide kuji parents)
-  const { data: products = [] } = useQuery({
-    queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
-    queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
-    enabled: open,
-  });
+  const { data: products = [] } = useProducts(
+    { rootOnly: true, excludeCustomKuji: true },
+    { enabled: open }
+  );
 
   // Fetch all machines of the same type
   const { data: machines = [], isLoading: isMachinesLoading } = useSiteLocations(open ? locationType : undefined);

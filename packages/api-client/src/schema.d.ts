@@ -3447,15 +3447,19 @@ export interface components {
             templateQuantity?: number;
         };
         CatalogProductResponse: {
+            category?: components["schemas"]["CategoryResponseDTO"];
             /** Format: uuid */
             categoryId?: string;
             categoryName?: string;
             /** Format: date-time */
             createdAt?: string;
             description?: string;
+            hasChildren?: boolean;
             /** Format: uuid */
             id?: string;
             imageUrl?: string;
+            /** @description Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential). */
+            kujiSlackWebhookUrl?: string;
             /** @enum {string} */
             kujiType?: "PREMADE" | "CUSTOM";
             letter?: string;
@@ -3465,6 +3469,10 @@ export interface components {
             packsPerBox?: number;
             /** Format: uuid */
             parentId?: string;
+            preferredSupplierAuto?: boolean;
+            /** Format: uuid */
+            preferredSupplierId?: string;
+            preferredSupplierName?: string;
             sku?: string;
             /** Format: int32 */
             templateQuantity?: number;
@@ -4577,6 +4585,7 @@ export interface components {
             id?: string;
             imageUrl?: string;
             isActive?: boolean;
+            /** @description Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential). */
             kujiSlackWebhookUrl?: string;
             /** @enum {string} */
             kujiType?: "PREMADE" | "CUSTOM";
@@ -4655,6 +4664,7 @@ export interface components {
             id?: string;
             imageUrl?: string;
             isActive?: boolean;
+            /** @description Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential). */
             kujiSlackWebhookUrl?: string;
             /** @enum {string} */
             kujiType?: "PREMADE" | "CUSTOM";

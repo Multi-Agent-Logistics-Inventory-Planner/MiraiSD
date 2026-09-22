@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.catalog.api;
 
 import com.mirai.inventoryservice.catalog.application.EffectiveProductSettings;
 import com.mirai.inventoryservice.catalog.application.ProductService;
+import com.mirai.inventoryservice.catalog.application.ProductSettingsDefaults;
 import com.mirai.inventoryservice.catalog.application.SiteAssortment;
 import com.mirai.inventoryservice.catalog.application.SiteProductService;
 import com.mirai.inventoryservice.catalog.application.SiteProductSettingsUpdate;
@@ -53,11 +54,14 @@ public class SiteProductController {
     public ResponseEntity<List<SiteProductResponse>> getSiteProducts(
             @PathVariable UUID siteId, Authentication authentication) {
         UUID contextSiteId = AuthorizedSiteContextHolder.require().siteId();
-        List<Product> products = productService.getAllProducts();
+        // Slim projection, not productService.getAllProducts() -> findAllWithCategories(): this
+        // response needs 9 scalar columns, never category/parent/preferredSupplier. See
+        // .specs/catalog-product-egress/spec.md AC-3.
+        List<ProductSettingsDefaults> products = productService.getAllProductSettingsDefaults();
         Map<UUID, SiteProduct> rows = siteAssortment.rowsForSite(contextSiteId);
 
         List<SiteProductResponse> body = products.stream()
-                .map(product -> toResponse(contextSiteId, product, rows.get(product.getId())))
+                .map(product -> toResponse(contextSiteId, product, rows.get(product.id())))
                 .peek(dto -> applyCostVisibility(dto, authentication))
                 .toList();
         return ResponseEntity.ok(body);
@@ -114,13 +118,17 @@ public class SiteProductController {
     }
 
     private SiteProductResponse toResponse(UUID siteId, Product product, SiteProduct row) {
+        return toResponse(siteId, ProductSettingsDefaults.from(product), row);
+    }
+
+    private SiteProductResponse toResponse(UUID siteId, ProductSettingsDefaults product, SiteProduct row) {
         EffectiveProductSettings effective = row != null
                 ? EffectiveProductSettings.from(row, product)
                 : EffectiveProductSettings.absent(siteId, product);
         return SiteProductResponse.builder()
-                .productId(product.getId())
-                .sku(product.getSku())
-                .name(product.getName())
+                .productId(product.id())
+                .sku(product.sku())
+                .name(product.name())
                 .isStocked(effective.isStocked())
                 .forecastingEnabled(effective.forecastingEnabled())
                 .unitCost(effective.unitCost())

@@ -8,12 +8,18 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 
 /**
- * Nulls out cost/MSRP fields the caller's role isn't permitted to see. Promoted out of
+ * Nulls out cost/MSRP fields the caller's role isn't permitted to see, and redacts the Kuji
+ * Slack webhook URL from callers who cannot edit products. Promoted out of
  * {@code ProductController}'s package-private statics (docs:
  * .specs/phase-5a-catalog-module-move/spec.md T-7/AC-5) into a real, shared class so both
  * {@code ProductController} and {@code SupplierController} (GET /api/suppliers/{id}/products)
  * apply it consistently — a gap review previously found that endpoint, along with
  * createProduct/updateProduct, bypassing this when it only covered GET-by-id/list.
+ *
+ * <p>{@code kujiSlackWebhookUrl} is a Slack incoming-webhook bearer credential — anyone holding
+ * it can post to that channel — not merely a display field, so it is gated on
+ * {@link Permission#PRODUCTS_UPDATE} (the same permission required to change it) rather than a
+ * dedicated view permission: viewing and holding the credential are the same trust level here.
  *
  * <p>Deliberately a plain static-method class, matching {@link RolePermissions}'s own style,
  * rather than a Spring-managed component — there is no state to inject, and callers already use
@@ -34,6 +40,9 @@ public final class CostVisibilityPolicy {
         if (!RolePermissions.hasPermission(authentication, Permission.MSRP_VIEW)) {
             dto.setMsrp(null);
         }
+        if (!RolePermissions.hasPermission(authentication, Permission.PRODUCTS_UPDATE)) {
+            dto.setKujiSlackWebhookUrl(null);
+        }
     }
 
     public static void applyCostVisibility(List<ProductResponseDTO> dtos, Authentication authentication) {
@@ -51,6 +60,9 @@ public final class CostVisibilityPolicy {
         }
         if (!RolePermissions.hasPermission(authentication, Permission.MSRP_VIEW)) {
             dto.setMsrp(null);
+        }
+        if (!RolePermissions.hasPermission(authentication, Permission.PRODUCTS_UPDATE)) {
+            dto.setKujiSlackWebhookUrl(null);
         }
     }
 }
