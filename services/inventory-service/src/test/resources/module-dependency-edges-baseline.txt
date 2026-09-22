@@ -28,6 +28,120 @@
 # has zero outgoing edges in this file (it is a pure leaf, same as it is for every other module
 # already depending on it - auth, identity, services, sites), so this cannot create a new cycle.
 #
+# Third reviewed addition: `inventory -> identity`, from inventory.application.LastActorActivityAdapter
+# implementing identity.application.LastActorActivityPort (.specs/phase-6-inventory/log.md T-2,
+# R-3). Resolves a real identity/inventory cycle risk (identity.application.UserService needed
+# stock-movement data for its last-activity display; inventory needs a managed identity.domain.User
+# for AuditLog.user, tracked separately as R-4) by inverting the dependency: the port lives in
+# identity (the consumer), the adapter lives in inventory (the provider), so the edge runs one way
+# only. Paired removal in the SAME review: `identity -> models` and `identity -> repositories` are
+# deleted below - UserService was their only source in identity/** (verified by grep), and it no
+# longer imports StockMovement or StockMovementRepository now that it delegates to the port.
+# `identity -> inventory` does NOT appear anywhere in this file, confirmed by grep - approving only
+# the `inventory -> identity` direction is what keeps this a DAG edge rather than a cycle the
+# moduleDependencyEdgesMatchApprovedBaseline check cannot itself detect once both directions are
+# individually approved (see LastActorActivityPort's Javadoc for the same point).
+#
+# Fourth reviewed addition (2026-09-09, .specs/phase-6-inventory/log.md T-3): the mechanical move
+# of LocationInventory, StockMovement, their repositories/specifications/projection, and the three
+# inventory exceptions out of the legacy `models`/`repositories`/`exceptions` packages into
+# `inventory.domain`/`inventory.infrastructure`. This is a pure package relocation - every one of
+# the edges below already existed as `<source> -> models`, `<source> -> repositories`, or
+# `<source> -> exceptions` (already approved) before the move; only the *target* package name
+# changed, not the underlying dependency:
+#   `analytics -> inventory`   (SalesRollupRecomputeService -> StockMovementRepository)
+#   `controllers -> inventory` (legacy inventory controllers -> the moved repositories)
+#   `dtos -> inventory`        (AuditLogMapper/StockMovementMapper/AuditLogSpecifications -> StockMovement)
+#   `exceptions -> inventory`  (GlobalExceptionHandler -> the three moved exception classes)
+#   `models -> inventory`      (AuditLog.movements -> StockMovement; the R-2 transitional-debt edge,
+#                                the mirror side of the pre-existing `inventory -> models` edge -
+#                                recorded, not newly introduced: this is the SAME bidirectional
+#                                AuditLog<->StockMovement JPA association that already existed
+#                                entirely inside `models.audit` before the move, so rule 6.1.8
+#                                treats this as an existing relationship carried across the
+#                                boundary, not a new cross-module JPA relationship)
+#   `services -> inventory`    (StockMovementService/LocationInventoryService/ShipmentService/
+#                                KujiBoxService/MachineDisplayService -> the moved classes)
+# Two edges are genuinely new dependency *directions*, both from code that already lived inside
+# the moved files, now recomputed against the new module boundary rather than freshly written:
+#   `inventory -> sites`  (LocationInventory's `location`/`site` associations -> sites.domain)
+#   `inventory -> dtos`   (InventoryTotalsRepository -> dtos.responses.InventoryTotalDTO;
+#                          StockMovementSpecifications -> dtos.requests.AuditLogFilterDTO)
+#   `inventory -> utils`  (InventoryTotalsRepository -> utils.TimestampUtils)
+# `inventory -> dtos` paired with the `dtos -> inventory` edge above is the second genuinely
+# bidirectional pair in this file (alongside `models <-> inventory`) - same pre-existing-tangle
+# character, not new coupling introduced by this move.
+# Pruned in the SAME review: `inventory -> repositories` - grep confirmed `inventory/**` no longer
+# imports anything from the legacy `repositories` package once its own repositories moved out of it.
+#
+# Fifth reviewed addition (2026-09-09, .specs/phase-6-inventory/log.md T-4): moved
+# StockMovementService, LocationInventoryService and InventoryAggregateService out of the legacy
+# `services` package into `inventory.application`. Mechanical, same underlying dependencies as
+# before under a renamed source package - no behavior change. Re-adds `inventory -> repositories`
+# (pruned two entries above): StockMovementService still reaches `AuditLogRepository` via the
+# `repositories.*` wildcard import (AuditLogRepository itself has not moved - that is `audit`
+# module territory, Stage G/Phase 7, out of this checkpoint's scope). Every other edge this move
+# touches was already covered by the existing `inventory -> {catalog,identity,models,services,
+# sites,dtos,utils}` lines above (StockMovementService already depended on `services.
+# {EventOutboxService,SupabaseBroadcastService}`, `sites.application.LocationService`, etc. before
+# the move; only the *source* module of those dependencies changed, from `services` to
+# `inventory`, which these lines already approve). No new `services -> inventory` edge either:
+# EventOutboxService/KujiBoxService/ShipmentService (still in `services`) already had that edge
+# approved from calling the pre-move `services.StockMovementService`; they call the same class
+# under its new package now. As part of T-4's R-8 consolidation (.specs/phase-6-inventory/log.md),
+# `LocationService.DEFAULT_SITE_CODE`/`getDefaultSiteId()` went public and both moved services now
+# call it instead of duplicating the lookup - this removed their `SiteRepository` dependency
+# entirely, so no `inventory -> sites.infrastructure`-shaped concern arises from that change either
+# (the edge check is module-level, not package-level, and `inventory -> sites` was already
+# approved).
+#
+# Sixth reviewed addition (2026-09-10, .specs/phase-6-inventory/log.md T-6): moved
+# InventoryAggregateController/StockMovementController and their DTOs/mappers into inventory.api,
+# and LocationAggregateController/Service/Repository (+ LocationWithCountsDTO) into
+# sites.api/sites.application/sites.infrastructure per R-1. Four new edges, all mechanical (same
+# underlying dependency as before the move, only the source module's name changed):
+#   `inventory -> validation`  (TransferInventoryRequestDTO's @ValidTransferDestination annotation
+#                                 -- was `dtos -> validation`, already approved, before the move)
+#   `validation -> inventory`  (TransferDestinationValidator's ConstraintValidator<..,
+#                                 TransferInventoryRequestDTO> -- was `validation -> dtos`, already
+#                                 approved, before the move)
+#   `sites -> models`          (LocationAggregateController/Service use models.enums.LocationType --
+#                                 was `controllers -> models`/`services -> models`, both already
+#                                 approved, before the move)
+#   `sites -> utils`           (LocationAggregateRepository uses utils.TimestampUtils -- was
+#                                 `repositories -> utils`, already approved, before the move)
+# `sites -> models` combined with the pre-existing `models -> sites` edge (AuditLog-era R-2
+# precedent) is a third bidirectional pair in this file, alongside `models <-> inventory` and
+# `inventory <-> dtos` above -- same already-accepted legacy-technical-package tangle character,
+# not a new business-module cycle: `models` here is exactly the legacy `models.enums` package
+# (LocationType), not a real aggregate relationship, and `sites` gains no new edge into any real
+# business module from this move.
+# InventoryAggregateController's `getInventoryTotals` also stopped reaching
+# InventoryTotalsRepository directly (now goes through InventoryQueries), so no new
+# `inventory -> inventory` edge (same-module, not tracked) and the pre-existing
+# `controllers -> inventory` edge for this specific call site is retired (a controller reaching a
+# repository directly used to be one of ArchitectureTest's frozen
+# repositoriesAreOnlyAccessedByServicesOrRepositories violations; regenerating that store shrank
+# it by exactly one entry for this reason).
+# `LocationInventoryController`/`LocationInventoryMapper`/`LocationInventoryResponseDTO`/
+# `InventoryRequestDTO` are deliberately NOT moved into `inventory.api` (R-9): LocationInventoryResponseDTO
+# .item is catalog.api.ProductSummaryDTO, and LocationInventoryMapper `uses` catalog.api.ProductMapper
+# -- moving them into inventory.api would create an inventory.api -> catalog.api edge, which
+# modulesDoNotDependOnAnotherModulesApi forbids unconditionally (no baseline/exemption mechanism,
+# unlike the frozen-store or module-edge rules). Resolving it properly needs a catalog-owned
+# application-layer product-summary read contract inventory.api can consume instead of catalog's
+# own transport DTO -- real design work, not a mechanical move.
+#
+# 6e (T-6e-be-9) deleted these four classes outright, on the theory that their only remaining
+# caller (the legacy LocationInventoryController's own GET/POST/DELETE routes) had no production
+# traffic. The 6e independent review's R-3 finding reverted that deletion: the documented
+# compatibility-removal gate (docs/baseline/api-v1-map.md) needs access-log evidence of no legacy
+# traffic plus a stabilization window on a *released* version -- unsatisfiable when the
+# deprecation headers for these exact routes only just landed on this same unmerged branch. All
+# four classes, and the `inventory.api -> catalog.api` avoidance rationale above, are current
+# again as of that revert (2026-09-15). See log.md's "Review-driven fix: 6e independent review
+# findings" section.
+#
 # This replaces the previous FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` check, which
 # froze the full, multi-line cycle-path text (including specific example call-site edges, capped
 # by ArchUnit's own truncation) for the pre-existing catalog/dtos/exceptions/identity/models/
@@ -44,7 +158,32 @@
 # cross-module cycle, while staying small enough to actually read during review. It does not by
 # itself resolve the pre-existing tangle within this edge set - that is unchanged, already-accepted
 # debt.
+#
+# Seventh reviewed addition (2026-09-12, .specs/phase-6-inventory/log.md T-6c-10): `exceptions ->
+# shared`, from GlobalExceptionHandler mapping the new
+# shared.idempotency.IdempotencyConflictException to 409, the same pattern it already uses for
+# every other domain exception (SiteProductVersionConflictException, etc.). `shared` remains a
+# pure leaf in this file (it has zero outgoing edges into any module, confirmed by grep), so this
+# cannot create a new cycle - the same reasoning as the `catalog -> shared`/`inventory -> shared`
+# additions above.
+#
+# Eighth reviewed addition (2026-09-13, .specs/phase-6-inventory/log.md T-6c-11/T-6c-12):
+# `inventory -> shared`, from the new v1 controllers (SiteInventoryController,
+# SiteInventoryMutationController) reading shared.web.AuthorizedSiteContextHolder (the same
+# site-scoped-controller pattern sites.api.SiteLocationController already uses via `sites ->
+# shared`) and, for the mutation controller, calling shared.idempotency.CommandIdempotencyService
+# and reading shared.correlation.IdempotencyKeyContext.HEADER_NAME (Q-6c-3/T-6c-10/T-6c-12).
+# `shared` remains a pure leaf in this file (zero outgoing edges, confirmed by grep), so this
+# cannot create a new cycle - same reasoning as every other `<module> -> shared` addition above.
+# Ninth reviewed addition (2026-09-16, Phase 6 gap closure): `controllers -> shared` and
+# `sites -> identity` are intentionally limited to retained unversioned HTTP compatibility
+# adapters. LocationInventoryController consumes AuthorizedSiteContext after resolving MAIN, and
+# LocationController/StorageLocationController/LocationAggregateController delegate MAIN-context
+# construction to identity.application.LegacyMainSiteContextResolver. This keeps trusted actor and
+# membership derivation at the HTTP boundary. Remove both edges with these deprecated adapters
+# after the documented legacy removal gate is met.
 analytics -> catalog
+analytics -> inventory
 analytics -> models
 analytics -> repositories
 auth -> identity
@@ -60,30 +199,39 @@ controllers -> analytics
 controllers -> catalog
 controllers -> dtos
 controllers -> identity
+controllers -> inventory
 controllers -> models
 controllers -> repositories
 controllers -> services
 controllers -> sites
+controllers -> shared
 displays -> catalog
 displays -> repositories
 dtos -> catalog
 dtos -> identity
+dtos -> inventory
 dtos -> models
 dtos -> services
 dtos -> sites
 dtos -> validation
 exceptions -> catalog
 exceptions -> identity
+exceptions -> inventory
+exceptions -> shared
 exceptions -> sites
-identity -> models
-identity -> repositories
 identity -> services
 identity -> shared
 identity -> sites
 inventory -> catalog
+inventory -> dtos
+inventory -> identity
 inventory -> models
 inventory -> repositories
 inventory -> services
+inventory -> shared
+inventory -> sites
+inventory -> utils
+inventory -> validation
 jobs -> repositories
 jobs -> services
 kuji -> catalog
@@ -91,6 +239,7 @@ kuji -> models
 kuji -> repositories
 models -> catalog
 models -> identity
+models -> inventory
 models -> sites
 repositories -> dtos
 repositories -> identity
@@ -100,6 +249,7 @@ services -> catalog
 services -> dtos
 services -> exceptions
 services -> identity
+services -> inventory
 services -> kafka
 services -> models
 services -> repositories
@@ -107,6 +257,10 @@ services -> shared
 services -> sites
 shipments -> catalog
 shipments -> repositories
+sites -> models
 sites -> shared
+sites -> identity
+sites -> utils
 validation -> dtos
+validation -> inventory
 validation -> models

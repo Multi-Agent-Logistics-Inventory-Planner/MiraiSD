@@ -1,8 +1,23 @@
 "use client";
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { LocationType, type Location } from "@/types/api";
-import { getLocationsByType, getLocationById } from "@/lib/api/locations";
+import { useQuery, skipToken, type UseQueryResult } from "@tanstack/react-query";
+import { LocationType, STORAGE_LOCATION_CODES, type Location } from "@/types/api";
+import { getLocationsByType, getLocationById, getSiteLocations } from "@/lib/api/locations";
+
+import { useCurrentSite } from "./use-current-site";
+
+/** Phase 6 inventory pickers. Legacy hooks below remain for Phase 7 consumers. */
+export function useSiteLocations(locationType?: LocationType) {
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+  const query = useQuery({
+    queryKey: ["locations", siteId, locationType],
+    queryFn: siteId && locationType && locationType !== LocationType.NOT_ASSIGNED
+      ? () => getSiteLocations(siteId, STORAGE_LOCATION_CODES[locationType])
+      : skipToken,
+  });
+  const error = siteError ?? (!siteId && !isSiteLoading ? new Error("No active site") : null) ?? query.error;
+  return { ...query, siteId, error, isLoading: isSiteLoading || query.isLoading };
+}
 
 export function useLocations(locationType: LocationType) {
   return useQuery({

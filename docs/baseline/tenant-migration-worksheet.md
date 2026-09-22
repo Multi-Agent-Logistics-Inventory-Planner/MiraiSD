@@ -31,7 +31,7 @@ Migrations use expand, backfill to `MAIN`, verify, constrain and only then enfor
 | `shipment_items` | Through shipment | Derived-site | Shipments | Enforce parent ownership; add explicit site only if query/constraint evidence requires it |
 | `shipment_item_allocations` | Through shipment/location | Derived-site | Shipments | Enforce same-site shipment and location constraints |
 | `webhook_events` | Through tracker/shipment resolution | Site-owned | Shipments | Resolve and persist site before applying a mutation |
-| `machine_display` / `machine_displays` | Location/product based; physical name disputed | Site-owned | Displays | Verify production name, then add/backfill/require site and same-site location constraints |
+| `machine_display` | Location/product based | Site-owned | Displays | Add/backfill/require site and same-site location constraints |
 | `kuji_boxes` | Location/product based | Site-owned | Kuji | Add/backfill/require site |
 | `kuji_box_tiers` | Through box | Derived-site | Kuji | Enforce parent box ownership |
 | `lootboxes` | Nullable forward-compatible `site_id` | Site-owned | Lootbox | Backfill and require site if crates differ by store |
@@ -46,7 +46,7 @@ Migrations use expand, backfill to `MAIN`, verify, constrain and only then enfor
 | `audit_logs` | Entity/context dependent | Site-owned | Audit | Add/backfill/require site, actor and correlation context |
 | `forecast_predictions` | Unique by product/time | Site-owned | Forecasting | Add site; unique/index by site/product/time |
 | `analytics_daily_rollup` | Organization-wide | Site-owned | Analytics | Add site to dimensions and uniqueness |
-| `analytics_monthly_rollup` | Organization-wide | Site-owned | Analytics | Add site to dimensions and uniqueness |
+| `analytics_monthly_rollup` | Does not exist | None | Analytics | Do not create; Phase 7 deletes the dead dev-only mapped code path |
 | `analytics_category_demand_rollup` | Category/time | Site-owned | Analytics | Add site to dimensions and uniqueness |
 | `mv_lead_time_stats` | Organization-wide view | Site-aware view | Forecasting | Redefine by site/product/supplier dimensions as required |
 | `event_outbox` | Technical, payload not universally site-aware | Platform + site context | Shared events | Add claim/lease state and require site context for site events |
@@ -67,7 +67,7 @@ Migrations use expand, backfill to `MAIN`, verify, constrain and only then enfor
 ## Verification required before schema work
 
 - Export the production schema and row counts without data values.
-- Resolve `machine_display` versus `machine_displays`.
+- Confirm `machine_display` row counts and site source.
 - Confirm whether bootstrap-only tables still exist or contain rows.
 - Confirm every current `site_id` nullable/non-null state and foreign key.
 - Confirm Supabase functions, triggers, views and realtime publications not represented by JPA.

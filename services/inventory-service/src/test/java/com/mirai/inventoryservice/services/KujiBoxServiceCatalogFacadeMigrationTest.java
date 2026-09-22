@@ -1,6 +1,8 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.application.ProductService;
@@ -13,9 +15,9 @@ import com.mirai.inventoryservice.dtos.requests.kuji.NewKujiBoxTierDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
 import com.mirai.inventoryservice.dtos.requests.kuji.PatchKujiTierRequestDTO;
 import com.mirai.inventoryservice.models.audit.AuditLog;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.kuji.KujiBox;
 import com.mirai.inventoryservice.models.kuji.KujiBoxTier;
 import com.mirai.inventoryservice.sites.domain.Location;
@@ -24,10 +26,8 @@ import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,15 +74,13 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
     @Mock private CatalogEntityAccess catalogEntityAccess;
     @Mock private ProductStockStateWriter productStockStateWriter;
     @Mock private LocationRepository locationRepository;
-    @Mock private LocationInventoryRepository locationInventoryRepository;
+    @Mock private InventoryOperations inventoryOperations;
+    @Mock private InventoryQueries inventoryQueries;
     @Mock private MachineDisplayRepository machineDisplayRepository;
     @Mock private AuditLogRepository auditLogRepository;
-    @Mock private StockMovementRepository stockMovementRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
     @Mock private SupabaseBroadcastService broadcastService;
-    @Mock private EventOutboxService eventOutboxService;
-    @Mock private StockMovementService stockMovementService;
     @Mock private EntityManager entityManager;
     @Mock private ProductService productService;
 
@@ -104,15 +102,13 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
                 catalogEntityAccess,
                 productStockStateWriter,
                 locationRepository,
-                locationInventoryRepository,
+                inventoryOperations,
+                inventoryQueries,
                 machineDisplayRepository,
                 auditLogRepository,
-                stockMovementRepository,
                 userRepository,
                 notificationService,
                 broadcastService,
-                eventOutboxService,
-                stockMovementService,
                 entityManager,
                 productService);
 
@@ -140,7 +136,7 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
             return b;
         });
         when(kujiBoxTierRepository.save(any(KujiBoxTier.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(inventoryOperations.recordMovement(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -172,7 +168,7 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
         when(catalogQueries.findById(linkedId)).thenReturn(Optional.of(ProductRef.from(linkedEntity)));
         when(catalogEntityAccess.getReference(linkedId)).thenReturn(linkedEntity);
 
-        when(locationInventoryRepository.findByLocation_IdAndProduct_Id(sourceLocationId, linkedId))
+        when(inventoryOperations.findInventory(sourceLocationId, linkedId))
                 .thenReturn(Optional.of(LocationInventory.builder()
                         .id(UUID.randomUUID()).location(sourceLocation).site(site)
                         .product(linkedEntity).quantity(10).build()));
@@ -309,7 +305,7 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
         when(catalogQueries.findById(linkedId)).thenReturn(Optional.of(ProductRef.from(linkedEntity)));
         when(catalogEntityAccess.getReference(linkedId)).thenReturn(linkedEntity);
 
-        when(locationInventoryRepository.findByLocation_IdAndProduct_Id(sourceLocationId, linkedId))
+        when(inventoryOperations.findInventory(sourceLocationId, linkedId))
                 .thenReturn(Optional.of(LocationInventory.builder()
                         .id(UUID.randomUUID()).location(sourceLocation).site(site)
                         .product(linkedEntity).quantity(10).build()));

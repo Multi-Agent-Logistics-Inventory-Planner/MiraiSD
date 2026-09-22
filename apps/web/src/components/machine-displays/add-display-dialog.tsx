@@ -112,6 +112,7 @@ export function AddDisplayDialog({
   const productsQuery = useQuery({
     queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
     queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
+    enabled: open,
   });
 
   const products = productsQuery.data ?? [];

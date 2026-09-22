@@ -392,9 +392,11 @@ jobs:
 
             # Verify required configuration is present without printing values.
             for key in SUPABASE_DB_URL SUPABASE_DB_USERNAME SUPABASE_DB_PASSWORD \
-                       INVENTORY_SERVICE_IMAGE_DIGEST WEB_IMAGE_DIGEST; do
+                       INVENTORY_SERVICE_IMAGE_DIGEST WEB_IMAGE_DIGEST \
+                       MESSAGING_SERVICE_IMAGE_DIGEST FORECASTING_SERVICE_IMAGE_DIGEST; do
               if ! grep -q "^${key}=.\+" .env; then
                 echo "Missing required configuration: $key"
+                echo "If an image digest is missing, manually run Deploy on main to rebuild all images and restore the digests."
                 exit 1
               fi
             done

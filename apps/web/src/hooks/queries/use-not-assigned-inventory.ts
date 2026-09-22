@@ -1,21 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getStorageLocationInventory } from "@/lib/api/inventory";
-import { getStorageLocationByCode } from "@/lib/api/locations";
-import type { LocationInventory } from "@/types/api";
+import { LocationType } from "@/types/api";
+import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 
 /**
- * Hook to fetch NOT_ASSIGNED inventory.
- * Backend already excludes child/prize products via parent_id IS NULL.
+ * Site-scoped NOT_ASSIGNED inventory - a thin wrapper over useLocationInventory, which resolves
+ * the site's real NOT_ASSIGNED location and excludes kuji-child/CUSTOM-kuji-parent rows (T-6d-9).
  */
 export function useNotAssignedInventory() {
-  return useQuery<LocationInventory[]>({
-    queryKey: ["notAssignedInventory"],
-    queryFn: async () => {
-      const storageLocation = await getStorageLocationByCode("NOT_ASSIGNED");
-      return getStorageLocationInventory(storageLocation.id);
-    },
-    staleTime: 30_000,
-  });
+  return useLocationInventory(LocationType.NOT_ASSIGNED, undefined);
 }

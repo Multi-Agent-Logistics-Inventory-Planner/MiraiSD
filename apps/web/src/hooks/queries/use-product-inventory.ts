@@ -1,16 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, skipToken } from "@tanstack/react-query";
 import type { ProductListItem } from "@/types/api";
 import type { StockStatus } from "@/types/dashboard";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useSiteProducts } from "@/hooks/queries/use-site-products";
-import { getInventoryTotals } from "@/lib/api/inventory";
+import { fetchSequencedInventoryTotals } from "@/hooks/realtime/inventory-refresh";
+import type { SiteInventoryTotal } from "@/lib/api/site-inventory";
 
 export interface ProductWithInventory {
   product: ProductListItem;
-  /** Legacy totals for MAIN; undefined when inventory display is withheld. */
+  /**
+   * Present for both the legacy and the site-scoped view as of Phase 6 checkpoint 6d (restored
+   * from the site-scoped totals route - see .specs/phase-6-inventory/spec.md AC-6). Was withheld
+   * on the site-scoped view during Phase 5 (phase-5d spec.md AC-6b) before Phase 6 existed.
+   */
   totalQuantity?: number;
   lastUpdatedAt?: string;
   status?: StockStatus;
@@ -35,81 +40,73 @@ function getStatus(totalQuantity: number, reorderPoint?: number): StockStatus {
   return "good";
 }
 
-export function useProductInventory(rootOnly = false) {
-  const productsQuery = useProducts(rootOnly);
-  const totalsQuery = useQuery({
-    queryKey: ["inventoryTotals"],
-    queryFn: getInventoryTotals,
-    // No staleTime override: this fetches an unpaginated, whole-catalog
-    // aggregate (InventoryTotalsRepository.findAllInventoryTotals). At the old
-    // 30s staleTime, every remount of a component that calls this hook
-    // (products page, location-detail-sheet) past 30s re-ran the full-table
-    // query — the dominant contributor to Supabase pooler egress. Falls back
-    // to the app-wide 5-minute default in lib/query-client.ts.
-    // See refs/product-inventory-query-egress.md.
-  });
-
-  const data: ProductWithInventory[] | null = useMemo(() => {
-    const products = productsQuery.data;
-    const totals = totalsQuery.data;
-    if (!products) return null;
-
-    const totalsByItemId = new Map(
-      (totals ?? []).map((t) => [t.itemId, t.totalQuantity])
-    );
-
-    return products.map((p) => {
-      // Use actual inventory across all storage locations (parent's own stock)
-      const qty = totalsByItemId.get(p.id) ?? 0;
-      return {
-        product: p,
-        totalQuantity: qty,
-        lastUpdatedAt: totals?.find((t) => t.itemId === p.id)?.lastUpdatedAt ?? p.updatedAt,
-        status: getStatus(qty, p.reorderPoint),
-      };
-    });
-  }, [productsQuery.data, totalsQuery.data]);
-
-  return {
-    data,
-    isLoading: productsQuery.isLoading || totalsQuery.isLoading,
-    error: productsQuery.error ?? totalsQuery.error,
-  };
-}
-
-// --- Site-scoped view (phase-5d T-5) ---------------------------------------
+// --- Site-scoped view (phase-5d T-5, quantity restored in phase-6 T-6d-4) ------------------
 // Joins the untouched legacy getProducts() (catalog/Kuji display fields - name, sku, category,
 // imageUrl, kujiType, hasChildren, hasActiveBox, preferredSupplier*) with getSiteProducts (the
-// *only* source for site_products-owned fields - isStocked, money/settings fields, version).
-// See .specs/phase-5d-catalog-v1-and-web/spec.md AC-6a: each field's source is fixed, never a
-// fallback chain. Temporary MAIN inventory exception: see temp-restore-legacy-inventory-counts.
+// *only* source for site_products-owned fields - isStocked, money/settings fields, version) and,
+// as of 6d, getSiteInventoryTotals (the *only* source for quantity/status - AC-6). See
+// .specs/phase-5d-catalog-v1-and-web/spec.md AC-6a: each field's source is fixed, never a
+// fallback chain.
 
 /**
- * Site-owned settings with temporary legacy counts for MAIN until Phase 6 scoped reads.
- * Never join cached or late legacy totals into another site.
+ * Site-scoped product list for the Products page. Quantity/status come from the site-scoped
+ * totals route (T-6d-4) - never falls back to the legacy, unscoped inventory totals.
  */
 export function useSiteProductInventory(rootOnly = false) {
   const productsQuery = useProducts(rootOnly);
   const siteProductsQuery = useSiteProducts();
-  const showInventory = siteProductsQuery.siteCode === "MAIN" &&
-    Boolean(siteProductsQuery.siteId) && !siteProductsQuery.isLoading && !siteProductsQuery.error;
-  const totalsQuery = useQuery({
-    queryKey: ["inventoryTotals"],
-    queryFn: showInventory ? getInventoryTotals : skipToken,
+  const siteId = siteProductsQuery.siteId;
+  const queryClient = useQueryClient();
+
+  // Split into a fetch-trigger query and a read-only cache mirror (follow-up review, fifth
+  // round) - a single useQuery whose own queryFn write into ["inventoryTotals", siteId] could
+  // never be fully protected from React Query's own unconditional, un-interceptable application
+  // of that queryFn's return value, which happens some microtask hops after the function
+  // returns on React Query's own schedule. No amount of internal delay/yielding closes that gap
+  // (verified: a longer competing delay always defeats a shorter mitigating one). The only real
+  // fix is to make sure nothing ever registers a queryFn for the real key at all, so every write
+  // to it goes exclusively through the one atomic path (`commitFullTotals`, via
+  // `fetchSequencedInventoryTotals` here or a targeted flush elsewhere) with nothing left to
+  // race against.
+  //
+  // The trigger query drives the actual network fetch and lifecycle (mount, window focus,
+  // staleTime, manual refetch) on a private key nothing reads for display; its own queryFn
+  // return value gets written only into that throwaway key by React Query, which is harmless
+  // since nothing consumes it. The real work - claiming sequence and atomically committing the
+  // merged result - already happened synchronously inside fetchSequencedInventoryTotals before
+  // it returned.
+  const totalsFetchTrigger = useQuery({
+    queryKey: ["inventoryTotalsFetchTrigger", siteId],
+    queryFn: siteId ? () => fetchSequencedInventoryTotals(queryClient, siteId) : skipToken,
+  });
+
+  // The mirror: never fetches on its own (queryFn: skipToken), so React Query never
+  // independently applies anything to this key - it only ever observes whatever `setQueryData`
+  // writes here (from the trigger above, from a targeted flush, or from recovery), and re-renders
+  // reactively when any of those commit. This is the only reader of the real, shared cache key.
+  const totalsQuery = useQuery<SiteInventoryTotal[]>({
+    queryKey: ["inventoryTotals", siteId],
+    queryFn: skipToken,
   });
 
   const data: ProductWithInventory[] | null = useMemo(() => {
     const products = productsQuery.data;
     const siteProducts = siteProductsQuery.data;
-    if (!products || !siteProducts || (showInventory && !totalsQuery.data)) return null;
-
-    const totalsById = new Map((showInventory ? totalsQuery.data ?? [] : []).map((t) => [t.itemId, t]));
+    // Wait for the totals query's own data too - not just products/siteProducts - otherwise
+    // every row would fabricate `totalQuantity: 0`/`status: "out-of-stock"` while totals are
+    // still in flight (review finding 5). The Products page's own loading skeleton happened to
+    // mask this, but location-detail-sheet.tsx's embedded ProductModal has no such gate around
+    // this hook and would flash a false out-of-stock state. `siteId` gates the totals query
+    // itself (skipToken until resolved), so once siteId is known we must also wait for its data.
+    if (!products || !siteProducts || (siteId && totalsQuery.data === undefined)) return null;
 
     const bySiteProductId = new Map(siteProducts.map((sp) => [sp.productId, sp]));
+    const totalsByProductId = new Map((totalsQuery.data ?? []).map((t) => [t.productId, t]));
 
     return products.map((p) => {
       const sp = bySiteProductId.get(p.id);
-      const total = totalsById.get(p.id);
+      const total = totalsByProductId.get(p.id);
+      const qty = total?.totalQuantity ?? 0;
       return {
         product: {
           ...p,
@@ -120,22 +117,35 @@ export function useSiteProductInventory(rootOnly = false) {
           leadTimeDays: sp?.leadTimeDays,
           forecastingEnabled: sp?.forecastingEnabled,
         },
-        ...(showInventory ? {
-          totalQuantity: total?.totalQuantity ?? 0,
-          lastUpdatedAt: total?.lastUpdatedAt ?? p.updatedAt,
-        } : {}),
         isStocked: sp?.isStocked ?? false,
         siteProductVersion: sp?.version ?? null,
+        totalQuantity: qty,
+        lastUpdatedAt: total?.lastUpdatedAt ?? p.updatedAt,
+        status: getStatus(qty, sp?.reorderPoint),
       };
     });
-  }, [productsQuery.data, siteProductsQuery.data, showInventory, totalsQuery.data]);
+  }, [productsQuery.data, siteProductsQuery.data, totalsQuery.data, siteId]);
+
+  // The mirror query never fetches on its own, so its own isLoading/error are always
+  // false/undefined regardless of whether data has arrived - that state has to come from the
+  // trigger query, which is the one that actually fetches. But the trigger's error is *only*
+  // ever about its own attempt: it stays set even after some other writer (a targeted flush, a
+  // realtime notification, or the trigger's own next successful retry landing via recovery
+  // elsewhere) has already committed fresh, authoritative data into the mirror directly - since
+  // recovery writes the mirror, not the trigger, nothing ever clears the trigger's stale error
+  // on its own (follow-up review, sixth round). Surfacing that stale error once the mirror
+  // plainly has usable data would show "Could not load products" over a page that, in fact,
+  // just loaded successfully through a different path - so the trigger's error is suppressed
+  // once the mirror has any data, without touching how either query writes (the split/write
+  // separation from the fifth round is unchanged; this only changes what the hook reports).
+  const totalsError = totalsQuery.data === undefined ? totalsFetchTrigger.error : null;
 
   return {
     data,
+    siteId,
     siteCode: siteProductsQuery.siteCode,
-    showInventory,
-    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || (showInventory && totalsQuery.isLoading),
-    error: productsQuery.error ?? siteProductsQuery.error ?? (showInventory ? totalsQuery.error : null),
+    isLoading: productsQuery.isLoading || siteProductsQuery.isLoading || totalsFetchTrigger.isLoading,
+    error: productsQuery.error ?? siteProductsQuery.error ?? totalsError,
   };
 }
 

@@ -104,7 +104,7 @@ export function compareProducts(
       return dir * a.product.name.localeCompare(b.product.name);
 
     case "status": {
-      // Match the temporary legacy Active/Inactive status shown in the table and modal.
+      // Match the Active/Inactive status shown in the table and modal.
       const aVal = a.product.isActive ? 0 : 1;
       const bVal = b.product.isActive ? 0 : 1;
       return dir * (aVal - bVal);

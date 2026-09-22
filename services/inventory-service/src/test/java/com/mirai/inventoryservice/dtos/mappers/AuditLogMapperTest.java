@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.dtos.responses.AuditLogEntryDTO;
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;

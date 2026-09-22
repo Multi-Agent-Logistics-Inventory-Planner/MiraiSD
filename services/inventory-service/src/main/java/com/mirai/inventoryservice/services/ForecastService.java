@@ -9,9 +9,8 @@ import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.InventoryTotalsRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
-import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
+import com.mirai.inventoryservice.inventory.application.StockMovementHistoryEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,8 +36,7 @@ public class ForecastService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final CatalogQueries catalogQueries;
     private final CatalogPricing catalogPricing;
-    private final InventoryTotalsRepository inventoryTotalsRepository;
-    private final StockMovementRepository stockMovementRepository;
+    private final InventoryQueries inventoryQueries;
 
     @Transactional(readOnly = true)
     public Page<ForecastPredictionResponseDTO> getAllForecasts(Pageable pageable) {
@@ -67,7 +65,7 @@ public class ForecastService {
                     ProductRef product = catalogQueries.findById(p.getItemId()).orElse(null);
                     BigDecimal unitCost = catalogPricing.findPricing(p.getItemId())
                             .map(ProductPricing::unitCost).orElse(null);
-                    Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+                    Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
                     return convertToDTO(p, product, unitCost, stockMap);
                 })
                 .orElse(null);
@@ -84,7 +82,7 @@ public class ForecastService {
                     ProductRef product = catalogQueries.findById(p.getItemId()).orElse(null);
                     BigDecimal unitCost = catalogPricing.findPricing(p.getItemId())
                             .map(ProductPricing::unitCost).orElse(null);
-                    Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+                    Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
                     return convertToDTO(p, product, unitCost, stockMap);
                 })
                 .orElse(null);
@@ -105,13 +103,13 @@ public class ForecastService {
         if (prediction == null) {
             return null;
         }
-        List<StockMovementHistoryView> recent = stockMovementRepository.findHistoryByItemId(
+        List<StockMovementHistoryEntry> recent = inventoryQueries.findHistoryByItemId(
                 itemId,
                 OffsetDateTime.now().minusYears(10),
                 OffsetDateTime.now(),
                 List.of(StockMovementReason.RESTOCK, StockMovementReason.SHIPMENT_RECEIPT),
                 PageRequest.of(0, 1));
-        OffsetDateTime lastRestockAt = recent.isEmpty() ? null : recent.get(0).getAt();
+        OffsetDateTime lastRestockAt = recent.isEmpty() ? null : recent.get(0).at();
         return new ForecastExplanationDTO(
                 prediction.getItemId(),
                 prediction.getComputedAt(),
@@ -123,7 +121,7 @@ public class ForecastService {
     private Page<ForecastPredictionResponseDTO> mapToDTOs(Page<ForecastPrediction> predictions) {
         Map<UUID, ProductRef> productMap = getProductMap(predictions.getContent());
         Map<UUID, ProductPricing> pricingMap = getPricingMap(productMap.keySet());
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
         return predictions.map(p -> convertToDTO(
                 p, productMap.get(p.getItemId()), unitCostOf(pricingMap, p.getItemId()), stockMap));
     }
@@ -131,7 +129,7 @@ public class ForecastService {
     private List<ForecastPredictionResponseDTO> mapToDTOList(List<ForecastPrediction> predictions) {
         Map<UUID, ProductRef> productMap = getProductMap(predictions);
         Map<UUID, ProductPricing> pricingMap = getPricingMap(productMap.keySet());
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
         return predictions.stream()
                 .map(p -> convertToDTO(
                         p, productMap.get(p.getItemId()), unitCostOf(pricingMap, p.getItemId()), stockMap))
@@ -161,7 +159,7 @@ public class ForecastService {
      * Get all stock totals as a map. Use this for batch operations.
      */
     public Map<UUID, Integer> getAllStockTotals() {
-        return inventoryTotalsRepository.findAllStockTotalsMap();
+        return inventoryQueries.findAllStockTotalsMap();
     }
 
     /**
@@ -169,7 +167,7 @@ public class ForecastService {
      */
     public Integer getCurrentStockPublic(UUID itemId) {
         if (itemId == null) return 0;
-        Map<UUID, Integer> stockMap = inventoryTotalsRepository.findAllStockTotalsMap();
+        Map<UUID, Integer> stockMap = inventoryQueries.findAllStockTotalsMap();
         return stockMap.getOrDefault(itemId, 0);
     }
 

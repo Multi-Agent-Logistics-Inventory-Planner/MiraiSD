@@ -24,6 +24,11 @@ the final source of truth.
 | [API v1 map](baseline/api-v1-map.md) | Classifies all current Spring controller mappings and defines target route families | Baseline |
 | [Phase cost-impact template](templates/phase-cost-impact.md) | Required cost review for each implementation phase | Template |
 | [SDD workflow](sdd-workflow.md) | Feature-level specification, implementation, validation and review lifecycle | Active |
+| [Phase 4-6 closeout](plans/phase-4-6-closeout.md) | Closeout work order, integrity and production gates | Active |
+| [Phase 6 gap closure](plans/phase-6-gap-closure.md) | Audited gaps, deferrals and closure ownership | Active |
+| [CI/CD pipeline runbook](runbooks/ci-cd-pipeline.md) | CI, deployment and migration operational guidance | Active |
+| [Hetzner cutover runbook](runbooks/hetzner-cutover.md) | Historical infrastructure cutover record | Complete |
+| [Phase 4-6 production schema apply](runbooks/phase-4-6-production-schema-apply.md) | Prepared F1 backup, migration, and verification procedure | Approval required |
 
 ## Document conventions
 

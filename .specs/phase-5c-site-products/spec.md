@@ -53,14 +53,13 @@ configuration real, using expand/backfill/verify (constrain is explicitly deferr
   [`docs/specs/multi-site-data-and-api.md`](../../docs/specs/multi-site-data-and-api.md) §2 (T-7)
   — not a new root `CONTEXT.md`, since this repo's `.gitignore` only tracks `README.md` and
   `AGENTS.md` at the root and a durable spec already exists that owns this exact vocabulary.
-- **`products.is_active` does not currently mean what this record needs it to mean.**
+- **`products.is_active` has the durable §2 global stock-derived meaning.**
   `StockMovementService:360` computes `shouldBeActive = total > 0` and writes it to
   `products.is_active` on every stock recalculation, so today the column effectively means "has
   stock somewhere", not "not retired from the master catalog". Phase 5 **does not change this**
   — kuji Active/Closed tabs and forecasting's `WHERE p.is_active = true` both depend on the current
-  behavior. What this record does is (a) define the intended end-state semantics, (b) keep
-  `is_stocked` strictly independent of it so no new code inherits the conflation, and (c) hand
-  Phase 6 the split as explicit scope when `quantity` moves to `inventory`. Cross-referenced from
+  behavior. `is_stocked` remains strictly independent, so no new code inherits the conflation.
+  Cross-referenced from
   [5b](../phase-5b-catalog-facade/spec.md), which pins the current derivation by test.
 - **Read semantics turn on row presence, not on `is_stocked`** — these are two distinct states and
   must not be collapsed:

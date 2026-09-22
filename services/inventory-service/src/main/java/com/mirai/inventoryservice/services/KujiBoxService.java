@@ -20,15 +20,17 @@ import com.mirai.inventoryservice.dtos.responses.kuji.KujiAllocationByProductDTO
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxTierResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.kuji.KujiDailyPayoutsResponseDTO;
-import com.mirai.inventoryservice.exceptions.InsufficientInventoryException;
-import com.mirai.inventoryservice.exceptions.InventoryNotFoundException;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
+import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.catalog.domain.KujiType;
@@ -36,17 +38,15 @@ import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.NotificationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.kuji.KujiBox;
 import com.mirai.inventoryservice.models.kuji.KujiBoxTier;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -100,15 +100,13 @@ public class KujiBoxService {
     private final CatalogEntityAccess catalogEntityAccess;
     private final ProductStockStateWriter productStockStateWriter;
     private final LocationRepository locationRepository;
-    private final LocationInventoryRepository locationInventoryRepository;
+    private final InventoryOperations inventoryOperations;
+    private final InventoryQueries inventoryQueries;
     private final MachineDisplayRepository machineDisplayRepository;
     private final AuditLogRepository auditLogRepository;
-    private final StockMovementRepository stockMovementRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final SupabaseBroadcastService broadcastService;
-    private final EventOutboxService eventOutboxService;
-    private final StockMovementService stockMovementService;
     private final EntityManager entityManager;
 
     private final ProductService productService;
@@ -120,15 +118,13 @@ public class KujiBoxService {
             CatalogEntityAccess catalogEntityAccess,
             ProductStockStateWriter productStockStateWriter,
             LocationRepository locationRepository,
-            LocationInventoryRepository locationInventoryRepository,
+            InventoryOperations inventoryOperations,
+            InventoryQueries inventoryQueries,
             MachineDisplayRepository machineDisplayRepository,
             AuditLogRepository auditLogRepository,
-            StockMovementRepository stockMovementRepository,
             UserRepository userRepository,
             NotificationService notificationService,
             SupabaseBroadcastService broadcastService,
-            EventOutboxService eventOutboxService,
-            StockMovementService stockMovementService,
             EntityManager entityManager,
             ProductService productService
     ) {
@@ -138,15 +134,13 @@ public class KujiBoxService {
         this.catalogEntityAccess = catalogEntityAccess;
         this.productStockStateWriter = productStockStateWriter;
         this.locationRepository = locationRepository;
-        this.locationInventoryRepository = locationInventoryRepository;
+        this.inventoryOperations = inventoryOperations;
+        this.inventoryQueries = inventoryQueries;
         this.machineDisplayRepository = machineDisplayRepository;
         this.auditLogRepository = auditLogRepository;
-        this.stockMovementRepository = stockMovementRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.broadcastService = broadcastService;
-        this.eventOutboxService = eventOutboxService;
-        this.stockMovementService = stockMovementService;
         this.entityManager = entityManager;
         this.productService = productService;
     }
@@ -331,8 +325,9 @@ public class KujiBoxService {
                         .actorName(resolvedActorName)
                         .at(now)
                         .metadata(metadata)
+                        .site(box.getLocation().getStorageLocation().getSite())
                         .build();
-                stockMovementRepository.save(birth);
+                inventoryOperations.saveMovement(birth);
                 continue;
             }
 
@@ -360,7 +355,7 @@ public class KujiBoxService {
 
         // Sync product totals + broadcasts
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
             broadcastService.broadcastInventoryUpdated();
             broadcastService.broadcastAuditLogCreated();
         }
@@ -415,8 +410,9 @@ public class KujiBoxService {
                             .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
+                            .site(box.getLocation().getStorageLocation().getSite())
                             .build();
-                    stockMovementRepository.save(removal);
+                    inventoryOperations.saveMovement(removal);
                 }
                 tier.setActiveCount(0);
                 tier.setInactiveCount(0);
@@ -485,7 +481,7 @@ public class KujiBoxService {
         box = kujiBoxRepository.save(box);
 
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
         }
         if (!affectedProductIds.isEmpty() || endedDisplay) {
             broadcastService.broadcastInventoryUpdated();
@@ -546,8 +542,8 @@ public class KujiBoxService {
                     Location destination = locationRepository.findById(mv.getToLocationId())
                             .orElseThrow(() -> new LocationNotFoundException(
                                     "Reopen destination location not found: " + mv.getToLocationId()));
-                    LocationInventory inv = locationInventoryRepository
-                            .findByLocation_IdAndProduct_Id(destination.getId(), mv.getItem().getId())
+                    LocationInventory inv = inventoryOperations
+                            .findInventory(destination.getId(), mv.getItem().getId())
                             .orElseThrow(() -> new InventoryNotFoundException(
                                     "Cannot reopen: destination inventory missing for "
                                             + mv.getItem().getName()));
@@ -558,10 +554,10 @@ public class KujiBoxService {
                     }
                     int newQty = inv.getQuantity() - qty;
                     if (newQty == 0) {
-                        locationInventoryRepository.delete(inv);
+                        inventoryOperations.deleteInventory(inv);
                     } else {
                         inv.setQuantity(newQty);
-                        locationInventoryRepository.save(inv);
+                        inventoryOperations.saveInventory(inv);
                     }
 
                     // Restore tier counters from metadata.
@@ -600,9 +596,9 @@ public class KujiBoxService {
                             .actorName(resolvedActorName)
                             .at(OffsetDateTime.now())
                             .metadata(metadata)
+                            .site(destination.getStorageLocation().getSite())
                             .build();
-                    StockMovement saved = stockMovementRepository.save(reverse);
-                    eventOutboxService.createStockMovementEvent(saved);
+                    inventoryOperations.recordMovement(reverse);
                     affectedProductIds.add(mv.getItem().getId());
                     continue;
                 }
@@ -656,7 +652,7 @@ public class KujiBoxService {
         box = kujiBoxRepository.save(box);
 
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
             broadcastService.broadcastInventoryUpdated();
             broadcastService.broadcastAuditLogCreated();
         }
@@ -773,10 +769,10 @@ public class KujiBoxService {
                     .actorId(request.getActorId())
                     .at(now)
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
 
-            StockMovement saved = stockMovementRepository.save(movement);
-            eventOutboxService.createStockMovementEvent(saved);
+            inventoryOperations.recordMovement(movement);
 
             // Persist the decremented tier count
             kujiBoxTierRepository.save(tier);
@@ -830,7 +826,7 @@ public class KujiBoxService {
             throw new IllegalStateException("Draw already undone");
         }
 
-        List<StockMovement> originals = stockMovementRepository.findByAuditLogIdWithItem(auditLogId);
+        List<StockMovement> originals = inventoryQueries.findByAuditLogIdWithItem(auditLogId);
         if (originals == null || originals.isEmpty()) {
             throw new IllegalArgumentException(
                     "No stock movements found for audit log: " + auditLogId);
@@ -907,8 +903,8 @@ public class KujiBoxService {
                     && mv.getFromLocationId() != null
                     && mv.getFromLocationId().equals(box.getLocation().getId())) {
                 Product linked = mv.getItem();
-                LocationInventory inv = locationInventoryRepository
-                        .findByLocation_IdAndProduct_Id(box.getLocation().getId(), linked.getId())
+                LocationInventory inv = inventoryOperations
+                        .findInventory(box.getLocation().getId(), linked.getId())
                         .orElse(null);
 
                 int prev = inv != null ? inv.getQuantity() : 0;
@@ -923,7 +919,7 @@ public class KujiBoxService {
                 } else {
                     inv.setQuantity(next);
                 }
-                locationInventoryRepository.save(inv);
+                inventoryOperations.saveInventory(inv);
                 affectedProductIds.add(linked.getId());
             }
 
@@ -956,9 +952,9 @@ public class KujiBoxService {
                     .actorId(actorId)
                     .at(now)
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
-            StockMovement saved = stockMovementRepository.save(reverse);
-            eventOutboxService.createStockMovementEvent(saved);
+            inventoryOperations.recordMovement(reverse);
 
             // Restore tier slip count
             if (tier != null) {
@@ -982,7 +978,7 @@ public class KujiBoxService {
         }
 
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
         }
 
         emitDrawNotification(
@@ -1210,7 +1206,7 @@ public class KujiBoxService {
         kujiBoxTierRepository.save(tier);
 
         if (!autoCreateMint) {
-            stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+            inventoryOperations.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
         }
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
@@ -1256,7 +1252,7 @@ public class KujiBoxService {
         kujiBoxTierRepository.save(tier);
 
         if (!autoCreateMint) {
-            stockMovementService.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
+            inventoryOperations.syncProductTotals(List.of(tier.getLinkedProduct().getId()));
         }
         broadcastService.broadcastInventoryUpdated();
         broadcastService.broadcastAuditLogCreated();
@@ -1289,18 +1285,9 @@ public class KujiBoxService {
         Product child = tier.getLinkedProduct();
         Location boxLocation = box.getLocation();
 
-        LocationInventory inv = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(boxLocation.getId(), child.getId())
-                .orElseGet(() -> LocationInventory.builder()
-                        .location(boxLocation)
-                        .site(boxLocation.getStorageLocation().getSite())
-                        .product(child)
-                        .quantity(0)
-                        .build());
-
-        int prev = inv.getQuantity();
-        inv.setQuantity(prev + quantity);
-        locationInventoryRepository.save(inv);
+        InventoryOperations.InventoryQuantityChange change =
+                inventoryOperations.adjustQuantity(boxLocation, child, quantity);
+        int prev = change.previousQuantity();
 
         // Auto-create children only ever live at this one location, so the denormalized
         // Product.quantity equals LocationInventory.quantity. Update directly to avoid
@@ -1336,9 +1323,9 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(boxLocation.getStorageLocation().getSite())
                 .build();
-        StockMovement saved = stockMovementRepository.save(movement);
-        eventOutboxService.createStockMovementEvent(saved);
+        inventoryOperations.recordMovement(movement);
     }
 
     @Transactional
@@ -1431,8 +1418,9 @@ public class KujiBoxService {
                         .actorName(resolveActorName(request.getActorId()))
                         .at(OffsetDateTime.now())
                         .metadata(metadata)
+                        .site(box.getLocation().getStorageLocation().getSite())
                         .build();
-                stockMovementRepository.save(birth);
+                inventoryOperations.saveMovement(birth);
             } else {
                 if (request.getSourceLocationId() == null) {
                     throw new IllegalArgumentException(
@@ -1454,7 +1442,7 @@ public class KujiBoxService {
         }
 
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
             broadcastService.broadcastInventoryUpdated();
             broadcastService.broadcastAuditLogCreated();
         }
@@ -1665,13 +1653,13 @@ public class KujiBoxService {
                     .actorId(request.getActorId())
                     .at(OffsetDateTime.now())
                     .metadata(metadata)
+                    .site(box.getLocation().getStorageLocation().getSite())
                     .build();
-            StockMovement saved = stockMovementRepository.save(movement);
-            eventOutboxService.createStockMovementEvent(saved);
+            inventoryOperations.recordMovement(movement);
         }
 
         if (!affectedProductIds.isEmpty()) {
-            stockMovementService.syncProductTotals(new ArrayList<>(affectedProductIds));
+            inventoryOperations.syncProductTotals(new ArrayList<>(affectedProductIds));
             broadcastService.broadcastInventoryUpdated();
         }
         broadcastService.broadcastAuditLogCreated();
@@ -1731,7 +1719,7 @@ public class KujiBoxService {
                     "to (" + resolvedTo + ") must be on or after from (" + resolvedFrom + ")");
         }
 
-        List<Object[]> rows = stockMovementRepository.aggregateKujiDailyPayouts(
+        List<Object[]> rows = inventoryQueries.aggregateKujiDailyPayouts(
                 boxId, resolvedFrom, resolvedTo, zone.getId());
 
         Map<java.time.LocalDate, KujiDailyPayoutsResponseDTO.DailyPoint> byDate = new HashMap<>();
@@ -1845,8 +1833,8 @@ public class KujiBoxService {
             throw new IllegalArgumentException("Removal quantity must be positive");
         }
 
-        LocationInventory source = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(sourceLocationId, product.getId())
+        LocationInventory source = inventoryOperations
+                .findInventory(sourceLocationId, product.getId())
                 .orElseThrow(() -> new InventoryNotFoundException(
                         "Source LocationInventory not found for product " + product.getName()
                                 + " at location " + sourceLocationId));
@@ -1890,17 +1878,17 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(sourceLocation.getStorageLocation().getSite())
                 .build();
 
         if (newSourceQty == 0) {
-            locationInventoryRepository.delete(source);
+            inventoryOperations.deleteInventory(source);
         } else {
             source.setQuantity(newSourceQty);
-            locationInventoryRepository.save(source);
+            inventoryOperations.saveInventory(source);
         }
 
-        StockMovement saved = stockMovementRepository.save(removal);
-        eventOutboxService.createStockMovementEvent(saved);
+        inventoryOperations.recordMovement(removal);
 
         return product.getId();
     }
@@ -1922,9 +1910,9 @@ public class KujiBoxService {
             throw new IllegalArgumentException("Return quantity must be positive");
         }
 
-        LocationInventory destination = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(destinationLocation.getId(), product.getId())
-                .orElseGet(() -> locationInventoryRepository.save(LocationInventory.builder()
+        LocationInventory destination = inventoryOperations
+                .findInventory(destinationLocation.getId(), product.getId())
+                .orElseGet(() -> inventoryOperations.saveInventory(LocationInventory.builder()
                         .location(destinationLocation)
                         .site(destinationLocation.getStorageLocation().getSite())
                         .product(product)
@@ -1934,7 +1922,7 @@ public class KujiBoxService {
         int destPrev = destination.getQuantity();
         int destNext = destPrev + quantity;
         destination.setQuantity(destNext);
-        locationInventoryRepository.save(destination);
+        inventoryOperations.saveInventory(destination);
 
         AuditLog auditLog = createAuditLog(
                 actorId,
@@ -1966,9 +1954,9 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(OffsetDateTime.now())
                 .metadata(metadata)
+                .site(destinationLocation.getStorageLocation().getSite())
                 .build();
-        StockMovement saved = stockMovementRepository.save(deposit);
-        eventOutboxService.createStockMovementEvent(saved);
+        inventoryOperations.recordMovement(deposit);
     }
 
     /**
@@ -1998,8 +1986,8 @@ public class KujiBoxService {
                             + destinationLocation.getLocationCode() + ")");
         }
 
-        LocationInventory source = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(sourceLocationId, product.getId())
+        LocationInventory source = inventoryOperations
+                .findInventory(sourceLocationId, product.getId())
                 .orElseThrow(() -> new InventoryNotFoundException(
                         "Source LocationInventory not found for product " + product.getName()
                                 + " at location " + sourceLocationId));
@@ -2011,9 +1999,9 @@ public class KujiBoxService {
 
         Location sourceLocation = source.getLocation();
 
-        LocationInventory destination = locationInventoryRepository
-                .findByLocation_IdAndProduct_Id(destinationLocation.getId(), product.getId())
-                .orElseGet(() -> locationInventoryRepository.save(LocationInventory.builder()
+        LocationInventory destination = inventoryOperations
+                .findInventory(destinationLocation.getId(), product.getId())
+                .orElseGet(() -> inventoryOperations.saveInventory(LocationInventory.builder()
                         .location(destinationLocation)
                         .site(destinationLocation.getStorageLocation().getSite())
                         .product(product)
@@ -2061,6 +2049,7 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(now)
                 .metadata(withdrawalMetadata)
+                .site(sourceLocation.getStorageLocation().getSite())
                 .build();
 
         StockMovement deposit = StockMovement.builder()
@@ -2076,23 +2065,22 @@ public class KujiBoxService {
                 .actorId(actorId)
                 .at(now)
                 .metadata(depositMetadata)
+                .site(destinationLocation.getStorageLocation().getSite())
                 .build();
 
         // Update inventory rows
         int newSourceQty = sourcePrev - quantity;
         if (newSourceQty == 0) {
-            locationInventoryRepository.delete(source);
+            inventoryOperations.deleteInventory(source);
         } else {
             source.setQuantity(newSourceQty);
-            locationInventoryRepository.save(source);
+            inventoryOperations.saveInventory(source);
         }
         destination.setQuantity(destPrev + quantity);
-        locationInventoryRepository.save(destination);
+        inventoryOperations.saveInventory(destination);
 
-        StockMovement savedW = stockMovementRepository.save(withdrawal);
-        StockMovement savedD = stockMovementRepository.save(deposit);
-        eventOutboxService.createStockMovementEvent(savedW);
-        eventOutboxService.createStockMovementEvent(savedD);
+        inventoryOperations.recordMovement(withdrawal);
+        inventoryOperations.recordMovement(deposit);
     }
 
     private AuditLog createAuditLog(

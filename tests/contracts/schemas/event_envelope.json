@@ -27,6 +27,22 @@
       "type": ["string", "null"],
       "format": "date-time"
     },
+    "correlation_id": {
+      "type": ["string", "null"]
+    },
+    "event_version": {
+      "type": ["integer", "null"]
+    },
+    "site_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "causation_id": {
+      "type": ["string", "null"]
+    },
+    "idempotency_key": {
+      "type": ["string", "null"]
+    },
     "payload": {
       "type": "object",
       "required": ["item_id", "quantity_change", "at"],

@@ -26,7 +26,10 @@ There is no bulk rename of all controllers/services/repositories at the start.
 
 ## 2. Work tracking
 
-Each stage should be delivered through small pull requests. Every PR records:
+Each stage should normally be delivered through small pull requests. Phase 6 uses the explicitly
+agreed exception in the [parent plan](enterprise-modernization.md#9-phase-6--inventory-and-stock-movements):
+one branch/PR with five validated commit/review checkpoints, subject to the migration rollout gate.
+Every PR records:
 
 - module and use case affected;
 - classes/tables moved or introduced;
@@ -117,6 +120,23 @@ These modules establish the tenancy boundary required by every later site-owned 
 
 ## 7. Stage E: Inventory module (parent Phase 6)
 
+### Delivery checkpoints
+
+Use the parent plan's 6a–6e sequence and the single Full-tier
+[Phase 6 execution record](../../.specs/phase-6-inventory/spec.md). Module boundary work (6a), schema
+foundation (6b), scoped backend/contracts (6c), web adoption (6d), and targeted refresh/exit proof
+(6e) remain separately reviewable commits within one draft PR. The task list below describes the
+required outcomes; it does not create additional PRs. Extra fix commits are permitted.
+Each checkpoint is one slice: T-numbered tasks proceed continuously within it, with focused
+checks during implementation and independent review after the completed slice passes its gate.
+Tasks do not require separate approval, review, or commit cycles. Follow the
+[shared review cadence](../sdd-workflow.md#slice-level-review-cadence); retain material-decision
+and migration prerequisites before dependent work.
+
+The schema expansion and enforcement steps need a proven rollout sequence, not just ordered Git
+commits. Apply the parent plan's separate-release exception if an earlier writer/backfill deployment
+is necessary for compatibility.
+
 ### Tasks
 
 1. Move LocationInventory, StockMovement, aggregate queries and stock operations into `inventory`.
@@ -141,8 +161,9 @@ inventory updates. Historical query counters and these logs do not establish the
 daily egress spike. Measure savings rather than treating that attribution as proven.
 
 Keep this work in Phase 6, separate from Phase 5 catalog/site-product changes and from bulk package
-relocation. Before implementation, create Full-tier execution records for the mergeable slices,
-linking [multi-site data/API](../specs/multi-site-data-and-api.md),
+relocation. Specify its query/contract work under checkpoint 6c and its client-refresh/measurement
+work under 6e in the single Full-tier Phase 6 record, linking
+[multi-site data/API](../specs/multi-site-data-and-api.md),
 [client applications](../specs/client-applications.md) and
 [event contracts](../specs/events-and-replica-readiness.md).
 

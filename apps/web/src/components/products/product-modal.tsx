@@ -36,7 +36,7 @@ import { getProductChildren } from "@/lib/api/products";
 import { KujiPrizesDialog } from "./kuji-prizes-dialog";
 import { KujiBoxView } from "@/components/kuji";
 import { ProductImageLightbox } from "./product-image-lightbox";
-import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
+import { useSiteProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import { useKujiAllocationsByProduct } from "@/hooks/queries/use-kuji-box";
 import { useDeleteProductMutation } from "@/hooks/mutations/use-product-mutations";
 import { useShipmentsByProduct } from "@/hooks/queries/use-shipments-by-product";
@@ -67,8 +67,6 @@ interface ProductModalProps {
   onEditClick?: () => void;
   /** Hide the delete button (e.g. when opened from the location detail sheet) */
   hideDelete?: boolean;
-  /** Whether inventory counts are available for this view. */
-  showInventory?: boolean;
 }
 
 export function ProductModal({
@@ -79,11 +77,14 @@ export function ProductModal({
   onTransferClick,
   onEditClick,
   hideDelete = false,
-  showInventory = true,
 }: ProductModalProps) {
   const { toast } = useToast();
-  const { data: inventoryData, isLoading: locationsLoading } =
-    useProductInventoryEntries(product?.product.id);
+  const {
+    data: inventoryData,
+    isLoading: locationsLoading,
+    error: inventoryError,
+    refetch: refetchInventory,
+  } = useSiteProductInventoryEntries(product?.product.id);
   const { data: kujiAllocations } = useKujiAllocationsByProduct(
     product?.product.id,
   );
@@ -128,6 +129,7 @@ export function ProductModal({
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const hasInventory = locations && locations.length > 0;
+  const inventoryFailedToLoad = Boolean(inventoryError);
 
   if (!product) {
     return null;
@@ -333,6 +335,12 @@ export function ProductModal({
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
+                  disabled={inventoryFailedToLoad}
+                  title={
+                    inventoryFailedToLoad
+                      ? "Inventory failed to load. Retry before adjusting stock."
+                      : undefined
+                  }
                   onClick={() => {
                     onAdjustClick({
                       product: p,
@@ -348,8 +356,20 @@ export function ProductModal({
                 <Button
                   size="sm"
                   className="bg-black text-white hover:bg-black/90"
+                  disabled={inventoryFailedToLoad}
+                  title={
+                    inventoryFailedToLoad
+                      ? "Inventory failed to load. Retry before transferring stock."
+                      : undefined
+                  }
                   onClick={() => {
-                    if (hasInventory) {
+                    if (inventoryFailedToLoad) {
+                      toast({
+                        title: "Inventory failed to load",
+                        description: "Retry loading inventory before transferring stock.",
+                        variant: "destructive",
+                      });
+                    } else if (hasInventory) {
                       onTransferClick({
                         product: p,
                         inventoryEntries: locations,
@@ -395,6 +415,12 @@ export function ProductModal({
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              disabled={inventoryFailedToLoad}
+              title={
+                inventoryFailedToLoad
+                  ? "Inventory failed to load. Retry before adjusting stock."
+                  : undefined
+              }
               onClick={() => {
                 onAdjustClick({
                   product: p,
@@ -410,8 +436,20 @@ export function ProductModal({
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/90 h-7 px-1.5 text-xs"
+              disabled={inventoryFailedToLoad}
+              title={
+                inventoryFailedToLoad
+                  ? "Inventory failed to load. Retry before transferring stock."
+                  : undefined
+              }
               onClick={() => {
-                if (hasInventory) {
+                if (inventoryFailedToLoad) {
+                  toast({
+                    title: "Inventory failed to load",
+                    description: "Retry loading inventory before transferring stock.",
+                    variant: "destructive",
+                  });
+                } else if (hasInventory) {
                   onTransferClick({
                     product: p,
                     inventoryEntries: locations,
@@ -452,7 +490,6 @@ export function ProductModal({
         </div>
 
         {/* Current Stock Section */}
-        {showInventory && (
         <div className="mt-4 sm:mt-6 min-w-0">
           <h3 className="text-sm sm:text-base font-medium text-primary mb-2 sm:mb-3">
             Current Stock{" "}
@@ -488,6 +525,25 @@ export function ProductModal({
                           </TableRow>
                         ))}
                       </>
+                    ) : inventoryFailedToLoad ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-destructive py-3"
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm">Couldn&apos;t load inventory</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => refetchInventory()}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ) : (!locations || locations.length === 0) &&
                       (!kujiAllocations || kujiAllocations.length === 0) ? (
                       <TableRow>
@@ -558,7 +614,6 @@ export function ProductModal({
             </Card>
           </div>
         </div>
-        )}
 
         {/* Active Displays Section */}
         <div className="mt-4 sm:mt-6 min-w-0">

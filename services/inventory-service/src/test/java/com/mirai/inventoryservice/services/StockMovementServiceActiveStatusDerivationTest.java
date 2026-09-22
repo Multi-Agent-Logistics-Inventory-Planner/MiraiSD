@@ -5,23 +5,22 @@ import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.dtos.requests.BatchAdjustLineDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchAdjustStockRequestDTO;
+import com.mirai.inventoryservice.inventory.api.BatchAdjustLineDTO;
+import com.mirai.inventoryservice.inventory.api.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
+import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
-import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,9 +83,7 @@ class StockMovementServiceActiveStatusDerivationTest {
     @Mock private UserRepository userRepository;
     @Mock private LocationInventoryRepository locationInventoryRepository;
     @Mock private LocationRepository locationRepository;
-    @Mock private StorageLocationRepository storageLocationRepository;
-    @Mock private SiteRepository siteRepository;
-    @Mock private KujiBoxTierRepository kujiBoxTierRepository;
+    @Mock private LocationService locationService;
     @Mock private EntityManager entityManager;
     @Mock private SupabaseBroadcastService broadcastService;
     @Mock private EventOutboxService eventOutboxService;
@@ -97,8 +94,8 @@ class StockMovementServiceActiveStatusDerivationTest {
     void setUp() {
         service = new StockMovementService(
                 stockMovementRepository, auditLogRepository, catalogQueries, productStockStateWriter,
-                userRepository, locationInventoryRepository, locationRepository, storageLocationRepository,
-                siteRepository, kujiBoxTierRepository, entityManager, broadcastService, eventOutboxService);
+                userRepository, locationInventoryRepository, locationRepository, locationService,
+                entityManager, broadcastService, eventOutboxService);
     }
 
     private ProductRef existingRef(UUID id) {

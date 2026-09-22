@@ -14,15 +14,14 @@ import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.inventory.LocationInventory;
+import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.shipment.ShipmentItem;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
-import com.mirai.inventoryservice.repositories.LocationInventoryRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryQueries;
 import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
-import com.mirai.inventoryservice.repositories.projections.StockMovementHistoryView;
+import com.mirai.inventoryservice.inventory.application.StockMovementHistoryEntry;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -62,12 +61,11 @@ public class ProductReportBundleService {
 
     private final CatalogQueries catalogQueries;
     private final CatalogPricing catalogPricing;
-    private final LocationInventoryRepository locationInventoryRepository;
+    private final InventoryQueries inventoryQueries;
     private final DailySalesRollupRepository dailySalesRollupRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final ShipmentItemRepository shipmentItemRepository;
     private final MachineDisplayRepository machineDisplayRepository;
-    private final StockMovementRepository stockMovementRepository;
 
     // ---------- header ----------
 
@@ -77,7 +75,7 @@ public class ProductReportBundleService {
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
 
         Integer currentStock = Optional
-                .ofNullable(locationInventoryRepository.sumQuantityByProductId(productId))
+                .ofNullable(inventoryQueries.sumQuantityByProductId(productId))
                 .orElse(0);
 
         LocalDate today = LocalDate.now();
@@ -108,13 +106,13 @@ public class ProductReportBundleService {
 
         // Last restock timestamp via the (item_id, at DESC) index on a single row
         Pageable onePage = PageRequest.of(0, 1);
-        List<StockMovementHistoryView> lastRestockRows = stockMovementRepository.findHistoryByItemId(
+        List<StockMovementHistoryEntry> lastRestockRows = inventoryQueries.findHistoryByItemId(
                 productId,
                 OffsetDateTime.now().minusYears(10),
                 OffsetDateTime.now(),
                 List.of(StockMovementReason.RESTOCK, StockMovementReason.SHIPMENT_RECEIPT),
                 onePage);
-        OffsetDateTime lastRestockAt = lastRestockRows.isEmpty() ? null : lastRestockRows.get(0).getAt();
+        OffsetDateTime lastRestockAt = lastRestockRows.isEmpty() ? null : lastRestockRows.get(0).at();
 
         boolean onDisplay = !machineDisplayRepository.findActiveByProduct_Id(productId).isEmpty();
 
@@ -153,10 +151,10 @@ public class ProductReportBundleService {
         BigDecimal unitCost = catalogPricing.findPricing(productId).map(ProductPricing::unitCost).orElse(null);
 
         Integer currentStock = Optional
-                .ofNullable(locationInventoryRepository.sumQuantityByProductId(productId))
+                .ofNullable(inventoryQueries.sumQuantityByProductId(productId))
                 .orElse(0);
 
-        List<LocationInventory> inventoryRows = locationInventoryRepository.findByProduct_Id(productId);
+        List<LocationInventory> inventoryRows = inventoryQueries.findByProductId(productId);
 
         LocalDate today = LocalDate.now();
         LocalDate windowStart = today.minusDays(clampedDays);
@@ -270,7 +268,7 @@ public class ProductReportBundleService {
         validateDateRange(from, to);
         int clampedLimit = Math.max(1, Math.min(limit, MOVEMENTS_MAX_LIMIT));
         List<StockMovementReason> reasonFilter = (reasons == null || reasons.isEmpty()) ? null : reasons;
-        List<StockMovementHistoryView> rows = stockMovementRepository.findHistoryByItemId(
+        List<StockMovementHistoryEntry> rows = inventoryQueries.findHistoryByItemId(
                 productId,
                 from,
                 to,
@@ -278,14 +276,14 @@ public class ProductReportBundleService {
                 PageRequest.of(0, clampedLimit));
         return rows.stream()
                 .map(v -> new MovementRowDTO(
-                        v.getId(),
-                        v.getAt(),
-                        v.getReason(),
-                        v.getQuantityChange(),
-                        v.getPreviousQuantity(),
-                        v.getCurrentQuantity(),
-                        v.getFromLocationId(),
-                        v.getToLocationId()))
+                        v.id(),
+                        v.at(),
+                        v.reason(),
+                        v.quantityChange(),
+                        v.previousQuantity(),
+                        v.currentQuantity(),
+                        v.fromLocationId(),
+                        v.toLocationId()))
                 .toList();
     }
 
@@ -300,22 +298,22 @@ public class ProductReportBundleService {
         // Pull up to the MOVEMENTS_MAX_LIMIT most-recent rows via the indexed path;
         // at the documented <100 moves/day volume this comfortably covers the
         // typical 30- and 90-day windows the assistant asks about.
-        List<StockMovementHistoryView> rows = stockMovementRepository.findHistoryByItemId(
+        List<StockMovementHistoryEntry> rows = inventoryQueries.findHistoryByItemId(
                 productId, from, to, null, PageRequest.of(0, MOVEMENTS_MAX_LIMIT));
 
         Map<StockMovementReason, Long> byReason = new EnumMap<>(StockMovementReason.class);
         Map<StockMovementReason, OffsetDateTime> lastByReason = new EnumMap<>(StockMovementReason.class);
         Map<LocalDate, Long> byDay = new LinkedHashMap<>();
 
-        for (StockMovementHistoryView row : rows) {
-            StockMovementReason reason = row.getReason();
+        for (StockMovementHistoryEntry row : rows) {
+            StockMovementReason reason = row.reason();
             if (reason != null) {
                 byReason.merge(reason, 1L, Long::sum);
-                lastByReason.merge(reason, row.getAt(),
+                lastByReason.merge(reason, row.at(),
                         (existing, candidate) -> candidate.isAfter(existing) ? candidate : existing);
             }
-            LocalDate day = row.getAt().atZoneSameInstant(ZoneOffset.UTC).toLocalDate();
-            long units = Math.abs(row.getQuantityChange() == null ? 0 : row.getQuantityChange());
+            LocalDate day = row.at().atZoneSameInstant(ZoneOffset.UTC).toLocalDate();
+            long units = Math.abs(row.quantityChange() == null ? 0 : row.quantityChange());
             byDay.merge(day, units, Long::sum);
         }
 

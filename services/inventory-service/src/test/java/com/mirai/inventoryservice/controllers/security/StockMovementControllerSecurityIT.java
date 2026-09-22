@@ -1,6 +1,12 @@
 package com.mirai.inventoryservice.controllers.security;
 
 import com.mirai.inventoryservice.BaseIntegrationTest;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.identity.domain.UserSiteMembership;
+import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.infrastructure.UserSiteMembershipRepository;
+import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,7 +24,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("StockMovementController Security Tests")
 class StockMovementControllerSecurityIT extends BaseIntegrationTest {
 
+    @org.springframework.beans.factory.annotation.Autowired private UserRepository userRepository;
+    @org.springframework.beans.factory.annotation.Autowired private UserSiteMembershipRepository membershipRepository;
+    @org.springframework.beans.factory.annotation.Autowired private SiteRepository siteRepository;
+
     private static final String BASE_URL = "/api/stock-movements";
+
+    @BeforeEach
+    void grantEmployeeMainMembership() {
+        employeeToken();
+        var main = siteRepository.findByCode("MAIN").orElseThrow();
+        User employee = userRepository.findByEmail("employee.persona@test.internal").orElseThrow();
+        if (membershipRepository.findByUserIdAndSiteId(employee.getId(), main.getId()).isEmpty()) {
+            membershipRepository.save(UserSiteMembership.builder().userId(employee.getId()).siteId(main.getId()).isActive(true).build());
+        }
+    }
 
     @Nested
     @DisplayName("GET /api/stock-movements/history/{itemId}")
@@ -52,7 +72,7 @@ class StockMovementControllerSecurityIT extends BaseIntegrationTest {
         @DisplayName("Should allow ADMIN role to get movement history")
         void getMovementHistory_adminRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL + "/history/550e8400-e29b-41d4-a716-446655440000")
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }

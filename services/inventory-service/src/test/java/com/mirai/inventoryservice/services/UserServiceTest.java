@@ -1,18 +1,20 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.identity.application.LastActorActivityPort;
 import com.mirai.inventoryservice.identity.application.UserService;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.identity.infrastructure.InvitationRepository;
 import com.mirai.inventoryservice.identity.infrastructure.SupabaseAdminService;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,7 +41,7 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private StockMovementRepository stockMovementRepository;
+    private LastActorActivityPort lastActorActivityPort;
 
     @Mock
     private InvitationRepository invitationRepository;
@@ -183,5 +185,40 @@ class UserServiceTest {
         when(supabaseAdminService.deleteUserByEmail("user@example.com")).thenReturn(false);
 
         assertThrows(IllegalStateException.class, () -> userService.deleteUser(userId));
+    }
+
+    // Phase 6a T-2 (.specs/phase-6-inventory/log.md, R-3): UserService no longer reaches
+    // StockMovementRepository directly -- it delegates to LastActorActivityPort, so this proves
+    // the delegation, not stock-movement query logic (that lives in the port's adapter).
+
+    @Test
+    void getLastAuditDate_DelegatesToPort() {
+        UUID userId = UUID.randomUUID();
+        OffsetDateTime lastActivity = OffsetDateTime.now();
+        when(lastActorActivityPort.lastActivityFor(userId)).thenReturn(Optional.of(lastActivity));
+
+        Optional<OffsetDateTime> result = userService.getLastAuditDate(userId);
+
+        assertEquals(Optional.of(lastActivity), result);
+    }
+
+    @Test
+    void getLastAuditDate_NoActivity_ReturnsEmpty() {
+        UUID userId = UUID.randomUUID();
+        when(lastActorActivityPort.lastActivityFor(userId)).thenReturn(Optional.empty());
+
+        assertFalse(userService.getLastAuditDate(userId).isPresent());
+    }
+
+    @Test
+    void getAllLastAuditDates_DelegatesToPort() {
+        UUID actorId = UUID.randomUUID();
+        OffsetDateTime lastActivity = OffsetDateTime.now();
+        Map<UUID, OffsetDateTime> activity = Map.of(actorId, lastActivity);
+        when(lastActorActivityPort.lastActivityByActor()).thenReturn(activity);
+
+        Map<UUID, OffsetDateTime> result = userService.getAllLastAuditDates();
+
+        assertEquals(activity, result);
     }
 }

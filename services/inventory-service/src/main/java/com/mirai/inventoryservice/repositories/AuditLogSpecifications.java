@@ -2,7 +2,7 @@ package com.mirai.inventoryservice.repositories;
 
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
 import com.mirai.inventoryservice.models.audit.AuditLog;
-import com.mirai.inventoryservice.models.audit.StockMovement;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;

@@ -4427,80 +4427,6 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "location-inventory-controller" ]
-      },
-      "put" : {
-        "operationId" : "updateInventory",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "locationId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "in" : "path",
-          "name" : "inventoryId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/InventoryRequestDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/LocationInventoryResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "location-inventory-controller" ]
       }
     },
     "/api/lootbox/admin/activity" : {
@@ -13015,6 +12941,686 @@
         "tags" : [ "me-controller" ]
       }
     },
+    "/api/v1/sites/{siteId}/inventory/adjustments" : {
+      "post" : {
+        "operationId" : "adjustSiteInventory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchAdjustStockRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}" : {
+      "get" : {
+        "operationId" : "getSiteInventoryByLocation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "locationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteLocationInventoryEntryDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}/items" : {
+      "post" : {
+        "operationId" : "createSiteLocationInventoryItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "locationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateLocationInventoryRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SiteLocationInventoryEntryDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/locations/{locationId}/items/{inventoryId}" : {
+      "delete" : {
+        "operationId" : "deleteSiteLocationInventoryItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "locationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "inventoryId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/movements" : {
+      "get" : {
+        "operationId" : "getSiteMovements",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "itemId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "search",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "actorId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "reason",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "fromDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "toDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageable",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/Pageable"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageSiteStockMovementResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/products/{productId}" : {
+      "get" : {
+        "operationId" : "getSiteInventoryByProduct",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "productId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductInventoryResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/totals" : {
+      "get" : {
+        "operationId" : "getSiteInventoryTotals",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "productIds",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteInventoryTotalDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/transfers" : {
+      "post" : {
+        "operationId" : "transferSiteInventory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TransferInventoryRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/inventory/transfers/batch" : {
+      "post" : {
+        "operationId" : "batchTransferSiteInventory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchTransferInventoryRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-inventory-mutation-controller" ]
+      }
+    },
     "/api/v1/sites/{siteId}/locations" : {
       "get" : {
         "operationId" : "getSiteLocations",
@@ -13041,7 +13647,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/Location"
+                    "$ref" : "#/components/schemas/SiteLocationDTO"
                   }
                 }
               }
@@ -13108,7 +13714,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13147,6 +13753,75 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "site-location-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/locations/with-counts" : {
+      "get" : {
+        "operationId" : "getSiteLocationsWithCounts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "BOX_BIN", "CABINET", "DOUBLE_CLAW_MACHINE", "FOUR_CORNER_MACHINE", "GACHAPON", "KEYCHAIN_MACHINE", "PUSHER_MACHINE", "RACK", "SHELF", "SINGLE_CLAW_MACHINE", "WINDOW", "NOT_ASSIGNED" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/LocationWithCountsDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-location-aggregate-controller" ]
       }
     },
     "/api/v1/sites/{siteId}/locations/{id}" : {
@@ -13231,7 +13906,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -13305,7 +13980,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/Location"
+                  "$ref" : "#/components/schemas/SiteLocationDTO"
                 }
               }
             },
@@ -14598,7 +15273,7 @@
             "items" : {
               "$ref" : "#/components/schemas/TransferInventoryRequestDTO"
             },
-            "maxItems" : 2147483647,
+            "maxItems" : 50,
             "minItems" : 1
           }
         },
@@ -15041,6 +15716,32 @@
             "format" : "int32"
           }
         }
+      },
+      "CreateLocationInventoryRequestDTO" : {
+        "type" : "object",
+        "properties" : {
+          "intakeQty" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "intakeUnit" : {
+            "type" : "string"
+          },
+          "productId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+          }
+        },
+        "required" : [ "productId", "quantity" ]
       },
       "CreateLocationRequest" : {
         "type" : "object",
@@ -17092,6 +17793,52 @@
           }
         }
       },
+      "PageSiteStockMovementResponseDTO" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SiteStockMovementResponseDTO"
+            }
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "numberOfElements" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "PageStockMovementResponseDTO" : {
         "type" : "object",
         "properties" : {
@@ -18377,6 +19124,85 @@
         },
         "required" : [ "isStocked" ]
       },
+      "SiteInventoryTotalDTO" : {
+        "type" : "object",
+        "properties" : {
+          "lastUpdatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "productId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "totalQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "SiteLocationDTO" : {
+        "type" : "object",
+        "properties" : {
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "fullLocationCode" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "locationCode" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "storageLocation" : {
+            "$ref" : "#/components/schemas/StorageLocationSummary"
+          },
+          "storageLocationCode" : {
+            "type" : "string"
+          },
+          "storageLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "storageLocation" ]
+      },
+      "SiteLocationInventoryEntryDTO" : {
+        "type" : "object",
+        "properties" : {
+          "inventoryId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "productId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "SiteMembershipDTO" : {
         "type" : "object",
         "properties" : {
@@ -18482,6 +19308,75 @@
             "type" : [ "number", "null" ]
           }
         }
+      },
+      "SiteStockMovementResponseDTO" : {
+        "type" : "object",
+        "properties" : {
+          "actorId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "fromLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "itemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "locationType" : {
+            "type" : "string",
+            "enum" : [ "BOX_BIN", "CABINET", "DOUBLE_CLAW_MACHINE", "FOUR_CORNER_MACHINE", "GACHAPON", "KEYCHAIN_MACHINE", "PUSHER_MACHINE", "RACK", "SHELF", "SINGLE_CLAW_MACHINE", "WINDOW", "NOT_ASSIGNED" ]
+          },
+          "metadata" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "quantityChange" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+          },
+          "siteAttribution" : {
+            "type" : "string",
+            "description" : "\"UNKNOWN\" when this row predates the site backfill; omitted otherwise."
+          },
+          "toLocationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "SiteSummary" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [ "id" ]
       },
       "SortObject" : {
         "type" : "object",
@@ -18603,6 +19498,27 @@
           }
         },
         "required" : [ "site" ]
+      },
+      "StorageLocationSummary" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "site" : {
+            "$ref" : "#/components/schemas/SiteSummary"
+          }
+        },
+        "required" : [ "id", "site" ]
       },
       "SupplierRequestDTO" : {
         "type" : "object",

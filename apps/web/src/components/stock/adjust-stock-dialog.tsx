@@ -25,10 +25,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocationInventory } from "@/hooks/queries/use-location-inventory";
 import { useCategories } from "@/hooks/queries/use-categories";
 import { useBatchAdjustStockMutation } from "@/hooks/mutations/use-stock-mutations";
-import {
-  useCreateInventoryMutation,
-  useUpdateInventoryMutation,
-} from "@/hooks/mutations/use-location-mutations";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { useCreateInventoryMutation } from "@/hooks/mutations/use-location-mutations";
 import { AddInventoryDialog } from "@/components/locations/add-inventory-dialog";
 import type {
   InventoryRequest,
@@ -91,6 +89,8 @@ export function AdjustStockDialog({
 }: AdjustStockDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { siteId } = useCurrentSite();
+  const previousSiteId = useRef(siteId);
   const queryClient = useQueryClient();
 
   const isProductFilteredMode = Boolean(preselectedProduct);
@@ -124,14 +124,15 @@ export function AdjustStockDialog({
 
   const inventoryQuery = useLocationInventory(
     location.locationType ?? undefined,
-    location.locationId ?? undefined
+    location.locationId ?? undefined,
+    location.locationCode
   );
+  // The real, resolved location UUID - resolves the NOT_ASSIGNED virtual ID. Every v1 mutation
+  // below that takes a bare locationId (adjust; the create mutation resolves internally) must
+  // use this, never the raw `location.locationId` from the selector.
+  const resolvedLocationId = inventoryQuery.resolvedLocationId;
 
   const createInventoryMutation = useCreateInventoryMutation(
-    location.locationType ?? LocationType.BOX_BIN,
-    location.locationId ?? ""
-  );
-  const updateInventoryMutation = useUpdateInventoryMutation(
     location.locationType ?? LocationType.BOX_BIN,
     location.locationId ?? ""
   );
@@ -161,6 +162,18 @@ export function AdjustStockDialog({
       });
     }
   }, [open, initialLocationProp]);
+
+  useEffect(() => {
+    if (previousSiteId.current === siteId) return;
+    previousSiteId.current = siteId;
+    setLocation(EMPTY_LOCATION);
+    setCart(new Map());
+    setSelectedInventoryId(null);
+    setQuantity("");
+    setQuantityWarning(null);
+    setConfirmDialogOpen(false);
+    setAddInventoryDialogOpen(false);
+  }, [siteId]);
 
   // Reset per-line state when the location changes.
   useEffect(() => {
@@ -278,9 +291,12 @@ export function AdjustStockDialog({
   // ----- Submission shared logic -----
 
   const hasValidLocation = Boolean(location.locationId);
+  // A cached value paired with a failed latest read is not safe mutation input.  Treat it as an
+  // error until retry succeeds rather than silently presenting it as an empty/ready inventory.
+  const inventoryUnavailable = Boolean(inventoryQuery.isError || inventoryQuery.isUnresolved);
+  const inventoryReady = Boolean(inventoryQuery.data) && !inventoryUnavailable && !inventoryQuery.isLoading;
   const isAdjusting = batchAdjustMutation.isPending;
-  const isSavingInventory =
-    createInventoryMutation.isPending || updateInventoryMutation.isPending;
+  const isSavingInventory = createInventoryMutation.isPending || isAdjusting;
 
   const locationLabel = location.locationType
     ? `${LOCATION_TYPE_CODES[location.locationType]}${location.locationCode}`
@@ -315,15 +331,14 @@ export function AdjustStockDialog({
     adjustments: BatchAdjustLine[],
     productIds: string[]
   ) {
-    const actorId = user?.personId || user?.id;
-    if (!actorId) {
+    if (!user) {
       toast({ title: "Missing user", description: "Please sign in again." });
       return false;
     }
-    if (!location.locationType || !location.locationId) {
+    if (!inventoryReady || !location.locationType || !resolvedLocationId) {
       toast({
-        title: "Missing selection",
-        description: "Select a location.",
+        title: "Inventory unavailable",
+        description: "Retry loading inventory before adjusting stock.",
       });
       return false;
     }
@@ -336,20 +351,11 @@ export function AdjustStockDialog({
       await batchAdjustMutation.mutateAsync({
         payload: {
           locationType: location.locationType,
-          locationId: location.locationId,
+          locationId: resolvedLocationId,
           adjustments,
           reason,
-          actorId,
         },
         productIds,
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "locationInventory",
-          location.locationType,
-          location.locationId,
-        ],
       });
 
       toast({ title: "Stock adjusted", variant: "success" });
@@ -619,28 +625,61 @@ export function AdjustStockDialog({
     requireConfirmThenSubmit(doSubmit);
   }
 
+  async function handleRetryUncertain() {
+    try {
+      await batchAdjustMutation.retryUncertain?.();
+      toast({ title: "Adjustment confirmed", description: "The original submission was safely retried.", variant: "success" });
+      setCart(new Map());
+      setSelectedInventoryId(null);
+    } catch (err) {
+      toast({ title: "Adjustment outcome still uncertain", description: err instanceof Error ? err.message : "Retry later.", variant: "destructive" });
+    }
+  }
+
   // ----- Add-new-inventory (preselectedProduct, location empty) -----
 
+  // Updating an existing row has no v1 "set exact quantity" route (R-9's resolution dropped
+  // the legacy untracked PUT - see lib/api/site-inventory.ts's deleteSiteLocationInventory doc
+  // comment). Editing an existing row goes through the audited adjust mutation with a computed
+  // signed delta instead; only a genuinely new row uses the create mutation.
   async function handleAddNewInventory(
     payload: InventoryRequest,
     isUpdate: boolean,
     inventoryId?: string
   ) {
-    const actorId = user?.personId || user?.id;
-    const enrichedPayload: InventoryRequest = {
-      ...payload,
-      actorId,
-      reason: StockMovementReason.ADJUSTMENT,
-    };
-
     try {
       if (isUpdate && inventoryId) {
-        await updateInventoryMutation.mutateAsync({
-          inventoryId,
-          payload: enrichedPayload,
+        const existing = inventory.find((inv) => inv.id === inventoryId);
+        const delta = payload.quantity - (existing?.quantity ?? 0);
+        if (delta === 0) {
+          toast({ title: "No change", description: "Quantity is unchanged." });
+          return;
+        }
+        if (!location.locationType || !resolvedLocationId) return;
+        await batchAdjustMutation.mutateAsync({
+          payload: {
+            locationType: location.locationType,
+            locationId: resolvedLocationId,
+            adjustments: [
+              {
+                inventoryId,
+                quantityChange: delta,
+                intakeUnit: payload.intakeUnit,
+                intakeQty: payload.intakeQty,
+              },
+            ],
+            reason: StockMovementReason.ADJUSTMENT,
+          },
+          productIds: existing ? [existing.item.id] : [],
         });
       } else {
-        await createInventoryMutation.mutateAsync(enrichedPayload);
+        await createInventoryMutation.mutateAsync({
+          productId: payload.itemId,
+          quantity: payload.quantity,
+          reason: StockMovementReason.ADJUSTMENT,
+          intakeUnit: payload.intakeUnit,
+          intakeQty: payload.intakeQty,
+        });
       }
       toast({ title: "Inventory added successfully", variant: "success" });
     } catch (err) {
@@ -658,11 +697,6 @@ export function AdjustStockDialog({
     if (!preselectedProduct || !location.locationType || !location.locationId) {
       return;
     }
-    const actorId = user?.personId || user?.id;
-    if (!actorId) {
-      toast({ title: "Missing user", description: "Please sign in again." });
-      return;
-    }
     if (quantityNum < 1) {
       toast({
         title: "Invalid quantity",
@@ -670,24 +704,15 @@ export function AdjustStockDialog({
       });
       return;
     }
-    const payload: InventoryRequest = {
-      itemId: preselectedProduct.product.id,
-      quantity: quantityNum,
-      actorId,
-      reason: StockMovementReason.ADJUSTMENT,
-    };
 
     try {
-      await createInventoryMutation.mutateAsync(payload);
-      await queryClient.invalidateQueries({
-        queryKey: [
-          "locationInventory",
-          location.locationType,
-          location.locationId,
-        ],
+      await createInventoryMutation.mutateAsync({
+        productId: preselectedProduct.product.id,
+        quantity: quantityNum,
+        reason: StockMovementReason.ADJUSTMENT,
       });
       await queryClient.invalidateQueries({
-        queryKey: ["productInventoryEntries", preselectedProduct.product.id],
+        queryKey: ["productInventoryEntries"],
       });
       toast({ title: "Product added to location", variant: "success" });
       setQuantity("");
@@ -707,9 +732,10 @@ export function AdjustStockDialog({
 
   const cartItemCount = cart.size;
   const cartCanSubmit =
-    hasValidLocation && cartLines.length > 0 && !isAdjusting;
+    hasValidLocation && inventoryReady && cartLines.length > 0 && !isAdjusting;
   const singleCanSubmit =
     hasValidLocation &&
+    inventoryReady &&
     Boolean(selectedInventory) &&
     quantityNum >= 1 &&
     (action === "add" || quantityNum <= availableForSubtract) &&
@@ -798,7 +824,14 @@ export function AdjustStockDialog({
           </div>
 
           {/* Body */}
-          {hasValidLocation &&
+          {hasValidLocation && inventoryUnavailable ? (
+            <div className="flex-1 flex flex-col items-center justify-center rounded-md border border-dashed p-6 text-center mt-4 gap-3">
+              <p className="text-sm text-destructive">Couldn&apos;t load inventory for this location.</p>
+              <Button type="button" variant="outline" onClick={() => void inventoryQuery.retry?.()}>
+                Retry
+              </Button>
+            </div>
+          ) : hasValidLocation &&
           isProductFilteredMode &&
           preselectedProduct &&
           preselectedProduct.inventoryEntries.length === 0 &&
@@ -986,6 +1019,11 @@ export function AdjustStockDialog({
             />
           )}
           <DialogFooter className="px-6 py-3">
+            {batchAdjustMutation.uncertainSubmission ? (
+              <Button type="button" variant="outline" onClick={handleRetryUncertain} disabled={isAdjusting}>
+                Retry uncertain adjustment
+              </Button>
+            ) : null}
             <Button
               type="button"
               onClick={isProductFilteredMode ? handleSingleSubmit : handleCartSubmit}

@@ -21,5 +21,11 @@ public interface EventOutboxRepository extends JpaRepository<EventOutbox, UUID> 
     
     // Find published events after a certain timestamp
     List<EventOutbox> findByPublishedAtAfter(OffsetDateTime timestamp);
+
+    // Dedupe guard (.specs/phase-6-inventory T-6c-8): entityId is the deterministic UUID derived
+    // from the stock movement's id, so this is equivalent to (and cheaper/safer than) attempting
+    // the V16 JSONB-path unique-index insert and catching the violation - a plain indexed-PK-like
+    // lookup on entityId never poisons the caller's flush/transaction the way a failed insert can.
+    boolean existsByEntityId(UUID entityId);
 }
 

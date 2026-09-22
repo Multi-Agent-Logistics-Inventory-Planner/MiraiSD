@@ -46,14 +46,9 @@ export function useStorageLocations() {
 
 /**
  * Hook to get the NOT_ASSIGNED storage location.
- * Returns the storage location ID needed for NOT_ASSIGNED inventory queries.
- *
- * Currently unused (dead before this feature touched this file - see
- * .specs/track-d-web-client-adoption/log.md). Its `storageLocationId` is now the
- * site-scoped ID from `getSiteStorageLocations`, whereas `use-location-inventory.ts` and
- * `use-location-mutations.ts` still resolve NOT_ASSIGNED's ID through the legacy, unscoped
- * `getStorageLocationByCode`. A future caller of this hook must not mix the two IDs across
- * a request that expects one or the other.
+ * Returns a site-scoped storage-category ID, not a concrete location ID.
+ * Currently unused. Inventory mutations resolve the virtual NOT_ASSIGNED selection
+ * through resolveSiteLocationId, which returns the concrete location within this category.
  */
 export function useNotAssignedStorageLocation() {
   const { data: storageLocations, ...rest } = useStorageLocations();

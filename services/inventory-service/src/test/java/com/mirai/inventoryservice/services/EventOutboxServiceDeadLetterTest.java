@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.services;
 
+import com.mirai.inventoryservice.inventory.application.StockMovementService;
 import com.mirai.inventoryservice.kafka.KafkaProducer;
 import com.mirai.inventoryservice.models.audit.EventDeadLetter;
 import com.mirai.inventoryservice.models.audit.EventOutbox;

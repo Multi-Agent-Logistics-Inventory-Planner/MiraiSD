@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { LocationSelector } from "@/components/stock/location-selector";
+import { LegacyLocationSelector as LocationSelector } from "@/components/stock/location-selector";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useCloseKujiBoxMutation } from "@/hooks/mutations/use-kuji-box-mutations";

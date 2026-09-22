@@ -1,71 +1,16 @@
-import { apiGet, apiPost } from "./client";
+import { apiGet } from "./client";
 import {
-  StockMovement,
-  BatchAdjustStockRequest,
-  TransferStockRequest,
-  BatchTransferStockRequest,
   PaginatedResponse,
   AuditLogEntry,
   AuditLogFilters,
   AuditLog,
   AuditLogDetail,
 } from "@/types/api";
-import { resolveLocationId } from "./inventory";
 
-/**
- * Adjust stock for one or more inventory items at a single location, atomically.
- * Single-item adjustments are submitted as a batch of one.
- */
-export async function batchAdjustStock(
-  data: BatchAdjustStockRequest
-): Promise<void> {
-  const locationId = await resolveLocationId(data.locationType, data.locationId);
-  return apiPost<void, BatchAdjustStockRequest>(
-    "/api/stock-movements/batch-adjust",
-    { ...data, locationId }
-  );
-}
-
-/**
- * Transfer stock between locations (single item)
- */
-export async function transferStock(
-  data: TransferStockRequest
-): Promise<StockMovement> {
-  return apiPost<StockMovement, TransferStockRequest>(
-    "/api/stock-movements/transfer",
-    data
-  );
-}
-
-/**
- * Transfer multiple inventory items in a single batch.
- * Creates one audit log entry for the entire operation.
- */
-export async function batchTransferStock(
-  data: BatchTransferStockRequest
-): Promise<void> {
-  return apiPost<void, BatchTransferStockRequest>(
-    "/api/stock-movements/batch-transfer",
-    data
-  );
-}
-
-/**
- * Get stock movement history for a product (paginated)
- * @param productId - The product ID to get history for
- * @param page - Page number (0-indexed)
- * @param size - Page size
- */
-export async function getStockMovementHistory(
-  productId: string,
-  page: number = 0,
-  size: number = 20
-): Promise<PaginatedResponse<StockMovement>> {
-  return apiGet<PaginatedResponse<StockMovement>>(
-    `/api/stock-movements/history/${productId}?page=${page}&size=${size}`
-  );
-}
+// batchAdjustStock/transferStock/batchTransferStock/getStockMovementHistory (legacy, unscoped)
+// were deleted in .specs/phase-6-inventory 6e, T-6e-7 - superseded by the site-scoped v1
+// mutations in use-stock-mutations.ts and the site-scoped movement history in site-inventory.ts.
+// No v1 audit-log route exists yet (T-6d-12 residual), so these three stay on legacy routes.
 
 /**
  * Get audit log with optional filters (paginated)

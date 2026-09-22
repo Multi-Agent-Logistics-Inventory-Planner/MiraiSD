@@ -16,6 +16,7 @@ import lombok.AllArgsConstructor;
 import com.mirai.inventoryservice.identity.infrastructure.SiteAccessAuthorizationFilter;
 import com.mirai.inventoryservice.shared.correlation.CorrelationIdContext;
 import com.mirai.inventoryservice.shared.correlation.CorrelationIdFilter;
+import com.mirai.inventoryservice.shared.correlation.IdempotencyKeyFilter;
 
 import java.util.Arrays;
 
@@ -27,6 +28,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
     private final CorrelationIdFilter correlationIdFilter;
+    private final IdempotencyKeyFilter idempotencyKeyFilter;
     private final SiteAccessAuthorizationFilter siteAccessAuthorizationFilter;
     private final Environment environment;
 
@@ -85,6 +87,9 @@ public class SecurityConfig {
         // Correlation ID runs before rate limiting so every subsequent filter's logs (and any
         // outbox events created during this request) can be tied back to the request.
         http.addFilterBefore(correlationIdFilter, RateLimitingFilter.class);
+        // Idempotency key carries alongside correlation id; order relative to it doesn't matter
+        // since neither reads the other, but placing it after keeps MDC setup together.
+        http.addFilterAfter(idempotencyKeyFilter, CorrelationIdFilter.class);
         http.addFilterAfter(jwtAuthenticationFilter, RateLimitingFilter.class);
         // Runs after JWT auth so it can read the resolved AuthenticatedPrincipal, per
         // docs/specs/authentication-and-authorization.md section 5's resolution order.

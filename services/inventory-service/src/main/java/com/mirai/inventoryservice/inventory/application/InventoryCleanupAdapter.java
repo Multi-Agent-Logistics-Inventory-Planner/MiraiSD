@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.inventory.application;
 
 import com.mirai.inventoryservice.catalog.application.InventoryCleanupPort;
-import com.mirai.inventoryservice.repositories.StockMovementRepository;
-import com.mirai.inventoryservice.services.InventoryAggregateService;
+import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
+import com.mirai.inventoryservice.inventory.application.InventoryAggregateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
