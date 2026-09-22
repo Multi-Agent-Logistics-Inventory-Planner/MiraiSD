@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.catalog.application;
 
+import com.mirai.inventoryservice.catalog.api.CatalogProductResponse;
 import com.mirai.inventoryservice.catalog.domain.DuplicateSkuException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.SupplierNotFoundException;
@@ -221,10 +222,6 @@ public class ProductService {
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with SKU: " + sku));
     }
 
-    public List<Product> getAllProducts() {
-        return productRepository.findAllWithCategories();
-    }
-
     /**
      * Slim projection for callers that only need the columns {@link EffectiveProductSettings}
      * resolves (id/sku/name plus the six site_products-overridable settings), not the full
@@ -236,28 +233,21 @@ public class ProductService {
         return productRepository.findAllSettingsDefaults();
     }
 
-    public List<Product> getActiveProducts() {
-        return productRepository.findByIsActiveTrueWithCategories();
+    // ==================== Slim Catalog List-Item Methods (egress optimization) ====================
+    // Master-identity-only projections for CatalogProductController's list endpoint (.specs/
+    // catalog-product-egress/spec.md AC-5) -- never carry site-owned data, unlike the slim
+    // *AsListItems methods above which back the legacy /api/products route.
+
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> getAllCatalogListItems() {
+        return productRepository.findAllCatalogListItems();
     }
 
-    public List<Product> getProductsByCategory(UUID categoryId) {
-        return productRepository.findByCategoryIdWithCategories(categoryId);
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> getCatalogListItemsByCategory(UUID categoryId) {
+        return productRepository.findCatalogListItemsByCategoryId(categoryId);
     }
 
-    public List<Product> getActiveProductsByCategory(UUID categoryId) {
-        return productRepository.findByCategoryIdAndIsActiveTrueWithCategories(categoryId);
-    }
-
-    public List<Product> searchProducts(String query) {
-        return productRepository.searchWithCategories(query);
-    }
-
-    /**
-     * Global-identity search - see {@link ProductRepository#searchAllWithCategories}: no
-     * {@code isActive} filter, since a global catalog product need not be stocked anywhere yet.
-     */
-    public List<Product> searchAllProducts(String query) {
-        return productRepository.searchAllWithCategories(query);
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> searchCatalogListItems(String query) {
+        return productRepository.searchCatalogListItems(query);
     }
 
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
@@ -430,41 +420,6 @@ public class ProductService {
     }
 
     // ==================== Parent-Child Methods ====================
-
-    /**
-     * Get root products only (no parent) for main product listing
-     */
-    public List<Product> getRootProducts() {
-        return productRepository.findRootProductsWithCategories();
-    }
-
-    /**
-     * Get active root products only
-     */
-    public List<Product> getActiveRootProducts() {
-        return productRepository.findRootProductsWithCategoriesActive();
-    }
-
-    /**
-     * Get root products that have at least one child (Kuji parents only)
-     */
-    public List<Product> getRootKujiProducts() {
-        return productRepository.findRootKujiProductsWithCategories();
-    }
-
-    /**
-     * Get children of a parent product
-     */
-    public List<Product> getChildProducts(UUID parentId) {
-        return productRepository.findByParentIdWithCategories(parentId);
-    }
-
-    /**
-     * Get active children of a parent product
-     */
-    public List<Product> getActiveChildProducts(UUID parentId) {
-        return productRepository.findByParentIdAndIsActiveTrueWithCategories(parentId);
-    }
 
     /**
      * Get product by ID with children loaded
