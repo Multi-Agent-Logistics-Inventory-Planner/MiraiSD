@@ -245,6 +245,35 @@ class ProductListEgressIT extends BaseKafkaIntegrationTest {
     }
 
     @Test
+    void catalogProductList_throughController_issuesExactlyOneStatement() throws Exception {
+        seedCategoryAndTwoProductsWithAChild();
+        entityManager.flush();
+        entityManager.clear();
+        String token = adminToken();
+        CapturingStatementInspector.clear();
+        statistics.clear();
+
+        mockMvc.perform(get("/api/v1/catalog/products").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // Unlike the legacy list (hasActiveBox lookup) and site-products list (separate
+        // assortment query), CatalogProductController.getCatalogProducts does nothing beyond the
+        // single repository call -- applyKujiWebhookVisibility is a pure in-memory permission
+        // check, no DB access. One statement past the auth preamble is the correct total here,
+        // not just the repository query's own shape (which the repository-level test above
+        // already proved in isolation).
+        List<String> sql = withoutAuthPreamble(CapturingStatementInspector.captured());
+        // No "no JOIN" check here, same reason as the legacy list test above:
+        // CATALOG_LIST_SELECT's LEFT JOIN to categories/suppliers for one row's worth of columns
+        // is correct, existing behavior (proven slim, and free of site-owned columns, at the
+        // repository level above).
+        assertThat(sql)
+                .as("GET /api/v1/catalog/products must issue exactly the one slim list query -- "
+                        + "no extra statement, unlike the legacy and site-products endpoints")
+                .hasSize(1);
+    }
+
+    @Test
     void siteProductsList_throughController_isTheSlimQueryPlusTheSeparateAssortmentQuery() throws Exception {
         Site mainSite = siteRepository.findByCode("MAIN").orElseThrow();
         seedCategoryAndTwoProductsWithAChild();

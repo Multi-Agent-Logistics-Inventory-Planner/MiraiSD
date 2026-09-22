@@ -36,11 +36,16 @@ All commands green after the four review-finding fixes:
 | Gate | Result |
 | --- | --- |
 | `./mvnw -B clean test` | 483/483 |
-| `./mvnw -B clean test -Dtest='*IT'` (real Postgres, Testcontainers) | 563/563 |
+| `./mvnw -B clean test -Dtest='*IT'` (real Postgres, Testcontainers) | 564/564 |
 | Contract regen + `git diff packages/contracts/openapi.json` | additive only |
 | TS client regen + typecheck | clean; diff additive only |
 | `npx tsc --noEmit` (apps/web) | clean |
 | `npx vitest run --pool=threads` (apps/web) | 67 files / 461 tests |
+
+A follow-up review round (see `review.md`) closed one coverage gap (v1 catalog list now has an
+HTTP-level egress test, not just repository-level) and corrected AC-3/AC-6 wording to match the
+justified two-statement shape of the legacy and site-products endpoints. Re-verified: `*IT`
+564/564 (563 -> 564), all other gates unchanged.
 | `npm run lint` (apps/web) | 0 errors, 53 pre-existing warnings, none in touched files |
 
 A `vitest run` invocation using the default forks pool intermittently hit
@@ -61,9 +66,10 @@ mistaken for a real failure.
   `CatalogProductControllerIT`; `ProductListEgressIT.catalogProductDetail_endToEnd_...`
   (preferredSupplierName, flat category -- both review-finding fixes).
 - AC-5 (dead code removed, caller-set pinned): `ProductFullHydrationCallerSetTest`.
-- AC-6 (comprehensive egress proof, both layers): `ProductListEgressIT`, 6 tests -- 3
-  repository-level (query shape in isolation) and 3 through-controller (the real regression
-  boundary, added during review).
+- AC-6 (comprehensive egress proof, both layers): `ProductListEgressIT`, 7 tests -- 3
+  repository-level (query shape in isolation) and 4 through-controller (the real regression
+  boundary: legacy list, catalog list, catalog detail, site-products list), enumerating each
+  endpoint's justified statement total per the corrected AC-3/AC-6 wording.
 
 ## Not covered by this record, by design
 

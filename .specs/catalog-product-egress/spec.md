@@ -36,16 +36,23 @@ Phase 7's kuji slice since `kuji_boxes` has no `site_id` yet).
   every endpoint that serializes it (legacy list, legacy detail, v1 catalog).
 - AC-2: `hasChildren` is computed in the same query as the product list (no
   separate parent-ID query) for both the legacy list and v1 catalog list.
-- AC-3: `SiteProductController.getSiteProducts` issues one query with no joins.
+- AC-3: `SiteProductController.getSiteProducts` resolves its product settings via one query
+  with no joins (previously a JOIN FETCH across category/parent-category/parent-product). The
+  endpoint's separate `site_products` assortment query is a distinct, always-necessary lookup
+  against a different table -- not part of this claim, and not something this record removes.
 - AC-4: `/api/v1/catalog/products` list/detail responses include `hasChildren`,
   `preferredSupplierId/Name/Auto`, and a full `category` object, in addition to
   existing fields. The contract change is additive only (oasdiff passes).
 - AC-5: Every `ProductRepository` `*WithCategories` list method and
   `ProductService` wrapper with no remaining caller is deleted, and a caller-set
   test pins the exact remaining callers of full-entity hydration.
-- AC-6: An egress integration test proves one prepared statement per list call
-  for legacy `/api/products`, v1 catalog list, and v1 site products, with no
-  `JOIN` in the site-products SQL.
+- AC-6: An egress integration test proves, for each of legacy `/api/products`, v1 catalog list,
+  v1 catalog detail, and v1 site products: no JOIN FETCH across category/parent-category/
+  parent-product remains, and every statement issued past the endpoint's own authentication
+  preamble is accounted for and justified. That total is one statement for v1 catalog list; two
+  for legacy `/api/products` (the slim list query plus the separate open-Kuji-box lookup that
+  populates `hasActiveBox`) and for v1 site products (the slim settings query plus the separate
+  `site_products` assortment query, which must have no `JOIN` in either statement).
 
 ## Non-goals
 

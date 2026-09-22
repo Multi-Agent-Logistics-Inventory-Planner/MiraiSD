@@ -104,7 +104,7 @@ The original three repository-level tests were kept: they are still correct, che
 the first line of defense on the query itself, they just aren't sufficient alone, which the class
 javadoc now says explicitly.
 
-## Verification after fixes
+## Verification after the four fixes
 
 - `./mvnw -B clean test`: 483/483 (482 -> 483, the new `ProductServiceListItemsTest`).
 - `./mvnw -B clean test -Dtest='*IT'`: 563/563 (560 -> 563, the three new HTTP-level
@@ -112,5 +112,35 @@ javadoc now says explicitly.
 - `apps/web`: `npx tsc --noEmit` clean; `npx vitest run --pool=threads`: 461/461 (460 -> 461, the
   new `hasActiveBox` survival test).
 
-No source changes beyond the four fixes and their regression tests. No migrations, no production
-action, no push.
+## Follow-up review round
+
+A second independent review of `ada0ac8` found no new blocking issues -- it confirmed the three
+production-code fixes above are correct -- but flagged two non-blocking follow-ups, both closed
+here:
+
+1. **Coverage gap:** `ProductListEgressIT` had HTTP-level tests for the legacy list, site-products
+   list, and catalog detail, but the v1 catalog *list* (`GET /api/v1/catalog/products`) still only
+   had the original repository-level test. Added
+   `catalogProductList_throughController_issuesExactlyOneStatement`, confirming
+   `CatalogProductController.getCatalogProducts` genuinely adds nothing past the repository call
+   (`applyKujiWebhookVisibility` is a pure in-memory check, no DB access) -- one statement past the
+   auth preamble, unlike the legacy and site-products endpoints' justified two.
+2. **Spec/reality mismatch:** AC-3 and AC-6 (`spec.md`) still described "one query"/"one prepared
+   statement" for `SiteProductController.getSiteProducts` and for "each list call," without
+   acknowledging the justified second statement each of the legacy and site-products endpoints
+   issues (the `hasActiveBox` lookup and the `site_products` assortment query respectively) --
+   both real, both pre-existing, neither part of the egress problem this record fixes. Rewrote
+   both ACs to state the actual, now-fully-tested shape: one statement for v1 catalog list and
+   detail, two (justified, and now enumerated) for legacy list and site-products list.
+
+## Verification after the follow-up round
+
+- `./mvnw -B clean test`: 483/483 (unchanged).
+- `./mvnw -B clean test -Dtest='*IT'`: 564/564 (563 -> 564, the new catalog-list HTTP test).
+- `apps/web`: `npx tsc --noEmit` clean; `npx vitest run --pool=threads`: 461/461 (unchanged).
+- `npm run lint` (apps/web): 0 errors.
+- No contract change this round (`git status` on `packages/contracts/openapi.json` and
+  `packages/api-client/src/schema.d.ts` clean).
+
+No source changes beyond the four fixes, the follow-up test and spec wording, and their
+regression coverage. No migrations, no production action, no push.

@@ -2,10 +2,14 @@
 
 ## Current handoff
 
-- Status: **Complete, including a post-implementation review round.** An external review of the
-  working tree (before push) found four real issues -- see `review.md` for full detail. All four
-  fixed, verified with new regression tests, and re-validated. `review.md`/`validation.md` added
-  (this record is Full tier and was initially missing both).
+- Status: **Complete, including two post-implementation review rounds.** The first external
+  review found four real issues -- see `review.md` for full detail. All four fixed, verified with
+  new regression tests, and validated (`review.md`/`validation.md` added; this record is Full
+  tier and was initially missing both). A second review of the fix commit (`ada0ac8`) found no
+  new blocking issues but flagged two non-blocking follow-ups -- a coverage gap (v1 catalog list
+  had only repository-level egress coverage) and a spec/reality mismatch (AC-3/AC-6 still implied
+  "one statement" for endpoints that justifiably issue two). Both closed; see `review.md`'s
+  "Follow-up review round" section.
 - Next action: none for this record.
 - Review-round summary (full detail in `review.md`):
   1. **Regression, high severity:** consolidating every `useProducts` caller onto
