@@ -1,7 +1,7 @@
 # Phase 4–6 closeout and Phase 7 kickoff
 
-- Status: Approved work order
-- Date: 2026-09-18
+- Status: Phase 4–6 production work complete 2026-09-22; F2 deferred; Phase 7 next
+- Date: 2026-09-18, updated 2026-09-22
 - Continues: [Phase 6 gap audit and proposed closure plan](phase-6-gap-closure.md)
 - Baseline commit: `53ca9e2` (`refactor/remaining-endpoints` == `dev` == `origin/dev`);
   `origin/main` is at `78c8bbf`, **53 commits behind**
@@ -141,6 +141,59 @@ that deletes, renames or moves code will hit this.
 
 Record exists. Trigger chosen (the predicate spans two tables, so a unique index cannot express
 it). **V67 reserved** for the constrain migration; V61 is not used. No migration written yet.
+
+---
+
+## 1b. Progress as of 2026-09-22 — production at V68
+
+### Slice C — DONE
+
+`V67` seeds SECOND's canonical `NOT_ASSIGNED` storage location and `NA` location, and installs the
+guard trigger on both INSERT and `UPDATE OF storage_location_id`, serialized with a transaction
+advisory lock. `V68` is the separate, human-gated FK + `SET NOT NULL` on `stock_movements.site_id`.
+The two were originally bundled; they were split so the seed and guard could ship without the
+constraint, which depends on the deploy.
+
+### Slice D and the Phase 7 artifact fixes — DONE
+
+Doc reconciliation, the `is_active` resolution, and Phase 7 fixes (a)–(e) landed in `e61d5f2`.
+
+### Slice F1 — DONE
+
+V58–V67 applied manually, PR #328 merged as `7a5008b` and deployed, post-deploy NULL recheck zero,
+V68 applied. Evidence in `.specs/prod-schema-reconciliation/`. V60 split: 13,442 rows resolved via
+location, 2,972 MAIN fallback, 0 mismatches, all 16,414 pre-deploy rows on MAIN.
+
+### Slice F2 — DEFERRED
+
+Deferred by user decision on 2026-09-22; not blocking Phase 7. Production still has no
+`flyway_schema_history`, so every new migration — including all of Phase 7's — is a manual,
+approved apply following the runbook pattern. When F2 resumes, baseline at V68.
+
+### Slice E — gated, unchanged
+
+Still gated on second-site enablement.
+
+### Egress: what this deploy did and did not fix
+
+`refs/product-inventory-query-egress.md` (local-only; `refs/` is gitignored) identified four causes
+of the Supabase pooler egress. Status after `7a5008b`:
+
+| Cause | Status |
+| --- | --- |
+| Rank 1: full-catalog `GET /api/inventory/totals`, 8 columns incl. `image_url` | **Fixed for the web.** The app now calls v1 `/api/v1/sites/{siteId}/inventory/totals`: 3 columns (id, quantity, last update). Post-edit and realtime refreshes fetch only the affected `productIds` (batched, max 500) instead of the whole catalog. The legacy route still exists for other clients. |
+| `staleTime: 30_000` override on the totals hook | Fixed 2026-08-25, before this deploy. |
+| `GET /api/products` unbounded; `findAllParentIds` uncached on every list call | **Not fixed.** Still a full-catalog `List`; the parent-ID `SELECT DISTINCT` is the most-called query in the database (44,185 calls since stats reset). |
+| Heavy `JOIN FETCH` product queries | **Not fixed, and one new caller added.** `SiteProductController.getSiteProducts` (v1, added in Phase 5d and now called on every Products page load) uses `productService.getAllProducts()` → `findAllWithCategories()`, hydrating every product with its category and parent category. `SiteProductResponse` uses none of the category fields. |
+
+Net effect is unmeasured. Refreshes after edits are much cheaper; initial Products page load now
+issues four full-catalog reads (slim product list, parent IDs, full-entity site products, slim
+totals). `pg_stat_statements` is cumulative since 2026-01-16, so it cannot isolate this deploy —
+compare the Supabase daily egress chart against the ~150–200 MB/day baseline over the next few days.
+
+Cheapest open fix: make `SiteProductController` load a slim projection instead of
+`findAllWithCategories()`. It is catalog-module work, not a Phase 7 slice; track it as a small
+standalone Standard-tier change.
 
 ---
 
