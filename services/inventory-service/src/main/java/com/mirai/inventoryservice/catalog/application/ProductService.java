@@ -1,5 +1,6 @@
 package com.mirai.inventoryservice.catalog.application;
 
+import com.mirai.inventoryservice.catalog.api.CatalogProductResponse;
 import com.mirai.inventoryservice.catalog.domain.DuplicateSkuException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.SupplierNotFoundException;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -222,32 +222,32 @@ public class ProductService {
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with SKU: " + sku));
     }
 
-    public List<Product> getAllProducts() {
-        return productRepository.findAllWithCategories();
-    }
-
-    public List<Product> getActiveProducts() {
-        return productRepository.findByIsActiveTrueWithCategories();
-    }
-
-    public List<Product> getProductsByCategory(UUID categoryId) {
-        return productRepository.findByCategoryIdWithCategories(categoryId);
-    }
-
-    public List<Product> getActiveProductsByCategory(UUID categoryId) {
-        return productRepository.findByCategoryIdAndIsActiveTrueWithCategories(categoryId);
-    }
-
-    public List<Product> searchProducts(String query) {
-        return productRepository.searchWithCategories(query);
-    }
-
     /**
-     * Global-identity search - see {@link ProductRepository#searchAllWithCategories}: no
-     * {@code isActive} filter, since a global catalog product need not be stocked anywhere yet.
+     * Slim projection for callers that only need the columns {@link EffectiveProductSettings}
+     * resolves (id/sku/name plus the six site_products-overridable settings), not the full
+     * {@link Product} entity with its category/parent/preferredSupplier joins. See
+     * {@code ProductRepository.findAllSettingsDefaults()} and
+     * .specs/catalog-product-egress/spec.md AC-3.
      */
-    public List<Product> searchAllProducts(String query) {
-        return productRepository.searchAllWithCategories(query);
+    public List<ProductSettingsDefaults> getAllProductSettingsDefaults() {
+        return productRepository.findAllSettingsDefaults();
+    }
+
+    // ==================== Slim Catalog List-Item Methods (egress optimization) ====================
+    // Master-identity-only projections for CatalogProductController's list endpoint (.specs/
+    // catalog-product-egress/spec.md AC-5) -- never carry site-owned data, unlike the slim
+    // *AsListItems methods above which back the legacy /api/products route.
+
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> getAllCatalogListItems() {
+        return productRepository.findAllCatalogListItems();
+    }
+
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> getCatalogListItemsByCategory(UUID categoryId) {
+        return productRepository.findCatalogListItemsByCategoryId(categoryId);
+    }
+
+    public List<com.mirai.inventoryservice.catalog.api.CatalogProductResponse> searchCatalogListItems(String query) {
+        return productRepository.searchCatalogListItems(query);
     }
 
     public Product updateProduct(UUID id, String sku, UUID categoryId, UUID parentId,
@@ -422,41 +422,6 @@ public class ProductService {
     // ==================== Parent-Child Methods ====================
 
     /**
-     * Get root products only (no parent) for main product listing
-     */
-    public List<Product> getRootProducts() {
-        return productRepository.findRootProductsWithCategories();
-    }
-
-    /**
-     * Get active root products only
-     */
-    public List<Product> getActiveRootProducts() {
-        return productRepository.findRootProductsWithCategoriesActive();
-    }
-
-    /**
-     * Get root products that have at least one child (Kuji parents only)
-     */
-    public List<Product> getRootKujiProducts() {
-        return productRepository.findRootKujiProductsWithCategories();
-    }
-
-    /**
-     * Get children of a parent product
-     */
-    public List<Product> getChildProducts(UUID parentId) {
-        return productRepository.findByParentIdWithCategories(parentId);
-    }
-
-    /**
-     * Get active children of a parent product
-     */
-    public List<Product> getActiveChildProducts(UUID parentId) {
-        return productRepository.findByParentIdAndIsActiveTrueWithCategories(parentId);
-    }
-
-    /**
      * Get product by ID with children loaded
      */
     public Product getProductByIdWithChildren(UUID id) {
@@ -486,24 +451,13 @@ public class ProductService {
         return productRepository.countChildrenByParentId(parentId);
     }
 
-    /**
-     * Get set of all product IDs that have children (for efficient hasChildren computation)
-     */
-    public Set<UUID> getParentProductIds() {
-        return new HashSet<>(productRepository.findAllParentIds());
-    }
-
     // ==================== Slim List-Item Methods (egress optimization) ====================
     // Return projected ProductListItemDTO directly instead of full Product entities.
-    // Fills in hasChildren via a single parentIds batch lookup (existing findAllParentIds).
-
-    private List<ProductListItemDTO> withHasChildren(List<ProductListItemDTO> items) {
-        Set<UUID> parentIds = getParentProductIds();
-        for (ProductListItemDTO item : items) {
-            item.setHasChildren(parentIds.contains(item.getId()));
-        }
-        return items;
-    }
+    // hasChildren is computed inside LIST_ITEM_SELECT itself (a correlated EXISTS) -- it no
+    // longer requires a second, uncached full-table parent-IDs scan per call (that scan,
+    // ProductService.getParentProductIds()/ProductRepository.findAllParentIds(), was the single
+    // most-called query in the database; both are removed, see
+    // .specs/catalog-product-egress/spec.md AC-2).
 
     private List<ProductListItemDTO> withHasActiveBox(List<ProductListItemDTO> items) {
         Set<UUID> activeBoxProductIds = openKujiBoxPort.findProductIdsWithOpenBox();
@@ -514,42 +468,48 @@ public class ProductService {
     }
 
     public List<ProductListItemDTO> getAllProductsAsListItems() {
-        return withHasChildren(productRepository.findAllAsListItems());
+        // withHasActiveBox is required here, not just on the root-only methods below: every
+        // rootOnly/kujiOnly web caller now routes through this one method too (web-product-
+        // list-cache W1 consolidated useProducts onto a single unfiltered fetch, applying
+        // rootOnly/kujiOnly client-side afterward). CustomKujiTabs partitions purely on
+        // hasActiveBox, so leaving it unpopulated here silently mispartitioned every kuji product
+        // as Closed regardless of its real box status.
+        return withHasActiveBox(productRepository.findAllAsListItems());
     }
 
     public List<ProductListItemDTO> getActiveProductsAsListItems() {
-        return withHasChildren(productRepository.findActiveAsListItems());
+        return productRepository.findActiveAsListItems();
     }
 
     public List<ProductListItemDTO> getProductsByCategoryAsListItems(UUID categoryId) {
-        return withHasChildren(productRepository.findByCategoryIdAsListItems(categoryId));
+        return productRepository.findByCategoryIdAsListItems(categoryId);
     }
 
     public List<ProductListItemDTO> getActiveProductsByCategoryAsListItems(UUID categoryId) {
-        return withHasChildren(productRepository.findByCategoryIdActiveAsListItems(categoryId));
+        return productRepository.findByCategoryIdActiveAsListItems(categoryId);
     }
 
     public List<ProductListItemDTO> searchProductsAsListItems(String query) {
-        return withHasChildren(productRepository.searchAsListItems(query));
+        return productRepository.searchAsListItems(query);
     }
 
     public List<ProductListItemDTO> getRootProductsAsListItems() {
-        return withHasActiveBox(withHasChildren(productRepository.findRootAsListItems()));
+        return withHasActiveBox(productRepository.findRootAsListItems());
     }
 
     public List<ProductListItemDTO> getActiveRootProductsAsListItems() {
-        return withHasActiveBox(withHasChildren(productRepository.findRootActiveAsListItems()));
+        return withHasActiveBox(productRepository.findRootActiveAsListItems());
     }
 
     public List<ProductListItemDTO> getRootKujiProductsAsListItems() {
-        return withHasActiveBox(withHasChildren(productRepository.findRootKujiAsListItems()));
+        return withHasActiveBox(productRepository.findRootKujiAsListItems());
     }
 
     public List<ProductListItemDTO> getChildProductsAsListItems(UUID parentId) {
-        return withHasChildren(productRepository.findByParentIdAsListItems(parentId));
+        return productRepository.findByParentIdAsListItems(parentId);
     }
 
     public List<ProductListItemDTO> getActiveChildProductsAsListItems(UUID parentId) {
-        return withHasChildren(productRepository.findByParentIdActiveAsListItems(parentId));
+        return productRepository.findByParentIdActiveAsListItems(parentId);
     }
 }

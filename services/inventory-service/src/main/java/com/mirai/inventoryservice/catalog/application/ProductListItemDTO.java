@@ -31,6 +31,8 @@ public class ProductListItemDTO {
     private Integer packsPerBox;
     private UUID parentId;
     private KujiType kujiType;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential).")
     private String kujiSlackWebhookUrl;
     private Integer reorderPoint;
     private Integer targetStockLevel;
@@ -52,7 +54,8 @@ public class ProductListItemDTO {
     /**
      * Constructor used by JPQL {@code SELECT new ProductListItemDTO(...)} projections.
      * Flat argument list so Hibernate can hydrate it without entity proxies.
-     * {@code hasChildren} is filled in by the service via the parent-IDs set.
+     * {@code hasChildren} is computed by the query itself (a correlated EXISTS, see
+     * {@code ProductRepository.LIST_ITEM_SELECT}) -- not filled in afterward.
      */
     public ProductListItemDTO(
             UUID id,
@@ -82,7 +85,8 @@ public class ProductListItemDTO {
             String categorySlug,
             Integer categoryDisplayOrder,
             Boolean categoryIsActive,
-            Boolean categoryUsesPacks
+            Boolean categoryUsesPacks,
+            Boolean hasChildren
     ) {
         this.id = id;
         this.sku = sku;
@@ -105,7 +109,7 @@ public class ProductListItemDTO {
         this.preferredSupplierName = preferredSupplierName;
         this.preferredSupplierAuto = preferredSupplierAuto;
         this.updatedAt = updatedAt;
-        this.hasChildren = null;
+        this.hasChildren = hasChildren;
         this.category = categoryId == null ? null : CategoryResponseDTO.builder()
                 .id(categoryId)
                 .name(categoryName)

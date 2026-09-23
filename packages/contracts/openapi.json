@@ -15374,6 +15374,9 @@
       "CatalogProductResponse" : {
         "type" : "object",
         "properties" : {
+          "category" : {
+            "$ref" : "#/components/schemas/CategoryResponseDTO"
+          },
           "categoryId" : {
             "type" : "string",
             "format" : "uuid"
@@ -15388,12 +15391,19 @@
           "description" : {
             "type" : "string"
           },
+          "hasChildren" : {
+            "type" : "boolean"
+          },
           "id" : {
             "type" : "string",
             "format" : "uuid"
           },
           "imageUrl" : {
             "type" : "string"
+          },
+          "kujiSlackWebhookUrl" : {
+            "type" : "string",
+            "description" : "Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential)."
           },
           "kujiType" : {
             "type" : "string",
@@ -15415,6 +15425,16 @@
           "parentId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "preferredSupplierAuto" : {
+            "type" : "boolean"
+          },
+          "preferredSupplierId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "preferredSupplierName" : {
+            "type" : "string"
           },
           "sku" : {
             "type" : "string"
@@ -18166,7 +18186,8 @@
             "type" : "boolean"
           },
           "kujiSlackWebhookUrl" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential)."
           },
           "kujiType" : {
             "type" : "string",
@@ -18361,7 +18382,8 @@
             "type" : "boolean"
           },
           "kujiSlackWebhookUrl" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "Omitted when the caller lacks the products:update permission - redacted server-side (it is a Slack incoming-webhook bearer credential)."
           },
           "kujiType" : {
             "type" : "string",

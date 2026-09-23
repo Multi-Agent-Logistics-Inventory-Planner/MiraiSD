@@ -300,3 +300,31 @@ describe("useRealtimeBroadcast (.specs/phase-6-inventory 6e, T-6e-2/3/6)", () =>
     unsubscribe();
     client.clear();
   });
+
+  it("patches the consolidated unfiltered products cache (post-web-product-list-cache AC-2: every useProducts caller now shares one [\"products\", {}] entry, not per-options copies)", async () => {
+    mockGetProductById.mockReset();
+    mockUseCurrentSite.mockReturnValue({ siteId: "site-1" });
+    mockGetSupabaseClient.mockReturnValue({ channel: () => fakeChannel(), removeChannel: vi.fn() });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const existingProduct = { id: "p1", name: "Old" };
+    const updatedProduct = { id: "p1", name: "New" };
+    const newProduct = { id: "p2", name: "Brand New", parentId: null };
+    client.setQueryData(["products", {}], [existingProduct]);
+    mockGetProductById.mockResolvedValueOnce(updatedProduct).mockResolvedValueOnce(newProduct);
+    renderHook(() => useRealtimeBroadcast(true), { wrapper: createWrapper(client) });
+
+    await act(async () => {
+      emit({ type: "product_updated", itemId: "p1" });
+      await Promise.resolve();
+    });
+    expect(client.getQueryData(["products", {}])).toEqual([updatedProduct]);
+
+    await act(async () => {
+      emit({ type: "product_updated", itemId: "p2" });
+      await Promise.resolve();
+    });
+    // A product not yet in the cache is appended: matchesFilter({}) has no filter to fail,
+    // since the cached list is always the unfiltered one every useProducts caller derives from.
+    expect(client.getQueryData(["products", {}])).toEqual([updatedProduct, newProduct]);
+    client.clear();
+  });

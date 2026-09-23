@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Check, ImageOff, Loader2, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
-import { getProducts } from "@/lib/api/products";
+import { useProducts } from "@/hooks/queries/use-products";
 import { cn } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/utils/validation";
 import type { ProductListItem, Category, MachineDisplay } from "@/types/api";
@@ -109,11 +108,10 @@ export function AddDisplayDialog({
   isSaving,
   onSubmit,
 }: AddDisplayDialogProps) {
-  const productsQuery = useQuery({
-    queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
-    queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
-    enabled: open,
-  });
+  const productsQuery = useProducts(
+    { rootOnly: true, excludeCustomKuji: true },
+    { enabled: open }
+  );
 
   const products = productsQuery.data ?? [];
 

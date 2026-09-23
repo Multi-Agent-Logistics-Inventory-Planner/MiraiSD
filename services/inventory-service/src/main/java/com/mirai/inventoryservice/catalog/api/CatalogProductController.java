@@ -3,10 +3,13 @@ package com.mirai.inventoryservice.catalog.api;
 import com.mirai.inventoryservice.catalog.application.ProductDeletionCoordinator;
 import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.identity.domain.Permission;
+import com.mirai.inventoryservice.identity.domain.RolePermissions;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,29 +42,54 @@ public class CatalogProductController {
     @GetMapping
     public ResponseEntity<List<CatalogProductResponse>> getCatalogProducts(
             @RequestParam(required = false) UUID categoryId,
-            @RequestParam(required = false) String search) {
-        List<Product> products;
+            @RequestParam(required = false) String search,
+            Authentication authentication) {
+        // Slim projection, not getAllProducts()/getProductsByCategory()/searchAllProducts() ->
+        // *WithCategories(): those JOIN FETCH full Product/Category/parent-Product entities for a
+        // response that needs 24 scalar/nested-object columns and no entity hydration at all.
+        // See .specs/catalog-product-egress/spec.md AC-5.
+        List<CatalogProductResponse> body;
         if (search != null && !search.isBlank()) {
-            products = productService.searchAllProducts(search);
+            body = productService.searchCatalogListItems(search);
         } else if (categoryId != null) {
-            products = productService.getProductsByCategory(categoryId);
+            body = productService.getCatalogListItemsByCategory(categoryId);
         } else {
-            products = productService.getAllProducts();
+            body = productService.getAllCatalogListItems();
         }
-        List<CatalogProductResponse> body = products.stream().map(catalogProductMapper::toResponse).toList();
+        body.forEach(dto -> applyKujiWebhookVisibility(dto, authentication));
         return ResponseEntity.ok(body);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CatalogProductResponse> getCatalogProductById(@PathVariable UUID id) {
+    public ResponseEntity<CatalogProductResponse> getCatalogProductById(
+            @PathVariable UUID id, Authentication authentication) {
         Product product = productService.getProductById(id);
-        return ResponseEntity.ok(catalogProductMapper.toResponse(product));
+        CatalogProductResponse dto = catalogProductMapper.toResponse(product);
+        dto.setHasChildren(productService.countChildren(product.getId()) > 0);
+        applyKujiWebhookVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/sku/{sku}")
-    public ResponseEntity<CatalogProductResponse> getCatalogProductBySku(@PathVariable String sku) {
+    public ResponseEntity<CatalogProductResponse> getCatalogProductBySku(
+            @PathVariable String sku, Authentication authentication) {
         Product product = productService.getProductBySku(sku);
-        return ResponseEntity.ok(catalogProductMapper.toResponse(product));
+        CatalogProductResponse dto = catalogProductMapper.toResponse(product);
+        dto.setHasChildren(productService.countChildren(product.getId()) > 0);
+        applyKujiWebhookVisibility(dto, authentication);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * kujiSlackWebhookUrl is a Slack incoming-webhook bearer credential, gated the same way as
+     * the legacy list/detail routes -- see CostVisibilityPolicy's javadoc for the rationale.
+     * Not routed through CostVisibilityPolicy itself: that class's methods are typed to
+     * ProductResponseDTO/ProductListItemDTO, not this module's CatalogProductResponse.
+     */
+    private void applyKujiWebhookVisibility(CatalogProductResponse dto, Authentication authentication) {
+        if (!RolePermissions.hasPermission(authentication, Permission.PRODUCTS_UPDATE)) {
+            dto.setKujiSlackWebhookUrl(null);
+        }
     }
 
     @PostMapping

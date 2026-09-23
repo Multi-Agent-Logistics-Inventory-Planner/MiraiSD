@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ProductFilterHeader } from "@/components/stock/adjust/product-filter-header";
 import { ProductList, SelectedProduct } from "./add-inventory";
-import { getProducts } from "@/lib/api/products";
+import { useProducts } from "@/hooks/queries/use-products";
 import type { ProductListItem, LocationType, InventoryRequest, LocationInventory, Category } from "@/types/api";
 
 interface AddInventoryDialogProps {
@@ -34,10 +33,7 @@ export function AddInventoryDialog({
   isSaving,
   onSubmit,
 }: AddInventoryDialogProps) {
-  const productsQuery = useQuery({
-    queryKey: ["products", { rootOnly: true, excludeCustomKuji: true }],
-    queryFn: () => getProducts({ rootOnly: true, excludeCustomKuji: true }),
-  });
+  const productsQuery = useProducts({ rootOnly: true, excludeCustomKuji: true });
 
   const products = productsQuery.data ?? [];
 

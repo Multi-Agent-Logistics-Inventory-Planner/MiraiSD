@@ -181,4 +181,117 @@ class ProductCostVisibilityIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.unitCost").doesNotExist())
                 .andExpect(jsonPath("$.msrp").value(29.99));
     }
+    /**
+     * Regression for the Kuji Slack webhook URL exposure gap found during the product-list
+     * egress audit: kujiSlackWebhookUrl is a Slack incoming-webhook bearer credential (anyone
+     * holding it can post to that channel), but it reached every authenticated role on both
+     * detail and list responses -- CostVisibilityPolicy only ever redacted cost/MSRP.
+     */
+    private String createKujiParentProductAndGetId() throws Exception {
+        Category category = categoryRepository.save(Category.builder()
+                .name("Webhook Visibility Test Category")
+                .slug("webhook-visibility-test-category")
+                .build());
+
+        String productJson = """
+                {
+                    "sku": "WEBHOOK-VIS-001",
+                    "name": "Webhook Visibility Test Product",
+                    "categoryId": "%s",
+                    "reorderPoint": 10,
+                    "targetStockLevel": 50,
+                    "leadTimeDays": 14,
+                    "kujiSlackWebhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+                }
+                """.formatted(category.getId());
+
+        String responseBody = mockMvc.perform(post("/api/products")
+                        .header("Authorization", "Bearer " + adminToken())
+                        .contentType("application/json")
+                        .content(productJson))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(responseBody).get("id").asText();
+    }
+
+    @Test
+    void adminSeesKujiSlackWebhookUrlOnDetail() throws Exception {
+        String id = createKujiParentProductAndGetId();
+
+        mockMvc.perform(get("/api/products/" + id)
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kujiSlackWebhookUrl")
+                        .value("https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"));
+    }
+
+    @Test
+    void assistantManagerSeesKujiSlackWebhookUrlOnDetail() throws Exception {
+        String id = createKujiParentProductAndGetId();
+
+        mockMvc.perform(get("/api/products/" + id)
+                        .header("Authorization", "Bearer " + assistantManagerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kujiSlackWebhookUrl")
+                        .value("https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"));
+    }
+
+    @Test
+    void employeeDoesNotSeeKujiSlackWebhookUrlOnDetail() throws Exception {
+        String id = createKujiParentProductAndGetId();
+
+        String body = mockMvc.perform(get("/api/products/" + id)
+                        .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.kujiSlackWebhookUrl").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode json = objectMapper.readTree(body);
+        assertThat(json.has("kujiSlackWebhookUrl")).isFalse();
+    }
+
+    @Test
+    void employeeDoesNotSeeKujiSlackWebhookUrlOnList() throws Exception {
+        createKujiParentProductAndGetId();
+
+        String responseBody = mockMvc.perform(get("/api/products")
+                        .header("Authorization", "Bearer " + employeeToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode products = objectMapper.readTree(responseBody);
+        JsonNode target = null;
+        for (JsonNode product : products) {
+            if ("WEBHOOK-VIS-001".equals(product.path("sku").asText())) {
+                target = product;
+                break;
+            }
+        }
+
+        assertThat(target).as("seeded product should be in the list response").isNotNull();
+        assertThat(target.has("kujiSlackWebhookUrl")).isFalse();
+    }
+
+    @Test
+    void assistantManagerSeesKujiSlackWebhookUrlOnList() throws Exception {
+        createKujiParentProductAndGetId();
+
+        String responseBody = mockMvc.perform(get("/api/products")
+                        .header("Authorization", "Bearer " + assistantManagerToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode products = objectMapper.readTree(responseBody);
+        JsonNode target = null;
+        for (JsonNode product : products) {
+            if ("WEBHOOK-VIS-001".equals(product.path("sku").asText())) {
+                target = product;
+                break;
+            }
+        }
+
+        assertThat(target).as("seeded product should be in the list response").isNotNull();
+        assertThat(target.get("kujiSlackWebhookUrl").asText())
+                .isEqualTo("https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX");
+    }
 }
