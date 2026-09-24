@@ -182,6 +182,76 @@
 # construction to identity.application.LegacyMainSiteContextResolver. This keeps trusted actor and
 # membership derivation at the HTTP boundary. Remove both edges with these deprecated adapters
 # after the documented legacy removal gate is met.
+#
+# Tenth reviewed addition (2026-09-23, .specs/phase-7-shipments/log.md T-4): mechanical move of
+# ShipmentController/TrackingController/EasyPostWebhookController, ShipmentService/TrackingService/
+# EasyPostWebhookService, ShipmentRepository/ShipmentItemRepository/ShipmentItemAllocationRepository/
+# WebhookEventRepository, and the Shipment/ShipmentItem/ShipmentItemAllocation/WebhookEvent entities
+# out of the legacy `controllers`/`services`/`repositories`/`models` packages into
+# `shipments.{api,application,domain,infrastructure}`. Same pattern as the Fourth/Fifth/Sixth
+# inventory-move additions above: every edge below already existed as `<source> -> controllers`,
+# `<source> -> services`, `<source> -> models`, or the reverse, before the move; only the *target*
+# package name changed for the moved classes' own outgoing dependencies, not the underlying
+# dependency itself:
+#   `shipments -> exceptions`   (ShipmentService/TrackingService -> InvalidShipmentStatusException/
+#                                 ShipmentItemNotFoundException/ShipmentNotFoundException/
+#                                 TrackingException -- was `services -> exceptions`, already approved)
+#   `shipments -> identity`     (ShipmentController/TrackingController ->
+#                                 LegacyMainSiteContextResolver; ShipmentService -> UserService/
+#                                 UserRepository -- was `controllers -> identity`/`services ->
+#                                 identity`, already approved)
+#   `shipments -> inventory`    (ShipmentService -> InventoryOperations/StockMovement/
+#                                 LocationInventory/InsufficientInventoryException -- was `services
+#                                 -> inventory`, already approved)
+#   `shipments -> models`       (ShipmentStatus/CarrierStatus/LocationType/NotificationType/
+#                                 NotificationSeverity/StockMovementReason enums, AuditLog,
+#                                 Notification -- was `controllers -> models`/`services -> models`,
+#                                 already approved)
+#   `shipments -> shared`       (ShipmentController/TrackingController -> AuthorizedSiteContext --
+#                                 was `controllers -> shared`, already approved)
+#   `shipments -> sites`        (ShipmentService -> Location/Site/LocationRepository/
+#                                 StorageLocationRepository/SiteRepository -- was `services ->
+#                                 sites`, already approved)
+#   `controllers -> shipments`  (DevSeedController's dev-only shipment seeding -- was `controllers
+#                                 -> models`/`controllers -> repositories`, already approved)
+#   `dtos -> shipments`         (ShipmentMapper/ShipmentItemResponseDTO -> the moved
+#                                 ShipmentItemAllocationResponseDTO and the Shipment/ShipmentItem
+#                                 domain entities -- was `dtos -> models`, already approved)
+# Two edges are genuinely new dependency *directions*, both mechanical fallout of classes leaving
+# the `services` package rather than any new coupling:
+#   `shipments -> services`     (ShipmentService/EasyPostWebhookService now need explicit imports
+#                                 for NotificationService/AuditLogService/SupabaseBroadcastService,
+#                                 which same-package visibility hid before the move -- matches the
+#                                 already-approved `inventory -> services` precedent for the same
+#                                 shape)
+#   `services -> shipments`     (ActivityFeedService/ProductReportBundleService, both still in
+#                                 `services`, read ShipmentRepository/Shipment directly -- was
+#                                 `services -> services`/`services -> models`/`services ->
+#                                 repositories` internal-package references before the move, not
+#                                 tracked as a cross-module edge until now)
+#   `shipments -> dtos`         (ShipmentController/ShipmentMapperDecorator -> ShipmentMapper/
+#                                 ShipmentResponseDTO/ShipmentItemResponseDTO, which stay in
+#                                 `dtos.mappers`/`dtos.responses` -- see the note below)
+# `ShipmentMapper`, `ShipmentResponseDTO`, and `ShipmentItemResponseDTO` were deliberately NOT
+# moved into `shipments.api` (same reasoning as `LocationInventoryResponseDTO`/
+# `LocationInventoryMapper` staying out of `inventory.api`, documented above): `ShipmentMapper`
+# depends on `catalog.api.ProductMapper`/`identity.api.UserMapper`, and `ShipmentResponseDTO`/
+# `ShipmentItemResponseDTO` depend on `identity.api.UserResponseDTO`/`catalog.api.ProductSummaryDTO`
+# respectively -- moving them would create a `shipments.api -> catalog.api`/`shipments.api ->
+# identity.api` edge, which `modulesDoNotDependOnAnotherModulesApi` forbids unconditionally, no
+# exemption mechanism. Confirmed by running the full ArchUnit suite with them moved in: exactly
+# this violation, 24 instances. Resolving it properly needs the same kind of catalog/identity-owned
+# summary-DTO contract the inventory precedent calls for -- real design work, not a mechanical move.
+# Pruned in the SAME review: `shipments -> repositories` -- grep confirmed `shipments/**` no longer
+# imports anything from the legacy `repositories` package once its own four repositories moved out
+# of it (ShipmentRepository, ShipmentItemRepository, ShipmentItemAllocationRepository,
+# WebhookEventRepository are now `shipments.infrastructure.*`). `shipments -> catalog` is
+# unchanged (already approved) -- ShipmentService still reaches catalog only through its existing
+# facade layer (CatalogQueries/CatalogCommands/CatalogEntityAccess/ProductService/SupplierService),
+# confirmed unchanged by this move; `catalog.application.CatalogEntityAccess`'s own Javadoc lists
+# `ShipmentItem.item` as one of the callers this facade is designed for, so the `Product`/`Supplier`
+# entity references on `Shipment`/`ShipmentItem` (`@ManyToOne` associations, not raw entity fetches)
+# are the intended, already-reviewed pattern -- not something this move needed to change.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -203,6 +273,7 @@ controllers -> inventory
 controllers -> models
 controllers -> repositories
 controllers -> services
+controllers -> shipments
 controllers -> sites
 controllers -> shared
 displays -> catalog
@@ -212,6 +283,7 @@ dtos -> identity
 dtos -> inventory
 dtos -> models
 dtos -> services
+dtos -> shipments
 dtos -> sites
 dtos -> validation
 exceptions -> catalog
@@ -254,9 +326,17 @@ services -> kafka
 services -> models
 services -> repositories
 services -> shared
+services -> shipments
 services -> sites
 shipments -> catalog
-shipments -> repositories
+shipments -> dtos
+shipments -> exceptions
+shipments -> identity
+shipments -> inventory
+shipments -> models
+shipments -> services
+shipments -> shared
+shipments -> sites
 sites -> models
 sites -> shared
 sites -> identity

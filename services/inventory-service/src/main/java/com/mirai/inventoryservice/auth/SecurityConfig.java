@@ -52,8 +52,10 @@ public class SecurityConfig {
                 // Block dev endpoints in all profiles (defense in depth)
                 .requestMatchers("/api/dev/**").denyAll()
 
-                // Webhook endpoints (validated by signature, not JWT)
-                .requestMatchers("/api/webhooks/**").permitAll()
+                // Webhook endpoints (validated by signature, not JWT). The v1 alias
+                // (/api/v1/webhooks/**) has no {siteId} segment, so it never reaches
+                // SiteAccessAuthorizationFilter's /api/v1/sites/{siteId}/** pattern either.
+                .requestMatchers("/api/webhooks/**", "/api/v1/webhooks/**").permitAll()
 
                 // OpenAPI docs (only actually registered when springdoc.api-docs.enabled=true,
                 // i.e. the test profile - see application.properties)

@@ -46,3 +46,5 @@ Report only actionable findings, ordered by severity:
 For each finding, cite the file and behavior, explain the relevant invariant,
 and propose the smallest repair. End with residual risks and a clear approve,
 approve-with-advisories, or block verdict.
+
+Apply the `unslop` skill to the write-up before presenting it.

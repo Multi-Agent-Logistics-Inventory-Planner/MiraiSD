@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.shipments.application;
 
 import com.mirai.inventoryservice.catalog.application.SupplierDeliveryHistoryPort;
-import com.mirai.inventoryservice.repositories.ShipmentRepository;
+import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

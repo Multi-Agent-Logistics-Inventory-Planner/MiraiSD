@@ -19,8 +19,8 @@ import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.models.MachineDisplay;
 import com.mirai.inventoryservice.models.review.Review;
 import com.mirai.inventoryservice.models.review.ReviewDailyCount;
-import com.mirai.inventoryservice.models.shipment.Shipment;
-import com.mirai.inventoryservice.models.shipment.ShipmentItem;
+import com.mirai.inventoryservice.shipments.domain.Shipment;
+import com.mirai.inventoryservice.shipments.domain.ShipmentItem;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
@@ -33,7 +33,7 @@ import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
-import com.mirai.inventoryservice.repositories.ShipmentRepository;
+import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
@@ -337,6 +337,7 @@ public class DevSeedController {
             shipments.add(Shipment.builder()
                 .shipmentNumber("DEV-SHIP-" + String.format("%03d", i + 1))
                 .supplierName(suppliers[i % suppliers.length])
+                .site(site)
                 .status(statuses[i])
                 .carrierStatus(carrierStatuses[i])
                 .carrierDeliveredAt(carrierStatuses[i] == CarrierStatus.DELIVERED
@@ -1530,6 +1531,8 @@ public class DevSeedController {
             ));
         }
 
+        Site site = siteRepository.findByCode(DEFAULT_SITE_CODE)
+            .orElseThrow(() -> new RuntimeException("Default site not found: " + DEFAULT_SITE_CODE));
         String[] suppliers = {"Mirai Wholesale", "Japan Arcade Supply", "ACE Toys", "Pacific Imports"};
         LocalDate today = LocalDate.now();
         List<Shipment> shipments = new ArrayList<>();
@@ -1560,6 +1563,7 @@ public class DevSeedController {
             Shipment shipment = Shipment.builder()
                 .shipmentNumber("TEST-SHIP-" + String.format("%03d", i + 1))
                 .supplierName(suppliers[i % suppliers.length])
+                .site(site)
                 .status(statuses[i])
                 .carrierStatus(carrierStatuses[i])
                 .carrierDeliveredAt(carrierStatuses[i] == CarrierStatus.DELIVERED
@@ -1587,6 +1591,7 @@ public class DevSeedController {
 
                 ShipmentItem item = ShipmentItem.builder()
                     .shipment(shipment)
+                    .site(site)
                     .item(product)
                     .orderedQuantity(orderedQty)
                     .receivedQuantity(receivedQty)

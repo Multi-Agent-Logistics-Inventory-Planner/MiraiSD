@@ -8,13 +8,14 @@
  */
 
 import { useMemo, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import { useAllForecasts, useAtRiskForecasts } from "./use-forecasts";
 import { useNotifications, useNotificationCounts } from "./use-notifications";
 import { useProducts } from "./use-products";
 import { useAllLocationsWithCounts } from "./use-locations-with-counts";
+import { useCurrentSite } from "./use-current-site";
 import { getPerformanceMetrics } from "@/lib/api/analytics";
-import { getShipmentsPaged } from "@/lib/api/shipments";
+import { getSiteShipmentsPaged } from "@/lib/api/site-shipments";
 import { ShipmentStatus, NotificationSeverity } from "@/types/api";
 import type { ProductListItem } from "@/types/api";
 import type {
@@ -45,6 +46,7 @@ export function useDashboardMetrics() {
   const notificationCountsQuery = useNotificationCounts();
   const notificationsQuery = useNotifications();
   const productsQuery = useProducts();
+  const { siteId, isLoading: isSiteLoading } = useCurrentSite();
 
   // Additional API queries
   const performanceMetricsQuery = useQuery({
@@ -55,11 +57,13 @@ export function useDashboardMetrics() {
 
   // Fetch all active shipments in a single query, then filter client-side
   const activeShipmentsQuery = useQuery({
-    queryKey: ["shipments", "active"],
-    queryFn: async () => {
-      const response = await getShipmentsPaged({}, 0, 100);
-      return response.content;
-    },
+    queryKey: ["shipments", siteId, "active"],
+    queryFn: siteId
+      ? async () => {
+          const response = await getSiteShipmentsPaged(siteId, {}, 0, 100);
+          return response.content;
+        }
+      : skipToken,
     staleTime: 60 * 1000,
   });
 
@@ -98,6 +102,7 @@ export function useDashboardMetrics() {
     notificationsQuery.isLoading ||
     productsQuery.isLoading ||
     performanceMetricsQuery.isLoading ||
+    isSiteLoading ||
     activeShipmentsQuery.isLoading ||
     locationsQuery.isLoading;
 
