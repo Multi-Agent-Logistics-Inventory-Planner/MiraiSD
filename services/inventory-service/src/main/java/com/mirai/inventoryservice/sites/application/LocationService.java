@@ -12,8 +12,12 @@ import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Unified service for managing locations across all storage location types.
@@ -119,6 +123,23 @@ public class LocationService {
     public Location getLocationById(UUID siteId, UUID id) {
         return locationRepository.findByIdAndSite_Id(id, siteId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found with id: " + id));
+    }
+
+    /**
+     * Bulk id -> location-code lookup, scoped to a single site: for a caller (e.g. a response
+     * mapper batch-enriching several ids at once) that only needs the human-readable code, not
+     * the managed entity -- returning entities across the module boundary for this would leak
+     * more than the caller needs. An id belonging to a different site, or no site at all, is
+     * silently omitted from the result rather than erroring, since the caller's contract is
+     * "resolve what you can, treat the rest as not-this-site's-problem" (e.g. masking a foreign
+     * site's location in a response).
+     */
+    public Map<UUID, String> findCodesByIdsAndSite(Collection<UUID> ids, UUID siteId) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return locationRepository.findByIdInAndSite_Id(ids, siteId).stream()
+                .collect(Collectors.toMap(Location::getId, Location::getLocationCode));
     }
 
     /**

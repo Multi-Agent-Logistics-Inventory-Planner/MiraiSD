@@ -53,6 +53,15 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
     }
 
+    /**
+     * Tolerant variant of {@link #getUserById(UUID)} for callers that treat a missing/invalid id
+     * as "no actor", not an error (e.g. an optional {@code receivedBy}/{@code createdBy} on a
+     * write request, or resolving a JWT principal's display name for a response).
+     */
+    public Optional<User> findById(UUID id) {
+        return userRepository.findById(id);
+    }
+
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));

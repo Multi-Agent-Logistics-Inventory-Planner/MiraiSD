@@ -1,7 +1,9 @@
 package com.mirai.inventoryservice.controllers;
 
 import com.mirai.inventoryservice.dtos.responses.ActivityFeedEventDTO;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
 import com.mirai.inventoryservice.services.ActivityFeedService;
+import com.mirai.inventoryservice.shared.web.AuthorizedSiteContext;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.List;
 public class ActivityFeedController {
 
     private final ActivityFeedService activityFeedService;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
     @GetMapping
     public ResponseEntity<List<ActivityFeedEventDTO>> getActivityFeed(
@@ -27,6 +30,7 @@ public class ActivityFeedController {
             @RequestParam(required = false) List<String> types,
             @RequestParam(defaultValue = "false") boolean includeResolved
     ) {
-        return ResponseEntity.ok(activityFeedService.getActivityFeed(limit, types, includeResolved));
+        AuthorizedSiteContext context = legacyMainSiteContextResolver.requireMain();
+        return ResponseEntity.ok(activityFeedService.getActivityFeed(context.siteId(), limit, types, includeResolved));
     }
 }

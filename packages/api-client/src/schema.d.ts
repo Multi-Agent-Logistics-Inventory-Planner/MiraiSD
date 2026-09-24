@@ -3076,6 +3076,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{siteId}/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSiteShipments"];
+        put?: never;
+        post: operations["createSiteShipment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/by-product/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteShipmentsByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/display-status-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteDisplayStatusCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteShipmentById"];
+        put: operations["updateSiteShipment"];
+        post?: never;
+        delete: operations["deleteSiteShipment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receiveSiteShipment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["overrideSiteShipmentStatus"];
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/{shipmentId}/items/{itemId}/undo-receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["undoReceiveSiteShipmentItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/shipments/{shipmentId}/undo-receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["undoReceiveSiteShipmentItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{siteId}/storage-locations": {
         parameters: {
             query?: never;
@@ -3134,6 +3262,54 @@ export interface paths {
         get: operations["getSiteInventoryStorageLocations"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/tracking/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["lookupSiteTracking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/tracking/{trackingNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteTracking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/easypost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["handleEasyPostWebhook_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16771,6 +16947,571 @@ export interface operations {
             };
         };
     };
+    listSiteShipments: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "RECEIVED" | "CANCELLED";
+                displayStatus?: string;
+                search?: string;
+                page?: number;
+                size?: number;
+                sortBy?: string;
+                sortDir?: string;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    createSiteShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteShipmentsByProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                productId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteDisplayStatusCounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteShipmentById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateSiteShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    deleteSiteShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    receiveSiteShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveShipmentRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    overrideSiteShipmentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    undoReceiveSiteShipmentItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                shipmentId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    undoReceiveSiteShipmentItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                shipmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UndoReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ShipmentResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
     getSiteStorageLocations: {
         parameters: {
             query?: never;
@@ -16961,6 +17702,131 @@ export interface operations {
                         status?: unknown;
                     };
                 };
+            };
+        };
+    };
+    lookupSiteTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackingLookupRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                trackingNumber: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TrackingLookupResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    handleEasyPostWebhook_1: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Hmac-Signature"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

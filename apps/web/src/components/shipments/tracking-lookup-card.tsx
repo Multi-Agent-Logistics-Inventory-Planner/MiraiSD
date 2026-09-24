@@ -6,10 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  lookupTracking,
-  type TrackingLookupResponse,
-} from "@/lib/api/tracking";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { lookupSiteTracking } from "@/lib/api/site-tracking";
+import { type TrackingLookupResponse } from "@/lib/api/tracking";
 
 interface TrackingLookupCardProps {
   onTrackingAdded: (tracking: TrackingLookupResponse) => void;
@@ -19,6 +18,7 @@ export function TrackingLookupCard({
   onTrackingAdded,
 }: TrackingLookupCardProps) {
   const { toast } = useToast();
+  const { siteId } = useCurrentSite();
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,10 +31,18 @@ export function TrackingLookupCard({
       });
       return;
     }
+    if (!siteId) {
+      toast({
+        title: "Error",
+        description: "No active site",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const result = await lookupTracking({
+      const result = await lookupSiteTracking(siteId, {
         trackingNumber: trackingNumber.trim(),
       });
       onTrackingAdded(result);

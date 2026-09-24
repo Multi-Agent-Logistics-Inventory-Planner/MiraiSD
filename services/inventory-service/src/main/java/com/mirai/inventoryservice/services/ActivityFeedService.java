@@ -6,10 +6,10 @@ import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.shipment.Shipment;
+import com.mirai.inventoryservice.shipments.domain.Shipment;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
-import com.mirai.inventoryservice.repositories.ShipmentRepository;
+import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -31,8 +32,15 @@ public class ActivityFeedService {
 
     private static final Set<String> STOCK_MOVEMENT_TYPES = Set.of("restock", "sale", "adjustment", "transfer");
 
+    /**
+     * Audit-log and notification reads below are not yet site-scoped ({@code AuditLog}/
+     * {@code Notification} carry no {@code site_id} column) -- that is the
+     * notifications-reviews-audit slice's responsibility, not this one's. Only the shipment
+     * portion is scoped here, per .specs/phase-7-shipments AC-2, since shipments already carries
+     * {@code site_id} and a site-scoped query.
+     */
     @Transactional(readOnly = true)
-    public List<ActivityFeedEventDTO> getActivityFeed(int limit, List<String> types, boolean includeResolved) {
+    public List<ActivityFeedEventDTO> getActivityFeed(UUID siteId, int limit, List<String> types, boolean includeResolved) {
         List<ActivityFeedEventDTO> events = new ArrayList<>();
         Set<String> typeSet = types != null && !types.isEmpty() ? new HashSet<>(types) : null;
 
@@ -71,9 +79,9 @@ public class ActivityFeedService {
             }
         }
 
-        // Fetch shipments
+        // Fetch shipments (site-scoped; the caller's authorized site is server-derived, never client-supplied)
         if (typeSet == null || typeSet.contains("shipment")) {
-            var shipments = shipmentRepository.findAllWithAssociations(PageRequest.of(0, 50));
+            var shipments = shipmentRepository.findByStatusPaged(null, siteId, PageRequest.of(0, 50));
 
             for (Shipment shipment : shipments.getContent()) {
                 int itemCount = shipment.getItems().size();

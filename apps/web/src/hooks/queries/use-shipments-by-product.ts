@@ -1,12 +1,21 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getShipmentsByProduct } from "@/lib/api/shipments";
+import { useQuery, skipToken } from "@tanstack/react-query";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { getSiteShipmentsByProduct } from "@/lib/api/site-shipments";
 
 export function useShipmentsByProduct(productId?: string | null) {
-  return useQuery({
-    queryKey: ["shipmentsByProduct", productId ?? "none"],
-    queryFn: () => getShipmentsByProduct(productId as string),
-    enabled: Boolean(productId),
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["shipmentsByProduct", siteId, productId ?? "none"],
+    queryFn:
+      siteId && productId ? () => getSiteShipmentsByProduct(siteId, productId) : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }

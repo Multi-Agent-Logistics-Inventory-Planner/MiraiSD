@@ -1,13 +1,13 @@
 package com.mirai.inventoryservice.dtos.mappers;
 
 import com.mirai.inventoryservice.catalog.api.ProductMapper;
-import com.mirai.inventoryservice.dtos.responses.ShipmentItemAllocationResponseDTO;
+import com.mirai.inventoryservice.shipments.api.ShipmentItemAllocationResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentItemResponseDTO;
 import com.mirai.inventoryservice.dtos.responses.ShipmentResponseDTO;
 import com.mirai.inventoryservice.identity.api.UserMapper;
-import com.mirai.inventoryservice.models.shipment.Shipment;
-import com.mirai.inventoryservice.models.shipment.ShipmentItem;
-import com.mirai.inventoryservice.models.shipment.ShipmentItemAllocation;
+import com.mirai.inventoryservice.shipments.domain.Shipment;
+import com.mirai.inventoryservice.shipments.domain.ShipmentItem;
+import com.mirai.inventoryservice.shipments.domain.ShipmentItemAllocation;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;

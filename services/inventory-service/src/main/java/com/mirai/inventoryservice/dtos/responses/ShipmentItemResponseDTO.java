@@ -2,6 +2,7 @@ package com.mirai.inventoryservice.dtos.responses;
 
 import com.mirai.inventoryservice.catalog.api.ProductSummaryDTO;
 import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.shipments.api.ShipmentItemAllocationResponseDTO;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
