@@ -301,6 +301,61 @@ class ArchitectureTest {
         return false;
     }
 
+    // .specs/phase-7-displays/log.md T-3: the displays-module mirror of
+    // noProductionClassOutsideCatalogDependsOnCatalogInfrastructure /
+    // noProductionClassOutsideInventoryDependsOnInventoryInfrastructure above. Runs live, never
+    // frozen: T-3 already migrated every named production caller off direct
+    // MachineDisplayRepository/MachineDisplay access onto DisplayQueries/DisplayOperations.
+    @Test
+    void noProductionClassOutsideDisplaysDependsOnDisplaysInfrastructure() {
+        outsideDisplaysToDisplaysInfrastructureRule().check(importedClasses);
+    }
+
+    // Same dev-profile-only seeding class exempted from the catalog/inventory versions of this
+    // rule, for the same reason: no production equivalent (docs/baseline/api-v1-map.md), so a
+    // seeding port for one throwaway consumer is not worth the indirection. Verified by grep
+    // (2026-09-24) that this is the only production class outside `displays` reaching
+    // displays.infrastructure directly.
+    private static final String[] DISPLAYS_INFRASTRUCTURE_ACCESS_EXEMPTIONS = {
+        BASE_PACKAGE + ".controllers.DevSeedController"
+    };
+
+    static ArchRule outsideDisplaysToDisplaysInfrastructureRule() {
+        return classes()
+                .that(new DescribedPredicate<JavaClass>("reside outside displays and are not exempted") {
+                    @Override
+                    public boolean test(JavaClass javaClass) {
+                        return !"displays".equals(moduleOf(javaClass)) && !isExemptFromDisplaysInfrastructureRule(javaClass);
+                    }
+                })
+                .should(new ArchCondition<JavaClass>("not depend on displays.infrastructure") {
+                    @Override
+                    public void check(JavaClass javaClass, ConditionEvents events) {
+                        for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                            JavaClass target = dependency.getTargetClass();
+                            if (isPackageOrSubpackageOf(target.getPackageName(), BASE_PACKAGE + ".displays.infrastructure")) {
+                                events.add(SimpleConditionEvent.violated(
+                                        javaClass,
+                                        dependency.getDescription()
+                                                + " -- displays.infrastructure must only be accessed from within"
+                                                + " displays, via DisplayQueries/DisplayOperations"));
+                            }
+                        }
+                    }
+                })
+                .allowEmptyShould(true);
+    }
+
+    private static boolean isExemptFromDisplaysInfrastructureRule(JavaClass javaClass) {
+        String name = javaClass.getName();
+        for (String exempt : DISPLAYS_INFRASTRUCTURE_ACCESS_EXEMPTIONS) {
+            if (exempt.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Replaces a FreezingArchRule-based `topLevelPackagesAreFreeOfCycles` cycle check (removed;
     // see git history and .specs/phase-5c-site-products/log.md). That rule froze the full,
     // multi-line cycle-path text (including specific example call-site edges, subject to

@@ -26,7 +26,8 @@ import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryExceptio
 import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
+import com.mirai.inventoryservice.displays.application.DisplayOperations;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
@@ -46,7 +47,6 @@ import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -102,7 +102,7 @@ public class KujiBoxService {
     private final LocationRepository locationRepository;
     private final InventoryOperations inventoryOperations;
     private final InventoryQueries inventoryQueries;
-    private final MachineDisplayRepository machineDisplayRepository;
+    private final DisplayOperations displayOperations;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -120,7 +120,7 @@ public class KujiBoxService {
             LocationRepository locationRepository,
             InventoryOperations inventoryOperations,
             InventoryQueries inventoryQueries,
-            MachineDisplayRepository machineDisplayRepository,
+            DisplayOperations displayOperations,
             AuditLogRepository auditLogRepository,
             UserRepository userRepository,
             NotificationService notificationService,
@@ -136,7 +136,7 @@ public class KujiBoxService {
         this.locationRepository = locationRepository;
         this.inventoryOperations = inventoryOperations;
         this.inventoryQueries = inventoryQueries;
-        this.machineDisplayRepository = machineDisplayRepository;
+        this.displayOperations = displayOperations;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -169,13 +169,8 @@ public class KujiBoxService {
 
         MachineDisplay machineDisplay = null;
         if (request.getMachineDisplayId() != null) {
-            machineDisplay = machineDisplayRepository.findById(request.getMachineDisplayId())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "MachineDisplay not found: " + request.getMachineDisplayId()));
-            if (machineDisplay.getEndedAt() != null) {
-                throw new IllegalArgumentException(
-                        "MachineDisplay is no longer active: " + request.getMachineDisplayId());
-            }
+            UUID activeDisplayId = displayOperations.requireActive(request.getMachineDisplayId());
+            machineDisplay = displayOperations.getReference(activeDisplayId);
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -185,21 +180,9 @@ public class KujiBoxService {
         // Why: the location-card blue dot is driven by active machine_display rows; opening
         // a kuji at a machine should make it visible there without a separate "set on display" step.
         if (machineDisplay == null && isMachineLocation(boxLocation)) {
-            LocationType locationType = mapLocationType(boxLocation);
-            machineDisplay = machineDisplayRepository
-                    .findActiveByLocationTypeAndMachineId(locationType, boxLocation.getId())
-                    .stream()
-                    .filter(d -> d.getProduct() != null
-                            && d.getProduct().getId().equals(productRef.id()))
-                    .findFirst()
-                    .orElseGet(() -> machineDisplayRepository.save(MachineDisplay.builder()
-                            .location(boxLocation)
-                            .locationType(locationType)
-                            .machineId(boxLocation.getId())
-                            .product(catalogEntityAccess.getReference(productRef.id()))
-                            .startedAt(now)
-                            .actorId(request.getActorId())
-                            .build()));
+            UUID attachedDisplayId = displayOperations.attachProductAtMachine(
+                    boxLocation.getId(), productRef.id(), request.getActorId(), now);
+            machineDisplay = displayOperations.getReference(attachedDisplayId);
         }
 
         KujiBox box = KujiBox.builder()
@@ -469,10 +452,8 @@ public class KujiBoxService {
         // "remove from display" step.
         boolean endedDisplay = false;
         MachineDisplay attachedDisplay = box.getMachineDisplay();
-        if (attachedDisplay != null && attachedDisplay.getEndedAt() == null) {
-            attachedDisplay.setEndedAt(OffsetDateTime.now());
-            machineDisplayRepository.save(attachedDisplay);
-            endedDisplay = true;
+        if (attachedDisplay != null) {
+            endedDisplay = displayOperations.endIfActive(attachedDisplay.getId(), OffsetDateTime.now());
         }
 
         box.setStatus(KujiBoxStatus.CLOSED);

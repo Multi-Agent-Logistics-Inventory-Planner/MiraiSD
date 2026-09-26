@@ -1,6 +1,6 @@
-package com.mirai.inventoryservice.repositories;
+package com.mirai.inventoryservice.displays.infrastructure;
 
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -122,6 +122,11 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
     List<Object[]> countActiveDisplaysByLocationType();
 
     /**
+     * Whether a product currently has any active (not ended) display.
+     */
+    boolean existsByProduct_IdAndEndedAtIsNull(UUID productId);
+
+    /**
      * Delete all display records for a product (e.g. when deleting the product).
      */
     void deleteByProduct_Id(UUID productId);
@@ -179,4 +184,58 @@ public interface MachineDisplayRepository extends JpaRepository<MachineDisplay, 
     List<Object[]> calculateDisplayDaysByProduct(
         @Param("startDate") OffsetDateTime startDate,
         @Param("endDate") OffsetDateTime endDate);
+
+    // ========= Site-scoped finders (.specs/phase-7-displays T-4, AC-3) =========
+    // A display/machine belonging to a different site must be indistinguishable from a
+    // nonexistent one, matching shipments' ShipmentRepository.findByIdAndSite_Id* precedent.
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    Optional<MachineDisplay> findByIdAndSite_Id(UUID id, UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.locationType = :locationType AND md.machineId = :machineId " +
+            "AND md.site.id = :siteId AND md.endedAt IS NULL ORDER BY md.startedAt ASC")
+    List<MachineDisplay> findActiveByLocationTypeAndMachineIdAndSite_Id(
+            @Param("locationType") LocationType locationType,
+            @Param("machineId") UUID machineId,
+            @Param("siteId") UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    Optional<MachineDisplay> findByLocationTypeAndMachineIdAndSite_IdAndEndedAtIsNull(
+            LocationType locationType, UUID machineId, UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    List<MachineDisplay> findByEndedAtIsNullAndSite_IdOrderByStartedAtAsc(UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    Page<MachineDisplay> findByEndedAtIsNullAndSite_Id(UUID siteId, Pageable pageable);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    List<MachineDisplay> findByLocationTypeAndEndedAtIsNullAndSite_IdOrderByStartedAtAsc(
+            LocationType locationType, UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    List<MachineDisplay> findByLocationTypeAndMachineIdAndSite_IdOrderByStartedAtDesc(
+            LocationType locationType, UUID machineId, UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    Page<MachineDisplay> findByLocationTypeAndMachineIdAndSite_IdOrderByStartedAtDesc(
+            LocationType locationType, UUID machineId, UUID siteId, Pageable pageable);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    List<MachineDisplay> findByProduct_IdAndSite_IdOrderByStartedAtDesc(UUID productId, UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.endedAt IS NULL AND md.startedAt < :threshold " +
+            "AND md.site.id = :siteId ORDER BY md.startedAt ASC")
+    List<MachineDisplay> findStaleDisplaysBySite_Id(
+            @Param("threshold") OffsetDateTime threshold, @Param("siteId") UUID siteId);
+
+    @EntityGraph(value = "MachineDisplay.withProduct")
+    @Query("SELECT md FROM MachineDisplay md WHERE md.locationType = :locationType AND md.endedAt IS NULL " +
+            "AND md.startedAt < :threshold AND md.site.id = :siteId ORDER BY md.startedAt ASC")
+    List<MachineDisplay> findStaleDisplaysByLocationTypeAndSite_Id(
+            @Param("locationType") LocationType locationType,
+            @Param("threshold") OffsetDateTime threshold,
+            @Param("siteId") UUID siteId);
 }

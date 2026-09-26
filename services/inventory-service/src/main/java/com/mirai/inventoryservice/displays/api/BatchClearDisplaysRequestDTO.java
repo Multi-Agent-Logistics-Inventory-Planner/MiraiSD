@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.requests;
+package com.mirai.inventoryservice.displays.api;
 
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;

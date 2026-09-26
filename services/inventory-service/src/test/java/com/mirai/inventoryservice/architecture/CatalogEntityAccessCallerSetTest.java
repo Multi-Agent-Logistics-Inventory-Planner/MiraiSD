@@ -63,6 +63,7 @@ class CatalogEntityAccessCallerSetTest {
         expected.add(new Origin("KujiBoxService", "openBox", "getReference"));
         expected.add(new Origin("KujiBoxService", "addTier", "getReference"));
         expected.add(new Origin("KujiBoxService", "patchTier", "getReference"));
+        expected.add(new Origin("DisplayOperations", "attachProductAtMachine", "getReference"));
         return expected;
     }
 

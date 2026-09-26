@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.requests;
+package com.mirai.inventoryservice.displays.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
 import jakarta.validation.constraints.NotNull;

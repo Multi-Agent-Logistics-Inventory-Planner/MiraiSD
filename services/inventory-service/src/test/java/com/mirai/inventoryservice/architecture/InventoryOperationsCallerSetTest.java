@@ -49,7 +49,7 @@ class InventoryOperationsCallerSetTest {
         Set<String> expected = new HashSet<>();
         expected.add("com.mirai.inventoryservice.shipments.application.ShipmentService");
         expected.add("com.mirai.inventoryservice.services.KujiBoxService");
-        expected.add("com.mirai.inventoryservice.services.MachineDisplayService");
+        expected.add("com.mirai.inventoryservice.displays.application.MachineDisplayService");
         expected.add("com.mirai.inventoryservice.services.ProductReportBundleService");
         expected.add("com.mirai.inventoryservice.services.ForecastService");
         expected.add("com.mirai.inventoryservice.services.AnalyticsService");

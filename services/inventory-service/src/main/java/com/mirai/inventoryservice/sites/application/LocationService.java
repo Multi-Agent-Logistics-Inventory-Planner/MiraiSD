@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -123,6 +124,27 @@ public class LocationService {
     public Location getLocationById(UUID siteId, UUID id) {
         return locationRepository.findByIdAndSite_Id(id, siteId)
                 .orElseThrow(() -> new LocationNotFoundException("Location not found with id: " + id));
+    }
+
+    /**
+     * Non-throwing, unscoped id lookup - kept only for legacy callers migrating off direct
+     * repository access (e.g. displays) that already tolerate a missing location as absent
+     * rather than an error; do not add new callers without a site check.
+     */
+    public Optional<Location> findById(UUID id) {
+        return locationRepository.findById(id);
+    }
+
+    /**
+     * Bulk id -> location-code lookup, unscoped - kept only for legacy callers migrating off
+     * direct repository access; do not add new callers without a site check.
+     */
+    public Map<UUID, String> findCodesByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return locationRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Location::getId, Location::getLocationCode));
     }
 
     /**

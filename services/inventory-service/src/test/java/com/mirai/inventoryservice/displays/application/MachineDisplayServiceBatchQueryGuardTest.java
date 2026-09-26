@@ -1,8 +1,8 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.displays.application;
 
-import com.mirai.inventoryservice.dtos.requests.BatchClearDisplaysRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.api.BatchClearDisplaysRequestDTO;
+import com.mirai.inventoryservice.displays.api.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.identity.domain.User;
@@ -10,13 +10,15 @@ import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
-import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.sites.application.LocationService;
+import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
-import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.application.UserService;
+import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.services.NotificationService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,9 +57,9 @@ class MachineDisplayServiceBatchQueryGuardTest {
     @Mock private MachineDisplayRepository machineDisplayRepository;
     @Mock private CatalogQueries catalogQueries;
     @Mock private CatalogEntityAccess catalogEntityAccess;
-    @Mock private UserRepository userRepository;
+    @Mock private UserService userService;
     @Mock private InventoryOperations inventoryOperations;
-    @Mock private LocationRepository locationRepository;
+    @Mock private LocationService locationService;
     @Mock private EntityManager entityManager;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
@@ -70,8 +72,8 @@ class MachineDisplayServiceBatchQueryGuardTest {
     @BeforeEach
     void setUp() {
         service = new MachineDisplayService(
-                machineDisplayRepository, catalogQueries, catalogEntityAccess, userRepository,
-                inventoryOperations, locationRepository, entityManager,
+                machineDisplayRepository, catalogQueries, catalogEntityAccess, userService,
+                inventoryOperations, locationService, entityManager,
                 auditLogService, notificationService);
 
         actorId = UUID.randomUUID();
@@ -87,11 +89,11 @@ class MachineDisplayServiceBatchQueryGuardTest {
         loc.setId(machineId);
         loc.setLocationCode("R2");
         loc.setStorageLocation(storageLocation);
-        when(locationRepository.findById(machineId)).thenReturn(Optional.of(loc));
+        when(locationService.findById(machineId)).thenReturn(Optional.of(loc));
 
         User user = new User();
         user.setId(actorId);
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(user));
+        when(userService.findById(actorId)).thenReturn(Optional.of(user));
 
         when(machineDisplayRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
     }

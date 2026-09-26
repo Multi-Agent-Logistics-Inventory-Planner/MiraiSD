@@ -1,15 +1,8 @@
-package com.mirai.inventoryservice.controllers;
+package com.mirai.inventoryservice.displays.api;
 
-import com.mirai.inventoryservice.dtos.requests.BatchClearDisplaysRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayBatchRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
-import com.mirai.inventoryservice.dtos.responses.MachineDisplayDTO;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.services.MachineDisplayService;
+import com.mirai.inventoryservice.displays.application.MachineDisplayService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

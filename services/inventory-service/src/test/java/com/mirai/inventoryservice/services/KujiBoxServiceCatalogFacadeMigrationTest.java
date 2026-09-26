@@ -27,7 +27,7 @@ import com.mirai.inventoryservice.repositories.AuditLogRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxRepository;
 import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.displays.application.DisplayOperations;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,7 +76,7 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
     @Mock private LocationRepository locationRepository;
     @Mock private InventoryOperations inventoryOperations;
     @Mock private InventoryQueries inventoryQueries;
-    @Mock private MachineDisplayRepository machineDisplayRepository;
+    @Mock private DisplayOperations displayOperations;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
@@ -104,7 +104,7 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
                 locationRepository,
                 inventoryOperations,
                 inventoryQueries,
-                machineDisplayRepository,
+                displayOperations,
                 auditLogRepository,
                 userRepository,
                 notificationService,

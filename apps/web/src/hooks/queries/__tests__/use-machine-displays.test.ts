@@ -4,15 +4,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import type { ReactNode } from "react";
 
-// Mock the API module before importing the hook
-vi.mock("@/lib/api/machine-displays", () => ({
-  getActiveDisplays: vi.fn().mockResolvedValue([]),
-  getActiveDisplaysByType: vi.fn().mockResolvedValue([]),
-  getMachineHistoryPaged: vi.fn().mockResolvedValue({ content: [], totalElements: 0 }),
-  getProductDisplayHistory: vi.fn().mockResolvedValue([]),
-  getActiveDisplaysForMachine: vi.fn().mockResolvedValue([]),
+const mockUseCurrentSite = vi.fn();
+
+vi.mock("@/hooks/queries/use-current-site", () => ({
+  useCurrentSite: () => mockUseCurrentSite(),
 }));
 
+// Mock the API module before importing the hook
+vi.mock("@/lib/api/site-machine-displays", () => ({
+  getSiteActiveDisplays: vi.fn().mockResolvedValue([]),
+  getSiteActiveDisplaysByType: vi.fn().mockResolvedValue([]),
+  getSiteMachineHistoryPaged: vi.fn().mockResolvedValue({ content: [], totalElements: 0 }),
+  getSiteProductDisplayHistory: vi.fn().mockResolvedValue([]),
+  getSiteActiveDisplaysForMachine: vi.fn().mockResolvedValue([]),
+}));
+
+import { getSiteActiveDisplays } from "@/lib/api/site-machine-displays";
 import {
   useActiveDisplays,
   useActiveDisplaysByType,
@@ -20,6 +27,7 @@ import {
 } from "../use-machine-displays";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
+const SITE_ID = "11111111-1111-1111-1111-111111111111";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -38,9 +46,30 @@ function createWrapper() {
 describe("use-machine-displays", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseCurrentSite.mockReturnValue({ siteId: SITE_ID, siteCode: "MAIN", isLoading: false, error: null });
   });
 
   describe("useActiveDisplays", () => {
+    it("stays disabled and does not call getSiteActiveDisplays until siteId resolves", () => {
+      mockUseCurrentSite.mockReturnValue({ siteId: undefined, siteCode: undefined, isLoading: true, error: null });
+
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useActiveDisplays(), { wrapper });
+
+      expect(result.current.isLoading).toBe(true);
+      expect(getSiteActiveDisplays).not.toHaveBeenCalled();
+    });
+
+    it("does not call getSiteActiveDisplays when the site has resolved to no site", () => {
+      mockUseCurrentSite.mockReturnValue({ siteId: undefined, siteCode: undefined, isLoading: false, error: null });
+
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useActiveDisplays(), { wrapper });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(getSiteActiveDisplays).not.toHaveBeenCalled();
+    });
+
     it("uses a staleTime of 10 minutes (600000ms)", async () => {
       const wrapper = createWrapper();
       const { result } = renderHook(() => useActiveDisplays(), { wrapper });
@@ -54,7 +83,7 @@ describe("use-machine-displays", () => {
     });
 
     it("returns data from the API", async () => {
-      const { getActiveDisplays } = await import("@/lib/api/machine-displays");
+      const { getSiteActiveDisplays } = await import("@/lib/api/site-machine-displays");
       const mockDisplays = [
         {
           id: "d1",
@@ -67,7 +96,7 @@ describe("use-machine-displays", () => {
           daysActive: 30,
         },
       ];
-      vi.mocked(getActiveDisplays).mockResolvedValueOnce(mockDisplays as never);
+      vi.mocked(getSiteActiveDisplays).mockResolvedValueOnce(mockDisplays as never);
 
       const wrapper = createWrapper();
       const { result } = renderHook(() => useActiveDisplays(), { wrapper });
@@ -75,6 +104,7 @@ describe("use-machine-displays", () => {
       await waitFor(() => {
         expect(result.current.data).toEqual(mockDisplays);
       });
+      expect(getSiteActiveDisplays).toHaveBeenCalledWith(SITE_ID);
     });
   });
 

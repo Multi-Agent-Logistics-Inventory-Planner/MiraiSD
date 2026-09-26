@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.responses;
+package com.mirai.inventoryservice.displays.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
 import lombok.AllArgsConstructor;
@@ -35,7 +35,7 @@ public class MachineDisplayDTO {
      * Calculate days active from startedAt to endedAt (or now if still active)
      */
     public static MachineDisplayDTO fromEntity(
-            com.mirai.inventoryservice.models.MachineDisplay display,
+            com.mirai.inventoryservice.displays.domain.MachineDisplay display,
             String machineCode,
             String actorName,
             int staleThresholdDays) {
