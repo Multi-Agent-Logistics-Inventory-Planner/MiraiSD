@@ -1,4 +1,4 @@
-package com.mirai.inventoryservice.dtos.requests;
+package com.mirai.inventoryservice.displays.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
 import jakarta.validation.constraints.NotEmpty;
@@ -11,19 +11,25 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Request DTO for renewing display records.
+ * Renewing ends the current display record and creates a new one
+ * with fresh startedAt timestamp for the same product.
+ * Used when restocking the same product and wanting to reset tracking.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SetMachineDisplayBatchRequestDTO {
+public class RenewDisplayRequestDTO {
     @NotNull(message = "Location type is required")
     private LocationType locationType;
 
     @NotNull(message = "Machine ID is required")
     private UUID machineId;
 
-    @NotEmpty(message = "At least one product ID is required")
-    private List<UUID> productIds;
+    @NotEmpty(message = "Display IDs are required")
+    private List<UUID> displayIds;
 
     private UUID actorId;
 }

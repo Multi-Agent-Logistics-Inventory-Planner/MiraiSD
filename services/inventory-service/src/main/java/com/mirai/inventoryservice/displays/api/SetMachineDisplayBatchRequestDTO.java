@@ -1,27 +1,29 @@
-package com.mirai.inventoryservice.dtos.requests;
+package com.mirai.inventoryservice.displays.api;
 
 import com.mirai.inventoryservice.models.enums.LocationType;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SetMachineDisplayRequestDTO {
+public class SetMachineDisplayBatchRequestDTO {
     @NotNull(message = "Location type is required")
     private LocationType locationType;
 
     @NotNull(message = "Machine ID is required")
     private UUID machineId;
 
-    @NotNull(message = "Product ID is required")
-    private UUID productId;
+    @NotEmpty(message = "At least one product ID is required")
+    private List<UUID> productIds;
 
     private UUID actorId;
 }

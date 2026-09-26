@@ -1,9 +1,9 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.displays.application;
 
-import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.SetMachineDisplayRequestDTO;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.api.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.displays.api.RenewDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.SetMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.audit.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
@@ -14,15 +14,17 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
-import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.sites.application.LocationService;
+import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
-import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
+import com.mirai.inventoryservice.identity.application.UserService;
+import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.services.NotificationService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,9 +58,9 @@ class MachineDisplayServiceNotificationTest {
     @Mock private MachineDisplayRepository machineDisplayRepository;
     @Mock private CatalogQueries catalogQueries;
     @Mock private CatalogEntityAccess catalogEntityAccess;
-    @Mock private UserRepository userRepository;
+    @Mock private UserService userService;
     @Mock private InventoryOperations inventoryOperations;
-    @Mock private LocationRepository locationRepository;
+    @Mock private LocationService locationService;
     @Mock private EntityManager entityManager;
     @Mock private AuditLogService auditLogService;
     @Mock private NotificationService notificationService;
@@ -79,9 +81,9 @@ class MachineDisplayServiceNotificationTest {
                 machineDisplayRepository,
                 catalogQueries,
                 catalogEntityAccess,
-                userRepository,
+                userService,
                 inventoryOperations,
-                locationRepository,
+                locationService,
                 entityManager,
                 auditLogService,
                 notificationService);
@@ -121,14 +123,14 @@ class MachineDisplayServiceNotificationTest {
         sameSiteTargetLoc.setId(sameSiteTargetMachineId);
         sameSiteTargetLoc.setLocationCode("R7");
         sameSiteTargetLoc.setStorageLocation(storageLocation);
-        when(locationRepository.findById(machineId)).thenReturn(Optional.of(loc));
-        when(locationRepository.findById(targetMachineId)).thenReturn(Optional.of(targetLoc));
-        when(locationRepository.findById(sameSiteTargetMachineId)).thenReturn(Optional.of(sameSiteTargetLoc));
+        when(locationService.findById(machineId)).thenReturn(Optional.of(loc));
+        when(locationService.findById(targetMachineId)).thenReturn(Optional.of(targetLoc));
+        when(locationService.findById(sameSiteTargetMachineId)).thenReturn(Optional.of(sameSiteTargetLoc));
 
         // Actor lookup
         User user = new User();
         user.setId(actorId);
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(user));
+        when(userService.findById(actorId)).thenReturn(Optional.of(user));
     }
 
     private Product product(String name) {

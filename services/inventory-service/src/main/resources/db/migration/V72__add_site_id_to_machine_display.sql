@@ -1,0 +1,13 @@
+-- Expand step (docs/specs/multi-site-data-and-api.md section 5, .specs/phase-7-displays AC-1/AC-2).
+-- machine_display predates multi-site and carries no site dimension; it only reaches a site
+-- indirectly through location_id -> locations.storage_location_id -> storage_locations.site_id
+-- (see MachineDisplayService.resolveMachineSite, the existing same-site-swap guard from
+-- phase-6-inventory T-6c-4). Adds site_id nullable, with no FK and no default, matching V59/V69's
+-- precedent: existing rows get a value from V73's backfill, not from a default that would hide
+-- which rows are genuinely unresolved. New rows get site_id from application code (T-3's
+-- displays-owned writers) starting with the release that ships alongside this migration.
+--
+-- Constraining machine_display (NOT NULL + FK + supporting indexes) is deliberately deferred to a
+-- later, separately released migration once the code rollout has been deployed and verified
+-- against production data - see T-5.
+ALTER TABLE machine_display ADD COLUMN site_id UUID;

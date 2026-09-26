@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +61,14 @@ public class UserService {
      */
     public Optional<User> findById(UUID id) {
         return userRepository.findById(id);
+    }
+
+    /**
+     * Batch variant of {@link #findById(UUID)} for callers that need several actors' names at
+     * once (e.g. a response mapper enriching a page of records).
+     */
+    public List<User> findAllByIds(Collection<UUID> ids) {
+        return userRepository.findAllById(ids);
     }
 
     public User getUserByEmail(String email) {

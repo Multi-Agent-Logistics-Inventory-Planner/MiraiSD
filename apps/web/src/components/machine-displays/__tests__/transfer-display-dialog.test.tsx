@@ -5,11 +5,11 @@ import { LocationType } from "@/types/api";
 
 const api = vi.hoisted(() => ({
   getSiteLocations: vi.fn(), getLocationsByType: vi.fn(), getProducts: vi.fn(),
-  getActiveDisplaysByType: vi.fn(), getActiveDisplaysForMachine: vi.fn(),
+  getSiteActiveDisplaysByType: vi.fn(), getSiteActiveDisplaysForMachine: vi.fn(),
 }));
 vi.mock("@/lib/api/locations", () => api);
 vi.mock("@/lib/api/products", () => api);
-vi.mock("@/lib/api/machine-displays", () => api);
+vi.mock("@/lib/api/site-machine-displays", () => api);
 vi.mock("@/hooks/queries/use-current-site", () => ({ useCurrentSite: () => ({ siteId: "main", isLoading: false }) }));
 import { TransferDisplayDialog } from "../transfer-display-dialog";
 
@@ -30,13 +30,13 @@ describe("display transfer query lifecycle", () => {
     rerender(view(true));
     await waitFor(() => expect(api.getSiteLocations).toHaveBeenCalledWith("main", "GACHAPON"));
     await waitFor(() => expect(api.getProducts).toHaveBeenCalledTimes(1));
-    expect(api.getActiveDisplaysByType).toHaveBeenCalledWith(LocationType.GACHAPON);
+    expect(api.getSiteActiveDisplaysByType).toHaveBeenCalledWith("main", LocationType.GACHAPON);
     expect(api.getLocationsByType).not.toHaveBeenCalled();
     rerender(view(false, LocationType.DOUBLE_CLAW_MACHINE));
     await act(async () => { await client.invalidateQueries(); });
     expect(api.getSiteLocations).toHaveBeenCalledTimes(1);
     expect(api.getProducts).toHaveBeenCalledTimes(1);
-    expect(api.getActiveDisplaysByType).toHaveBeenCalledTimes(1);
-    expect(api.getActiveDisplaysForMachine).not.toHaveBeenCalled();
+    expect(api.getSiteActiveDisplaysByType).toHaveBeenCalledTimes(1);
+    expect(api.getSiteActiveDisplaysForMachine).not.toHaveBeenCalled();
   });
 });

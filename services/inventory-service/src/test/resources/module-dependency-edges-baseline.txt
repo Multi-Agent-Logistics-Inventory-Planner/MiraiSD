@@ -252,6 +252,56 @@
 # `ShipmentItem.item` as one of the callers this facade is designed for, so the `Product`/`Supplier`
 # entity references on `Shipment`/`ShipmentItem` (`@ManyToOne` associations, not raw entity fetches)
 # are the intended, already-reviewed pattern -- not something this move needed to change.
+#
+# Eleventh reviewed addition (2026-09-24, .specs/phase-7-displays/log.md T-3): mechanical move of
+# MachineDisplayController, MachineDisplayService, MachineDisplayRepository, the MachineDisplay
+# entity, and its seven request/response DTOs out of the legacy `controllers`/`services`/
+# `repositories`/`models`/`dtos` packages into `displays.{api,application,domain,infrastructure}`,
+# plus two new facades (`displays.application.DisplayQueries`, `DisplayOperations`) that replace
+# every remaining foreign-repository access to `MachineDisplay`/`MachineDisplayRepository` from
+# outside the module (AC-4). Pruned in the SAME review: `displays -> repositories` -- grep
+# confirmed `displays/**` no longer imports anything from the legacy `repositories` package once
+# `MachineDisplayRepository` itself moved out of it. `displays -> catalog` is unchanged (already
+# approved) -- `CatalogEntityAccess`/`CatalogQueries`/`ProductRef`/`Product` usage inside the moved
+# `MachineDisplayService` and the new `DisplayOperations` is the same facade-only access pattern
+# already reviewed for this edge.
+#   `displays -> inventory`  (InventoryOperations, StockMovement, InvalidInventoryOperationException
+#                              -- was `services -> inventory`, already approved)
+#   `displays -> sites`      (Location, Site, LocationNotFoundException, sites.application.
+#                              LocationService -- was `services -> sites`, already approved; the
+#                              moved MachineDisplayService now calls LocationService instead of
+#                              LocationRepository directly, per rule 6.1.5)
+#   `displays -> identity`   (identity.application.UserService -- was `services -> identity`,
+#                              already approved; same rule-6.1.5 repository-to-facade swap)
+#   `displays -> models`     (LocationType and the other shared enums, AuditLog, Notification --
+#                              was `services -> models`, already approved)
+#   `displays -> services`   (AuditLogService, NotificationService, needed as explicit imports now
+#                              that same-package visibility no longer hides them -- mirrors the
+#                              already-approved `shipments -> services` addition above)
+#   `services -> displays`   (AnalyticsService, ProductReportBundleService, KujiBoxService now call
+#                              DisplayQueries/DisplayOperations instead of MachineDisplayRepository/
+#                              the MachineDisplay entity directly)
+#   `models -> displays`     (KujiBox.machineDisplay, a pre-existing `@ManyToOne` association that
+#                              lived entirely inside `models.kuji`/(legacy `models`) before this
+#                              move -- rule 6.1.8 transitional-relationship carry-across, the same
+#                              character as the recorded `models -> inventory` R-2 precedent above,
+#                              not a new cross-module JPA relationship. Removing this association in
+#                              favor of a plain UUID column is left to the kuji/lootbox slice.)
+#   `controllers -> displays` (DevSeedController's dev-only display seeding endpoints -- was
+#                              `controllers -> models`/`controllers -> repositories`, already
+#                              approved; forced by the move at compile time, no behavior change)
+# `displays <-> services` and `displays <-> models` are two more already-accepted bidirectional
+# pairs in this file, alongside `models <-> inventory` and `inventory <-> dtos` above -- same
+# legacy-technical-package-tangle character, not a new business-module cycle.
+# Not added in this review: `displays -> dtos` (the seven DTOs moved into `displays.api` instead of
+# staying in `dtos`, so no edge is needed).
+#
+# Twelfth reviewed addition (2026-09-24, .specs/phase-7-displays/log.md T-4): `displays -> shared`,
+# from the new `displays.api.SiteMachineDisplayController` reading
+# `shared.web.AuthorizedSiteContextHolder` to resolve the authorized site before any entity lookup
+# (AC-3) -- the same `<module> -> shared` pattern already approved for `catalog`, `inventory`,
+# `shipments`, and `controllers` above. `shared` remains a pure leaf in this file (zero outgoing
+# edges), so this cannot create a new cycle.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -276,8 +326,14 @@ controllers -> services
 controllers -> shipments
 controllers -> sites
 controllers -> shared
+controllers -> displays
 displays -> catalog
-displays -> repositories
+displays -> identity
+displays -> inventory
+displays -> models
+displays -> services
+displays -> shared
+displays -> sites
 dtos -> catalog
 dtos -> identity
 dtos -> inventory
@@ -310,6 +366,7 @@ kuji -> catalog
 kuji -> models
 kuji -> repositories
 models -> catalog
+models -> displays
 models -> identity
 models -> inventory
 models -> sites
@@ -318,6 +375,7 @@ repositories -> identity
 repositories -> models
 repositories -> utils
 services -> catalog
+services -> displays
 services -> dtos
 services -> exceptions
 services -> identity

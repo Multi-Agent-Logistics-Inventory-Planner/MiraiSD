@@ -1,8 +1,9 @@
-package com.mirai.inventoryservice.models;
+package com.mirai.inventoryservice.displays.domain;
 
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.domain.Site;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -37,6 +38,17 @@ public class MachineDisplay {
     @JoinColumn(name = "location_id", nullable = false)
     @NotNull
     private Location location;
+
+    /**
+     * The site this display belongs to. Nullable at the JPA level because the underlying column
+     * (V72) is expand-phase nullable pending a separate constraining migration (.specs/
+     * phase-7-displays T-5) once every writer is confirmed to set it; every production write path
+     * sets it explicitly, derived from the display's location rather than the caller's authorized
+     * site context, since a display always belongs to the site that owns its machine's location.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "site_id")
+    private Site site;
 
     // Legacy fields - kept for backward compatibility during migration
     // TODO: Remove in Phase C after 30+ days

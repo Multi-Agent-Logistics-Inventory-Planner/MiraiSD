@@ -28,7 +28,7 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.inventory.application.InventoryQueries;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.displays.application.DisplayQueries;
 import com.mirai.inventoryservice.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +66,7 @@ public class AnalyticsService {
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final InventoryQueries inventoryQueries;
     private final DailySalesRollupRepository dailySalesRollupRepository;
-    private final MachineDisplayRepository machineDisplayRepository;
+    private final DisplayQueries displayQueries;
 
     private static final String[] DOW_NAMES = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     private static final int MOVERS_LIMIT = 10;
@@ -690,13 +690,8 @@ public class AnalyticsService {
         // Fetch display days for current period (for ACV-weighted velocity)
         OffsetDateTime currentStartOdt = currentPeriodStart.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime todayOdt = today.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-        Map<UUID, Double> currentDisplayDays = machineDisplayRepository
-            .calculateDisplayDaysByProduct(currentStartOdt, todayOdt)
-            .stream()
-            .collect(Collectors.toMap(
-                row -> (UUID) row[0],
-                row -> ((Number) row[1]).doubleValue()
-            ));
+        Map<UUID, Double> currentDisplayDays = displayQueries
+            .displayDaysByProduct(currentStartOdt, todayOdt);
 
         List<DayOfWeekPattern> dowPatterns = computeDowPatternsWithDemand(rollups, featuresMap);
         List<Mover> topMovers = computeMoversFromRollups(rollups, currentPeriodStart, previousPeriodStart, today, true, productMap, categoriesById, featuresMap, currentDisplayDays);

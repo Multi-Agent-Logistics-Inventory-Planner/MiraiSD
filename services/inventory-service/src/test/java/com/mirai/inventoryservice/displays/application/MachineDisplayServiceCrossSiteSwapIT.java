@@ -1,17 +1,17 @@
-package com.mirai.inventoryservice.services;
+package com.mirai.inventoryservice.displays.application;
 
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
-import com.mirai.inventoryservice.dtos.requests.BatchDisplaySwapRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.RenewDisplayRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.SwapMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.displays.api.RenewDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.SwapMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;

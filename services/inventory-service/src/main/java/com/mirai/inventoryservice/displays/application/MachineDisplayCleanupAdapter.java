@@ -1,7 +1,7 @@
 package com.mirai.inventoryservice.displays.application;
 
 import com.mirai.inventoryservice.catalog.application.MachineDisplayCleanupPort;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
