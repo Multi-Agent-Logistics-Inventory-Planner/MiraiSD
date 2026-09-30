@@ -414,7 +414,7 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     ]);
   });
 
-  it("invalidates both the site-qualified and the legacy two-element productInventoryEntries key (Required 4)", async () => {
+  it("invalidates the site-qualified productInventoryEntries key; the legacy two-element key has no remaining caller (Phase 7 web migration)", async () => {
     const qc = client();
     qc.setQueryData(["inventoryTotals", "site-1"], [{ productId: "p1", totalQuantity: 1 }]);
     mockGetSiteInventoryTotals.mockResolvedValue([{ productId: "p1", totalQuantity: 2 }]);
@@ -423,7 +423,7 @@ describe("flushInventorySiteRefresh (.specs/phase-6-inventory 6e, AC-7)", () => 
     await flushInventorySiteRefresh(qc, "site-1", ["p1"]);
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "site-1", "p1"] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["productInventoryEntries", "p1"] });
   });
 
   it("a later-issued flush always wins for the same product, even if it resolves before an earlier, still-pending one (follow-up review finding, P1)", async () => {

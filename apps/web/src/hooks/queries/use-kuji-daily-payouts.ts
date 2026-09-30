@@ -1,22 +1,32 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getKujiDailyPayouts } from "@/lib/api/kuji-boxes";
+import { useQuery, skipToken } from "@tanstack/react-query";
+import { getSiteKujiDailyPayouts } from "@/lib/api/site-kuji-boxes";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 
 export function useKujiDailyPayouts(
   boxId: string | null | undefined,
   params: { from?: string; to?: string; tz: string }
 ) {
-  return useQuery({
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
     queryKey: [
       "kuji-box",
       "daily-payouts",
+      siteId,
       boxId,
       params.from ?? null,
       params.to ?? null,
       params.tz,
     ],
-    queryFn: () => getKujiDailyPayouts(boxId!, params),
-    enabled: !!boxId,
+    queryFn:
+      siteId && boxId ? () => getSiteKujiDailyPayouts(siteId, boxId, params) : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(boxId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }

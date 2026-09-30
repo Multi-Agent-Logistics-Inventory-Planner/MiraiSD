@@ -27,11 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Executes V75-V79 (.specs/phase-7-kuji-lootbox T-2/T-3) themselves against real PostgreSQL,
+ * Executes V75-V80 (.specs/phase-7-kuji-lootbox T-2/T-3/T-5) themselves against real PostgreSQL,
  * the same standalone-Testcontainers approach as {@code SiteIntegrityMigrationIT} - no Spring
  * context, a minimal stub schema shaped like the columns each migration actually touches, and
- * the real migration files executed verbatim. V80 is deferred to the T-5 gate and does not exist
- * yet, so it is not exercised here.
+ * the real migration files executed verbatim.
  */
 @Testcontainers
 class KujiLootboxSiteMigrationIT {
@@ -87,6 +86,8 @@ class KujiLootboxSiteMigrationIT {
                     + "CONSTRAINT uq_review_daily_counts_user_date UNIQUE (user_id, date))");
             s.execute("CREATE UNIQUE INDEX ux_lootbox_plays_user_idem ON lootbox_plays(user_id, idempotency_key) "
                     + "WHERE idempotency_key IS NOT NULL");
+            s.execute("CREATE UNIQUE INDEX uniq_kuji_boxes_open_per_product ON kuji_boxes (product_id) "
+                    + "WHERE status = 'OPEN'");
         }
     }
 
@@ -189,6 +190,38 @@ class KujiLootboxSiteMigrationIT {
         UUID user = uuid("INSERT INTO users DEFAULT VALUES RETURNING id");
         assertThatThrownBy(() -> exec("INSERT INTO lootbox_plays (user_id, lootbox_id, site_id) VALUES "
                 + "('" + user + "', NULL, '" + main + "')"))
+                .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void v80ReplacesGlobalOpenBoxUniquenessWithPerSite() throws Exception {
+        UUID main = site("MAIN");
+        UUID second = site("SECOND");
+        UUID mainStorage = uuid("INSERT INTO storage_locations (site_id) VALUES ('" + main + "') RETURNING id");
+        UUID mainLocation = uuid("INSERT INTO locations (storage_location_id) VALUES ('" + mainStorage + "') RETURNING id");
+        UUID secondStorage = uuid("INSERT INTO storage_locations (site_id) VALUES ('" + second + "') RETURNING id");
+        UUID secondLocation = uuid("INSERT INTO locations (storage_location_id) VALUES ('" + secondStorage + "') RETURNING id");
+        UUID product = uuid("INSERT INTO products DEFAULT VALUES RETURNING id");
+
+        migrate("V75__add_site_id_to_kuji_lootbox_and_coin_ledger.sql");
+        migrate("V76__backfill_kuji_lootbox_site_main.sql");
+        migrateStatements("V77__kuji_lootbox_site_indexes.sql");
+        migrate("V78__constrain_kuji_lootbox_catalog_site.sql");
+        migrate("V79__constrain_coin_ledger_site.sql");
+        migrateStatements("V80__drop_global_kuji_open_box_uniqueness.sql");
+
+        // Two sites can each have an OPEN box for the same product now that the constraint is
+        // per-site instead of global.
+        exec("INSERT INTO kuji_boxes (product_id, location_id, site_id) VALUES "
+                + "('" + product + "', '" + mainLocation + "', '" + main + "')");
+        exec("INSERT INTO kuji_boxes (product_id, location_id, site_id) VALUES "
+                + "('" + product + "', '" + secondLocation + "', '" + second + "')");
+        assertThat(count("SELECT COUNT(*) FROM kuji_boxes WHERE product_id = '" + product
+                + "' AND status = 'OPEN'")).isEqualTo(2);
+
+        // A second OPEN box for the same product at the same site is still rejected.
+        assertThatThrownBy(() -> exec("INSERT INTO kuji_boxes (product_id, location_id, site_id) VALUES "
+                + "('" + product + "', '" + mainLocation + "', '" + main + "')"))
                 .isInstanceOf(SQLException.class);
     }
 
