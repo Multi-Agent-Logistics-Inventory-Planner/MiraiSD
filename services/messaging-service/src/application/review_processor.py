@@ -26,6 +26,10 @@ class ReviewEvent:
     # Rate snapshotted at fetch time. Defaults to 1 for events produced before the
     # field existed (or for tests/manual emits that don't bother setting it).
     coin_rate: int = 1
+    # Site snapshotted at fetch time. None for events produced before the field
+    # existed (rolling deploy / already-queued Kafka messages) — process_review
+    # resolves a fallback via the repo rather than crash the consumer.
+    site_id: str | None = None
 
 
 class ReviewProcessor:
@@ -143,8 +147,11 @@ class ReviewProcessor:
                 review_date,
             )
 
-            # Update daily count, applying the rate that traveled with this event
-            self._repo.increment_daily_count(employee, review_date, rate=event.coin_rate)
+            # Update daily count, applying the rate and site that traveled with
+            # this event. Fall back to resolving the site here only for events
+            # queued before the site_id field existed.
+            site_id = event.site_id or self._repo.get_review_site_id()
+            self._repo.increment_daily_count(employee, review_date, site_id, rate=event.coin_rate)
             return True
 
         # review_id is None means duplicate (external_id already exists)
@@ -194,6 +201,7 @@ class ReviewProcessor:
                 reviewer_name=payload.get("reviewer_name", ""),
                 published_at=payload.get("published_at", ""),
                 coin_rate=int(payload.get("coin_rate", 1)),
+                site_id=payload.get("site_id"),
             )
         except Exception as e:
             logger.warning("Failed to parse review event: %s", e)

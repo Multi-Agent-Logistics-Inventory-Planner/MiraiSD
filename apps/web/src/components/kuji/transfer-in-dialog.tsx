@@ -25,7 +25,7 @@ import {
   useTransferInMoreToKujiTierMutation,
   useTransferInInventoryOnlyToKujiTierMutation,
 } from "@/hooks/mutations/use-kuji-box-mutations";
-import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
+import { useSiteProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import type { KujiBox, KujiBoxTier } from "@/types/api";
 import type { LocationSelection } from "@/types/transfer";
 
@@ -88,7 +88,7 @@ export function TransferInDialog({
   }, [open, initialMode, isLinked]);
 
   const isAutoCreated = Boolean(tier.autoCreatedProduct);
-  const inventoryQuery = useProductInventoryEntries(
+  const inventoryQuery = useSiteProductInventoryEntries(
     isAutoCreated || !isLinked ? null : tier.linkedProductId,
   );
   const availableEntries = (inventoryQuery.data?.entries ?? []).filter(

@@ -85,7 +85,6 @@ export function UndoDrawDialog({
       await undoDraw.mutateAsync({
         boxId: box.id,
         auditLogId: selectedAuditLogId,
-        actorId,
         productId: box.productId,
       });
       toast({ title: "Draw undone", variant: "success" });

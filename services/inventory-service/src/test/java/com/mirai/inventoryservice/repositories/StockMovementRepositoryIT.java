@@ -11,8 +11,10 @@ import com.mirai.inventoryservice.inventory.infrastructure.StockMovementReposito
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.kuji.KujiBox;
-import com.mirai.inventoryservice.models.kuji.KujiBoxTier;
+import com.mirai.inventoryservice.kuji.domain.KujiBox;
+import com.mirai.inventoryservice.kuji.domain.KujiBoxTier;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;

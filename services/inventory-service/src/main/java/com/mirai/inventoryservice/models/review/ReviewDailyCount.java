@@ -45,6 +45,16 @@ public class ReviewDailyCount {
     @Builder.Default
     private Integer coinsAwarded = 0;
 
+    /**
+     * Site the review source that produced this row's reviews is mapped to
+     * (.specs/phase-7-kuji-lootbox T-2). The only production writer is the Python
+     * messaging-service (supabase_repo.py::increment_daily_count), which resolves this from a
+     * server-side REVIEW_SITE_CODE config value, never from any payload. Uniqueness is
+     * (site_id, user_id, date) as of V79, replacing the legacy (user_id, date) constraint.
+     */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

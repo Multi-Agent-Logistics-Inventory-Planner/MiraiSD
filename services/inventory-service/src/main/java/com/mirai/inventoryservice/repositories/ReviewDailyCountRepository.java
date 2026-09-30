@@ -66,16 +66,17 @@ public interface ReviewDailyCountRepository extends JpaRepository<ReviewDailyCou
      */
     @Query("SELECT c.date, c.reviewCount, c.coinsAwarded, c.expiresAt " +
             "FROM ReviewDailyCount c " +
-            "WHERE c.user.id = :userId " +
+            "WHERE c.user.id = :userId AND c.siteId = :siteId " +
             "ORDER BY c.date DESC")
-    List<Object[]> findDailyCreditsByUser(@Param("userId") UUID userId);
+    List<Object[]> findDailyCreditsByUser(@Param("userId") UUID userId, @Param("siteId") UUID siteId);
 
     /** Rows whose expires_at is between (today, today + windowDays] for the "expiring soon" UI. */
     @Query("SELECT c FROM ReviewDailyCount c " +
-            "WHERE c.user.id = :userId " +
+            "WHERE c.user.id = :userId AND c.siteId = :siteId " +
             "  AND c.expiresAt > :today AND c.expiresAt <= :until " +
             "ORDER BY c.expiresAt ASC")
     List<ReviewDailyCount> findExpiringSoon(@Param("userId") UUID userId,
+                                            @Param("siteId") UUID siteId,
                                             @Param("today") LocalDate today,
                                             @Param("until") LocalDate until);
 

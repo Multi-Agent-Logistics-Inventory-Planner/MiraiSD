@@ -16,7 +16,7 @@ Kuji and lootbox workflows remain legacy modules and include product/stock behav
 
 ## Acceptance criteria
 
-- AC-1: `kuji_boxes`, `kuji_box_tiers`, `lootboxes`, `lootbox_tiers`, `lootbox_prizes`, `lootbox_plays`, and `coin_adjustments` have an explicit site-owner/source and expand/backfill/verify/constrain plan.
+- AC-1: `kuji_boxes`, `kuji_box_tiers`, `lootboxes`, `lootbox_tiers`, `lootbox_prizes`, `lootbox_plays`, `coin_adjustments`, and `review_daily_counts` have an explicit site-owner/source and expand/backfill/verify/constrain plan. `review_daily_counts` is added per the T-2 coin-balance decision (per-site, site-of-action balances are impossible without it); this feature owns the column, its migration, its unique-key change, and the balance reads that depend on it, while the notifications/reviews/audit slice keeps owning `ReviewService` and leaderboard reads against it.
 - AC-2: Kuji and lootbox commands and reads resolve authorized site context before lookup; all child/location/product relationships remain tenant consistent.
 - AC-3: Draw, intake, allocation and related stock changes call `InventoryOperations`, commit audit/outbox atomically, and publish site-aware events/realtime notifications.
 - AC-4: `kuji` and `lootbox` own their repositories and use facades/read projections rather than catalog, inventory or legacy repositories. Existing Kuji architecture edges shrink; any new lootbox edge is reviewed first.

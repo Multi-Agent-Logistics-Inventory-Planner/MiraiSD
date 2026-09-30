@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { LegacyLocationSelector as LocationSelector } from "@/components/stock/location-selector";
 import { ProductLocationSelector } from "@/components/stock/product-location-selector";
-import { useProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
+import { useSiteProductInventoryEntries } from "@/hooks/queries/use-product-inventory-entries";
 import {
   deleteProductImage,
   isUploadError,
@@ -170,7 +170,7 @@ export function TierEditDialog({
 
   // Load locations the newly-selected linked product actually lives at so the
   // source picker only offers real candidates.
-  const newProductInventoryQuery = useProductInventoryEntries(
+  const newProductInventoryQuery = useSiteProductInventoryEntries(
     canBringInNewProduct ? linkedProductId : null,
   );
   const newProductAvailableEntries =

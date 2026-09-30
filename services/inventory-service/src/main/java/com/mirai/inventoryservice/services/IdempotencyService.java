@@ -9,11 +9,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Per-(user, key) idempotency cache. Single-replica deployment assumption — if you
+ * Per-(site, user, key) idempotency cache. Single-replica deployment assumption — if you
  * scale horizontally, swap this for a Redis-backed implementation.
  *
- * The lootbox_plays table also has UNIQUE(user_id, idempotency_key) as a database-level
- * safety net for replays that miss the cache (e.g. after a restart within 5 minutes).
+ * The lootbox_plays table also has UNIQUE(site_id, user_id, idempotency_key) (V79) as a
+ * database-level safety net for replays that miss the cache (e.g. after a restart within 5
+ * minutes).
+ *
+ * siteId is part of the cache key, not just an extra check on the cached value, so that reusing
+ * the same key at a different site within the TTL can never return another site's cached prize
+ * and balance (review finding P1 for .specs/phase-7-kuji-lootbox: the key was previously
+ * user+key only).
  */
 @Service
 public class IdempotencyService {
@@ -27,19 +33,19 @@ public class IdempotencyService {
             .build();
 
     @SuppressWarnings("unchecked")
-    public <T> Optional<T> get(UUID userId, String key, Class<T> type) {
+    public <T> Optional<T> get(UUID siteId, UUID userId, String key, Class<T> type) {
         if (key == null || key.isBlank()) return Optional.empty();
-        Object cached = cache.getIfPresent(cacheKey(userId, key));
+        Object cached = cache.getIfPresent(cacheKey(siteId, userId, key));
         if (cached == null || !type.isInstance(cached)) return Optional.empty();
         return Optional.of((T) cached);
     }
 
-    public void put(UUID userId, String key, Object value) {
+    public void put(UUID siteId, UUID userId, String key, Object value) {
         if (key == null || key.isBlank() || value == null) return;
-        cache.put(cacheKey(userId, key), value);
+        cache.put(cacheKey(siteId, userId, key), value);
     }
 
-    private String cacheKey(UUID userId, String key) {
-        return userId + ":" + key;
+    private String cacheKey(UUID siteId, UUID userId, String key) {
+        return siteId + ":" + userId + ":" + key;
     }
 }
