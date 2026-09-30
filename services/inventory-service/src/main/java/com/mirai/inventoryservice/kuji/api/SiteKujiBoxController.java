@@ -25,10 +25,14 @@ import java.util.UUID;
  * v1 route shape mirroring {@link KujiBoxController}'s legacy one route-for-route. Distinct
  * handler names from {@link KujiBoxController}'s so springdoc doesn't collide operation IDs.
  * <p>
- * Unlike the legacy route's {@code reopenBox}/{@code undoDraw}, the actor for a v1 mutation is
- * always the authenticated principal from the resolved site context, never a client-supplied
- * {@code actorId} query parameter -- matching {@code SiteMachineDisplayController}'s actor-
- * spoofing fix.
+ * The actor for every v1 mutation is always the authenticated principal from the resolved site
+ * context, never a client-supplied value -- matching {@code SiteMachineDisplayController}'s
+ * actor-spoofing fix. {@code reopenBox}/{@code undoDraw} take no client actor at all (unlike
+ * their legacy query-param equivalents). Every other mutation's request DTO still carries an
+ * {@code actorId} field for legacy wire-shape compatibility with {@link KujiBoxController}'s
+ * request bodies; this controller overwrites it with {@link #contextActorId()} right before
+ * calling the service, so the field is validated but never trusted (review finding P1: a v1
+ * caller could otherwise attribute audit-log/stock-movement rows to an arbitrary user id).
  */
 @RestController
 @RequestMapping("/api/v1/sites/{siteId}/kuji-boxes")
@@ -119,6 +123,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID siteId,
             @Valid @RequestBody OpenKujiBoxRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO created = kujiBoxService.openBox(contextSiteId(), request);
         applyPriceVisibility(created, authentication);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -131,6 +136,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID boxId,
             @Valid @RequestBody CloseKujiBoxRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.closeBox(contextSiteId(), boxId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -156,6 +162,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID boxId,
             @Valid @RequestBody AddKujiTierRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.addTier(contextSiteId(), boxId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -169,6 +176,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody PatchKujiTierRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.patchTier(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -182,6 +190,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody TransferInMoreRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.transferInMore(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -195,6 +204,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody TransferInMoreRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.transferInInventoryOnly(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -208,6 +218,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody AddSlipRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.addSlip(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -221,6 +232,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody MoveSlipsRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.moveSlips(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -234,6 +246,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID tierId,
             @Valid @RequestBody DeletePrizeRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.deletePrize(contextSiteId(), boxId, tierId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);
@@ -248,6 +261,7 @@ public class SiteKujiBoxController {
             @PathVariable UUID boxId,
             @Valid @RequestBody RecordDrawRequestDTO request,
             Authentication authentication) {
+        request.setActorId(contextActorId());
         KujiBoxResponseDTO box = kujiBoxService.recordDraw(contextSiteId(), boxId, request);
         applyPriceVisibility(box, authentication);
         return ResponseEntity.ok(box);

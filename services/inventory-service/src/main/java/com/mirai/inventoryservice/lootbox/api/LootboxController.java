@@ -82,7 +82,7 @@ public class LootboxController {
         UUID siteId = resolveSiteId(auth);
         UUID userId = resolveUserId(auth);
 
-        var cached = idempotencyService.get(userId, idempotencyKey, PlayLootboxResponseDTO.class);
+        var cached = idempotencyService.get(siteId, userId, idempotencyKey, PlayLootboxResponseDTO.class);
         if (cached.isPresent()) {
             return ResponseEntity.ok(cached.get());
         }
@@ -92,7 +92,7 @@ public class LootboxController {
                 .play(LootboxService.toPlayDto(result.play()))
                 .newBalance(result.newBalance())
                 .build();
-        idempotencyService.put(userId, idempotencyKey, response);
+        idempotencyService.put(siteId, userId, idempotencyKey, response);
         return ResponseEntity.ok(response);
     }
 

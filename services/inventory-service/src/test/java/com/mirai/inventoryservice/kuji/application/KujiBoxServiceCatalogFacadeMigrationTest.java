@@ -171,6 +171,10 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
         when(catalogQueries.findById(linkedId)).thenReturn(Optional.of(ProductRef.from(linkedEntity)));
         when(catalogEntityAccess.getReference(linkedId)).thenReturn(linkedEntity);
 
+        when(inventoryOperations.findInventory(site.getId(), sourceLocationId, linkedId))
+                .thenReturn(Optional.of(LocationInventory.builder()
+                        .id(UUID.randomUUID()).location(sourceLocation).site(site)
+                        .product(linkedEntity).quantity(10).build()));
         when(inventoryOperations.findInventory(sourceLocationId, linkedId))
                 .thenReturn(Optional.of(LocationInventory.builder()
                         .id(UUID.randomUUID()).location(sourceLocation).site(site)
@@ -308,6 +312,10 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
         when(catalogQueries.findById(linkedId)).thenReturn(Optional.of(ProductRef.from(linkedEntity)));
         when(catalogEntityAccess.getReference(linkedId)).thenReturn(linkedEntity);
 
+        when(inventoryOperations.findInventory(site.getId(), sourceLocationId, linkedId))
+                .thenReturn(Optional.of(LocationInventory.builder()
+                        .id(UUID.randomUUID()).location(sourceLocation).site(site)
+                        .product(linkedEntity).quantity(10).build()));
         when(inventoryOperations.findInventory(sourceLocationId, linkedId))
                 .thenReturn(Optional.of(LocationInventory.builder()
                         .id(UUID.randomUUID()).location(sourceLocation).site(site)
@@ -326,6 +334,10 @@ class KujiBoxServiceCatalogFacadeMigrationTest {
 
         verify(catalogEntityAccess, times(1)).getReference(linkedId);
         verify(productStockStateWriter, never()).setActive(any(), anyBoolean());
+
+        // Review finding P2 regression (.specs/phase-7-kuji-lootbox): the audit broadcast must
+        // carry this box's real site, never the site-less overload.
+        verify(broadcastService).broadcastAuditLogCreated(site.getId(), box.getProduct().getId().toString());
     }
 
     @Test

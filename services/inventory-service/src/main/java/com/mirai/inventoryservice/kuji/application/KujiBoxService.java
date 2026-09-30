@@ -358,6 +358,7 @@ public class KujiBoxService {
             // Pull prizes from the source location into the kuji's internal counters.
             // No deposit at the machine — kuji prize counts live only on the tier.
             executeKujiSourceRemoval(
+                    siteId,
                     dto.getSourceLocationId(),
                     tier.getLinkedProduct(),
                     totalQuantity,
@@ -806,7 +807,7 @@ public class KujiBoxService {
         );
 
         broadcastService.broadcastInventoryUpdated(siteId, null, null, null);
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -995,7 +996,7 @@ public class KujiBoxService {
         );
 
         broadcastService.broadcastInventoryUpdated(siteId, null, null, null);
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -1044,7 +1045,7 @@ public class KujiBoxService {
                 parentProduct.getId()
         );
 
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -1111,7 +1112,7 @@ public class KujiBoxService {
                 parentProduct.getId()
         );
 
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -1162,7 +1163,7 @@ public class KujiBoxService {
                 parentProduct.getId()
         );
 
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -1192,6 +1193,7 @@ public class KujiBoxService {
             metadata.put("action", "transfer_in_more");
             applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
             executeKujiSourceRemoval(
+                    siteId,
                     request.getSourceLocationId(),
                     tier.getLinkedProduct(),
                     request.getQuantity(),
@@ -1237,6 +1239,7 @@ public class KujiBoxService {
             metadata.put("action", "transfer_in_inventory_only");
             applyIntakeMetadata(metadata, request.getIntakeUnit(), request.getIntakeQty());
             executeKujiSourceRemoval(
+                    siteId,
                     request.getSourceLocationId(),
                     tier.getLinkedProduct(),
                     request.getQuantity(),
@@ -1427,6 +1430,7 @@ public class KujiBoxService {
                 metadata.put("activeCount", slipCount);
                 metadata.put("inactiveCount", heldBack);
                 executeKujiSourceRemoval(
+                        siteId,
                         request.getSourceLocationId(),
                         linkedProduct,
                         totalQuantity,
@@ -1460,7 +1464,7 @@ public class KujiBoxService {
                 summary,
                 parentProduct.getId()
         );
-        broadcastService.broadcastAuditLogCreated(parentProduct.getId().toString());
+        broadcastService.broadcastAuditLogCreated(siteId, parentProduct.getId().toString());
 
         entityManager.flush();
         return toResponseDTO(box);
@@ -1548,6 +1552,7 @@ public class KujiBoxService {
                     metadata.put("activeCount", newActiveIn);
                     metadata.put("inactiveCount", newInactiveIn);
                     executeKujiSourceRemoval(
+                            siteId,
                             request.getNewProductSourceLocationId(),
                             newLinked,
                             newTotalIn,
@@ -1814,6 +1819,7 @@ public class KujiBoxService {
      * syncProductTotals batch.
      */
     private UUID executeKujiSourceRemoval(
+            UUID siteId,
             UUID sourceLocationId,
             Product product,
             int quantity,
@@ -1825,8 +1831,14 @@ public class KujiBoxService {
             throw new IllegalArgumentException("Removal quantity must be positive");
         }
 
+        // sourceLocationId is client-supplied (open/transfer-in/add-tier/patch-tier request
+        // bodies) and never independently resolved through a site-scoped location lookup before
+        // reaching here, so this call must stay site-scoped: a foreign-site location id returns
+        // empty (not the other site's row), which the caller maps to 404 like any missing
+        // inventory row (review finding P1 — a same-site source location was previously not
+        // required, letting a caller drain another site's stock into their own kuji counters).
         LocationInventory source = inventoryOperations
-                .findInventory(sourceLocationId, product.getId())
+                .findInventory(siteId, sourceLocationId, product.getId())
                 .orElseThrow(() -> new InventoryNotFoundException(
                         "Source LocationInventory not found for product " + product.getName()
                                 + " at location " + sourceLocationId));

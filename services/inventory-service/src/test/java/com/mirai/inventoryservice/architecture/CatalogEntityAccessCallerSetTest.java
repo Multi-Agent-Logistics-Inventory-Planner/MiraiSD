@@ -9,8 +9,12 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -78,6 +82,7 @@ class CatalogEntityAccessCallerSetTest {
      */
     private static Set<Origin> actualOrigins() {
         Set<Origin> actual = new HashSet<>();
+        Map<JavaClass, NavigableMap<Integer, String>> namedMethodLinesByClass = new HashMap<>();
         for (JavaClass javaClass : importedClasses) {
             for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
                 for (JavaAccess<?> access : codeUnit.getAccessesFromSelf()) {
@@ -91,8 +96,11 @@ class CatalogEntityAccessCallerSetTest {
                         continue;
                     }
                     String accessor = access.getTarget().getName();
-                    String methodName = topLevelMethodName(codeUnit);
-                    actual.add(new Origin(access.getOriginOwner().getSimpleName(), methodName, accessor));
+                    JavaClass originClass = access.getOriginOwner();
+                    NavigableMap<Integer, String> namedMethodLines = namedMethodLinesByClass
+                            .computeIfAbsent(originClass, CatalogEntityAccessCallerSetTest::namedMethodStartLines);
+                    String methodName = enclosingNamedMethod(namedMethodLines, access.getLineNumber());
+                    actual.add(new Origin(originClass.getSimpleName(), methodName, accessor));
                 }
             }
         }
@@ -100,21 +108,38 @@ class CatalogEntityAccessCallerSetTest {
     }
 
     /**
-     * A call or reference inside a lambda (e.g. {@code orElseGet(() -> ...)}, common at every
-     * genuine origin here) is reported by ArchUnit as originating from a synthetic {@code
-     * lambda$enclosingMethod$N} method, not the enclosing method itself. Strip that down to the
-     * enclosing method name so a lambda-wrapped access still matches its real origin method —
-     * matching what a human reading T-0's table means by "this method calls CatalogEntityAccess",
-     * regardless of whether the specific access happens to sit inside a lambda within it.
+     * Maps every non-synthetic method's declared start line to its name, for one class. Used to
+     * attribute a lambda-wrapped access back to the real method it's written inside.
+     * <p>
+     * On this codebase's compiled output, javac names every lambda's synthetic method
+     * {@code lambda$<N>} — a bare, class-wide counter with no enclosing-method segment at all
+     * (not the more commonly assumed {@code lambda$<enclosingMethod>$<N>} shape) — so name-parsing
+     * a lambda's {@code JavaCodeUnit.getName()} cannot recover its enclosing method. Source line
+     * ranges can: Java forbids nested method declarations, so method bodies (including a lambda
+     * literal's own body) never overlap in source line — the enclosing method for a given line is
+     * always the closest-preceding non-synthetic method's declaration.
      */
-    private static String topLevelMethodName(JavaCodeUnit codeUnit) {
-        String name = codeUnit.getName();
-        if (name.startsWith("lambda$")) {
-            String rest = name.substring("lambda$".length());
-            int lastDollar = rest.lastIndexOf('$');
-            return lastDollar > 0 ? rest.substring(0, lastDollar) : rest;
+    private static NavigableMap<Integer, String> namedMethodStartLines(JavaClass javaClass) {
+        NavigableMap<Integer, String> lines = new TreeMap<>();
+        for (JavaCodeUnit codeUnit : javaClass.getCodeUnits()) {
+            String name = codeUnit.getName();
+            if (name.startsWith("lambda$") || name.startsWith("<") || name.startsWith("$")) {
+                continue;
+            }
+            lines.put(codeUnit.getSourceCodeLocation().getLineNumber(), name);
         }
-        return name;
+        return lines;
+    }
+
+    /** The nearest non-synthetic method declared at or before {@code accessLine}, in its class. */
+    private static String enclosingNamedMethod(NavigableMap<Integer, String> namedMethodLines, int accessLine) {
+        Map.Entry<Integer, String> enclosing = namedMethodLines.floorEntry(accessLine);
+        if (enclosing == null) {
+            throw new IllegalStateException(
+                    "No non-synthetic method found at or before line " + accessLine
+                            + " -- every access must be inside some declared method.");
+        }
+        return enclosing.getValue();
     }
 
     /**

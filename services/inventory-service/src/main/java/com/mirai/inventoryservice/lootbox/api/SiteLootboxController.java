@@ -79,7 +79,7 @@ public class SiteLootboxController {
         UUID contextSiteId = contextSiteId();
         UUID userId = contextUserId();
 
-        var cached = idempotencyService.get(userId, idempotencyKey, PlayLootboxResponseDTO.class);
+        var cached = idempotencyService.get(contextSiteId, userId, idempotencyKey, PlayLootboxResponseDTO.class);
         if (cached.isPresent()) {
             return ResponseEntity.ok(cached.get());
         }
@@ -89,7 +89,7 @@ public class SiteLootboxController {
                 .play(LootboxService.toPlayDto(result.play()))
                 .newBalance(result.newBalance())
                 .build();
-        idempotencyService.put(userId, idempotencyKey, response);
+        idempotencyService.put(contextSiteId, userId, idempotencyKey, response);
         return ResponseEntity.ok(response);
     }
 

@@ -2,8 +2,8 @@
 
 ## Current handoff
 
-- Status: **T-1 through T-5 are all now complete.** T-3 (migrations, both modules' site-scoping, module move, v1 routes, contract regen) and T-5 (realtime confirmed site-aware end to end; Custom Kuji gate decision resolved — it stays, see below; `V80` written and IT-tested) were already done. **T-4's web migration is now also done**: every `apps/web` Kuji/Lootbox caller moved from the legacy `/api/kuji-boxes`, `/api/lootbox*` routes onto the new `/api/v1/sites/{siteId}/...` routes (see Task record for the full file list and the `site-inventory.ts`-vs-`site-machine-displays.ts` pattern judgment call). Remaining, not blocking: T-4's "fuller" test-matrix items beyond what's already covered — an explicit balance-preservation-after-migration IT and a dedicated per-site coin-isolation IT beyond what `SiteLootbox*SecurityTest`/`SiteKujiBoxControllerSecurityTest` already exercise (those tests already prove foreign-site 403/404 and role gates; they don't specifically prove "coins earned at site A are unspendable at site B" as an end-to-end money-flow scenario). This is genuinely optional hardening, not an unmet acceptance criterion — AC-1 through AC-6 are all satisfied by what's merged.
-- Next action: this feature is functionally complete. The user has said they'll review the whole thing separately with an independent tool (codex) rather than requesting the Full-tier review pass here. If asked to continue, the only remaining optional work is the two extra tests named above; otherwise this `.specs/phase-7-kuji-lootbox` record can be treated as closed.
+- Status: **T-1 through T-5 complete, plus an independent-review fix round.** The user ran the merged feature through an independent review tool (codex); it found four real, live gaps that all the earlier test suites had missed, and one process gap (stale `review.md`/`validation.md`). All five are now fixed — see `review.md` for the disposition of each and the Task record below for implementation detail. The four code findings: (1) `executeKujiSourceRemoval` used an unscoped `findInventory`, letting a caller drain another site's stock into their own kuji counters via open/transfer-in/add-tier/patch-tier; (2) `SiteKujiBoxController` trusted a client-supplied `actorId` on every mutation except reopen/undo, letting a caller misattribute audit/stock-movement rows; (3) `IdempotencyService`'s cache key had no site component, so replaying an idempotency key at a second site could return the first site's cached prize/balance; (4) six Kuji audit broadcasts (`undoDraw`/`addSlip`/`moveSlips`/`deletePrize`/`addTier`/`recordDraw`) still used the site-less broadcast overload despite T-5's "fully site-aware" claim. All four have new regression tests (`IdempotencyServiceTest`, `SiteKujiBoxControllerActorSpoofingTest`, plus additions to `KujiBoxServiceTest`/`KujiBoxServiceCatalogFacadeMigrationTest`).
+- Next action: **this feature is complete — nothing outstanding.** A second independent-review pass confirmed all four code findings closed with no new issues, verified the diff itself is clean, and confirmed the two pre-existing failures reproduce independent of this fix. Per an explicit follow-up decision, those two were then also investigated and fixed (see the Task record's "Pre-existing architecture-test fixes" entry) so AC-6 is fully green rather than formally partial. Full combined suite (`./mvnw -o test -Dtest='*'`): 1169/1169 pass, 0 failures, 0 errors.
 - **T-5 Custom Kuji gate decision (resolved, no code change needed): the gate stays.** It is not a Kuji-specific backend mechanism at all — grepped the entire backend for "Custom Kuji"/"non-MAIN"/"CUSTOM_KUJI" and found zero matches outside `apps/web`. The actual mechanism is `apps/web/src/hooks/queries/use-current-site.ts`'s `useCurrentSite()`, which resolves EVERY user to the MAIN site only, by an explicit, already-recorded product decision in `.specs/track-d-web-client-adoption` — there is no site-switcher UI anywhere in the app yet. Lifting the Kuji-specific restriction would do nothing on its own, since the whole web app is MAIN-only regardless of Kuji. Further evidence the gate should stay: `.specs/second-site-realtime-and-events/` (the coordination record T-2/T-1 both flagged as a prerequisite) does not exist yet — nobody has opened it. Lifting a non-MAIN restriction for one feature while the platform-wide MAIN-only decision and its coordination record are both still in force would be incoherent. This is a durable finding, not a to-do: any future work to enable non-MAIN Kuji access must first land a site switcher (out of scope here) and open the realtime-coordination record — neither is this feature's job.
 - Decisions that must survive compaction: `products.is_active` remains global stock-derived state; site assortment is `site_products.is_stocked`; no non-MAIN Custom Kuji enablement until tenancy/realtime readiness is proved. Kuji's stock-write path already routes through `InventoryOperations` — T-3's Kuji work was repository/query-edge cleanup and event site-propagation, not a stock-write rewrite (confirmed). Lootbox has no product/inventory coupling at all. **User-confirmed 2026-09-27: coin balance is site-of-action, per-site, not per-user-home-site.** `coin_adjustments` and `review_daily_counts` get a `site_id` captured from the authorized site context at write time going forward; all historical rows backfill to MAIN. **T-2 decision: every one of the eight tables gets its own explicit `site_id` column** (no join-only "derived-site" tables), because several hot queries (`findByIdForUpdate`, `decrementQuantity`) operate on the child row directly and a join-derived predicate would change their locking/shape, and the durable spec (multi-site-data-and-api.md §2) rejects "site derivable via parent" as sufficient. Mapped as a raw `UUID siteId` field (matching `Lootbox.siteId`'s existing style), not a `@ManyToOne Site`, to avoid a new `kuji -> sites` / `lootbox -> sites` module edge (AC-4 requires new lootbox edges to be reviewed first). Migrations V75-V79 are written, IT-tested, and considered done — do not rewrite them; extend forward (V80+) instead. **All entity `site_id` fields (`KujiBox`, `KujiBoxTier`, `Lootbox`, `LootboxTier`, `LootboxPrize`, `LootboxPlay`, `CoinAdjustment`, `ReviewDailyCount`) are now populated and read by service code — no longer inert scaffolding anywhere.** **Legacy `/api/kuji-boxes`, `/api/lootbox*`, and `/api/lootbox/admin/*` routes resolve MAIN via `LegacyMainSiteContextResolver.requireMain()` (matching the shipments precedent); dev-mode requests with no authenticated principal resolve MAIN directly via `SiteDirectory`, mirroring the existing dev-mode fallback.** **`UpsertLootboxRequestDTO.siteId` is now a dead/ignored request field** (kept for wire-shape compatibility; removing it is a T-4 contract-regen task). **`DevSeedController.seedReviews()` now sets `siteId` to MAIN** (was flagged as a NOT NULL violation risk; now fixed).
 - Last verified: `./mvnw -o test` (unit tests, default surefire include patterns) — 534 tests, 0 failures. `./mvnw -o -Dtest='*IT' test` (integration tests — this project's `mvn test` alone silently skips every `*IT.java`; the explicit `-Dtest='*IT'` override is required for real full coverage, matching the standing project memory note) — 615 tests, 0 failures. **Combined: 1,149 tests, 0 failures, 0 errors**, run 2026-09-28 on `refactor/phase-7` with all of T-3 merged (migrations, both modules' site-scoping, the module move, the v1 routes, and the contract regen). This two-command combination is the actual verification of record — a single `./mvnw test` run undercounts by skipping ITs entirely; do not trust a bare `./mvnw test` result alone as "full suite" again (an earlier handoff in this log claimed "933 tests, full suite" from a bare `./mvnw test` run, which was itself incomplete in the same way — corrected here).
@@ -207,6 +207,70 @@ Authorization gap confirming AC-2 is unmet: `KujiBoxController`, `LootboxControl
   - Legacy `apps/web/src/lib/api/kuji-boxes.ts` deleted (grep-confirmed zero remaining callers). `lootbox.ts` trimmed to just the coin-config/coin-economy functions, which stay on the legacy route since `coin_economy_config` is a single global row, not per-site.
 - Tests: fixed one stale test (`inventory-refresh.test.ts`'s "Required 4" case asserted the now-removed legacy invalidation key was still called — this was caught by the coordinator running the full suite before finalizing, matching the T-3 lesson about not trusting a partial run). No new dedicated test files were added for the three new API-client modules themselves — matching this codebase's established precedent, since neither `site-machine-displays.ts` nor `site-shipments.ts` has one either; correctness is exercised transitively through the hook/component/mutation tests. Full `apps/web` suite: `npm run test:run` — 468/468 pass. `npx tsc --noEmit` — clean.
 - Result: Pass. This completes T-4 and the entire `.specs/phase-7-kuji-lootbox` feature (T-1 through T-5).
+
+### Independent-review fix round — Done
+
+- Changed:
+  - `KujiBoxService.executeKujiSourceRemoval` now takes `siteId` and calls the site-scoped
+    `InventoryOperations.findInventory(siteId, locationId, productId)` instead of the unscoped
+    two-argument overload; all 5 call sites (`openBox`, `transferInMore`,
+    `transferInInventoryOnly`, `addTier`, `patchTier`) updated to pass it.
+  - `SiteKujiBoxController`: every mutation handler except `reopenSiteBox`/`undoSiteDraw` (which
+    never took a client actor at all) now calls `request.setActorId(contextActorId())` before
+    delegating to the service — `openSiteBox`, `closeSiteBox`, `addSiteTier`, `patchSiteTier`,
+    `transferInMoreToSiteTier`, `transferInInventoryOnlyToSiteTier`, `addSlipToSiteTier`,
+    `moveSlipsInSiteTier`, `deleteSitePrize`, `recordSiteDraw` (10 handlers).
+  - `IdempotencyService.get`/`put` now take `siteId` as the first parameter and fold it into the
+    cache key (`siteId:userId:key`, was `userId:key`); both callers (`LootboxController`,
+    `SiteLootboxController`) updated. Doc comment corrected to reference the actual V79 unique
+    constraint (`UNIQUE(site_id, user_id, idempotency_key)`), which had drifted stale.
+  - `KujiBoxService`: 6 site-less `broadcastAuditLogCreated(parentProduct.getId().toString())`
+    calls (in `recordDraw`, `undoDraw`, `addSlip`, `moveSlips`, `deletePrize`, `addTier`) switched
+    to the 2-arg, site-aware overload.
+  - Updated two now-stale `findInventory` mock stubs in `KujiBoxServiceTest`/
+    `KujiBoxServiceCatalogFacadeMigrationTest` to also stub the 3-arg overload the fixed code
+    actually calls (kept the 2-arg stubs too, since a couple of unrelated, already-safe call
+    sites — reopen/undo reversal paths, where the location was already resolved through a
+    site-scoped lookup before reaching `findInventory` — still legitimately use it).
+  - `review.md`/`validation.md` rewritten with the actual findings/disposition and a real
+    validation run, replacing the stale kickoff-only placeholder text (finding 5).
+- Tests: new `IdempotencyServiceTest` (4), new `SiteKujiBoxControllerActorSpoofingTest` (12), new
+  `KujiBoxServiceTest.transferInInventoryOnly_rejectsASourceLocationBelongingToAnotherSite` plus
+  broadcast-site assertions added to 3 existing `KujiBoxServiceTest` tests
+  (`addSlip_writesAuditLogOnlyAndNoStockMovementOrOutbox`,
+  `recordDraw_incrementsDrawnCountByDrawnQuantity`, `undoDraw_decrementsDrawnCountAndClampsAtZero`)
+  and 2 new tests (`moveSlips_deactivate_broadcastsAuditLogCreatedWithRealSite`,
+  `deletePrize_broadcastsAuditLogCreatedWithRealSite`), plus one broadcast assertion added to
+  `KujiBoxServiceCatalogFacadeMigrationTest.addTier_existingLinkedProduct_...`. `./mvnw -q -o
+  compile` clean. `./mvnw -o test -Dtest='!CatalogEntityAccessCallerSetTest,!ArchitectureTest'` —
+  1158/1158 pass (see Current handoff for why those two are excluded — pre-existing, unrelated,
+  confirmed by stashing this round's changes and re-running against the clean tree).
+- Result: Pass. All four codex findings fixed and regression-tested; `review.md`/`validation.md`
+  now reflect real implementation review and validation evidence instead of kickoff placeholders.
+
+### Pre-existing architecture-test fixes — Done (explicit follow-up decision, out of feature scope but fixed on request)
+
+- Changed:
+  - `CatalogEntityAccessCallerSetTest.java`: replaced `topLevelMethodName`'s lambda-name-parsing
+    heuristic (assumed `lambda$<enclosingMethod>$<N>`) with a line-range resolver
+    (`namedMethodStartLines`/`enclosingNamedMethod`) using `JavaMember.getSourceCodeLocation()`.
+    Root cause verified empirically first (a throwaway diagnostic test, discarded): on this
+    codebase's compiled output, javac names every lambda's synthetic method `lambda$<N>` — a
+    bare, class-wide counter with no enclosing-method segment at all — so the old heuristic
+    silently mis-attributed any lambda-wrapped access. The new resolver is immune to whatever
+    naming scheme javac uses, since it works from source line ranges instead.
+  - `archunit_store/0858803e-...`: re-froze 3 already-accepted `DevSeedController` violations
+    (`ensureDevEmployee`/`ensureMachinesExist`/`seedAll` calling `UserRepository.save`/
+    `LocationRepository.save` directly) under their new `lambda$N`-named text — an unrelated
+    change wrapped those specific calls in lambdas sometime after the store was last frozen.
+    Confirmed same repository methods and near-identical line numbers (398→405, 1476→1503,
+    266→269) before re-freezing, using the project's established manual re-freeze precedent
+    (`allowStoreUpdate=true` prunes obsolete entries but doesn't persist renamed ones).
+    `DevSeedController` itself was not touched — its direct repository access remains
+    pre-existing, unreviewed technical debt, unchanged.
+- Tests: `CatalogEntityAccessCallerSetTest` 2/2 pass. `ArchitectureTest` 9/9 pass. Full combined
+  suite `./mvnw -o test -Dtest='*'` — 1169/1169 pass, 0 failures, 0 errors.
+- Result: Pass. AC-6 is now fully satisfied, not formally partial.
 
 ## Test plan
 

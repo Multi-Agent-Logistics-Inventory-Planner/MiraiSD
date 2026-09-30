@@ -7,10 +7,13 @@ import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductService;
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.kuji.api.AddSlipRequestDTO;
+import com.mirai.inventoryservice.kuji.api.DeletePrizeRequestDTO;
+import com.mirai.inventoryservice.kuji.api.MoveSlipsRequestDTO;
 import com.mirai.inventoryservice.kuji.api.RecordDrawRequestDTO;
 import com.mirai.inventoryservice.kuji.api.TransferInMoreRequestDTO;
 import com.mirai.inventoryservice.kuji.api.KujiDailyPayoutsResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryException;
+import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.models.audit.AuditLog;
@@ -177,6 +180,8 @@ class KujiBoxServiceTest {
                 .product(linkedProduct)
                 .quantity(BOX_INVENTORY)
                 .build();
+        when(inventoryOperations.findInventory(siteId, sourceLocationId, productId))
+                .thenReturn(Optional.of(sourceInv));
         when(inventoryOperations.findInventory(sourceLocationId, productId))
                 .thenReturn(Optional.of(sourceInv));
         when(inventoryOperations.findInventory(boxLocationId, productId))
@@ -267,6 +272,32 @@ class KujiBoxServiceTest {
         assertEquals(INITIAL_SLIP_COUNT, tier.getActiveCount());
     }
 
+    /**
+     * Regression coverage for the .specs/phase-7-kuji-lootbox review finding P1:
+     * executeKujiSourceRemoval used to look up sourceLocationId with the unscoped two-argument
+     * findInventory, so a caller in site A could supply a real location UUID that actually
+     * belongs to site B's inventory and drain site B's stock into their own kuji counters — the
+     * box itself is legitimately the caller's own (site-scoped lookup already passes), only the
+     * supplied source location secretly belongs elsewhere. The site-scoped repository query
+     * (findByLocation_IdAndProduct_IdAndSite_Id) correctly returns nothing for that combination,
+     * which this test models by stubbing the 3-arg findInventory to empty even though the 2-arg,
+     * unscoped lookup for the same location/product WOULD find a row (stubbed to a real one in
+     * setUp) — proving the fix actually changed which query gets used, not just that some query
+     * eventually fails.
+     */
+    @Test
+    void transferInInventoryOnly_rejectsASourceLocationBelongingToAnotherSite() {
+        when(inventoryOperations.findInventory(siteId, sourceLocationId, productId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                InventoryNotFoundException.class,
+                () -> service.transferInInventoryOnly(siteId, boxId, tierId, request()));
+
+        verify(inventoryOperations, never()).saveInventory(any(LocationInventory.class));
+        verify(inventoryOperations, never()).recordMovement(any());
+    }
+
     // ===================== Perf-optimization regression guards =====================
 
     @Test
@@ -296,6 +327,37 @@ class KujiBoxServiceTest {
         // Box not reloaded — toResponseDTO should run on the in-memory box.
         verify(kujiBoxRepository, times(1)).findByIdAndSiteIdWithTiers(boxId, siteId);
         verify(entityManager).flush();
+
+        // Review finding P2 regression: the audit broadcast must carry this box's real site,
+        // never the site-less overload.
+        verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
+    }
+
+    @Test
+    void moveSlips_deactivate_broadcastsAuditLogCreatedWithRealSite() {
+        MoveSlipsRequestDTO req = MoveSlipsRequestDTO.builder()
+                .actorId(actorId)
+                .quantity(2)
+                .direction(MoveSlipsRequestDTO.Direction.DEACTIVATE)
+                .build();
+
+        service.moveSlips(siteId, boxId, tierId, req);
+
+        // Review finding P2 regression: the audit broadcast must carry this box's real site,
+        // never the site-less overload.
+        verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
+    }
+
+    @Test
+    void deletePrize_broadcastsAuditLogCreatedWithRealSite() {
+        box.setTiers(new java.util.ArrayList<>(List.of(tier)));
+        DeletePrizeRequestDTO req = DeletePrizeRequestDTO.builder().actorId(actorId).build();
+
+        service.deletePrize(siteId, boxId, tierId, req);
+
+        // Review finding P2 regression: the audit broadcast must carry this box's real site,
+        // never the site-less overload.
+        verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
     }
 
     @Test
@@ -372,6 +434,9 @@ class KujiBoxServiceTest {
                 "activeCount must decrement by drawn quantity");
         assertEquals(3, tier.getDrawnCount(),
                 "drawnCount must increment by drawn quantity");
+
+        // Review finding P2 regression: the audit broadcast must carry this box's real site.
+        verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
     }
 
     @Test
@@ -415,6 +480,9 @@ class KujiBoxServiceTest {
                 "activeCount must be restored to pre-draw value");
         assertEquals(0, tier.getDrawnCount(),
                 "drawnCount must decrement and clamp at 0");
+
+        // Review finding P2 regression: the audit broadcast must carry this box's real site.
+        verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
     }
 
     // ===================== daily-payouts =====================
