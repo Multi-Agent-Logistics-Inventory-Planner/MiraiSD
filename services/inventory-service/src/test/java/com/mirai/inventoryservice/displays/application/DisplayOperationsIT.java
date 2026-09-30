@@ -7,13 +7,13 @@ import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
-import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.NewKujiBoxTierDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
+import com.mirai.inventoryservice.kuji.api.CloseKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.NewKujiBoxTierDTO;
+import com.mirai.inventoryservice.kuji.api.OpenKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
-import com.mirai.inventoryservice.repositories.KujiBoxRepository;
-import com.mirai.inventoryservice.services.KujiBoxService;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
+import com.mirai.inventoryservice.kuji.application.KujiBoxService;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
@@ -173,7 +173,7 @@ class DisplayOperationsIT {
                 .actorId(UUID.randomUUID())
                 .build();
 
-        KujiBoxResponseDTO opened = kujiBoxService.openBox(openRequest);
+        KujiBoxResponseDTO opened = kujiBoxService.openBox(site.getId(), openRequest);
         assertThat(opened.getMachineDisplayId()).isNotNull();
 
         MachineDisplay attachedAfterOpen = machineDisplayRepository.findById(opened.getMachineDisplayId()).orElseThrow();
@@ -183,7 +183,7 @@ class DisplayOperationsIT {
         CloseKujiBoxRequestDTO closeRequest = CloseKujiBoxRequestDTO.builder()
                 .actorId(openRequest.getActorId())
                 .build();
-        KujiBoxResponseDTO closed = kujiBoxService.closeBox(opened.getId(), closeRequest);
+        KujiBoxResponseDTO closed = kujiBoxService.closeBox(site.getId(), opened.getId(), closeRequest);
 
         assertThat(closed.getStatus()).isEqualTo(KujiBoxStatus.CLOSED);
         MachineDisplay attachedAfterClose = machineDisplayRepository.findById(opened.getMachineDisplayId()).orElseThrow();

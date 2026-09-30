@@ -8,16 +8,16 @@ import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.shipments.api.ReceiveShipmentRequestDTO;
 import com.mirai.inventoryservice.shipments.api.ShipmentItemRequestDTO;
 import com.mirai.inventoryservice.shipments.api.ShipmentRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.NewKujiBoxTierDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
+import com.mirai.inventoryservice.kuji.api.CloseKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.NewKujiBoxTierDTO;
+import com.mirai.inventoryservice.kuji.api.OpenKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.shipments.domain.Shipment;
-import com.mirai.inventoryservice.services.KujiBoxService;
+import com.mirai.inventoryservice.kuji.application.KujiBoxService;
 import com.mirai.inventoryservice.shipments.application.ShipmentService;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
@@ -190,7 +190,7 @@ class InventoryOperationsSharedCallerPathIT {
                 .isEmpty();
 
         UUID actorId = UUID.randomUUID();
-        KujiBoxResponseDTO opened = kujiBoxService.openBox(OpenKujiBoxRequestDTO.builder()
+        KujiBoxResponseDTO opened = kujiBoxService.openBox(site.getId(), OpenKujiBoxRequestDTO.builder()
                 .productId(parentProduct.getId())
                 .locationId(boxLocation.getId())
                 .actorId(actorId)
@@ -210,7 +210,7 @@ class InventoryOperationsSharedCallerPathIT {
 
         UUID tierId = opened.getTiers().get(0).getId();
 
-        kujiBoxService.closeBox(opened.getId(), CloseKujiBoxRequestDTO.builder()
+        kujiBoxService.closeBox(site.getId(), opened.getId(), CloseKujiBoxRequestDTO.builder()
                 .actorId(actorId)
                 .transferOutTargets(List.of(CloseKujiBoxRequestDTO.TierTransferDestination.builder()
                         .tierId(tierId)

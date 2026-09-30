@@ -1,8 +1,8 @@
 package com.mirai.inventoryservice.kuji.application;
 
 import com.mirai.inventoryservice.catalog.application.KujiBoxCleanupPort;
-import com.mirai.inventoryservice.repositories.KujiBoxRepository;
-import com.mirai.inventoryservice.repositories.KujiBoxTierRepository;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxTierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

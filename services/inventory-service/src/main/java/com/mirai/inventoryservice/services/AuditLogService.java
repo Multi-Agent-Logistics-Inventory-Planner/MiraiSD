@@ -185,6 +185,15 @@ public class AuditLogService {
     }
 
     /**
+     * Load a single audit log by id (e.g. for a caller that needs to mutate and re-save it).
+     * Added for .specs/phase-7-kuji-lootbox T-3, replacing KujiBoxService's direct
+     * AuditLogRepository access.
+     */
+    public java.util.Optional<AuditLog> findById(UUID id) {
+        return auditLogRepository.findById(id);
+    }
+
+    /**
      * Delete an audit log (used to discard a parent audit row when a multi-item action turned out
      * to produce no actual movements — i.e. orphan cleanup, never used for normal history pruning).
      */

@@ -302,6 +302,89 @@
 # (AC-3) -- the same `<module> -> shared` pattern already approved for `catalog`, `inventory`,
 # `shipments`, and `controllers` above. `shared` remains a pure leaf in this file (zero outgoing
 # edges), so this cannot create a new cycle.
+#
+# Thirteenth reviewed addition (2026-09-27, .specs/phase-7-kuji-lootbox/log.md T-3): mechanical move
+# of KujiBoxController, KujiBoxService, KujiBoxRepository/KujiBoxTierRepository, the KujiBox/
+# KujiBoxTier entities and their ten request/five response DTOs out of the legacy `controllers`/
+# `services`/`repositories`/`models`/`dtos` packages into `kuji.{api,application,infrastructure,
+# domain}`; and LootboxController, LootboxAdminController, LootboxService, LootboxAdminService,
+# LootboxTierLifecycle, CoinAdminDashboardService, CoinEconomyService, the Lootbox/LootboxTier/
+# LootboxPrize/LootboxPlay/CoinAdjustment/CoinEconomyConfig entities, their six repositories, and
+# their sixteen request/response DTOs into `lootbox.{api,application,infrastructure,domain}`. Same
+# pattern as the Fourth/Fifth/Sixth/Tenth/Eleventh moves above: every edge below already existed as
+# `<source> -> controllers`, `<source> -> services`, `<source> -> repositories`, `<source> ->
+# models`, or `<source> -> dtos` before the move; only the *target* package name changed for the
+# moved classes' own outgoing dependencies, not the underlying dependency itself:
+#   `kuji -> identity`     (KujiBoxService -> UserService -- was `services -> identity`, approved)
+#   `kuji -> inventory`    (InventoryOperations/InventoryQueries/StockMovement/LocationInventory --
+#                            was `services -> inventory`, approved)
+#   `kuji -> shared`       (KujiBoxController -> AuthorizedSiteContext -- was `controllers ->
+#                            shared`, approved)
+#   `kuji -> sites`        (LocationService/Location -- was `services -> sites`, approved)
+#   `kuji -> displays`     (KujiBox.machineDisplay, a pre-existing `@ManyToOne` association that
+#                            lived entirely inside `models.kuji` before this move -- rule 6.1.8
+#                            transitional-relationship carry-across, same character as the recorded
+#                            `models -> displays` Eleventh-addition precedent above, which explicitly
+#                            named this exact association and left its removal to this slice; not a
+#                            new cross-module JPA relationship)
+#   `lootbox -> identity`  (UserService/UserRepository/UserSiteMembershipRepository -- was `services
+#                            -> identity`, approved)
+#   `lootbox -> inventory` -- NOT added: confirmed by grep that no moved Lootbox class reaches
+#                            `inventory` (Lootbox has no product/inventory coupling, per T-1)
+#   `lootbox -> models`    (ReviewDailyCount (models.review), LocationType and other shared enums --
+#                            was `services -> models`, approved)
+#   `lootbox -> repositories` (ReviewDailyCountRepository, still legacy and owned by the future
+#                            notifications/reviews/audit slice per the baseline inventory's ownership
+#                            table -- was `services -> repositories`, approved)
+#   `lootbox -> exceptions` (LootboxException -- was `services -> exceptions`, approved)
+#   `lootbox -> sites`     (LocationService/SiteDirectory, used by the legacy-route MAIN resolution
+#                            in `LootboxController`/`LootboxAdminController` -- was `controllers ->
+#                            sites`, approved)
+#   `lootbox -> dtos`      (AdminCoinActivityDTO/CoinStatsResponseDTO/PlayerCoinRowDTO, still legacy
+#                            -- was `services -> dtos`, approved)
+#   `lootbox -> shared`    (LegacyMainSiteContextResolver.requireMain()'s AuthorizedSiteContext
+#                            return type, referenced without a source-level import the same way
+#                            `shipments -> shared` was documented from ShipmentController/
+#                            TrackingController above -- was `controllers -> shared`, approved)
+#   `config -> lootbox`    (LootboxConfig/LootboxDevSeed -> the moved Lootbox domain/repository
+#                            classes -- was `config -> models`/`config -> repositories`, both
+#                            already approved)
+# Two edges are genuinely new dependency *directions*, both mechanical fallout of classes leaving
+# the `services` package rather than any new coupling, matching the already-approved `shipments ->
+# services`/`displays -> services` precedent for the same shape:
+#   `kuji -> services`     (KujiBoxService now needs explicit imports for AuditLogService/
+#                            NotificationService/SupabaseBroadcastService, which same-package
+#                            visibility hid before the move)
+#   `lootbox -> services`  (LootboxService/LootboxAdminService/CoinAdminDashboardService/
+#                            CoinEconomyService now need the same explicit imports for the same
+#                            three classes)
+# One more genuinely new pair, both directions, from the DTO split: `UserCoinProfileResponseDTO`
+# stays in the legacy `dtos.responses` package (it also composes `CoinAdjustmentResponseDTO`, which
+# is unrelated to this move) but now composes the moved `LootboxBalanceResponseDTO`/
+# `LootboxPlayResponseDTO`, while `CoinAdminDashboardService` (moved into `lootbox.application`)
+# still reads `AdminCoinActivityDTO`/`CoinStatsResponseDTO`/`PlayerCoinRowDTO` from that same legacy
+# package (the `lootbox -> dtos` entry above). This makes `dtos <-> lootbox` a bidirectional pair,
+# the same already-accepted legacy-technical-package-tangle character as `models <-> inventory`,
+# `inventory <-> dtos`, `sites <-> models`, and `displays <-> services`/`displays <-> models` above --
+# not a new business-module cycle, since `dtos` is a legacy technical-layer package, not a real
+# domain module, and this same coupling already existed inside one undivided `dtos` package before
+# either DTO family moved:
+#   `dtos -> lootbox`      (UserCoinProfileResponseDTO -> LootboxBalanceResponseDTO/
+#                            LootboxPlayResponseDTO)
+# Pruned in the SAME review: `kuji -> repositories` only -- confirmed by grep that no remaining
+# `kuji/**` class imports anything from the legacy `repositories` package once `KujiBoxRepository`/
+# `KujiBoxTierRepository` themselves moved into `kuji.infrastructure`; `kuji.application.
+# KujiOpenBoxAdapter`/`KujiBoxCleanupAdapter`, which previously created this edge by depending on
+# those two repositories while they still lived outside `kuji`, now depend on same-module
+# infrastructure instead (AC-4's `kuji -> repositories` shrink target, met by this move rather than
+# needing separate facade work). `kuji -> catalog` is unchanged (Product/ProductRef/CatalogQueries/
+# CatalogEntityAccess/ProductService/ProductStockStateWriter, the same facade-only access already
+# reviewed for this edge). `kuji -> models` is unchanged, not pruned: `KujiBox`/`KujiBoxService`/
+# `KujiBoxRepository`/`KujiOpenBoxAdapter` still reach `models.enums.KujiBoxStatus`/`LocationType`/
+# `NotificationSeverity`/`NotificationType`/`StockMovementReason` and `models.audit.AuditLog`/
+# `Notification` -- the same shared-enum/legacy-audit-entity access already covered by the
+# pre-existing `services -> models`/`controllers -> models` lines, just under the moved classes' new
+# package name.
 analytics -> catalog
 analytics -> inventory
 analytics -> models
@@ -362,9 +445,24 @@ inventory -> utils
 inventory -> validation
 jobs -> repositories
 jobs -> services
+config -> lootbox
+dtos -> lootbox
 kuji -> catalog
+kuji -> displays
+kuji -> identity
+kuji -> inventory
 kuji -> models
-kuji -> repositories
+kuji -> services
+kuji -> shared
+kuji -> sites
+lootbox -> dtos
+lootbox -> exceptions
+lootbox -> identity
+lootbox -> models
+lootbox -> repositories
+lootbox -> services
+lootbox -> shared
+lootbox -> sites
 models -> catalog
 models -> displays
 models -> identity

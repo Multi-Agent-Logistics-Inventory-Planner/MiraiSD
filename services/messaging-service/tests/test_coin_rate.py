@@ -52,10 +52,13 @@ def test_get_review_coin_rate_defaults_to_1_when_row_missing():
     assert repo.get_review_coin_rate() == 1
 
 
+_MAIN_SITE_ID = "00000000-0000-0000-0000-0000000000aa"
+
+
 def test_increment_daily_count_default_rate_is_1():
     repo, _engine, conn = _build_repo()
     with patch.object(repo, "get_employee_id_by_name", return_value="00000000-0000-0000-0000-000000000001"):
-        ok = repo.increment_daily_count("Alice", date(2026, 5, 20))
+        ok = repo.increment_daily_count("Alice", date(2026, 5, 20), _MAIN_SITE_ID)
     assert ok is True
     _query, params = conn.execute.call_args.args
     assert params["rate"] == 1
@@ -64,7 +67,7 @@ def test_increment_daily_count_default_rate_is_1():
 def test_increment_daily_count_applies_rate():
     repo, _engine, conn = _build_repo()
     with patch.object(repo, "get_employee_id_by_name", return_value="00000000-0000-0000-0000-000000000001"):
-        ok = repo.increment_daily_count("Alice", date(2026, 5, 20), rate=3)
+        ok = repo.increment_daily_count("Alice", date(2026, 5, 20), _MAIN_SITE_ID, rate=3)
     assert ok is True
     _query, params = conn.execute.call_args.args
     assert params["rate"] == 3
@@ -151,6 +154,7 @@ def test_kafka_message_carries_coin_rate_through_to_increment():
         }
     ]
     repo.create_review.return_value = "00000000-0000-0000-0000-000000000abc"
+    repo.get_review_site_id.return_value = _MAIN_SITE_ID
 
     processor = ReviewProcessor(repo=repo)
     event = ReviewProcessor.parse_kafka_message({
@@ -162,6 +166,7 @@ def test_kafka_message_carries_coin_rate_through_to_increment():
             "reviewer_name": "Customer",
             "published_at": "2026-05-20T10:00:00",
             "coin_rate": 4,
+            "site_id": _MAIN_SITE_ID,
         },
     })
     assert event is not None
@@ -170,8 +175,11 @@ def test_kafka_message_carries_coin_rate_through_to_increment():
     processor.process_review(event)
 
     repo.increment_daily_count.assert_called_once()
-    _name, _date = repo.increment_daily_count.call_args.args
+    _name, _date, site_id = repo.increment_daily_count.call_args.args
+    assert site_id == _MAIN_SITE_ID
     assert repo.increment_daily_count.call_args.kwargs["rate"] == 4
+    # Site travelled on the event, so the fallback DB lookup was never needed.
+    repo.get_review_site_id.assert_not_called()
 
 
 def test_kafka_message_defaults_coin_rate_to_1_when_missing():

@@ -44,7 +44,7 @@ class DisplaysFacadeCallerSetTest {
 
     private static Set<String> expectedOperationsOrigins() {
         Set<String> expected = new HashSet<>();
-        expected.add("com.mirai.inventoryservice.services.KujiBoxService");
+        expected.add("com.mirai.inventoryservice.kuji.application.KujiBoxService");
         return expected;
     }
 

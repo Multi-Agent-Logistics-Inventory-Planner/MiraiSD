@@ -2,7 +2,7 @@ package com.mirai.inventoryservice.kuji.application;
 
 import com.mirai.inventoryservice.catalog.application.OpenKujiBoxPort;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
-import com.mirai.inventoryservice.repositories.KujiBoxRepository;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

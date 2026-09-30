@@ -34,6 +34,7 @@ import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.repositories.ReviewRepository;
 import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
+import com.mirai.inventoryservice.sites.application.SiteDirectory;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.sites.infrastructure.StorageLocationRepository;
@@ -93,6 +94,7 @@ public class DevSeedController {
     private final StockMovementRepository stockMovementRepository;
     private final AuditLogRepository auditLogRepository;
     private final SiteRepository siteRepository;
+    private final SiteDirectory siteDirectory;
     private final StorageLocationRepository storageLocationRepository;
     private final LocationRepository locationRepository;
     private final LocationInventoryRepository locationInventoryRepository;
@@ -827,6 +829,12 @@ public class DevSeedController {
      */
     @PostMapping("/seed/reviews")
     public ResponseEntity<Map<String, Object>> seedReviews() {
+        // review_daily_counts.site_id is NOT NULL as of the phase-7 kuji/lootbox
+        // migration; dev-seeded data is always attributed to the MAIN site.
+        UUID siteId = siteDirectory.findByCode(DEFAULT_SITE_CODE)
+            .orElseThrow(() -> new RuntimeException("MAIN site should exist"))
+            .id();
+
         // Sample reviewer names for generated reviews
         String[] reviewerNames = {
             "John D.", "Sarah M.", "Mike R.", "Emily K.", "David L.",
@@ -918,6 +926,7 @@ public class DevSeedController {
 
                 // Create daily count
                 ReviewDailyCount dailyCount = ReviewDailyCount.builder()
+                    .siteId(siteId)
                     .user(user)
                     .date(currentDate)
                     .reviewCount(reviewCount)
