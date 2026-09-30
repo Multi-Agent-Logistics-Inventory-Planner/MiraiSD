@@ -38,7 +38,7 @@ Migrations use expand, backfill to `MAIN`, verify, constrain and only then enfor
 | `lootbox_tiers` | Through lootbox | Derived-site | Lootbox | Enforce parent ownership |
 | `lootbox_prizes` | Through lootbox/tier | Derived-site | Lootbox | Enforce parent ownership |
 | `lootbox_plays` | Through lootbox and user | Site-owned | Lootbox | Persist site for audit/reporting |
-| `coin_adjustments` | User/global economy oriented | Site-owned event | Lootbox | Persist originating site; balance policy remains global unless business decides otherwise |
+| `coin_adjustments` | User/site-of-action | Site-owned event | Lootbox | Persist originating site; balance is per-site (site-of-action), confirmed 2026-09-27 — see `.specs/phase-7-kuji-lootbox/log.md` |
 | `coin_economy_config` | Singleton | Global | Lootbox | Keep global initially |
 | `notifications` | Operational entity references | Site-owned | Notifications | Add/backfill/require site; user-specific delivery remains recipient scoped |
 | `reviews` | User/review source | Site-owned | Reviews | Persist store attribution or reject if source cannot identify a site |

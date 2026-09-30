@@ -58,6 +58,15 @@ public class KujiBox {
     @Builder.Default
     private KujiBoxStatus status = KujiBoxStatus.OPEN;
 
+    /**
+     * Raw UUID, not a JPA relation, to avoid a new kuji -> sites module edge
+     * (.specs/phase-7-kuji-lootbox T-2). Nullable until V78 constrains it; every new box must
+     * resolve this from the authorized site context, never a default, and it must always match
+     * {@link #location}'s site (enforced in the database by the V78 consistency trigger).
+     */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @Column(length = 120)
     private String label;
 

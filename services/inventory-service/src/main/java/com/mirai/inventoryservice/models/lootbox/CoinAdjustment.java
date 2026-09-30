@@ -50,6 +50,14 @@ public class CoinAdjustment {
     @Column(name = "granted_by_user_id", insertable = false, updatable = false)
     private UUID grantedByUserId;
 
+    /**
+     * Site of action at write time, per the user-confirmed coin-balance policy
+     * (.specs/phase-7-kuji-lootbox log.md): per-site, not per-user-home-site. Every new
+     * adjustment must resolve this from the admin's authorized site context, never a default.
+     */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

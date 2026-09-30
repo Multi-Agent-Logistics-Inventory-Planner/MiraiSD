@@ -96,6 +96,14 @@ public class LootboxPlay {
     @Column(name = "idempotency_key")
     private String idempotencyKey;
 
+    /**
+     * Inherited from {@link #lootbox}'s site at play time (.specs/phase-7-kuji-lootbox T-2).
+     * NOT NULL as of V79 - {@link #lootbox} also becomes NOT NULL in that migration, since the
+     * 2026-09-27 pre-flight check found zero existing plays with a null lootbox_id.
+     */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @CreationTimestamp
     @Column(name = "played_at", updatable = false)
     private OffsetDateTime playedAt;

@@ -43,6 +43,14 @@ public class LootboxPrize {
     @Column(name = "tier_id", insertable = false, updatable = false)
     private UUID tierId;
 
+    /**
+     * Inherited from {@link #tier}'s site (.specs/phase-7-kuji-lootbox T-2). Backed by a
+     * composite (tier_id, site_id) FK as of V78, closing the path where an unscoped tier lookup
+     * could repoint a prize into another site's crate.
+     */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @NotBlank
     @Column(nullable = false)
     private String name;

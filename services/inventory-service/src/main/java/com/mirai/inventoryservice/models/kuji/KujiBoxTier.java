@@ -58,6 +58,10 @@ public class KujiBoxTier {
     @Column(name = "linked_product_id", insertable = false, updatable = false)
     private UUID linkedProductId;
 
+    /** Inherited from {@link #box}'s site (.specs/phase-7-kuji-lootbox T-2); see KujiBox.siteId. */
+    @Column(name = "site_id")
+    private UUID siteId;
+
     /** Slips currently winnable / on a slip in the box. */
     @NotNull
     @Column(name = "active_count", nullable = false)
