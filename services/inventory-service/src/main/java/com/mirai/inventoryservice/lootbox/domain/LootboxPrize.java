@@ -48,7 +48,7 @@ public class LootboxPrize {
      * composite (tier_id, site_id) FK as of V78, closing the path where an unscoped tier lookup
      * could repoint a prize into another site's crate.
      */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @NotBlank

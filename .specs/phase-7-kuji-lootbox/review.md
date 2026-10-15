@@ -44,6 +44,15 @@ below were verified against the actual code and fixed in this session rather tha
   artifacts). Fixed: this file and `validation.md` now reflect the actual implementation and the
   real validation run below.
 
+- [Spec] `KujiBoxTier` rows were written without `site_id` in both `KujiBoxService.openBox` and
+  `addTier` — found by running the app against a migrated database, not by the independent review
+  — **act on** (AC-1, AC-2). V78 makes `kuji_box_tiers.site_id` NOT NULL, so every open-box with
+  tiers and every add-tier returned 500 on a migrated database. Fixed: `.siteId(box.getSiteId())`
+  on both builders. Regression test: `KujiBoxTierSiteIT` (2 tests). Root-cause fix for the test
+  gap: the eight V78/V79-constrained `site_id` columns are now `nullable = false` on their
+  entities so the H2 test schema enforces the same constraint; the one stale fixture this exposed
+  (`StockMovementRepositoryIT`) now sets the site.
+
 ## Residual risk (resolved)
 
 - `CatalogEntityAccessCallerSetTest.catalogEntityAccessCallersMatchT0Inventory` and

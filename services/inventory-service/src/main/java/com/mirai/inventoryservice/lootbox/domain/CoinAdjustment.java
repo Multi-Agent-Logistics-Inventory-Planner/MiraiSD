@@ -55,7 +55,7 @@ public class CoinAdjustment {
      * (.specs/phase-7-kuji-lootbox log.md): per-site, not per-user-home-site. Every new
      * adjustment must resolve this from the admin's authorized site context, never a default.
      */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @CreationTimestamp
